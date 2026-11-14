@@ -1,0 +1,31 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-outfit-layered",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/cargo-pants"
+    },
+    {
+      "id": "axcenity/hair-bob"
+    },
+    {
+      "id": "axcenity/cropped-jacket"
+    },
+    {
+      "id": "axcenity/sneakers"
+    },
+    {
+      "id": "axcenity/tee"
+    },
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

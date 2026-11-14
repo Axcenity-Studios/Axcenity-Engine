@@ -1,0 +1,642 @@
+{
+  "anti_aliasing": "TAA",
+  "characters": [
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-blend-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-blend-body-default"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-feminine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-feminine-body-default"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-feminine-body-heavy",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-feminine-body-heavy"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-feminine-body-slim",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-feminine-body-slim"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-feminine-outfit-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Hair_Swept": 0,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 0,
+          "Teeth": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        }
+      },
+      "name": "stylized-feminine-outfit-default"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-feminine-outfit-layered",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Bob": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Hair_Bob": 0,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Bob": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Bob": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Bob": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-feminine-outfit-layered"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-masculine-body-default"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-body-heavy",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-masculine-body-heavy"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-body-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-masculine-body-muscular"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-masculine-body-shortest"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Teeth": 0,
+          "Underwear_Briefs": 0,
+          "Underwear_Top": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Briefs": 1,
+          "Underwear_Top": 1
+        }
+      },
+      "name": "stylized-masculine-body-tallest"
+    },
+    {
+      "base": "axcenity/stylized",
+      "description": "stylized-masculine-outfit-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 0,
+          "Eyes": 0,
+          "Hair_Swept": 0,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 0,
+          "Teeth": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "Eyes": 2,
+          "Hair_Swept": 1,
+          "Jacket_Cropped": 0,
+          "Pants_Cargo": 0,
+          "Shirt_Tee": 0,
+          "Shoes_Sneakers": 1,
+          "Teeth": 2
+        }
+      },
+      "name": "stylized-masculine-outfit-default"
+    }
+  ],
+  "frames": 48,
+  "lights": [
+    "studio",
+    "hard"
+  ],
+  "quality": "High",
+  "size": [
+    1280,
+    720
+  ],
+  "stance": "rest",
+  "views": [
+    "front",
+    "three-quarter",
+    "side",
+    "back",
+    "face"
+  ]
+}

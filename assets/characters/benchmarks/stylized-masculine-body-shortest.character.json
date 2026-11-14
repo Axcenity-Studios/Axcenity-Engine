@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-body-shortest",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0,
+    "height": 0.5,
+    "leg_length": 0.5
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

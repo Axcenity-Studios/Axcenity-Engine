@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-feminine-face-nose-bridge-min",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 1,
+    "nose_bridge": -1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

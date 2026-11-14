@@ -7,7 +7,7 @@ crates: [anim, assets, render]
 source: [crates/assets/src/model/morph.rs, crates/anim/src/face.rs, crates/anim/src/face_play.rs, crates/anim/src/face_world.rs, crates/core/src/face.rs, crates/assets/src/face_profile.rs, crates/assets/src/face_expression.rs, crates/script/src/face.rs, crates/anim/src/lip_sync.rs, crates/assets/src/lip_sync.rs, crates/anim/src/lib.rs, crates/anim/src/retarget.rs, crates/anim/src/retarget/roles.rs, crates/anim/src/retarget/check.rs, crates/anim/src/retarget/profile.rs, crates/assets/src/rig_definition.rs, crates/anim/src/animators.rs, crates/anim/src/clip.rs, crates/anim/src/controller.rs, crates/anim/src/blend_space.rs, crates/anim/src/ik.rs, crates/anim/src/ik_control.rs, crates/anim/src/feet.rs, crates/anim/src/ragdoll.rs, crates/anim/src/sequence.rs, crates/anim/src/easing.rs, crates/assets/src/model/rig.rs, crates/assets/src/model/identity.rs, crates/render/src/renderer/skinning.rs]
 docs: [docs/rendering/animation.md, docs/scripting/api-animation.md, docs/project/animation-files.md, docs/project/sequences.md, crates/anim/CLAUDE.md]
 verified: 2026-11-14
-verified_commit: b8535483
+verified_commit: f903964e
 tags: [system/animation]
 ---
 

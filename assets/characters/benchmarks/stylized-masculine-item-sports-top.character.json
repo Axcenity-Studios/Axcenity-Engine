@@ -1,0 +1,13 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-item-sports-top",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

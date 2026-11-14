@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "stylized-blend-body-default",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0.5
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

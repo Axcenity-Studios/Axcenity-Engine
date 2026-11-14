@@ -19,7 +19,7 @@ How every milestone is tested, what runs where, and the tests that exist. Visual
 | Engine agreement | The manifests describe what the engine ships (sockets, body sliders, parts, default outfit); format 1 files resolve to what the workspace shows | `project` `default_humanoid::tests::the_character_data_manifests_describe_the_default_humanoid`; `editor` `character_workspace::tests::a_saved_look_migrates_to_the_same_parts_and_shapes` | `cargo nextest run -p axcenity-project -p axcenity-editor` |
 | Runtime | A description applied in the player: parts, identity baked into derived models, followers taking live shapes, bone offsets, attributes, materials, kept descriptions applied again; game scripts calling the `HumanoidDescription` API | `player` `default_humanoid_tests/description.rs` and `description_lua.rs`; `gameplay` `description_tests.rs`; `assets` `model::identity`, `derived`; `avatar` `tests::resolving` | `cargo nextest run -p axcenity-player description`, `-p axcenity-gameplay`, `-p axcenity-assets identity derived` |
 | Geometry QA | Poke-through, waist gaps, layer order, joint volume, eyelid closure, teeth and lips, self-intersection at slider extremes | `assets/characters/<family>/qa/measure.py` (Blender, `bpy`) | Locally where `bpy` is installed (below) |
-| Visual | Benchmark sheets, in Blender and in the engine *(CO2)* | `render_baseline.py`; the in-engine capture | [visual-qa.md](visual-qa.md) |
+| Visual | Benchmark sheets, in Blender and in the engine | `render_baseline.py`; the in-engine capture (`player`'s `character_capture.rs`, the `capture_characters` tool) | [visual-qa.md](visual-qa.md) |
 | UI | Walkthroughs: open, edit, undo, redo, save, reopen; every control changes the character; drawing snapshots | `editor` `character_workspace/tests.rs`, `app/character_workspace.rs` | `AXCENITY_SNAPSHOTS=<folder> cargo nextest run -p axcenity-editor character` |
 | Performance | GPU timings per pass, the character budget, a crowd | `FramePass` timers; `docs/benchmarks.md` | On the reference PC, pinned to one CCD |
 
@@ -75,6 +75,10 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 | Eyeball front uncovered in a full blink | 20–23% | 0% |
 | Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 |
 | Face vertices above the head joint carrying `Neck` weight | 911 | 0 |
+
+## Tests that exist (CO2)
+
+`player` `character_capture::the_same_description_captures_identical_pictures_and_every_view_is_drawn`; `avatar` `every_benchmark_character_is_sound`.
 
 ## Tests that exist (CO3)
 

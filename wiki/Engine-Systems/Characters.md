@@ -7,7 +7,7 @@ crates: [character, gameplay, avatar, assets]
 source: [crates/character/src/lib.rs, crates/character/src/seat.rs, crates/character/src/rig.rs, crates/gameplay/src/description.rs, crates/gameplay/src/description_system.rs, crates/avatar/src/resolve.rs, crates/assets/src/model/identity.rs, crates/assets/src/derived.rs, crates/core/src/material_values.rs, crates/scene/src/material.rs, crates/project/src/character_library.rs]
 docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md, docs/development/character-studio/architecture.md, crates/gameplay/CLAUDE.md]
 verified: 2026-11-14
-verified_commit: b8535483
+verified_commit: f903964e
 tags: [system/character, gameplay]
 ---
 
@@ -73,7 +73,7 @@ flowchart LR
 
 ## Testing
 
-`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset). The Character Runtime: `avatar` `tests::resolving`; `assets` `model::identity::tests` and `derived::tests`; `crates/gameplay/src/description_tests.rs` (changing a description, and scripts doing it on both sides); the player's `default_humanoid_tests/description.rs` (parts worn, identity baked, eyes carried by the frame's bones, body sliders, material values, a kept description applied again) and `default_humanoid_tests/description_lua.rs`; the editor's `a_character_file_applied_in_a_game_matches_the_workspaces_preview` (the applier and Character Studio's preview put every corner in the same place).
+`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset). The Character Runtime: `avatar` `tests::resolving`; `assets` `model::identity::tests` and `derived::tests`; `crates/gameplay/src/description_tests.rs` (changing a description, and scripts doing it on both sides); the player's `default_humanoid_tests/description.rs` (parts worn, identity baked, eyes carried by the frame's bones, body sliders, material values, a kept description applied again) and `default_humanoid_tests/description_lua.rs`; the editor's `a_character_file_applied_in_a_game_matches_the_workspaces_preview` (the applier and Character Studio's preview put every corner in the same place). Visual QA: `crates/player/src/character_capture.rs` draws a character from a description file with the player's renderer (five fixed cameras, two lighting presets; the `capture_characters` tool), the same input giving the same pictures; the benchmark characters are `assets/characters/benchmarks/` (`docs/development/character-studio/visual-qa.md`).
 
 ## Limitations
 

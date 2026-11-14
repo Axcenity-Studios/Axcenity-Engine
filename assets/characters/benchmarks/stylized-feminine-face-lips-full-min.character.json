@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-feminine-face-lips-full-min",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 1,
+    "lips_full": -1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

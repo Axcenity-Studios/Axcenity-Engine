@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-blend-body-slim",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": -1,
+    "frame": 0.5
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}
