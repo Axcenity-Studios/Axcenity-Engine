@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-14 | Character Data (new), ADR-0032 to ADR-0037, ADR-0030 superseded, ADR index, System inventory, System dependencies, File formats, Characters, Roadmap | Character Studio overhaul Stage 2 (CO1): the `avatar` crate's contracts, the stylized humanoid's manifests, six ADRs | Claude |
 | 2026-11-14 | Roadmap | Character Studio overhaul approved; its plan moves to `plans/axcenity-engine-character-studio.md` | Claude |
 | 2026-11-14 | Roadmap | Character Studio overhaul, Stage 1: research, audit, baseline renders and the proposed plan (`docs/development/character-studio/`) | Claude |
 | 2026-11-14 | ADR-0031, ADR index, roadmap, Specialized editors | CS2: the Character Studio workspace, opened from the start screen with no project | Claude |

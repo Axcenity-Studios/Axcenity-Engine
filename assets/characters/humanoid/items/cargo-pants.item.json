@@ -1,0 +1,47 @@
+{
+  "format_version": 1,
+  "id": "axcenity/cargo-pants",
+  "label": "Cargo pants",
+  "kind": "garment",
+  "slot": "bottom",
+  "layer": 1,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/stylized"
+  ],
+  "model": {
+    "file": "../HumanoidParts.glb",
+    "object": "AxcenityHumanoid/Pants_Cargo"
+  },
+  "hides": [
+    "hips",
+    "thighs_top",
+    "thighs_low",
+    "shins_top",
+    "shins_low"
+  ],
+  "materials": [
+    {
+      "name": "Trousers",
+      "shading": "cloth"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Frame_Feminine",
+      "Build_Heavy",
+      "Build_Slim",
+      "Build_Muscular"
+    ]
+  },
+  "tags": [
+    "casual",
+    "joggers",
+    "pockets"
+  ],
+  "source": {
+    "author": "Axcenity Engine contributors",
+    "licence": "CC0-1.0"
+  }
+}

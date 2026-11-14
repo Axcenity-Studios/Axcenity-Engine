@@ -21,5 +21,9 @@ zip.workspace = true
 zstd.workspace = true
 axcenity-workspace-hack.workspace = true
 
+[dev-dependencies]
+# The default humanoid's Character Data manifest against these constants.
+axcenity-avatar.workspace = true
+
 [lints]
 workspace = true

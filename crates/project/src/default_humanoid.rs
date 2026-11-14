@@ -683,6 +683,70 @@ mod tests {
         );
     }
 
+    /// The stylized base model's Character Data (`avatar`, Character Studio
+    /// overhaul CO1, made by `assets/characters/humanoid/manifests.py`)
+    /// describes this default humanoid: the same parts file, sockets, body
+    /// sliders, parts and default outfit.
+    #[test]
+    fn the_character_data_manifests_describe_the_default_humanoid() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+        let (library, _, problems) = axcenity_avatar::Library::read(&root);
+        assert!(problems.is_empty(), "{problems:?}");
+        let base = library.base(axcenity_avatar::V1_BASE).unwrap();
+        let file = library.path_of(&base.id, &base.model.file).unwrap();
+        assert_eq!(fs::read(root.join(&file)).unwrap(), DEFAULT_HUMANOID_PARTS);
+        let sockets: Vec<(&str, &str)> = base
+            .sockets
+            .iter()
+            .map(|socket| (socket.name.as_str(), socket.bone.as_str()))
+            .collect();
+        assert_eq!(sockets, HUMANOID_SOCKETS);
+        let attributes: Vec<&str> = base
+            .parameters
+            .iter()
+            .flat_map(|parameter| parameter.attributes.iter())
+            .map(|driver| driver.attribute.as_str())
+            .collect();
+        assert_eq!(attributes, axcenity_anim::BODY_SLIDERS);
+        // Every object of the parts file is the body, one of its always-worn
+        // parts or an item's model, and nothing else.
+        let mut mesh_ids: Vec<String> = std::iter::once(&base.model.body)
+            .chain(&base.model.parts)
+            .map(|object| format!("{DEFAULT_HUMANOID_PARTS_PATH}#{object}"))
+            .collect();
+        for item in library.items.values() {
+            for model in item.models() {
+                assert_eq!(library.path_of(&item.id, &model.file).unwrap(), file);
+                let object = model.object.as_deref().unwrap();
+                mesh_ids.push(format!("{DEFAULT_HUMANOID_PARTS_PATH}#{object}"));
+            }
+        }
+        mesh_ids.sort();
+        let mut parts: Vec<String> = HUMANOID_PARTS
+            .iter()
+            .map(|part| humanoid_part_mesh_id(part))
+            .collect();
+        parts.sort();
+        assert_eq!(mesh_ids, parts);
+        // The default outfit is the customization file's.
+        let custom: serde_json::Value =
+            serde_json::from_str(DEFAULT_HUMANOID_CUSTOMIZATION).unwrap();
+        let part_of = |id: &str| {
+            let (part, _) = axcenity_avatar::V1_ITEMS
+                .iter()
+                .find(|(_, item)| *item == id)
+                .unwrap();
+            serde_json::Value::from(*part)
+        };
+        let defaults: Vec<serde_json::Value> =
+            base.defaults.items.iter().map(|id| part_of(id)).collect();
+        assert_eq!(defaults[0], custom["default"]["hair"]);
+        assert_eq!(
+            serde_json::Value::from(defaults[1..].to_vec()),
+            custom["default"]["outfit"]
+        );
+    }
+
     #[test]
     fn a_modular_character_leads_its_parts_from_the_body() {
         let mut world = World::new();

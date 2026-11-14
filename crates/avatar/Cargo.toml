@@ -1,0 +1,19 @@
+[package]
+name = "axcenity-avatar"
+description = "Axcenity Character Data: the character description, base model and item manifests, the catalogue, their checks and migrations."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+# Character Data is shared by Character Studio (editor) and the Character
+# Runtime (player, server): no renderer, window, UI or Instance code here.
+[dependencies]
+axcenity-assets.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+axcenity-workspace-hack.workspace = true
+
+[lints]
+workspace = true

@@ -61,7 +61,6 @@ tracing = { version = "0.1" }
 tracing-core = { version = "0.1", default-features = false, features = ["std"] }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
 uuid = { version = "1", features = ["serde", "v4"] }
-zeroize = { version = "1" }
 zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 
 [build-dependencies]

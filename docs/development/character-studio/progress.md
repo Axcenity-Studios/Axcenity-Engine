@@ -6,12 +6,23 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 |---|---|---|
 | 1. Research and audit | **Done, approved** (2026-11-14) | [research.md](research.md), [audit.md](audit.md), [the plan](../../../plans/axcenity-engine-character-studio.md) (decisions in its section 0); baseline in [baseline/](baseline/) by `assets/characters/humanoid/qa/` |
 | Before Stage 2 | **Done** (2026-11-14) | #401 fixed (waist hole, clothing intersections), tested and merged; #402 merged; #400 brought onto main and merged; the full suite run, its Windows-only editor failures fixed in #404 (see the log) |
-| 2. Architecture and contracts (CO1) | Not started | `architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md` and the ADRs |
-| 3. Foundation (CO2–CO6) | Not started | |
+| 2. Architecture and contracts (CO1) | **Done** (2026-11-14) | [architecture.md](architecture.md), [agent-assignments.md](agent-assignments.md), [testing.md](testing.md), [visual-qa.md](visual-qa.md), [dependencies.md](dependencies.md); ADR-0032 to ADR-0037; the `avatar` crate; the stylized humanoid's manifests (see the log) |
+| 3. Foundation (CO2–CO6) | Next | Waits for Paul's go-ahead |
 | 4. Parallel specialists (CO7–CO12) | Not started | |
 | 5. Integration (CO13) | Not started | |
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
+
+## 2026-11-14: Stage 2 (CO1), architecture and contracts
+
+- **Agents:** the lead alone, as the plan assigns CO1; no specialist started.
+- **Contracts:** [architecture.md](architecture.md) fixes the three layers (Character Studio, Character Runtime, Character Data), the seven pipeline systems and their owners (addition A2), the description (format 2, with A3 field by field), the base model and item manifests, what parameters mean (spans, corners, constraints, regions; identity against live shapes), fitting methods, the material parameter set per shading model, the groom file's binary layout, the skeleton's additive twist bones, the face's layers (addition A4), how parts take the body's shapes, the content library and catalogue, and the Rust and Lua signatures for CO3 and CO9. [agent-assignments.md](agent-assignments.md), [testing.md](testing.md) (with thresholds agreed for Stage 3), [visual-qa.md](visual-qa.md) (the A1 benchmark set) and [dependencies.md](dependencies.md) beside it.
+- **Decisions:** ADR-0032 (semi-realistic default family; supersedes ADR-0030's art direction), ADR-0033 (one description, a parameter manifest), ADR-0034 (content library and catalogue), ADR-0035 (binding and region hiding; supersedes ADR-0030's masks), ADR-0036 (shading models, modulating values), ADR-0037 (one groom, three tiers). ADR-0030 is marked superseded; its stylized asset is still shipped.
+- **Code:** `crates/avatar` (new, `axcenity-avatar`, depends on `assets` only): `Description` (format 2, unknown fields kept, format 1 migrated), `BaseManifest`, `ItemManifest`, `Catalogue`, `Library`, `ShadingModel` and material values, checks returning every `Problem`, `parameter_values`, `body_shape_weights`, `span`. `assets/characters/humanoid/manifests.py` (plain Python, run by `build.py` after its JSON) writes `Humanoid.base.json` (`axcenity/stylized`: 31 parameters, 10 regions, 7 slots, 7 sockets, 8 materials) and twelve `items/*.item.json`; `assets/characters/catalogue.py` writes `catalogue.json`. **No behaviour change:** nothing in the engine reads them yet; the workspace still writes format 1.
+- **Red, then green:** the tests were written against stubs (`todo!()`) before the logic and before the manifests existed. First run: `35 tests run: 11 passed, 24 failed`. The 11 that passed only exercised serde-derived round trips and the ID helpers, which the derives make true from the start; every migration, check, resolution and shipped-library test failed. After the code and the manifests: `35 tests run: 35 passed`. A deliberate wrong shape name in `Humanoid.base.json` (`Build_Muscly`) made `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` fail with `parameters[2].shapes[0]: the body has no shape`; the file was regenerated.
+- **Agreement tests** (written after the manifests, so not seen red): `project` `the_character_data_manifests_describe_the_default_humanoid` (the manifest's parts file is the embedded one; sockets are `HUMANOID_SOCKETS`; attribute drivers are `anim::BODY_SLIDERS`; every object of the parts file is the body, a face part or an item; the default outfit matches); `editor` `a_saved_look_migrates_to_the_same_parts_and_shapes` (every preset and a mixed look: same parts, same body shape weights as `Look::shape_weights`).
+- **Dependencies added:** none (`serde`, `serde_json`, `thiserror` already pinned). `cargo hakari generate` also removed a stale `zeroize` line from `crates/workspace-hack`.
+- **Visual QA:** no asset or renderer change, so no new renders; the baseline stands.
 
 ## 2026-11-14: the plan moves to `plans/`
 

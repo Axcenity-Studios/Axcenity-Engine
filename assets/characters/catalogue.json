@@ -1,0 +1,195 @@
+{
+  "format_version": 1,
+  "bases": [
+    {
+      "id": "axcenity/stylized",
+      "manifest": "humanoid/Humanoid.base.json",
+      "label": "Stylized",
+      "family": "stylized"
+    }
+  ],
+  "items": [
+    {
+      "id": "axcenity/briefs",
+      "manifest": "humanoid/items/briefs.item.json",
+      "label": "Briefs",
+      "kind": "garment",
+      "slot": "underwear_bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
+      "id": "axcenity/cargo-pants",
+      "manifest": "humanoid/items/cargo-pants.item.json",
+      "label": "Cargo pants",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "casual",
+        "joggers",
+        "pockets"
+      ]
+    },
+    {
+      "id": "axcenity/cropped-jacket",
+      "manifest": "humanoid/items/cropped-jacket.item.json",
+      "label": "Cropped jacket",
+      "kind": "garment",
+      "slot": "outerwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "casual",
+        "cropped",
+        "zip",
+        "ribbed"
+      ]
+    },
+    {
+      "id": "axcenity/hair-bob",
+      "manifest": "humanoid/items/hair-bob.item.json",
+      "label": "Bob",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "medium",
+        "straight"
+      ]
+    },
+    {
+      "id": "axcenity/hair-buzz",
+      "manifest": "humanoid/items/hair-buzz.item.json",
+      "label": "Buzz",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "very-short"
+      ]
+    },
+    {
+      "id": "axcenity/hair-crop",
+      "manifest": "humanoid/items/hair-crop.item.json",
+      "label": "Crop",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "short"
+      ]
+    },
+    {
+      "id": "axcenity/hair-long",
+      "manifest": "humanoid/items/hair-long.item.json",
+      "label": "Long",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "long",
+        "straight"
+      ]
+    },
+    {
+      "id": "axcenity/hair-ponytail",
+      "manifest": "humanoid/items/hair-ponytail.item.json",
+      "label": "Ponytail",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "long",
+        "tied"
+      ]
+    },
+    {
+      "id": "axcenity/hair-swept",
+      "manifest": "humanoid/items/hair-swept.item.json",
+      "label": "Swept",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "short",
+        "straight",
+        "side-part"
+      ]
+    },
+    {
+      "id": "axcenity/sneakers",
+      "manifest": "humanoid/items/sneakers.item.json",
+      "label": "Sneakers",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "casual",
+        "trainers"
+      ]
+    },
+    {
+      "id": "axcenity/sports-top",
+      "manifest": "humanoid/items/sports-top.item.json",
+      "label": "Sports top",
+      "kind": "garment",
+      "slot": "underwear_top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "underwear",
+        "athletic"
+      ]
+    },
+    {
+      "id": "axcenity/tee",
+      "manifest": "humanoid/items/tee.item.json",
+      "label": "T-shirt",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/stylized"
+      ],
+      "tags": [
+        "casual",
+        "cotton",
+        "short-sleeve"
+      ]
+    }
+  ]
+}

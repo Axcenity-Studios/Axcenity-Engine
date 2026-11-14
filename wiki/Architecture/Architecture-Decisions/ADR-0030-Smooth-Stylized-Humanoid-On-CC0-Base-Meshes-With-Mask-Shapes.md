@@ -2,10 +2,10 @@
 title: "ADR-0030: The default humanoid: smooth stylized, built on CC0 base meshes, clothing masks as blend shapes"
 type: adr
 adr: 30
-adr_status: Accepted
+adr_status: Superseded
 date: 2026-11-14
 supersedes:
-superseded_by:
+superseded_by: ADR-0032 (art direction), ADR-0035 (clothing masks)
 affects: [assets, project, anim, editor]
 source: [assets/characters/humanoid/build.py, assets/characters/humanoid/bodyshapes.py, crates/project/src/default_humanoid.rs]
 docs: [docs/research/character-studio.md, docs/research/default-humanoid.md, assets/characters/humanoid/README.md]
@@ -14,7 +14,7 @@ tags: [adr, characters, assets]
 
 # ADR-0030: The default humanoid: smooth stylized, built on CC0 base meshes, clothing masks as blend shapes
 
-- **Status:** Accepted
+- **Status:** Superseded (2026-11-14, Paul's overhaul decisions) by [ADR-0032](ADR-0032-Semi-Realistic-Default-Character-Family.md) (semi-realistic is the default family; this stylized humanoid stays as a second family) and [ADR-0035](ADR-0035-Clothing-Fits-By-Surface-Binding-With-Region-Hiding.md) (fitting by binding and hiding by regions replace mask shapes for new bodies). The stylized asset described here is still shipped and still hides skin with its masks until it is retired
 - **Date:** 2026-11-14
 - **Affected systems:** the default humanoid asset (`assets/characters/humanoid`), `project`'s default character, Character Studio (CS2–CS5)
 

@@ -1,0 +1,322 @@
+# Character Studio overhaul: architecture and contracts
+
+Stage 2 (CO1) of [the plan](../../../plans/axcenity-engine-character-studio.md). This file is the **contract**: the layers, the pipeline systems, the file formats with their exact fields, what each value means, and the Rust and Lua signatures later stages build on. Only the lead changes it (plan section 5); a specialist who needs a change asks the lead first ([agent-assignments.md](agent-assignments.md)). Decisions behind it: [ADR-0032](../../../wiki/Architecture/Architecture-Decisions/ADR-0032-Semi-Realistic-Default-Character-Family.md) to [ADR-0037](../../../wiki/Architecture/Architecture-Decisions/ADR-0037-One-Groom-Asset-With-Card-Strand-And-Mesh-Tiers.md).
+
+**Built in CO1:** the `avatar` crate (`crates/avatar`) with the description, base model manifest, item manifest, catalogue and material schemas, their checks, format 1 migration and parameter resolution; the stylized humanoid's manifests (`assets/characters/humanoid/Humanoid.base.json`, `items/*.item.json`, made by `manifests.py`) and the library's `assets/characters/catalogue.json` (made by `catalogue.py`). **Nothing in the engine reads them yet:** no behaviour changed. Everything marked *(CO3)*, *(CO9)* and so on is the contract for that milestone, not built.
+
+## 1. Three layers
+
+| Layer | What it is | Where | Never |
+|---|---|---|---|
+| **Character Data** | The formats: a character's description, base model and item manifests, the catalogue, material values | `crates/avatar` (depends on `assets` only; may depend on `core`) | Rendering, UI, Instances, editor state |
+| **Character Runtime** | Loads, applies and changes characters in a running game: resolves a description into bone transforms, shape weights, attributes, material values and a parts list; fits items; bakes identity | `avatar` (pure resolution and fitting) + `anim` (posing) + `assets` (derived models) + `script` (the `HumanoidDescription` API) *(CO3)* | Editor code; the player must not depend on `editor`, `egui` or `blocks` |
+| **Character Studio** | The authoring workspace: panels drawn from the manifests, the wardrobe browser, presets, the stage | `crates/editor` (`character_workspace*`, `start/characters.rs`) | Writing editor state into Character Data |
+
+Editor state (camera, stage lighting, backdrop, panel layout, undo history, selection) stays in the editor's settings or memory, never in a `*.character.json`.
+
+## 2. Pipeline systems (addition A2)
+
+Separate systems, each with its own module, owner and tests, integrated in one experience. Owners are the agents of [agent-assignments.md](agent-assignments.md).
+
+| System | Offline (Blender, Python) | Runtime (Rust) | Owner | Tests |
+|---|---|---|---|---|
+| Creation and editing | | `editor/src/character_workspace*` | Agent 5 | Walkthroughs, drawing snapshots |
+| Mesh generation and deformation (body, shapes, identity bake) | `assets/characters/<family>/body.py`, `bodyshapes.py` | `avatar::resolve`; derived models in `assets` *(CO3)* | Agent 1 (lead for the bake) | Manifest vs model; geometry QA |
+| Clothing fitting | `fit.py`; the binding build *(CO9)* | `avatar::fit` *(CO9)* | Agent 4 | Poke-through thresholds per item × body |
+| Hair authoring | `hair.py`; the groom converter *(CO11)* | groom runtime in `anim`/`scene` *(CO11)* | Agent 3 | Renders in motion; clipping at rest |
+| Material authoring | `materials.py`, the bakes | `scene` material translation; `render` shading models *(CO7)* | Agent 6 | GPU timings; comparison renders |
+| Rigging and skinning | `rig.py` (twist bones, weights) | `anim` (twist bones, correctives, body sliders) | Agent 1 | Joint volume in the QA poses |
+| Packaging and export | `manifests.py`, `catalogue.py`, the import flow *(CO9)* | `avatar::Library`; character packages *(CO13)* | Lead (formats), Agent 4 (import) | Library tests (`crates/avatar/tests/shipped_library.rs`) |
+
+## 3. Data flow
+
+```text
+ Content library (disk)                  Description (data)                Runtime (player, server, editor)
+ catalogue.json                          *.character.json, format 2        HumanoidDescription ── Humanoid:ApplyDescription (CO3)
+ <family>/<Name>.base.json  ──────┐       base: "axcenity/realistic"              │
+   glTF body + parts, skeleton    │       parameters: {frame, fat, …}             ▼
+   parameters, regions, slots     ├────►  items: [{id, variant, materials}]  avatar: parameter_values → drivers
+ <family>/items/*.item.json       │       materials: {Skin: {melanin: …}}    ├─ shape weights ─► derived model (identity bake, assets) ─► scene ─► render
+   glTF + binding / groom tiers   │                                          ├─ bone offsets and scales ─► anim (after the pose, with BodyShape)
+   materials, variants, tags      │                                          ├─ attributes (BodyHeight, …) ─► the body MeshPart ─► anim's body sliders
+ *.groom (strands, optional) ─────┘                                          ├─ material values ─► scene material translation ─► render shading models
+                                                                             └─ parts list ─► MeshParts that follow the body (followers)
+```
+
+Networking replicates the description (small data), never meshes; each machine resolves it itself *(CO13)*.
+
+## 4. Versioning, IDs and paths
+
+**Versions.** Every file has `format_version`. A reader refuses a newer version with a message ("It was saved by a newer Axcenity (character format 3; this version reads up to 2)") and migrates an older one on load (`avatar::FormatError::Newer`). A file with no `format_version` is version 1.
+
+- Adding an **optional** field is not a version change: readers keep fields they don't know (the description's `extra`; manifests ignore them), so a file survives a round trip through an older editor.
+- Changing what a field means, renaming or removing one, or making one required **is**: bump the format's version constant in `avatar`, add the migration, add a test that an old file migrates, and update this section.
+- Damaged files are errors, never panics (`FormatError::Damaged`). Checks return every `Problem` they find (`at`: a path into the file such as `parameters[3].shapes[0]`; `message`).
+
+| Format | Constant | Version |
+|---|---|---|
+| Character description `*.character.json` | `DESCRIPTION_VERSION` | 2 (1 was CS2's `Look`) |
+| Base model manifest `*.base.json` | `BASE_VERSION` | 1 |
+| Item manifest `*.item.json` | `ITEM_VERSION` | 1 |
+| Catalogue `catalogue.json` | `CATALOGUE_VERSION` | 1 |
+| Groom file `*.groom` (binary) | `GROOM_VERSION` *(CO11)* | 1 |
+
+**IDs** name base models and items: lower-case segments of `a`–`z`, `0`–`9`, `-`, `_`, `.` joined by `/`, at least two (namespace, then name): `axcenity/tee`, `studio-x/coats/parka`. First-party content uses `axcenity/`; an import picks its own namespace (the project's or the author's). `avatar::is_valid_id`.
+
+**Paths** inside a manifest are relative to the manifest's folder, `/`-separated, never absolute, no drive letter or backslash (`avatar::is_valid_path`). `..` is allowed but must stay inside the library (`Library::path_of`, checked by `Library::validate`). Model objects are named by their `MeshId` pick path (`AxcenityHumanoid/Shirt_Tee`), as `assets::Pick` reads them.
+
+## 5. The character description (`*.character.json`, format 2)
+
+One character: its base model, parameter values, items and material values. **Values only**: no meshes, no editor state.
+
+```json
+{
+  "format_version": 2,
+  "name": "Ada",
+  "base": "axcenity/stylized",
+  "parameters": { "frame": 0.6, "build": -0.3, "height": 1.04, "nose_width": 0.2 },
+  "items": [
+    { "id": "axcenity/tee", "variant": "navy", "materials": { "Shirt": { "tint": "#e8e8e8" } } },
+    { "id": "axcenity/hair-bob" }
+  ],
+  "materials": { "Skin": { "melanin": 0.4 }, "Iris": { "iris_tint": "#5a7a9a" } }
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `format_version` | 2 | |
+| `name` | string | Shown in the studio and to scripts; not empty |
+| `base` | ID | The base model package |
+| `parameters` | map ID → number | Values by the base manifest's parameter IDs; one left out takes its default; resolution clamps to the range (a check reports values outside it) |
+| `items` | list of `{id, variant?, materials?}` | Worn items, each in its manifest's slot; one per slot unless the slot is `multiple`. `variant` names one of the item's variants; `materials` are values over the variant's, by the item's material slot names |
+| `materials` | map slot → values | Values for the base model's materials (skin, eyes, brows, lashes, mouth, teeth), see section 10 |
+| anything else | any | Kept as it was (`Description::extra`): room for additive fields such as skin and makeup layers *(CO17)* |
+
+**Addition A3, field by field:** versioned with migration (`format_version`, section 4); external asset references (`base` and item IDs, resolved through the catalogue); morph configuration referenced (the base manifest owns what each parameter drives; the description holds values only); skeleton and rig metadata (the base manifest's `skeleton`); material references (material slot names) and values; clothing and hair references (`items`); runtime customization parameters (`parameters` and `materials`, which a game changes at runtime and re-applies); no editor state.
+
+**Format 1** (`editor::character_workspace::Look`: `name`, `build` −1–1, `muscle` 0–1, `hair`, `top`, `outerwear`, `bottom`, `shoes`) migrates on load (`avatar/src/migrate.rs`): base `axcenity/stylized` (`V1_BASE`); `parameters` `build` and `muscle`, clamped as format 1 did; each slot's part name becomes its item ID (`V1_ITEMS`: `Shirt_Tee` → `axcenity/tee`, `Hair_Bob` → `axcenity/hair-bob`, …) in format 1's slot order; missing values are the default character's; an empty name is "New Character"; unknown part names are dropped, as format 1 ignored them. The editor's test `a_saved_look_migrates_to_the_same_parts_and_shapes` proves a migrated file wears the same parts and resolves to the same body shapes the workspace poses today. Until CO12 the workspace still writes format 1.
+
+## 6. The base model manifest (`*.base.json`)
+
+Ships beside a base model's glTF file. The stylized one is `assets/characters/humanoid/Humanoid.base.json` (generated by `manifests.py` from `Humanoid.customization.json` and `HumanoidParts.glb`; edit the script, not the file).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `format_version` | 1 | |
+| `id`, `label` | ID, string | `axcenity/stylized`, "Stylized" |
+| `family` | string | `stylized`, `realistic`: groups bases; items name the exact bases they fit |
+| `model` | `{file, body, parts[]}` | The glTF file; the body's object path; parts always worn with it (eyes, teeth, brows, lashes), which follow its pose and shapes |
+| `skeleton` | `{convention, height, pose, added_bones[]}` | `humanoid` (Unity/VRM names), metres standing, `a-pose-45`; twist and helper bones added as `{name, parent}` (section 12) |
+| `groups` | `[{id, label, category}]` | Parameter groups; `category` is a studio category: `body`, `face`, `skin`, `hair`, `clothing`, `accessories` |
+| `parameters` | `[Parameter]` | The sliders, in display order (section 7) |
+| `corners` | `[{shape, factors[]}]` | Shapes driven by several parameters at once (section 7) |
+| `constraints` | `[{kind: "max_sum", parameters, limit}` or `{kind: "follow", source, target, factor}]` | Rules between parameters (section 7) |
+| `regions` | `[{id, label, mask_shape?, map_index?}]` | Body regions items hide: by a mask shape (stylized, ADR-0030) or an index in the body's region map ([ADR-0035](../../../wiki/Architecture/Architecture-Decisions/ADR-0035-Clothing-Fits-By-Surface-Binding-With-Region-Hiding.md)); at least one |
+| `slots` | `[{id, label, category, multiple?, empty_label?}]` | Where items are worn; data, so a new slot is not a code change |
+| `sockets` | `[{name, bone}]` | Attachments that follow a bone (`anim`'s sockets); the stylized ones are `project::HUMANOID_SOCKETS` |
+| `materials` | `[{name, shading}]` | **Every** material of the body and its parts, with its shading model (section 10) |
+| `face` | `{profile, eye_bones[], jaw_bone?}` | The FaceControls profile the head uses and its eye and jaw bones (section 13) |
+| `defaults` | `{items[]}` | What a new character on this base wears |
+
+**Parameter:**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id`, `label` | string | The ID descriptions use (`snake_case`); the slider's name |
+| `group` | group ID | |
+| `range` | `[min, max]` | min < max |
+| `default` | number | Inside the range; 0 when absent |
+| `advanced` | bool | Shown only in the advanced view (D3's basic/advanced) |
+| `mirror` | parameter ID | The other side's parameter, for symmetric editing; each names the other |
+| `shapes` | `[{shape, from?, to?}]` | Blend shape weights |
+| `bones` | `[{bone, from?, to?, offset?, scale?}]` | At mapped weight w: the bone's head moves by `offset × w` (model space, metres, glTF axes: Y up, +Z front) and the bone scales by `1 + (scale − 1) × w`; applied after the animated pose *(CO3)* |
+| `attributes` | `[{attribute, from?, to?}]` | A number attribute on the character's skinned body: `anim`'s body sliders (`BodyHeight`, `LegLength`, `ArmLength`, `ShoulderWidth`, `WaistWidth`, `HipWidth`, `HeadSize`, `HandSize`, `FootSize`; PR #400), which become one output of applying a description (D2) |
+| `material_values` | `[{material, value, from?, to?}]` | A number value of a material slot's shading model |
+
+## 7. What parameters mean (resolution)
+
+`avatar/src/resolve.rs` is the reference; the runtime and the studio's preview use it.
+
+1. **Values.** Each parameter's value is the description's or its default, clamped to its range (`parameter_values`).
+2. **`max_sum` constraints** then apply: when the named parameters (all with ranges from 0 up) add to more than `limit`, each is scaled by `limit / sum`. Example: fat and muscle at 1 with a limit of 1.5 resolve to 0.75 each.
+3. **Spans.** Every driver maps the value through its `from` span onto its `to` span (`avatar::span`): `t = clamp((v − from[0]) / (from[1] − from[0]), 0, 1)`, result `to[0] + (to[1] − to[0]) × t`. `from` defaults to `[0, 1]`, `to` to `from`. A downward span is allowed: `build`'s `Build_Slim` driver is `from [0, −1] to [0, 1]`, so −0.4 gives 0.4 and any positive value gives 0. A bipolar identity shape is `from [−1, 1]` (−0.6 gives −0.6).
+4. **Shapes.** A shape's weight is the sum of its drivers' results plus its **corners'**: a corner's weight is the product of its factors' spans (MakeHuman's corner targets, D5: `Feminine_Heavy` is frame × fat, so fat and muscle layers mix without cancelling). Every shape the manifest names is in the result, at 0 when nothing drives it.
+5. **Regions.** Each region with a mask shape is in the result at 0, and at 1 when a worn item hides it (`body_shape_weights`). Map regions are hidden by the renderer from the region map *(CO9)*.
+6. **`follow` constraints** are editing rules, not resolution: changing `source` by d moves `target` by `factor × d` unless the person pinned `target` *(CO12)*. A saved description holds the result.
+7. **Bones, attributes and material values** use the same spans *(CO3)*. Bone offsets and scales from several parameters add (offsets) and multiply (scales). Attributes are written to the body MeshPart; `anim::BodyShape` applies them after the pose as it does today.
+
+**Identity versus live shapes (D4).** Every shape a parameter, corner or region drives is **identity**: constant until the description changes, so it is baked into a per-character rest mesh *(CO3, derived models)*. **Live** shapes (expressions through the face profile, pose-driven correctives *(CO5)*) morph every frame. A manifest may add `correctives` later as an optional field (no version bump): `[{shape, bone, axis, angles: [start, full]}]`.
+
+## 8. The item manifest (`*.item.json`)
+
+One garment, accessory or groom. The stylized ones are `assets/characters/humanoid/items/`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `format_version` | 1 | |
+| `id`, `label` | ID, string | |
+| `kind` | `garment`, `accessory`, `groom` | |
+| `slot` | slot ID | A slot of every base it fits |
+| `layer` | 0–3 | Garments only, the order outward for push-out: 0 underwear, 1 base (shirts, trousers, shoes), 2 mid (sweaters, vests), 3 outer (jackets, coats) |
+| `tier` | `built_in` (default), `premium` | The two content tiers (section 0, decision 2): generated by the engine's scripts, or artist-made or imported |
+| `bases` | `[ID]` | The base models it fits |
+| `model` | `{file, object?}` | Garments and accessories: the mesh. Grooms have none here |
+| `hides` | `[region ID]` | The body regions it hides |
+| `materials` | `[{name, shading}]` | **Every** material of its model(s), with its shading model |
+| `variants` | `[{id, label, materials}]` | Colour and material variants: values per material slot (glTF's `KHR_materials_variants` maps onto these on import *(CO9)*) |
+| `fit` | `{method: "shapes", follows[]}`, `{method: "binding", data?, margin}`, `{method: "socket", socket}` | Section 9 |
+| `groom` | `{cards?, strands?, mesh?}` | Grooms only: section 11 |
+| `tags` | `[string]` | For the wardrobe browser's search and filters |
+| `thumbnail` | path | For the browser *(CO9 makes them)* |
+| `source` | `{author, licence, url?}` | Provenance; `licence` is an SPDX ID (`CC0-1.0`). Imports must fill it |
+
+**Rules** (`ItemManifest::validate`, `check_against`): a garment needs a model and a layer; an accessory needs a model and no layer; only accessories hang on a socket; a groom has no `model`, has `groom`, and has **cards or a mesh** (strands are never the only tier); the slot, every hidden region and the socket exist on every base it fits; variant values suit the shading models.
+
+## 9. Fitting (ADR-0035)
+
+| Method | How the item follows the body | Who uses it |
+|---|---|---|
+| `shapes` | The item carries its own copies of the named body shapes; the runtime gives each the body's weight by name (section 14) | The stylized humanoid's garments and hair (today's build) |
+| `binding` | Each item vertex is bound to the body's surface (a triangle, barycentric coordinates and an offset along the normal), made at build or import and stored in `data` (a binding file, *CO9*); when the description's identity changes, the fitted rest positions are rebuilt from the body's resolved rest mesh, then pushed clear of every lower layer and the body by `margin` metres (default 0.002) | Every new garment (CO9, CO10) and every import |
+| `socket` | Rigid on a socket; scaled by the socket bone's scale | Caps, glasses, watches |
+
+**Body hiding by regions** replaces mask shapes for new bases: the body's second UV set (or a region map texture over its UVs) gives each body triangle a region index; a worn item's `hides` regions are not drawn *(CO9)*. The stylized base keeps its mask shapes (`regions[].mask_shape`) until it is retired. Inner layers covered by an outer one are pushed under it, never through.
+
+## 10. Character materials (ADR-0036)
+
+Each material slot has a **shading model**. Values **modulate** the material's own maps (a tint multiplies the base colour map; a scale multiplies roughness); they never replace them, and a material with no values looks exactly as authored (every value's neutral setting changes nothing; audit §3.8). Until the renderer has the new models *(CO7)*, `scene` draws skin, eye, cloth and hair as Standard with the same tint and roughness values. The set is `avatar::ShadingModel::values`:
+
+| Model | Value | Kind, range, neutral | Meaning |
+|---|---|---|---|
+| `standard` | `tint` | colour, white | × base colour map |
+| | `roughness_scale` | 0–2, 1 | × roughness |
+| `skin` | `tint` | colour, white | × albedo after toning |
+| | `melanin` | −1–1, 0 | Lighter to darker than the map, along a melanin absorption curve |
+| | `redness` | −1–1, 0 | Haemoglobin: pallor to flush |
+| | `undertone` | −1–1, 0 | Cooler to warmer |
+| | `roughness_scale` | 0.5–1.5, 1 | Oily to dry |
+| | `detail_strength` | 0–2, 1 | Pore and micro-detail normal |
+| | `scatter_scale` | 0–2, 1 | × subsurface radius |
+| `eye` | `iris_tint`, `sclera_tint` | colour, white | × iris map, × sclera map |
+| | `pupil_size` | 0.5–2, 1 | × authored pupil diameter |
+| | `limbal_ring` | 0–2, 1 | × ring darkness |
+| | `iris_depth` | 0–2, 1 | × iris parallax depth under the cornea |
+| `cloth` | `tint`, `sheen_tint` | colour, white | × base colour map, × authored sheen colour |
+| | `roughness_scale`, `sheen_roughness_scale` | 0.5–1.5, 1 | |
+| | `anisotropy_scale` | 0–2, 1 | × authored anisotropy (satin, silk) |
+| `hair` | `tint` | colour, white | × colour after melanin and dye |
+| | `melanin`, `redness` | −1–1, 0 | Lighter to darker; ash to red (pheomelanin) |
+| | `dye`, `dye_amount` | colour white; 0–1, 0 | A dye mixed in |
+| | `tip_lightening` | 0–1, 0 | Root-to-tip gradient |
+| | `highlight` | 0–2, 1 | Secondary (coloured) highlight strength |
+| | `roughness_scale` | 0.5–1.5, 1 | |
+
+Colours are sRGB `"#rrggbb"`. A value is checked against its slot's model (`check_values`): its name, kind and range. Customization baked for games (MetaHuman's approach) is a CO17/CO18 optimization; the description keeps the values.
+
+## 11. Grooms (ADR-0037)
+
+One groom item, three tiers: **cards** (a glTF mesh of alpha-clipped cards, every GPU, spring bones *(CO11)*), **strands** (an optional `*.groom` file, drawn by a compute pipeline on capable GPUs *(CO14)*), **mesh** (a solid fallback for crowds and far LODs). A groom must have cards or a mesh; the runtime picks the best tier the machine's settings allow and falls back to cards, then the mesh. Facial hair is a groom in a face slot, bound to the face.
+
+**The groom file** (`*.groom`, little-endian binary, made by the editor-only converter from USD `BasisCurves` or Blender hair curves, ADR-0027) *(CO11)*:
+
+| Part | Layout |
+|---|---|
+| Header | magic `AXGROOM\0` (8 bytes); `u32` version (1); `u32` flags (bit 0: has guides); `u32` strand count S; `u32` point count P; `u32` guide count G; `f32[6]` bounds (min, max; metres, glTF axes, the base's rest pose) |
+| Strands | `u32[S + 1]` first point of each strand (the last is P) |
+| Points | `f32[3 × P]` positions; `f32[P]` widths (metres) |
+| Roots | per strand: `u32` body triangle, `f32[2]` barycentric coordinates (bound to the scalp of the item's first base) |
+| Attributes | per strand: `u16` clump, `u16` reserved, `f32` melanin variation (added to the material's `melanin`) |
+| Guides | `u32[G]` strand indices simulated as guides |
+
+Strands interpolate from guides with curl and clumping at runtime *(CO14)*; cards are generated from the same strands offline *(CO11)*, so one groom drives every tier.
+
+## 12. The skeleton
+
+Today's contract stays: Unity/VRM humanoid names, 45° A-pose, 1.75 m = 5 studs, +Z front, at most 4 influences per vertex ([default-humanoid.md](../../research/default-humanoid.md) D3–D6). Every clip, retarget profile, state machine and face profile depends on it.
+
+**Added bones** are only ever added, never renamed, and listed in `skeleton.added_bones`. Twist bones: `LeftUpperArmTwist` (parent `LeftUpperArm`), `LeftLowerArmTwist` (`LeftLowerArm`), `LeftUpperLegTwist` (`LeftUpperLeg`), `LeftLowerLegTwist` (`LeftLowerLeg`) and the `Right…` mirrors. They are driven after the pose by `anim` (a fraction of the child joint's twist, upper arm 0.5, forearm 0.5 from the wrist), never keyed by clips, so every clip plays unchanged *(CO4)*. Helper bones (pecs, lats, ankles) follow the same rule with a `Helper` suffix.
+
+## 13. Facial animation (addition A4)
+
+The face is its own subsystem on the existing runtime (F1–F7, [ADR-0028](../../../wiki/Architecture/Architecture-Decisions/ADR-0028-Facial-Animation-Morph-Targets-On-GPU-And-FaceControls.md)), kept separate from identity:
+
+| Layer | Contract |
+|---|---|
+| Identity (who the face is) | Base manifest parameters in the `face` category (eyes, brows, nose, mouth, jaw, cheeks, ears, head); identity shapes are baked (D4) |
+| Controls (what it does) | `FaceControls`' 48 standard controls, mapped to the head's shapes and bones by the profile `face.profile` names (`axcenity`, `arkit`, `vroid`, or a new head's `*.face.json`) |
+| Blend shapes | Expression shapes on the body mesh (the head is part of it) and on the face's parts (brows, lashes), named the same so parts follow (section 14) |
+| Eye movement and eyelids | `face.eye_bones` turn by gaze; lids by `Blink`/`Eye_Closed` shapes that must close fully (CO6's check) |
+| Jaw and lip sync | `face.jaw_bone` and the viseme map (F5) |
+| Expressions and animation-driven poses | F4's layers (expressions, overrides, blinks, gaze, idle) and clips' face tracks, on the controls |
+
+A new head plugs in by a profile; nothing in the description stores expressions. Wrinkle maps by expression are CO17.
+
+## 14. Parts follow the body's shapes
+
+A part (a follower MeshPart inside the skinned body) takes the body's pose by bone name today. *(CO3)* It also takes, **for every blend shape it has, the weight of the body's shape of the same name**; shapes the body lacks keep the part's own weight. That is how brows and lashes blink with the face, and how `fit: shapes` garments follow the frame and build. Binding-fitted items get fitted rest meshes instead and need no copied shapes.
+
+## 15. The content library (ADR-0034)
+
+A folder with `catalogue.json` at its root. The repository's is `assets/characters/`; *(CO9)* the editor installs it as the global character library and a project copies what it uses into `assets/characters/` of the project (the existing global-assets path), so games ship only what they wear. One default character stays embedded for new projects.
+
+```text
+assets/characters/
+  catalogue.json                  the index (catalogue.py writes it; a test fails when it's stale)
+  catalogue.py
+  humanoid/                       the stylized base model package
+    Humanoid.base.json
+    HumanoidParts.glb …
+    items/tee.item.json …         its items (they share HumanoidParts.glb)
+  realistic/                      (CO4) the realistic package: <Name>.base.json, glTF, items/…
+```
+
+**`catalogue.json`:** `format_version` 1; `bases`: `[{id, manifest, label, family}]`; `items`: `[{id, manifest, label, kind, slot, tier, bases, tags?, thumbnail?}]`, both sorted by ID, `manifest` and `thumbnail` relative to the library. It is an index made from the manifests (`avatar::Catalogue::of` makes the same one), so the browser can list a large wardrobe without opening every manifest.
+
+## 16. Rust API (`axcenity_avatar`)
+
+```rust
+// Files
+Description::from_json(&str) -> Result<Description, FormatError>   // migrates format 1
+Description::to_json(&self) -> String                               // deterministic, trailing newline
+Description::new(name, base) -> Description
+Description::validate(&self, &Library) -> Vec<Problem>
+BaseManifest::{from_json, to_json, validate, check_model(&self, body: &ModelContents, parts: &[ModelContents])}
+ItemManifest::{from_json, to_json, validate, check_against(&self, &BaseManifest), check_model(&self, item, body), models()}
+Catalogue::{from_json, to_json, of(&Library)}
+Library::{new, add_base, add_item, base, item, manifest_path, path_of, read(root: &Path) -> (Library, Option<Catalogue>, Vec<Problem>), validate}
+ModelContents::of(&axcenity_assets::Model)                          // shapes, bones, materials by name
+// Resolution
+parameter_values(&BaseManifest, &Description) -> BTreeMap<String, f32>
+body_shape_weights(&BaseManifest, &Description, &Library) -> BTreeMap<String, f32>
+span(value, from, to) -> f32
+// Materials
+ShadingModel::{values, value}; MaterialValue::{Number, Colour}; Colour::parse
+```
+
+**Planned (CO3, the lead's):** `resolve::Resolved { shapes, bones: BTreeMap<String, BoneChange>, attributes, materials, parts: Vec<ResolvedPart> }` and `resolve(&Library, &Description) -> Resolved`; `assets` derived models keyed by `(base model path, hash of the identity values)`; `anim` applying `BoneChange`s after the pose with `BodyShape`, and followers taking shape weights. **(CO9, Agent 4):** `avatar::fit::{Binding, bind(item, body) -> Binding, fit(binding, body_rest, lower_layers, margin) -> Vec<[f32; 3]>}`.
+
+## 17. Lua API (CO3, Roblox-familiar names)
+
+| Member | Signature | Does |
+|---|---|---|
+| `HumanoidDescription` | Instance | Holds a description: `Base` (string), `Data` (the JSON text, replicated) |
+| `HumanoidDescription:GetParameter(id)` / `:SetParameter(id, value)` | number | Read and change a value |
+| `HumanoidDescription:GetItems()` / `:SetItem(slot, id, variant?)` / `:RemoveItem(slot)` | | The wardrobe |
+| `HumanoidDescription:SetMaterialValue(slot, name, value)` | number or `Color3` | Material values |
+| `Humanoid:ApplyDescription(description)` | | Resolves and applies it to the character (parts, shapes, bones, attributes, materials) |
+| `Humanoid:GetAppliedDescription()` | `HumanoidDescription` | A copy of what is applied |
+| `Players:CreateHumanoidModelFromDescription(description)` | `Model` | A character from a description (NPCs, previews) |
+
+## 18. Where each stage plugs in
+
+| Stage | Uses | Adds (optional fields need no version bump) |
+|---|---|---|
+| CO2 QA harness | Descriptions as the input of every capture | |
+| CO3 applier | Sections 5–7, 10, 14, 17 | `Resolved`, derived models, `HumanoidDescription` |
+| CO4–CO6 realistic body and head | Sections 6, 7, 12, 13 | `assets/characters/realistic/`, its base manifest, twist bones, `correctives` |
+| CO7 shading | Section 10 | Renderer shading models; no format change |
+| CO9 clothing | Sections 8, 9, 15 | Binding files, region maps, the import flow, thumbnails |
+| CO11 hair | Section 11 | The groom file and converter |
+| CO12 studio | Sections 6, 7 (`follow`), 15 | Panels from the manifest; writes format 2 |
+| CO13 presets, network | Section 5 | Preset files (descriptions without `name`), replication of `Data` |

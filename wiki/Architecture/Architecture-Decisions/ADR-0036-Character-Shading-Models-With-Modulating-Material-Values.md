@@ -1,0 +1,52 @@
+---
+title: "ADR-0036: Characters get Skin, Eye, Cloth and Hair shading models, and material values that modulate maps"
+type: adr
+adr: 36
+adr_status: Accepted
+date: 2026-11-14
+supersedes:
+superseded_by:
+affects: [avatar, scene, render, assets]
+source: [crates/avatar/src/material.rs]
+docs: [docs/development/character-studio/architecture.md, docs/development/character-studio/audit.md]
+tags: [adr, characters, rendering]
+---
+
+# ADR-0036: Characters get Skin, Eye, Cloth and Hair shading models, and material values that modulate maps
+
+- **Status:** Accepted (Paul, 2026-11-14: plan D9)
+- **Date:** 2026-11-14
+- **Affected systems:** Character Data (`avatar`: the material parameter set), `scene` (material translation), `render` (shading models, CO7)
+
+## Context and problem
+
+The renderer has Standard, Unlit and Toon shading and a foliage path (audit §3.10): no subsurface scattering, sheen, anisotropy or hair lighting, and custom WGSL surfaces can't change lighting. All 16 material texture slots are used. Customizing a colour today goes through a SurfaceAppearance that **replaces** a model's maps, so tinting skin loses its texture (audit §3.8). The research (§B.5, §B.6) recommends pre-integrated skin with two specular lobes, Charlie sheen for cloth and Karis/Tafuri-style hair lobes.
+
+## Considered alternatives
+
+| Option | For | Against |
+|---|---|---|
+| Custom WGSL surfaces per material | No renderer change | Can't add lobes or change diffuse |
+| Built-in Skin, Eye, Cloth and Hair shading models, with a fixed parameter set per model (chosen) | Correct lighting; one contract the studio and runtime share | Renderer work (CO7); slots must be freed |
+| Raise device texture limits | No packing | Less portable; still no lobes |
+
+## Decision
+
+Every character material slot names a shading model (`standard`, `skin`, `eye`, `cloth`, `hair`), and each model has a fixed set of values (`avatar::ShadingModel::values`) that **modulate** the material's own maps (tints multiply, scales multiply, offsets shift); every value's neutral setting leaves the material as authored. The renderer gains the four models (CO7), freeing two texture slots by packing metalness, roughness and occlusion into one texture. Until then `scene` draws them as Standard with the same tint and roughness values.
+
+## Reasons
+
+- Modulating keeps baked detail (pores, fabric weave) while customizing colour and response.
+- A fixed, checked parameter set per model is a contract the studio (pickers), descriptions (values) and renderer (uniforms) share without knowing each other.
+- `render` stays free of Instances: `scene` translates plain values (ADR-0003).
+
+## Consequences
+
+- The parameter set is part of Character Data: adding a value is an optional addition; changing a meaning needs a description migration.
+- CO7 measures each model's GPU cost on the reference PC; screen-space SSS is CO17.
+- Revisit if glTF ratifies a subsurface extension the set should map onto.
+
+## Implementation references
+
+- `crates/avatar/src/material.rs` (`ShadingModel`, `ValueSpec`, `check_values`)
+- Plan: D9, CO7, CO17

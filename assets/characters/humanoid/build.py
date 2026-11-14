@@ -11,8 +11,10 @@ mask shapes, add eyes, brows, lashes and teeth, the outfits and hair
 styles (each following the body's shapes), bake the skin texture, and
 export `Humanoid.glb` (the default character), `HumanoidParts.glb` (every
 part), `HumanoidAnimations.glb` (the clips) and
-`Humanoid.customization.json` (what each slider moves). Units are metres,
-Blender Z up, the character faces -Y (glTF +Z after export).
+`Humanoid.customization.json` (what each slider moves), then the base
+model and item manifests (`manifests.py`; afterwards rebuild the library's
+catalogue with `../catalogue.py`). Units are metres, Blender Z up, the
+character faces -Y (glTF +Z after export).
 """
 
 import json
@@ -30,6 +32,7 @@ import clothes  # noqa: E402
 import face  # noqa: E402
 import fit  # noqa: E402
 import hair  # noqa: E402
+import manifests  # noqa: E402
 import materials  # noqa: E402
 import rig  # noqa: E402
 from common import (  # noqa: E402
@@ -466,6 +469,8 @@ def main(out_dir):
     with open(os.path.join(out_dir, "Humanoid.customization.json"), "w", newline="\n") as f:
         json.dump(custom, f, indent=1, sort_keys=True)
         f.write("\n")
+    # The Character Data manifests (base model and items) from the files above.
+    manifests.write(out_dir)
     for name in ("Skin.png", "Iris.png"):
         path = os.path.join(out_dir, name)
         if os.path.exists(path):
