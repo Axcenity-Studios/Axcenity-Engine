@@ -10,7 +10,7 @@ Earlier plans this builds on, not repeats: [default-humanoid.md](../../research/
 
 ### A.0 The reference library
 
-Paul's reference library (kept outside the repository; collected 2026-11-14) has 189 web references and 20 images he picked, in ten folders, each with a `REFERENCES.md` that names a concrete lesson per item. His picks are the strongest signal: `FINAL` is the look to reach, `TARGET` is how the system should behave. The images are third-party (product shots, ArtStation work, Unreal and Sims screenshots), so they are described here and never copied into the repository or used as textures.
+Paul's reference library (kept outside the repository; collected 2026-11-14) has 189 web references and 20 images Paul picked, in ten folders, each with a `REFERENCES.md` that names a concrete lesson per item. Those picks are the strongest signal: `FINAL` is the look to reach, `TARGET` is how the system should behave. The images are third-party (product shots, ArtStation work, Unreal and Sims screenshots), so they are described here and never copied into the repository or used as textures.
 
 What the 20 picks have in common decides the direction:
 

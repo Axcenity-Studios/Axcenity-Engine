@@ -1,6 +1,6 @@
 # Character Studio overhaul: implementation plan
 
-**Status: approved by Paul on 2026-11-14, with his decisions and additions in section 0.** Section 0 wins wherever the rest of this plan disagrees with it.
+**Status: approved by Paul on 2026-11-14; the decisions and additions are recorded in section 0.** Section 0 wins wherever the rest of this plan disagrees with it.
 
 ## 0. Paul's decisions and additions (2026-11-14)
 
