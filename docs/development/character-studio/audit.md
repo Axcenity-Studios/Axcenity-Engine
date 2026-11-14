@@ -1,6 +1,6 @@
 # Character Studio overhaul: audit of what exists
 
-Stage 1 of Paul's overhaul brief (2026-11-14). What the character systems are today, what is wrong with them, and what must change in the architecture. Audited on branch `character-studio-cs2` at `bd3ae493`, which holds CS1 (#401) and CS2 (#402); neither is merged into main yet. PR #400 (bone sliders and sockets, branch `default-humanoid-sockets`) is open against main and was read from its branch. Research: [research.md](research.md). Proposal: [implementation-plan.md](implementation-plan.md).
+Stage 1 of Paul's overhaul brief (2026-11-14). What the character systems are today, what is wrong with them, and what must change in the architecture. Audited on branch `character-studio-cs2` at `bd3ae493`, which holds CS1 (#401) and CS2 (#402); neither is merged into main yet. PR #400 (bone sliders and sockets, branch `default-humanoid-sockets`) is open against main and was read from its branch. Research: [research.md](research.md). Plan: [plans/axcenity-engine-character-studio.md](../../../plans/axcenity-engine-character-studio.md).
 
 Evidence is marked **Measured** (a script or test produced the number), **Read** (from the source, with a path) or **Observed** (seen in a render). Renders and measurements are in [baseline/](baseline/), made by `assets/characters/humanoid/qa/` so the "after" renders of later stages use the same cameras, lights and settings.
 
@@ -156,7 +156,7 @@ Paul's condition for merging the open PRs: known visual defects don't become acc
 
 ## 4. Recommended architectural changes
 
-Each maps to a decision in [implementation-plan.md](implementation-plan.md).
+Each maps to a decision in [the plan](../../../plans/axcenity-engine-character-studio.md).
 
 | Limitation | Change | Plan |
 |---|---|---|
