@@ -1,17 +1,21 @@
 # Character Studio overhaul: progress
 
-Where the overhaul stands, newest first. The plan and its stage IDs are in [implementation-plan.md](implementation-plan.md).
+Where the overhaul stands, newest first. The plan and its stage IDs are in [plans/axcenity-engine-character-studio.md](../../../plans/axcenity-engine-character-studio.md).
 
 | Stage | State | Notes |
 |---|---|---|
-| 1. Research and audit | **Done, approved** (2026-11-14) | [research.md](research.md), [audit.md](audit.md), [implementation-plan.md](implementation-plan.md) (decisions in its section 0); baseline in [baseline/](baseline/) by `assets/characters/humanoid/qa/` |
-| Before Stage 2 | **Done but one merge** (2026-11-14) | #401 fixed (waist hole, clothing intersections), tested and merged; #402 merged; #400 brought onto main, checked, waiting to be merged; the full suite run (see the log) |
+| 1. Research and audit | **Done, approved** (2026-11-14) | [research.md](research.md), [audit.md](audit.md), [the plan](../../../plans/axcenity-engine-character-studio.md) (decisions in its section 0); baseline in [baseline/](baseline/) by `assets/characters/humanoid/qa/` |
+| Before Stage 2 | **Done** (2026-11-14) | #401 fixed (waist hole, clothing intersections), tested and merged; #402 merged; #400 brought onto main and merged; the full suite run, its Windows-only editor failures fixed in #404 (see the log) |
 | 2. Architecture and contracts (CO1) | Not started | `architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md` and the ADRs |
 | 3. Foundation (CO2–CO6) | Not started | |
 | 4. Parallel specialists (CO7–CO12) | Not started | |
 | 5. Integration (CO13) | Not started | |
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
+
+## 2026-11-14: the plan moves to `plans/`
+
+- The plan is now [plans/axcenity-engine-character-studio.md](../../../plans/axcenity-engine-character-studio.md), with the engine's other plans; Stage 1's research, audit, this log and the baseline stay here. Its status lines now say what's done: #400, #403 (Stage 1) and #404 (the editor test fixes) are merged.
 
 ## 2026-11-14: before Stage 2
 

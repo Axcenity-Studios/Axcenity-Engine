@@ -1,6 +1,6 @@
-# Character Studio overhaul: implementation plan
+# Plan: Axcenity Engine, Character Studio overhaul
 
-**Status: approved by Paul on 2026-11-14; the decisions and additions are recorded in section 0.** Section 0 wins wherever the rest of this plan disagrees with it.
+> Source: Paul's Character Studio overhaul brief of 2026-11-14 (its Stages 1 to 7; milestones CO1 to CO18 here), approved the same day with the decisions and additions in section 0. **Section 0 wins wherever the rest of this plan disagrees with it.** Stage 1's research, audit, progress log and baseline renders are in [docs/development/character-studio/](../docs/development/character-studio/), and Stage 2's documents (`architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md`) go beside them. Read the stage you're on, not the whole file.
 
 ## 0. Paul's decisions and additions (2026-11-14)
 
@@ -22,17 +22,17 @@
 - **A3 A future-proof character format.** Versioned files with backward-compatible migration; external asset references; morph configuration embedded or referenced; skeleton and rig metadata; material references; clothing and hair references; runtime customization parameters. **No editor state in the runtime format** (camera, stage lighting, panel layout and undo stay in the editor).
 - **A4 Facial animation gets its own architecture.** Even where advanced facial animation isn't in the first release, every head leaves room for blend shapes, eye movement, eyelid controls, jaw movement, lip sync, expressions and animation-driven facial poses. The existing face runtime (F1–F7) is the base; Stage 2's architecture gives the face its own section, and the quality benchmarks weigh facial deformation as heavily as the body.
 
-The plan for Paul's overhaul brief of 2026-11-14. It rests on [research.md](research.md) (evidence) and [audit.md](audit.md) (what exists and what's wrong), and on these wiki pages and ADRs: [Animation](../../../wiki/Engine-Systems/Animation.md), [Characters](../../../wiki/Engine-Systems/Characters.md), [Rendering](../../../wiki/Engine-Systems/Rendering.md), [Importers](../../../wiki/Asset-Pipeline/Importers.md), [ADR-0027](../../../wiki/Architecture/Architecture-Decisions/ADR-0027-Convert-New-Model-Formats-To-glTF-On-Import.md) (convert on import), [ADR-0028](../../../wiki/Architecture/Architecture-Decisions/ADR-0028-Facial-Animation-Morph-Targets-On-GPU-And-FaceControls.md) (morph targets and FaceControls), [ADR-0030](../../../wiki/Architecture/Architecture-Decisions/ADR-0030-Smooth-Stylized-Humanoid-On-CC0-Base-Meshes-With-Mask-Shapes.md) (the stylized humanoid, which D1 and D6 would supersede) and [ADR-0031](../../../wiki/Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md) (the workspace, kept).
+The plan for Paul's overhaul brief of 2026-11-14. It rests on [research.md](../docs/development/character-studio/research.md) (evidence) and [audit.md](../docs/development/character-studio/audit.md) (what exists and what's wrong), and on these wiki pages and ADRs: [Animation](../wiki/Engine-Systems/Animation.md), [Characters](../wiki/Engine-Systems/Characters.md), [Rendering](../wiki/Engine-Systems/Rendering.md), [Importers](../wiki/Asset-Pipeline/Importers.md), [ADR-0027](../wiki/Architecture/Architecture-Decisions/ADR-0027-Convert-New-Model-Formats-To-glTF-On-Import.md) (convert on import), [ADR-0028](../wiki/Architecture/Architecture-Decisions/ADR-0028-Facial-Animation-Morph-Targets-On-GPU-And-FaceControls.md) (morph targets and FaceControls), [ADR-0030](../wiki/Architecture/Architecture-Decisions/ADR-0030-Smooth-Stylized-Humanoid-On-CC0-Base-Meshes-With-Mask-Shapes.md) (the stylized humanoid, which D1 and D6 supersede) and [ADR-0031](../wiki/Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md) (the workspace, kept).
 
-It replaces stages CS3–CS6 of [character-studio.md](../../research/character-studio.md): their content (a runtime description, live customization, face and animation categories, character files, polish) is folded into the stages below. The face runtime of [facial-animation.md](../../research/facial-animation.md) (F1–F7) is reused unchanged.
+It replaces stages CS3–CS6 of [character-studio.md](../docs/research/character-studio.md): their content (a runtime description, live customization, face and animation categories, character files, polish) is folded into the stages below. The face runtime of [facial-animation.md](../docs/research/facial-animation.md) (F1–F7) is reused unchanged.
 
 ## 1. In one paragraph
 
 Keep what works: the skeleton contract, GPU morph targets, the whole face runtime, modular parts, PR #400's bone sliders and sockets, and the workspace shell. Replace the character itself with a **semi-realistic one built on the realistic CC0 bodies in the same bundle the stylized ones are vendored from**. Give the engine **one runtime character description** that the player can read, driven by a **data manifest** instead of Rust enums. Make clothing **fit any body from its geometry** instead of per-garment shape copies. Move the wardrobe **out of the binaries into a content library**. Teach the renderer **skin, eye, cloth and hair shading**. Build hair as **one groom with card, strand and mesh tiers**, cards first. The hardest part is not code but **art production**: the target look in Paul's references comes from sculpted, simulated and baked assets. This plan builds a scripted high-to-low asset pipeline and an import path for artist-made items, and is honest about where generated content will fall short (section 8).
 
-## 2. Decisions for approval
+## 2. Decisions
 
-Each decision is reversible until its stage starts. **Recommended** options are first.
+Approved on 2026-11-14, as section 0 refines them. Each stays reversible until its stage starts. The **Recommended** column is what was approved.
 
 | # | Decision | Recommended | Alternatives and why not |
 |---|---|---|---|
@@ -52,7 +52,7 @@ Each decision is reversible until its stage starts. **Recommended** options are 
 
 ## 3. Architecture direction
 
-Stage 2 turns this into `architecture.md` with exact schemas and signatures. The direction:
+Stage 2 turns this into `docs/development/character-studio/architecture.md` with exact schemas and signatures. The direction:
 
 ```text
  Content library (disk)                     Description (data)                     Runtime (player, server, editor)
@@ -84,11 +84,11 @@ The brief's seven stages, with milestones of one PR each. **CO** is this overhau
 
 ### Before Stage 2: merge the open character PRs
 
-#400 (bone sliders, sockets), #401 (CS1) and #402 (CS2) all touch the default humanoid; #402 contains #401, and #400 is based on main and changes `anim/src/animators.rs`. In Paul's order (section 0, decision 4): fix the waist hole and the clothing intersections in #401; add regression tests and re-render the baseline; merge #401, then #402 once it has the fix; bring #400 onto the resulting main (the lead resolves conflicts); run the complete relevant test suite. The overhaul starts from that main. **Status (2026-11-14):** all done except merging #400, which is pushed and mergeable; details in [progress.md](progress.md).
+#400 (bone sliders, sockets), #401 (CS1) and #402 (CS2) all touch the default humanoid; #402 contains #401, and #400 is based on main and changes `anim/src/animators.rs`. In Paul's order (section 0, decision 4): fix the waist hole and the clothing intersections in #401; add regression tests and re-render the baseline; merge #401, then #402 once it has the fix; bring #400 onto the resulting main (the lead resolves conflicts); run the complete relevant test suite. The overhaul starts from that main. **Done (2026-11-14):** #401 (with the fixes), #402 and #400 merged; the full suite's only failures were six editor tests that failed on Windows, fixed in #404. Details in [progress.md](../docs/development/character-studio/progress.md).
 
-### Stage 1: research and audit (this checkpoint)
+### Stage 1: research and audit (done)
 
-[research.md](research.md), [audit.md](audit.md), this plan; the baseline measurements and renders in [baseline/](baseline/) and their scripts in `assets/characters/humanoid/qa/`.
+[research.md](../docs/development/character-studio/research.md), [audit.md](../docs/development/character-studio/audit.md), this plan; the baseline measurements and renders in [baseline/](../docs/development/character-studio/baseline/) and their scripts in `assets/characters/humanoid/qa/`.
 
 ### Stage 2: architecture and contracts
 
@@ -145,7 +145,7 @@ The lead reviews every change, runs the whole suite, checks the editor and playe
 
 | Agent | Owns (files only it changes) | Consumes |
 |---|---|---|
-| Lead: architect | The `avatar` crate's schemas, `Cargo.toml`, the build orchestrator (`build.py`), the manifests' format, ADRs, this folder, merging | Everything |
+| Lead: architect | The `avatar` crate's schemas, `Cargo.toml`, the build orchestrator (`build.py`), the manifests' format, ADRs, this plan and `docs/development/character-studio/`, merging | Everything |
 | 1: Modeling and anatomy | `assets/characters/humanoid/` body, rig and body-shape modules; the base model package's body; `anim` correctives and twist bones (with the lead) | The skeleton and manifest contracts |
 | 2: Facial systems | The face, eye, brow and lash modules; face profiles in `anim/src/faces/`; expressions | The head topology from Agent 1 |
 | 3: Hair and simulation | The hair modules and the groom converter; the groom runtime (simulation, binding); spring bones | Shading from Agent 6; the head surface from Agents 1 and 2 |

@@ -4,7 +4,7 @@ type: roadmap
 status: current
 verified: 2026-11-12
 verified_commit: 5143a5a
-docs: [docs/research/engine-modernization-report.md, docs/research/engine-gap-analysis.md, docs/research/competitive-development-roadmap.md, docs/development-policy.md, plans/axcenity-engine-unified.md, plans/axcenity-engine-graphics.md, docs/research/usability/design-system.md, docs/research/usability/usability-audit.md, docs/research/release-system/README.md]
+docs: [docs/research/engine-modernization-report.md, docs/research/engine-gap-analysis.md, docs/research/competitive-development-roadmap.md, docs/development-policy.md, plans/axcenity-engine-unified.md, plans/axcenity-engine-graphics.md, plans/axcenity-engine-character-studio.md, docs/research/usability/design-system.md, docs/research/usability/usability-audit.md, docs/research/release-system/README.md]
 tags: [roadmap]
 ---
 
@@ -102,7 +102,7 @@ R15 is built: sculpt brushes and the Mesh Filter (#317), masks saved (#322), `_C
 
 `docs/research/facial-animation.md` (Paul's facial animation spec, 2026-11-14): blend shapes imported (F1) and morphed on the GPU (F2, [ADR-0028](../Architecture/Architecture-Decisions/ADR-0028-Facial-Animation-Morph-Targets-On-GPU-And-FaceControls.md)), face profiles and `FaceControls` (F3), expressions, face layers, blinking and gaze (F4), lip sync (F5), Character Studio's Face workspace (F6), facial LOD, profiling and replication (F7). F0–F7 built (PRs #358, #360, #367, #377, #384, #385, #389, #392, #393 F7a facial LOD, F7b replication).
 
-`docs/research/character-studio.md` (Paul's character redesign and Character Studio brief, 2026-11-14): CS1 the smooth stylized default humanoid on CC0 base meshes ([ADR-0030](../Architecture/Architecture-Decisions/ADR-0030-Smooth-Stylized-Humanoid-On-CC0-Base-Meshes-With-Mask-Shapes.md)) **done**; CS2 the Character Studio workspace from the start screen ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)) **done**; CS3 live customization (`HumanoidDescription`), CS4 face and animation preview, CS5 character files, CS6 polish next. **Overhaul proposed** (Paul's brief of 2026-11-14, semi-realistic by default): Stage 1 research, audit and baseline renders in `docs/development/character-studio/`, with a plan (D1–D13, CO1–CO18) that would supersede ADR-0030's art direction and replace CS3–CS6; awaiting approval.
+`docs/research/character-studio.md` (Paul's character redesign and Character Studio brief, 2026-11-14): CS1 the smooth stylized default humanoid on CC0 base meshes ([ADR-0030](../Architecture/Architecture-Decisions/ADR-0030-Smooth-Stylized-Humanoid-On-CC0-Base-Meshes-With-Mask-Shapes.md)) **done**; CS2 the Character Studio workspace from the start screen ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)) **done**; CS3 live customization (`HumanoidDescription`), CS4 face and animation preview, CS5 character files, CS6 polish next. **Overhaul approved** (Paul's brief of 2026-11-14, semi-realistic by default): the plan is `plans/axcenity-engine-character-studio.md` (D1–D13, CO1–CO18); it supersedes ADR-0030's art direction and replaces CS3–CS6. Stage 1 (research, audit and baseline renders in `docs/development/character-studio/`) and the work before Stage 2 are done; Stage 2 (architecture and contracts) is next.
 
 ## Feature plan (unified plan, Phases 1–93)
 

@@ -1,6 +1,6 @@
 # Character Studio overhaul: research
 
-Stage 1 of Paul's brief of 2026-11-14, "Axcenity Character Studio: Complete Overhaul, Research, Multi-Agent Development & Implementation". This file holds the evidence: what the references show (part A) and what the technology offers (part B), kept apart. The audit of what exists is [audit.md](audit.md); the proposal built on both is [implementation-plan.md](implementation-plan.md).
+Stage 1 of Paul's brief of 2026-11-14, "Axcenity Character Studio: Complete Overhaul, Research, Multi-Agent Development & Implementation". This file holds the evidence: what the references show (part A) and what the technology offers (part B), kept apart. The audit of what exists is [audit.md](audit.md); the plan built on both is [plans/axcenity-engine-character-studio.md](../../../plans/axcenity-engine-character-studio.md).
 
 Earlier plans this builds on, not repeats: [default-humanoid.md](../../research/default-humanoid.md) (the skeleton contract), [character-studio.md](../../research/character-studio.md) (CS1–CS6, the stylized redesign and the workspace) and [facial-animation.md](../../research/facial-animation.md) (F0–F7, the face runtime).
 
