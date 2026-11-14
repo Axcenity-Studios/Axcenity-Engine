@@ -5,7 +5,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::{BaseManifest, Constraint, Description, Library};
+use axcenity_assets::{BoneChange, Identity, IdentityLayer};
+
+use crate::{BaseManifest, Constraint, Description, Library, MaterialValues, ModelRef, Problem};
 
 /// `value` mapped through `from` onto `to` (`to` defaults to `from`): how
 /// far `value` is from `from[0]` towards `from[1]`, clamped to 0–1, then as
@@ -104,4 +106,303 @@ pub fn body_shape_weights(
         }
     }
     weights
+}
+
+/// A description resolved against its library: everything the Character
+/// Runtime applies (CO3). Plain data: the host turns it into Instances,
+/// derived models and material values.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Resolved {
+    /// The base model's ID.
+    pub base: String,
+    /// The body: the base model's own mesh.
+    pub body: ResolvedPart,
+    /// What the body wears, in order: the base model's parts (eyes, teeth,
+    /// brows, lashes), then one part per worn item, in the description's
+    /// order.
+    pub parts: Vec<ResolvedPart>,
+    /// The body's shape weights by name ([`body_shape_weights`]).
+    pub shapes: BTreeMap<String, f32>,
+    /// Each changed bone's offset (model space, metres) and scale, summed
+    /// over the parameters that drive it.
+    pub bones: BTreeMap<String, BoneChange>,
+    /// The identity to bake into the body and every part
+    /// (`axcenity_assets::Model::bake`): a layer per parameter, corner and
+    /// region mask, so each model reseats or carries by the shapes it has.
+    pub identity: Identity,
+    /// Number attributes for the body MeshPart (`anim`'s body sliders).
+    pub attributes: BTreeMap<String, f32>,
+    /// The base model's material values by slot: the description's over
+    /// what parameters drive.
+    pub materials: BTreeMap<String, MaterialValues>,
+    /// What was left out and why (an item the library lacks, one that
+    /// doesn't fit the base, a second item in a slot that holds one).
+    pub problems: Vec<Problem>,
+}
+
+/// One mesh of a resolved character.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedPart {
+    /// Its Instance's name: the object's own name in its file, or the
+    /// item's.
+    pub name: String,
+    /// The item it is, or `None` for the body and the base model's parts.
+    pub item: Option<String>,
+    /// The slot it fills.
+    pub slot: Option<String>,
+    /// Its model as a `MeshId` relative to the library's folder
+    /// (`humanoid/HumanoidParts.glb#AxcenityHumanoid/Shirt_Tee`).
+    pub model: String,
+    pub fit: PartFit,
+    /// Its material values by slot: the worn item's over its variant's.
+    pub materials: BTreeMap<String, MaterialValues>,
+}
+
+/// How a part follows the body.
+#[derive(Clone, Debug, PartialEq)]
+pub enum PartFit {
+    /// On the body's skeleton, taking its pose and shapes (the body's own
+    /// parts, `fit: shapes` items and, until CO9 fits them, `binding`
+    /// items).
+    Skinned,
+    /// Rigid on this socket of the base model.
+    Socket(String),
+}
+
+/// Resolves `description` against `library`, or says why it can't be (no
+/// such base model). Items that can't be worn are left out and listed in
+/// [`Resolved::problems`]; values outside their ranges are clamped.
+pub fn resolve(library: &Library, description: &Description) -> Result<Resolved, Problem> {
+    let base = library.base(&description.base).ok_or_else(|| {
+        Problem::new(
+            "base",
+            format!("the library has no base model `{}`", description.base),
+        )
+    })?;
+    let mesh_id = |owner: &str, model: &ModelRef| -> Option<String> {
+        let file = library.path_of(owner, &model.file)?;
+        Some(match &model.object {
+            Some(object) => format!("{file}#{object}"),
+            None => file,
+        })
+    };
+    let own_part = |object: &str| -> Option<ResolvedPart> {
+        let model = ModelRef {
+            file: base.model.file.clone(),
+            object: Some(object.to_owned()),
+        };
+        Some(ResolvedPart {
+            name: last_segment(object).to_owned(),
+            item: None,
+            slot: None,
+            model: mesh_id(&base.id, &model)?,
+            fit: PartFit::Skinned,
+            materials: BTreeMap::new(),
+        })
+    };
+    let body = own_part(&base.model.body).ok_or_else(|| {
+        Problem::new(
+            "base",
+            format!("`{}`'s model leads out of the library", base.id),
+        )
+    })?;
+    let mut parts: Vec<ResolvedPart> = base
+        .model
+        .parts
+        .iter()
+        .filter_map(|part| own_part(part))
+        .collect();
+
+    // The worn items, one per slot unless the slot holds several (the
+    // later one is worn), each with why another was left out.
+    let mut problems: Vec<(usize, Problem)> = Vec::new();
+    let mut worn: Vec<(usize, &crate::WornItem, &crate::ItemManifest)> = Vec::new();
+    for (index, item) in description.items.iter().enumerate() {
+        let mut skip = |message: String| {
+            problems.push((index, Problem::new(format!("items[{index}]"), message)));
+        };
+        let Some(manifest) = library.item(&item.id) else {
+            skip(format!("the library has no item `{}`", item.id));
+            continue;
+        };
+        if !manifest.bases.contains(&base.id) {
+            skip(format!("`{}` doesn't fit `{}`", manifest.id, base.id));
+            continue;
+        }
+        let Some(slot) = base.slot(&manifest.slot) else {
+            skip(format!("`{}` has no slot `{}`", base.id, manifest.slot));
+            continue;
+        };
+        if !slot.multiple
+            && let Some(at) = worn.iter().position(|(_, _, other)| other.slot == slot.id)
+        {
+            let (earlier, _, other) = worn.remove(at);
+            problems.push((
+                earlier,
+                Problem::new(
+                    format!("items[{earlier}]"),
+                    format!(
+                        "the {} slot holds one item: `{}` is worn in place of `{}`",
+                        slot.id, manifest.id, other.id
+                    ),
+                ),
+            ));
+        }
+        worn.push((index, item, manifest));
+    }
+    let mut hidden: Vec<&str> = Vec::new();
+    for (index, item, manifest) in &worn {
+        let model = match manifest.kind {
+            crate::ItemKind::Groom => manifest
+                .groom
+                .as_ref()
+                .and_then(|groom| groom.cards.as_ref().or(groom.mesh.as_ref())),
+            _ => manifest.model.as_ref(),
+        };
+        let Some(model_id) = model.and_then(|model| mesh_id(&manifest.id, model)) else {
+            problems.push((
+                *index,
+                Problem::new(
+                    format!("items[{index}]"),
+                    format!("`{}` has no model in the library", manifest.id),
+                ),
+            ));
+            continue;
+        };
+        let mut materials = item
+            .variant
+            .as_deref()
+            .and_then(|variant| manifest.variant(variant))
+            .map(|variant| variant.materials.clone())
+            .unwrap_or_default();
+        for (slot, values) in &item.materials {
+            materials
+                .entry(slot.clone())
+                .or_default()
+                .extend(values.clone());
+        }
+        let name = model
+            .and_then(|model| model.object.as_deref())
+            .map_or_else(|| last_segment(&manifest.id), last_segment);
+        parts.push(ResolvedPart {
+            name: name.to_owned(),
+            item: Some(manifest.id.clone()),
+            slot: Some(manifest.slot.clone()),
+            model: model_id,
+            fit: match &manifest.fit {
+                crate::Fit::Socket { socket } => PartFit::Socket(socket.clone()),
+                crate::Fit::Shapes { .. } | crate::Fit::Binding { .. } => PartFit::Skinned,
+            },
+            materials,
+        });
+        hidden.extend(manifest.hides.iter().map(String::as_str));
+    }
+    problems.sort_by_key(|(index, _)| *index);
+
+    let values = parameter_values(base, description);
+    let value = |id: &str| values.get(id).copied().unwrap_or(0.0);
+    let mut identity = Identity::default();
+    let mut bones: BTreeMap<String, BoneChange> = BTreeMap::new();
+    let mut attributes: BTreeMap<String, f32> = BTreeMap::new();
+    let mut materials: BTreeMap<String, MaterialValues> = BTreeMap::new();
+    for parameter in &base.parameters {
+        let own = value(&parameter.id);
+        let mut layer = IdentityLayer::default();
+        for driver in &parameter.shapes {
+            layer
+                .shapes
+                .push((driver.shape.clone(), span(own, driver.from, driver.to)));
+        }
+        for driver in &parameter.bones {
+            let weight = span(own, driver.from, driver.to);
+            let offset = driver.offset.unwrap_or_default().map(|axis| axis * weight);
+            let scale = 1.0 + (driver.scale.unwrap_or(1.0) - 1.0) * weight;
+            if offset == [0.0; 3] && scale == 1.0 {
+                continue;
+            }
+            layer.bones.push(BoneChange {
+                bone: driver.bone.clone(),
+                offset,
+                scale,
+            });
+            let total = bones
+                .entry(driver.bone.clone())
+                .or_insert_with(|| BoneChange {
+                    bone: driver.bone.clone(),
+                    offset: [0.0; 3],
+                    scale: 1.0,
+                });
+            for (sum, axis) in total.offset.iter_mut().zip(offset) {
+                *sum += axis;
+            }
+            total.scale *= scale;
+        }
+        if !layer.shapes.is_empty() || !layer.bones.is_empty() {
+            identity.layers.push(layer);
+        }
+        for driver in &parameter.attributes {
+            attributes.insert(driver.attribute.clone(), span(own, driver.from, driver.to));
+        }
+        for driver in &parameter.material_values {
+            materials
+                .entry(driver.material.clone())
+                .or_default()
+                .insert(
+                    driver.value.clone(),
+                    crate::MaterialValue::Number(span(own, driver.from, driver.to)),
+                );
+        }
+    }
+    for corner in &base.corners {
+        let weight: f32 = corner
+            .factors
+            .iter()
+            .map(|factor| span(value(&factor.parameter), factor.from, factor.to))
+            .product();
+        identity.layers.push(IdentityLayer {
+            shapes: vec![(corner.shape.clone(), weight)],
+            bones: Vec::new(),
+        });
+    }
+    for region in &base.regions {
+        if let Some(mask) = &region.mask_shape {
+            let weight = if hidden.contains(&region.id.as_str()) {
+                1.0
+            } else {
+                0.0
+            };
+            identity.layers.push(IdentityLayer {
+                shapes: vec![(mask.clone(), weight)],
+                bones: Vec::new(),
+            });
+        }
+    }
+    for (slot, own) in &description.materials {
+        materials
+            .entry(slot.clone())
+            .or_default()
+            .extend(own.clone());
+    }
+    // The body's weights are what the layers add up to, so the two can't
+    // disagree about which items are worn.
+    let mut shapes: BTreeMap<String, f32> = BTreeMap::new();
+    for (name, weight) in identity.layers.iter().flat_map(|layer| &layer.shapes) {
+        *shapes.entry(name.clone()).or_default() += weight;
+    }
+    Ok(Resolved {
+        base: base.id.clone(),
+        body,
+        parts,
+        shapes,
+        bones,
+        identity,
+        attributes,
+        materials,
+        problems: problems.into_iter().map(|(_, problem)| problem).collect(),
+    })
+}
+
+/// The last name of an object path or an ID (`Rig/Tee` is `Tee`).
+fn last_segment(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }

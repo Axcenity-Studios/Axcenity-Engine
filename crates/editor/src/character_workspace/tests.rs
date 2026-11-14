@@ -295,3 +295,121 @@ fn the_views_look_at_the_character_from_where_they_say() {
     orbit.pan(1.0e6, 1.0e6);
     assert!(orbit.target.length() < Vec3::new(4.0, 6.0, 4.0).length() + 0.01);
 }
+
+/// Overhaul CO3: the same character file shown by the workspace's preview
+/// and applied to a character in a game (`gameplay`'s applier, which bakes
+/// the body shapes into derived models instead of leaning on them every
+/// frame) is the same character: the same parts, and every corner of
+/// every part in the same place, in the same pose.
+#[test]
+fn a_character_file_applied_in_a_game_matches_the_workspaces_preview() {
+    use axcenity_assets::Model;
+    use axcenity_render::glam::Vec3;
+
+    let folder = test_folder("workspace-agrees");
+    let look = Look {
+        build: 0.7,
+        muscle: 0.3,
+        hair: Some("Hair_Bob".to_owned()),
+        outerwear: None,
+        ..Look::default()
+    };
+    let mut workspace = CharacterWorkspace::open(&folder, look.clone(), false).unwrap();
+
+    // The game's side: the same folder with the character library, the
+    // default character and the file's description applied to it.
+    axcenity_project::add_character_library(&folder).unwrap();
+    let assets = Assets::new(&folder);
+    let mut world = World::new();
+    let character = axcenity_project::default_character(&mut world, Vector3::default());
+    let workspace_service = world.workspace();
+    world
+        .set_parent(character, Some(workspace_service))
+        .unwrap();
+    let description = axcenity_avatar::Description::from_json(&look.to_json()).unwrap();
+    let applied = axcenity_gameplay::description::apply_description(
+        &mut world,
+        &assets,
+        character,
+        &description,
+    )
+    .unwrap();
+    assert!(applied.problems.is_empty(), "{:?}", applied.problems);
+    let mut animators = Animators::new();
+    for _ in 0..20 {
+        workspace.step_by(1.0 / 60.0);
+        animators.update(&mut world, &assets, 1.0 / 60.0);
+    }
+
+    // Each MeshPart's corners where its pose puts them, in its file's
+    // space (metres), by the part's name.
+    let corners = |world: &World,
+                   assets: &Assets,
+                   poses: &axcenity_scene::Poses,
+                   body: InstanceId|
+     -> BTreeMap<String, Vec<Vec3>> {
+        let mut parts = vec![body];
+        parts.extend(
+            world
+                .get(body)
+                .unwrap()
+                .children()
+                .iter()
+                .copied()
+                .filter(|child| world.get(*child).unwrap().property("MeshId").is_some()),
+        );
+        parts
+            .into_iter()
+            .map(|part| {
+                let instance = world.get(part).unwrap();
+                let mesh_id = instance.property("MeshId").and_then(Value::as_str).unwrap();
+                let model: Arc<Model> = assets.model_blocking(mesh_id).unwrap();
+                let posed = poses.get(&part).expect("every part is posed");
+                let unfit = model.rig.as_ref().unwrap().fit.inverse();
+                let points = (0..model.primitives.len())
+                    .flat_map(|index| posed.primitive(&model, index, 0).positions.clone())
+                    .map(|corner| unfit.transform_point3(Vec3::from(corner)))
+                    .collect();
+                (instance.name().to_owned(), points)
+            })
+            .collect()
+    };
+    let shown = corners(
+        &workspace.world,
+        &workspace.assets,
+        &workspace.poses(),
+        workspace.body.unwrap(),
+    );
+    let in_game = corners(&world, &assets, animators.poses(), applied.body);
+    assert_eq!(
+        shown.keys().collect::<Vec<_>>(),
+        in_game.keys().collect::<Vec<_>>(),
+        "the same parts"
+    );
+    for (name, shown) in &shown {
+        let applied = &in_game[name];
+        assert_eq!(shown.len(), applied.len(), "{name}");
+        let worst = shown
+            .iter()
+            .zip(applied)
+            .map(|(a, b)| a.distance(*b))
+            .fold(0.0, f32::max);
+        assert!(worst < 2e-4, "{name}: {worst} m apart");
+    }
+    // The heavy build did move the body: this isn't two bare meshes.
+    let base = assets
+        .model_blocking(&axcenity_project::humanoid_part_mesh_id("Body"))
+        .unwrap();
+    let derived_id = world
+        .get(applied.body)
+        .unwrap()
+        .property("MeshId")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    let derived = assets.model_blocking(&derived_id).unwrap();
+    assert_ne!(
+        base.primitives[0].positions, derived.primitives[0].positions,
+        "the build is baked into the body"
+    );
+}

@@ -11,6 +11,7 @@ mod collision;
 pub(crate) mod cooked_model;
 mod fbx;
 mod gltf_takes;
+mod identity;
 mod lod;
 mod lod_cache;
 mod lod_report;
@@ -23,6 +24,9 @@ mod stamped;
 mod test_rig;
 
 pub use collision::is_piece as is_collision_piece;
+pub use identity::{
+    BoneChange, BoneDelta, Identity, IdentityLayer, derived_mesh_id, split_derived,
+};
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
 pub use maps::{MapSlot, TextureRole, texture_pack_name, texture_roles};
@@ -129,6 +133,10 @@ pub struct Model {
     /// here. Shapes of one name in several meshes are one target, so a
     /// face split into meshes moves as one. Empty when it has none.
     pub morph_targets: Vec<MorphTarget>,
+    /// For a derived model ([`Model::bake`]): what its identity adds to
+    /// each bone of a pose, after the clips ([`Model::settle`]). Empty for
+    /// a model as it was loaded.
+    pub(crate) identity_pose: Vec<BoneDelta>,
 }
 
 impl Model {
@@ -190,6 +198,7 @@ impl Model {
             warnings: Vec::new(),
             rig: self.rig.clone(),
             morph_targets: self.morph_targets.clone(),
+            identity_pose: self.identity_pose.clone(),
         }
     }
 
@@ -2216,6 +2225,7 @@ fn fit_with(
         warnings: Vec::new(),
         rig: None,
         morph_targets: Vec::new(),
+        identity_pose: Vec::new(),
     })
 }
 

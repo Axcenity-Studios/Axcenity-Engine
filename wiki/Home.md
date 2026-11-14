@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-14 | ADR-0038, Characters, Animation, Character Data, Gameplay systems, roadmap, known limitations | Character Studio overhaul CO3, the runtime applier: descriptions applied to characters, identity baked into derived models named by `MeshId` |
 | 2026-11-14 | Character Data, ADR-0032 to ADR-0037, roadmap | Character Studio overhaul Stage 2: one character description and its manifests (`avatar`), six decisions; ADR-0030 superseded |
 | 2026-11-14 | Roadmap | Character Studio overhaul approved; its plan moves to `plans/axcenity-engine-character-studio.md` |
 | 2026-11-14 | Roadmap | Character Studio overhaul proposed: research, audit and baseline renders for semi-realistic characters (Stage 1) |
 | 2026-11-14 | ADR-0031, Specialized editors | Character Studio opens from the start screen as a workspace of its own (CS2) |
-| 2026-11-14 | ADR-0030, Characters, roadmap | The default humanoid redesigned: smooth stylized, new outfit and hair, body and face shapes (CS1) |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

@@ -3,18 +3,18 @@ title: Characters
 type: system
 status: current
 implementation: implemented
-crates: [character]
-source: [crates/character/src/lib.rs, crates/character/src/seat.rs, crates/character/src/rig.rs]
-docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md]
-verified: 2026-11-11
-verified_commit: 19c7179d
+crates: [character, gameplay, avatar, assets]
+source: [crates/character/src/lib.rs, crates/character/src/seat.rs, crates/character/src/rig.rs, crates/gameplay/src/description.rs, crates/gameplay/src/description_system.rs, crates/avatar/src/resolve.rs, crates/assets/src/model/identity.rs, crates/assets/src/derived.rs, crates/core/src/material_values.rs, crates/scene/src/material.rs, crates/project/src/character_library.rs]
+docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md, docs/development/character-studio/architecture.md, crates/gameplay/CLAUDE.md]
+verified: 2026-11-14
+verified_commit: b8535483
 tags: [system/character, gameplay]
 ---
 
 # Characters
 
 > [!summary]
-> `character` steps `ThirdPersonController` and `FirstPersonController` Instances (declared in `core`) with the same **kinematic** movement code: ray probes (`physics::cast_ray_excluding`), not a physics body. Walk, run and crouch are built-in modes; jump, slopes and step-up are movement on those modes; a custom `Movement` name hands motion to scripts. It also seats characters (Seats and VehicleSeats), rides anchored moving platforms, and provides the default character rig. Humanoids, Players and spawning live in `script` on top of it. **Implemented.**
+> `character` steps `ThirdPersonController` and `FirstPersonController` Instances (declared in `core`) with the same **kinematic** movement code: ray probes (`physics::cast_ray_excluding`), not a physics body. Walk, run and crouch are built-in modes; jump, slopes and step-up are movement on those modes; a custom `Movement` name hands motion to scripts. It also seats characters (Seats and VehicleSeats), rides anchored moving platforms, and provides the default character rig. Humanoids, Players and spawning live in `script` on top of it. **Implemented.** What a character looks like is separate: the **Character Runtime** (Character Studio overhaul CO3, in `gameplay`, `avatar`, `assets`, `anim` and `scene`) applies a character **description** to a character's Model; see [Applying a description](#applying-a-description-character-runtime). **Built in CO3, pending review** ([ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) is Proposed).
 
 ## Architecture and flow
 
@@ -34,9 +34,38 @@ sequenceDiagram
 - The controller of a Player's `Character`, else the first controller in the Workspace with a body, receives input and owns the camera; others walk their `MoveDirection` (Humanoids).
 - A seated character is unanchored and welded to its seat; `keep_kinematic` skips it.
 
+## Applying a description (Character Runtime)
+
+Built in Character Studio overhaul CO3. The contract, field by field, is `docs/development/character-studio/architecture.md` (sections 7, 10, 14 to 17); the formats are [Character Data](Character-Data.md). This is how the pieces run.
+
+```mermaid
+flowchart LR
+  D["HumanoidDescription<br/>Base, Data"] --> A["apply_description<br/>gameplay description.rs"]
+  L["the project's library<br/>assets/characters/"] --> A
+  A --> R["avatar::resolve<br/>Resolved (plain data)"]
+  R --> I["Identity: a layer per<br/>parameter, corner, region mask"]
+  I --> M["Assets::derive<br/>derived MeshIds"]
+  M --> P["Body and part MeshParts<br/>(DescriptionPart)"]
+  R --> S["body slider attributes<br/>on the Body"]
+  R --> V["Mat_… attributes<br/>read by scene"]
+  A --> K["kept HumanoidDescription<br/>inside the Humanoid"]
+  K --> Y["DescriptionSync::step<br/>each frame"]
+  Y --> A
+```
+
+- **Resolve.** `apply_description(world, assets, character, description)` (`crates/gameplay/src/description.rs`) reads the project's character library (`library`: `assets/characters/` in the project folder, read once and again when its `catalogue.json` changes) and calls `avatar::resolve` (`crates/avatar/src/resolve.rs`). The result is plain data: the body and the parts worn (the base model's eyes, teeth, brows and lashes, then one per item) as `MeshId`s, the body's shape weights, bone changes, body slider attributes, material values, and the items left out with the reason. A character with no skinned body, or a base model the library hasn't, is an error that changes nothing.
+- **Derived models.** The resolved `Identity` has one layer per parameter, corner and region mask. `Assets::derive` registers it and gives each model's derived `MeshId` (`…#AxcenityHumanoid/Body#i<key>`); `Assets` bakes the model the first time something asks for it (`crates/assets/src/model/identity.rs`, `crates/assets/src/derived.rs`). The body and every part are derived with the same identity, so a part's own copies of the body's shapes are baked at the body's weights, and characters with the same description share their meshes. Why a `MeshId`: [ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md).
+- **Parts.** The character's `Body` MeshPart takes the body's derived `MeshId`, kept where the old model's skeleton stood (`anim::ragdoll::refit`). Each part is a MeshPart inside the `Body`, named after its object, not colliding and massless, with the attribute `DescriptionPart`. Parts already worn are kept (and keep their pose), parts no longer worn are destroyed, and MeshParts without the attribute are the creator's own and left alone, except that one named like a library part is taken over (the default humanoid's hand-placed parts). They follow the body as any follower does ([Animation](Animation.md)). An item on a socket gets an Attachment named after the socket, so `anim`'s sockets hang it; the base model's sockets the body lacks are added.
+- **Attributes.** Body slider values (`BodyHeight` and the rest) are number attributes on the `Body`; one at 1 isn't written unless it undoes an earlier value. A slider attribute this base model doesn't drive, left on the `Body` by another base model, is set back to 1 (`anim::BODY_SLIDERS`).
+- **An Animator.** Something must pose the body for its parts to be placed on it, so a `Body` with no Animator is given one. An Animator with nothing to play poses its MeshPart at rest when that MeshPart has MeshPart children ([Animation](Animation.md)), so a character standing still wears its parts in place.
+- **Material values.** Each value is an attribute `Mat_<material>_<value>` (`crates/core/src/material_values.rs`; a number or a `Color3`) on the MeshPart whose model has the material: the base model's on the body and its own parts, an item's on its part. Values a description no longer has are removed. `scene` reads them when it builds the part's draw items (`modulate` in `crates/scene/src/material.rs`): `tint` and `iris_tint` multiply the base colour and `roughness_scale` the roughness, so the material's maps stay ([ADR-0036](../Architecture/Architecture-Decisions/ADR-0036-Character-Shading-Models-With-Modulating-Material-Values.md)). The other values are stored and wait for the renderer's shading models (CO7).
+- **The kept description.** What was applied stays in the World as a `HumanoidDescription` inside the character's Humanoid (named `AppliedDescription` inside a character without one), so it is saved and replicated like any Instance. A derived `MeshId` only means something to a run that has registered its identity, so `DescriptionSync::step` applies every kept description under the Workspace that this run hasn't applied, or whose `Base` or `Data` changed since. `DescriptionSystem` (`crates/gameplay/src/description_system.rs`) steps it every frame from the game systems' step in the script step (on each side; the second finds nothing left to do) and reports a description it can't apply once. Until that step runs, a derived `MeshId` draws its base model.
+- **Scripts** reach all of it through `HumanoidDescription`'s methods, `Humanoid:ApplyDescription`, `Humanoid:GetAppliedDescription` (a copy) and `Players:CreateHumanoidModelFromDescription` (a copy of the StarterCharacter with the description applied): `docs/scripting/api-character.md`.
+- **The library in a project.** `project::add_character_library` (`crates/project/src/character_library.rs`) writes the engine's built-in package (the stylized humanoid's manifests, `HumanoidParts.glb` and a catalogue) into a project's `assets/characters/`, keeping files already there. `project::add_default_humanoid` calls it first, so the library arrives with the default character: a new project with a character, Insert ▸ Character, Character Studio's workspace folder and the visual QA capture's stage. A project made before CO3 has none until Insert ▸ Character is used, and a packed game from such a project has none ([Known limitations](../Roadmap/Known-Limitations.md#characters)).
+
 ## Dependencies
 
-`core`, `anim` (seat `Sit` state), `assets`, `physics`. **`physics` must never depend on it**; `nav` may.
+`core`, `anim` (seat `Sit` state), `assets`, `physics`. **`physics` must never depend on it**; `nav` may. The Character Runtime is not in the `character` crate: the applier is in `gameplay`, which depends on `avatar` for it; `avatar` itself makes no Instances.
 
 ## Performance
 
@@ -44,7 +73,11 @@ sequenceDiagram
 
 ## Testing
 
-`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset).
+`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset). The Character Runtime: `avatar` `tests::resolving`; `assets` `model::identity::tests` and `derived::tests`; `crates/gameplay/src/description_tests.rs` (changing a description, and scripts doing it on both sides); the player's `default_humanoid_tests/description.rs` (parts worn, identity baked, eyes carried by the frame's bones, body sliders, material values, a kept description applied again) and `default_humanoid_tests/description_lua.rs`; the editor's `a_character_file_applied_in_a_game_matches_the_workspaces_preview` (the applier and Character Studio's preview put every corner in the same place).
+
+## Limitations
+
+The bake's cost isn't measured (**Unverified**; CO18 measures characters). The rest of the Character Runtime's limits (the editor's edit mode, values not drawn until CO7, no content yet for binding-fitted and socket items) are in [Known limitations](../Roadmap/Known-Limitations.md#characters).
 
 ## Development guidance
 
@@ -55,4 +88,4 @@ sequenceDiagram
 
 ## Related documentation
 
-`docs/scripting/api-character.md`; [ADR-0007](../Architecture/Architecture-Decisions/ADR-0007-Fixed-Step-Physics-And-Kinematic-Characters.md); [Physics](Physics.md); [Animation](Animation.md)
+`docs/scripting/api-character.md`; `docs/development/character-studio/architecture.md`; [ADR-0007](../Architecture/Architecture-Decisions/ADR-0007-Fixed-Step-Physics-And-Kinematic-Characters.md); [ADR-0033](../Architecture/Architecture-Decisions/ADR-0033-One-Character-Description-Read-By-Every-Host.md); [ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md); [Character Data](Character-Data.md); [Gameplay systems](Gameplay-Systems.md); [Physics](Physics.md); [Animation](Animation.md)

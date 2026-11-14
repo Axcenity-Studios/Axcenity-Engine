@@ -3728,6 +3728,16 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "If true, dying turns on every Ragdoll in the character.",
     ),
     (
+        ClassName::HumanoidDescription,
+        "Base",
+        "The ID of its base model in the project's character library, such as `axcenity/stylized`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of `axcenity/stylized` when this is empty too).",
+    ),
+    (
+        ClassName::HumanoidDescription,
+        "Data",
+        "The description: the text of a character file (`*.character.json`), with the base model, parameter values, items worn and material values. Empty is the base model's default character. The methods read and write it, and setting it to a saved character's text loads that character. Changing the Data of the one inside a Humanoid changes that character by the next frame.",
+    ),
+    (
         ClassName::Players,
         "CharacterAutoLoads",
         "If true, each player gets a character as they join (unless one is already in the Workspace, which becomes theirs) and a new one RespawnTime seconds after their character's Humanoid dies. If false, characters come only from `LoadCharacter`.",
@@ -5914,6 +5924,9 @@ pub(super) fn class_doc(class: ClassName) -> &'static str {
         }
         ClassName::Humanoid => {
             "A Roblox-familiar front for a character, in its Model. It finds the Model's character controller, Health, Inventory and Animator, making each one that's missing during Play, and its WalkSpeed, RunSpeed, JumpHeight, Sit, PlatformStand, AutoRotate and MoveDirection are the controller's, and Health, MaxHealth, DisplayName and HealthDisplayDistance the Health's: there's one value, so the pieces work the same with or without it. It stores only BreakJointsOnDeath and RagdollOnDeath. Its Animator plays its Idle, Walk, Run, Jump and Fall states, if it has them."
+        }
+        ClassName::HumanoidDescription => {
+            "A character's look as data: its base model, body and face values, what it wears and its material values. Data is the text of a character file (`*.character.json`, as Character Studio saves it) and Base its base model's ID. Humanoid:ApplyDescription makes a character look like it. The one inside a Humanoid is what that character has applied; it's applied again when the world is loaded or replicated, so every device builds the character's meshes itself."
         }
         ClassName::DamageZone => {
             "A Part that hurts: every Health whose Model has a part inside it loses DamagePerSecond a second, with the zone as the source. Anchored, half see-through and walked through (CanCollide off) by default. Everything a Part has, and DamagePerSecond."

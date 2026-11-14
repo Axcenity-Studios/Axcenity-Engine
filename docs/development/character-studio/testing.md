@@ -17,7 +17,7 @@ How every milestone is tested, what runs where, and the tests that exist. Visual
 | Unit | Schemas, checks, migration, resolution, fitting maths | `crates/avatar/src/tests/` and each crate's tests | `cargo nextest run -p axcenity-avatar` |
 | Contract | The repository's library against its models: every shape, bone and material a manifest names exists; the catalogue is current; defaults and migrated files are sound | `crates/avatar/tests/shipped_library.rs` | Same; after any change to a manifest, a model or `catalogue.json` |
 | Engine agreement | The manifests describe what the engine ships (sockets, body sliders, parts, default outfit); format 1 files resolve to what the workspace shows | `project` `default_humanoid::tests::the_character_data_manifests_describe_the_default_humanoid`; `editor` `character_workspace::tests::a_saved_look_migrates_to_the_same_parts_and_shapes` | `cargo nextest run -p axcenity-project -p axcenity-editor` |
-| Runtime | A description applied in the player: parts, followers taking shapes, bone offsets, attributes, materials; a game script calling `ApplyDescription` *(CO3)* | `player` tests (`default_humanoid_tests.rs` and new ones) | `cargo nextest run -p axcenity-player` |
+| Runtime | A description applied in the player: parts, identity baked into derived models, followers taking live shapes, bone offsets, attributes, materials, kept descriptions applied again; game scripts calling the `HumanoidDescription` API | `player` `default_humanoid_tests/description.rs` and `description_lua.rs`; `gameplay` `description_tests.rs`; `assets` `model::identity`, `derived`; `avatar` `tests::resolving` | `cargo nextest run -p axcenity-player description`, `-p axcenity-gameplay`, `-p axcenity-assets identity derived` |
 | Geometry QA | Poke-through, waist gaps, layer order, joint volume, eyelid closure, teeth and lips, self-intersection at slider extremes | `assets/characters/<family>/qa/measure.py` (Blender, `bpy`) | Locally where `bpy` is installed (below) |
 | Visual | Benchmark sheets, in Blender and in the engine *(CO2)* | `render_baseline.py`; the in-engine capture | [visual-qa.md](visual-qa.md) |
 | UI | Walkthroughs: open, edit, undo, redo, save, reopen; every control changes the character; drawing snapshots | `editor` `character_workspace/tests.rs`, `app/character_workspace.rs` | `AXCENITY_SNAPSHOTS=<folder> cargo nextest run -p axcenity-editor character` |
@@ -75,6 +75,10 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 | Eyeball front uncovered in a full blink | 20–23% | 0% |
 | Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 |
 | Face vertices above the head joint carrying `Neck` weight | 911 | 0 |
+
+## Tests that exist (CO3)
+
+`assets` 13 (`model::identity::tests`, `derived::tests`); `avatar` 5 more in `tests::resolving` (`resolve`); `player` `default_humanoid_tests::description` (7: parts worn and swapped, identity baked and live shapes followed, the frame's bones re-seating the body and carrying the eyes, body sliders, material values modulating, a still character wearing its parts, kept descriptions applied again) and `description_lua` (3: the script API); `gameplay` `description_tests` (the API's pure functions); `project` `character_library::tests` (2); `editor` `a_character_file_applied_in_a_game_matches_the_workspaces_preview`. Three of the player's tests were checked against the behaviour switched off (no settle, no follower shapes, no modulation) and failed.
 
 ## Tests that exist (CO1)
 

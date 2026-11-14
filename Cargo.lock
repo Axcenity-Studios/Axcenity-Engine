@@ -956,6 +956,7 @@ version = "0.2.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
+ "axcenity-avatar",
  "axcenity-character",
  "axcenity-core",
  "axcenity-nav",
@@ -1054,6 +1055,7 @@ dependencies = [
  "axcenity-anim",
  "axcenity-assets",
  "axcenity-audio",
+ "axcenity-avatar",
  "axcenity-character",
  "axcenity-core",
  "axcenity-gameplay",

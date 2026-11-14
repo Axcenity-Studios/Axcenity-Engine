@@ -624,6 +624,36 @@ humanoid:GetPropertyChangedSignal("Health"):Connect(function()
 end)"#,
     ),
     (
+        "Humanoid.ApplyDescription",
+        r#"local Players = game:GetService("Players")
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		local description = Instance.new("HumanoidDescription")
+		description:SetItem("hair", "axcenity/hair-bob")
+		description:SetParameter("height", 1.1)
+		character:WaitForChild("Humanoid"):ApplyDescription(description)
+	end)
+end)"#,
+    ),
+    (
+        "HumanoidDescription.SetMaterialValue",
+        r#"local humanoid = workspace.Hero.Humanoid
+local description = humanoid:GetAppliedDescription() or Instance.new("HumanoidDescription")
+description:SetMaterialValue("Skin", "melanin", 0.4)
+description:SetMaterialValue("Iris", "iris_tint", Color3.fromRGB(90, 122, 154))
+humanoid:ApplyDescription(description)"#,
+    ),
+    (
+        "Players.CreateHumanoidModelFromDescription",
+        r#"local description = Instance.new("HumanoidDescription")
+description:SetItem("hair", "axcenity/hair-long")
+description:RemoveItem("outerwear")
+local guard = game:GetService("Players"):CreateHumanoidModelFromDescription(description)
+guard.Name = "Guard"
+guard:PivotTo(workspace.GuardPost.CFrame)
+guard.Parent = workspace"#,
+    ),
+    (
         "Players.PlayerRemoving",
         r#"local Players = game:GetService("Players")
 Players.PlayerRemoving:Connect(function(player)

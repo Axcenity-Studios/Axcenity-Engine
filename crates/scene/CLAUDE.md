@@ -1,6 +1,6 @@
 # `scene`
 
-- Shared bridge from `core::World` to `render::DrawList`, plus camera and picking. Draw-list rules: `docs/rendering/pipeline.md`.
+- Shared bridge from `core::World` to `render::DrawList`, plus camera and picking. Draw-list rules: `docs/rendering/pipeline.md`. A MeshPart's character material values (attributes named `Mat_<material>_<value>`, `core::material_value_attribute`; Character Studio overhaul CO3) change its model's materials in `material::modulate`, called from `mesh_part_draw_items`: a `tint` or `iris_tint` multiplies the base colour and `roughness_scale` the roughness. Values modulate, never replace: the maps stay, and a part with no values draws as authored (`docs/development/character-studio/architecture.md` section 10).
 - Keep picking consistent with rendered placement (MeshParts pick by their box), and preserve the shared orientation convention (degrees, YXZ).
 - `streaming.rs` (Phase 80): what's in range of the host's camera, in `TerrainCache::streaming` (hosts call `step`); drawing leaves out the rest and terrain chunks build on a thread (`docs/architecture/streaming.md`).
 - Joint constraints with `Visible` on are drawn from built-in cylinders and spheres in `constraints.rs` (coil, rope, axle).

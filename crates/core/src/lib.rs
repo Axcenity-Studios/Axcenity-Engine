@@ -23,6 +23,7 @@ pub mod face;
 mod index;
 pub mod input;
 mod journal;
+mod material_values;
 pub mod memory;
 pub mod prefab;
 mod sequence;
@@ -50,6 +51,7 @@ pub use enums::{
     ToneMapping, UserInputState, UserInputType,
 };
 pub use journal::Edit;
+pub use material_values::{MATERIAL_VALUE_PREFIX, material_value_attribute};
 pub use sequence::{
     ColorKeypoint, ColorSequence, MAX_KEYPOINTS, NumberKeypoint, NumberSequence, SequenceError,
 };

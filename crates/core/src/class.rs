@@ -388,6 +388,14 @@ pub enum ClassName {
     /// of its own but `BreakJointsOnDeath` and `RagdollOnDeath`. Fires
     /// `MoveToFinished`, `StateChanged` and `Died`.
     Humanoid,
+    /// A character's look as data (Character Studio overhaul CO3): `Data`
+    /// is a character description (the text of a `*.character.json`
+    /// file: base model, parameter values, items, material values) and
+    /// `Base` its base model's ID. `Humanoid:ApplyDescription` makes a
+    /// character look like it; the one inside a Humanoid is what that
+    /// character has applied, and is applied again wherever the world is
+    /// loaded or replicated, so each device builds the meshes itself.
+    HumanoidDescription,
     /// Something a character can do (Phase 76), under its Model or its
     /// Player: `Activate` (or its input map `ActivationKey`) spends `Cost`
     /// of an attribute and starts its `Cooldown`, unless the holder has one
@@ -600,6 +608,7 @@ impl ClassName {
         ClassName::Tool,
         ClassName::Inventory,
         ClassName::Humanoid,
+        ClassName::HumanoidDescription,
         ClassName::Ability,
         ClassName::Effect,
         ClassName::ForceField,
@@ -748,6 +757,7 @@ impl ClassName {
             ClassName::Tool => "Tool",
             ClassName::Inventory => "Inventory",
             ClassName::Humanoid => "Humanoid",
+            ClassName::HumanoidDescription => "HumanoidDescription",
             ClassName::Ability => "Ability",
             ClassName::Effect => "Effect",
             ClassName::ForceField => "ForceField",
@@ -2984,6 +2994,14 @@ impl ClassName {
                 // On, dying turns on the Model's Ragdolls.
                 ("RagdollOnDeath", Value::Bool(false)),
             ],
+            ClassName::HumanoidDescription => vec![
+                // The base model's ID in the character library, such as
+                // `axcenity/stylized`. Kept in step with `Data`.
+                ("Base", Value::String(String::new())),
+                // The description: the text of a `*.character.json` file.
+                // Empty is the base model's default character.
+                ("Data", Value::String(String::new())),
+            ],
             ClassName::WeldConstraint => {
                 let mut properties = vec![
                     ("Part0", Value::Instance(None)),
@@ -3245,6 +3263,7 @@ impl ClassName {
             | ClassName::BindableFunction
             | ClassName::Model
             | ClassName::Inventory
+            | ClassName::HumanoidDescription
             | ClassName::Effect
             | ClassName::Folder
             | ClassName::SurfaceAppearance

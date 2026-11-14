@@ -2654,6 +2654,91 @@ pub(super) const CLASS_METHODS: &[(ClassName, Function)] = &[
         },
     ),
     (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "GetParameter",
+            doc: "The value of the base model's parameter `id` (`height`, `build`, `nose_width`, ...): the description's, or the parameter's default when it holds none. An error for a parameter the base model hasn't.",
+            params: &[("id", "string")],
+            returns: "number",
+        },
+    ),
+    (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "SetParameter",
+            doc: "Sets the parameter `id` to `value`, kept within the parameter's range (5 for a parameter from -1 to 1 is 1). An error for a parameter the base model hasn't, or a number that isn't finite.",
+            params: &[("id", "string"), ("value", "number")],
+            returns: "()",
+        },
+    ),
+    (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "GetItems",
+            doc: "What it wears, in order: for each item its ID in the character library (`axcenity/tee`), the slot it's worn in (nil for an item the library hasn't) and its variant, if one was chosen.",
+            params: &[],
+            returns: "{ { Id: string, Slot: string?, Variant: string? } }",
+        },
+    ),
+    (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "SetItem",
+            doc: "Puts the library's item `id` in `slot`, as its variant `variant` if given, in place of what the slot holds (a slot that holds several keeps them). An item worn already stays where it is and only its variant changes. An error if the library has no such item, it doesn't fit the base model, `slot` isn't the item's slot, or it has no such variant.",
+            params: &[("slot", "string"), ("id", "string"), ("variant", "string?")],
+            returns: "()",
+        },
+    ),
+    (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "RemoveItem",
+            doc: "Takes off every item in `slot` (`hair` for a bald head). An error for a slot the base model hasn't.",
+            params: &[("slot", "string")],
+            returns: "()",
+        },
+    ),
+    (
+        ClassName::HumanoidDescription,
+        Function {
+            name: "SetMaterialValue",
+            doc: "Sets the value `name` of the base model's material `slot` (`Skin`, `Iris`, `Brow`, ...): a number such as the skin's `melanin`, or a Color3 such as its `tint`. Values change the material as it was made, they don't replace its maps, and the neutral value changes nothing. An error for a material the base model hasn't, a value its shading model hasn't, the wrong kind of value, or a number outside the value's range.",
+            params: &[
+                ("slot", "string"),
+                ("name", "string"),
+                ("value", "number | Color3"),
+            ],
+            returns: "()",
+        },
+    ),
+    (
+        ClassName::Humanoid,
+        Function {
+            name: "ApplyDescription",
+            doc: "Makes the character look like `description`: its body takes the description's shape, the parts it wears are put on inside its `Body` (and those it no longer wears taken off), and its body sliders and material values are set. The character keeps a copy inside the Humanoid, which is applied again wherever the world is loaded or replicated. An item that can't be worn is left out with a warning. An error, changing nothing, if the Humanoid isn't in a character's Model, the character has no skinned `Body`, or the project's character library (`assets/characters/`) hasn't the description's base model.",
+            params: &[("description", "HumanoidDescription")],
+            returns: "()",
+        },
+    ),
+    (
+        ClassName::Humanoid,
+        Function {
+            name: "GetAppliedDescription",
+            doc: "A new copy of the description the character has applied, with no Parent, or nil if it has none. Change it and call ApplyDescription to change the character.",
+            params: &[],
+            returns: "HumanoidDescription?",
+        },
+    ),
+    (
+        ClassName::Players,
+        Function {
+            name: "CreateHumanoidModelFromDescription",
+            doc: "A new character that looks like `description`, for an NPC or a preview: a copy of the game's StarterCharacter with the description applied. Its Parent is nil: name it, place it and put it in the Workspace. An error if the game has no StarterCharacter (StarterPlayer's StarterCharacter names no prefab) or the description can't be applied.",
+            params: &[("description", "HumanoidDescription")],
+            returns: "Model",
+        },
+    ),
+    (
         ClassName::Health,
         Function {
             name: "Heal",

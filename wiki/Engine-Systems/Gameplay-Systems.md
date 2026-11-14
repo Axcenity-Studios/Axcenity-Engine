@@ -4,17 +4,17 @@ type: system
 status: current
 implementation: implemented
 crates: [gameplay, script, sim]
-source: [crates/script/src/system.rs, crates/gameplay/src/lib.rs, crates/gameplay/src/ability_system.rs, crates/gameplay/src/tool_system.rs, crates/gameplay/src/character_system.rs, crates/gameplay/src/story.rs, crates/gameplay/src/debris.rs]
+source: [crates/script/src/system.rs, crates/gameplay/src/lib.rs, crates/gameplay/src/ability_system.rs, crates/gameplay/src/tool_system.rs, crates/gameplay/src/character_system.rs, crates/gameplay/src/story.rs, crates/gameplay/src/debris.rs, crates/gameplay/src/description_system.rs, crates/gameplay/src/description.rs]
 docs: [docs/architecture/game-systems.md, crates/gameplay/CLAUDE.md]
-verified: 2026-11-11
-verified_commit: 19c7179d
+verified: 2026-11-14
+verified_commit: b8535483
 tags: [system/gameplay, scripting]
 ---
 
 # Gameplay systems
 
 > [!summary]
-> Roadmap **L7** (PRs #68, #72, #77, #82, #85, 2026-11-11) moved gameplay systems out of `script` into the **`gameplay`** crate, so `ScriptRuntime` shrinks toward the Luau core (interpreter, sandbox, scheduler, Instances, events). Each system implements **`script::GameSystem`** (`crates/script/src/system.rs`): the services it adds, Instance methods, read-only and kept properties, a per-frame step, input and prompt hooks, event firing and network activation requests. **Implemented**: Debris, Abilities and Effects, Tools and Inventories, Health and Humanoids, and Story (dialogues and quests). **Players stays in `script`** by Paul's decision (it's part of the multiplayer core), which ends L7 ([ADR-0019](../Architecture/Architecture-Decisions/ADR-0019-Gameplay-Systems-Through-GameSystem.md)).
+> Roadmap **L7** (PRs #68, #72, #77, #82, #85, 2026-11-11) moved gameplay systems out of `script` into the **`gameplay`** crate, so `ScriptRuntime` shrinks toward the Luau core (interpreter, sandbox, scheduler, Instances, events). Each system implements **`script::GameSystem`** (`crates/script/src/system.rs`): the services it adds, Instance methods, read-only and kept properties, a per-frame step, input and prompt hooks, event firing and network activation requests. **Implemented**: Debris, Abilities and Effects, Tools and Inventories, Health and Humanoids, and Story (dialogues and quests). **Players stays in `script`** by Paul's decision (it's part of the multiplayer core), which ends L7 ([ADR-0019](../Architecture/Architecture-Decisions/ADR-0019-Gameplay-Systems-Through-GameSystem.md)). Character Studio overhaul CO3 added a sixth system that was never in `script`: **character descriptions** (`DescriptionSystem`).
 
 ## Architecture
 
@@ -30,9 +30,10 @@ flowchart LR
     T[Tools and Inventories]
     H[Health and Humanoids]
     S["Story: DialogueService,<br/>QuestService"]
+    C["Character descriptions<br/>(DescriptionSystem)"]
   end
-  D & A & T & H & S -- implement --> GS
-  D & A & T & H & S -- use only --> SYS
+  D & A & T & H & S & C -- implement --> GS
+  D & A & T & H & S & C -- use only --> SYS
   INST["gameplay::install(runtime)"] --> RT
   SIMRT["sim::script_runtime()<br/>= ScriptRuntime::new() + install"] --> INST
   HOSTS[player, editor Play, server, test runner] --> SIMRT
@@ -41,6 +42,7 @@ flowchart LR
 - **Every host** builds its runtime with `axcenity_sim::script_runtime()`. A bare `ScriptRuntime::new()` (script's own tests, the edit-time Console, plugins' `EditRuntime`) has no gameplay systems.
 - Hosts call the systems' frame functions from the shared schedule: `gameplay::step_humanoids`, `fire_landed`, `step_tools`, `step_abilities` (frame step 1), `step_health` (step 4, server), `place_tools` (after Animators); UI reads `ability_bar`, `player_inventory`, `dialogue_view`, `quest_tracker`.
 - Event order is preserved: Abilities then Health fire **first** (before the engine's Players and levels events), Tools fire after.
+- **`DescriptionSystem`** (`crates/gameplay/src/description_system.rs`, CO3) adds a `HumanoidDescription`'s methods, `Humanoid:ApplyDescription` and `GetAppliedDescription`, and `Players:CreateHumanoidModelFromDescription`. Its `step` runs the applier's `DescriptionSync`, so a description kept in a character is applied where the world is loaded or replicated and again when a script changes it; no host calls it. The applier itself (`crates/gameplay/src/description.rs`) is plain World functions with no Lua, described in [Characters](Characters.md#applying-a-description-character-runtime).
 - **Definitions**: the luau-lsp file still describes every service; `system::DESCRIBED_SYSTEM_*` lists what systems add, and `gameplay`'s `system_tests` check them against the installed systems.
 
 ## Development guidance
@@ -51,8 +53,8 @@ flowchart LR
 
 ## Testing
 
-`crates/gameplay/src/*_tests.rs` (Debris, abilities, health, humanoids, tools, dialogue, system lists); `net/src/ability_tests.rs`; editor dialogue tests.
+`crates/gameplay/src/*_tests.rs` (Debris, abilities, health, humanoids, tools, descriptions, dialogue, system lists); `net/src/ability_tests.rs`; editor dialogue tests.
 
 ## Related documentation
 
-`docs/architecture/game-systems.md` (the full trait and what each system hooks); [Scripting](Scripting.md); [Frame schedule](Frame-Schedule.md)
+`docs/architecture/game-systems.md` (the full trait and what each system hooks); [Scripting](Scripting.md); [Frame schedule](Frame-Schedule.md); [Characters](Characters.md)

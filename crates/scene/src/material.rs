@@ -5,7 +5,9 @@ use axcenity_assets::{
     Assets, Channel as FileChannel, MapFile, MapSettings, MaterialFile, MaterialMaps,
     ModelMaterial, Shading as FileShading, StandardMaterial,
 };
-use axcenity_core::{ClassName, Instance, InstanceId, TextureChannel, Value, World};
+use axcenity_core::{
+    ClassName, Instance, InstanceId, TextureChannel, Value, World, material_value_attribute,
+};
 use axcenity_render::glam::Mat4;
 use axcenity_render::{
     Channel, ChannelMap, Material, NormalMap, Outline, SURFACE_PARAMETERS, Shading, SurfaceShader,
@@ -135,6 +137,28 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
             width: outline.width,
             color: outline.color,
         }),
+    }
+}
+
+/// Modulates `material` (the one named `name` in its model) by the
+/// character material values `instance` (a MeshPart) has for it, as
+/// attributes (`core::material_value_attribute`): a tint multiplies its
+/// base colour and a roughness scale its roughness, so its maps stay. A
+/// part with no values is drawn as authored.
+pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str) {
+    let value = |value: &str| instance.attribute(&material_value_attribute(name, value));
+    // Until the renderer has skin, eye, cloth and hair shading (CO7), each
+    // is drawn as a standard material with its tint and roughness.
+    for tint in ["tint", "iris_tint"] {
+        if let Some(tint) = value(tint).and_then(Value::as_color3) {
+            let [r, g, b] = material.base_color;
+            material.base_color = [r * tint.r, g * tint.g, b * tint.b];
+        }
+    }
+    if let Some(scale) = value("roughness_scale").and_then(Value::as_number)
+        && scale.is_finite()
+    {
+        material.roughness = (material.roughness * scale as f32).clamp(0.0, 1.0);
     }
 }
 

@@ -50,8 +50,11 @@ pub enum Pick {
 }
 
 impl Pick {
-    /// Splits a `MeshId` into its file and what it picks from it.
+    /// Splits a `MeshId` into its file and what it picks from it. A derived
+    /// model's identity (after a second `#`, see `identity.rs`) is left
+    /// out: it picks what its base model picks.
     pub fn of_mesh_id(mesh_id: &str) -> (&str, Pick) {
+        let (mesh_id, _) = super::split_derived(mesh_id);
         match mesh_id.split_once('#') {
             Some((file, objects)) => {
                 let paths = objects
