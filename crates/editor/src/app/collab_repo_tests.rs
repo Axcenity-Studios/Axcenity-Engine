@@ -18,6 +18,13 @@ use super::*;
 use axcenity_core::PartType;
 use axcenity_project as project;
 
+/// A file's text with LF line endings. Conflict copies and resolved files
+/// come out as a checkout would (`repo::conflicts`), so where Git converts
+/// line endings (`core.autocrlf`, on by default on Windows) they're CRLF.
+fn text(path: &std::path::Path) -> String {
+    std::fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+}
+
 pub(super) fn bare_remote(name: &str) -> String {
     let dir = std::env::temp_dir().join(format!(
         "axcenity-editor-remote-{name}-{}",
@@ -218,14 +225,8 @@ fn a_file_changed_on_both_sides_keeps_both_until_someone_chooses() {
     let note = found.iter().find(|c| c.path == "scripts/Note.lua").unwrap();
     let copy = note.copy.clone().unwrap();
     assert!(copy.starts_with("scripts/Note.remote-"), "{copy}");
-    assert_eq!(
-        std::fs::read_to_string(folder.join("scripts/Note.lua")).unwrap(),
-        "return 'paul'\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join(&copy)).unwrap(),
-        "return 'sam'\n"
-    );
+    assert_eq!(text(&folder.join("scripts/Note.lua")), "return 'paul'\n");
+    assert_eq!(text(&folder.join(&copy)), "return 'sam'\n");
     app.run_console_command("conflicts");
     assert!(
         app.output
@@ -244,24 +245,15 @@ fn a_file_changed_on_both_sides_keeps_both_until_someone_chooses() {
     );
     app.run_console_command("resolve theirs notes.txt");
     frames_until(&mut app, &State::Synced);
-    assert_eq!(
-        std::fs::read_to_string(folder.join("notes.txt")).unwrap(),
-        "sam\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(folder.join("scripts/Note.lua")).unwrap(),
-        "return 'paul'\n"
-    );
+    assert_eq!(text(&folder.join("notes.txt")), "sam\n");
+    assert_eq!(text(&folder.join("scripts/Note.lua")), "return 'paul'\n");
     let log = remote_log(&url, "repo-conflict");
     assert_eq!(log[0].kind, Some(Kind::Merge), "{:?}", log[0]);
     let check = std::env::temp_dir().join(format!(
         "axcenity-editor-check-repo-conflict-{}",
         std::process::id()
     ));
-    assert_eq!(
-        std::fs::read_to_string(check.join(&copy)).unwrap(),
-        "return 'sam'\n"
-    );
+    assert_eq!(text(&check.join(&copy)), "return 'sam'\n");
     let _ = std::fs::remove_dir_all(&folder);
     let _ = std::fs::remove_dir_all(&sam);
     let _ = std::fs::remove_dir_all(&check);
@@ -398,10 +390,7 @@ fn the_resolve_window_merges_with_each_files_choice() {
     app.resolve_chosen();
     assert!(!app.repo.ui.conflicts_open);
     frames_until(&mut app, &State::Synced);
-    assert_eq!(
-        std::fs::read_to_string(folder.join("notes.txt")).unwrap(),
-        "paul\n"
-    );
+    assert_eq!(text(&folder.join("notes.txt")), "paul\n");
     let _ = std::fs::remove_dir_all(&folder);
     let _ = std::fs::remove_dir_all(&sam);
 }

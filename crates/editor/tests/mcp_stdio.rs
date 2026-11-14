@@ -176,8 +176,11 @@ fn check_prints_a_report_and_client_lines_for_this_binary() {
         text.starts_with("Axcenity MCP check\nok   project "),
         "{text}"
     );
+    // The editor names `current_exe`; on Windows `canonicalize` adds `\\?\`.
     let exe = std::fs::canonicalize(env!("CARGO_BIN_EXE_axcenity-editor")).unwrap();
-    assert!(text.contains(&format!("{}", exe.display())), "{text}");
+    let exe = exe.display().to_string();
+    let exe = exe.strip_prefix(r"\\?\").unwrap_or(&exe);
+    assert!(text.contains(exe), "{text}");
     assert!(text.contains("claude mcp add axcenity -- "), "{text}");
     let missing = Command::new(env!("CARGO_BIN_EXE_axcenity-editor"))
         .args(["--mcp", "--check", "/no/such/project"])

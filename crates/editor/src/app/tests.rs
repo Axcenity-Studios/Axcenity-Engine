@@ -1032,13 +1032,30 @@ fn a_broken_world_file_is_reported_with_its_line_and_the_rest_still_opens() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// Runs `test` on a thread with room for several editors on its stack
+/// (an unoptimized `EditorApp` is large; the default is 2 MiB).
+pub(super) fn with_big_stack(test: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(16 << 20)
+        .spawn(test)
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
 /// A copy of an example project in the temp directory, safe to save over.
+/// Leaves out `.axcenity`: what an editor opened on the example kept there
+/// (Version History, AutoRecover) isn't part of it, and would change what
+/// the tests see.
 pub(super) fn copy_of_example(name: &str, test: &str) -> PathBuf {
     fn copy_folder(from: &Path, to: &Path) {
         std::fs::create_dir_all(to).unwrap();
         for entry in std::fs::read_dir(from).unwrap() {
             let entry = entry.unwrap();
             let target = to.join(entry.file_name());
+            if entry.file_name() == ".axcenity" {
+                continue;
+            }
             if entry.file_type().unwrap().is_dir() {
                 copy_folder(&entry.path(), &target);
             } else {
