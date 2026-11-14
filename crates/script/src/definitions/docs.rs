@@ -2783,6 +2783,26 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "If true, parts and characters bump into what it places, as into painted foliage marked solid. False by default.",
     ),
     (
+        ClassName::ScatterRule,
+        "AlignToSlope",
+        "0 to 1: how far what it places leans with the ground's slope. 0 (the default) stands straight up, as trees grow; 1 stands square to the ground, as rocks and grass on a hillside do.",
+    ),
+    (
+        ClassName::ScatterRule,
+        "SinkDepth",
+        "Studs what it places sinks into the ground (at scale 1; a bigger one sinks more), so a trunk or rock on a slope doesn't show its base. 0 by default.",
+    ),
+    (
+        ClassName::ScatterRule,
+        "AvoidParts",
+        "If true (the default), it places nothing under or into anchored, colliding parts standing on or near the ground (lower than 12 studs above it), such as a house's walls and floor or a placed rock. Moving such a part remakes only the ground near it.",
+    ),
+    (
+        ClassName::ScatterRule,
+        "PartMargin",
+        "Studs past those parts' sides it keeps clear, with AvoidParts. 1 by default.",
+    ),
+    (
         ClassName::Biome,
         "Enabled",
         "If false, the biome covers nothing and the rules inside it place nothing. True by default.",
@@ -2896,6 +2916,106 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::TerrainPath,
         "MaxGrade",
         "The steepest the editor's Route lets the road climb, in degrees. 8 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "Seed",
+        "Changes which bays get windows. The same Seed and settings give the same building. 1 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "Position",
+        "Standing free: the middle of its foundation, in studs. Ignored inside a Spline.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "Orientation",
+        "Standing free: only its turn round Y (degrees) counts, so the building stays upright; its front (with the door) faces -Z turned by it. Ignored inside a Spline.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "Size",
+        "The foundation: width (X), thickness (Y) and depth (Z) in studs. Inside a Spline only the thickness counts, under the lowest point. 24, 1, 16 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "Floors",
+        "How many storeys, 1 to 50. 2 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "FloorHeight",
+        "Studs from one floor to the next. 10 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "RoofStyle",
+        "`Enum.BuildingRoofStyle.Gable` (the default) puts a pitched roof over a rectangular footprint, its ridge along the longer side; `Flat`, or any footprint that isn't a rectangle, a flat one.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "RoofHeight",
+        "Studs from the eaves to a gable roof's ridge. 6 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "BayWidth",
+        "About how many studs of wall each window, door or plain bay takes: each side is cut into a whole number of equal bays. 8 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WindowChance",
+        "The share of bays (0 to 1) that get a window rather than plain wall, picked by Seed. 0.7 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WallThickness",
+        "Studs. 1 by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WallModel",
+        "A model file stretched over each plain wall bay (its front, -Z, facing out). Empty (the default) uses a built-in part.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WindowModel",
+        "A model file stretched over each window bay. Empty (the default) builds the window from parts with a glass pane.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "DoorModel",
+        "A model file stretched over the door bay. Empty (the default) leaves an open doorway in parts.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "CornerModel",
+        "A model file stretched over each corner, one a floor. Empty (the default) uses a built-in post.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WallMaterial",
+        "The walls' Material. Brick by default.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "WallColor",
+        "The walls' color.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "TrimColor",
+        "The floors, corners, sills and lintels' color.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "RoofColor",
+        "The roof's color.",
+    ),
+    (
+        ClassName::BuildingGenerator,
+        "CanCollide",
+        "If true (the default), its parts are solid.",
     ),
     (
         ClassName::ThirdPersonController,
@@ -3263,6 +3383,51 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "Small movements a living face makes by itself (the eyes darting, the brows drifting), from 0 (none) to 1.",
     ),
     (
+        ClassName::FaceControls,
+        "VisemeMap",
+        "Which viseme map lip sync uses: what each of the 12 visemes (Silence, AI, E, O, U, FV, L, MBP, WQ, TH, TDN, KG) does to the controls, and how much of the opening the jaw carries. A `*.visemes.json` file's name or path in assets/faces/visemes, or empty for the built-in one.",
+    ),
+    (
+        ClassName::FaceControls,
+        "LipSyncSmoothing",
+        "Seconds one viseme takes to blend into the next during lip sync.",
+    ),
+    (
+        ClassName::FaceControls,
+        "LipSyncAnticipation",
+        "Seconds before its time each viseme starts, since mouths move a little before the sound comes.",
+    ),
+    (
+        ClassName::FaceControls,
+        "ProceduralEnabled",
+        "If false, the face doesn't blink, look about or move by itself: it shows only its controls, expressions, lip sync and overrides. For background characters, or a face a cutscene keys whole.",
+    ),
+    (
+        ClassName::FaceControls,
+        "LodDistance",
+        "Studs from the camera where the face starts costing less: beyond it the face updates 15 times a second without idle motion, beyond twice it only its expressions 4 times a second, and beyond four times it (or out of view) it rests. 0 keeps it whole at any distance.",
+    ),
+    (
+        ClassName::FaceControls,
+        "ReplicateExpressions",
+        "In multiplayer, whether expressions set on the server (`SetExpression`, `ClearExpression`) show on players' devices. Off, each device's own LocalScripts set them.",
+    ),
+    (
+        ClassName::FaceControls,
+        "ReplicateOverrides",
+        "In multiplayer, whether overrides and layer settings set on the server (`SetOverride`, `ClearOverrides`, `SetLayer`) go to players' devices.",
+    ),
+    (
+        ClassName::FaceControls,
+        "ReplicateLipSync",
+        "In multiplayer, whether a lip sync played on the server (`PlayLipSync`, `StopLipSync`) plays on players' devices, kept in time with the server's.",
+    ),
+    (
+        ClassName::FaceControls,
+        "ReplicationRate",
+        "In multiplayer, the most times a second the face's changes go to players' devices (they blend between them themselves). 0 sends every change at once.",
+    ),
+    (
         ClassName::IKControl,
         "Type",
         "How it turns the bones: `\"Position\"` puts EndEffector at the Target, `\"Rotation\"` turns it as the Target is turned from the MeshPart, `\"Transform\"` does both, and `\"LookAt\"` faces it at the Target.",
@@ -3616,6 +3781,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::Players,
         "MaxPlayers",
         "How many players a hosted game takes, the host's own player among them. A player who joins a full game is refused, and their `NetworkService.ConnectionFailed` says the game is full.",
+    ),
+    (
+        ClassName::Players,
+        "CharacterAuthority",
+        "Who moves players' characters in a hosted game. \"Client\" (the default): each device moves its own player's character at once and the server checks it. \"Server\": the server moves them from the keys players' devices send, and each device predicts its own character and is corrected when the server disagrees, so a modified client can't move it where the game wouldn't.",
     ),
     (
         ClassName::StarterPlayer,
@@ -5647,6 +5817,9 @@ pub(super) fn class_doc(class: ClassName) -> &'static str {
         }
         ClassName::TerrainPath => {
             "Inside a Spline: a road or path on the terrain (procedural worlds PW4), Width studs across along the Spline's curve. ScatterRules keep off it (ClearScatter) wherever it goes, on every device, without changing the terrain. In the editor, Apply to Terrain flattens the ground under it to the curve and paints its Layer, blending in over Falloff (one undo step), and Route lays the Spline's points over the terrain from its first point to its last, no stretch climbing more than MaxGrade degrees, so a road winds round or up a hill (one undo step). Put a SplineMesh in the same Spline for the road's surface."
+        }
+        ClassName::BuildingGenerator => {
+            "A building made from a footprint (procedural worlds PW6). Standing free, its footprint is its own box (Position, Size, and its turn round Y from Orientation, front facing -Z), which the editor's Move, Rotate and Scale handles change; inside a Spline, the Spline's points are its corners. On a foundation Size.Y studs thick, it stacks Floors storeys FloorHeight studs tall of wall bays about BayWidth studs wide, each a window (WindowChance of them) or plain wall, with a doorway in the middle of the front, under a Flat or Gable roof. Bays, the door and corners are built-in parts unless WallModel, WindowModel, DoorModel or CornerModel name a model to stretch into place. The same Seed gives the same building. Its parts are made again on every device whenever its settings change and are never saved; Bake in the editor keeps them as a Model."
         }
         ClassName::DataLayer => {
             "A data layer (roadmap R16): the Instances tagged with its Name (CollectionService), wherever they are in the tree. The editor's Layers panel shows, hides and locks them together; renaming the layer renames the tag."

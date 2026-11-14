@@ -98,8 +98,16 @@ fn the_default_humanoid_head_has_the_facial_profile_shapes_at_rest() {
     ] {
         assert!(names.contains(&name), "{name} in {names:?}");
     }
-    assert_eq!(names.len(), 41);
-    assert!(model.morph_targets.iter().all(|t| t.default_weight == 0.0));
+    // The 41 expression shapes, and the clothing masks the default outfit
+    // needs, resting at 1 (they pull the covered skin inside the clothes).
+    let (masks, face): (Vec<_>, Vec<_>) = model
+        .morph_targets
+        .iter()
+        .partition(|target| target.name.starts_with("Mask_"));
+    assert_eq!(face.len(), 41, "{names:?}");
+    assert!(face.iter().all(|t| t.default_weight == 0.0));
+    assert!(!masks.is_empty());
+    assert!(masks.iter().all(|t| t.default_weight == 1.0), "{masks:?}");
 }
 
 /// A new Baseplate project in a temporary folder, its player spawned as
@@ -327,7 +335,7 @@ fn a_part_inside_the_body_follows_its_pose_and_place() {
         top(&game, body)
     );
     // Swapping is setting the MeshId: the short hair is placed anew.
-    let short = axcenity_project::humanoid_part_mesh_id("Hair_Short");
+    let short = axcenity_project::humanoid_part_mesh_id("Hair_Swept");
     game.world
         .set_property(hair, "MeshId", Value::String(short.clone()))
         .unwrap();
@@ -471,10 +479,10 @@ fn body_sliders_reshape_the_default_character_and_its_parts() {
                 .set_attribute(body, name, Some(Value::Number(*value)))
                 .unwrap();
         }
-        let hair = axcenity_project::humanoid_part(&mut game.world, body, "Hair_Short");
+        let hair = axcenity_project::humanoid_part(&mut game.world, body, "Hair_Swept");
         let _ = game
             .assets
-            .model_blocking(&axcenity_project::humanoid_part_mesh_id("Hair_Short"));
+            .model_blocking(&axcenity_project::humanoid_part_mesh_id("Hair_Swept"));
         game.frames(20, MoveInput::default());
         (body, hair)
     };
@@ -501,7 +509,7 @@ fn body_sliders_reshape_the_default_character_and_its_parts() {
     let grew = eye_from_head(&shaped, body) / eye_from_head(&plain, plain_body);
     assert!((grew - 1.4).abs() < 0.02, "{grew}");
     // The hair takes the same head: its Head bone and its scale match.
-    let hair_mesh = axcenity_project::humanoid_part_mesh_id("Hair_Short");
+    let hair_mesh = axcenity_project::humanoid_part_mesh_id("Hair_Swept");
     let head = |part, mesh: &str| {
         let rig = shaped
             .assets

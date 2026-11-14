@@ -14,7 +14,7 @@
 //!
 //! Operational tests (MP2): `--churn <s>` has each bot leave after about
 //! that long and a new one (a new install) join in its place, for leak
-//! checks; `--flood silent|junk|spam|deep` opens misbehaving connections
+//! checks; `--flood tokenless|silent|junk|spam|deep` opens misbehaving connections
 //! instead of bots (`flood.rs`). A bot that loses its connection tries to
 //! rejoin for a minute, as a player's device does. MP3b: `--cheat
 //! speed|noclip|fly` makes every bot a modified client (`cheat.rs`).
@@ -42,7 +42,8 @@ use stats::{BotSample, Summary};
 
 const USAGE: &str = "usage: axcenity-bots <project-folder> --join <address:port> [--count <n>] [--seconds <s>] \
                      [--threads <n>] [--stagger <ms>] [--password <text>] [--no-scripts] [--idle] [--roam <studs>] \
-                     [--report <s>] [--report-file <path>] [--user-id <first>] [--churn <s>] [--flood silent|junk|spam|deep] [--cheat speed|noclip|fly]\n\
+                     [--report <s>] [--report-file <path>] [--user-id <first>] [--churn <s>] [--flood tokenless|silent|junk|spam|deep] [--cheat speed|noclip|fly] [--relay <address:port>] [--no-punch]\n\
+                     --join takes an address, a join link, or a join code with --relay; --no-punch always goes through the relay\n\
                      example: cargo run -p axcenity-server --bin axcenity-bots -- examples/hello-character --join 127.0.0.1:47800 --count 16";
 
 /// Each frame is this long.
@@ -69,6 +70,8 @@ struct Arguments {
     churn: Option<f64>,
     flood: Option<Flood>,
     cheat: Option<Cheat>,
+    relay: Option<String>,
+    punch: bool,
 }
 
 impl Default for Arguments {
@@ -90,6 +93,8 @@ impl Default for Arguments {
             churn: None,
             flood: None,
             cheat: None,
+            relay: None,
+            punch: true,
         }
     }
 }
@@ -163,6 +168,8 @@ impl Arguments {
                     }
                     parsed.churn = Some(seconds);
                 }
+                "--relay" => parsed.relay = Some(value("--relay", "the relay's address and port")?),
+                "--no-punch" => parsed.punch = false,
                 "--cheat" => {
                     parsed.cheat = Some(Cheat::parse(&value("--cheat", "a kind")?)?);
                 }
@@ -217,6 +224,8 @@ fn main() -> Result<()> {
         roam: arguments.roam,
         cheat: arguments.cheat,
         first_user_id,
+        relay: arguments.relay.clone(),
+        punch: arguments.punch,
     };
     // A flood's connections only need the game's name and version.
     let flood = match arguments.flood {
@@ -339,6 +348,17 @@ fn main() -> Result<()> {
             if kept > 0 {
                 bail!(
                     "the server kept {kept} of {} flood connections",
+                    summary.bots
+                );
+            }
+            return Ok(());
+        }
+        // A secured server must never have let one in.
+        Some(Flood::Tokenless) => {
+            if summary.joined > 0 {
+                bail!(
+                    "the server let {} of {} connections without a token in",
+                    summary.joined,
                     summary.bots
                 );
             }
@@ -569,7 +589,8 @@ mod tests {
         assert_eq!(parsed.flood, Some(Flood::Silent));
         let err = parse(&["castle", "--flood", "loud"]).unwrap_err();
         assert!(
-            err.to_string().contains("silent, junk, spam or deep"),
+            err.to_string()
+                .contains("tokenless, silent, junk, spam or deep"),
             "{err}"
         );
         let parsed = parse(&["castle", "--cheat", "noclip"]).unwrap();

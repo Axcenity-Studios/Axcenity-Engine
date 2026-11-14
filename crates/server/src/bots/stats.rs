@@ -31,6 +31,16 @@ pub struct BotSample {
     pub frame_ms: f64,
     /// Instances in its world.
     pub instances: usize,
+    /// How it reached the server (MP5): `"direct"`, `"punched"` or
+    /// `"relayed"`; `None` before it has a token.
+    pub route: Option<&'static str>,
+    /// With server-moved characters (MP6a): moves predicted, the
+    /// server's answers that differed (and the largest, in studs), and the
+    /// time taking moves again took, in ms.
+    pub predicted: u64,
+    pub predict_corrections: u64,
+    pub predict_largest: f64,
+    pub replay_ms: f64,
 }
 
 /// The value at `share` (0 to 1) of `values`, nearest rank; 0 for none.
@@ -72,6 +82,13 @@ pub struct Summary {
     pub frame_ms_max: f64,
     /// Why connections ended, with how many each.
     pub ended: BTreeMap<String, usize>,
+    /// How bots reached the server, with how many each (MP5).
+    pub routes: BTreeMap<&'static str, usize>,
+    /// Prediction (MP6a), summed over the bots; the largest correction.
+    pub predicted: u64,
+    pub predict_corrections: u64,
+    pub predict_largest: f64,
+    pub replay_ms: f64,
 }
 
 impl Summary {
@@ -93,7 +110,19 @@ impl Summary {
         for reason in samples.iter().filter_map(|s| s.ended.clone()) {
             *ended.entry(reason).or_insert(0) += 1;
         }
+        let mut routes = BTreeMap::new();
+        for route in samples.iter().filter_map(|s| s.route) {
+            *routes.entry(route).or_insert(0) += 1;
+        }
         Summary {
+            predicted: samples.iter().map(|s| s.predicted).sum(),
+            predict_corrections: samples.iter().map(|s| s.predict_corrections).sum(),
+            predict_largest: samples
+                .iter()
+                .map(|s| s.predict_largest)
+                .fold(0.0, f64::max),
+            replay_ms: samples.iter().map(|s| s.replay_ms).sum(),
+            routes,
             bots: samples.len(),
             joined: joins.len(),
             connected: live.len(),
@@ -150,8 +179,22 @@ impl Summary {
         if self.churned > 0 {
             line.push_str(&format!("; {} replaced", self.churned));
         }
+        if self.predicted > 0 {
+            line.push_str(&format!(
+                "; {} moves predicted, {} answers differed (largest {:.2} studs), {:.1} ms taking moves again",
+                self.predicted, self.predict_corrections, self.predict_largest, self.replay_ms
+            ));
+        }
         if self.script_errors > 0 {
             line.push_str(&format!("; {} script errors", self.script_errors));
+        }
+        if self.routes.keys().any(|route| *route != "direct") {
+            let routes: Vec<String> = self
+                .routes
+                .iter()
+                .map(|(route, count)| format!("{count} {route}"))
+                .collect();
+            line.push_str(&format!("; {}", routes.join(", ")));
         }
         for (reason, count) in &self.ended {
             line.push_str(&format!("; {count} ended: {reason}"));
@@ -182,6 +225,11 @@ impl Summary {
             "bot_frame_ms_mean": self.frame_ms_mean,
             "bot_frame_ms_max": self.frame_ms_max,
             "ended": self.ended,
+            "routes": self.routes,
+            "predicted": self.predicted,
+            "predict_corrections": self.predict_corrections,
+            "predict_largest": self.predict_largest,
+            "replay_ms": self.replay_ms,
         })
     }
 }

@@ -12,8 +12,13 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-14 | ADR-0031, ADR index, roadmap, Specialized editors | CS2: the Character Studio workspace, opened from the start screen with no project | Claude |
+| 2026-11-14 | ADR-0030, ADR index, roadmap, Characters | CS1: the default humanoid redesigned (smooth stylized on CC0 base meshes, frames, identity and mask shapes, new outfit and hair); Character Studio plan CS1–CS6 | Claude |
 | 2026-11-14 | Lighting and atmosphere | RL4: ray traced reflections on glossy surfaces (`renderer/ray_reflections.rs`) | Claude |
 | 2026-11-14 | Lighting and atmosphere | RL3: ray traced GI traced in software on GPUs without ray queries (`renderer/ray_soft.rs`) | Claude |
+| 2026-11-14 | Animation, roadmap | F7b: faces' expressions, overrides, layers and lip sync replicated per face at a set rate | Claude |
+| 2026-11-14 | Animation, roadmap | F7a: facial LOD by distance and view, ProceduralEnabled, the Profiler's Faces section | Claude |
+| 2026-11-14 | Animation, roadmap | F6: the Character Studio tab edits faces (profile, controls, shape mapping, expressions, lip-sync timeline) | Claude |
 | 2026-11-14 | ADR-0028, ADR index, roadmap, Animation | Facial animation plan F0–F7 (`docs/research/facial-animation.md`) | Claude |
 | 2026-11-14 | Supported formats, importers | P7.1: OBJ models with their `.mtl` read through `ufbx` | Claude |
 | 2026-11-14 | Supported formats, importers, dependencies, system dependencies, file formats | P7.2: USD converted to `.glb` on import by the editor-only `convert` crate (`openusd`); `converted_from` in sidecars | Claude |

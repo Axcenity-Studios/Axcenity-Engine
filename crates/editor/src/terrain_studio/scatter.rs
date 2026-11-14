@@ -15,6 +15,8 @@ pub struct RulePreset {
     pub models: &'static str,
     pub spacing: f64,
     pub density: f64,
+    /// Degrees: only steeper ground than this (cliff pieces).
+    pub min_slope: f64,
     pub max_slope: f64,
     /// Below this fraction of the height range (the tree line), if any.
     pub below: Option<f64>,
@@ -24,6 +26,10 @@ pub struct RulePreset {
     pub scale: (f32, f32),
     pub collide: bool,
     pub seed: f64,
+    /// 0 to 1: how far what it places leans with the slope.
+    pub lean: f64,
+    /// Studs it sinks into the ground.
+    pub sink: f64,
 }
 
 impl RulePreset {
@@ -34,6 +40,7 @@ impl RulePreset {
             ("Models", Value::String(self.models.to_owned())),
             ("Spacing", Value::Number(self.spacing)),
             ("Density", Value::Number(self.density)),
+            ("MinSlope", Value::Number(self.min_slope)),
             ("MaxSlope", Value::Number(self.max_slope)),
             ("AvoidRadius", Value::Number(self.avoid)),
             ("Clumping", Value::Number(self.clumping)),
@@ -44,6 +51,8 @@ impl RulePreset {
             ),
             ("CanCollide", Value::Bool(self.collide)),
             ("Seed", Value::Number(self.seed)),
+            ("AlignToSlope", Value::Number(self.lean)),
+            ("SinkDepth", Value::Number(self.sink)),
         ];
         if let Some(below) = self.below {
             properties.push((
@@ -60,6 +69,7 @@ pub const FOREST_TREES: RulePreset = RulePreset {
     models: "plant:Tree",
     spacing: 9.0,
     density: 0.8,
+    min_slope: 0.0,
     max_slope: 30.0,
     below: Some(0.6),
     avoid: 0.0,
@@ -68,12 +78,15 @@ pub const FOREST_TREES: RulePreset = RulePreset {
     scale: (0.8, 1.3),
     collide: true,
     seed: 11.0,
+    lean: 0.0,
+    sink: 0.4,
 };
 pub const UNDERGROWTH: RulePreset = RulePreset {
     name: "Undergrowth",
     models: "plant:Bush",
     spacing: 4.0,
     density: 1.5,
+    min_slope: 0.0,
     max_slope: 35.0,
     below: Some(0.65),
     avoid: 4.0,
@@ -82,12 +95,15 @@ pub const UNDERGROWTH: RulePreset = RulePreset {
     scale: (0.7, 1.2),
     collide: false,
     seed: 23.0,
+    lean: 0.3,
+    sink: 0.1,
 };
 pub const MEADOW_FLOWERS: RulePreset = RulePreset {
     name: "Meadow Flowers",
     models: "plant:Flower",
     spacing: 2.5,
     density: 4.0,
+    min_slope: 0.0,
     max_slope: 25.0,
     below: Some(0.5),
     avoid: 2.0,
@@ -96,12 +112,15 @@ pub const MEADOW_FLOWERS: RulePreset = RulePreset {
     scale: (0.8, 1.2),
     collide: false,
     seed: 37.0,
+    lean: 0.5,
+    sink: 0.0,
 };
 pub const GRASS_TUFTS: RulePreset = RulePreset {
     name: "Grass Tufts",
     models: "plant:Grass",
     spacing: 2.0,
     density: 10.0,
+    min_slope: 0.0,
     max_slope: 30.0,
     below: Some(0.6),
     avoid: 1.5,
@@ -110,6 +129,46 @@ pub const GRASS_TUFTS: RulePreset = RulePreset {
     scale: (0.8, 1.3),
     collide: false,
     seed: 41.0,
+    lean: 0.7,
+    sink: 0.0,
+};
+/// Rock faces on steep ground (PW7): upright slabs leaning a little with
+/// the slope and sunk into it, so slopes too steep for plants read as
+/// cliffs. Beside a hole cut with the Holes tool they frame a cave mouth.
+pub const CLIFF_ROCKS: RulePreset = RulePreset {
+    name: "Cliff Rocks",
+    models: "prop:Cliff",
+    spacing: 7.0,
+    density: 1.2,
+    min_slope: 38.0,
+    max_slope: 90.0,
+    below: None,
+    avoid: 0.0,
+    clumping: 0.0,
+    clump_size: 48.0,
+    scale: (0.8, 1.5),
+    collide: true,
+    seed: 61.0,
+    lean: 0.35,
+    sink: 2.5,
+};
+/// Boulders on gentle and middling slopes, in groups, leaning with them.
+pub const BOULDERS: RulePreset = RulePreset {
+    name: "Boulders",
+    models: "prop:Rock",
+    spacing: 10.0,
+    density: 0.25,
+    min_slope: 8.0,
+    max_slope: 40.0,
+    below: None,
+    avoid: 3.0,
+    clumping: 0.6,
+    clump_size: 40.0,
+    scale: (0.6, 1.6),
+    collide: true,
+    seed: 67.0,
+    lean: 0.8,
+    sink: 0.6,
 };
 /// No models yet: select it and click models or props in Assets.
 pub const YOUR_MODELS: RulePreset = RulePreset {
@@ -117,6 +176,7 @@ pub const YOUR_MODELS: RulePreset = RulePreset {
     models: "",
     spacing: 8.0,
     density: 1.0,
+    min_slope: 0.0,
     max_slope: 35.0,
     below: None,
     avoid: 0.0,
@@ -125,14 +185,18 @@ pub const YOUR_MODELS: RulePreset = RulePreset {
     scale: (0.85, 1.15),
     collide: false,
     seed: 1.0,
+    lean: 0.0,
+    sink: 0.0,
 };
 
 /// The single rules the Add menu offers.
-pub const RULE_PRESETS: [RulePreset; 5] = [
+pub const RULE_PRESETS: [RulePreset; 7] = [
     FOREST_TREES,
     UNDERGROWTH,
     MEADOW_FLOWERS,
     GRASS_TUFTS,
+    CLIFF_ROCKS,
+    BOULDERS,
     YOUR_MODELS,
 ];
 

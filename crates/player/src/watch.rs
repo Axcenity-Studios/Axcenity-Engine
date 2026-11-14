@@ -37,6 +37,15 @@ pub struct Arguments {
     pub network: Option<NetworkStart>,
     /// `--password <text>`: the password a host asks for, or a join gives.
     pub password: Option<String>,
+    /// `--lan` with `--host`: a LAN game, not secured with connect tokens
+    /// (MP4).
+    pub lan: bool,
+    /// `--relay <address:port>`: an `axcenity-relay` a host gets a join
+    /// code from, and join codes are looked up on (MP5).
+    pub relay: Option<String>,
+    /// `--no-port-map` with `--host`: don't ask the router to forward the
+    /// port (MP5b).
+    pub no_port_map: bool,
     /// `--dev`: the F9 Developer Console, even in a built game whose
     /// project setting has it off (Phase 71).
     pub dev: bool,
@@ -153,6 +162,17 @@ impl Arguments {
                     bail!("--replay takes the .replay file to watch\n\n{USAGE}");
                 };
                 parsed.replay = Some(PathBuf::from(file));
+            } else if argument == "--lan" {
+                parsed.lan = true;
+            } else if argument == "--no-port-map" {
+                parsed.no_port_map = true;
+            } else if argument == "--relay" {
+                let Some(relay) = arguments.next() else {
+                    bail!(
+                        "--relay takes the relay's address and port, such as relay.example.com:47810\n\n{USAGE}"
+                    );
+                };
+                parsed.relay = Some(relay.to_string_lossy().into_owned());
             } else if argument == "--password" {
                 let Some(password) = arguments.next() else {
                     bail!("--password takes the game's password\n\n{USAGE}");
@@ -165,6 +185,9 @@ impl Arguments {
             } else {
                 bail!("only one game can be played at a time\n\n{USAGE}");
             }
+        }
+        if parsed.lan && !matches!(parsed.network, Some(NetworkStart::Host(_))) {
+            bail!("--lan goes with --host: it hosts a LAN game, not secured\n\n{USAGE}");
         }
         if parsed.replay.is_some() && parsed.network.is_some() {
             bail!("a replay is watched on its own, without --host or --join\n\n{USAGE}");
@@ -407,6 +430,24 @@ mod tests {
         }
         let err = parse(&["--quality", "Epic"]).unwrap_err();
         assert!(err.to_string().contains("--quality takes"), "{err}");
+    }
+
+    #[test]
+    fn lan_goes_with_host() {
+        let lan = parse(&["--host", "--lan", "examples/hello-part"]).unwrap();
+        assert!(lan.lan);
+        assert_eq!(lan.network, Some(NetworkStart::Host(None)));
+        assert!(!parse(&["--host", "examples/hello-part"]).unwrap().lan);
+        assert!(parse(&["--lan", "examples/hello-part"]).is_err());
+        assert!(parse(&["--join", "127.0.0.1:4000", "--lan"]).is_err());
+        let code = parse(&["--join", "K7Q-M2P", "--relay", "relay.example.com:47810"]).unwrap();
+        assert_eq!(code.relay.as_deref(), Some("relay.example.com:47810"));
+        assert!(parse(&["--relay"]).is_err());
+        assert!(
+            parse(&["--host", "--no-port-map", "examples/hello-part"])
+                .unwrap()
+                .no_port_map
+        );
     }
 
     #[test]

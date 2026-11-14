@@ -471,6 +471,12 @@ pub enum ClassName {
     /// the editor flattens and paints the ground under it, and Route lays
     /// its points over the terrain within `MaxGrade`.
     TerrainPath,
+    /// A building made from a footprint (procedural worlds PW6): its own
+    /// `Size` box, or the corners of the Spline it's in. Floors of walls,
+    /// windows and a door from built-in parts or your module models,
+    /// varied by `Seed`, under a flat or gable roof. Its parts are made
+    /// again whenever its settings change and never saved; Bake keeps them.
+    BuildingGenerator,
 }
 
 impl ClassName {
@@ -628,6 +634,7 @@ impl ClassName {
         ClassName::ScatterRule,
         ClassName::Biome,
         ClassName::TerrainPath,
+        ClassName::BuildingGenerator,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -771,6 +778,7 @@ impl ClassName {
             ClassName::ScatterRule => "ScatterRule",
             ClassName::Biome => "Biome",
             ClassName::TerrainPath => "TerrainPath",
+            ClassName::BuildingGenerator => "BuildingGenerator",
         }
     }
 
@@ -1118,6 +1126,11 @@ impl ClassName {
                 // How many players a hosted game takes, the host's own
                 // player among them (Phase 63).
                 ("MaxPlayers", Value::Number(8.0)),
+                // Who moves each player's character (multiplayer readiness
+                // MP6a): "Client", their device, which the server checks;
+                // or "Server", the server from their device's input, which
+                // the device predicts.
+                ("CharacterAuthority", Value::String("Client".to_owned())),
             ],
             ClassName::StarterPlayer => vec![
                 // The prefab each player's character is a copy of, such as
@@ -2563,6 +2576,15 @@ impl ClassName {
                 ("ScaleRange", Value::Vector2(Vector2::new(0.85, 1.15))),
                 // Whether parts and characters bump into what it places.
                 ("CanCollide", Value::Bool(false)),
+                // 0 to 1: how far what it places leans with the slope (0
+                // stands straight up, 1 square to the ground), and studs
+                // it sinks into the ground at scale 1.
+                ("AlignToSlope", Value::Number(0.0)),
+                ("SinkDepth", Value::Number(0.0)),
+                // Whether it keeps off anchored, colliding parts standing
+                // on or near the ground, and how many studs past them.
+                ("AvoidParts", Value::Bool(true)),
+                ("PartMargin", Value::Number(1.0)),
             ],
             ClassName::Biome => vec![
                 ("Enabled", Value::Bool(true)),
@@ -2608,6 +2630,40 @@ impl ClassName {
                 ("ClearMargin", Value::Number(1.0)),
                 // Route's steepest climb, in degrees.
                 ("MaxGrade", Value::Number(8.0)),
+            ],
+            ClassName::BuildingGenerator => vec![
+                // The same seed gives the same building.
+                ("Seed", Value::Number(1.0)),
+                // Its foundation: a box the building stands on, `Size`
+                // studs (width, thickness, depth), its front facing -Z.
+                // Only its turn round Y counts. Inside a Spline, the
+                // points are the corners instead, and the foundation
+                // (Size's thickness) lies under the lowest one.
+                ("Position", Value::Vector3(Vector3::new(0.0, 0.5, 0.0))),
+                ("Orientation", Value::Vector3(Vector3::new(0.0, 0.0, 0.0))),
+                ("Size", Value::Vector3(Vector3::new(24.0, 1.0, 16.0))),
+                // Storeys, and studs from one floor to the next.
+                ("Floors", Value::Number(2.0)),
+                ("FloorHeight", Value::Number(10.0)),
+                // Flat or Gable (a rectangular footprint; any other is flat).
+                ("RoofStyle", enum_item("BuildingRoofStyle", "Gable")),
+                ("RoofHeight", Value::Number(6.0)),
+                // Studs of wall each window or door takes, about (a whole
+                // number fill each side), and the share that get windows.
+                ("BayWidth", Value::Number(8.0)),
+                ("WindowChance", Value::Number(0.7)),
+                ("WallThickness", Value::Number(1.0)),
+                // Model files for a bay of plain wall, a window, the door
+                // and a corner, stretched to fit. Empty uses built-in parts.
+                ("WallModel", Value::String(String::new())),
+                ("WindowModel", Value::String(String::new())),
+                ("DoorModel", Value::String(String::new())),
+                ("CornerModel", Value::String(String::new())),
+                ("WallMaterial", Value::Material(Material::Brick)),
+                ("WallColor", Value::Color3(Color3::new(0.86, 0.78, 0.66))),
+                ("TrimColor", Value::Color3(Color3::new(0.55, 0.52, 0.48))),
+                ("RoofColor", Value::Color3(Color3::new(0.45, 0.24, 0.2))),
+                ("CanCollide", Value::Bool(true)),
             ],
             ClassName::ThirdPersonController => {
                 let mut properties = movement_properties();
@@ -2779,6 +2835,29 @@ impl ClassName {
                     // Small idle movements (eye darts, brow drift), 0 (none)
                     // to 1.
                     ("IdleMotion", Value::Number(0.5)),
+                    // Lip sync (F5): the viseme map (a name or
+                    // `*.visemes.json` path; empty: the built-in one), the
+                    // seconds each viseme takes to blend in and out, and
+                    // how much earlier than its time it starts.
+                    ("VisemeMap", Value::String(String::new())),
+                    ("LipSyncSmoothing", Value::Number(0.06)),
+                    ("LipSyncAnticipation", Value::Number(0.04)),
+                    // Blinking, gaze and idle motion together (F7): off,
+                    // the face shows only what's set and played on it.
+                    ("ProceduralEnabled", Value::Bool(true)),
+                    // Facial LOD (F7): studs from the camera where the face
+                    // starts updating less often (twice that: only its
+                    // expressions, four times: not at all); 0 keeps it
+                    // whole at any distance.
+                    ("LodDistance", Value::Number(30.0)),
+                    // Multiplayer (F7b): which of what scripts set on the
+                    // face goes to players' devices (expressions; overrides
+                    // and layer settings; the lip sync playing), and at most
+                    // how many times a second (0: every frame).
+                    ("ReplicateExpressions", Value::Bool(true)),
+                    ("ReplicateOverrides", Value::Bool(true)),
+                    ("ReplicateLipSync", Value::Bool(true)),
+                    ("ReplicationRate", Value::Number(10.0)),
                 ];
                 properties.extend(
                     crate::face::FACE_CONTROLS
@@ -3197,6 +3276,7 @@ impl ClassName {
             | ClassName::ScatterRule
             | ClassName::Biome
             | ClassName::TerrainPath
+            | ClassName::BuildingGenerator
             | ClassName::Checkpoint
             | ClassName::Spline
             | ClassName::SplinePoint

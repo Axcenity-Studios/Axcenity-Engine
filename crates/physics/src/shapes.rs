@@ -15,6 +15,7 @@ use axcenity_core::{
 use rapier3d::geometry::Array2;
 use rapier3d::glamx::{Quat, Vec3};
 use rapier3d::math::Pose;
+use rapier3d::parry::shape::{HeightField, HeightFieldCellStatus};
 use rapier3d::parry::transformation::vhacd::VHACDParameters;
 use rapier3d::parry::transformation::voxelization::FillMode;
 use rapier3d::prelude::{Collider, ColliderBuilder, SharedShape};
@@ -707,7 +708,20 @@ fn heightfield(data: &TerrainData, size: Vec3) -> ColliderBuilder {
         }
     }
     let scale = size.abs().max(Vec3::splat(MIN_SIZE));
-    ColliderBuilder::heightfield(Array2::new(size_z, size_x, heights), scale)
+    if !data.has_holes() {
+        return ColliderBuilder::heightfield(Array2::new(size_z, size_x, heights), scale);
+    }
+    // Holes (procedural worlds PW7): their cells are taken out, so things
+    // fall and walk through them.
+    let mut field = HeightField::new(Array2::new(size_z, size_x, heights), scale);
+    for z in 0..size_z.saturating_sub(1) {
+        for x in 0..size_x.saturating_sub(1) {
+            if data.is_hole(x, z) {
+                field.set_cell_status(z, x, HeightFieldCellStatus::CELL_REMOVED);
+            }
+        }
+    }
+    ColliderBuilder::new(SharedShape::new(field))
 }
 
 /// Solid colliders for colliding foliage, in the terrain body's local space.
@@ -732,7 +746,12 @@ pub fn foliage_forms(data: &TerrainData, size: Vec3, assets: &Assets) -> Vec<(Po
         let Some(ground) = foliage_ground(data, size, instance.x, instance.z) else {
             continue;
         };
-        let yaw = Quat::from_rotation_y(instance.yaw);
+        let ground = ground - Vec3::new(0.0, instance.sink, 0.0);
+        let (size_x, size_z) = data.size();
+        let cell = (size.x / (size_x - 1) as f32, size.z / (size_z - 1) as f32);
+        let up = to_vec3(instance.up(data, cell, size.y));
+        // Turned round its up, then leaned with the ground.
+        let yaw = Quat::from_rotation_arc(Vec3::Y, up) * Quat::from_rotation_y(instance.yaw);
         let scale = instance.scale.max(0.01);
         let (form, form_size, center) = match &instance.source {
             FoliageSource::Model(path) => {
@@ -785,4 +804,19 @@ fn foliage_ground(data: &TerrainData, size: Vec3, x: f32, z: f32) -> Option<Vec3
 
 fn to_vec3(v: Vector3) -> Vec3 {
     Vec3::new(v.x, v.y, v.z)
+}
+
+/// A triangle mesh collider from flat vertex and index lists, such as a
+/// terrain volume chunk's surface (the PW8 spike). `None` for an empty or
+/// broken mesh.
+pub fn triangle_mesh(positions: &[[f32; 3]], indices: &[u32]) -> Option<ColliderBuilder> {
+    if indices.len() < 3 {
+        return None;
+    }
+    let vertices = positions.iter().map(|&p| Vec3::from_array(p)).collect();
+    let triangles = indices
+        .chunks_exact(3)
+        .map(|t| [t[0], t[1], t[2]])
+        .collect();
+    ColliderBuilder::trimesh(vertices, triangles).ok()
 }

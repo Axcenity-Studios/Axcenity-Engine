@@ -2,7 +2,7 @@
 
 Paul's priority 1 of 2026-11-14 is to make multiplayer ready for public hosting: scale tests with 16–32 real clients, secure connections, NAT traversal and a relay, general-purpose prediction and rollback, server-authoritative validation, and repeatable operational tests. The development policy deferred internet hosting and renet's secure mode (roadmap M11) "until the multiplayer systems are mature"; Paul's request lifts that deferral for the engine's own code. Running servers for other people (a public relay, matchmaking) is still infrastructure and stays Paul's call ([§4](#4-what-stays-pauls-call)).
 
-- **Status:** MP0 (this plan) written. MP1's bots and harness are built ([§6](#6-results)); its two-machine run is G13, on Paul's PC and Mac. MP2's reconnecting and operational tests are built ([§6](#mp2-crashes-churn-and-floods-cloud-container-2026-11-14)). MP3 is built in two parts: MP3a (budgets, argument limits, flags, `Players.PlayerFlagged`, the kick threshold) and MP3b (wall and flight checks, owned-assembly speed, strikes, `--cheat` bots). MP4–MP7 not started.
+- **Status:** MP0 (this plan) written. MP1's bots and harness are built ([§6](#6-results)); its two-machine run is G13, on Paul's PC and Mac. MP2's reconnecting and operational tests are built ([§6](#mp2-crashes-churn-and-floods-cloud-container-2026-11-14)). MP3 is built in two parts: MP3a (budgets, argument limits, flags, `Players.PlayerFlagged`, the kick threshold) and MP3b (wall and flight checks, owned-assembly speed, strikes, `--cheat` bots). MP4's secure connections are built ([§6](#mp4-secure-connections-cloud-container-2026-11-14)); its PC–Mac join over Tailscale waits for Paul's machines. MP5a (the relay with join codes, hole punching, the NAT lab) is built ([§6](#mp5a-relay-join-codes-and-hole-punching-cloud-container-2026-11-14)), and MP5b (port mapping on the host) too ([§6](#mp5b-port-mapping-on-the-host-cloud-container-2026-11-14)). MP6a (server-moved characters with prediction) is built ([§6](#mp6a-server-moved-characters-and-prediction-cloud-container-2026-11-14)); MP6b and MP6c wait for Paul, MP7 for his machines.
 - **Date:** 2026-11-14
 - **Engine:** `main` at `f6d5427`
 - **Relies on:** [ADR-0010](../../wiki/Architecture/Architecture-Decisions/ADR-0010-Listen-Server-Replicas-And-Network-IDs.md) (listen servers, replicas, network IDs), [ADR-0026](../../wiki/Architecture/Architecture-Decisions/ADR-0026-Secure-Game-Connections-And-Relay.md) (this plan's connection decisions), the [development policy](../development-policy.md) (no cross-machine determinism, no infrastructure before it's needed), [networking.md](../architecture/networking.md).
@@ -72,6 +72,93 @@ Stages: MP6a input-driven server characters with prediction and reconciliation; 
 
 Operational tests start the real `axcenity-server` and real bot processes over UDP on one machine, inject the failure (kill the server, cut a bot's packets, flood), and check the outcome: players back in after a restart, memory and Instance counts back to where they started after churn, the server still at frame rate under a flood. Short versions run with `cargo test`; long soaks are `--ignored` and run by hand. Players' devices learn to **reconnect**: when the connection is lost (not when kicked or refused), the player tries again for 60 seconds with back-off, and the server takes the same UserId back in place of a stale connection.
 
+### MP4: secure connections (cloud container, 2026-11-14)
+
+[networking.md](../architecture/networking.md#secure-connections). Every server on the network is now secured unless it's a LAN game (`--host --lan`, `axcenity-server --insecure`, which logs a warning): a player gets a connect token over TLS from the token port (TCP, same number), checked against the fingerprint in a join link or the one remembered for the address, and netcode encrypts everything after. The certificate is kept in the engine's data folder (`server-certificate.json`), never a project; the token key is new each run.
+
+| Test | Result |
+|---|---|
+| Join over UDP with the join link's fingerprint | In, encrypted (`Client::is_secured`); one token issued |
+| A link with another fingerprint, or a remembered address whose certificate changed | Refused before the password is sent: "isn't the one you expected", with both short fingerprints |
+| Wrong password, wrong version | Refused at the token port with the handshake's wording; no token |
+| A connection without a token, and `--flood tokenless` (20 connections) beside 2 bots | Never answered; holds no slot; both bots join |
+| A typed address with no token port (a LAN host) | Joined unsecured; with a fingerprint expected it fails with why instead |
+| Hosting twice from one data folder | Same fingerprint |
+| Every earlier UDP test (handshake, LAN search, rejoin after a crash, churn, floods, cheats) | Pass, now through tokens |
+
+Choices made while building it: a player falls back to unsecured only when nothing answers on the token port and it has no fingerprint for the server, so a secured server can't silently be swapped for an unsecured one; the per-address limit (30 tokens a minute) doesn't apply to this computer's own addresses, so bots and the scale run can join 32 players from one machine. Breaking: an engine from before MP4 can't join a secured server.
+
+Left: the PC–Mac join over Tailscale (a firewall must let TCP through as well as UDP on the game port); a join link in the player's UI and a "copy join link" for hosts (today the log prints it); NAT traversal is MP5.
+
+### MP5a: relay, join codes and hole punching (cloud container, 2026-11-14)
+
+[networking.md](../architecture/networking.md#reaching-a-host). `axcenity-relay` is in the repository (`crates/relay`); a host started with `--relay` gets a join code, and players join by code or the host's link, through a hole both ends punch or through the relay. The token exchange is TLS from player to host through a spliced TCP connection, so the relay sees neither the game nor the password.
+
+**The NAT lab** (`scripts/nat-lab.sh`): two home networks behind masquerading Linux routers that let in only replies, the relay on a bridge between them, in network namespaces on the container.
+
+| Run | Result |
+|---|---|
+| `cone`: both routers keep a port per inside address, 16 bots | 16 of 16 in, all **punched** (direct); join p50 0.12 s; round trip p50 24 ms; no loss, no corrections |
+| `symmetric`: the players' router picks a new port per destination, 16 bots | 16 of 16 in, all **relayed**; join p50 2.16 s (the 2 s punch try first); round trip p50 30 ms; no loss, no corrections |
+| Real server and bots on one machine (`tests/relay.rs`) | 3 relayed with `--no-punch`, 3 punched |
+
+Found while building it: **a router that accepts unasked packets addressed to itself breaks hole punching on Linux.** The first punch to arrive left a connection-tracking entry that made the router map the other side's outgoing packets to a new port, so neither side's punches matched (all relayed, even with friendly routers). Home routers drop such packets, and with the lab's routers doing the same every bot punched through. A router that accepts them still works, through the relay.
+
+Left: a real cross-network join on Paul's machines (a relay on a public address, host and player on different networks); a "copy join code" in the player's UI; a relay address in the project settings so a game can carry its own.
+
+### MP5b: port mapping on the host (cloud container, 2026-11-14)
+
+[networking.md](../architecture/networking.md#reaching-a-host). A secured host (the server, or the player's `--host`) asks its router to forward the game's UDP and TCP port: UPnP IGD first (SSDP search, then the WAN connection's `AddPortMapping`), then PCP, then NAT-PMP for a router that only speaks that. It runs on a thread, leases for 30 minutes and renews at half, removes the mappings when hosting stops, and logs the router's outside address with a join link (and a warning when that address is a provider's shared one, where only a relay helps). The HTTP, SOAP and XML are a few hundred lines in `net::port_map`, no new dependency. `--no-port-map` turns it off; tests and `--bench` never ask.
+
+**The NAT lab** gained two modes in which router A runs miniupnpd (Ubuntu's `miniupnpd-nftables`) and there's no relay: the host asks it, and the bots behind router B join the address it logs. The lab's internet moved to 11.0.0.0/24, because miniupnpd won't forward on a documentation address.
+
+| Run (16 bots) | Result |
+|---|---|
+| `upnp`: miniupnpd with only UPnP | Mapped `11.0.0.1:47800` (UPnP); 16 of 16 in, all **direct**; join p50 0.09 s; round trip p50 20 ms; no loss, no corrections |
+| `pcp`: miniupnpd with only PCP and NAT-PMP | Mapped `11.0.0.1:47800` (PCP); 16 of 16 in, all **direct**; join p50 0.08 s; round trip p50 22 ms; no loss, no corrections |
+| Both, host killed and started again | Gets the same port back at once (the router's leftover mapping is the same computer's) |
+| `cone` and `symmetric` again (16 bots, with the new addresses) | 16 punched; 16 relayed (join p50 2.15 s) |
+
+Fake routers in `port_map/tests.rs` cover what miniupnpd doesn't show: a chunked description, a router that only takes permanent leases (UPnP 725), a port another computer already has (718: the next of 8 is mapped and the link names it, and the other computer's mapping is never deleted), NAT-PMP after a router refuses PCP, and nothing answering at all.
+
+Left: a check on Paul's router, which has no UPnP (the log should say why nothing was forwarded) and on any router that does; IPv6 pinholes (PCP can open them) aren't asked for; a killed host leaves its mapping for up to 30 minutes.
+
+### MP6a: server-moved characters and prediction (cloud container, 2026-11-14)
+
+[networking.md](../architecture/networking.md#server-moved-characters-and-prediction), [ADR-0029](../../wiki/Architecture/Architecture-Decisions/ADR-0029-Server-Moved-Characters-And-Prediction.md). `Players.CharacterAuthority = "Server"` (or `axcenity-server --character-authority server`) has the server move players' characters from their input; their devices predict and reconcile. `"Client"` stays the default.
+
+**One change from D3:** no fixed ticks. Characters step with the frame's length, so a device numbers each step it takes (a `Move`: its length, the camera's turn, keys and stick) and the server takes the same steps with the same code (`Controllers::drive`). What a tick would have bounded, an allowance does: moves are paid from real time, saved up to half a second, so a device claiming longer moves than passed gets no further (`a_device_claiming_more_time_than_passed_moves_no_further_than_real_time_allows`). Physics state isn't saved or restored (D3's point 3): characters are ray probes, so their state is six numbers (`CharacterState`); rapier's sets wait for MP6b.
+
+Tests (`crates/net/src/predict_tests.rs`, in-process with the loopback's emulated latency, jitter and loss):
+
+| Test | Result |
+|---|---|
+| One player walking, running, jumping and turning beside a standing one, 150 ms | Moves at once on the device; 0 corrections; ends 0.000 studs from the server |
+| The same alone at 100 ms ±20 with 5% loss, and 200 ms ±40 with 10% loss | 0 corrections in both; ends where the server has it |
+| A modified client sending its character's parts | Ignored; the server's character stays where its moves put it, and the device snaps back to it |
+| A modified client claiming 1 s moves every frame | Moves no further than real time allows |
+| A server Script teleporting the character 30 studs | The device ends where the server has it |
+| `"Client"` authority | Unchanged: no moves sent, the old checks |
+
+Measurement (`prediction_cost`, release build, 8 players walking, running and jumping for about 4 s each; per device):
+
+| Conditions | Players apart (12 studs) | Players in a crowd (spawn ring, jumping onto each other) |
+|---|---|---|
+| 100 ms ±20, 2% loss | 0 corrections | 0–58 corrections a player (mean 0.4–1.2 studs, largest 14 studs, 7 snaps of 2,080 moves) |
+| 200 ms ±40, 5% loss | 0 corrections | 0–30 a player (mean 0.7–1.8 studs, largest 10 studs, 10 snaps) |
+| Replay cost | — | at most 0.94 ms in a frame (about 24 moves taken again); 13 ms over a whole run |
+
+Real processes over UDP on one machine (debug builds, `axcenity-server examples/hello-spawn --character-authority server` and `axcenity-bots`, which now print prediction counts):
+
+| Run | Result |
+|---|---|
+| 8 bots, 30 s | 13,979 moves; 156 answers differed (largest 1.03 studs), all while bots were joining and spawning beside each other; none in the last 10 s; 23 ms taking moves again in all |
+| 24 bots, 40 s | 33,429 moves; 991 differed, 933 of them in the first 20 s while 24 bots spawned on one ring (largest 4 studs); one of 53 studs later, most likely a respawn from the map's Lava (not traced); no flags |
+
+So the prediction is exact when nothing else moves near the character: the device's step and the server's are the same function on the same input. Corrections come from other players, who are drawn about a round trip plus 0.1 s in the past: a crowd jumping together lands on heads on one side and not the other, and a character standing on another rides it (Phase 73's carry treats a character's anchored parts as a platform), so their differences grow until the answer arrives.
+
+Left: other players in the past (the usual fix is to rewind them too, as lag compensation does for raycasts; worth it only if games with crowds ask); moving platforms aren't rewound; seats, `MoveTo` and `MoveDirection` don't drive a server-moved character, and a device Script's `Jump` can be lost in a replay; Paul's hand check on the PC over a real network.
+
 ## 4. What stays Paul's call
 
 - Running a public `axcenity-relay` or any hosted service (the policy's rule 1; costs money).
@@ -91,7 +178,7 @@ One PR per phase against `main`, opened in merge order. Each updates `docs/archi
 | MP3 | **Validation.** D4's budgets, argument limits, wall and flight checks, owned-assembly speed, strikes, `Players.PlayerFlagged`, kick threshold. Tests with a "modified client" bot mode for each cheat. | Cloud |
 | MP4 | **Secure connections.** D1: token port over TLS, the server's certificate kept in its data folder, connect tokens, encrypted netcode, fingerprints in join links and remembered per address, password at the token port, `--insecure`. | Cloud; then a PC–Mac join over Tailscale |
 | MP5 | **NAT traversal and relay.** `axcenity-relay` (rendezvous, join codes, relaying), port mapping on the host, hole punching, fallback order and log. | Cloud (relay and NAT emulated with network namespaces where the container allows); **Paul's machines** for a real cross-network join |
-| MP6a | **Prediction and rollback, stage 1.** D3's ticks, input streams, server-moved characters with prediction and reconciliation, error smoothing; measured under emulated latency and loss. | Cloud (loopback with emulated network); hand check on the PC |
+| MP6a | **Prediction and rollback, stage 1.** D3's ticks (numbered moves instead, see results), input streams, server-moved characters with prediction and reconciliation, error smoothing; measured under emulated latency and loss. | Cloud (loopback with emulated network); hand check on the PC |
 | MP7 | **Scale run report.** G13's numbers from Paul's machines, with what they change (MaxPlayers default, budgets). | Paul's machines |
 
 MP6b, MP6c and anything hosted wait for Paul.
@@ -134,7 +221,7 @@ Debug builds, the server and bots as separate processes over UDP on one 4-vCPU c
 
 The plan said the server replaces a stale connection "with the same UserId". A UserId is whatever the device says, so anyone could knock another player out with it; the server instead gives each player a random rejoin key in `Welcome`, and only a Hello with that key replaces the old connection.
 
-**Left for later phases:** a spamming connection is only dropped once MP3's per-connection budgets exist (the test notes the loss rather than failing on it); silent connections can hold every spare slot for 10 s until MP4's connect tokens keep strangers out.
+**Left for later phases:** a spamming connection is only dropped once MP3's per-connection budgets exist (the test notes the loss rather than failing on it); silent connections can hold every spare slot for 10 s until MP4's connect tokens keep strangers out (done: see MP4).
 
 ### MP3a: budgets, flags and kicks (cloud container, 2026-11-14)
 

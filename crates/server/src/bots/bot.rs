@@ -37,6 +37,10 @@ pub struct BotSettings {
     pub first_user_id: u64,
     /// A modified client's way of moving its character (`--cheat`).
     pub cheat: Option<Cheat>,
+    /// The relay a bare join code is on (`--relay`, MP5).
+    pub relay: Option<String>,
+    /// Joining by code tries a direct path first (`--no-punch` doesn't).
+    pub punch: bool,
 }
 
 /// Pixels of mouse look that turn a character half round: the controllers
@@ -199,6 +203,8 @@ impl Bot {
             network.set_client_scripts(client_scripts(&world, &project.scripts));
         }
         network.set_join_name(format!("Bot{}", index + 1));
+        network.set_relay(settings.relay.clone());
+        network.set_punching(settings.punch);
         network
             .join(
                 &mut world,
@@ -269,6 +275,7 @@ impl Bot {
         };
         self.busy = Duration::ZERO;
         self.frames = 0;
+        let prediction = self.network.prediction();
         BotSample {
             bot: self.index,
             joined_after: self.joined_after,
@@ -279,11 +286,20 @@ impl Bot {
             sent_per_second: link.bytes_sent_per_second,
             received_per_second: link.bytes_received_per_second,
             corrections: self.network.corrections(),
+            route: self.network.route().map(|route| match route {
+                axcenity_net::Route::Direct => "direct",
+                axcenity_net::Route::Punched(_) => "punched",
+                axcenity_net::Route::Relayed(_) => "relayed",
+            }),
             rejoins: self.network.rejoins(),
             rejoining: self.network.is_rejoining(),
             script_errors: self.script_errors,
             frame_ms,
             instances: self.sim.world.len(),
+            predicted: prediction.moves,
+            predict_corrections: prediction.corrections,
+            predict_largest: f64::from(prediction.largest),
+            replay_ms: prediction.replay_seconds * 1000.0,
             ..BotSample::default()
         }
     }
@@ -320,8 +336,15 @@ impl HostIo for Bot {
     }
 
     fn net_receive(&mut self, seconds: f64) -> ControlFlow<()> {
-        let Sim { world, scripts, .. } = &mut self.sim;
+        let Sim {
+            world,
+            scripts,
+            assets,
+            characters,
+            ..
+        } = &mut self.sim;
         self.network.receive(world, scripts, seconds);
+        self.network.step_characters(world, assets, characters);
         let mut failure = None;
         for line in self.network.take_log() {
             log::info!("Bot{}: {line}", self.index + 1);
@@ -415,6 +438,8 @@ impl HostIo for Bot {
                 root,
             );
         }
+        self.network
+            .record_move(&self.sim.world, &self.sim.scripts, &mut self.sim.characters);
         self.network.send(&self.sim.world, &mut self.sim.scripts);
     }
 }

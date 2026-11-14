@@ -13,7 +13,11 @@ use axcenity_core::{ClassName, InstanceId, Value, World};
 use glam::{Mat4, Quat, Vec3};
 
 use crate::retarget::Severity;
-use crate::{Animators, FaceProblem, FaceRig, check_face, choose_face_profile};
+use crate::{
+    Animators, CompiledVisemes, FaceProblem, FaceRig, built_in_face_profile, check_face,
+    choose_face_profile,
+};
+use axcenity_assets::VisemeMap;
 
 fn bone(name: &str, parent: Option<usize>, at: Vec3, rotation: Quat) -> Bone {
     Bone {
@@ -525,6 +529,7 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
                 viewer: None,
                 heads: &mut heads,
             },
+            crate::face_play::FaceDetail::at(crate::FaceLod::Full, true),
             dt,
             &mut Vec::new(),
         )
@@ -584,4 +589,208 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
     }
     assert!(closed > 0.9, "{closed}");
     assert_eq!(world.face(face).unwrap().expressions.len(), 1);
+}
+
+#[test]
+fn a_lip_sync_keeps_time_with_its_sound_and_fades_out_when_it_stops() {
+    let folder = std::env::temp_dir().join(format!("axcenity-lip-sync-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(folder.join("voice")).unwrap();
+    std::fs::write(
+        folder.join("voice/hi.lipsync.json"),
+        r#"{ "format_version": 1, "duration": 2,
+            "visemes": [ { "time": 0, "viseme": "AI" }, { "time": 1, "viseme": "MBP" } ] }"#,
+    )
+    .unwrap();
+    let assets = Assets::new(&folder);
+    let model = head(Quat::IDENTITY);
+    let mut world = World::new();
+    let part = mesh_part(&mut world, "none.glb");
+    let face = face_controls(&mut world, part, &[("Mouth_Open", 0.1)]);
+    let sound = world.create(ClassName::Sound).unwrap();
+    world.set_parent(sound, Some(part)).unwrap();
+    world.face_mut(face).unwrap().lip_sync = Some(axcenity_core::face::LipSyncPlay {
+        path: "voice/hi.lipsync.json".into(),
+        time: 0.0,
+        speed: 1.0,
+        sound: Some(sound),
+        heard: false,
+        weight: 1.0,
+        target_weight: 1.0,
+        fade: 0.1,
+    });
+    let profile = crate::built_in_face_profile("axcenity").unwrap();
+    let (rig, _) = FaceRig::bind(&model, "axcenity", &profile);
+    let mut motion = crate::face_play::FaceMotion::new(1);
+    let mut step = |world: &mut World, dt: f64| {
+        let mut heads = std::collections::HashMap::new();
+        let mut problems = Vec::new();
+        let layers = crate::face_world::face_layers(
+            world,
+            &assets,
+            face,
+            part,
+            &model,
+            &mut motion,
+            crate::face_world::Lookers {
+                viewer: None,
+                heads: &mut heads,
+            },
+            crate::face_play::FaceDetail::at(crate::FaceLod::Full, true),
+            dt,
+            &mut problems,
+        )
+        .unwrap();
+        assert!(problems.is_empty(), "{problems:?}");
+        let controls = layers.compose(&rig, None, None);
+        let at = |name| controls[face_control(name).unwrap()];
+        (at("Mouth_Open"), at("Jaw_Open"))
+    };
+    let time = |world: &World| world.face(face).unwrap().lip_sync.as_ref().map(|p| p.time);
+    // The Sound hasn't started: the line waits on AI's first frame.
+    let (open, jaw) = step(&mut world, 0.5);
+    assert_eq!(time(&world), Some(0.0));
+    assert!(
+        (open - 0.45).abs() < 1e-5 && (jaw - 0.3).abs() < 1e-5,
+        "{open} {jaw}"
+    );
+    world
+        .set_property(sound, "Playing", Value::Bool(true))
+        .unwrap();
+    world
+        .set_property(sound, "PlaybackSpeed", Value::Number(2.0))
+        .unwrap();
+    step(&mut world, 0.6);
+    assert_eq!(time(&world), Some(1.2), "twice as fast as the Sound");
+    let (open, _) = step(&mut world, 0.0);
+    assert_eq!(open, 0.0, "MBP: closed, over the base's 0.1");
+    // The Sound stops: the line fades out over 0.1 s and the face is its
+    // own again.
+    world
+        .set_property(sound, "Playing", Value::Bool(false))
+        .unwrap();
+    step(&mut world, 0.05);
+    let (open, _) = step(&mut world, 0.05);
+    assert!((open - 0.1).abs() < 1e-5, "{open}");
+    assert!(world.face(face).unwrap().lip_sync.is_none());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_preview_poses_the_face_and_frames_the_head() {
+    let model = head(Quat::IDENTITY);
+    let profile = built_in_face_profile("arkit").unwrap();
+    let (rig, _) = FaceRig::bind(&model, "arkit", &profile);
+    let posed = crate::pose_face(&model, &rig, &controls(&[("Jaw_Open", 0.5)]));
+    // jawOpen at half; eyeBlinkLeft driven (so 0); Freckles keeps its own.
+    assert_eq!(posed.morph_weights(), &[0.0, 0.5, 0.3]);
+    let at = crate::face_point(&model, &rig).unwrap();
+    assert!((at - Vec3::new(0.0, 1.6, 0.0)).length() < 1e-5, "{at}");
+    let moving = face_control("Jaw_Open").unwrap();
+    assert!(rig.moves(moving));
+    assert!(!rig.moves(face_control("Cheek_Puff").unwrap()));
+    assert!(!rig.moves(FACE_CONTROLS.len()));
+    let mut lip = VisemeMap::default();
+    lip.visemes
+        .insert("AI".into(), [("Jaw_Open".into(), 0.8)].into());
+    let (compiled, problems) = CompiledVisemes::new(&lip);
+    assert!(problems.is_empty());
+    let mut values = controls(&[("Jaw_Open", 0.2), ("Brow_Lower_Left", 0.4)]);
+    let mut weights = [0.0; 12];
+    weights[1] = 1.0;
+    compiled.apply(&weights, &mut values);
+    assert!(
+        (values[moving] - 0.8).abs() < 1e-6,
+        "the mouth covers the jaw"
+    );
+    assert_eq!(values[face_control("Brow_Lower_Left").unwrap()], 0.4);
+}
+
+#[test]
+fn far_and_unseen_faces_cost_less_and_say_so() {
+    let (assets, mesh) = remy();
+    let mut world = World::new();
+    let part = mesh_part(&mut world, mesh);
+    let face = face_controls(&mut world, part, &[("Eye_Look_Left", 1.0)]);
+    world
+        .set_property(face, "LodDistance", Value::Number(10.0))
+        .unwrap();
+    let mut animators = Animators::new();
+    let look = Some(axcenity_core::Vector3::new(0.0, 0.0, 1.0));
+    let from = |z: f32| Some(axcenity_core::Vector3::new(0.0, 0.0, -z));
+
+    // Near and in view: whole, every frame.
+    animators.set_viewer(from(5.0), look);
+    for _ in 0..3 {
+        animators.update(&mut world, &assets, FRAME);
+    }
+    let stats = animators.face_stats();
+    assert_eq!(stats.faces, [1, 0, 0, 0]);
+    assert_eq!(stats.evaluated, 1);
+    assert!(stats.controls >= 4, "the eyes turn: {stats:?}");
+    assert!(animators.poses().get(&part).is_some());
+
+    // Past LodDistance: worked out 15 times a second, the rest reused.
+    animators.set_viewer(from(12.0), look);
+    let mut evaluated = 0;
+    for _ in 0..60 {
+        animators.update(&mut world, &assets, FRAME);
+        evaluated += animators.face_stats().evaluated;
+        assert_eq!(animators.face_stats().faces, [0, 1, 0, 0]);
+        assert!(animators.poses().get(&part).is_some(), "still shown");
+    }
+    assert!((14..=17).contains(&evaluated), "{evaluated}");
+
+    // Out of view: the face rests, so nothing poses Remy.
+    animators.set_viewer(from(5.0), Some(axcenity_core::Vector3::new(0.0, 0.0, -1.0)));
+    animators.update(&mut world, &assets, FRAME);
+    assert_eq!(animators.face_stats().faces, [0, 0, 0, 1]);
+    assert_eq!(animators.face_stats().controls, 0);
+    assert!(animators.poses().get(&part).is_none());
+
+    // LodDistance 0 keeps it whole however far.
+    world
+        .set_property(face, "LodDistance", Value::Number(0.0))
+        .unwrap();
+    animators.set_viewer(from(500.0), look);
+    animators.update(&mut world, &assets, FRAME);
+    assert_eq!(animators.face_stats().faces, [1, 0, 0, 0]);
+    assert!(animators.take_errors().is_empty());
+}
+
+#[test]
+fn a_face_without_procedural_motion_doesnt_blink_or_look_about() {
+    let (assets, mesh) = remy();
+    let mut world = World::new();
+    let part = mesh_part(&mut world, mesh);
+    let face = face_controls(&mut world, part, &[]);
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    world
+        .set_property(face, "GazeMode", Value::String("Camera".into()))
+        .unwrap();
+    world
+        .set_property(face, "BlinkIntervalMax", Value::Number(0.2))
+        .unwrap();
+    world
+        .set_property(face, "BlinkIntervalMin", Value::Number(0.1))
+        .unwrap();
+    let model = assets.model_blocking(mesh).unwrap();
+    let rig = model.rig.clone().unwrap();
+    let eye = rig.bone("mixamorig:LeftEye").unwrap();
+    let mut animators = Animators::new();
+    animators.set_viewer(
+        Some(axcenity_core::Vector3::new(3.0, 1.0, 3.0)),
+        Some(axcenity_core::Vector3::new(-1.0, 0.0, -1.0)),
+    );
+    for _ in 0..90 {
+        animators.update(&mut world, &assets, FRAME);
+        let posed = animators.poses().get(&part).expect("posed");
+        let turn = eye_turn(&rig, eye, posed);
+        assert!(
+            turn.angle_between(Quat::IDENTITY) < 1e-3,
+            "the eyes stay ahead"
+        );
+    }
 }

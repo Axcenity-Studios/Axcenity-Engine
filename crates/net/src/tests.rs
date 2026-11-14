@@ -464,3 +464,254 @@ fn released_format(name: &str) -> u32 {
 fn the_release_files_list_this_network_protocol() {
     assert_eq!(released_format("network_protocol"), PROTOCOL_VERSION);
 }
+
+#[test]
+fn a_secured_host_keeps_its_certificate_and_its_join_link_joins_it() {
+    let folder = std::env::temp_dir().join(format!("axcenity-net-cert-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    let mut host = Game::new("1.0", 47926);
+    host.network.set_data_folder(Some(folder.clone()));
+    let port = host.host_udp();
+    host.collect();
+    let fingerprint = host.network.fingerprint().expect("hosted secured");
+    assert!(host.said(&format!("#{fingerprint}")), "{:?}", host.output);
+
+    let mut joiner = Game::new("1.0", 47927);
+    let link = crate::join_link(&format!("127.0.0.1:{port}"), &fingerprint);
+    joiner
+        .network
+        .join(&mut joiner.world, &mut joiner.scripts, &link, None)
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the secured join", |a, b| {
+        a.players().len() == 2 && b.players().len() == 2
+    });
+    assert_eq!(host.network.tokens_issued(), 1);
+
+    // Hosting again from the same data folder: the same certificate, so
+    // players who joined before still trust it.
+    host.network.disconnect(&mut host.world, &mut host.scripts);
+    host.host_udp();
+    assert_eq!(host.network.fingerprint(), Some(fingerprint));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_lan_host_is_not_secured_and_still_joins() {
+    let mut host = Game::new("1.0", 47928);
+    host.network.set_secure(false);
+    let port = host.host_udp();
+    host.collect();
+    assert!(host.network.fingerprint().is_none());
+    assert!(host.said("not secured"), "{:?}", host.output);
+    let mut joiner = Game::new("1.0", 47929);
+    joiner
+        .network
+        .join(
+            &mut joiner.world,
+            &mut joiner.scripts,
+            &format!("127.0.0.1:{port}"),
+            None,
+        )
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the LAN join", |a, b| {
+        a.players().len() == 2 && b.players().len() == 2
+    });
+    assert_eq!(host.network.tokens_issued(), 0);
+}
+
+#[test]
+fn a_secured_host_asks_its_router_to_forward_the_port_and_removes_it_on_stopping() {
+    use crate::port_map::tests::{FakePmp, OUTSIDE, silent};
+    let router = FakePmp::start(false);
+    let mut host = Game::new("1.0", 47_940);
+    host.network.set_port_mapping(true);
+    host.network.map_gateways = Some(crate::port_map::Gateways {
+        ssdp: silent(),
+        pmp: Some(vec![router.address]),
+        wait: Duration::from_millis(100),
+    });
+    let port = host.host_udp();
+    let start = Instant::now();
+    while host.network.public_address().is_none() {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no mapping: {:?}",
+            host.output
+        );
+        host.frame();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let outside = std::net::SocketAddr::from((OUTSIDE, port));
+    assert_eq!(host.network.public_address(), Some(outside));
+    let fingerprint = host.network.fingerprint().unwrap();
+    assert!(
+        host.said(&format!(
+            "The router forwards {outside} to this game (PCP); players on the internet join \
+             with axcenity://join/{outside}#{fingerprint}"
+        )),
+        "{:?}",
+        host.output
+    );
+    host.network.disconnect(&mut host.world, &mut host.scripts);
+    assert_eq!(host.network.public_address(), None);
+    let removed = router
+        .asked()
+        .iter()
+        .filter(|(_, _, lifetime)| *lifetime == 0)
+        .count();
+    assert_eq!(removed, 2, "UDP and TCP removed: {:?}", router.asked());
+}
+
+#[test]
+fn a_lan_host_never_asks_its_router() {
+    use crate::port_map::tests::FakePmp;
+    let router = FakePmp::start(false);
+    let mut host = Game::new("1.0", 47_941);
+    host.network.set_port_mapping(true);
+    host.network.set_secure(false);
+    host.network.map_gateways = Some(crate::port_map::Gateways {
+        ssdp: crate::port_map::tests::silent(),
+        pmp: Some(vec![router.address]),
+        wait: Duration::from_millis(100),
+    });
+    host.host_udp();
+    for _ in 0..20 {
+        host.frame();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(router.asked().is_empty());
+    assert!(!host.said("router"), "{:?}", host.output);
+}
+
+/// A relay on a free port, and a host of "Castle" on it with its code.
+fn relayed_host(discovery: u16) -> (axcenity_relay::Relay, String, Game) {
+    let relay = axcenity_relay::Relay::start(axcenity_relay::RelaySettings {
+        port: 0,
+        ..Default::default()
+    })
+    .expect("a free port");
+    let address = format!("127.0.0.1:{}", relay.port());
+    let mut host = Game::new("1.0", discovery);
+    host.network.set_relay(Some(address.clone()));
+    host.host_udp();
+    let start = Instant::now();
+    while host.network.join_code().is_none() {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no join code: {:?}",
+            host.output
+        );
+        host.frame();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    (relay, address, host)
+}
+
+#[test]
+fn a_player_joins_by_code_through_the_relay() {
+    let (relay, address, mut host) = relayed_host(47930);
+    let code = host.network.join_code().unwrap().to_owned();
+    assert!(
+        host.said(&format!("/{code}#")),
+        "the join link: {:?}",
+        host.output
+    );
+    let mut joiner = Game::new("1.0", 47931);
+    joiner.network.set_relay(Some(address.clone()));
+    // No direct path: everything goes through the relay.
+    joiner.network.set_punching(false);
+    let shown = format!("{}-{}", &code[..3], &code[3..]).to_lowercase();
+    joiner
+        .network
+        .join(&mut joiner.world, &mut joiner.scripts, &shown, None)
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the relayed join", |a, b| {
+        a.players().len() == 2 && b.players().len() == 2
+    });
+    let relay_address: std::net::SocketAddr = address.parse().unwrap();
+    assert_eq!(joiner.network.route(), Some(Route::Relayed(relay_address)));
+    assert!(joiner.said("through the relay"), "{:?}", joiner.output);
+    assert_eq!(relay.players(), 1);
+
+    // The game goes on through the relay: a chat-free check that the
+    // joiner still hears the host a second later.
+    for _ in 0..60 {
+        host.frame();
+        joiner.frame();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(joiner.network.is_joined());
+}
+
+#[test]
+fn a_join_by_code_punches_a_direct_path_when_it_can() {
+    let (_relay, address, mut host) = relayed_host(47932);
+    let code = host.network.join_code().unwrap().to_owned();
+    let fingerprint = host.network.fingerprint().unwrap();
+    let mut joiner = Game::new("1.0", 47933);
+    // The host's link: the relay, the code and the fingerprint.
+    let link = crate::join_link(&format!("{address}/{code}"), &fingerprint);
+    joiner
+        .network
+        .join(&mut joiner.world, &mut joiner.scripts, &link, None)
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the punched join", |a, b| {
+        a.players().len() == 2 && b.players().len() == 2
+    });
+    // On one computer the host's address as the relay sees it is reachable.
+    assert!(
+        matches!(joiner.network.route(), Some(Route::Punched(_))),
+        "{:?}",
+        joiner.network.route()
+    );
+}
+
+#[test]
+fn a_wrong_code_or_fingerprint_is_refused_with_why() {
+    let (_relay, address, mut host) = relayed_host(47934);
+    let code = host.network.join_code().unwrap().to_owned();
+    let mut joiner = Game::new("1.0", 47935);
+    joiner.start(
+        "scripts/menu.client.lua",
+        r#"game:GetService("NetworkService").ConnectionFailed:Connect(function(reason)
+            print("failed: " .. reason)
+        end)"#,
+    );
+    joiner.network.set_relay(Some(address.clone()));
+    let other = if code == "ZZZZZZ" { "YYYYYY" } else { "ZZZZZZ" };
+    joiner
+        .network
+        .join(&mut joiner.world, &mut joiner.scripts, other, None)
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the refusal", |_, b| {
+        b.said("failed:")
+    });
+    assert!(
+        joiner.said("No game is hosted with the code"),
+        "{:?}",
+        joiner.output
+    );
+
+    let wrong = crate::join_link(&format!("{address}/{code}"), &"ab".repeat(32));
+    joiner.output.clear();
+    joiner
+        .network
+        .join(&mut joiner.world, &mut joiner.scripts, &wrong, None)
+        .unwrap();
+    run_until(&mut host, &mut joiner, "the wrong certificate", |_, b| {
+        b.said("failed:")
+    });
+    assert!(
+        joiner.said("isn't the one you expected"),
+        "{:?}",
+        joiner.output
+    );
+
+    // A code with no relay to look it up on.
+    let mut lost = Game::new("1.0", 47936);
+    let err = lost
+        .network
+        .join(&mut lost.world, &mut lost.scripts, &code, None)
+        .unwrap_err();
+    assert!(err.contains("which relay"), "{err}");
+}

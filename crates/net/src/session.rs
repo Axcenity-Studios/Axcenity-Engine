@@ -161,6 +161,10 @@ impl Host {
         self.server.port()
     }
 
+    pub fn server(&self) -> &Server {
+        &self.server
+    }
+
     pub fn server_mut(&mut self) -> &mut Server {
         &mut self.server
     }
@@ -315,7 +319,7 @@ impl Host {
     fn greet(&mut self, id: ConnectionId, hello: Option<Message>) -> Vec<SessionEvent> {
         let from = self
             .server
-            .address_of(id)
+            .describe(id)
             .map(|address| format!(" from {address}"))
             .unwrap_or_default();
         // A player back after losing their connection, which the host
@@ -525,6 +529,16 @@ impl Join {
     /// The key to rejoin with, once the host took this player in; 0 before.
     pub fn rejoin_key(&self) -> u64 {
         self.rejoin_key
+    }
+
+    /// Whether the connection is encrypted with a connect token (MP4).
+    pub fn is_secured(&self) -> bool {
+        self.client.is_secured()
+    }
+
+    /// How the connection reached the host (MP5).
+    pub fn route(&self) -> Option<crate::relayed::Route> {
+        self.client.route()
     }
 
     /// This player, once the host took them in.

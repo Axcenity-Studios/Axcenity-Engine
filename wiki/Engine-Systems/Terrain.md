@@ -4,7 +4,7 @@ type: system
 status: current
 implementation: implemented
 crates: [terrain, core, scene, physics, project, procedural]
-source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs]
+source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs]
 docs: [docs/terrain.md, crates/terrain/CLAUDE.md]
 verified: 2026-11-11
 verified_commit: 19c7179d
@@ -14,7 +14,7 @@ tags: [system/terrain]
 # Terrain
 
 > [!summary]
-> A `Terrain` Instance holds `TerrainData` (`core`): a height grid, paint (material layers blended by height, slope and painted weights) and **painted foliage** (scattered props or models, not Instances, visual or solid). `terrain` only computes on that data: brushes with undo records, deterministic generation and erosion, material rules, chunk meshes at several LODs, raycasts, file codecs and background jobs. `scene` meshes and draws it (chunks on a worker), `physics` collides with a heightfield, `project` reads and writes `heights.png`, paint maps and `foliage.json`. **Implemented.**
+> A `Terrain` Instance holds `TerrainData` (`core`): a height grid, paint (material layers blended by height, slope and painted weights) and **painted foliage** (scattered props or models, not Instances, visual or solid). `terrain` only computes on that data: brushes with undo records, deterministic generation and erosion, material rules, chunk meshes at several LODs, raycasts, file codecs and background jobs. `scene` meshes and draws it (chunks on a worker), `physics` collides with a heightfield, `project` reads and writes `heights.png`, paint maps, `foliage.json` and `holes.png`. **Implemented.**
 
 ## Architecture
 
@@ -35,6 +35,10 @@ Since PW1 (procedural worlds, 2026-11-14) a Terrain can hold `ScatterRule`s that
 
 Since PW2, `Biome`s inside a Terrain split it into areas, each with a ground layer and its own ScatterRules. `terrain::biomes` weighs them by height, slope and shared moisture noise with soft edges; a biome's hand paint is its ground layer's paint, so nothing new is stored. `MaterialRules` carries the biomes, laying each ground layer under the layers' own rules, and a rule inside a Biome is scaled by that biome's weight.
 
+Since PW5, rules keep off anchored parts near the ground (`AvoidParts`, `procedural/src/obstacles.rs`, cached between frames by revision), and generated foliage can lean with the slope and sink (`FoliageInstance::lean`, `sink`, read by the scene and physics). Conform to Terrain and Blend into Terrain (Solid Modeling group) set models on the ground and level it under them.
+
+Since PW7, a Terrain can have holes: a per-cell mask in `TerrainData` (empty until the first hole, saved as optional `holes.png`, changes counted as height changes so undo and chunk versions follow). Hole cells are left out of the drawn chunk (a holed chunk stays at full detail), the parry heightfield (`CELL_REMOVED`), the navmesh's ground, `ground_y`, raycasts and scatter rules, and a holed terrain isn't "solid below" for queries, so a cave of parts under it works. The Holes tool cuts them; built-in `Cliff` and `Rock` props with the Cliff Rocks and Boulders rule presets dress steep ground. `examples/hello-caves` is the walk-in check. Overhangs beyond this wait for the PW8 voxel spike: `terrain/src/volume.rs` holds a signed-distance volume in 32³ chunks (`i8` sixteenths of a voxel, all-air or all-rock chunks a byte), ball brushes and a surface-nets mesher whose chunks meet without gaps, collided as parry trimeshes (`physics::triangle_mesh`). It isn't an Instance yet; `bench_volume_spike` and `bench_volume_colliders` on the PC decide the full build.
+
 Since PW4, a `TerrainPath` inside a Spline keeps scatter rules off its strip (each strip's hash goes into the key of the chunks it reaches), and the editor's Apply flattens and paints under it and Route lays it over hills within a grade (`procedural/src/paths.rs`, `route.rs`; see Splines).
 
 Since PW3, world presets (`.axworld`, `project/src/world_presets.rs`) save and restore a whole setup: generator settings, the layers, biomes and rules (as prefab JSON, heights scaled to the target terrain) and the water. Six are built in (the editor makes them from its presets); a project's own live in `presets/`.
@@ -54,7 +58,7 @@ flowchart LR
 
 ## Testing
 
-42 tests in `terrain`; `bench_terrain_with_foliage` (player, ignored). Biomes: 6 tests in `terrain/src/biomes_tests.rs`, one in `procedural`, editor `app/terrain/biome_tests.rs` and a Terrain Studio drawing test. Scatter rules: 8 tests in `procedural/src/terrain_scatter_tests.rs`, `bench_forest_on_a_2048_stud_terrain` (ignored), scene foliage and editor `app/terrain/scatter_tests.rs`.
+42 tests in `terrain`; `bench_terrain_with_foliage` (player, ignored). Biomes: 6 tests in `terrain/src/biomes_tests.rs`, one in `procedural`, editor `app/terrain/biome_tests.rs` and a Terrain Studio drawing test. Holes: tests in `core` (regions and resizing), `terrain` (files, mesh, raycast), `physics` (a ball falls through, filling catches the next), `nav` (a cave floor under holed ground is walkable), `project` (saved and removed), editor `app/terrain/tests.rs` (the brush and undo), and `examples/hello-caves/tests/cave.spec.lua` (walks in). Scatter rules: 8 tests in `procedural/src/terrain_scatter_tests.rs`, `bench_forest_on_a_2048_stud_terrain` (ignored), scene foliage and editor `app/terrain/scatter_tests.rs`.
 
 ## Development guidance
 
