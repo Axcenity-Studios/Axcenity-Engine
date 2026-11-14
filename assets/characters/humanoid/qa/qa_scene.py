@@ -396,11 +396,14 @@ def cover_test(bvh, p, n, out_window=0.05, in_window=0.03, poke_max=POKE_MAX):
     return None, None
 
 
-def band_gaps(bvh_layers, bvh_body, z0, z1, centre=(0.0, -0.02), step=0.002, angles=16, start=0.24):
+def band_gaps(bvh_layers, bvh_body, z0, z1, centre=(0.0, -0.02), step=0.002, angles=16, start=0.24,
+              skip=None):
     """Horizontal rays toward the body's axis between z0 and z1, starting
     `start` m out (inside the A-pose arms): per direction, the height (mm)
     where the body is hit before any layer (bare skin; in Humanoid.glb,
-    whose covered skin is removed, a hole)."""
+    whose covered skin is removed, a hole). `skip(face index)` leaves out
+    body hits that aren't the torso (a heavy build's arm reaches inside
+    `start`)."""
     out = {}
     for k in range(angles):
         a = 2 * math.pi * k / angles
@@ -411,7 +414,7 @@ def band_gaps(bvh_layers, bvh_body, z0, z1, centre=(0.0, -0.02), step=0.002, ang
             o = Vector((centre[0], centre[1], z)) - d * start
             lb = bvh_body.ray_cast(o, d, 2 * start)
             ll = bvh_layers.ray_cast(o, d, 2 * start)
-            if lb[0] is not None and (ll[0] is None or ll[3] > lb[3]):
+            if lb[0] is not None and (ll[0] is None or ll[3] > lb[3]) and not (skip and skip(lb[2])):
                 gap += step
             elif lb[0] is None and ll[0] is None:
                 pass

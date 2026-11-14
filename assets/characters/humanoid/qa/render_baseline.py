@@ -254,8 +254,40 @@ class Run:
         self.save("details", tiles, 4, labels, "Details the measurements point at")
 
 
+    def fit(self):
+        """Clothing fit at the extremes the measurements test: the default
+        outfit, the tee without the jacket and the underwear, on both
+        frames with the heavy build (the hardest case), plus the shoes on
+        the slim build. The body is whole here, with the garments' masks."""
+        ch, cam = self.scene(self.a.parts, 320, 320)
+        tiles, labels = [], []
+        under = ["Underwear_Top", "Underwear_Briefs"]
+        shots = [
+            ("masculine heavy, outfit", 0.0, "Build_Heavy", None, 35, ((0.0, -2.5, 1.05), (0.0, 0.0, 1.0), 85)),
+            ("feminine heavy, outfit", 1.0, "Build_Heavy", None, 35, ((0.0, -2.5, 1.05), (0.0, 0.0, 1.0), 85)),
+            ("feminine heavy, tee side", 1.0, "Build_Heavy", ["Shirt_Tee", "Pants_Cargo", "Shoes_Sneakers"], 90,
+             ((0.0, -1.5, 1.08), (0.0, 0.0, 1.02), 85)),
+            ("feminine heavy, outfit back", 1.0, "Build_Heavy", None, 180, ((0.0, -1.7, 1.12), (0.0, 0.0, 1.05), 85)),
+            ("masculine heavy, briefs front", 0.0, "Build_Heavy", under, 0, ((0.0, -1.2, 0.86), (0.0, 0.0, 0.84), 85)),
+            ("masculine heavy, briefs back", 0.0, "Build_Heavy", under, 180, ((0.0, -1.2, 0.88), (0.0, 0.0, 0.86), 85)),
+            ("masculine heavy, sports top", 0.0, "Build_Heavy", under, 35, ((0.0, -1.3, 1.30), (0.0, 0.0, 1.27), 85)),
+            ("feminine heavy, briefs back", 1.0, "Build_Heavy", under, 180, ((0.0, -1.2, 0.93), (0.0, 0.0, 0.91), 85)),
+            ("masculine heavy, shoes", 0.0, "Build_Heavy", None, 0, ((0.45, -0.75, 0.55), (0.10, -0.06, 0.05), 85)),
+            ("masculine slim, shoes", 0.0, "Build_Slim", None, 0, ((0.45, -0.75, 0.55), (0.10, -0.06, 0.05), 85)),
+            ("feminine heavy, shoes", 1.0, "Build_Heavy", None, 0, ((0.45, -0.75, 0.55), (0.10, -0.06, 0.05), 85)),
+            ("feminine heavy, shoes front", 1.0, "Build_Heavy", None, 0, ((0.05, -0.85, 0.18), (0.05, -0.08, 0.06), 85)),
+        ]
+        for label, frame, build, outfit, deg, cam_def in shots:
+            self.dressed(ch, frame, build={build: 1.0}, outfit=outfit)
+            Q.turn_character(ch, deg)
+            tiles.append(self.tile(cam, "fit_" + label.replace(",", "").replace(" ", "_"), cam_def))
+            labels.append(label)
+        Q.turn_character(ch, 0)
+        self.save("fit", tiles, 4, labels, "Clothing fit at the extremes (parts file, heavy and slim builds)")
+
+
 SHEETS = ["turnaround_masculine", "turnaround_feminine", "face_closeups", "face_topology", "body_clay",
-          "build_range", "hair_styles", "deformation_poses", "expressions", "details"]
+          "build_range", "hair_styles", "deformation_poses", "expressions", "details", "fit"]
 
 
 def main():

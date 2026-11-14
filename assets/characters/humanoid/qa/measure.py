@@ -335,6 +335,29 @@ def poke_stats(body_geo, layer_bvh, W, idx=None, extra=None, out_window=0.05, in
     return out
 
 
+ARM_BONES = ("UpperArm", "LowerArm", "Hand")
+
+
+def arm_face(body, W):
+    """A test for the body's triangles (by index) that belong to an arm."""
+    def test(fi):
+        tri = body.tris[fi]
+        votes = sum(1 for i in tri if (dominant(W, int(i)) or "").endswith(ARM_BONES))
+        return votes >= 2
+    return test
+
+
+def facing_out(layer, body, reach=0.1):
+    """The layer's points whose normal faces away from the body (the skin's
+    normal at the nearest point), leaving out openings' rolled-in bands."""
+    keep = []
+    for i in range(len(layer.co)):
+        loc, nrm, _, _ = body.bvh.find_nearest(Vector(layer.co[i]), reach)
+        if loc is not None and Vector(layer.nrm[i]).dot(nrm) > 0.2:
+            keep.append(i)
+    return keep
+
+
 def combo_name(f, b):
     return ("feminine" if f else "masculine") + "/" + (b or "neutral")
 
@@ -358,24 +381,28 @@ def clipping(ch, W, ear_idx):
             body = Q.Geo(ch.parts["Body"])
             gg = Q.Geo(ch.parts[g])
             out["garments"].setdefault(g, {})[cn] = poke_stats(body, gg.bvh, W)
-        # Default layering: tee under jacket; pants waistband vs tee hem.
+        # The outfit's layer order, as build.py clears it: the trousers'
+        # waistband under the untucked tee, the tee under the jacket. Only
+        # inner points facing away from the body count: an opening's
+        # rolled-in band faces the skin, can't be seen, and isn't a poke.
         ch.set_look(frame=f, build=build, masks=ch.masks_for(outfit))
+        body = Q.Geo(ch.parts["Body"])
         tee = Q.Geo(ch.parts["Shirt_Tee"])
         jacket = Q.Geo(ch.parts["Jacket_Cropped"])
         pants = Q.Geo(ch.parts["Pants_Cargo"])
-        out["layering"].setdefault("Shirt_Tee_under_Jacket_Cropped", {})[cn] = poke_stats(tee, jacket.bvh, WT)
-        out["layering"].setdefault("Pants_Cargo_under_Shirt_Tee", {})[cn] = poke_stats(pants, tee.bvh, WP)
-        out["layering"].setdefault("Shirt_Tee_under_Pants_Cargo", {})[cn] = poke_stats(tee, pants.bvh, WT)
-        body = Q.Geo(ch.parts["Body"])
+        out["layering"].setdefault("Shirt_Tee_under_Jacket_Cropped", {})[cn] = poke_stats(
+            tee, jacket.bvh, WT, idx=facing_out(tee, body))
+        out["layering"].setdefault("Pants_Cargo_under_Shirt_Tee", {})[cn] = poke_stats(
+            pants, tee.bvh, WP, idx=facing_out(pants, body))
         all_g = Q.merged_bvh([Q.Geo(ch.parts[g]) for g in outfit])
         out["layering"].setdefault("Body_under_default_outfit", {})[cn] = poke_stats(body, all_g, W)
         # Bare skin between the outfit's garments round the waist (in the
         # shipped Humanoid.glb that skin is removed: a hole).
-        out["waist_gap_mm"][cn] = Q.band_gaps(all_g, body.bvh, 0.88, 1.20)
+        out["waist_gap_mm"][cn] = Q.band_gaps(all_g, body.bvh, 0.88, 1.20, skip=arm_face(body, W))
         ch.set_look(frame=f, build=build, masks=ch.masks_for(["Shirt_Tee", "Pants_Cargo"]))
         body = Q.Geo(ch.parts["Body"])
         tp = Q.merged_bvh([Q.Geo(ch.parts["Shirt_Tee"]), Q.Geo(ch.parts["Pants_Cargo"])])
-        out["tee_alone_waist_gap_mm"][cn] = Q.band_gaps(tp, body.bvh, 0.88, 1.20)
+        out["tee_alone_waist_gap_mm"][cn] = Q.band_gaps(tp, body.bvh, 0.88, 1.20, skip=arm_face(body, W))
         # Hair (builds don't move hair; the face and neck do move a little).
         if b in (None, "Build_Heavy"):
             for h in HAIR:
@@ -691,8 +718,9 @@ def deformation(ch, W, default_path):
             gs = {g: Q.Geo(ch.parts[g]) for g in outfit}
             merged = Q.merged_bvh(list(gs.values()))
             res["body_through_outfit"] = poke_stats(body, merged, W)
-            res["tee_through_jacket"] = poke_stats(gs["Shirt_Tee"], gs["Jacket_Cropped"].bvh, WT)
-            wg = Q.band_gaps(merged, body.bvh, 0.88, 1.20)
+            res["tee_through_jacket"] = poke_stats(gs["Shirt_Tee"], gs["Jacket_Cropped"].bvh, WT,
+                                                   idx=facing_out(gs["Shirt_Tee"], body))
+            wg = Q.band_gaps(merged, body.bvh, 0.88, 1.20, skip=arm_face(body, W))
             res["waist_gap_mm_max"] = max(wg.values())
             res["waist_gap_mm_sum_16_dirs"] = round(sum(wg.values()), 1)
             fr[pose] = res
@@ -866,6 +894,7 @@ def main():
     ap.add_argument("--out", default="measurements.json")
     ap.add_argument("--source-ngons", action="store_true")
     ap.add_argument("--only", default="", help="comma list of sections to run")
+    ap.add_argument("--check", default="", help="thresholds file: exit 1 if clipping is worse")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     only = set(filter(None, a.only.split(",")))
     run = lambda s: not only or s in only  # noqa: E731
@@ -925,6 +954,36 @@ def main():
         json.dump(out, f, indent=1)
         f.write("\n")
     print("wrote", a.out, round(time.time() - t0, 1), "s")
+    if a.check:
+        failures = check(out, json.load(open(a.check)))
+        for line in failures:
+            print("WORSE:", line)
+        print("check:", "failed" if failures else "passed")
+        if failures:
+            sys.exit(1)
+
+
+def check(out, limits):
+    """Where the clipping measurements are worse than `limits` (a
+    thresholds file, see `thresholds.json`): a list of lines, empty when
+    nothing is."""
+    c = out.get("clipping")
+    if c is None:
+        return ["no clipping section (run with --only clipping or all sections)"]
+    failures = []
+    for key in ("waist_gap_mm", "tee_alone_waist_gap_mm"):
+        worst = max(max(per.values()) for per in c[key].values())
+        if worst > limits[key]:
+            failures.append(f"{key}: {worst} mm > {limits[key]} mm")
+    for group in ("garments", "layering"):
+        for name, limit in limits[group].items():
+            combos = c[group][name]
+            points = sum(v["poke"] for v in combos.values())
+            deepest = max(v["poke_max_mm"] for v in combos.values())
+            if points > limit["points"] or deepest > limit["max_mm"]:
+                failures.append(f"{group} {name}: {points} points, deepest {deepest} mm "
+                                f"(limit {limit['points']} points, {limit['max_mm']} mm)")
+    return failures
 
 
 if __name__ == "__main__":
