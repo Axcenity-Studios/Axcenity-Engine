@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use axcenity_core::PartType;
 
-use super::tests::{copy_of_example, inserted};
+use super::tests::{copy_of_example, inserted, with_big_stack};
 use super::*;
 
 const SCRIPT: &str = "scripts/pad.server.lua";
@@ -79,6 +79,10 @@ fn unsaved_work_is_kept_after_the_interval_and_save_removes_it() {
 
 #[test]
 fn a_left_behind_snapshot_is_offered_and_recover_brings_the_work_back_unsaved() {
+    with_big_stack(recover_then_save);
+}
+
+fn recover_then_save() {
     let (app, folder) = unsaved_work("autorecover-recover");
     let saved_script = std::fs::read_to_string(folder.join(SCRIPT)).unwrap();
     let saved_world = std::fs::read(folder.join("world.json")).unwrap();
@@ -133,6 +137,11 @@ fn a_left_behind_snapshot_is_offered_and_recover_brings_the_work_back_unsaved() 
 
 #[test]
 fn discard_deletes_a_left_behind_snapshot() {
+    // A crashed editor and two more on one stack.
+    with_big_stack(discard_then_open_again);
+}
+
+fn discard_then_open_again() {
     let (app, folder) = unsaved_work("autorecover-discard");
     std::mem::forget(app);
     age_snapshot(&folder);

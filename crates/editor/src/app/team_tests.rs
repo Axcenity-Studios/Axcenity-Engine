@@ -8,7 +8,7 @@ use axcenity_collab::Role;
 use axcenity_core::{ClassName, PartType, Value};
 
 use super::team::SharedHub;
-use super::tests::{copy_of_example, example};
+use super::tests::{copy_of_example, example, with_big_stack};
 use super::*;
 use crate::properties::Edit;
 
@@ -958,17 +958,6 @@ fn crash_a_session(project: &std::path::Path) -> usize {
     scripts
 }
 
-/// Runs `test` on a thread with room for several editors on its stack
-/// (an unoptimized `EditorApp` is large; the default is 2 MiB).
-fn with_big_stack(test: impl FnOnce() + Send + 'static) {
-    std::thread::Builder::new()
-        .stack_size(16 << 20)
-        .spawn(test)
-        .unwrap()
-        .join()
-        .unwrap();
-}
-
 #[test]
 fn a_hosting_editor_that_stops_without_ending_gets_the_session_back() {
     with_big_stack(recover_after_a_crash);
@@ -998,6 +987,10 @@ fn recover_after_a_crash() {
 
 #[test]
 fn a_session_ended_with_its_changes_saved_leaves_nothing_to_recover() {
+    with_big_stack(end_after_a_save);
+}
+
+fn end_after_a_save() {
     let project = copy_of_example("hello-touched", "team-quit-saved");
     let (mut a, b) = session_with_a_crate(&project, "quit-saved");
     drop(b);
