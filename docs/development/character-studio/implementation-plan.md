@@ -84,7 +84,7 @@ The brief's seven stages, with milestones of one PR each. **CO** is this overhau
 
 ### Before Stage 2: merge the open character PRs
 
-#400 (bone sliders, sockets), #401 (CS1) and #402 (CS2) all touch the default humanoid; #402 contains #401, and #400 is based on main and changes `anim/src/animators.rs`. In Paul's order (section 0, decision 4): fix the waist hole and the clothing intersections in #401; add regression tests and re-render the baseline; merge #401, then #402 once it has the fix; bring #400 onto the resulting main (the lead resolves conflicts); run the complete relevant test suite. The overhaul starts from that main.
+#400 (bone sliders, sockets), #401 (CS1) and #402 (CS2) all touch the default humanoid; #402 contains #401, and #400 is based on main and changes `anim/src/animators.rs`. In Paul's order (section 0, decision 4): fix the waist hole and the clothing intersections in #401; add regression tests and re-render the baseline; merge #401, then #402 once it has the fix; bring #400 onto the resulting main (the lead resolves conflicts); run the complete relevant test suite. The overhaul starts from that main. **Status (2026-11-14):** all done except merging #400, which is pushed and mergeable; details in [progress.md](progress.md).
 
 ### Stage 1: research and audit (this checkpoint)
 

@@ -4,14 +4,22 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [impl
 
 | Stage | State | Notes |
 |---|---|---|
-| 1. Research and audit | **Done, awaiting Paul's review** (2026-11-14) | [research.md](research.md), [audit.md](audit.md), [implementation-plan.md](implementation-plan.md); baseline in [baseline/](baseline/) by `assets/characters/humanoid/qa/` |
-| Before Stage 2 | Not started | Fix the waist hole in CS1 (audit §2.2 defect 1); merge #401, #402, then #400 rebased |
-| 2. Architecture and contracts (CO1) | Not started | Needs the plan's decisions approved; then `architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md` and the ADRs |
+| 1. Research and audit | **Done, approved** (2026-11-14) | [research.md](research.md), [audit.md](audit.md), [implementation-plan.md](implementation-plan.md) (decisions in its section 0); baseline in [baseline/](baseline/) by `assets/characters/humanoid/qa/` |
+| Before Stage 2 | **Done but one merge** (2026-11-14) | #401 fixed (waist hole, clothing intersections), tested and merged; #402 merged; #400 brought onto main, checked, waiting to be merged; the full suite run (see the log) |
+| 2. Architecture and contracts (CO1) | Not started | `architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md` and the ADRs |
 | 3. Foundation (CO2–CO6) | Not started | |
 | 4. Parallel specialists (CO7–CO12) | Not started | |
 | 5. Integration (CO13) | Not started | |
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
+
+## 2026-11-14: before Stage 2
+
+- **#401 (CS1) fixed before merging**, as decision 4 asked. The waist hole came from the tee's sleeve cut: an endless plane that took the side of the torso with it. It now cuts only near the arm. The clothes are kept clear of the body and of each other on both frames and every build: new `assets/characters/humanoid/fit.py`, run by `build.py`. Each garment is pushed out per shape key and per frame-and-build mix. An inner garment follows the outer one's shape where it's covered, then is pushed clear of it. The sneaker sole covers the foot's footprint, and the hip weights are smoothed so the trousers don't tear in a hip flex. Before and after: [audit.md](audit.md) §2.3.
+- **Regression tests:** two in `crates/project/src/default_humanoid.rs` (no hole round the waist of the shipped character; the modular outfit covers the waist with and without the jacket), red on the old asset and green on the new one. `measure.py --check` compares the measurements with `qa/thresholds.json` and fails on any regression. The residual counts there are what's left to fix, mostly at the shoes and the briefs' rim.
+- **Baseline re-rendered** from the fixed asset; the sheets of the original are in [baseline/pre-fix/](baseline/pre-fix/), and a new fit sheet shows each garment, the layers and the poses.
+- **Merged:** #401, then #402 (main merged into it first). #400 has main merged into it rather than rebased, so its branch needed no force-push. The conflicts were in the humanoid README and the sockets list, and one test followed CS1's renamed hair part. #400 is pushed and mergeable; merging it is left to Paul.
+- **Full suite on #400 merged with main:** fmt, clippy (`-D warnings`) and doc tests clean; nextest 4789 passed, 9 failed, none from the character work. Three were timing tests that passed when run again. Six editor tests (MCP, Collaborate, AutoRecover, team history) fail on main on Windows. Their fixes are on the separate `fix-windows-editor-tests` branch: `\\?\` paths, Git's CRLF checkouts, two tests that needed the big-stack thread their neighbours use, and example copies that took a local `.axcenity` history.
 
 ## 2026-11-14: Stage 1
 
