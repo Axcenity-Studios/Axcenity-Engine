@@ -332,20 +332,26 @@ def mixed(shapes, values, frame):
     return sum(shapes[name] * weight for name, weight in w.items() if name in shapes and weight)
 
 
-def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print):
+def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, mirror=None, grow=None):
     """Every body shape as offsets from each frame's rest positions:
     ({shape name: (frame, offsets)}, report, the mesh's triangles,
     Laplacian and mirror pairing for whoever works on it next). `source` and `rest` are
     {frame: positions} in the bundle's pose and the rest pose; `weights`
-    the skin's; `eyes` and `eye_radius` {frame: ...}."""
+    the skin's; `eyes` and `eye_radius` {frame: ...}. Where the body has
+    more vertices than the bundle's (`rims.split`), `mirror` is its
+    mirror pairing and `grow` gives the vendored offsets the new
+    vertices' rows."""
     geom, transfer = _transfer()
     me = body.data
     faces = [tuple(p.vertices) for p in me.polygons]
     tris = geom.triangles(np.array([f if len(f) == 4 else f + (-1,) for f in faces]))
     edges = np.array([tuple(e.vertices) for e in me.edges])
     lap = geom.Laplacian(len(me.vertices), edges)
-    mirror = geom.mirror_map([array(source["Masculine"]), array(source["Feminine"])])
+    if mirror is None:
+        mirror = geom.mirror_map([array(source["Masculine"]), array(source["Feminine"])])
     packed = unpack()
+    if grow is not None:
+        packed = {frame: {name: grow(d) for name, d in corners.items()} for frame, corners in packed.items()}
     out, report = {}, {"frames": {}}
     for frame in FRAMES:
         P0, P = array(source[frame]), array(rest[frame])

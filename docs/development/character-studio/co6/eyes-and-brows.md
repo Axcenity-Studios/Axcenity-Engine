@@ -1,13 +1,13 @@
 # CO6 review: eyes, lids, lashes and brows
 
-What the review of the realistic head's upper face found, what was changed and what still falls short. The head itself is described in [README.md](README.md); the package is [assets/characters/realistic/](../../../../assets/characters/realistic/README.md). Code: `lids.py`, `lashes.py`, `eyes.py`, and in `face.py` the eye, brow, cheek and nose entries of `Face.expressions`, `Face.brow`, `Face.cheek` and `soften_lids`.
+What the review of the realistic head's upper face found, what was changed and what still falls short. The head itself is described in [README.md](README.md); the package is [assets/characters/realistic/](../../../../assets/characters/realistic/README.md). Code: `rims.py`, `lids.py`, `lashes.py`, `eyes.py`, and in `face.py` the eye, brow, cheek and nose entries of `Face.expressions`, `Face.brow`, `Face.cheek` and `soften_lids`.
 
-Every picture named here is a crop of a 3840 x 2160 capture from the engine's renderer (`capture_characters`, the straight-on `face-front` view) of the committed, baked build; masculine frame on the left, feminine on the right, a row per pose. They are in [engine/](engine/), and are the second round's: sections 1 to 7 are the first round as it was found and changed then, with what the second round changed noted in them; [Round 2](#round-2) is the second; [Still short](#still-short) is as things stand.
+Every picture named here is a crop of a 3840 x 2160 capture from the engine's renderer (`capture_characters`, the straight-on `face-front` view) of the committed, baked build; masculine frame on the left, feminine on the right, a row per pose. They are in [engine/](engine/), and are the third round's (the mesh round the lids changed in it, so every picture was made again): sections 1 to 7 are the first round as it was found and changed then, with what the second round changed noted in them; [Round 2](#round-2) is the second and [Round 3](#round-3) the third; [Still short](#still-short) is as things stand.
 
 ## How it was looked at
 
 - The engine's captures at full size, in the studio light and the hard side light.
-- The mesh, in numbers (millimetres, masculine frame). An eye is 24.5 mm from corner to corner; the lids' inner edges stand 11.8 mm apart at the middle and their outer edges (the lash lines) 10.4 mm; the eyeball's radius is 12.3 mm and its centre is 1.7 mm above the middle of the opening. The lid's inner edge is a ring of 20 vertices (8 on the upper lid), the outer edge one of 22, of which 7 run round the two corners outside the span of the inner edge.
+- The mesh, in numbers (millimetres, masculine frame). An eye is 24.5 mm from corner to corner; the lids' inner edges stand 11.8 mm apart at the middle and their outer edges (the lash lines) 10.4 mm; the eyeball's radius is 12.3 mm and its centre is 1.7 mm above the middle of the opening. The lid's inner edge was a ring of 20 vertices (8 on the upper lid), the outer edge one of 22, of which 7 run round the two corners outside the span of the inner edge; since round 3 each has twice as many (40 and 42).
 - The skin's texture round the eye: from lash line to fold the upper lid is 10 to 12 texels of the 2048 map; the fold's own strip (loops 5 to 6) is half a millimetre at rest, one or two texels.
 
 ## 1. The squint
@@ -89,7 +89,7 @@ What the pictures show ([engine/brows-controls.jpg](engine/brows-controls.jpg), 
 
 ## 7. The upper face in the expressions
 
-[engine/eyes-expressions.jpg](engine/eyes-expressions.jpg) (ten at full strength, both frames, tiles at half size), [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg) (Sad, Worried, Fearful, Crying, Frustrated at 0.8 of full size) and [engine/eyes-faces.jpg](engine/eyes-faces.jpg) (whole faces at a third: rest, blinks, Happy, Laughing, Surprised, Angry, Sad).
+[engine/eyes-expressions.jpg](engine/eyes-expressions.jpg) (twelve at full strength, both frames, tiles at half size), [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg) (Sad, Worried, Fearful, Crying, Frustrated at 0.8 of full size) and [engine/eyes-faces.jpg](engine/eyes-faces.jpg) (whole faces at a third: rest, half and whole blinks, Happy, Laughing, Surprised, Angry, Sad).
 
 | Expression | From the nose up |
 |---|---|
@@ -171,26 +171,102 @@ Found from the second review's captures and by taking things out of the build on
 
 ### The lids' outline
 
-Not started. It is 8 vertices along the upper lid's edge and 12 along the lower; a narrowed eye's arch is three or four straight pieces for that reason.
+Not started in round 2. It was 8 vertices along the upper lid's edge and 12 along the lower; a narrowed eye's arch was three or four straight pieces for that reason: [round 3](#round-3).
+
+## Round 3
+
+Found from the third review's captures, from measures on the built file (the skin's height over its resting surface, the film's height over the eyeball's mesh, pairs of crossing triangles, the normals the engine adds up against the posed mesh's own) and by taking parts out of the build one at a time (the tear line, the lashes, the whole eye shell: none of those builds is committed).
+
+### The lids' outline: twice the vertices
+
+**Found.** At 4K the eye's opening was a polygon: 8 vertices along the upper lid's edge, 12 along the lower. What the mesh and the build had to say about cutting it finer:
+
+- *The strips are clean far enough.* Past the lid's inner edge the loops counted by steps from the ring are not closed edge loops (a vertex of five edges sits at each corner of the eye), but the strips of quads that run out across them are well defined: from each of the ring's 20 edges, quad by quad through the edge across. All 20 run clean out to the fifth loop and 18 of them to the eleventh; the two under the inner corner turn along the cheek after the fifth. Inward, the lining is ten loops of 20 vertices closed by a cap of 5 by 5 quads.
+- *What is kept by the bundle's vertex index.* Both frames' vendored bodies, the two sculpts (677,442 displacements each, stored against the bundle's mesh subdivided three times), the 16 vendored body shapes, and the mirror pairing the mouth is made even by. The eyeball's fit is found from the socket's vertices and from which skin vertices lie inside it.
+- *Midpoints change nothing.* A new vertex at the middle of its edge leaves the polygon the polygon it was.
+
+**Changed** (`rims.py`, called from `build.py` after the texture coordinates are laid out).
+
+- Every quad of those strips is cut in two along the strip: over the lining back to its fifth loop and over the skin out to the seventh (the two strips under the inner corner to the fifth), so each of those loops has twice the vertices: 256 new vertices an eye. Where a strip stops, the quad beyond it takes the one new vertex on its edge as a fan of three triangles: behind the eyeball, under the brow and on the cheek, none on the lid.
+- A new vertex is put on the cubic through the four vertices of its loop round it (spaced by the centripetal measure, which does not overshoot where the loop turns the corner of the eye). That is a fixed mix of four old vertices, so one rule places the new vertices on both frames, in the bundle's pose, in the stood pose and in the vendored shapes' offsets: the bundle's 10,582 vertices keep their indices and their places, and the new ones follow them. The mirror pairing of a new vertex is the vertex on the mirror image of its edge, exactly.
+- The eyes are fitted and the texture coordinates laid out before the cut, on the bundle's topology: the eyeballs, every joint and the texture layout are the same as before to the last digit of `Realistic.build.json`. The sculpts are subdivided from the bundle's topology (`skin.bake`, `cage`) and baked onto the finer body.
+- The lid shapes need nothing new: they find their loops by steps from the ring, and a new vertex is as many steps out as the two it lies between. Two things were made finer with them: the line the lids close on is worked out at 32 places (12), and a closed lid's raise takes the most its two neighbours either side need (one).
+- The lashes get a row at every vertex of the lash line (twice the rows), the film a column at every vertex of the lids' edges.
+
+| | Before | After |
+|---|---|---|
+| `Body` | 10,582 vertices, 21,160 triangles | 11,094 vertices, 22,184 triangles |
+| `Body_LOD1`, `Body_LOD2` | 10,500 and 5,000 triangles | the same (they are made to a budget) |
+| `EyeShell`, `Lashes` | 1,788 and 88 triangles | 2,612 and 188 |
+| `RealisticParts.glb` | 31.04 MB | 31.61 MB |
+
+**Now** ([engine/eyes-rest.jpg](engine/eyes-rest.jpg), [engine/eyes-wide.jpg](engine/eyes-wide.jpg), [engine/eyes-closed.jpg](engine/eyes-closed.jpg), and at twice the size [engine/eyes-outline-close.jpg](engine/eyes-outline-close.jpg)): at rest, wide and half shut the lids' edges are curves on both frames in both lights, at full size and at twice the size. The inner corner is still the bundle's: the lower lid leaves it in a short straight run before it curves.
+
+### The narrowed eye: one share of the opening from corner to corner
+
+**Found.** With the outline smooth, a squint and a laugh were still a slot with a tall end at each corner. Round 1 eased both lids' share to nothing over the last 2.5 to 5 mm before a corner, so neither lid moved there; the opening is 3 to 4 mm tall within a millimetre of a corner at rest, and a narrowed eye was 2 mm tall at the middle and taller than that at both ends, the white of the eye bright in them. The same easing made a blink on top of a squint close the middle before the ends.
+
+**Changed.** The lower lid is still held toward the corners (over 6 mm from the inner corner and 4.5 mm from the outer; 5 and 2.5 before, which stood the lid's edge up as a hook at the outer corner). What it is held back by, the upper lid now comes down instead (`lids.Eye._turns`), in the squint and in the raised cheek alike, and the upper lid's own share is not eased. Each control that narrows the eye therefore closes one share of the opening from corner to corner: a narrowed eye has the outline of the open one, pressed flat.
+
+**Now** ([engine/eyes-squint.jpg](engine/eyes-squint.jpg), [engine/eyes-squint-hard.jpg](engine/eyes-squint-hard.jpg), [engine/eyes-laugh-close.jpg](engine/eyes-laugh-close.jpg)): Laughing and the squint with the raised cheek are one dark arch from corner to corner, a curve at full size and at twice the size, on both frames in both lights, its ends coming down to the corners. The ends are no taller than the middle. A thin grey wedge of the white is left at the inner end of the squint and, thinner, of the laugh: the white beside the iris, where the film is at its lightest. Under the hard light a small lit point of skin stands at the outer corner of the lit eye. Reported by `face_checks.py`, not held: 13 pairs of triangles cross under `Eye_Squint` and 27 in Laughing (none before), all of them the two lids' lining behind the outer corner, 7.5 to 8.6 mm behind the opening, where a blink's lining crosses too (172 pairs).
+
+**What a blink has left** (`Realistic.build.json`, `face.blink_shares`, which the build now measures: how much of a blink a control at 1 uses up, at the middle of the eye and the most anywhere between 3 mm inside each corner):
+
+| Control | Round 2, at the middle | Round 2, the most | Now, at the middle | Now, the most |
+|---|---|---|---|---|
+| `Eye_Squint` | 0.670 | 0.692 | 0.673 | 0.705 |
+| `Cheek_Raise` | 0.270 | 0.298 | 0.282 | 0.304 |
+| `Brow_Lower` | 0.171 | 0.232 | 0.184 | 0.255 |
+
+The most is 3 mm inside the outer corner in every case (0.88 of the way along the eye). The engine holds a blink back by 0.69, 0.30 and 0.22; by this measure it would need 0.71, 0.31 and 0.26 for the lids never to touch there (at 0.69, 0.30 and 0.22 they pass each other by a tenth or two of a millimetre at that one place, with a control at 1 and a full blink asked for). The engine's numbers are not changed here.
+
+### Brows raised and drawn in together
+
+**Found.** `Brow_Raise` with `Brow_Inward`, both at 1, left a lit ridge between the brows' inner ends, with the hair's inner ends splayed on it. Measured on the built file, the skin within 7 mm of the middle of the face stood up to 3.5 mm over its resting surface on the masculine frame and 2.6 mm on the feminine (1.1 and 1.9 mm with one control alone). It was neither the bunch alone nor the cards. Four shapes carry that skin up the forehead (both sides' raise and inward), each along the straight line to where it alone ends on the skull, and the forehead is curved: added together the four lines end off it. And the skin between the brows was held off the skull on purpose, for its bunch and because it is within a dozen loops of both eyes (like the folds over the lids).
+
+**Changed** (`face.Face.expressions`).
+
+- The skin within 7 mm of the middle of the face slides on the skull all the way (none of it past 13 mm), and its bunch is added afterwards, 0.8 mm (1.5).
+- All four shapes together end on the skull: what their sum is off by is taken out of each by its share of the move. One alone then lies under the skull by that share.
+
+**Now** ([engine/brows-controls.jpg](engine/brows-controls.jpg), [engine/brows-controls-hard.jpg](engine/brows-controls-hard.jpg), Fearful in [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg)): no ridge and no lump between the inner ends on either frame, at full size and at twice the size; the hair's inner ends lie flat. What shows there now is the skin's own grain: it has been carried 13 to 16 mm up the root of the nose, and its pores are drawn out into short upright streaks where the light catches them, most with both controls at 1. The same measure:
+
+| | Before, masculine | Before, feminine | Now, masculine | Now, feminine |
+|---|---|---|---|---|
+| `Brow_Raise` 1 with `Brow_Inward` 1 | -1.0 to +3.5 mm | -0.8 to +2.6 | 0.0 to +0.8 | -1.2 to +1.9 |
+| both at 0.7 (Fearful) | -0.9 to +2.1 | -0.6 to +1.5 | -0.3 to +0.3 | -1.0 to +1.2 |
+| `Brow_Raise` 1 | -1.0 to +1.1 | -0.6 to +0.6 | -0.6 to 0.0 | -1.1 to +0.8 |
+| `Brow_Inward` 1 | -0.7 to +1.9 | -0.4 to +1.6 | -0.3 to +0.5 | -0.7 to +0.8 |
+
+What is left on the feminine frame is the two frames' foreheads being different skulls under one set of shapes (the shapes are made on the masculine one): it is spread over the forehead, not a ridge. `Brow_Lower` is as it was.
+
+### Looked at and not changed
+
+- **`Eye_Wide`, feminine: the streak above the key-side lid.** It is the feminine lid's own skin between the lash line and the fold, which shows at rest too (the masculine frame's is under its fold): drawn up, it is a narrower band turned further up to the key light. With twice the vertices it is one even band, not a broken streak. Not changed: hiding it means tucking the lid's skin under the fold on one frame only, with one shape for both.
+- **Pale shards low on the white beside the iris with the eye wide** (both frames; they were there before this round). They go when the eye shell is left out and stay when the tear line is, so they are the film's. The film stands 0.19 mm or more over the eyeball's and the cornea's mesh everywhere with the eye at rest and wide (measured by rays from the eye's centre at every vertex, edge middle and face middle of the film), so it is not under either. Two more rows in the film there made a new pale patch and were withdrawn. Not found.
+- **The pale patch on the skin under the feminine inner corner in a laugh** (round 1's). It stays with the lashes, the tear line and the whole eye shell left out, one at a time: it is the skin. The skin's folds there are alike on the two frames (34 and 30 edges folded past 60 degrees). The normals the engine adds up from the frame's shape and the two controls' are off by up to 14 degrees there on the feminine frame against 6 on the masculine. Not changed. (Letting the film settle toward the eyeball as the lids close did nothing for it and was withdrawn.)
 
 ## Checks
 
 On the committed build:
 
-- `face_checks.py --check`: exit 0, 0 failures. `Blink` and `Eye_Closed`: no ray bare on either frame.
-- Reported, not held: one lid vertex stands in the clear cornea under `Eye_Squint` and under `Cheek_Raise` (to 0.29 mm), two in Happy and Disgusted (to 0.26 mm): each control alone is part of the way along the straight path the two share, which cuts under the cornea's curve. None before.
+- `face_checks.py --check`: exit 0, 0 failures. `Blink` and `Eye_Closed`: no ray bare on either frame. No limit was changed.
+- Reported, not held: lid vertices standing in the clear cornea, 28 over all poses on the masculine frame and 27 on the feminine (20 and 15 in round 2: there are twice the vertices along a lid), to 0.54 mm at the most as before (two under `Eye_Squint` and two under `Cheek_Raise`, to 0.27 and 0.30 mm; none in Sleepy, four before). Pairs of crossing triangles: 172 with a closed eye (96), 13 under `Eye_Squint` and 27 in Laughing (none), all between the two lids' lining behind the outer corner.
+- `measure.py --package realistic --check`: the same lines as before this round (the two known shoulder lines, the sliders' section not run, four targets not met), none added.
 - `cargo nextest run -p axcenity-anim -p axcenity-avatar --no-fail-fast`: 223 pass.
+- New in `Realistic.build.json`: `face.blink_shares` (above).
 
 ## Still short
 
-1. **The laugh's arch is made of straight pieces** (the lids' vertices), its inner end stays a little open, and on the feminine frame a faint pale patch remains on the skin under the inner corner (round 1's: a shape's normals are stored as changes from the masculine frame's).
+1. **A narrowed eye's inner end** keeps a thin grey wedge of the white, and on the feminine frame a faint pale patch remains on the skin under the inner corner in a laugh (round 3: it is the skin, not a card or the film).
 2. **No creases.** A laughing eye has no lines fanning from its outer corner, lowered brows no furrow between them and raised brows no lines across the forehead: geometry at this density cannot fold that finely and the skin has no wrinkle maps.
-3. **The eye is shaded by a film, not by the renderer.** It is right for one head-on light; it does not know where the light is, and where it is drawn the renderer's own occlusion is lost (the film stands in for it). The eye's shading is CO7's.
+3. **The eye is shaded by a film, not by the renderer.** It is right for one head-on light; it does not know where the light is, and where it is drawn the renderer's own occlusion is lost (the film stands in for it). The eye's shading is CO7's. With the eye wide the film leaves pale shards low on the white beside the iris (round 3: looked for, not found).
 4. **A half-shut eye** has paler three-cornered areas low on its whites.
-5. **The closed lid's lit blotch** under a side light (above): not a card's shadow; not changed.
+5. **The closed lid's lit blotch** under a side light (round 2): not a card's shadow; not changed.
 6. **`Brow_Lower` under the hard light**: two thin bright lines along the masculine lid.
-7. **`Brow_Inward`** tilts the brow as one straight line and leaves a pale swelling between the inner ends, most in Fearful.
-8. **`Eye_Wide`, feminine**: a short faint streak above the key-side lid remains.
-9. **The lids' outline is angular** at 4K.
+7. **Brows raised and drawn in** stretch the skin's grain between them into short upright streaks, and the feminine forehead's skin lies up to 1.2 mm under and 1.9 mm over its resting surface with both controls at 1 (the shapes are made on the masculine skull).
+8. **`Eye_Wide`, feminine**: the lid's skin above the lash line is a lit band on the key side (round 3: what it is; not changed).
+9. **The iris's outline** is 24 straight pieces (`eyes.SEGMENTS`), which shows at twice the size now that the lids round it are curves. The inner corner of the eye is the bundle's: the lower lid leaves it in a short straight run.
 10. **Lashes and brows are cards.** Close up a brow is a dark mass with hairs at its edges; the lashes of the two lids do not interleave; a closed eye's lashes are longer than round 1's.
 11. Under the hard light a patch of the closed feminine lid is stippled where it is lit (the renderer's shadow edge at a grazing light).
+12. **`Eye_Closed` on top of a laugh** still passes the lids through each other from 0.2 (a dashed line, bottom rows of the squint sheets), and by the build's own measure the engine's three shares are a little low at the outer corner (round 3).

@@ -38,11 +38,12 @@ import manifests  # noqa: E402
 import parts  # noqa: E402
 import regions  # noqa: E402
 import rig  # noqa: E402
+import rims  # noqa: E402
 import shapes  # noqa: E402
 import skin  # noqa: E402
 import teeth as jawlib  # noqa: E402
 import uvs  # noqa: E402
-from common import array, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
+from common import array, duplicate, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
 
 ARMATURE = "AxcenityRealistic"
 PARTS_FILE = "RealisticParts.glb"
@@ -81,19 +82,36 @@ def build(out_dir, texture_size=2048, bakes=True):
     M, F = frames["Masculine"], frames["Feminine"]
     sets = face_sets(body_obj)
     layout = uvs.layout(body_obj, lm)
-    maps = skin.bake(body_obj, source, lm, texture_size, out_dir) if bakes else None
 
     # Eyes and teeth, on the frames as they stand. The eyes follow the
     # feminine frame on their bones (the frame's bone offsets and eye
     # scale), the teeth by a shape; the mouth's bag is widened round them.
+    # (The eyes are fitted to the bundle's own sockets, before the lids
+    # get their new vertices.)
     set_positions(body_obj, M.P)
     eyes_m, eye_radius, eye_fit = parts.fit_eyes(body_obj, M.P, lm)
     eyes_f, eye_radius_f, eye_fit_f = parts.fit_eyes(body_obj, F.P, lm)
+    # Twice the vertices round the lids (`rims.py`). The bundle's vertices
+    # keep their indices; the new ones follow in every set of positions,
+    # and whatever is kept by polygon is read again. The sculpts are baked
+    # from the bundle's own topology (`cage`).
+    cage = duplicate(body_obj, "Cage") if bakes else None
+    fine = rims.split(body_obj, sets)
+    sets = face_sets(body_obj)
+    lm = rig.stylized_rig().Landmarks(body_obj)
+    source = {name: fine.grow_points(P) for name, P in source.items()}
+    M.P, F.P = fine.grow_points(M.P), fine.grow_points(F.P)
+    set_positions(body_obj, source["Masculine"])
+    maps = skin.bake(body_obj, source, lm, texture_size, out_dir, cage) if bakes else None
+    if cage is not None:
+        bpy.data.objects.remove(cage)
+    set_positions(body_obj, M.P)
     # The face put right at rest (the feminine lids, the lids' lining, the
     # lips; `face.prepare`), before the teeth are placed and the body weighted.
     topo = face.topo_of(body_obj.data, sets)
     # (Each vertex's mirror vertex: the mouth is made even by it.)
-    mirror = shapes._transfer()[0].mirror_map([array(source["Masculine"]), array(source["Feminine"])])
+    mirror = fine.mirror(shapes._transfer()[0].mirror_map(
+        [array(source["Masculine"])[:fine.count], array(source["Feminine"])[:fine.count]]))
     m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f,
                                              mirror)
     M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
@@ -127,7 +145,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     both = lambda m, f: {"Masculine": m, "Feminine": f}  # noqa: E731
     body_shapes, shape_report, mesh = shapes.build(
         body_obj, source, both(P, F.P), lm, both(joints, joints_f), weights, both(eyes_m, eyes_f),
-        both(eye_radius, eye_radius_f))
+        both(eye_radius, eye_radius_f), mirror=mirror, grow=fine.grow)
     shapes.add_keys(body_obj, body_shapes, both(P, F.P))
     # The shapes the engine leans on as the arms are raised (CO5).
     driven = {"twists": [{"bone": n, "inside": i, "reads": r, "share": s} for n, i, r, s in rig.TWISTS],
