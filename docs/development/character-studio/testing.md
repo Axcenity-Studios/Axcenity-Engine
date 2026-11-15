@@ -71,7 +71,7 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 | Waist gap, every frame × build | 0 mm | 0 mm | Not measured: no garments until CO9 |
 | Garment poke-through (points, all combinations) | `thresholds.json` | 0 visible; counts recorded per item at CO9 | Not measured: no garments until CO9 |
 | Elbow 135° ring area ratio | 0.37 | ≥ 0.6 with twist bones and correctives | 0.757 / 0.758, met |
-| Shoulder abducted 150° volume ratio | 0.56 | ≥ 0.8 | 0.562 / 0.561, **not met** |
+| Shoulder abducted 150° volume ratio | 0.56 | ≥ 0.8 | 0.562 / 0.561, **not met**; at CO5 0.463 / 0.513, **not met** (below) |
 | Knee 135° ring area ratio | 0.44 | ≥ 0.6 | 0.74 / 0.75, met |
 | Eyeball front uncovered in a full blink | 20–23% | 0% | Not measured: no blink shape until CO6 |
 | Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 | 6 / 14 (the lower lip's inner side), not met (CO6) |
@@ -79,11 +79,17 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 
 **The realistic body at CO4** (`co4/measurements.json`, checked by `measure.py --package realistic --check assets/characters/realistic/qa/thresholds.json`). Met: the elbow, the knee, the `Neck` weights, and CO4's own test of no eye or teeth interpenetration at rest (0 on both frames). **Not met: the shoulder raised 150°** keeps 0.562 / 0.561 of its local volume against 0.8. A crease between collar and arm and a flattened deltoid show in `co4/deformation_poses.png`; the corrective shapes are CO5's. The thresholds file holds it as a `target` (printed as not met; `--strict` fails on it) over a floor of 0.54, and it moves into `at_least` when it is met. Also still short: the fist self-intersects (247 / 199 triangle pairs), the teeth touch the lower lip's inner side with the jaw open, and the lips rest about 2 mm apart (CO6). No target above has changed.
 
+**The realistic body at CO5** (`co5/measurements.json`). The shoulder has corrective shapes, a delta mush of the raised pose, chosen by the pictures (`co5/shoulders_*.png`, `co5/engine/cheer_shoulders_after.png`). On the measure it reads **0.463 / 0.513 at 150°** and 0.847 / 0.88 at 90° (the stylized body: 0.853 / 0.992): the target is not met, and the 150° figure is under the package's own limit of 0.54, so `--check` is red on those two lines. A first shape that moved skin outward until the measure read 0.86 was rejected: it passed the number and showed a step and a ball in the engine (`co5/engine/cheer_shoulders_before.png`). The same pose's ring area is 0.929 / 0.82. **No target or limit was changed; what the shoulder is held to is Paul's decision** (`progress.md`). New at CO5 and met: no pair of the manifest's parameters at the ends of their ranges makes the body newly cross itself at rest (0 of 351 pairs on each frame), and no shape slider puts skin in the eyes or teeth.
+
+## Tests that exist (CO5)
+
+`avatar` `tests/realistic_parameters.rs` (every parameter of the realistic manifest at each end of its range moves the baked body and both simpler copies by more than 2 mm, or changes one of `anim`'s body sliders; muscle and fat make four different corners; a baked body keeps only its four corrective shapes live); `anim` `tests/realistic_proportions.rs` (each of the nine body sliders moves the skin and both copies); `anim` `correctives::tests` (6: the rule, the constants against `Realistic.build.json`, the shipped body through the pose path on all three levels of detail, a model without such shapes left alone). Blender: the package thresholds' `sliders` entries (`measure.py --only` with `sliders` in the list, about four minutes) and `posed_crossings.py` (new crossings in a pose). The red runs are in `co5/` (`red-run-correctives.txt`, `red-run-parameters.txt`).
+
 ## Tests that exist (CO4)
 
 `anim` `twist::tests` (12: the twist and helper rules, a skeleton without such bones left alone, slider scale, the one call site, the shipped realistic skeleton driven as it was built); `anim` `retarget::tests::a_take_named_like_a_body_of_other_proportions_keeps_that_bodys_bones` and `the_starter_animations_keep_the_realistic_bodys_proportions` (the clip rule of architecture section 12). Blender: `assets/characters/realistic/qa/thresholds.json` (`at_least`, `at_most` and `within` limits, and the unmet shoulder `targets`). The red runs are in `co4/` (`red-run-anim.txt`, `red-run-avatar.txt`, `red-run-thresholds.txt`).
 
-**Left red on purpose:** `avatar` `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` fails for `axcenity/realistic` on the test's own floor (a base body has more than 10 shapes): the body has one shape, `Frame_Feminine`, until CO5 adds the body shapes. The manifest's check against its model passes. It is not an accepted baseline.
+**Left red on purpose:** `avatar` `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` fails for `axcenity/realistic` on the test's own floor (a base body has more than 10 shapes): the body has one shape, `Frame_Feminine`, until CO5 adds the body shapes. The manifest's check against its model passes. It is not an accepted baseline. **Green since CO5:** the body has 53 shapes; the floor was not changed.
 
 ## Tests that exist (CO2)
 
