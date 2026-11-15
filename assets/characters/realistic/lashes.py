@@ -40,7 +40,11 @@ HAIR = (0.020, 0.013, 0.009)
 # round the corner, and a strip through them stood up in zigzags.
 LASH_FROM_CORNER = 0.0006
 # How far a closed upper lid's lashes go from curled to straight.
-LASH_STRAIGHTENS = 0.75
+LASH_STRAIGHTENS = 0.7
+# How many times its lid's turn an upper lid's lashes turn as it comes down
+# (a closed lid's point about 45 degrees down: seen from the front, a
+# fringe and not a card on edge).
+LASH_TURNS_DOWN = 1.3
 # How much of an upper lid's upward turn its lashes take.
 LASH_TURNS_UP = 0.3
 # A lash keeps this far off the skin under every shape (metres).
@@ -90,7 +94,7 @@ def lash_texture(out_dir):
         # the lid they stand too close to tell apart. (Kept low: a tall
         # fringe made a closed eye's lashes one grey band.)
         x = rng.uniform(0.0, 1.0) * w
-        draw.line([(x, h - 1), (x + rng.normal(0, 0.006) * w, h - 1 - rng.uniform(0.08, 0.17) * h)], fill=255,
+        draw.line([(x, h - 1), (x + rng.normal(0, 0.006) * w, h - 1 - rng.uniform(0.05, 0.10) * h)], fill=255,
                   width=int(scale * 4))
 
     def both(draw, rng, w, h, scale):
@@ -98,7 +102,7 @@ def lash_texture(out_dir):
         for _ in range(2):
             fringe(draw, rng, w, h, scale)
 
-    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (512, 128), 150, 5, both, gain=2.6)
+    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (512, 128), 120, 5, both, gain=2.6)
 
 
 def brow_texture(out_dir):
@@ -197,7 +201,7 @@ def lashes(face, out_dir):
                 radial /= np.linalg.norm(radial)
                 fan = eye.axis * ((u - 0.42) * 0.9)
                 if upper:
-                    first = 0.35 * radial + 0.75 * eye.fwd + fan - 0.15 * up
+                    first = 0.35 * radial + 0.75 * eye.fwd + fan
                     second = first / np.linalg.norm(first) + 0.9 * up
                 else:
                     # (Out of the lid along the normal of the skin just
@@ -280,6 +284,13 @@ def follow_lashes(face, points, roots, shape, lids=True):
             # lashes keep most of their own direction (turned all the
             # way with the lid they lay flat on the fold).
             angle *= LASH_TURNS_UP
+        elif angle < 0 and eye.upper[i]:
+            # An upper lid coming down turns its lashes down a little
+            # further than itself, so a closed lid's are seen from the
+            # front as a fringe. (Not much further: on the straight path
+            # to there a half-shut eye's lashes would hang across the
+            # opening.)
+            angle *= LASH_TURNS_DOWN
         turned = rotate_about(points[k][None], eye.c, eye.turn_axis, angle)[0]
         carried = rotate_about(before[None], eye.c, eye.turn_axis, angle)[0]
         out[k] = turned + (after - carried) - points[k]
@@ -290,7 +301,7 @@ def follow_lashes(face, points, roots, shape, lids=True):
             root, mid, tip = (points[j] + out[j] for j in (k - 2, k - 1, k))
             length = np.linalg.norm(tip - mid)
             along, curled = (mid - root) / max(np.linalg.norm(mid - root), 1e-9), (tip - mid) / max(length, 1e-9)
-            way = curled + (along - curled) * (LASH_STRAIGHTENS * min(1.0, -angle / 0.6))
+            way = curled + (along - curled) * (LASH_STRAIGHTENS * min(1.0, -angle / 0.9))
             out[k] = mid + way / np.linalg.norm(way) * length - points[k]
     if lids and any(i in shape for i, _ in roots):
         # And off the skin as the shape leaves it: an upper lid drawn up
