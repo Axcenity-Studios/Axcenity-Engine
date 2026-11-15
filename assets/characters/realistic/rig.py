@@ -283,7 +283,7 @@ def _smooth(values, nbr, iterations, keep=None):
     return vals
 
 
-def skin(body, armature, P, lm, joints):
+def skin(body, armature, P, lm, joints, even=None):
     """Weights `body` to `armature`: bone-heat weights from the contract's
     bones, then the head and neck, the jaw, the fingers and toes from the
     face sets, each limb's twist bones, and the helper bones at the big
@@ -313,6 +313,16 @@ def skin(body, armature, P, lm, joints):
 
     _head_and_neck(w, X, in_sets, J)
     _jaw(w, X, body.data, lm, in_sets, of_set, J, nbr)
+    if even is not None:
+        # The jaw's hold the same on both sides of the mouth (`even`: each
+        # vertex's mirror vertex, and how much of it is the mouth's), as
+        # the mouth's form is (`face.prepare`).
+        mirror, share = even
+        head, jaw = w.index["Head"], w.index["Jaw"]
+        held = w.W[:, head] + w.W[:, jaw]
+        amount = w.W[:, jaw] + share * (0.5 * (w.W[:, jaw] + w.W[mirror, jaw]) - w.W[:, jaw])
+        amount = np.minimum(amount, held)
+        w.W[:, head], w.W[:, jaw] = held - amount, amount
     for side, s in SIDES:
         _shoulder(w, X, body.data, lm, of_set, side, s)
         _hand(w, X, of_set, J, side, s)

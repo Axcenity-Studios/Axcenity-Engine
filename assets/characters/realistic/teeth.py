@@ -257,6 +257,9 @@ def jaw_mesh(ks, level=0):
              for fs, faces in cages.items()}
 
     def in_tooth(p):
+        # (Asked of the point's image on one side: the jaw is the same on
+        # both, and a point on a cage's very surface must fall alike.)
+        p = Vector((abs(p[0]), p[1], p[2]))
         for tree, pts in cages.values():
             if np.all(np.array(p) > pts.min(axis=0)) and np.all(np.array(p) < pts.max(axis=0)):
                 votes = 0
@@ -284,6 +287,7 @@ def jaw_mesh(ks, level=0):
     tree = BVHTree.FromPolygons([tuple(v.co) for v in bm.verts], [[v.index for v in f.verts] for f in gum])
 
     def above_gum(p):
+        p = Vector((abs(p[0]), p[1], p[2]))
         loc, normal, _, _ = tree.find_nearest(p, 0.03)
         return 1.0 if loc is None else (p - loc).dot(normal)
 
@@ -454,6 +458,17 @@ def _close_lower_gum(bm, fs_of, centres, ks):
                 best = (d, at)
         return best
 
+    def node(q):
+        """The keel's nearest stop to `q`: under a tooth's middle or half
+        way between two. What is gathered onto the keel goes to these
+        (and is joined there), so the two sides come out alike; joined
+        by nearness alone, they differed by 2.4 mm."""
+        stops = [a + (b - a) * t for a, b in zip(line[:-1], line[1:]) for t in (0.0, 0.5)] + [line[-1]]
+        # (Chosen on one side and mirrored: a tie falls alike for both.)
+        side = -1.0 if q[0] < -1e-7 else 1.0
+        at = min(stops, key=lambda stop: float(np.linalg.norm(stop[:2] - np.array([abs(q[0]), q[1]]))))
+        return np.array([side * at[0], at[1], at[2]])
+
     floor = []
     for f in bm.faces:
         if fs_of(f) == FS_LOWER_GUM:
@@ -469,9 +484,9 @@ def _close_lower_gum(bm, fs_of, centres, ks):
         q = np.array(v.co)
         _, at = keel(q)
         if q[2] < at[2] + 0.0015 * ks or (v.is_boundary and q[1] < back):
-            v.co = Vector(at)
+            v.co = Vector(node(q))
             sunk.add(v)
-    bmesh.ops.remove_doubles(bm, verts=list(sunk), dist=0.0030 * ks)
+    bmesh.ops.remove_doubles(bm, verts=list(sunk), dist=1e-6)
     # (The faces that now close it are no longer flat: cut into triangles
     # here, on the diagonal that lies inside them, or the export's own
     # cut can turn one of a pair to face up into the gum.)

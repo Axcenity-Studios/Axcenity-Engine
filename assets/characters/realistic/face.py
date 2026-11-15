@@ -41,9 +41,55 @@ def topo_of(mesh, sets):
     return Topo([tuple(p.vertices) for p in mesh.polygons], sets, len(mesh.vertices))
 
 
-def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f):
+# The mouth is made the same on both sides: all of it within the first of
+# these of the line the lips meet on, none beyond the second (metres), and
+# the whole of the mouth's lining.
+MOUTH_EVEN = (0.040, 0.056)
+FLIP = np.array([-1.0, 1.0, 1.0])
+# The mouth's shapes that are one shape for both sides, and those that
+# are a left and a right (the two of a pair are made mirror images).
+EVEN_SHAPES = ("Mouth_Open", "Mouth_Wide", "Mouth_Narrow", "Mouth_Pucker", "Upper_Lip_Raise", "Lower_Lip_Lower",
+               "Cheek_Puff", "Jaw_Open", "Jaw_Forward", "Face_Lip_Fullness_Upper", "Face_Lip_Fullness_Lower",
+               "Face_Mouth_Height", "Face_Chin_Length", "Face_Chin_Forward", "Face_Chin_Width")
+EVEN_PAIRS = (("Mouth_Smile_Left", "Mouth_Smile_Right"), ("Mouth_Frown_Left", "Mouth_Frown_Right"),
+              ("Lip_Corner_Pull_Left", "Lip_Corner_Pull_Right"), ("Upper_Lip_Raise_Left", "Upper_Lip_Raise_Right"),
+              ("Lower_Lip_Lower_Left", "Lower_Lip_Lower_Right"), ("Nose_Sneer_Left", "Nose_Sneer_Right"),
+              ("Mouth_Left", "Mouth_Right"), ("Jaw_Left", "Jaw_Right"),
+              ("Face_Mouth_Width_Left", "Face_Mouth_Width_Right"),
+              ("Face_Cheek_Fullness_Left", "Face_Cheek_Fullness_Right"), ("Face_Jaw_Width_Left", "Face_Jaw_Width_Right"))
+
+
+def mouth_region(topo, frames, mirror):
+    """How much of each vertex is the mouth's (1 to 0; `MOUTH_EVEN`), the
+    same for a vertex and its mirror image, over all `frames`' positions."""
+    from facetopo import FS_MOUTH_LOWER, FS_MOUTH_UPPER
+    w = np.zeros(topo.count)
+    for P in frames:
+        P = np.asarray(P, dtype=np.float64)
+        d, _, _ = polyline_nearest(P, P[mouth.Mouth(topo, P).edge])
+        w = np.maximum(w, 1.0 - smoothstep(MOUTH_EVEN[0], MOUTH_EVEN[1], d))
+    w[[i for i in range(topo.count) if topo.vsets[i] and topo.vsets[i] <= {FS_MOUTH_UPPER, FS_MOUTH_LOWER}]] = 1.0
+    w *= topo.is_head
+    return np.maximum(w, w[mirror])
+
+
+def even(X, mirror, w, other=None):
+    """Positions or offsets `X` (every vertex) made mirror images of
+    themselves across the body's middle, by `w` per vertex: each is moved
+    toward the mean of itself and its mirror vertex's image. With
+    `other`, the mirror vertex's are taken from it: a left shape against
+    its right one."""
+    source = X if other is None else other
+    return X + w[:, None] * (0.5 * (X + source[mirror] * FLIP) - X)
+
+
+def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f, mirror=None):
     """Both frames' positions (arrays) with the face put right at rest,
-    and a report. `eyes_*` are {1: left centre, -1: right centre}."""
+    and a report. `eyes_*` are {1: left centre, -1: right centre}. With
+    `mirror` (each vertex's mirror vertex) the mouth is made even: the
+    bundle's lips differ left from right by up to 0.3 mm (masculine) and
+    1.3 mm (feminine), where the gap between closed lips is a tenth of a
+    millimetre, so the line between them showed on one half only."""
     M, F = np.array(M, dtype=np.float64), np.array(F, dtype=np.float64)
     report = {}
     moved = 0.0
@@ -67,9 +113,16 @@ def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f):
             P[:] = seated
     report["lining_vertices_lifted"] = lifted
     rise = {}
+    region = mouth_region(topo, (M, F), mirror) if mirror is not None else None
     for name, P in (("masculine", M), ("feminine", F)):
+        if region is not None:
+            P[:] = even(P, mirror, region)
         sealed, most = mouth.Mouth(topo, P).seal(P)
         P[:] = sealed
+        if region is not None:
+            # (The seal goes by rays and by which way each quad is cut:
+            # not quite alike on the two sides.)
+            P[:] = even(P, mirror, region)
         rise[name] = round(most * 1000, 2)
     report["lips_closed_by_mm"] = rise
     return M, F, report
@@ -623,6 +676,52 @@ class Face:
             share = mouth.SEAL.get(k, 0.0)
             if share:
                 out[i, 2] += share * float(np.interp(rest[i][0], xs, rises, left=0.0, right=0.0))
+        return out
+
+    def evened(self, shapes, mirror, w):
+        """`shapes` ({name: {vertex: offset}}) with the mouth's shapes made
+        even (`EVEN_SHAPES`, `EVEN_PAIRS`; `mirror` is each vertex's
+        mirror vertex, `w` how much of each is the mouth's): a shape is
+        made by rays and nearest points on a face that is not quite the
+        same on both sides, and comes out a little different on each.
+        The mean of two halves can put the lips through each other where
+        neither half did, so they are taken off each other again, alone
+        and for a pair together, and the result made even once more."""
+        count = len(self.P)
+        frames = [self.P] + ([self.other["P"]] if self.other else [])
+
+        def dense(shape):
+            out = np.zeros((count, 3))
+            for i, d in shape.items():
+                out[i] = d
+            return out
+
+        def sparse(D):
+            keep = np.where((np.linalg.norm(D, axis=1) > 2e-5) & self.topo.is_head)[0]
+            return {int(i): D[i].copy() for i in keep}
+
+        def apart(D):
+            for rest in frames:
+                D = D + self.lips_apart(rest + D, rest) - (rest + D)
+            return D
+
+        out = dict(shapes)
+        for name in EVEN_SHAPES:
+            if name in out:
+                D = even(dense(out[name]), mirror, w)
+                if not name.startswith("Jaw"):
+                    D = even(apart(D), mirror, w)
+                out[name] = sparse(D)
+        for left, right in EVEN_PAIRS:
+            if left in out and right in out:
+                L, R = dense(out[left]), dense(out[right])
+                L, R = even(L, mirror, w, R), even(R, mirror, w, L)
+                if not left.startswith("Jaw"):
+                    L, R = apart(L), apart(R)
+                    more = apart(L + R) - (L + R)
+                    L, R = L + more * self.side(1)[:, None], R + more * self.side(-1)[:, None]
+                    L, R = even(L, mirror, w, R), even(R, mirror, w, L)
+                out[left], out[right] = sparse(L), sparse(R)
         return out
 
     def spread(self, push, reach=3, rounds=4):
@@ -1287,7 +1386,8 @@ def _shape_keys(obj, shapes, count):
         key.value = 0.0
 
 
-def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, teeth, out_dir, teeth_copies=()):
+def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, teeth, out_dir, teeth_copies=(),
+          mirror=None):
     """Everything the face adds once the body is weighted: the expression
     and identity shapes on `body`, the parts that follow the lids and the
     brows (`EyeShell`, `Lashes`, `Brows`) with the shapes they follow by,
@@ -1312,6 +1412,11 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     identity = face.identity()
     shapes = dict(expressions)
     shapes.update({name: shape for name, (shape, _) in identity.items()})
+    if mirror is not None:
+        # The mouth's shapes even, as its resting form is (`prepare`).
+        shapes = face.evened(shapes, mirror, mouth_region(topo, (M, F), mirror))
+        expressions = {name: shapes[name] for name in expressions}
+        identity = {name: (shapes[name], changes) for name, (_, changes) in identity.items()}
     _shape_keys(body, shapes, len(M))
     # Parts that follow: under the frame's shape and every shape above.
     frame = {int(i): d for i, d in enumerate(F - M) if np.linalg.norm(d) > 1e-7}

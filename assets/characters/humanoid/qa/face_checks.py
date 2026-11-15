@@ -34,13 +34,25 @@ What is measured, per pose (millimetres; counts are vertices or rays):
   outside the face.
 - `self_crossing`: pairs of the head's triangles that cross, less the
   resting face's own.
+- `mouth_asymmetry_mm`, `teeth_asymmetry_mm`, `tongue_asymmetry_mm`: how
+  far the mouth's skin (the vertices `Mouth_Pucker` moves by more than
+  half a millimetre), the teeth and gums, and the tongue are from their
+  own mirror images across the body's middle: the furthest any vertex's
+  mirror image lies from the nearest vertex. Measured in poses that are
+  the same on both sides (rest, the controls that have no left and
+  right, each left and right pair together, the visemes, and the
+  expressions whose recipes are even). The gap between closed lips is a
+  tenth of a millimetre: half a millimetre's difference between the two
+  halves is a dark line on one side of the mouth and none on the other.
 
 `--check` exits 1 unless: no control, viseme or expression at full weight
 puts a lid in the opaque eyeball or the eyeball in a lid, or the teeth or
 tongue in the flesh, or the lips in the teeth, or the mouth's lining
 through the skin; the half-way blinks keep
-the lids out of the opaque eyeball; and `Blink` and `Eye_Closed` leave no
-ray bare, on both frames. The tongue controls are posed with the jaw
+the lids out of the opaque eyeball; `Blink` and `Eye_Closed` leave no
+ray bare; and in every pose that is the same on both sides the mouth, the
+teeth and the tongue are within `EVEN_MM` of their mirror images, on both
+frames. The tongue controls are posed with the jaw
 half open: a tongue doesn't leave a closed mouth.
 """
 
@@ -77,6 +89,12 @@ TONGUE = ("Tongue_Out", "Tongue_Up", "Tongue_Down")
 # The jaw's opening the tongue controls are posed with.
 TONGUE_JAW = 0.5
 OPAQUE = ("Sclera", "Iris")
+# In a pose that is the same on both sides, no vertex of the mouth, the
+# teeth or the tongue is further than this from a mirror image (millimetres).
+EVEN_MM = 0.1
+# The left and right controls checked together as pairs.
+PAIRS = ("Mouth_Smile", "Mouth_Frown", "Lip_Corner_Pull", "Upper_Lip_Raise", "Lower_Lip_Lower", "Nose_Sneer",
+         "Cheek_Raise")
 # Crossings of the mouth's lining and the skin this near the lips' edges
 # are the closed lips touching, not the lining coming through the face.
 LIPS_EDGE = 0.008
@@ -206,8 +224,42 @@ def pose(ch, frame, weights, identity=None):
     Q.update()
 
 
-def measure(ch, rest_crossing=None):
-    """The measures of the pose the character is in."""
+def even_weights(weights):
+    """Whether a pose's controls are the same on both sides: every left
+    control has its right one at the same weight."""
+    for name, w in weights.items():
+        for side, other in (("Left", "Right"), ("Right", "Left")):
+            if name.endswith(side) and abs(weights.get(name[:-len(side)] + other, 0.0) - w) > 1e-9:
+                return False
+    return True
+
+
+def asymmetry(co):
+    """The furthest any of the points' mirror images (across x = 0) lies
+    from the nearest of the points, in metres."""
+    from mathutils.kdtree import KDTree
+    if not len(co):
+        return 0.0
+    tree = KDTree(len(co))
+    for i, p in enumerate(co):
+        tree.insert(p, i)
+    tree.balance()
+    return max(tree.find((-p[0], p[1], p[2]))[2] for p in co)
+
+
+def mouth_vertices(ch, frame):
+    """Which of the body's posed vertices are the mouth's skin: those
+    `Mouth_Pucker` moves by more than half a millimetre."""
+    pose(ch, frame, {})
+    rest = Piece(ch.parts["Body"]).co
+    pose(ch, frame, {"Mouth_Pucker": 1.0})
+    moved = Piece(ch.parts["Body"]).co
+    return np.where(np.linalg.norm(moved - rest, axis=1) > 0.0005)[0]
+
+
+def measure(ch, rest_crossing=None, mouth_skin=None):
+    """The measures of the pose the character is in (with `mouth_skin`,
+    the mouth's vertices: how far it and the teeth are from even)."""
     body = Piece(ch.parts["Body"])
     eyes_obj, teeth_obj = ch.parts["Eyes"], ch.parts["Teeth"]
     opaque = Piece(eyes_obj, OPAQUE)
@@ -270,6 +322,10 @@ def measure(ch, rest_crossing=None):
     deep = [d for d in deep if d > 0.0002]
     out["lips_in_teeth"] = len(deep)
     out["lips_in_teeth_max_mm"] = mm(max(deep)) if deep else 0.0
+    if mouth_skin is not None:
+        out["mouth_asymmetry_mm"] = mm(asymmetry(body.co[mouth_skin]))
+        out["teeth_asymmetry_mm"] = mm(asymmetry(teeth.co))
+        out["tongue_asymmetry_mm"] = mm(asymmetry(tongue.co)) if tongue is not None else 0.0
     # The mouth's lining through the face's skin: pairs of their triangles
     # that cross, away from the lips' own edges (closed lips touch there).
     lining = Piece(ch.parts["Body"], ("Mouth",))
@@ -330,6 +386,8 @@ def poses(shapes, parameters):
         if control in TONGUE:
             w["Jaw_Open"] = TONGUE_JAW
         out.append(("controls", control, w, {}, True))
+    for name in PAIRS:
+        out.append(("pairs", name, {f"{name}_Left": 1.0, f"{name}_Right": 1.0}, {}, True))
     for name in ("Blink", "Eye_Closed"):
         both = {f"{name}_Left": 1.0, f"{name}_Right": 1.0}
         out.append(("closed", name, both, {}, True))
@@ -401,6 +459,9 @@ def failures(report):
                     if m[key]:
                         deep = m.get(key + "_max_mm")
                         bad.append(f"{frame}/{group}/{name}: {key} = {m[key]}" + (f" (to {deep} mm)" if deep else ""))
+                for key in ("mouth_asymmetry_mm", "teeth_asymmetry_mm", "tongue_asymmetry_mm"):
+                    if m.get(key, 0.0) > EVEN_MM:
+                        bad.append(f"{frame}/{group}/{name}: {key} = {m[key]} (at most {EVEN_MM})")
                 if group == "closed" and m["bare_rays"]:
                     bad.append(f"{frame}/{group}/{name}: the eye isn't closed: {m['bare_rays']} rays bare, "
                                f"open {m['open_mm']} mm")
@@ -438,9 +499,13 @@ def main():
     for frame_name, frame in (("masculine", 0.0), ("feminine", 1.0)):
         groups = {}
         rest_crossing = None
+        mouth = mouth_vertices(ch, frame)
         for group, name, weights, identity, required in listed:
             pose(ch, frame, weights, identity)
-            m, crossing = measure(ch, rest_crossing)
+            # (Evenness: of the poses that are even, and not of the
+            # identity's, whose ends are a face's own.)
+            even = required and not identity and even_weights(weights)
+            m, crossing = measure(ch, rest_crossing, mouth if even else None)
             if rest_crossing is None:
                 rest_crossing = crossing
                 m["self_crossing_at_rest"] = crossing

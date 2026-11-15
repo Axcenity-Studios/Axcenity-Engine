@@ -92,7 +92,10 @@ def build(out_dir, texture_size=2048, bakes=True):
     # The face put right at rest (the feminine lids, the lids' lining, the
     # lips; `face.prepare`), before the teeth are placed and the body weighted.
     topo = face.topo_of(body_obj.data, sets)
-    m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f)
+    # (Each vertex's mirror vertex: the mouth is made even by it.)
+    mirror = shapes._transfer()[0].mirror_map([array(source["Masculine"]), array(source["Feminine"])])
+    m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f,
+                                             mirror)
     M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
     if maps:
         face_rest["lid_texels_softened"] = face.soften_lids(body_obj, topo, m_face, eyes_m, eye_radius, maps)
@@ -100,6 +103,10 @@ def build(out_dir, texture_size=2048, bakes=True):
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
     teeth, teeth_copies, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle, out_dir)
+    # (Room for the jaw is made vertex by vertex: the mouth even again.)
+    mouth_share = face.mouth_region(topo, (array(M.P), array(F.P)), mirror)
+    M.P = [Vector(p) for p in face.even(array(M.P), mirror, mouth_share)]
+    F.P = [Vector(p) for p in face.even(array(F.P), mirror, mouth_share)]
 
     # The skeleton and the weights, on the masculine frame.
     P = M.P
@@ -107,7 +114,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     joints = rig.fit_joints(P, lm, eyes_m)
     joints_f = rig.fit_joints(F.P, lm, eyes_f)
     armature = rig.build_armature(joints, ARMATURE)
-    weights = rig.skin(body_obj, armature, P, lm, joints)
+    weights = rig.skin(body_obj, armature, P, lm, joints, even=(mirror, mouth_share))
     for obj in (body_obj, eyes, teeth, *teeth_copies):
         skin_to(obj, armature)
 
@@ -132,7 +139,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     # follow the lids and brows (before the simpler copies, which take
     # the body's shapes).
     face_parts, face_data = face.build(body_obj, topo, array(P), array(F.P), eyes_m, eyes_f, eye_radius,
-                                       joints, joints_f, weights, teeth, out_dir, teeth_copies)
+                                       joints, joints_f, weights, teeth, out_dir, teeth_copies, mirror)
     for obj in face_parts.values():
         skin_to(obj, armature)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
