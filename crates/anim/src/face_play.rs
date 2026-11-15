@@ -749,23 +749,20 @@ mod tests {
     #[test]
     fn asymmetry_keeps_one_side() {
         let mut state = FaceState::default();
-        let mut happy = play("Happy", 0, 0);
-        happy.presence = 1.0;
-        happy.asymmetry = -1.0;
-        state.expressions.push(happy);
+        // (Excited: a recipe with a control in the middle of the face.)
+        let mut excited = play("Excited", 0, 0);
+        excited.presence = 1.0;
+        excited.asymmetry = -1.0;
+        state.expressions.push(excited);
         let layer = advance_expressions(
             &mut state,
             &FaceExpressions::default(),
             0.0,
             &mut Vec::new(),
         );
-        assert_eq!(at(&layer, "Mouth_Smile_Left"), (0.8, 1.0));
+        assert_eq!(at(&layer, "Mouth_Smile_Left"), (1.0, 1.0));
         assert_eq!(at(&layer, "Mouth_Smile_Right"), (0.0, 0.0));
-        assert_eq!(
-            at(&layer, "Mouth_Open"),
-            (0.15, 1.0),
-            "middle controls stay"
-        );
+        assert_eq!(at(&layer, "Mouth_Open"), (0.3, 1.0), "middle controls stay");
     }
 
     #[test]
