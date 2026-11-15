@@ -12,7 +12,7 @@ Milestone CO6 of the [Character Studio overhaul](../../../../plans/axcenity-engi
 | `Eyes` | Per eye: `Sclera` (the white, textured), `Iris` (a dish set back inside the limbus, with the pupil), `Cornea` (a clear cap 1.2 mm proud of the white, alpha-blended). 2,256 triangles. Its own shape `Pupil_Size` widens or narrows the pupil; nothing drives it yet (below). |
 | `EyeShell` | `EyeOcclusion` (a film between the lids, dark at their edges) and `TearLine` (the wet line), on the head, following the lids by shapes and drawn back behind them as they close. 320 triangles. |
 | `Lashes`, `Brows` | Cards, alpha-blended. Lashes are rooted on the lid's outer edge and turn with it about the eyeball (160 triangles); a brow card lies on the skin and rides it whole (112 triangles). |
-| `Teeth` | The teeth meet 1.6 mm under the lips' line just behind the upper lip (CO4 had them 13 mm lower and 12 mm further back). The bundle's lower shell and floor, which tore between head and jaw, are gone; a tongue (294 triangles) is made with `Tongue_Out`, `Tongue_Up`, `Tongue_Down`. 3,893 triangles. |
+| `Teeth` | The teeth meet 1.6 mm under the lips' line just behind the upper lip (CO4 had them 13 mm lower and 12 mm further back). The bundle's lower shell and floor, which tore between head and jaw, are gone; a tongue (432 triangles, on the jaw) is made with `Tongue_Out`, `Tongue_Up`, `Tongue_Down`, and the lower teeth and the tongue carry their own `Jaw_Open` (review round 3, part 2). 7,632 triangles. |
 
 Materials and shading in the manifest: `Skin` skin; `Sclera`, `Iris`, `Cornea` eye; `Lashes`, `Brows` hair; `Mouth`, `Teeth`, `Gums`, `Tongue`, `EyeOcclusion`, `TearLine` standard. `RealisticParts.glb` is 29.2 MB with CO5's body shapes; `Body` and each simpler copy carry 142 shapes.
 
@@ -195,3 +195,39 @@ What changed:
 **Not solved: the open mouth is still a box.** An attempt to make it an oval (the jaw's hold eased toward half along the lips near the corners, the corners drawn in 7 mm) did narrow and round the opening, but put the mouth's lining through the cheek beside the nose at full opening on both frames (50 and 53 crossing pairs by `face_checks.py`, red patches in the engine picture) and left a pinched fold beside the corner. It was withdrawn; `Jaw_Open` is the corner-in shape of the round before, less the spike. What it would take: the jaw's weights themselves falling off along the lips from chin to corner (`rig.py`), the cheek's lining weighted with the cheek's skin so the two cannot part, and then a corrective shape for the lips' curve.
 
 Also still short after this part: at squint and cheek raise both at 1 the eye is all but shut and its lid line is ragged; at 4K the resting lips show a thin pale line between them (the upper teeth through the gap the seal leaves); the masculine smile's resting asymmetry (0.7 mm between the head's halves) was not looked at again; the reference photographs were not opened for lack of room in the session, so every reading here is against the lead's written description of them, not the photographs.
+
+## Review round 3, part 2 (the open mouth)
+
+Engine, 3840 x 2160, studio light; a row per pose: masculine face view and three-quarter view (the head cut from the full-body picture), then the feminine frame's. The mouths are cut from the pictures at full size.
+
+- **[engine/mouth-open.jpg](engine/mouth-open.jpg)**: the masculine `Jaw_Open` 1 as it was before this part, then rest, `Jaw_Open` 0.5 and 1.
+- **[engine/mouth-smile-laugh.jpg](engine/mouth-smile-laugh.jpg)**: the smile with the lips closed, Happy, Laughing, Surprised.
+- **[engine/mouth-speech.jpg](engine/mouth-speech.jpg)**: `Mouth_Open` 1 and the AI viseme.
+
+What was found in the mesh (masculine frame, before):
+
+- **The box was the weights.** The upper lip's edge is 23 vertices from corner to corner, the lower lip's loops 15 to 21. Every vertex of the upper lip had 0 of the jaw; the lower lip's had 1 to within one vertex of the corner (0.97 at 23.5 mm from the middle, 0.75 at 25.3 mm) and the corner itself 0. So the jaw's whole drop (37 mm at the lips) was taken by the last 2 mm of lip: the box's upright sides. Over the cheeks the hold went from none to all across 0.08 radians about the hinge, 7 mm of skin beside the corner.
+- **The lining tore along the cheek.** The mouth's upper lining was all the head's and its lower all the jaw's, with the seam between them (which runs back from the corner along the inside of the cheek) on the jaw: one row of faces from the corner back stretched the full drop.
+- **The tongue was not on the jaw.** Its 155 vertices had no weight at all in the file (the vertex groups were written through a handle that no longer added anything), so it stayed up under the palate while the jaw dropped away: the empty floor. `face_checks.py` had been measuring the tongue there.
+- **The hinge carries the jaw back.** It is 46 mm above the lips' line and 99 mm behind it, so a turn of 25 degrees takes the lower lip 37 mm down and 29 mm back, and raises the lower incisors' tips 2.7 mm over the lower lip's top.
+- **The black line was baked.** The sculpts' lips are closed, and the occlusion bake shaded where they touch: 0.2 to 0.6 along the lower lip's top and 0.19 in the corners (1 is unshaded). The upper lip's inner side was the mouth's dark flesh colour from its very edge.
+
+What changed:
+
+- **Weights** (`rig._jaw`): one smooth field over skin and lining. On the lips' line the upper lip takes `0.42 * (1 - sqrt(1 - u * u))` of the jaw and the lower `1 - 0.58 * (1 - sqrt(1 - u * u))` (`u` from the middle to a corner), carried off the lips in elliptic coordinates about the two corners; over the cheeks the hold runs across 0.38 radians. The lips' inner sides take their outer sides' weights; from 6 to 16 mm behind the lips' line the lining goes over to the head (roof), the jaw (floor) and half (the seam).
+- **`Jaw_Open`'s shape** (`face.jaw_open`): everything the jaw holds glides 19 mm forward (a jaw's joint slides forward as it opens; the lower teeth and tongue carry the same in a `Jaw_Open` of their own, which `Teeth` follows by name), the lower lip stands 5 mm higher and 2 mm back, the corners come in 4.5 mm and forward 2.5 mm.
+- **The tongue** is on the jaw, round at the tip and as wide as the lower arch (432 triangles). Its `Jaw_Open` lays it in the floor: the tip onto the lower incisors, the upper side flat out to the teeth and 3 mm onto their inner cusps, the back sunk 18 mm along its middle. `Tongue_Out` rises 3 mm more to pass over the lower lip.
+- **Skin maps** (`skin.bake`): the occlusion where the lips touch is lifted to 0.85 or more, and the lining within 13 mm of the lips' line shades from the lips' colour into flesh.
+
+Checks: `face_checks.py --check` exits 1 with **1 failure** (masculine `Mouth_Left`, 1 tooth point to 0.65 mm, as before; the feminine `Jaw_Right` is clear), [face-checks-run.txt](face-checks-run.txt) and [face_checks.json](face_checks.json) are this build's, and the table under "Measured" above is still the first hand-back's. `Jaw_Open` puts no lining through the skin on either frame. The Blender sheets beside this file are re-rendered.
+
+**Still short of the photographs:**
+
+1. From the face camera (beside and above the mouth) the far row of lower teeth still shows beside the tongue as a column of three or four pale blocks, in `Jaw_Open` and most in Laughing. The lower arch is tilted with the jaw, so their tops face the camera; the tongue now covers their inner sides only. The arch is also large for the head (71 mm across the molars).
+2. The tongue reads as a slab with a ridge across it, not as flesh: one flat colour, 16 points round, lit like the lips (nothing in the engine shades the inside of a mouth). At `Jaw_Open` 0.5 and in Surprised it fills the opening and no dark shows behind it.
+3. On the feminine frame the teeth stand 6.2 mm behind the lips (2.7 mm on the masculine; the teeth's fit, unchanged), so a dark gap shows between the lower lip and the tongue from above.
+4. The opening is wider than the photographs' in proportion at 0.5 (a long almond) and its corners are rounder than a mouth's at 1; the feminine opening at 1 is taller than wide.
+5. Laughing: the upper teeth's last tooth on the near side hangs below the row like a fang, and the far cheek shows both rows of molars.
+6. The teeth are flat grey (their material is CO7's), and in the full-body views the engine draws `Teeth` at a simpler level, where the tongue is a few blocks.
+7. The feminine U and WQ visemes count more head triangles crossing than before (53 and 63 pairs, from 3 and 4; reported, not held to 0): with a jaw barely open the lips' corners now part less, and the pucker's crossing lips (167 pairs on its own, as before) show there.
+8. At rest a thin pale line still shows between the lips at 4K (as before).

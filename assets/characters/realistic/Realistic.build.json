@@ -612,9 +612,9 @@
    "Face_Nose_Width_Left": 4.41,
    "Face_Nose_Width_Right": 4.41,
    "Jaw_Forward": 5.5,
-   "Jaw_Left": 5.04,
-   "Jaw_Open": 5.05,
-   "Jaw_Right": 6.96,
+   "Jaw_Left": 2.93,
+   "Jaw_Open": 19.27,
+   "Jaw_Right": 3.24,
    "Lip_Corner_Pull_Left": 5.24,
    "Lip_Corner_Pull_Right": 5.24,
    "Lower_Lip_Lower": 5.22,
@@ -1300,7 +1300,7 @@
    "points_in_flesh": 0,
    "scale": 1.0
   },
-  "tongue_triangles": 294
+  "tongue_triangles": 432
  },
  "texture_coordinates": {
   "coverage": 0.663,

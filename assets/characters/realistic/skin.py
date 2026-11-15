@@ -45,6 +45,9 @@ SCULPT_LEVELS = 3
 TONE = (0.74, 0.53, 0.43)
 FLESH = (0.42, 0.13, 0.14)          # inside the mouth, the eye sockets
 LIPS = (0.57, 0.27, 0.29)
+INNER_LIP = (0.55, 0.23, 0.25)      # the lips' inner sides at their edges
+# The least occlusion left where the lips touch (the sculpts are closed).
+LIP_SEAM_OCCLUSION = 0.85
 NAIL = (0.86, 0.70, 0.66)
 FLUSH = (1.12, 0.82, 0.80)
 PALE = (1.08, 1.01, 0.97)
@@ -210,6 +213,35 @@ def _blur(a, radius):
         out = (c.take(hi, axis=axis) - c.take(lo, axis=axis)) / (hi - lo).reshape(
             [-1 if k == axis else 1 for k in range(out.ndim)])
     return out
+
+
+def _near_lips(body, P, lm, size, full, none, sets=None):
+    """A soft mask over the texels of how near the line the lips meet on
+    each face is: 1 within `full` metres of it, 0 beyond `none` (of the
+    faces of `sets`, or all)."""
+    from PIL import Image, ImageDraw
+    X = array(P)
+    line = np.array(sorted(lm.ring(FS_HEAD, MOUTH_SETS[0])), dtype=np.int64)
+    line = X[line[np.argsort(X[line][:, 0])]]
+    away = np.full(len(X), np.inf)
+    head = np.array(sorted(set().union(*(lm.of_set[fs] for fs in HEAD_SETS))), dtype=np.int64)
+    for a, b in zip(line[:-1], line[1:]):
+        t = np.clip(((X[head] - a) @ (b - a)) / max(float((b - a) @ (b - a)), 1e-18), 0.0, 1.0)
+        away[head] = np.minimum(away[head], np.linalg.norm(X[head] - (a + t[:, None] * (b - a)), axis=1))
+    near = 1.0 - _step(full, none, away)
+    img = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(img)
+    layer = body.data.uv_layers[0].data
+    of = face_sets(body) if sets is not None else None
+    for poly in body.data.polygons:
+        if sets is not None and of[poly.index] not in sets:
+            continue
+        value = float(np.mean([near[v] for v in poly.vertices]))
+        if value <= 0.0:
+            continue
+        pts = [(layer[i].uv[0] * size, (1 - layer[i].uv[1]) * size) for i in poly.loop_indices]
+        draw.polygon(pts, fill=int(round(255 * value)), outline=int(round(255 * value)))
+    return _blur(np.asarray(img, dtype=np.float64) / 255.0, max(1, size // 700))
 
 
 # -- the fields over the body ---------------------------------------------------------
@@ -383,6 +415,12 @@ def bake(body, source, lm, size, out_dir):
     ao = np.clip(ao, 0.0, 1.0)
     shared[hidden] = (0.0, 0.0, 1.0)
     ao[hidden] = 1.0
+    # The lips were sculpted closed, and the bake shades where they touch
+    # as a crease: on an open mouth that is a black line along the lips'
+    # inner edges and a black notch in each corner. Most of it is taken
+    # out (a closed mouth's line is drawn by the lips themselves).
+    seam = _near_lips(body, source["Masculine"], lm, size, 0.004, 0.009)
+    ao = ao + (np.maximum(ao, LIP_SEAM_OCCLUSION) - ao) * seam
 
     # Skin grain: a bump texture in the body's own space, baked to a normal map.
     grain = _image("Grain", size, (0.5, 0.5, 1.0, 1.0))
@@ -533,6 +571,12 @@ def bake(body, source, lm, size, out_dir):
     albedo = albedo * (1.0 - crease * np.array([0.30, 0.42, 0.45]))
     albedo[hidden] = srgb_to_linear(FLESH)
     roughness[hidden] = 0.35
+    # The lips' inner sides are the lips' colour at their edges and darken
+    # into the mouth: flesh from the very edge drew a dark line round an
+    # open mouth.
+    inner = _near_lips(body, source["Masculine"], lm, size, 0.002, 0.013, set(MOUTH_SETS))[:, :, None]
+    inner = np.where(hidden[:, :, None], inner, 0.0)
+    albedo = albedo * (1.0 - inner) + srgb_to_linear(INNER_LIP) * inner
 
     from PIL import Image
     paths = [os.path.join(out_dir, name) for name in FILES]

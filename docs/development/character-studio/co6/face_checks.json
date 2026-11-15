@@ -47,8 +47,7 @@
   "Upper_Lip_Raise_Right"
  ],
  "failures": [
-  "masculine/controls/Mouth_Left: teeth_in_flesh = 1 (to 0.65 mm)",
-  "feminine/controls/Jaw_Right: teeth_in_flesh = 3 (to 0.89 mm)"
+  "masculine/controls/Mouth_Left: teeth_in_flesh = 1 (to 0.65 mm)"
  ],
  "file": "RealisticParts.glb",
  "frames": {
@@ -578,7 +577,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 73,
+     "self_crossing": 19,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -600,7 +599,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 80,
+     "self_crossing": 38,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -644,9 +643,9 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 39,
-     "teeth_in_flesh": 3,
-     "teeth_in_flesh_max_mm": 0.89,
+     "self_crossing": 31,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -1284,7 +1283,7 @@
       10.35
      ],
      "required": true,
-     "self_crossing": 4,
+     "self_crossing": 8,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -1328,7 +1327,7 @@
       7.08
      ],
      "required": true,
-     "self_crossing": 10,
+     "self_crossing": 6,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -2827,8 +2826,8 @@
      ],
      "required": false,
      "self_crossing": 0,
-     "teeth_in_flesh": 2,
-     "teeth_in_flesh_max_mm": 0.77,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -2841,16 +2840,16 @@
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
      "lining_through_skin": 0,
-     "lips_in_teeth": 1,
-     "lips_in_teeth_max_mm": 0.45,
+     "lips_in_teeth": 0,
+     "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
       9.4,
       9.3
      ],
      "required": false,
      "self_crossing": 0,
-     "teeth_in_flesh": 13,
-     "teeth_in_flesh_max_mm": 1.58,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -4809,8 +4808,8 @@
      ],
      "required": false,
      "self_crossing": 276,
-     "teeth_in_flesh": 2,
-     "teeth_in_flesh_max_mm": 0.77,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -4823,16 +4822,16 @@
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
      "lining_through_skin": 0,
-     "lips_in_teeth": 1,
-     "lips_in_teeth_max_mm": 0.45,
+     "lips_in_teeth": 0,
+     "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
       0.0,
       0.0
      ],
      "required": false,
      "self_crossing": 276,
-     "teeth_in_flesh": 13,
-     "teeth_in_flesh_max_mm": 1.58,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -5783,7 +5782,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 3,
+     "self_crossing": 53,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5805,7 +5804,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 4,
+     "self_crossing": 63,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -8610,8 +8609,8 @@
      ],
      "required": false,
      "self_crossing": 0,
-     "teeth_in_flesh": 1,
-     "teeth_in_flesh_max_mm": 0.51,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -10592,8 +10591,8 @@
      ],
      "required": false,
      "self_crossing": 251,
-     "teeth_in_flesh": 1,
-     "teeth_in_flesh_max_mm": 0.51,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },

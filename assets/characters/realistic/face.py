@@ -158,6 +158,45 @@ MOUTH_RISES = 0.0045
 JAW_SHIFTS = 0.0050
 # How far Jaw_Forward brings the jaw (metres).
 JAW_FORWARD = 0.0055
+# The jaw opening wide (`Jaw_Open` at 1, metres). The bone only turns
+# about its hinge, which carries the chin and the lower lip 29 mm back
+# under the upper teeth; a jaw's joint also slides forward as it opens,
+# so the shape brings all the jaw holds forward by `JAW_GLIDE` (the
+# lower teeth and the tongue carry the same in their own `Jaw_Open`).
+JAW_GLIDE = 0.019
+# The lower lip stands this much higher than the turn leaves it: it
+# covers the lower teeth, whose tips the turn alone raises over it.
+JAW_LIP_UP = 0.0050
+JAW_LIP_BACK = 0.0020
+# How much of `JAW_LIP_UP` each loop of the lower lip takes (by loop from
+# the fold behind the lip: `mouth.Mouth.lower`).
+LIP_RISES = {1: 0.8, 2: 1.0, 3: 1.0, 4: 0.9, 5: 0.65, 6: 0.35, 7: 0.12}
+# The mouth's corners come in round the opening by this much, and
+# forward along the teeth by this much.
+JAW_CORNER_IN = 0.0045
+JAW_CORNER_FORWARD = 0.0025
+# The tongue with the jaw open (metres, in the jaw's own space). Turned
+# with the jaw as it rests, it is a ramp from the lower incisors to the
+# upper molars: it hides the back of the mouth, and the far row of lower
+# teeth stands bare beside it. So:
+# - its front half stands `TONGUE_RISES` higher, level with the lower
+#   teeth's tops, domed by `TONGUE_DOME` along its middle, and its tip
+#   comes forward and up onto the lower incisors (`TONGUE_TIP`);
+# - its upper side spreads flat (`TONGUE_FLAT` of the way) out to
+#   `TONGUE_ROOM` from the teeth and `TONGUE_OVER` onto their inner cusps;
+# - its back half sinks toward the throat, by `TONGUE_SINKS` at the root
+#   along its middle and `TONGUE_EDGES` less of that at its edges, which
+#   stay up along the teeth, and is thinner by `TONGUE_THINS` of itself
+#   at the root, so it stays off the mouth's floor.
+TONGUE_RISES = 0.0015
+TONGUE_DOME = 0.0020
+TONGUE_TIP = (0.0060, 0.0027)
+TONGUE_FLAT = 0.75
+TONGUE_ROOM = 0.0006
+TONGUE_OVER = 0.0030
+TONGUE_SINKS = 0.018
+TONGUE_EDGES = 0.55
+TONGUE_THINS = 0.60
 
 
 def add(*shapes):
@@ -204,6 +243,12 @@ class Jaw:
     def rigid(self, X, open_deg=0.0, side_deg=0.0):
         return (np.asarray(X) - self.hinge) @ self.turn(open_deg, side_deg).T + self.hinge
 
+    @staticmethod
+    def glide():
+        """`JAW_GLIDE` as an offset of what rests on the jaw (a shape is
+        added before the bone turns): forward once the jaw is open."""
+        return Jaw.turn(JAW_OPEN_DEG).T @ np.array([0.0, -JAW_GLIDE, 0.0])
+
     def unpose(self, offsets, open_deg=0.0, side_deg=0.0, idx=None):
         """Offsets wanted on the posed skin, as offsets of the resting
         skin (a shape is added before the skin is posed)."""
@@ -231,10 +276,13 @@ class Teeth:
 
     def posed(self, jaw=None, open_deg=0.0, side_deg=0.0, shift=None):
         """The points with the lower half moved by `shift` (the teeth's
-        own Jaw_Forward shape) and turned with the jaw."""
+        own Jaw_Forward shape) and by their `Jaw_Open` shape's glide,
+        and turned with the jaw."""
         pts = self.points.copy()
         if shift is not None:
             pts[~self.upper] += shift
+        if open_deg:
+            pts[~self.upper] += Jaw.glide() * (open_deg / JAW_OPEN_DEG)
         if jaw is not None and (open_deg or side_deg):
             pts[~self.upper] = jaw.rigid(pts[~self.upper], open_deg, side_deg)
         return pts
@@ -720,23 +768,34 @@ class Face:
         return {name: S[name] for name in EXPRESSIONS}
 
     def jaw_open(self):
-        """With the jaw open all the way: the corners of the mouth come
-        in (the lips make an oval, not a diamond) and the cheeks hollow
-        between the jaws, and the lips stay off the teeth."""
+        """With the jaw open all the way, what the bone's turn and the
+        skin's weights don't give (`rig._jaw` makes the opening an oval):
+        the jaw's glide forward, the lower lip standing over the lower
+        teeth, the corners of the mouth drawn in and forward round the
+        opening, the cheeks hollowed a little between the jaws, and the
+        lips off the teeth."""
         P = self.P
         posed = self.jaw.pose(P, JAW_OPEN_DEG)
         X = posed.copy()
+        held = self.jaw.w * self.topo.is_head
+        X[:, 1] -= JAW_GLIDE * held
+        # The lower lip, by its loops from the fold behind it over its
+        # top to the fold above the chin; nothing at the corners.
+        rise = np.zeros(len(P))
+        for i, k in self.mouth.lower_step.items():
+            rise[i] = LIP_RISES.get(k, 0.0)
+        rise *= self.corner_taper(0.8)
+        X[:, 2] += JAW_LIP_UP * rise
+        # (And a little back: turned with the jaw the lip leans out.)
+        X[:, 1] += JAW_LIP_BACK * rise
         for _, s in SIDES:
-            corner = posed[self.mouth.corner[s]]
-            w = gauss(np.linalg.norm(posed - corner, axis=1), 0.017) * (self.skin | self.lining)
-            X[:, 0] -= s * 0.0058 * w
+            corner = X[self.mouth.corner[s]].copy()
+            w = gauss(np.linalg.norm(X - corner, axis=1), 0.017) * (self.skin | self.lining)
+            X[:, 0] -= s * JAW_CORNER_IN * w
+            X[:, 1] -= JAW_CORNER_FORWARD * w
         share = self.jaw.w * (1.0 - self.jaw.w) * 4.0
         hollow = share * smoothstep(0.024, 0.04, np.abs(P[:, 0])) * self.skin * (1.0 - self.lipness)
         X -= (hollow * 0.0022)[:, None] * self.N
-        # (Tried and withdrawn in review round 3: easing the jaw's hold
-        # toward the corners and drawing them in 7 mm made the opening an
-        # oval but put the mouth's lining through the cheek; see
-        # docs/development/character-studio/co6/README.md.)
         return self.shape(X, open_deg=JAW_OPEN_DEG)
 
     def clear_with(self, shape, other, parts=(1.0, 0.6), most=0.002):
@@ -907,6 +966,51 @@ class Face:
         return out
 
 
+def tongue_open(points, lower_teeth):
+    """The tongue's offsets at `Jaw_Open` 1 beyond the jaw's glide (its
+    points at rest, in `parts._tongue`'s order: rings from the tip, then
+    the tip's point; `lower_teeth` are the lower teeth's points). A
+    tongue lies in the floor of the open mouth from one row of teeth to
+    the other, level with their tops, and falls away toward the throat
+    (the `TONGUE_*` numbers above)."""
+    from parts import TONGUE_AROUND, TONGUE_ROWS
+    out = points.copy()
+    forward, up = TONGUE_TIP
+    for row in range(TONGUE_ROWS + 1):
+        # (The last "ring" is the tip's own point.)
+        ring = slice(row * TONGUE_AROUND, (row + 1) * TONGUE_AROUND) if row < TONGUE_ROWS else slice(-1, None)
+        R = points[ring]
+        t = row / (TONGUE_ROWS - 1.0) if row < TONGUE_ROWS else 0.0
+        tip = 1.0 - float(smoothstep(0.0, 0.4, t))
+        out[ring, 1] = R[:, 1] - forward * tip
+        if row == TONGUE_ROWS:
+            out[ring, 2] = R[:, 2] + TONGUE_RISES + up
+            break
+        top, low, half = R[:, 2].max(), R[:, 2].min(), max(float(np.abs(R[:, 0]).max()), 1e-6)
+        near = lower_teeth[np.abs(lower_teeth[:, 1] - R[:, 1].mean()) < 0.004]
+        room = float(np.abs(near[:, 0]).min()) - TONGUE_ROOM if len(near) and row else half
+        room = max(room, half)
+        over = TONGUE_OVER * float(smoothstep(0.25, 0.6, t)) if len(near) else 0.0
+        across = np.clip(np.abs(R[:, 0]) / half, 0.0, 1.0)
+        high = (R[:, 2] - low) / max(top - low, 1e-6)
+        sink = float(smoothstep(0.25, 1.0, t))
+        z = top - (top - R[:, 2]) * (1.0 - TONGUE_THINS * sink)
+        flat = TONGUE_FLAT * float(smoothstep(0.0, 0.3, t)) * np.clip(2.0 * high - 1.0, 0.0, 1.0)
+        z = top - (top - z) * (1.0 - flat)
+        z += TONGUE_RISES * (1.0 - sink) + up * tip - TONGUE_SINKS * sink * (1.0 - TONGUE_EDGES * across ** 2)
+        z += TONGUE_DOME * (1.0 - across ** 2) * high * float(smoothstep(0.0, 0.3, t))
+        # The upper side out over the teeth's inner cusps, and clear of them.
+        upper = np.clip(4.0 * high - 1.0, 0.0, 1.0)
+        x = R[:, 0] * (room + over * upper) / half
+        if over:
+            cusps = near[np.abs(near[:, 0]) < room + TONGUE_ROOM + over + 0.002]
+            on_teeth = np.abs(x) > room - 0.0005
+            if len(cusps):
+                z = np.where(on_teeth, np.maximum(z, cusps[:, 2].max() + 0.0006), z)
+        out[ring, 0], out[ring, 2] = x, z
+    return out - points
+
+
 # -- the build's hook -----------------------------------------------------------
 
 def to_gltf(d):
@@ -978,6 +1082,20 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     key = teeth.shape_key_add(name="Face_Jaw_Shift", from_mix=False)
     for i in np.nonzero(~upper)[0]:
         key.data[i].co = points[i] + np.array([JAW_SHIFTS, 0.0, 0.0])
+    key.value = 0.0
+    # The lower teeth glide forward with the opening jaw, and the tongue
+    # settles into the floor of the mouth.
+    tongue = np.unique([i for p, poly in zip(polys, me.polygons)
+                        if me.materials[poly.material_index].name == "Tongue" for i in p])
+    opened = points.copy()
+    opened[~upper] += Jaw.glide()
+    is_tooth = np.zeros(len(points), dtype=bool)
+    is_tooth[np.unique([i for p, poly in zip(polys, me.polygons)
+                        if me.materials[poly.material_index].name == "Teeth" for i in p])] = True
+    opened[tongue] += tongue_open(points[tongue], points[is_tooth & ~upper])
+    key = teeth.shape_key_add(name="Jaw_Open", from_mix=False)
+    for i in np.nonzero(~upper)[0]:
+        key.data[i].co = opened[i]
     key.value = 0.0
     bones = {}
     for name, (_, changes) in identity.items():

@@ -357,16 +357,22 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
     return out, nearest
 
 
+# The tongue's mesh: rings from the tip to the root, points round each.
+TONGUE_ROWS, TONGUE_AROUND = 14, 16
+
+
 def _tongue(lower_teeth, k):
     """A tongue in the jaw's own space (the incisors' front on the plane
     the teeth meet on; y back, z up): (points, quads and triangles, how
     far each point is from the root 0 to the tip 1). It lies inside the
-    lower teeth's arch, its tip behind the lower incisors, its back
-    rising toward the throat."""
+    lower teeth's arch and fills it from side to side, its tip round and
+    thin behind the lower incisors, its back rising toward the throat.
+    The points are in rings of `TONGUE_AROUND` from the tip, then the
+    tip's own point."""
     lower_teeth = np.asarray(lower_teeth)
-    tip_y = float(lower_teeth[np.abs(lower_teeth[:, 0]) < 0.006 * k][:, 1].max()) + 0.0035 * k
-    root_y = tip_y + 0.046 * k
-    rows, around = 11, 14
+    tip_y = float(lower_teeth[np.abs(lower_teeth[:, 0]) < 0.006 * k][:, 1].max()) + 0.0020 * k
+    root_y = tip_y + 0.048 * k
+    rows, around = TONGUE_ROWS, TONGUE_AROUND
 
     def room(y):
         """Half the width between the lower teeth at `y`."""
@@ -375,20 +381,23 @@ def _tongue(lower_teeth, k):
 
     points, along = [], []
     for row in range(rows):
-        t = row / (rows - 1.0)                       # 0 at the tip
+        # Rings closer together toward the tip, where the outline turns.
+        t = (row / (rows - 1.0)) ** 1.5 * 0.97 + 0.03          # 0 at the tip
         y = tip_y + (root_y - tip_y) * t
-        half = 0.0165 * k * min(1.0, (0.10 + t) ** 0.55 * 1.25) * (1.0 - 0.12 * max(0.0, t - 0.75) / 0.25)
-        half = max(0.003 * k, min(half, room(y) - 0.0018 * k))
-        thick = k * (0.0046 + 0.0095 * min(1.0, t * 1.8))
-        top = k * (-0.0022 + 0.0020 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
+        # The outline from above: a round tip, then the arch's width.
+        half = 0.0200 * k * math.sqrt(max(0.0, 1.0 - (1.0 - min(1.0, t / 0.42)) ** 2))
+        half *= 1.0 - 0.10 * max(0.0, t - 0.75) / 0.25
+        half = max(0.002 * k, min(half, room(y) - 0.0018 * k))
+        thick = k * (0.0030 + 0.0111 * min(1.0, t * 2.2) ** 0.8)
+        top = k * (-0.0024 + 0.0022 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
         for j in range(around):
             a = 2.0 * math.pi * j / around
             x, lift = math.sin(a), math.cos(a)        # round the section, from its top
-            # Flat on top with a furrow down the middle, rounder beneath.
-            z = top - thick * 0.5 + thick * 0.5 * (abs(lift) ** 0.6) * (1 if lift >= 0 else -1)
+            # A rounded section with a furrow down the middle of its top.
+            z = top - thick * 0.5 + thick * 0.5 * (abs(lift) ** 0.85) * (1 if lift >= 0 else -1)
             if lift > 0:
                 z -= 0.0007 * k * math.exp(-(x / 0.35) ** 2) * min(1.0, t * 3.0)
-            points.append((half * (abs(x) ** 0.8) * (1 if x >= 0 else -1), y, z))
+            points.append((half * (abs(x) ** 0.9) * (1 if x >= 0 else -1), y, z))
             along.append(1.0 - t)
     faces = []
     for row in range(rows - 1):
@@ -397,7 +406,7 @@ def _tongue(lower_teeth, k):
             faces.append((a, b, b + around, a + around))
     # The tip is closed with a fan; the root is hidden in the throat.
     tip = len(points)
-    points.append((0.0, tip_y - 0.0022 * k, k * (-0.0022 - 0.0023)))
+    points.append((0.0, tip_y - 0.0004 * k, k * (-0.0024 - 0.0015)))
     along.append(1.0)
     for j in range(around):
         faces.append((tip, (j + 1) % around, j))
@@ -418,7 +427,8 @@ def _tongue_shapes(points, along, k):
     forward[:, 2] += 0.0030 * k * reach
     forward[:, 0] *= 1.0 - 0.22 * reach
     mid = np.median(P[:, 2])
-    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0030 * k * reach
+    # (Over the lower lip, which stands higher on an open jaw.)
+    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0060 * k * reach
     out["Tongue_Out"] = forward
     for name, lift, back in (("Tongue_Up", 0.0105, 0.0030), ("Tongue_Down", -0.0045, 0.0040)):
         Q = P.copy()
@@ -520,7 +530,14 @@ def teeth(body, P, P_feminine, lm, k):
         bm.faces.new([made[i] for i in f]).material_index = order.index("Tongue")
     bm.to_mesh(me)
     bm.free()
-    lower.add(list(range(first, first + len(tongue))), 1.0, "REPLACE")
+    me.update()
+    # (The groups are looked up again: after the mesh is written back,
+    # the handles taken before it add nothing, and the tongue stayed on
+    # the head while the jaw dropped away under it.)
+    made = list(range(first, first + len(tongue)))
+    jaw.vertex_groups["Jaw"].add(made, 1.0, "REPLACE")
+    if not all(len(me.vertices[i].groups) == 1 for i in made):
+        raise RuntimeError("the tongue is not on the jaw")
     unit = array(v.co for v in me.vertices)
     on_jaw = np.concatenate([on_jaw, np.ones(len(tongue), dtype=bool)])
     is_tongue = np.arange(len(unit)) >= first
