@@ -12,9 +12,9 @@ Milestone CO6 of the [Character Studio overhaul](../../../../plans/axcenity-engi
 | `Eyes` | Per eye: `Sclera` (the white, textured), `Iris` (a dish set back inside the limbus, with the pupil), `Cornea` (a clear cap 1.2 mm proud of the white, alpha-blended). 2,256 triangles. Its own shape `Pupil_Size` widens or narrows the pupil; nothing drives it yet (below). |
 | `EyeShell` | `EyeOcclusion` (a film between the lids, dark at their edges) and `TearLine` (the wet line), on the head, following the lids by shapes and drawn back behind them as they close. 320 triangles. |
 | `Lashes`, `Brows` | Cards, alpha-blended. Lashes are rooted on the lid's outer edge and turn with it about the eyeball (160 triangles); a brow card lies on the skin and rides it whole (112 triangles). |
-| `Teeth` | The teeth meet 1.6 mm under the lips' line just behind the upper lip (CO4 had them 13 mm lower and 12 mm further back). The bundle's lower shell and floor, which tore between head and jaw, are gone; a tongue (432 triangles, on the jaw) is made with `Tongue_Out`, `Tongue_Up`, `Tongue_Down`, and the lower teeth and the tongue carry their own `Jaw_Open` (review round 3, part 2). 7,632 triangles. |
+| `Teeth` | The teeth, at 0.85 of the bundle's size, meet 1.6 mm under the lips' line, 2.7 mm behind the upper lip on both frames (CO4 had them 13 mm lower and 12 mm further back). The bundle's lower shell and floor, which tore between head and jaw, are gone; a tongue (432 triangles, on the jaw) is made with `Tongue_Out`, `Tongue_Up`, `Tongue_Down`, and the lower teeth and the tongue carry their own `Jaw_Open` (review round 3, part 2). Shaded by palette images, with two simpler copies of its own (the last section). 9,022 triangles. |
 
-Materials and shading in the manifest: `Skin` skin; `Sclera`, `Iris`, `Cornea` eye; `Lashes`, `Brows` hair; `Mouth`, `Teeth`, `Gums`, `Tongue`, `EyeOcclusion`, `TearLine` standard. `RealisticParts.glb` is 29.2 MB with CO5's body shapes; `Body` and each simpler copy carry 142 shapes.
+Materials and shading in the manifest: `Skin` skin; `Sclera`, `Iris`, `Cornea` eye; `Lashes`, `Brows` hair; `Mouth`, `Teeth`, `Gums`, `Tongue`, `EyeOcclusion`, `TearLine` standard. `RealisticParts.glb` is 30.5 MB with CO5's body shapes; `Body` and each simpler copy carry 142 shapes.
 
 ## How the shapes are made
 
@@ -258,3 +258,100 @@ Checks: `face_checks.py --check` exits 1 with **1 failure**, the masculine `Mout
 6. The feminine opening at `Jaw_Open` 1 is taller than wide.
 7. The crossings listed under "Checks".
 8. The teeth are flat grey (CO7's), and the full-body views draw `Teeth` at a simpler level.
+
+## Teeth and the inside of the mouth
+
+Engine, 3840 x 2160, the straight-on `face-front` view, the mouth cut at full size; a row per pose, the masculine frame then the feminine. Studio light unless the sheet says otherwise.
+
+- **[engine/teeth-open.jpg](engine/teeth-open.jpg)**: `Jaw_Open` 0.5 and 1, Surprised, the AI viseme.
+- **[engine/teeth-smile.jpg](engine/teeth-smile.jpg)**: rest, the smile with the lips closed, Happy, Laughing.
+- **[engine/teeth-other.jpg](engine/teeth-other.jpg)**: Crying, Disgusted, `Tongue_Out` with the jaw half open.
+- **[engine/teeth-hard-light.jpg](engine/teeth-hard-light.jpg)**: `Jaw_Open` 1, Laughing and Happy under the hard light.
+- **[engine/teeth-close.jpg](engine/teeth-close.jpg)**: Laughing's upper row and the resting lips at twice the size.
+- **[engine/teeth-before.jpg](engine/teeth-before.jpg)**: `Jaw_Open` 1, Laughing and rest as this work found them.
+
+### Adult teeth, measured
+
+The bundle's jaw against measured adults. "Ours" is at the body's scale (the bundle's tooth cages measured along the arch, times 0.85); the studies are means of dental casts, male and female.
+
+| | Bundle | Adults | Ours now | Source |
+|---|---|---|---|---|
+| Upper central incisor, width | 10.5 mm | 8.4 to 9.0 | 8.9 | [1] [2] [3] |
+| Upper canine, width | 8.8 | 7.7 to 8.2 | 7.5 | [1] [2] [3] |
+| Upper first molar, width | 12.7 | 10.0 to 10.6 | 10.8 | [1] [2] [3] |
+| Lower central incisor, width | 6.3 | 5.4 to 5.7 | 5.4 | [1] [2] [3] |
+| Lower first molar, width | 12.9 | 10.8 to 11.4 | 11.0 | [1] [2] [3] |
+| Upper arch across the second molars | 71.3 (outer faces) | 56 to 58 (between their buccal cusps) | 60.6 (outer faces) | [4] [5] |
+| Upper arch, incisors to the back of the second molars | 55.7 (their distal faces) | 43.5 to 44.4 (their distal cusps) | 47.3 (their distal faces) | [4] |
+| Upper central incisor shown under the lip at rest | | 1.9 (men), 3.4 (women) | 4.9 under the closed lips' line | [6] |
+| Last tooth seen in a posed smile | | second premolar in 42 to 45%, first molar in 31 to 35% | | [7] [8] |
+
+1. Iranian orthodontic patients, 331, aged 12 to 35: <https://pmc.ncbi.nlm.nih.gov/articles/PMC8853791>
+2. Turkish casts, 200, aged 10 to 26: <https://pmc.ncbi.nlm.nih.gov/articles/PMC12126891>
+3. Korean adults, 50, aged 24 to 32: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5582099>
+4. Saudi adults with normal occlusion, 169, aged 18 to 33: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5832096>
+5. Jordanian normal occlusion, 520, aged 15 to 17: <https://pmc.ncbi.nlm.nih.gov/articles/PMC7941956>
+6. Vig and Brundo 1978, as quoted by Zachrisson 1998: <https://www.jco-online.com/archive/1998/07/432-esthetic-factors-involved-in-anterior-tooth-display-and-the-smile-vertical-dimension/>
+7. Nold and others 2014, 106 adults (a copy of the paper): <https://go.digitalsmiledesign.com/hubfs/DSD%20Articles/Articles%20by%20others/Analysis%20of%20Select%20Facial%20and%20Dental%20Esthetic%20Parameters.pdf>
+8. Awad and others 2020, 157 Saudi adults: <https://pmc.ncbi.nlm.nih.gov/articles/PMC7718042>
+
+The bundle's teeth are 15 to 25% over those means, tooth by tooth, and 0.85 of its size puts the incisors and first molars inside the studies' ranges and the canines just under. **Not sourced:** the textbook table (Wheeler's) could not be reached, only two of its figures quoted elsewhere (upper central 8.5 mm, canines 7.5 and 7.0 mm), which agree; no study was found that measures an arch across the teeth's outer faces, so the arch's width is compared across cusps, which lie some 2.5 mm inside each outer face (that allowance is an estimate, not a source). The teeth's height under the lips was left where it was (the upper incisors' edge 4.9 mm under the closed lips' line, 1.5 to 3 mm lower than [6]): raising it changes how much every open mouth shows, which the last round tuned.
+
+### What was found
+
+- **Why the feminine jaw stood 6.2 mm behind the lips.** The fit turned a place down when the mouth's bag, widened round the jaw, came nearer the skin than 2 mm. It measured that at every vertex the widening *wanted* to move, including the ones that could not move at all, because they already rest nearer the skin than that or in front of the lower lip's inner side: on the feminine frame one such vertex reads about -5 mm at rest, whatever the jaw's place. Counting only vertices that moved, the limit holds by construction.
+- **The lower "gum" was a whole lower jaw.** The bundle's lower gum is a wall 19 mm tall down the front of the jaw, running on inside the teeth as the floor of the mouth, open underneath. Brought close behind the lips it came out through the skin under the lower lip (seen in the engine as a dark patch on the feminine chin with the mouth closed, and a band under the lip with it open), which no check saw: they count the teeth's *points* in the flesh, and a thinned sheet crosses the skin between its points. Its open underside is also why smaller teeth failed the last round's checks: a point of the lining under an open wall counts as behind it, and was pushed out of a solid that wasn't there (the lining through the skin, the lips "in" the teeth by 3 to 4 mm at one vertex).
+- **The engine drew the teeth at half their triangles in every face picture.** `Teeth` is under 30% of the view's height whenever a whole face is in view, so the renderer draws its first simpler copy, which for a part without copies of its own is meshoptimizer's halving of its triangles wherever they fall: the facets. The build's own decimation of the whole jaw to 7,200 triangles, collapsing across teeth and gums alike, had done the same once already.
+- **The "fangs"**: the bundle's upper canines hang 0.4 mm under the central incisors and 1.0 mm under the laterals.
+- **The pale line between closed lips** was two things: the upper lip's wet underside mirroring the studio's floor through the 0.3 mm the seal left, and the teeth themselves behind that gap at the sides.
+- **Light inside the mouth.** The studio's light is mostly sky light, which the engine takes an occlusion map off, with its reflection; a lamp's light it does not. So a dark tooth with a dark colour and no occlusion still mirrored the sky as a grey block.
+- **The crossings** the last round reported were the lips cutting each other: a shape moves both lips by one rule made on the masculine frame, and nothing kept them off each other. Laughing's and Crying's pairs are nearly all at the eyes (the lids, 68 to 76 mm above the teeth's edge), not the mouth: the feminine Laughing's other 18 were at the mouth's corners. And the committed `face_checks.json` predated the last change to Laughing: on the commit this work started from, Laughing measured 69 pairs (masculine) and 90 (feminine), not 49 and 72.
+
+### What changed
+
+- **`teeth.py`** (new) makes the jaw: 0.85 of the bundle's size; the upper canines and premolars lifted 1.0, 0.7 and 0.4 mm (at the bundle's size) so the row's edges rise evenly from the middle; each tooth's root and the gum inside each tooth removed; the six front teeth of each jaw subdivided once (the bundle's teeth are cages for subdividing); the lower gum ended 9 mm under the teeth and closed along a keel, its floor inside the row cut away. Only the gums away from the teeth, the hidden shell over the palate and the lower front teeth are thinned.
+- **Place.** Both frames: 2.7 mm behind the upper lip's inner side (feminine 6.2 before), no point in the flesh and no face of the jaw through a face of the body (a new test in the fit).
+- **`Teeth_LOD1` and `Teeth_LOD2`** are made by the build. The first, which a face picture draws, has the full object's upper teeth and gum edges.
+- **Shading, baked.** `Teeth`, `Gums` and `Tongue` each read a 64 px palette image by texture coordinates set per vertex: across it the colour (a tooth's neck, enamel, thin edge), up it the shade, divided between the colour and an occlusion image. A vertex is darker within 1.6 mm of the next tooth, within 2 mm of the gum, on sides that face into the mouth, and by how far back it stands (upper row: canines 0.84, first premolars 0.6, second 0.38, molars 0.2 and less; the lower row darker). The tongue is darker toward its root and underneath, with a darker groove. The lining (`Mouth`, on `Body`) is darkened in the skin's albedo and occlusion from 6 mm inside the lips to nearly black at 60 mm, and is matt for its first 5 mm.
+- **Lips.** A shape now keeps the lips off each other on both frames (`Face.lips_apart`), and the shapes that mean the mouth to stay closed bring them back together where keeping them off the teeth parted them (`Face.lips_together`: the smile, frown, corner pull, wide, pucker, left and right, puff). The seal leaves 0.1 mm (0.3). The lower lip's red thins sooner toward the corners.
+
+### Cost
+
+| | Before | Now |
+|---|---|---|
+| `Teeth` | 7,632 triangles, 4,624 vertices, 652 kB | 9,022 triangles (teeth 7,094, gums 1,496, tongue 432), 5,022 vertices, 692 kB |
+| `Teeth_LOD1` | (made by the engine at load: half) | 8,424 triangles, 658 kB |
+| `Teeth_LOD2` | (made by the engine at load: a quarter) | 2,411 triangles, 219 kB |
+| Images | none (three flat colours) | three palettes and an occlusion image, 64 px, 5.8 kB together |
+| `RealisticParts.glb` | 29.40 MB | 30.45 MB |
+
+Materials: `Teeth` roughness 0.16, `Gums` 0.34, `Tongue` 0.46, each with its palette as base colour and the shared occlusion image; `Mouth` now reads the skin's occlusion and roughness as well as its albedo. `TEXCOORD_0` on `Teeth` is a colour and a shade per vertex, not an unwrap.
+
+### Checks
+
+`face_checks.py --check` exits 0 with **0 failures** on both frames ([face-checks-run.txt](face-checks-run.txt), [face_checks.json](face_checks.json); 1 before: the masculine `Mouth_Left`). No limit or measure was changed. `anim` and `avatar`: 222 pass. Head triangle pairs that cross (reported, not held to 0), on the commit this started from and now:
+
+| | Masculine | Feminine |
+|---|---|---|
+| `Mouth_Smile` left, right | 30, 32 → 9, 8 | 32, 23 → 0, 0 |
+| `Mouth_Pucker` | 0 → 0 | 163 → 1 |
+| `Mouth_Right`, `Cheek_Puff` | 0, 0 → 0, 0 | 31, 22 → 0, 0 |
+| `Jaw_Left`, `Jaw_Right` | 0, 0 → 0, 0 | 30, 28 → 10, 14 |
+| U, WQ visemes | 0, 0 → 0, 0 | 61, 61 → 0, 2 |
+| Happy, Excited | 36, 1 → 6, 1 | 43, 21 → 1, 1 |
+| Laughing | 69 → 69 (the eyes) | 90 → 72 (the eyes) |
+| Crying | 59 → 59 (the eyes) | 62 → 62 (the eyes) |
+
+Identity ends (reported): `chin_forward` at -1 no longer puts the lining through the skin (31 and 22 pairs before) and leaves 2 points of the lower gum 0.6 to 0.8 mm in the flesh on each frame; `jaw_shift` at +1 leaves one feminine lining vertex 0.2 mm inside the gum. The Blender sheets beside this file are re-rendered. `measure.py --check` fails as before, on the shoulder's two lines and the sliders section it wasn't run with; its lines for the face and the teeth hold.
+
+### Still short of the photographs
+
+1. **Speckled teeth.** Where a tooth is half in the upper lip's shadow, the engine draws the shadow's edge as a pattern of dots (the laterals and canines in Laughing, [engine/teeth-close.jpg](engine/teeth-close.jpg)). It was there before this work and is the renderer's soft shadow, not the model: nothing in the package changes it.
+2. **No gloss on the enamel.** The teeth are off-white with a neck and an edge, but no highlight shows in either light: with the mouth's occlusion on, the sky's reflection is gone too, and a lamp's highlight needs the lamp in the right place. Wet teeth and a wet tongue need the engine to shade a mouth's inside.
+3. **The gum's edge is the bundle's cage**: a scallop over each tooth, of three or four straight pieces at twice the size.
+4. **The tongue** is a smooth ramp with a darker middle. No surface, no wet highlight; `Tongue_Out` is still a small bump over the lower lip.
+5. **Lower teeth at the corners** of an open mouth are still there as shapes, a little lighter than the black behind them (the AI viseme and `Jaw_Open` 0.5, masculine); the lower lip still stands as low at the sides as it did. On the masculine frame a speck of lit gum shows beside the upper lateral incisor on one side in those poses.
+6. **The smile with the lips closed** shows a hair of pale line at one or two places on the feminine frame at twice the size; `Mouth_Pucker` on the masculine frame shows a short one at one corner.
+7. **The upper teeth's height** is 1.5 to 3 mm lower under the lips than the measured display at rest (above).
+8. **The mouth's back is black**, with no palate or throat to be seen; the photographs show dark red there under a camera's flash. The shade is one baked guess for every light.
+9. The eyes' share of Laughing's and Crying's crossings is untouched (the lids are not this work's); the feminine `Jaw_Left` and `Jaw_Right` keep 10 and 14 pairs at one corner of the mouth, and the masculine smile 9 and 8.

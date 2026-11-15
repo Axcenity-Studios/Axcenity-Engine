@@ -600,7 +600,7 @@
    "Face_Jaw_Shift": 5.0,
    "Face_Jaw_Width_Left": 6.08,
    "Face_Jaw_Width_Right": 6.08,
-   "Face_Lip_Fullness_Lower": 4.98,
+   "Face_Lip_Fullness_Lower": 4.99,
    "Face_Lip_Fullness_Upper": 5.04,
    "Face_Mouth_Height": 4.5,
    "Face_Mouth_Width_Left": 4.8,
@@ -612,9 +612,9 @@
    "Face_Nose_Width_Left": 4.41,
    "Face_Nose_Width_Right": 4.41,
    "Jaw_Forward": 5.5,
-   "Jaw_Left": 2.47,
+   "Jaw_Left": 1.5,
    "Jaw_Open": 19.08,
-   "Jaw_Right": 2.91,
+   "Jaw_Right": 1.84,
    "Lip_Corner_Pull_Left": 5.24,
    "Lip_Corner_Pull_Right": 5.24,
    "Lower_Lip_Lower": 5.22,
@@ -625,10 +625,10 @@
    "Mouth_Left": 6.89,
    "Mouth_Narrow": 9.31,
    "Mouth_Open": 5.75,
-   "Mouth_Pucker": 14.72,
+   "Mouth_Pucker": 14.71,
    "Mouth_Right": 6.89,
-   "Mouth_Smile_Left": 13.47,
-   "Mouth_Smile_Right": 13.33,
+   "Mouth_Smile_Left": 13.15,
+   "Mouth_Smile_Right": 13.02,
    "Mouth_Wide": 6.6,
    "Nose_Sneer_Left": 7.08,
    "Nose_Sneer_Right": 7.1,
@@ -644,8 +644,8 @@
    "lid_texels_softened": 1429,
    "lining_vertices_lifted": 150,
    "lips_closed_by_mm": {
-    "feminine": 2.34,
-    "masculine": 1.79
+    "feminine": 2.54,
+    "masculine": 1.99
    }
   }
  },
@@ -1287,20 +1287,38 @@
  },
  "teeth": {
   "feminine": {
-   "bag_to_skin_mm": 2.8,
-   "behind_lips_mm": 6.2,
-   "bite_under_lips_mm": 1.6,
-   "points_in_flesh": 0,
-   "scale": 0.97
-  },
-  "masculine": {
-   "bag_to_skin_mm": 2.8,
+   "bag_moved_to_skin_mm": 5.1,
    "behind_lips_mm": 2.7,
    "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
    "points_in_flesh": 0,
-   "scale": 1.0
+   "scale": 0.85
   },
-  "tongue_triangles": 432
+  "masculine": {
+   "bag_moved_to_skin_mm": null,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
+   "points_in_flesh": 0,
+   "scale": 0.85
+  },
+  "of_bundle_size": 0.85,
+  "tongue_triangles": 432,
+  "triangles": {
+   "Gums": 1496,
+   "Teeth": 7094,
+   "Tongue": 432
+  },
+  "triangles_lod1": {
+   "Gums": 1316,
+   "Teeth": 6676,
+   "Tongue": 432
+  },
+  "triangles_lod2": {
+   "Gums": 245,
+   "Teeth": 1734,
+   "Tongue": 432
+  }
  },
  "texture_coordinates": {
   "coverage": 0.663,

@@ -40,6 +40,7 @@ import regions  # noqa: E402
 import rig  # noqa: E402
 import shapes  # noqa: E402
 import skin  # noqa: E402
+import teeth as jawlib  # noqa: E402
 import uvs  # noqa: E402
 from common import array, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
 
@@ -98,7 +99,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     eyes = eyelib.eyes(eyes_m, eye_radius, parts.iris_texture(out_dir), out_dir)
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
-    teeth, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle)
+    teeth, teeth_copies, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle, out_dir)
 
     # The skeleton and the weights, on the masculine frame.
     P = M.P
@@ -107,7 +108,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     joints_f = rig.fit_joints(F.P, lm, eyes_f)
     armature = rig.build_armature(joints, ARMATURE)
     weights = rig.skin(body_obj, armature, P, lm, joints)
-    for obj in (body_obj, eyes, teeth):
+    for obj in (body_obj, eyes, teeth, *teeth_copies):
         skin_to(obj, armature)
 
     # Materials (the face sets' are replaced), the frame shape, the body
@@ -131,7 +132,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     # follow the lids and brows (before the simpler copies, which take
     # the body's shapes).
     face_parts, face_data = face.build(body_obj, topo, array(P), array(F.P), eyes_m, eyes_f, eye_radius,
-                                       joints, joints_f, weights, teeth, out_dir)
+                                       joints, joints_f, weights, teeth, out_dir, teeth_copies)
     for obj in face_parts.values():
         skin_to(obj, armature)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
@@ -166,7 +167,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
     objects.update(face_parts)
-    objects.update({c.name: c for c in copies})
+    objects.update({c.name: c for c in (*copies, *teeth_copies)})
     report = {name: tri_count(obj) for name, obj in objects.items()}
     return armature, objects, data, report
 
@@ -203,7 +204,7 @@ def main(out_dir, texture_size=2048, bakes=True):
         f.write("\n")
     manifests.write(out_dir)
     skin.clean_up(out_dir)
-    for image in ("RealisticIris.png", *face.IMAGES):
+    for image in ("RealisticIris.png", *face.IMAGES, *jawlib.IMAGES):
         if os.path.exists(os.path.join(out_dir, image)):
             os.remove(os.path.join(out_dir, image))
     return report

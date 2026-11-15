@@ -476,6 +476,78 @@ class Face:
                     out[i] -= normal * depth
         return out
 
+    def lips_apart(self, X, rest, step=0.00012, rounds=80):
+        """Posed positions `X` with the lips moved off each other where a
+        face of one cuts a face of the other (and didn't in `rest`, the
+        frame as it rests): the upper lip's corners of the pair go up
+        and the lower lip's down, a little at a time, until none does.
+        A shape moves both lips by one rule made on the masculine frame;
+        the feminine lips lie differently on each other, and the same
+        offsets drove one through the other (163 pairs of faces in
+        `Mouth_Pucker`, none on the masculine frame)."""
+        from mathutils.bvhtree import BVHTree
+        from facetopo import FS_HEAD, FS_MOUTH_LOWER, FS_MOUTH_UPPER, FS_MUZZLE
+        near = self.d_line < 0.018
+        topo = self.topo
+        # (By face, so the faces at the corners count, where the two
+        # lips share vertices: a pair that shares one is left alone.)
+        of = [fs for p, fs in zip(topo.polys, topo.sets) for _ in range(len(p) - 2)]
+
+        def faces(sets):
+            return [tuple(int(i) for i in t) for t, fs in zip(topo.tris, of)
+                    if fs in sets and near[t[0]] and near[t[1]] and near[t[2]]]
+
+        upper, lower = faces((FS_HEAD, FS_MOUTH_UPPER)), faces((FS_MUZZLE, FS_MOUTH_LOWER))
+
+        def crossing(Q):
+            pts = [tuple(q) for q in Q]
+            a = BVHTree.FromPolygons(pts, upper, all_triangles=True)
+            b = BVHTree.FromPolygons(pts, lower, all_triangles=True)
+            return {(i, j) for i, j in a.overlap(b) if not set(upper[i]) & set(lower[j])}
+
+        resting = crossing(rest)
+        out = X.copy()
+        for _ in range(rounds):
+            pairs = crossing(out) - resting
+            if not pairs:
+                break
+            out[sorted({v for i, _ in pairs for v in upper[i]}), 2] += step
+            out[sorted({v for _, j in pairs for v in lower[j]}), 2] -= step
+        return out
+
+    def lips_together(self, X, rest, reach=0.0015):
+        """Posed positions `X` with the lower lip's top raised back to the
+        upper lip where they stand further apart than in `rest` (the
+        frame as it rests), by up to `reach`: a shape that means the
+        mouth to stay closed (a smile with the lips together) parts the
+        lips a hair where they are kept off the teeth, and the teeth
+        show through as a pale line. The loops beside the lip's crest
+        rise with it by `mouth.SEAL`'s shares."""
+        from mathutils import Vector
+        from facetopo import FS_HEAD, FS_MOUTH_UPPER
+        topo, lips = self.topo, self.mouth
+        over = {k for k, fs in enumerate(topo.sets) if fs in (FS_HEAD, FS_MOUTH_UPPER)}
+        now, before = topo.bvh(X, over), topo.bvh(rest, over)
+        up = Vector((0.0, 0.0, 1.0))
+        xs, rises = [], []
+        for i in lips.lower[mouth.CREST]:
+            hit, hit0 = now.ray_cast(Vector(X[i]), up, 0.01), before.ray_cast(Vector(rest[i]), up, 0.01)
+            if hit[0] is None or hit0[0] is None:
+                continue
+            more = float(hit[3]) - max(float(hit0[3]), mouth.TOUCH)
+            xs.append(float(rest[i][0]))
+            rises.append(more if 0.0 < more < reach else 0.0)
+        out = X.copy()
+        if not xs or max(rises) <= 0.0:
+            return out
+        order = np.argsort(xs)
+        xs, rises = np.array(xs)[order], np.array(rises)[order]
+        for i, k in lips.lower_step.items():
+            share = mouth.SEAL.get(k, 0.0)
+            if share:
+                out[i, 2] += share * float(np.interp(rest[i][0], xs, rises, left=0.0, right=0.0))
+        return out
+
     def spread(self, push, reach=3, rounds=4):
         """What kept single vertices off the teeth, made into one smooth
         lift of the lip: held off the teeth point by point a lip takes
@@ -506,11 +578,13 @@ class Face:
             out = new
         return out
 
-    def shape(self, X, open_deg=0.0, side_deg=0.0, slide=None, teeth=True, shift=None, bag=False, sweep=(1.0,)):
+    def shape(self, X, open_deg=0.0, side_deg=0.0, slide=None, teeth=True, shift=None, bag=False, sweep=(1.0,),
+              sealed=False):
         """The shape that takes the resting face to positions `X` (every
         vertex; with the jaw turned, `X` is where the *posed* skin should
         be). Skin is slid on the resting surface by `slide`, lips are
-        kept off the teeth in both frames. Returns {vertex: offset}."""
+        kept off the teeth and off each other in both frames, and with
+        `sealed` brought back together. Returns {vertex: offset}."""
         P = self.P
         if slide is not None:
             X = self.slide(X, slide)
@@ -527,10 +601,28 @@ class Face:
             for _ in range(2 if self.other else 1):
                 for frame in frames:
                     jaw = frame["jaw"]
+                    # The lips off each other first, then off the teeth.
+                    posed_f = jaw.pose(frame["P"] + offsets, open_deg, side_deg)
+                    more = self.lips_apart(posed_f, frame["P"]) - posed_f
+                    moved = np.where(np.linalg.norm(more, axis=1) > 1e-7)[0]
+                    if len(moved):
+                        offsets[moved] += jaw.unpose(more[moved], open_deg, side_deg, moved)
                     posed_f = jaw.pose(frame["P"] + offsets, open_deg, side_deg)
                     fixed = self.off_teeth(posed_f, open_deg, side_deg, teeth=frame["teeth"], jaw=jaw, shift=shift,
                                            bag=bag, sweep=sweep)
                     more = self.spread(fixed - posed_f)
+                    moved = np.where(np.linalg.norm(more, axis=1) > 1e-7)[0]
+                    if len(moved):
+                        offsets[moved] += jaw.unpose(more[moved], open_deg, side_deg, moved)
+            # A shape that keeps the mouth closed (`sealed`): the lips
+            # back together where keeping them off the teeth parted them,
+            # and off each other again.
+            if sealed and not open_deg:
+                for frame in frames:
+                    jaw = frame["jaw"]
+                    posed_f = jaw.pose(frame["P"] + offsets, open_deg, side_deg)
+                    more = self.lips_together(posed_f, frame["P"])
+                    more = self.lips_apart(more, frame["P"]) - posed_f
                     moved = np.where(np.linalg.norm(more, axis=1) > 1e-7)[0]
                     if len(moved):
                         offsets[moved] += jaw.unpose(more[moved], open_deg, side_deg, moved)
@@ -712,20 +804,23 @@ class Face:
         # made: the middle of the lips, which both sides move, is kept
         # off the teeth for both at once, not for each alone and added.
         for name, sides in pairs.items():
+            # (These keep the mouth closed; the lip and nose shapes part it.)
+            sealed = name in ("Mouth_Smile", "Mouth_Frown", "Lip_Corner_Pull")
             both = np.zeros_like(P)
-            for i, d in self._moved(sides[1][0] + sides[-1][0], slide=np.maximum(sides[1][1], sides[-1][1])).items():
+            for i, d in self._moved(sides[1][0] + sides[-1][0], slide=np.maximum(sides[1][1], sides[-1][1]),
+                                    sealed=sealed).items():
                 both[i] = d
             for side, s in SIDES:
                 share = self.side(s)
                 # (Kept off the teeth once more alone: one side's share of
                 # the middle is less than the whole it was made as.)
-                S[f"{name}_{side}"] = self._moved(both * share[:, None])
+                S[f"{name}_{side}"] = self._moved(both * share[:, None], sealed=sealed)
             if name in ("Upper_Lip_Raise", "Lower_Lip_Lower"):
                 S[name] = {int(i): both[i].copy() for i in np.where(np.linalg.norm(both, axis=1) > 2e-5)[0]}
         ul, ll = self.upper_lip(), self.lower_lip()
         S["Mouth_Open"] = self._moved(vec(ul, up * 0.0020) + vec(ll, up * -0.0058 + back * -0.0006), slide=slide * 0.6)
         wide = sum(self.corner_pull(s, (s * 1.0, 0.5, -0.12), 0.0066, radius=0.019, start=-0.6, power=1.2) for _, s in SIDES)
-        S["Mouth_Wide"] = self._moved(wide, slide=slide)
+        S["Mouth_Wide"] = self._moved(wide, slide=slide, sealed=True)
         # Lips drawn together: toward the middle, and forward as they
         # come round the teeth's arch.
         lips = gauss(self.d_line, 0.019) * (self.skin | self.lining)
@@ -734,11 +829,11 @@ class Face:
         narrow = gather(0.20, 0.0032, 0.0042) + vec(ul, up * 0.0012) + vec(ll, up * -0.0020)
         S["Mouth_Narrow"] = self._moved(narrow, slide=None)
         pucker = gather(0.31, 0.0054, 0.0056) + (lips * self.skin * 0.0009)[:, None] * N
-        S["Mouth_Pucker"] = self._moved(pucker, slide=None)
+        S["Mouth_Pucker"] = self._moved(pucker, slide=None, sealed=True)
         for side, s in SIDES:
             mouth_w = gauss(self.d_line, 0.028) * (self.skin | self.lining)
             shift = np.stack([s * 0.0062 * mouth_w, 0.0030 * mouth_w * self.u * s, np.zeros(len(P))], axis=1)
-            S[f"Mouth_{side}"] = self._moved(shift, slide=slide * 0.7)
+            S[f"Mouth_{side}"] = self._moved(shift, slide=slide * 0.7, sealed=True)
         puff = np.zeros_like(P)
         for _, s in SIDES:
             at = self.on_skin(np.array([s * 0.047, self.corner[s][1] + 0.028, self.corner[s][2] - 0.001]))
@@ -748,7 +843,7 @@ class Face:
             way /= np.maximum(np.linalg.norm(way, axis=1, keepdims=True), 1e-9)
             puff += (w * 0.0095)[:, None] * way
         puff += vec(gauss(self.d_line, 0.016) * self.skin, back * -0.0016)
-        S["Cheek_Puff"] = self._moved(puff, slide=None)
+        S["Cheek_Puff"] = self._moved(puff, slide=None, sealed=True)
         # The jaw: the bone turns; these shapes put right what the turn
         # alone gets wrong.
         S["Jaw_Open"] = self.clear_with(self.jaw_open(), add(S["Mouth_Smile_Left"], S["Mouth_Smile_Right"]))
@@ -991,6 +1086,38 @@ def tongue_open(points, lower_teeth):
     return out - points
 
 
+def _teeth_follow(teeth, lift):
+    """The shapes a `Teeth` object follows the body's with: the mouth's
+    height and the jaw's shift (identity), and `Jaw_Open`: the lower
+    teeth glide forward with the opening jaw, and the tongue settles
+    into the floor of the mouth."""
+    me = teeth.data
+    points = np.array([v.co[:] for v in me.vertices])
+    polys = [tuple(p.vertices) for p in me.polygons]
+    head_group = teeth.vertex_groups["Head"].index
+    upper = np.array([any(g.group == head_group for g in v.groups) for v in me.vertices])
+    key = teeth.shape_key_add(name="Face_Mouth_Height", from_mix=False)
+    for i, p in enumerate(points):
+        key.data[i].co = p + lift
+    key.value = 0.0
+    key = teeth.shape_key_add(name="Face_Jaw_Shift", from_mix=False)
+    for i in np.nonzero(~upper)[0]:
+        key.data[i].co = points[i] + np.array([JAW_SHIFTS, 0.0, 0.0])
+    key.value = 0.0
+    tongue = np.unique([i for p, poly in zip(polys, me.polygons)
+                        if me.materials[poly.material_index].name == "Tongue" for i in p])
+    opened = points.copy()
+    opened[~upper] += Jaw.glide()
+    is_tooth = np.zeros(len(points), dtype=bool)
+    is_tooth[np.unique([i for p, poly in zip(polys, me.polygons)
+                        if me.materials[poly.material_index].name == "Teeth" for i in p])] = True
+    opened[tongue] += tongue_open(points[tongue], points[is_tooth & ~upper])
+    key = teeth.shape_key_add(name="Jaw_Open", from_mix=False)
+    for i in np.nonzero(~upper)[0]:
+        key.data[i].co = opened[i]
+    key.value = 0.0
+
+
 # -- the build's hook -----------------------------------------------------------
 
 def to_gltf(d):
@@ -1011,7 +1138,7 @@ def _shape_keys(obj, shapes, count):
         key.value = 0.0
 
 
-def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, teeth, out_dir):
+def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, teeth, out_dir, teeth_copies=()):
     """Everything the face adds once the body is weighted: the expression
     and identity shapes on `body`, the parts that follow the lids and the
     brows (`EyeShell`, `Lashes`, `Brows`) with the shapes they follow by,
@@ -1053,30 +1180,10 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     brow, bound = hair.brows(face, out_dir)
     hair.add_shapes(brow, {name: hair.follow_bound(bound, following[name]) for name in order})
     made["Brows"] = brow
-    # The teeth go where the mouth goes.
+    # The teeth go where the mouth goes (and their simpler copies alike).
     lift = identity["Face_Mouth_Height"][0][face.mouth.mid]
-    key = teeth.shape_key_add(name="Face_Mouth_Height", from_mix=False)
-    for i, p in enumerate(points):
-        key.data[i].co = p + lift
-    key.value = 0.0
-    key = teeth.shape_key_add(name="Face_Jaw_Shift", from_mix=False)
-    for i in np.nonzero(~upper)[0]:
-        key.data[i].co = points[i] + np.array([JAW_SHIFTS, 0.0, 0.0])
-    key.value = 0.0
-    # The lower teeth glide forward with the opening jaw, and the tongue
-    # settles into the floor of the mouth.
-    tongue = np.unique([i for p, poly in zip(polys, me.polygons)
-                        if me.materials[poly.material_index].name == "Tongue" for i in p])
-    opened = points.copy()
-    opened[~upper] += Jaw.glide()
-    is_tooth = np.zeros(len(points), dtype=bool)
-    is_tooth[np.unique([i for p, poly in zip(polys, me.polygons)
-                        if me.materials[poly.material_index].name == "Teeth" for i in p])] = True
-    opened[tongue] += tongue_open(points[tongue], points[is_tooth & ~upper])
-    key = teeth.shape_key_add(name="Jaw_Open", from_mix=False)
-    for i in np.nonzero(~upper)[0]:
-        key.data[i].co = opened[i]
-    key.value = 0.0
+    for part in (teeth, *teeth_copies):
+        _teeth_follow(part, lift)
     bones = {}
     for name, (_, changes) in identity.items():
         if changes:

@@ -46,9 +46,7 @@
   "Upper_Lip_Raise_Left",
   "Upper_Lip_Raise_Right"
  ],
- "failures": [
-  "masculine/controls/Mouth_Left: teeth_in_flesh = 1 (to 0.65 mm)"
- ],
+ "failures": [],
  "file": "RealisticParts.glb",
  "frames": {
   "feminine": {
@@ -291,7 +289,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 22,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -599,7 +597,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 30,
+     "self_crossing": 10,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -643,7 +641,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 28,
+     "self_crossing": 14,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -885,7 +883,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 163,
+     "self_crossing": 1,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -907,7 +905,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 31,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -929,7 +927,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 32,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -951,7 +949,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 23,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -1195,7 +1193,7 @@
       7.29
      ],
      "required": true,
-     "self_crossing": 1,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -1283,7 +1281,7 @@
       10.35
      ],
      "required": true,
-     "self_crossing": 21,
+     "self_crossing": 1,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -1327,7 +1325,7 @@
       7.08
      ],
      "required": true,
-     "self_crossing": 6,
+     "self_crossing": 1,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -1349,14 +1347,14 @@
       6.97
      ],
      "required": true,
-     "self_crossing": 43,
+     "self_crossing": 1,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
     "Laughing": {
-     "bare_rays": 1360,
+     "bare_rays": 829,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -1367,8 +1365,8 @@
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
-      3.59,
-      3.59
+      2.54,
+      2.43
      ],
      "required": true,
      "self_crossing": 72,
@@ -1915,17 +1913,17 @@
      "lid_in_cornea_max_mm": 0.0,
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
-     "lining_through_skin": 22,
-     "lips_in_teeth": 0,
-     "lips_in_teeth_max_mm": 0.0,
+     "lining_through_skin": 0,
+     "lips_in_teeth": 1,
+     "lips_in_teeth_max_mm": 0.34,
      "open_mm": [
       9.4,
       9.3
      ],
      "required": false,
      "self_crossing": 0,
-     "teeth_in_flesh": 0,
-     "teeth_in_flesh_max_mm": 0.0,
+     "teeth_in_flesh": 2,
+     "teeth_in_flesh_max_mm": 0.57,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -1967,7 +1965,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 0,
+     "self_crossing": 4,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -2818,8 +2816,8 @@
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
      "lining_through_skin": 0,
-     "lips_in_teeth": 0,
-     "lips_in_teeth_max_mm": 0.0,
+     "lips_in_teeth": 1,
+     "lips_in_teeth_max_mm": 0.22,
      "open_mm": [
       9.4,
       9.3
@@ -2957,7 +2955,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 68,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -2979,7 +2977,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 79,
+     "self_crossing": 119,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3023,7 +3021,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 0,
+     "self_crossing": 4,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3067,7 +3065,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 76,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3199,7 +3197,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 0,
+     "self_crossing": 14,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3463,7 +3461,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 0,
+     "self_crossing": 16,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3897,17 +3895,17 @@
      "lid_in_cornea_max_mm": 0.0,
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
-     "lining_through_skin": 22,
-     "lips_in_teeth": 0,
-     "lips_in_teeth_max_mm": 0.0,
+     "lining_through_skin": 0,
+     "lips_in_teeth": 1,
+     "lips_in_teeth_max_mm": 0.34,
      "open_mm": [
       0.0,
       0.0
      ],
      "required": false,
      "self_crossing": 276,
-     "teeth_in_flesh": 0,
-     "teeth_in_flesh_max_mm": 0.0,
+     "teeth_in_flesh": 2,
+     "teeth_in_flesh_max_mm": 0.57,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -3949,7 +3947,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 276,
+     "self_crossing": 280,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -4800,8 +4798,8 @@
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
      "lining_through_skin": 0,
-     "lips_in_teeth": 0,
-     "lips_in_teeth_max_mm": 0.0,
+     "lips_in_teeth": 1,
+     "lips_in_teeth_max_mm": 0.22,
      "open_mm": [
       0.0,
       0.0
@@ -4939,7 +4937,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 344,
+     "self_crossing": 276,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -4961,7 +4959,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 355,
+     "self_crossing": 395,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5005,7 +5003,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 276,
+     "self_crossing": 280,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5049,7 +5047,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 352,
+     "self_crossing": 276,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5181,7 +5179,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 276,
+     "self_crossing": 290,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5445,7 +5443,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 276,
+     "self_crossing": 292,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5672,7 +5670,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 1,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5694,7 +5692,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 2,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5782,7 +5780,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 61,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5804,7 +5802,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 61,
+     "self_crossing": 2,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -6581,8 +6579,8 @@
      ],
      "required": true,
      "self_crossing": 0,
-     "teeth_in_flesh": 1,
-     "teeth_in_flesh_max_mm": 0.65,
+     "teeth_in_flesh": 0,
+     "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -6690,7 +6688,7 @@
       9.42
      ],
      "required": true,
-     "self_crossing": 30,
+     "self_crossing": 9,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -6712,7 +6710,7 @@
       9.42
      ],
      "required": true,
-     "self_crossing": 32,
+     "self_crossing": 8,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -7110,14 +7108,14 @@
       7.07
      ],
      "required": true,
-     "self_crossing": 36,
+     "self_crossing": 6,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
     "Laughing": {
-     "bare_rays": 1410,
+     "bare_rays": 870,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -7128,11 +7126,11 @@
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
-      3.75,
-      3.75
+      2.57,
+      2.68
      ],
      "required": true,
-     "self_crossing": 49,
+     "self_crossing": 69,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -7676,7 +7674,7 @@
      "lid_in_cornea_max_mm": 0.0,
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
-     "lining_through_skin": 31,
+     "lining_through_skin": 0,
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
@@ -7685,8 +7683,8 @@
      ],
      "required": false,
      "self_crossing": 0,
-     "teeth_in_flesh": 0,
-     "teeth_in_flesh_max_mm": 0.0,
+     "teeth_in_flesh": 2,
+     "teeth_in_flesh_max_mm": 0.79,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },
@@ -9658,7 +9656,7 @@
      "lid_in_cornea_max_mm": 0.0,
      "lid_in_eyeball": 0,
      "lid_in_eyeball_max_mm": 0.0,
-     "lining_through_skin": 31,
+     "lining_through_skin": 0,
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
      "open_mm": [
@@ -9667,8 +9665,8 @@
      ],
      "required": false,
      "self_crossing": 251,
-     "teeth_in_flesh": 0,
-     "teeth_in_flesh_max_mm": 0.0,
+     "teeth_in_flesh": 2,
+     "teeth_in_flesh_max_mm": 0.79,
      "tongue_in_flesh": 0,
      "tongue_in_flesh_max_mm": 0.0
     },

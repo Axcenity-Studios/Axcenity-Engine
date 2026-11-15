@@ -31,8 +31,9 @@ from facetopo import FS_HEAD, FS_MOUTH_LOWER, FS_MOUTH_UPPER, FS_MUZZLE, smooths
 SEAL = {0: 0.0, 1: 0.35, 2: 0.75, 3: 1.0, 4: 0.8, 5: 0.45, 6: 0.15}
 # The loop of the lower lip that meets the upper lip: its top's front.
 CREST = 3
-# The lips touch with this much room (metres).
-TOUCH = 0.0003
+# The lips touch with this much room (metres: at 0.3 mm the teeth showed
+# between them as a pale line in a 4K picture of the face).
+TOUCH = 0.0001
 
 
 class Mouth:

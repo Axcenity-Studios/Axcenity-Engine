@@ -46,6 +46,18 @@ TONE = (0.74, 0.53, 0.43)
 FLESH = (0.42, 0.13, 0.14)          # inside the mouth, the eye sockets
 LIPS = (0.57, 0.27, 0.29)
 INNER_LIP = (0.50, 0.19, 0.21)      # the lips' inner sides at their edges
+# What light is left on the mouth's lining by how far (metres) it is from
+# the line the lips meet on: the cheeks' insides by the corners are lit,
+# the back of the mouth is nearly black.
+MOUTH_SHADE = ((0.006, 1.0), (0.015, 0.75), (0.028, 0.36), (0.045, 0.10), (0.060, 0.04))
+# The upper lip's underside lies on the lower lip while the mouth is
+# closed, and is wet: seen through the hair's breadth between the lips it
+# mirrored the studio's floor as a pale line along the mouth. So by how
+# far in from the lips' edges it is (metres), it is occluded a little (a
+# laugh bares it: much, and it was a black band over the teeth) and
+# matt: (distance, occlusion, roughness; further in it is `WET`).
+LIP_EDGE = ((0.0005, 0.25, 0.9), (0.005, 1.0, 0.9), (0.009, 1.0, 0.35))
+WET = 0.35
 # The least occlusion left where the lips touch (the sculpts are closed).
 LIP_SEAM_OCCLUSION = 0.85
 NAIL = (0.86, 0.70, 0.66)
@@ -244,6 +256,75 @@ def _near_lips(body, P, lm, size, full, none, sets=None):
     return _blur(np.asarray(img, dtype=np.float64) / 255.0, max(1, size // 700))
 
 
+def _mouth_shade(body, P, lm, size):
+    """What the mouth's lining is darkened by, over the texels: by how
+    far each of its vertices is from the line the lips meet on
+    (`MOUTH_SHADE`), smooth across its faces (they are a centimetre
+    wide: one value a face showed as steps), 1 elsewhere; and its
+    occlusion and how wet it is at the lips' edges (`LIP_EDGE`), alike."""
+    X = array(P)
+    line = np.array(sorted(lm.ring(FS_HEAD, MOUTH_SETS[0])), dtype=np.int64)
+    line = X[line[np.argsort(X[line][:, 0])]]
+    away = np.full(len(X), np.inf)
+    bag = np.array(sorted(set().union(*(lm.of_set[fs] for fs in MOUTH_SETS))), dtype=np.int64)
+    for a, b in zip(line[:-1], line[1:]):
+        t = np.clip(((X[bag] - a) @ (b - a)) / max(float((b - a) @ (b - a)), 1e-18), 0.0, 1.0)
+        away[bag] = np.minimum(away[bag], np.linalg.norm(X[bag] - (a + t[:, None] * (b - a)), axis=1))
+    lit = np.ones(len(X))
+    lit[bag] = np.interp(away[bag], [d for d, _ in MOUTH_SHADE], [v for _, v in MOUTH_SHADE])
+    edge, wet = np.ones(len(X)), np.ones(len(X))
+    edge[bag] = np.interp(away[bag], [d for d, _, _ in LIP_EDGE], [v for _, v, _ in LIP_EDGE])
+    wet[bag] = np.interp(away[bag], [d for d, _, _ in LIP_EDGE], [(1.0 - r) / (1.0 - WET) for _, _, r in LIP_EDGE])
+    return _over_faces(body, size, lit), _over_faces(body, size, edge), _over_faces(body, size, wet)
+
+
+def _over_faces(body, size, lit):
+    """Values of the mouth's lining's vertices (`lit`) over the texels,
+    smooth across its faces; 1 elsewhere."""
+    from PIL import Image, ImageDraw
+    layer = body.data.uv_layers[0].data
+    of = face_sets(body)
+    # Each face's mean first, with its outline (the texels just outside
+    # an island are sampled too), then the smooth values inside.
+    flat = Image.new("L", (size, size), 255)
+    draw = ImageDraw.Draw(flat)
+    faces = [poly for poly in body.data.polygons if of[poly.index] in MOUTH_SETS]
+    for poly in faces:
+        value = int(round(255 * float(np.mean([lit[v] for v in poly.vertices]))))
+        pts = [(layer[i].uv[0] * size, (1 - layer[i].uv[1]) * size) for i in poly.loop_indices]
+        draw.polygon(pts, fill=value, outline=value)
+    out = np.asarray(flat, dtype=np.float64) / 255.0
+    out = np.where(_grow(out < 1.0, 2) & (out >= 1.0), _blur(np.where(out < 1.0, out, 0.0), 2)
+                   / np.maximum(_blur((out < 1.0).astype(np.float64), 2), 1e-6), out)
+    for poly in faces:
+        loops = list(poly.loop_indices)
+        uv = np.array([(layer[i].uv[0] * size, (1 - layer[i].uv[1]) * size) for i in loops])
+        val = np.array([lit[v] for v in poly.vertices])
+        for k in range(1, len(loops) - 1):
+            tri, tv = uv[[0, k, k + 1]], val[[0, k, k + 1]]
+            x0, y0 = np.floor(tri.min(axis=0)).astype(int)
+            x1, y1 = np.ceil(tri.max(axis=0)).astype(int) + 1
+            x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, size), min(y1, size)
+            if x1 <= x0 or y1 <= y0:
+                continue
+            gx, gy = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+            (ax, ay), (bx, by), (cx, cy) = tri
+            det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+            if abs(det) < 1e-9:
+                continue
+            wa = ((by - cy) * (gx - cx) + (cx - bx) * (gy - cy)) / det
+            wb = ((cy - ay) * (gx - cx) + (ax - cx) * (gy - cy)) / det
+            wc = 1.0 - wa - wb
+            # (A texel whose middle is just outside an edge is the
+            # neighbouring face's, or the island's rim: filled too, or it
+            # keeps the face's mean and draws the edge as a line.)
+            inside = (wa >= -0.12) & (wb >= -0.12) & (wc >= -0.12)
+            wa, wb, wc = np.clip(wa, 0.0, 1.0), np.clip(wb, 0.0, 1.0), np.clip(wc, 0.0, 1.0)
+            patch = out[y0:y1, x0:x1]
+            patch[inside] = ((wa * tv[0] + wb * tv[1] + wc * tv[2]) / np.maximum(wa + wb + wc, 1e-9))[inside]
+    return out
+
+
 # -- the fields over the body ---------------------------------------------------------
 
 def fields(body, P, lm):
@@ -319,6 +400,11 @@ def fields(body, P, lm):
         line_y = np.interp(at_x, X[order][:, 0], X[order][:, 1])
         dz = X[part][:, 2] - line_z
         taper = np.clip(1.0 - (np.abs(at_x) / half) ** 2.2, 0.0, 1.0) ** 0.6
+        if not upper:
+            # (The lower lip's red thins sooner toward the corners: as
+            # tall there as in the middle, it stood beside an open mouth
+            # as a pink strip.)
+            taper = np.clip(1.0 - (np.abs(at_x) / half) ** 1.9, 0.0, 1.0) ** 0.85
         tall = np.where(dz > 0, 0.0050, 0.0066) * height * taper + 0.0008
         on = 1.0 - _step(0.55, 1.0, np.abs(dz) / tall)
         on *= (np.abs(at_x) < half) & (X[part][:, 1] < line_y + 0.004)
@@ -570,13 +656,22 @@ def bake(body, source, lm, size, out_dir):
     crease = (1.0 - ao)[:, :, None]
     albedo = albedo * (1.0 - crease * np.array([0.30, 0.42, 0.45]))
     albedo[hidden] = srgb_to_linear(FLESH)
-    roughness[hidden] = 0.35
+    roughness[hidden] = WET
     # The lips' inner sides are the lips' colour at their edges and darken
     # into the mouth: flesh from the very edge drew a dark line round an
     # open mouth.
     inner = _near_lips(body, source["Masculine"], lm, size, 0.002, 0.013, set(MOUTH_SETS))[:, :, None]
     inner = np.where(hidden[:, :, None], inner, 0.0)
     albedo = albedo * (1.0 - inner) + srgb_to_linear(INNER_LIP) * inner
+    # And the mouth is dark inside: the lips and the cheeks shade it, and
+    # the engine lights it like the face. The shade is in the colour.
+    # (Divided between the colour and the occlusion, which takes the
+    # sky's light and its reflection off: `teeth.IN_COLOUR`.)
+    from teeth import IN_COLOUR, IN_OCCLUSION
+    shade, edge, wet = _mouth_shade(body, source["Masculine"], lm, size)
+    albedo = albedo * (shade ** IN_COLOUR)[:, :, None]
+    ao = ao * shade ** IN_OCCLUSION * edge
+    roughness = np.where(hidden, 1.0 - (1.0 - WET) * wet, roughness)
 
     from PIL import Image
     paths = [os.path.join(out_dir, name) for name in FILES]
@@ -668,7 +763,10 @@ def materials(body, sets, maps):
     polygon's face set (the materials it replaces held them)."""
     hidden = {*MOUTH_SETS, *FS_SOCKET.values()}
     skin = material("Skin", maps, colour=TONE)
-    mouth = material("Mouth", maps, roughness=0.35, colour=FLESH)
+    # (The whole set of maps on the lining too: its texels are flat in
+    # the normal map, and the mouth's shade is in the occlusion and its
+    # wetness in the roughness: `bake`.)
+    mouth = material("Mouth", maps, roughness=None if maps else WET, colour=FLESH)
     body.data.materials.clear()
     body.data.materials.append(skin)
     body.data.materials.append(mouth)
