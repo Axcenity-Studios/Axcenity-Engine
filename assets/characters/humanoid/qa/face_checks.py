@@ -44,6 +44,13 @@ What is measured, per pose (millimetres; counts are vertices or rays):
   expressions whose recipes are even). The gap between closed lips is a
   tenth of a millimetre: half a millimetre's difference between the two
   halves is a dark line on one side of the mouth and none on the other.
+- `lips_open_mm`, `seal_in_view`: how far the lips stand apart at the
+  middle of the face (the height through which rays from the front pass
+  between the upper lip's skin and the lower lip's; resting lips overlap
+  and measure under a millimetre), and how many vertices of `LipSeal`
+  (the flaps that hide the teeth behind lips a hair apart) are then out
+  of the body's flesh, where they can be seen. With the lips more than
+  `SEAL_GONE_MM` apart a flap in view is a line round the open mouth.
 
 `--check` exits 1 unless: no control, viseme or expression at full weight
 puts a lid in the opaque eyeball or the eyeball in a lid, or the teeth or
@@ -52,7 +59,8 @@ through the skin; the half-way blinks keep
 the lids out of the opaque eyeball; `Blink` and `Eye_Closed` leave no
 ray bare; and in every pose that is the same on both sides the mouth, the
 teeth and the tongue are within `EVEN_MM` of their mirror images, on both
-frames. The tongue controls are posed with the jaw
+frames; and no vertex of `LipSeal` is in view with the lips more than
+`SEAL_GONE_MM` apart. The tongue controls are posed with the jaw
 half open: a tongue doesn't leave a closed mouth.
 """
 
@@ -98,6 +106,9 @@ PAIRS = ("Mouth_Smile", "Mouth_Frown", "Lip_Corner_Pull", "Upper_Lip_Raise", "Lo
 # Crossings of the mouth's lining and the skin this near the lips' edges
 # are the closed lips touching, not the lining coming through the face.
 LIPS_EDGE = 0.008
+# With the lips further apart than this at the middle (millimetres), no
+# part of `LipSeal` may be in view.
+SEAL_GONE_MM = 6.0
 
 
 def mm(x):
@@ -257,9 +268,35 @@ def mouth_vertices(ch, frame):
     return np.where(np.linalg.norm(moved - rest, axis=1) > 0.0005)[0]
 
 
-def measure(ch, rest_crossing=None, mouth_skin=None):
+def lips_open(skin, seal_rest):
+    """How far the lips stand apart at the middle of the face, in metres:
+    rays from the front down the middle, from the upper lip's red
+    downward; the height of those that pass under the upper lip's skin
+    before one meets the lower lip's. `seal_rest` is where the lips' line
+    rests. (The lips overlap as they rest, the lower one's top in front
+    of the upper one's edge, so resting lips measure some tenths of a
+    millimetre.)"""
+    y, z0 = float(seal_rest[:, 1].min()) - 0.05, float(seal_rest[:, 2].mean()) + 0.008
+    step, reach = 0.0001, 0.11
+    lip, gap = None, 0
+    for k in range(700):
+        hit = skin.bvh.ray_cast(Vector((0.0, y, z0 - k * step)), Vector((0.0, 1.0, 0.0)), reach)
+        depth = None if hit[0] is None else float(hit[3])
+        if lip is None:
+            lip = depth
+        if depth is not None and (gap == 0 and depth < (lip or 0.0) + 0.006):
+            continue
+        if depth is not None:
+            break
+        gap += 1
+    return step * gap
+
+
+def measure(ch, rest_crossing=None, mouth_skin=None, seal_rest=None):
     """The measures of the pose the character is in (with `mouth_skin`,
-    the mouth's vertices: how far it and the teeth are from even)."""
+    the mouth's vertices: how far it and the teeth are from even; with
+    `seal_rest`, the resting `LipSeal`: how far the lips are apart and
+    how much of it is in view)."""
     body = Piece(ch.parts["Body"])
     eyes_obj, teeth_obj = ch.parts["Eyes"], ch.parts["Teeth"]
     opaque = Piece(eyes_obj, OPAQUE)
@@ -322,6 +359,9 @@ def measure(ch, rest_crossing=None, mouth_skin=None):
     deep = [d for d in deep if d > 0.0002]
     out["lips_in_teeth"] = len(deep)
     out["lips_in_teeth_max_mm"] = mm(max(deep)) if deep else 0.0
+    if seal_rest is not None:
+        out["lips_open_mm"] = mm(lips_open(Piece(ch.parts["Body"], ("Skin",)), seal_rest))
+        out["seal_in_view"] = sum(1 for p in Piece(ch.parts["LipSeal"]).co if not body.inside(p))
     if mouth_skin is not None:
         out["mouth_asymmetry_mm"] = mm(asymmetry(body.co[mouth_skin]))
         out["teeth_asymmetry_mm"] = mm(asymmetry(teeth.co))
@@ -462,6 +502,9 @@ def failures(report):
                 for key in ("mouth_asymmetry_mm", "teeth_asymmetry_mm", "tongue_asymmetry_mm"):
                     if m.get(key, 0.0) > EVEN_MM:
                         bad.append(f"{frame}/{group}/{name}: {key} = {m[key]} (at most {EVEN_MM})")
+                if m.get("lips_open_mm", 0.0) > SEAL_GONE_MM and m.get("seal_in_view"):
+                    bad.append(f"{frame}/{group}/{name}: {m['seal_in_view']} vertices of LipSeal in view with the lips "
+                               f"{m['lips_open_mm']} mm apart")
                 if group == "closed" and m["bare_rays"]:
                     bad.append(f"{frame}/{group}/{name}: the eye isn't closed: {m['bare_rays']} rays bare, "
                                f"open {m['open_mm']} mm")
@@ -500,12 +543,14 @@ def main():
         groups = {}
         rest_crossing = None
         mouth = mouth_vertices(ch, frame)
+        pose(ch, frame, {})
+        seal_rest = Piece(ch.parts["LipSeal"]).co if "LipSeal" in ch.parts else None
         for group, name, weights, identity, required in listed:
             pose(ch, frame, weights, identity)
             # (Evenness: of the poses that are even, and not of the
             # identity's, whose ends are a face's own.)
             even = required and not identity and even_weights(weights)
-            m, crossing = measure(ch, rest_crossing, mouth if even else None)
+            m, crossing = measure(ch, rest_crossing, mouth if even else None, seal_rest)
             if rest_crossing is None:
                 rest_crossing = crossing
                 m["self_crossing_at_rest"] = crossing

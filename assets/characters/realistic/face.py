@@ -1425,18 +1425,58 @@ def _teeth_follow(teeth, lift):
 # between the lips, not enamel. The body's lips meet along a line. `LipSeal`
 # is that depth: a flap hanging this far (metres) from the upper lip's
 # underside and one standing this far up from the lower lip's top, each
-# riding its own lip a few millimetres behind its edge, inside the other
-# lip's flesh while the mouth is closed. Together they close the first
-# 3 mm of any parting.
-SEAL_HANGS = 0.0014
-SEAL_STANDS = 0.0018
-# The controls that open the mouth to show the teeth take the flaps away:
-# control -> (how much of the upper flap, of the lower flap) at full weight.
-# (The left and right lip controls take their own side's.)
-SEAL_OPENS = {"Jaw_Open": (1.0, 1.0), "Mouth_Open": (1.0, 1.0), "Upper_Lip_Raise": (1.0, 0.0),
-              "Lower_Lip_Lower": (0.0, 1.0), "Nose_Sneer": (0.5, 0.0)}
-# Where in the gums' palette the flaps are: the lining's red, in shade.
-SEAL_PLACE = (1.0, 0.22)
+# riding its own lip a few millimetres behind its edge, behind the other
+# lip while the mouth is closed. (Seen from the front it is the upper
+# flap that closes the parting: the lower one stands behind the lower
+# lip's crest, and is what a view from above sees.)
+SEAL_HANGS = 0.0022
+SEAL_STANDS = 0.0014
+# A flap stands out of its lip along the lip's own middle (`_flesh_axis`),
+# and the controls that part the lips draw it back along that line into
+# the lip: control -> how many times a flap's height it is drawn back at
+# full weight. A shape moves a vertex in a straight line by its weight,
+# so a flap cannot stop when it is gone: past its own height it goes on
+# into the flesh of its lip, where nothing sees it. The numbers are what
+# that leaves room for. A flap must still cover the teeth with the lips
+# 1.5 mm apart and be gone soon after, and it shrinks evenly from the
+# first, so the lip controls have it gone by 3 mm of parting
+# (`Mouth_Open` parts the lips 7.8 mm at full weight: 2.6 times; and so
+# on) and the jaw, which parts them 37 mm, by 4.6 mm: sooner would take
+# a flap further into the face at full opening than a lip is deep (a
+# laugh takes the upper one 15 mm in as it is). (The left and right
+# controls take their own side's.)
+SEAL_OPENS = {"Jaw_Open": 8.0, "Mouth_Open": 2.6, "Upper_Lip_Raise": 1.55, "Lower_Lip_Lower": 1.75, "Nose_Sneer": 0.85,
+              "Mouth_Narrow": 1.15}
+# Where in the gums' palette the flaps are: the lining's red at the
+# shade the lining has just inside the lips (`skin.INNER_LIP`), so a flap
+# that shows beside an opening mouth is the lip's own inner side and not
+# a black line round it.
+SEAL_PLACE = (1.0, 0.55)
+# A flap's root is this far inside its lip (metres).
+SEAL_ROOT = 0.0006
+
+
+def _flesh_axis(face, loop, skin_loop, lining_loop, lean):
+    """For each vertex of `loop` (a lip's inner side just behind its
+    edge), the direction from it into the middle of the lip's flesh: at
+    a point between the lip's skin (`skin_loop`) and its lining
+    (`lining_loop`) some way from the edge, `lean` of the way from the
+    skin to the lining. {vertex: unit vector}."""
+    P = face.P
+
+    def along(ring):
+        ring = sorted((int(i) for i in ring), key=lambda i: P[i][0])
+        xs = np.array([P[i][0] for i in ring])
+        return lambda x: np.array([x, np.interp(x, xs, [P[i][1] for i in ring]), np.interp(x, xs, [P[i][2] for i in ring])])
+
+    skin, lining = along(skin_loop), along(lining_loop)
+    out = {}
+    for i in loop:
+        x = float(P[i][0])
+        to = skin(x) * (1.0 - lean) + lining(x) * lean - P[i]
+        to[0] = 0.0
+        out[int(i)] = to / np.linalg.norm(to)
+    return out
 
 
 def lip_seal(face, F, shapes, jaw_w):
@@ -1450,20 +1490,24 @@ def lip_seal(face, F, shapes, jaw_w):
     M, lips = face.P, face.mouth
     reach = 0.95 * lips.half
     points, bound, free, faces = [], [], [], []
-    for flap, (loop, way, tall) in enumerate(((lips.under[1], -1.0, SEAL_HANGS),
-                                              (lips.lower[mouth.CREST - 1], 1.0, SEAL_STANDS))):
+    upper, lower = lips.under[1], lips.lower[mouth.CREST - 1]
+    flaps = ((upper, _flesh_axis(face, upper, lips.upper[3], lips.under[4], 0.45), SEAL_HANGS),
+             (lower, _flesh_axis(face, lower, lips.lower[7], lips.floor, 0.6), SEAL_STANDS))
+    for flap, (loop, axis, tall) in enumerate(flaps):
         chain = [int(i) for i in sorted(loop, key=lambda i: M[i][0]) if abs(M[i][0]) < reach]
         first = len(points)
         for i in chain:
             taper = max(0.0, 1.0 - (abs(M[i][0]) / reach) ** 4)
             for is_free in (False, True):
-                rise = way * tall * taper if is_free else -way * 0.0006
-                points.append(np.array([0.0, 0.0005, rise]))
+                out = -tall * taper if is_free else SEAL_ROOT
+                points.append(axis[i] * out)
                 bound.append(i)
-                free.append((flap, way * tall * taper) if is_free else None)
+                # (What draws a free vertex back: its flap's height along the axis.)
+                free.append(axis[i] * tall * taper if is_free else None)
         for k in range(len(chain) - 1):
             a = first + 2 * k
-            faces.append((a, a + 2, a + 3, a + 1))
+            # (Both flaps face the front: seen from its back, a flap is lit from behind.)
+            faces.append((a, a + 1, a + 3, a + 2) if flap == 0 else (a, a + 2, a + 3, a + 1))
     bound = np.array(bound, dtype=np.int64)
     points = np.array(points)
     mesh = bpy.data.meshes.new("LipSeal")
@@ -1486,7 +1530,7 @@ def lip_seal(face, F, shapes, jaw_w):
             if w > 1e-4:
                 group.add([k], float(w), "REPLACE")
     # The shapes: each vertex takes its lip vertex's move, and the free
-    # edge of a flap is drawn back by the controls that bare the teeth.
+    # edge of a flap is drawn back by the controls that part the lips.
     rest = M[bound] + points
     seal.shape_key_add(name="Basis", from_mix=False)
     key = seal.shape_key_add(name="Frame_Feminine", from_mix=False)
@@ -1501,9 +1545,9 @@ def lip_seal(face, F, shapes, jaw_w):
             if name.endswith("_" + tag):
                 base, part = name[:-len(tag) - 1], side[tag]
         if base in SEAL_OPENS:
-            for k, held in enumerate(free):
-                if held is not None:
-                    offsets[k, 2] -= held[1] * SEAL_OPENS[base][held[0]] * (1.0 if part is None else part[k])
+            for k, back in enumerate(free):
+                if back is not None:
+                    offsets[k] += back * SEAL_OPENS[base] * (1.0 if part is None else part[k])
         if np.abs(offsets).max() < 2e-5:
             continue
         key = seal.shape_key_add(name=name, from_mix=False)
