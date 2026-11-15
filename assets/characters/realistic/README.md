@@ -1,10 +1,10 @@
 # Realistic base body
 
-The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body with human proportions, a masculine and a feminine frame, eyes, teeth, a baked skin texture set, twist and helper bones, body regions and two simpler copies. No hair, brows, lashes, face shapes or clothing yet: those are CO5 and CO6.
+The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body with human proportions, a masculine and a feminine frame, eyes, teeth, a baked skin texture set, twist and helper bones, body regions and two simpler copies. Since CO6 it has a face: expression shapes for the standard facial controls, face identity parameters, layered eyes, a tongue, lashes and brows (**[the face](../../../docs/development/character-studio/co6/README.md)**). No hair or clothing yet.
 
 | File | What it is |
 | --- | --- |
-| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`. The skin maps are inside it. |
+| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `EyeShell`, `Lashes`, `Brows`. The skin maps are inside it. |
 | `Realistic.base.json` | The base model manifest (written by `manifests.py`). |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
@@ -20,7 +20,7 @@ python -I assets/characters/realistic/build.py --out assets/characters/realistic
 python -I assets/characters/catalogue.py
 ```
 
-`--texture-size 4096` bakes the hero texture set (2048 is committed; the package is 31 MB with it, 20.5 MB of that `RealisticParts.glb`); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `parts.py` (eyes, teeth), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `regions.py`, `lods.py` and `manifests.py`. It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
+`--texture-size 4096` bakes the hero texture set (2048 is committed); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `face.py` (the face put right at rest), `eyes.py` and `parts.py` (eyes, teeth, tongue), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `face.py` again (expression and identity shapes; `EyeShell`, `Lashes`, `Brows` from `eyes.py` and `lashes.py`), `regions.py`, `lods.py` and `manifests.py` (with `faceparams.py`). It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
 
 After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 
@@ -154,6 +154,5 @@ The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim`
 - The raised shoulder's corrective shapes are made for raising the arm sideways with the collarbone still; raised forward, or on a rig that turns the collarbone, the shoulder has only its skinning. At 150 degrees a tight valley remains where the arm meets the neck.
 - The body's shapes are MakeHuman's anatomy at this mesh's resolution: the heavy and muscular corner is still a bodybuilder's build, and muscle definition finer than 25 mm isn't in the geometry (a normal-map layer, CO7).
 - The hips can't be made narrower, and the proportion sliders stop at 15% either way.
-- With the jaw open a few teeth points pass through the lower lip's inner side (6 masculine, 14 feminine, up to 3.4 mm); at rest none do. CO6's jaw shapes should cover it.
 - One normal and occlusion map serves both frames, so detail that sits differently on the two (the upper eyelid's fold) is softened or slightly misplaced on the feminine frame: two short dark marks above each feminine eye.
-- No subsurface map, no hair, brows or lashes; the eyes are a plain sclera and a painted iris.
+- No subsurface map and no hair. What the face still falls short of is listed in [the face's notes](../../../docs/development/character-studio/co6/README.md).

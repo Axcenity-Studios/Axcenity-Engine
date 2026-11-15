@@ -7,6 +7,8 @@ Scripts that measure the default humanoid for defects and render a fixed set of 
 | `qa_scene.py` | Shared helpers: import a file, set a look (frame, build, face, expression and mask shapes, the `Frame_Feminine` bone offsets and eye offsets and scales from `Humanoid.customization.json`), the fixed test poses, deformed geometry, the studio (Cycles CPU, AgX, OIDN, three area lights, grey cyclorama, seed 7) and contact sheets. |
 | `measure.py` | Writes `measurements.json`: per-object stats and topology, skin weights, clothing and hair clipping for each frame and build, joint deformation in the test poses, face shapes (self-intersection, eyes and lids, teeth), shape ranges, proportions against Drillis and Contini (1966). |
 | `render_baseline.py` | Renders the sheets: turnarounds, face close-ups and topology, base body, build range, hair styles, test poses, expressions, a details sheet, and `fit` (clothing fit at the extremes: the outfit, the tee alone and the underwear on both frames with the heavy build, the shoes on heavy and slim). |
+| `face_checks.py` | Checks a face control by control (CO6): every standard facial control, viseme, built-in expression and face parameter end on both frames, for the eyeball through a lid, teeth or tongue through the lips, the mouth's lining through the skin, and whether a blink closes. `--check` exits 1 on any. Its docstring says how each is measured. |
+| `render_face.py` | Renders the face sheets from the same poses: rest, blink, every control, visemes, expressions, identity, clay, and lids and lips under one low side light. |
 | `thresholds.json` | The clipping limits `measure.py --check` holds the build to, with why each garment's limit isn't zero. |
 
 ## Running

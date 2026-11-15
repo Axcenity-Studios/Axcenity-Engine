@@ -27,9 +27,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bpy  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 import body  # noqa: E402
 import correctives  # noqa: E402
+import eyes as eyelib  # noqa: E402
+import face  # noqa: E402
 import lods  # noqa: E402
 import manifests  # noqa: E402
 import parts  # noqa: E402
@@ -38,7 +41,7 @@ import rig  # noqa: E402
 import shapes  # noqa: E402
 import skin  # noqa: E402
 import uvs  # noqa: E402
-from common import face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
+from common import array, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
 
 ARMATURE = "AxcenityRealistic"
 PARTS_FILE = "RealisticParts.glb"
@@ -85,7 +88,12 @@ def build(out_dir, texture_size=2048, bakes=True):
     set_positions(body_obj, M.P)
     eyes_m, eye_radius, eye_fit = parts.fit_eyes(body_obj, M.P, lm)
     eyes_f, eye_radius_f, eye_fit_f = parts.fit_eyes(body_obj, F.P, lm)
-    eyes = parts.eyes(eyes_m, eye_radius, out_dir)
+    # The face put right at rest (the feminine lids, the lids' lining, the
+    # lips; `face.prepare`), before the teeth are placed and the body weighted.
+    topo = face.topo_of(body_obj.data, sets)
+    m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f)
+    M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
+    eyes = eyelib.eyes(eyes_m, eye_radius, parts.iris_texture(out_dir), out_dir)
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
     teeth, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle)
@@ -117,6 +125,13 @@ def build(out_dir, texture_size=2048, bakes=True):
     corrective_shapes, corrective_rules, corrective_report = correctives.build(
         body_obj, armature, weights, P, driven, mesh["mirror"], mesh["lap"], mesh["tris"])
     correctives.add_keys(body_obj, corrective_shapes, P)
+    # The face: its expression and identity shapes, and the parts that
+    # follow the lids and brows (before the simpler copies, which take
+    # the body's shapes).
+    face_parts, face_data = face.build(body_obj, topo, array(P), array(F.P), eyes_m, eyes_f, eye_radius,
+                                       joints, joints_f, weights, teeth, out_dir)
+    for obj in face_parts.values():
+        skin_to(obj, armature)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
     copies = lods.build(body_obj, armature, lm, P, joints, face_regions)
     for copy in copies:
@@ -145,8 +160,10 @@ def build(out_dir, texture_size=2048, bakes=True):
         "body_shapes": shape_report,
         "correctives": corrective_rules,
         "corrective_shapes": corrective_report,
+        "face": dict(face_data, rest=face_rest),
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
+    objects.update(face_parts)
     objects.update({c.name: c for c in copies})
     report = {name: tri_count(obj) for name, obj in objects.items()}
     return armature, objects, data, report
@@ -184,9 +201,9 @@ def main(out_dir, texture_size=2048, bakes=True):
         f.write("\n")
     manifests.write(out_dir)
     skin.clean_up(out_dir)
-    iris = os.path.join(out_dir, "RealisticIris.png")
-    if os.path.exists(iris):
-        os.remove(iris)
+    for image in ("RealisticIris.png", *face.IMAGES):
+        if os.path.exists(os.path.join(out_dir, image)):
+            os.remove(os.path.join(out_dir, image))
     return report
 
 

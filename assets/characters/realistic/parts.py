@@ -1,25 +1,25 @@
-"""The parts always worn with the realistic body: the eyes and the teeth,
-placed so nothing shows through the skin at rest.
+"""The eyes' place and the teeth of the realistic body, set so nothing
+shows through the skin at rest.
 
-- **Eyes**: the bundle's realistic eyeball (a sphere with the cornea's
-  bulge), one per side on its eye bone, sized and placed from the body's
-  eye sockets. The iris is a texture over the cornea (`Iris`), the rest
-  `Sclera`: one closed surface, which is what the renderer's eye shading
-  (iris parallax under a cornea lobe, CO7) expects. The bundle's separate
-  iris disc is vendored in `source/eyes.obj` for a head that wants real
-  depth behind a cornea shell (CO6).
-- **Teeth**: the bundle's realistic jaw (teeth, gums, the palate and the
-  floor of the mouth with the tongue), upper half on `Head`, lower half on
-  `Jaw`, set just behind the lips with the teeth meeting on the lips'
-  line. The body's mouth is a hollow bag that wasn't modelled round this
-  jaw, so the bag is widened where the jaw would touch it (`make_room`;
-  it is never seen from outside). It carries `Frame_Feminine`, as the
-  mouth sits elsewhere in that frame.
+- **Where the eyes go** (`fit_eyes`): each socket is a sphere of the mesh;
+  the eyeball sits a little forward in it, as large as leaves no skin
+  inside the bundle's eyeball and none of its front inside the lids. The
+  eyeballs themselves are made in `eyes.py` (CO6) at that place and size.
+- **Teeth** (`teeth`): the bundle's realistic jaw: the teeth, both gums
+  and the palate, upper half on `Head`, lower half on `Jaw`, and a tongue
+  made here with the tongue controls' shapes. The teeth meet 1.5 mm under
+  the line the lips meet on and stand just behind the upper lip's inner
+  side, where teeth are (CO4 had them 13 mm lower and 12 mm further
+  back, behind the lower lip). The body's mouth is a hollow bag that
+  wasn't modelled round this jaw, so the bag is widened where the jaw
+  would touch it (`make_room`; it is never seen from outside, and never
+  widened to nearer the face's skin than `UNDER_SKIN`). The teeth carry
+  `Frame_Feminine`, as the mouth sits elsewhere in that frame,
+  `Jaw_Forward`, and the tongue's `Tongue_Out`, `Tongue_Up` and
+  `Tongue_Down`.
 
-Both are placed by search: the eyeball as large and as far forward as
-leaves no skin inside it and none of it inside the lids, the jaw at the
-largest size that leaves none of it inside the flesh and the bag clear of
-the face's skin.
+The jaw is placed by search: the largest size that leaves none of it
+inside the flesh and the bag clear of the face's skin.
 """
 
 import math
@@ -31,10 +31,7 @@ import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-from common import (
-    FS_MUZZLE, FS_SOCKET, MOUTH_SETS, SIDES, array, fit_sphere, import_obj, new_object, select_only,
-    shade_smooth,
-)
+from common import FS_MUZZLE, FS_SOCKET, MOUTH_SETS, array, fit_sphere, import_obj, select_only, shade_smooth
 
 # The iris and pupil, as angles from the eye's axis seen from its centre.
 IRIS_DEG = 28.0
@@ -52,6 +49,11 @@ IRIS_COLOUR = (0.36, 0.24, 0.14)
 # every other set is a tooth.
 FS_UPPER_GUM, FS_LOWER_GUM, FS_PALATE, FS_FLOOR = 93, 155, 157, 31
 TEETH_TRIANGLES = 3600
+# The mouth's bag is never widened to nearer the face's skin than this (metres).
+UNDER_SKIN = 0.0028
+# How far the Jaw_Forward control brings the lower teeth (the body's shape
+# of that name moves the jaw's skin as far: `face.JAW_FORWARD`).
+JAW_FORWARD = 0.0055
 
 
 def srgb_to_linear(c):
@@ -181,47 +183,6 @@ def fit_eyes(body, P, lm):
     return best
 
 
-def eyes(centres, radius, out_dir):
-    """The `Eyes` object: both eyeballs at `centres` ({1: left, -1: right})
-    with radius `radius`, each on its eye bone."""
-    src, faces, src_radius = _eyeball()
-    scale = radius / src_radius
-    iris = iris_texture(out_dir)
-    tex_radius = radius * math.sin(math.radians(IRIS_DEG)) / 0.86
-    verts, polys, names, uvs, groups = [], [], [], [], {}
-    for side, s in SIDES:
-        base = len(verts)
-        for p in src:
-            verts.append(Vector((p[0] * s, p[1], p[2])) * scale + centres[s])
-        for f in faces:
-            mid = np.mean([src[i] for i in f], axis=0)
-            angle = math.degrees(math.acos(max(-1.0, min(1.0, -mid[1] / np.linalg.norm(mid)))))
-            f = f if s > 0 else f[::-1]
-            polys.append(tuple(base + i for i in f))
-            names.append("Iris" if angle < IRIS_DEG + 3.0 else "Sclera")
-            uvs.append([(0.5 + src[i][0] * s * scale / (2 * tex_radius),
-                         0.5 + src[i][2] * scale / (2 * tex_radius)) for i in f])
-        groups[f"{side}Eye"] = list(range(base, base + len(src)))
-    me = bpy.data.meshes.new("Eyes")
-    me.from_pydata([tuple(p) for p in verts], [], polys)
-    layer = me.uv_layers.new(name="UVMap")
-    k = 0
-    for corner in uvs:
-        for uv in corner:
-            layer.data[k].uv = uv
-            k += 1
-    obj = new_object("Eyes", me)
-    order = ["Sclera", "Iris"]
-    me.materials.append(material("Sclera"))
-    me.materials.append(material("Iris", iris))
-    for poly, name in zip(me.polygons, names):
-        poly.material_index = order.index(name)
-    for bone, idx in groups.items():
-        obj.vertex_groups.new(name=bone).add(idx, 1.0, "REPLACE")
-    shade_smooth(obj)
-    return obj
-
-
 def _largest_piece(mesh):
     """The vertex indices of the mesh's largest connected piece, in order."""
     nbr = [[] for _ in mesh.vertices]
@@ -246,14 +207,30 @@ def _largest_piece(mesh):
     return sorted(best)
 
 
+# The teeth meet this far under the line the lips meet on, and their front
+# is tried these distances behind the upper lip's inner side (metres at
+# 1.75 m; scaled with the body).
+BITE_UNDER_LIPS = 0.0015
+BEHIND_LIP = (0.0008, 0.0016, 0.0026, 0.004, 0.006)
+
+
 def _mouth(P, lm):
-    """Where the mouth is in body positions `P`: the middle of the line
-    where the lips meet, its front, and half its width."""
-    opening = sorted(set(lm.ring(FS_MUZZLE, MOUTH_SETS)))
-    pts = array(P[i] for i in opening)
-    mid = pts[np.abs(pts[:, 0]) < 0.012]
-    return {"front": float(mid[:, 1].min()), "z": float(np.median(mid[:, 2])),
-            "half": float(np.abs(pts[:, 0]).max()), "opening": opening}
+    """Where the mouth is in body positions `P`: the height of the line
+    the lips meet on (the upper lip's edge at the middle), how far back
+    the upper lip's inner side is there (the teeth go behind it), half
+    the mouth's width, and the vertices that must stay where they are
+    when room is made for the jaw (the lips' edges)."""
+    from common import FS_HEAD, FS_MOUTH_UPPER
+    edge = sorted(lm.ring(FS_MOUTH_UPPER, FS_HEAD))
+    pts = array(P[i] for i in edge)
+    mid = pts[np.abs(pts[:, 0]) < 0.006]
+    z, front = float(np.median(mid[:, 2])), float(mid[:, 1].min())
+    lining = array(P[i] for i in lm.verts(FS_MOUTH_UPPER))
+    behind = lining[(np.abs(lining[:, 0]) < 0.008) & (lining[:, 2] > z + 0.002) & (lining[:, 2] < z + 0.010)
+                    & (lining[:, 1] < front + 0.014)]
+    opening = sorted(set(lm.ring(FS_MUZZLE, MOUTH_SETS)) | set(edge))
+    return {"front": float(behind[:, 1].max()), "z": z, "half": float(np.abs(pts[:, 0]).max()),
+            "opening": opening}
 
 
 def _body_tree(body, P, faces=None):
@@ -280,7 +257,8 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
     """Body positions `P` with the mouth's bag moved clear of the jaw at
     `jaw_points`: each of the bag's vertices inside the jaw's hull (or
     nearer it than `margin`) goes straight out from the jaw's middle to
-    the hull and `margin` beyond. The lips' line stays, and the bag eases into the
+    the hull and `margin` beyond, but never nearer the face's skin than
+    `UNDER_SKIN`. The lips' line stays, and the bag eases into the
     change over the first centimetre behind it. Returns (positions, how
     near the bag now comes to the face's skin in metres)."""
     import rig
@@ -296,6 +274,31 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
     X = array(P)
     pts = np.asarray(jaw_points)
     dist, _ = rig.surface_distance(body.data, X, opening)
+    in_bag = set().union(*(lm.of_set[fs] for fs in MOUTH_SETS))
+    bag_faces = {p.index for p in body.data.polygons if all(v in in_bag for v in p.vertices)}
+    outer = _body_tree(body, P, faces={p.index for p in body.data.polygons} - bag_faces)
+
+    def under(p):
+        """How far `p` is under the skin round the bag (negative: through
+        it), the lips' inner sides included."""
+        loc, normal, _, _ = outer.find_nearest(p, 0.03)
+        return 1.0 if loc is None else (loc - p).dot(normal)
+
+    def held(i, to):
+        """`to`, or as far toward it from where vertex `i` rests as
+        leaves it `UNDER_SKIN` under the face's skin: the bag stays
+        inside the head whatever the teeth ask for."""
+        start = Vector(X[i])
+        if under(to) >= UNDER_SKIN:
+            return to
+        lo, hi = 0.0, 1.0
+        for _ in range(8):
+            mid = 0.5 * (lo + hi)
+            if under(start.lerp(to, mid)) >= UNDER_SKIN:
+                lo = mid
+            else:
+                hi = mid
+        return start.lerp(to, lo)
     out = [p.copy() for p in P]
     moved = []
     # The roof is pushed out from a point under the plane the teeth meet
@@ -320,7 +323,7 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
             ways[i] = (way, ease)
             edge = (hit[0] - core).length + margin
             if reach < edge:
-                out[i] = Vector(X[i]).lerp(core + way * edge, ease * ease * (3 - 2 * ease))
+                out[i] = held(i, Vector(X[i]).lerp(core + way * edge, ease * ease * (3 - 2 * ease)))
                 moved.append(i)
     bag = np.unique(np.array(bag, dtype=np.int64))
     # The bag has few faces, and a flat face between vertices that are
@@ -345,18 +348,84 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
             break
         for v, by in push.items():
             way, ease = ways[v]
-            out[v] = out[v] + way * (by * ease)
+            out[v] = held(v, out[v] + way * (by * ease))
             moved.append(v)
     # How near the widened bag comes to the skin outside it.
-    in_bag = set(bag.tolist())
-    bag_faces = {p.index for p in body.data.polygons if all(v in in_bag for v in p.vertices)}
-    outer = _body_tree(body, P, faces={p.index for p in body.data.polygons} - bag_faces)
     nearest = 1.0
     for i in set(moved):
-        loc, normal, _, _ = outer.find_nearest(out[i])
-        # How far under the skin (negative: through it).
-        nearest = min(nearest, (loc - out[i]).dot(normal))
+        nearest = min(nearest, under(out[i]))
     return out, nearest
+
+
+def _tongue(lower_teeth, k):
+    """A tongue in the jaw's own space (the incisors' front on the plane
+    the teeth meet on; y back, z up): (points, quads and triangles, how
+    far each point is from the root 0 to the tip 1). It lies inside the
+    lower teeth's arch, its tip behind the lower incisors, its back
+    rising toward the throat."""
+    lower_teeth = np.asarray(lower_teeth)
+    tip_y = float(lower_teeth[np.abs(lower_teeth[:, 0]) < 0.006 * k][:, 1].max()) + 0.0035 * k
+    root_y = tip_y + 0.046 * k
+    rows, around = 11, 14
+
+    def room(y):
+        """Half the width between the lower teeth at `y`."""
+        near = lower_teeth[np.abs(lower_teeth[:, 1] - y) < 0.004 * k]
+        return float(np.abs(near[:, 0]).min()) if len(near) else 0.02 * k
+
+    points, along = [], []
+    for row in range(rows):
+        t = row / (rows - 1.0)                       # 0 at the tip
+        y = tip_y + (root_y - tip_y) * t
+        half = 0.0165 * k * min(1.0, (0.10 + t) ** 0.55 * 1.25) * (1.0 - 0.12 * max(0.0, t - 0.75) / 0.25)
+        half = max(0.003 * k, min(half, room(y) - 0.0018 * k))
+        thick = k * (0.0038 + 0.0085 * min(1.0, t * 1.8))
+        top = k * (-0.0046 + 0.0030 * t + 0.0050 * max(0.0, t - 0.6) / 0.4)
+        for j in range(around):
+            a = 2.0 * math.pi * j / around
+            x, lift = math.sin(a), math.cos(a)        # round the section, from its top
+            # Flat on top with a furrow down the middle, rounder beneath.
+            z = top - thick * 0.5 + thick * 0.5 * (abs(lift) ** 0.6) * (1 if lift >= 0 else -1)
+            if lift > 0:
+                z -= 0.0007 * k * math.exp(-(x / 0.35) ** 2) * min(1.0, t * 3.0)
+            points.append((half * (abs(x) ** 0.8) * (1 if x >= 0 else -1), y, z))
+            along.append(1.0 - t)
+    faces = []
+    for row in range(rows - 1):
+        for j in range(around):
+            a, b = row * around + j, row * around + (j + 1) % around
+            faces.append((a, b, b + around, a + around))
+    # The tip is closed with a fan; the root is hidden in the throat.
+    tip = len(points)
+    points.append((0.0, tip_y - 0.0022 * k, k * (-0.0046 - 0.0019)))
+    along.append(1.0)
+    for j in range(around):
+        faces.append((tip, (j + 1) % around, j))
+    return np.array(points), faces, np.array(along)
+
+
+def _tongue_shapes(points, along, k):
+    """The tongue's shapes, as {name: positions}: `Tongue_Out` (forward
+    between the teeth, flatter and narrower), `Tongue_Up` (the tip to the
+    ridge behind the upper teeth) and `Tongue_Down` (the tip curled down
+    behind the lower teeth). `along` is 0 at the root and 1 at the tip."""
+    out = {}
+    reach = np.clip(along, 0.0, 1.0)
+    front = np.clip((reach - 0.35) / 0.65, 0.0, 1.0) ** 1.4
+    P = np.array(points)
+    forward = P.copy()
+    forward[:, 1] -= 0.017 * k * reach ** 0.8
+    forward[:, 2] += 0.0030 * k * reach
+    forward[:, 0] *= 1.0 - 0.22 * reach
+    mid = np.median(P[:, 2])
+    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0030 * k * reach
+    out["Tongue_Out"] = forward
+    for name, lift, back in (("Tongue_Up", 0.0105, 0.0030), ("Tongue_Down", -0.0045, 0.0040)):
+        Q = P.copy()
+        Q[:, 2] += lift * k * front
+        Q[:, 1] += back * k * front
+        out[name] = Q
+    return out
 
 
 def teeth(body, P, P_feminine, lm, k):
@@ -364,7 +433,17 @@ def teeth(body, P, P_feminine, lm, k):
     `Frame_Feminine` to where the mouth is in `P_feminine`. `k` is the
     body's scale against the bundle (its height over the bundle's).
     Returns (the object, both frames' positions with room made in the
-    mouth, a report)."""
+    mouth, a report).
+
+    The bundle's jaw is its teeth and one bag round them: the gums of
+    both jaws (sets 93, 155), a tongue on the floor (31) and an outer
+    shell that closes the bag above and below (157). Kept: the teeth,
+    both gums and the shell's upper half (the palate). The shell's lower
+    half and the floor would have to stretch from the head to the jaw
+    when it opens; the body's own lining is the mouth's floor instead,
+    and the tongue is made here (`_tongue`), with the tongue controls'
+    shapes. The upper half is cut free of the lower, so nothing spans
+    the two."""
     (jaw,) = import_obj("teeth.obj")
     me = jaw.data
     ids = [int(m.name.split("_")[1].split(".")[0]) for m in me.materials]
@@ -381,21 +460,26 @@ def teeth(body, P, P_feminine, lm, k):
     co = (co - np.array([0.0, front, bite])) * k
     for vert, p in zip(me.vertices, co):
         vert.co = p
-    # The gums, palate and floor run on four centimetres behind the last
+    # The gums and the palate run on four centimetres behind the last
     # teeth (the throat, for sculpting): cut off there, they'd come
     # through the skin under the ear when the jaw opens.
     back = float(co[tooth_verts][:, 1].max()) + 0.004 * k
     bm = bmesh.new()
     bm.from_mesh(me)
     bm.faces.ensure_lookup_table()
-    gone = [f for f in bm.faces if f.calc_center_median().y > back]
+    centre = [f.calc_center_median() for f in bm.faces]
+    gone = [f for f, c, s in zip(bm.faces, centre, sets)
+            if c.y > back or s == FS_FLOOR or (s == FS_PALATE and c.z < 0.002 * k)]
     gone_ids = {f.index for f in gone}
     bmesh.ops.delete(bm, geom=gone, context="FACES")
+    sets = [s for i, s in enumerate(sets) if i not in gone_ids]
+    upper_face = [s in upper_sets for s in sets]
+    bm.faces.ensure_lookup_table()
+    seam = [e for e in bm.edges if len({upper_face[f.index] for f in e.link_faces}) == 2]
+    bmesh.ops.split_edges(bm, edges=seam)
     bm.to_mesh(me)
     bm.free()
-    sets = [s for i, s in enumerate(sets) if i not in gone_ids]
-    kinds = ["Teeth" if s in teeth_sets else "Tongue" if s == FS_FLOOR else "Gums" for s in sets]
-    upper_face = [s in upper_sets for s in sets]
+    kinds = ["Teeth" if s in teeth_sets else "Gums" for s in sets]
     order = ["Teeth", "Gums", "Tongue"]
     me.materials.clear()
     for name in order:
@@ -420,28 +504,49 @@ def teeth(body, P, P_feminine, lm, k):
         to_head = weights.get("Head", 0.0) >= weights.get("Jaw", 0.0)
         (head if to_head else lower).add([vert.index], 1.0, "REPLACE")
         (lower if to_head else head).remove([vert.index])
+    # The tongue, on the jaw.
     unit = array(v.co for v in me.vertices)
+    on_jaw = np.array([any(jaw.vertex_groups[g.group].name == "Jaw" for g in v.groups) for v in me.vertices])
+    is_tooth = np.zeros(len(unit), dtype=bool)
+    for poly in me.polygons:
+        if poly.material_index == 0:
+            is_tooth[list(poly.vertices)] = True
+    tongue, tongue_faces, along = _tongue(unit[on_jaw & is_tooth], k)
+    first = len(unit)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    made = [bm.verts.new(tuple(p)) for p in tongue]
+    for f in tongue_faces:
+        bm.faces.new([made[i] for i in f]).material_index = order.index("Tongue")
+    bm.to_mesh(me)
+    bm.free()
+    lower.add(list(range(first, first + len(tongue))), 1.0, "REPLACE")
+    unit = array(v.co for v in me.vertices)
+    on_jaw = np.concatenate([on_jaw, np.ones(len(tongue), dtype=bool)])
+    is_tongue = np.arange(len(unit)) >= first
     placed, roomy, report = {}, {}, {}
     for frame, positions in (("masculine", P), ("feminine", P_feminine)):
         mouth = _mouth(positions, lm)
         best = None
         for scale in (1.0, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76):
-            for back in (0.006, 0.008, 0.010, 0.012):
-                at = np.array([0.0, mouth["front"] + back * k, mouth["z"]])
+            for back in BEHIND_LIP:
+                at = np.array([0.0, mouth["front"] + back * k, mouth["z"] - BITE_UNDER_LIPS * k])
                 points = unit * scale + at
-                room, nearest = make_room(body, positions, lm, points, mouth["opening"])
+                room, nearest = make_room(body, positions, lm, points[~is_tongue], mouth["opening"])
                 inside = _inside(_body_tree(body, room), points)
                 # None of it in the flesh, and 2 mm of flesh left outside the bag.
                 bad = inside + (1000 if nearest < 0.002 else 0)
                 if best is None or bad < best[0]:
                     best = (bad, points, room, {"scale": round(scale, 3), "behind_lips_mm": round(back * k * 1000, 1),
+                                                "bite_under_lips_mm": round(BITE_UNDER_LIPS * k * 1000, 1),
                                                 "points_in_flesh": inside,
-                                                "bag_to_skin_mm": round(nearest * 1000, 1)})
+                                                "bag_to_skin_mm": round(nearest * 1000, 1)}, scale, at)
                 if bad == 0:
                     break
             if best[0] == 0:
                 break
         placed[frame], roomy[frame], report[frame] = best[1], best[2], best[3]
+        placed[frame + "_fit"] = (best[4], best[5])
     for vert, p in zip(me.vertices, placed["masculine"]):
         vert.co = p
     me.update()
@@ -451,5 +556,17 @@ def teeth(body, P, P_feminine, lm, k):
     for i, p in enumerate(placed["feminine"]):
         key.data[i].co = p
     key.value = 0.0
+    # The shapes the teeth and tongue follow the body's controls with.
+    scale, at = placed["masculine_fit"]
+    key = jaw.shape_key_add(name="Jaw_Forward", from_mix=False)
+    for i in np.nonzero(on_jaw)[0]:
+        key.data[i].co = Vector(placed["masculine"][i]) + Vector((0.0, -JAW_FORWARD, 0.0))
+    key.value = 0.0
+    for name, moved in _tongue_shapes(tongue, along, k).items():
+        key = jaw.shape_key_add(name=name, from_mix=False)
+        for j, p in enumerate(moved * scale + at):
+            key.data[first + j].co = p
+        key.value = 0.0
+    report["tongue_triangles"] = sum(len(f) - 2 for f in tongue_faces)
     shade_smooth(jaw)
     return jaw, roomy["masculine"], roomy["feminine"], report
