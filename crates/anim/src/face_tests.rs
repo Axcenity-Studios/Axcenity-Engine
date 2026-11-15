@@ -401,6 +401,57 @@ fn the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts() {
     }
 }
 
+/// `Blink` and `Eye_Closed` both close a lid, and a head has a shape for
+/// each: a blink over an eye that is already closed (a sleepy face that
+/// blinks) closes only what is still open, or the lid would go on through
+/// the lower one.
+#[test]
+fn a_blink_closes_only_what_a_closed_eye_leaves_open() {
+    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
+    let mesh = "realistic/RealisticParts.glb#AxcenityRealistic/Body";
+    let model = assets.model_blocking(mesh).unwrap();
+    let mut world = World::new();
+    let body = mesh_part(&mut world, mesh);
+    let face = face_controls(
+        &mut world,
+        body,
+        &[
+            ("Eye_Closed_Left", 1.0),
+            ("Blink_Left", 1.0),
+            ("Eye_Closed_Right", 0.8),
+            ("Blink_Right", 0.5),
+        ],
+    );
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    let mut animators = Animators::new();
+    animators.update(&mut world, &assets, FRAME);
+    let errors = animators.take_errors();
+    assert!(errors.is_empty(), "{errors:?}");
+    let posed = animators.poses().get(&body).unwrap();
+    let weight = |name: &str| {
+        let index = model
+            .morph_targets
+            .iter()
+            .position(|target| target.name == name)
+            .unwrap_or_else(|| panic!("the body has no shape `{name}`"));
+        posed.morph_weights()[index]
+    };
+    assert!((weight("Eye_Closed_Left") - 1.0).abs() < 1e-4);
+    assert!(
+        weight("Blink_Left").abs() < 1e-4,
+        "{}",
+        weight("Blink_Left")
+    );
+    assert!((weight("Eye_Closed_Right") - 0.8).abs() < 1e-4);
+    assert!(
+        (weight("Blink_Right") - 0.2).abs() < 1e-4,
+        "{}",
+        weight("Blink_Right")
+    );
+}
+
 #[test]
 fn face_controls_set_a_still_models_blend_shapes() {
     let folder =

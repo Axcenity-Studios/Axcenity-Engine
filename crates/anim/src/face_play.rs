@@ -267,6 +267,17 @@ impl FaceLayers {
         for value in &mut out {
             *value = value.clamp(0.0, 1.0);
         }
+        // `Blink` and `Eye_Closed` both close a lid: a blink closes only
+        // what a closed eye leaves open, so the two together never close
+        // it further than shut.
+        for (blink, closed) in [
+            ("Blink_Left", "Eye_Closed_Left"),
+            ("Blink_Right", "Eye_Closed_Right"),
+        ] {
+            if let (Some(blink), Some(closed)) = (face_control(blink), face_control(closed)) {
+                out[blink] = out[blink].min(1.0 - out[closed]);
+            }
+        }
         out
     }
 
