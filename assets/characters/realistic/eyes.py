@@ -48,10 +48,46 @@ PUPIL_WIDE, PUPIL_NARROW = 1.6, 0.55
 IRIS_IN_TEXTURE = 0.86
 # The white's texture: the angle off the axis its edge shows.
 SCLERA_SPAN = 115.0
-# The occlusion film: how far each ring is from the lid's edge toward the
-# line between the lids (0 to 1), and how high it stands over the white.
-FILM_RINGS = ((0.0, 0.0), (0.3, 0.0008), (0.65, 0.0014), (1.0, 0.0015))
-TEAR_REACH = 0.16
+# The occlusion film: one sheet over the opening, in columns from corner
+# to corner. Its rows are set by their distance (metres) from the upper
+# lid's edge (True) or the lower's (False), each with its darkness (the
+# film's alpha): the shadow under the upper lid is at its deepest
+# (`FILM_UNDER_LID` over the least) for 1.5 mm and falls away by 5 mm, in
+# rows close enough that it has no visible steps (an eye narrowed to 2 mm
+# is all in the deep part); the lower lid's is slighter. A row keeps its distance from its lid as
+# the lids move and stops at the other lid, so a narrowed eye has only
+# the dark rows left between its lids, and the corners of the eye, where
+# the lids are near each other, are dark at rest.
+#
+# The film is nowhere clearer than `FILM_LEAST`. The renderer's screen-
+# space occlusion darkens the eyeball in its socket to about 0.58, and it
+# is worked out on the nearest surface drawn: a film over the eye, flush
+# with the lids' edges, has none, so wherever the film is drawn at all the
+# eyeball loses that shade (measured: a film of alpha 0.2 made the whites
+# 1.37 times brighter, one of 0.4 left them as they were). The film
+# therefore gives the whole opening that shade itself and adds the lids'
+# on top; with it the eye is shaded the same whether or not the renderer's
+# occlusion is on.
+FILM_COLUMNS = 22
+FILM_LEAST = 0.42
+FILM_UNDER_LID = 0.46
+FILM_ROWS = tuple(
+    [(True, d, FILM_LEAST + FILM_UNDER_LID * (1.0 - float(smoothstep(0.0015, 0.0050, d))))
+     for d in (0.0, 0.0008, 0.0015, 0.0021, 0.0027, 0.0033, 0.0040, 0.0050)]
+    + [(True, 0.0062, FILM_LEAST), (False, 0.0016, FILM_LEAST), (False, 0.0006, 0.48), (False, 0.0, 0.58)])
+FILM_DARKEST = 0.90
+# How much of the rows' depth over `FILM_LEAST` the film has at the very
+# corners of the eye (all of it from a quarter of the way along).
+FILM_CORNERS = 0.55
+# The film stands this far over the eyeball away from the lids' edges
+# (over the cornea too when the eye turns under it), reaching that height
+# over this distance from an edge.
+FILM_LIFT = 0.0015
+FILM_LIFT_OVER = 0.0025
+# The tear line: the wet line along the lower lid's edge, this wide
+# (metres). (It ran along both lids, a sixth of the opening wide: a pale
+# band under the upper lid, and a bright sliver in a narrowed eye.)
+TEAR_WIDTH = 0.0005
 # How far the film and the tear line draw back behind closed lids (metres).
 TUCK = 0.0009
 # The film and the tear line leave out the corners of the eye, where the
@@ -198,12 +234,12 @@ def sclera_texture(out_dir, size=512):
 
 
 def film_texture(out_dir):
-    """The occlusion film's gradient: black, dense at the lids' edge (v =
-    0), clear by the middle of the eye (v = 1)."""
+    """The occlusion film's ramp: black, `FILM_DARKEST` at v = 0, clear
+    at v = 1 (a vertex's v says how dark the film is there)."""
     from PIL import Image
     w, h = 4, 64
-    v = (np.arange(h) + 0.5) / h
-    alpha = 0.46 * (1.0 - v) ** 2.2
+    v = np.arange(h) / (h - 1.0)
+    alpha = FILM_DARKEST * (1.0 - v)
     px = np.zeros((h, w, 4), dtype=np.uint8)
     px[:, :, 3] = (alpha[::-1, None] * 255 + 0.5).astype(np.uint8)
     path = os.path.join(out_dir, "RealisticEyeOcclusion.png")
@@ -213,7 +249,7 @@ def film_texture(out_dir):
     return img
 
 
-def _material(name, colour, roughness, alpha=1.0, texture=None, texture_alpha=False):
+def _material(name, colour, roughness, alpha=1.0, texture=None, texture_alpha=False, metallic=0.0):
     m = bpy.data.materials.get(name)
     if m is not None:
         return m
@@ -221,7 +257,7 @@ def _material(name, colour, roughness, alpha=1.0, texture=None, texture_alpha=Fa
     m.use_nodes = True
     bsdf = m.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Roughness"].default_value = roughness
-    bsdf.inputs["Metallic"].default_value = 0.0
+    bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Base Color"].default_value = (*colour, 1.0)
     bsdf.inputs["Alpha"].default_value = alpha
     if texture is not None:
@@ -299,6 +335,27 @@ def follow(face, mix, shape, lids):
     at = lambda i: P[i] + shape.get(i, 0.0)  # noqa: E731
     out = np.zeros((len(mix), 3))
     for k, m in enumerate(mix):
+        if "row" in m:
+            ball = face.eye[m["side"]].ball
+            if lids:
+                out[k] = film_point(ball, m, at) - film_point(ball, m, lambda i: P[i])
+            else:
+                # A shape that moves the eye itself (the frame, an eye's
+                # place or size): the film goes with its two lids, each
+                # point by its place between them. (Worked out on the
+                # resting eyeball it lost its height over the eye on the
+                # feminine frame and lay partly inside it: a pale patch
+                # of bare white beside the iris.)
+                top = sum(P[i] * w for i, w in m["top"])
+                bottom = sum(P[i] * w for i, w in m["bottom"])
+                gap = float(np.linalg.norm(bottom - top))
+                from_upper, distance, _ = m["row"]
+                along = min(distance, gap) if from_upper else max(gap - distance, min(FILM_ROWS_REACH, gap))
+                share = along / max(gap, 1e-9)
+                moved_top = sum(at(i) * w for i, w in m["top"])
+                moved_bottom = sum(at(i) * w for i, w in m["bottom"])
+                out[k] = (moved_top - top) * (1.0 - share) + (moved_bottom - bottom) * share
+            continue
         rest = sum(P[i] * w for i, w in m["pieces"])
         moved = sum(at(i) * w for i, w in m["pieces"])
         if not m["lift"]:
@@ -318,6 +375,32 @@ def follow(face, mix, shape, lids):
         tucked = moved - away / max(np.linalg.norm(away), 1e-9) * TUCK
         out[k] = ball.lift(moved[None], m["lift"] * share)[0] * share + tucked * (1.0 - share) - lifted
     return out
+
+
+def film_point(ball, m, at):
+    """Where a vertex of the occlusion film is, with the lid vertices
+    at `at(i)`: on the line from the upper lid's edge to the lower's, at
+    its row's distance from its own lid (no further than the other lid),
+    stood off the eyeball between the edges, and drawn back behind the
+    lids as they meet."""
+    top = sum(at(i) * w for i, w in m["top"])
+    bottom = sum(at(i) * w for i, w in m["bottom"])
+    gap = float(np.linalg.norm(bottom - top))
+    from_upper, distance, _ = m["row"]
+    along = min(distance, gap) if from_upper else max(gap - distance, min(FILM_ROWS_REACH, gap))
+    p = top + (bottom - top) * (along / max(gap, 1e-9))
+    inside = min(along, gap - along)
+    lift = FILM_LIFT * float(smoothstep(0.0, FILM_LIFT_OVER, inside))
+    away = p - ball.c
+    away /= max(np.linalg.norm(away), 1e-9)
+    p = p - away * (TUCK * (1.0 - float(smoothstep(0.0, 0.0008, gap))))
+    floor = 0.0001 if gap < 0.0008 or inside > 1e-6 else 0.0
+    return ball.lift(p[None], max(lift, floor))[0]
+
+
+# The furthest row set from the upper lid: rows set from the lower lid
+# never lie above it.
+FILM_ROWS_REACH = max(d for upper, d, _ in FILM_ROWS if upper)
 
 
 def shell(face, out_dir):
@@ -362,10 +445,12 @@ def shell(face, out_dir):
             pts.append(at)
             return len(pts) - 1
 
-        def strip(rings, values, material, fade=False):
+        def strip(rings, values, material, fade=False, lower_only=False):
             for (ra, va), (rb, vb) in zip(zip(rings, values), zip(rings[1:], values[1:])):
                 for k in range(count):
                     j = (k + 1) % count
+                    if lower_only and (upper[k] or upper[j]):
+                        continue
                     # None in the corners, where the lids hardly part: a
                     # film there has nowhere to go when they close.
                     if min(room[k], room[j]) < CORNER:
@@ -380,14 +465,66 @@ def shell(face, out_dir):
                     uvs.append([(k / count, at(k, va)), ((k + 1) / count, at(j, va)),
                                 ((k + 1) / count, at(j, vb)), (k / count, at(k, vb))])
 
-        film = [[vertex(k, toward, lift) for k in range(count)] for toward, lift in FILM_RINGS]
-        strip(film, [toward for toward, _ in FILM_RINGS], "EyeOcclusion", fade=True)
-        tear = [[vertex(k, 0.0, 0.00012) for k in range(count)], [vertex(k, TEAR_REACH, 0.00006) for k in range(count)]]
-        strip(tear, [0.0, 1.0], "TearLine")
+        # The film: columns from corner to corner, each from a point of
+        # the upper lid's edge to the point of the lower lid's under it.
+        edges = {}
+        for is_upper in (True, False):
+            line = [j for j in range(count) if upper[j] == is_upper or ring[j] in (eye.canthus_in, eye.canthus_out)]
+            line.sort(key=lambda j: t[j])
+            edges[is_upper] = line
+
+        def on_edge(is_upper, at_t):
+            line = edges[is_upper]
+            for a, b in zip(line, line[1:]):
+                if t[a] <= at_t <= t[b]:
+                    w = (at_t - t[a]) / max(t[b] - t[a], 1e-9)
+                    return [(int(ring[a]), 1.0 - w), (int(ring[b]), w)]
+            end = line[0] if at_t < t[line[0]] else line[-1]
+            return [(int(ring[end]), 1.0)]
+
+        # (A column at every vertex of the two edges besides: between
+        # columns the film's border is straight, and where an edge turns a
+        # corner between two of them (under the inner corner) a sliver of
+        # bare white was left.)
+        places = sorted(set(np.round(np.concatenate([
+            np.linspace(eye.t_in, eye.t_out, FILM_COLUMNS + 1), np.clip(t, eye.t_in, eye.t_out)]), 6).tolist()))
+        places = [p for k, p in enumerate(places) if k == 0 or p - places[k - 1] > 1e-5]
+        span = eye.t_out - eye.t_in
+        grid = []
+        for at_t in places:
+            # (Less deep toward the corners, where every row lies at the
+            # lid's edge: they were black.)
+            ease = FILM_CORNERS + (1.0 - FILM_CORNERS) * float(smoothstep(0.0, 0.25, min(at_t - eye.t_in, eye.t_out - at_t) / span))
+            column = []
+            for from_upper, distance, dark in FILM_ROWS:
+                row = (from_upper, distance, FILM_LEAST + (dark - FILM_LEAST) * ease)
+                m = {"top": on_edge(True, at_t), "bottom": on_edge(False, at_t), "row": row, "side": s}
+                mix.append(m)
+                pts.append(film_point(eye.ball, m, lambda i: P[i]))
+                column.append(len(pts) - 1)
+            grid.append(column)
+        shade = lambda i: 1.0 - mix[i]["row"][2] / FILM_DARKEST  # noqa: E731
+        for c in range(len(places) - 1):
+            for r in range(len(FILM_ROWS) - 1):
+                quad = (grid[c][r], grid[c + 1][r], grid[c + 1][r + 1], grid[c][r + 1])
+                ua, ub = (places[c] - eye.t_in) / span, (places[c + 1] - eye.t_in) / span
+                uv = [(ua, shade(quad[0])), (ub, shade(quad[1])), (ub, shade(quad[2])), (ua, shade(quad[3]))]
+                if s < 0:
+                    quad, uv = quad[::-1], uv[::-1]
+                faces.append(quad)
+                mats.append("EyeOcclusion")
+                uvs.append(uv)
+        reach = [min(1.0, 2.0 * TEAR_WIDTH / max(room[k], 1e-9)) for k in range(count)]
+        tear = [[vertex(k, 0.0, 0.00012) for k in range(count)], [vertex(k, reach[k], 0.00006) for k in range(count)]]
+        strip(tear, [0.0, 1.0], "TearLine", lower_only=True)
     order = ["EyeOcclusion", "TearLine"]
     materials = [
-        _material("EyeOcclusion", (0.0, 0.0, 0.0), 0.9, texture=film_texture(out_dir), texture_alpha=True),
-        _material("TearLine", (1.0, 1.0, 1.0), 0.04, alpha=0.22),
+        # (A rough metal: it reflects only its own colour, black. As a
+        # dielectric the film reflected 4% of the sky, which is about as
+        # bright as a white of the eye in the lids' shade: it darkened
+        # nothing.)
+        _material("EyeOcclusion", (0.0, 0.0, 0.0), 1.0, texture=film_texture(out_dir), texture_alpha=True, metallic=1.0),
+        _material("TearLine", (1.0, 1.0, 1.0), 0.04, alpha=0.16),
     ]
     obj = _object("EyeShell", pts, faces, mats, uvs, order, materials)
     obj.vertex_groups.new(name="Head").add(list(range(len(pts))), 1.0, "REPLACE")

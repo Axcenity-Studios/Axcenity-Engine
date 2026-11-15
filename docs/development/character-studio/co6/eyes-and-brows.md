@@ -2,7 +2,7 @@
 
 What the review of the realistic head's upper face found, what was changed and what still falls short. The head itself is described in [README.md](README.md); the package is [assets/characters/realistic/](../../../../assets/characters/realistic/README.md). Code: `lids.py`, `lashes.py`, `eyes.py`, and in `face.py` the eye, brow, cheek and nose entries of `Face.expressions`, `Face.brow`, `Face.cheek` and `soften_lids`.
 
-Every picture named here is a crop of a 3840 x 2160 capture from the engine's renderer (`capture_characters`, the straight-on `face-front` view) of the committed, baked build; masculine frame on the left, feminine on the right, a row per pose. They are in [engine/](engine/).
+Every picture named here is a crop of a 3840 x 2160 capture from the engine's renderer (`capture_characters`, the straight-on `face-front` view) of the committed, baked build; masculine frame on the left, feminine on the right, a row per pose. They are in [engine/](engine/), and are the second round's: sections 1 to 7 are the first round as it was found and changed then, with what the second round changed noted in them; [Round 2](#round-2) is the second; [Still short](#still-short) is as things stand.
 
 ## How it was looked at
 
@@ -28,7 +28,7 @@ Every picture named here is a crop of a 3840 x 2160 capture from the engine's re
 - The cheek's lift runs on into the lower lid's skin loop by loop (`face.CHEEK_ON_LID`).
 - Lashes grow between the corners only, the lower ones along the normal of the skin under the lid's edge, and every lash is kept 0.4 mm off the skin under every shape (`lashes.off_skin`).
 
-**Now** ([engine/eyes-squint.jpg](engine/eyes-squint.jpg), [engine/eyes-squint-hard.jpg](engine/eyes-squint-hard.jpg)): one unbroken lid line above and below at 0.5 and 1, alone and together, on both frames; the upper lashes stand as lashes; nothing comes through the lids. Laughing's opening is 2.5 mm at the middle (3.75 mm before). The head's triangles that cross each other fell from 49 to none on the masculine frame in Laughing and from 72 to 18 on the feminine (`face_checks.py`).
+**After round 1:** one unbroken lid line above and below at every strength; Laughing's opening 2.5 mm at the middle (3.75 mm before). The eye was still a straight-sided slit of bright white: round 2, below.
 
 ## 2. The closed eye
 
@@ -49,7 +49,7 @@ Every picture named here is a crop of a 3840 x 2160 capture from the engine's re
 - Lashes: a new texture (150 tapering lashes in tufts over a thin dark edge, 512 x 128), a rough metal's shading (it reflects only its own colour), and an upper lid's lashes straighten as it comes down (with their full curl a closed lid's lashes pointed their outer halves at the viewer and the fringe ended in a cut line).
 - The occlusion film thins out toward where it stops short of the corners (`eyes.shell`).
 
-**Now** ([engine/eyes-closed.jpg](engine/eyes-closed.jpg), and at twice the size [engine/eyes-closed-close.jpg](engine/eyes-closed-close.jpg)): at `Blink` 1 and `Eye_Closed` 1, in both lights on both frames, no speck, no blob and no white point; the lash line reads as dark lashes with separate tips; the lit part of the lid is smooth. The closed lid's inner edge stands 1.3 mm off the eyeball at the middle and its outer edge 3.4 mm. `face_checks.py`: no ray bare on either frame; crossing triangle pairs in the closed eyes 175 (251) masculine, 182 (276) feminine.
+**Now** ([engine/eyes-closed.jpg](engine/eyes-closed.jpg), and at twice the size [engine/eyes-closed-close.jpg](engine/eyes-closed-close.jpg)): at `Blink` 1 and `Eye_Closed` 1, in both lights on both frames, no speck, no blob and no white point; the lash line reads as dark lashes with separate tips; the lit part of the lid is smooth. The closed lid's inner edge stands 1.3 mm off the eyeball at the middle and its outer edge 3.4 mm. `face_checks.py`: no ray bare on either frame.
 
 ## 3. The brows' cards
 
@@ -61,7 +61,7 @@ Every picture named here is a crop of a 3840 x 2160 capture from the engine's re
 - A card is 5 by 23 vertices; each vertex moves as its own point of the skin does, and no face of the card comes nearer the skin than 0.3 mm at rest or under any shape (`lashes.over_skin`).
 - The texture thins to a point at the tail; the card is shaded as the lashes are (a raised brow, turned to the sky, went grey).
 
-**Now** ([engine/brows-controls.jpg](engine/brows-controls.jpg), [engine/brows-controls-hard.jpg](engine/brows-controls-hard.jpg)): the cards are whole at rest, at `Brow_Lower` 0.15 and 1, `Brow_Raise` 1 (both and one side), `Brow_Inward` 1 and `Brow_Lower` with `Brow_Inward`, and in every expression of [engine/eyes-expressions.jpg](engine/eyes-expressions.jpg); no skin shows through. [engine/brows-arch.jpg](engine/brows-arch.jpg): the identity slider `brow_arch` at -1 and +1 flattens and peaks the brow without a hook. (The brow's identity shapes are made on the same weights, so they moved a little: `Face_Brow_Arch` 6.3 mm at its most, 6.1 before.)
+**Now** ([engine/brows-controls.jpg](engine/brows-controls.jpg), [engine/brows-controls-hard.jpg](engine/brows-controls-hard.jpg)): the cards are whole at rest, at `Brow_Lower` 0.15 and 1, `Brow_Raise` 1 (both and one side), `Brow_Inward` 1 and `Brow_Raise` with `Brow_Inward`, and in every expression of [engine/eyes-expressions.jpg](engine/eyes-expressions.jpg); no skin shows through. [engine/brows-arch.jpg](engine/brows-arch.jpg): the identity slider `brow_arch` at -1 and +1 flattens and peaks the brow without a hook. (The brow's identity shapes are made on the same weights, so they moved a little: `Face_Brow_Arch` 6.3 mm at its most, 6.1 before.)
 
 ## 4. Eyes wide
 
@@ -77,13 +77,11 @@ Every picture named here is a crop of a 3840 x 2160 capture from the engine's re
 |---|---|---|
 | `Brow_Lower` | The brow's skin 7.8 mm down at the inner end, 3.5 mm at the tail, 3.6 mm inward; the upper lid 14% of the way shut. | The same moves on the new weights, the skin between the brows 1.6 mm forward, the fold coming down on the lid and the lid 22% of the way shut (the opening 7.9 mm from 9.5; it was 8.35). |
 | `Brow_Raise` | 10.5 mm up (the inner end 7.9 mm), the lid 10% wider. | The same, the fold drawn up with it, the lid 12% wider (the opening 10.5 mm). One side alone leaves the other brow where it was. |
-| `Brow_Inward` | The inner end 8.2 mm **up** and 3.4 mm inward, the tail 2.6 mm down: an inner brow raise under another name. | The inner half 4.8 mm toward the middle, level, the skin between 2.4 mm forward. No vertex is drawn more than 0.4 of its way to the middle of the face. |
+| `Brow_Inward` | The inner end 8.2 mm up and 3.4 mm inward, the tail 2.6 mm down. | The same moves (the control is the inner brow raise: "draws the eyebrow's inner end in and up, as in worry", and ARKit's `browInnerUp` plays it), on the new weights, with the skin between the brows 1.5 mm forward. No vertex is drawn more than 0.4 of its way to the middle of the face. |
 
-`Brow_Inward` was changed because of what the profile uses it for: ARKit's `browDown` plays `Brow_Lower` with 0.3 of `Brow_Inward`, and Frustrated lowers the brows with 0.3 of it; an inner end that rises works against both.
+(Round 1 made `Brow_Inward` a level drawing-together, on a wrong reading of the control; it was put back before round 2, and Sad, Worried, Fearful and Crying have their raised inner ends again: [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg), [engine/brows-inner-raise-hard.jpg](engine/brows-inner-raise-hard.jpg).)
 
-What the pictures show ([engine/brows-controls.jpg](engine/brows-controls.jpg)): `Brow_Lower` brings the inner ends down and toward each other and narrows the eye from above, with a small swelling between the brows; there is no furrow. `Brow_Raise` lifts the brow and shows more lid. `Brow_Inward` brings the brows' heads together with a swelling between them that catches the light; there are no vertical lines. The mesh's edges there are 3 to 4 mm and the skin has no wrinkle maps.
-
-**The inner brow raise.** [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg): rest; `Brow_Raise` with `Brow_Inward`, both at 1; Sad, Worried and Fearful as their recipes ask; and Sad and Worried on the starting build, whose `Brow_Inward` raised the inner ends (and whose cards broke on the feminine frame). With the controls as they are named, `Brow_Raise` with `Brow_Inward` gives raised brows drawn together, their inner ends no higher than their tails: Sad (0.7 of `Brow_Inward`) and Worried (0.8 with 0.2 of `Brow_Raise`) do not read as sad or worried from the nose up, and Fearful reads as alarm by its eyes. An oblique brow needs the inner end raised alone, which no control among the 48 does.
+What the pictures show ([engine/brows-controls.jpg](engine/brows-controls.jpg), [engine/brows-controls-hard.jpg](engine/brows-controls-hard.jpg)): `Brow_Lower` brings the inner ends down and toward each other and narrows the eye from above, with a small swelling between the brows; there is no furrow. `Brow_Raise` lifts the brow and shows more lid. `Brow_Inward` tilts the brow about its middle, inner end up, with a swelling between the inner ends. The mesh's edges there are 3 to 4 mm and the skin has no wrinkle maps, so none of them draws a line in the skin.
 
 ## 6. One eye alone
 
@@ -91,40 +89,108 @@ What the pictures show ([engine/brows-controls.jpg](engine/brows-controls.jpg)):
 
 ## 7. The upper face in the expressions
 
-[engine/eyes-expressions.jpg](engine/eyes-expressions.jpg) (each at 0.5 and 1, both frames, tiles at half size) and [engine/eyes-faces.jpg](engine/eyes-faces.jpg) (whole faces at a third: rest, blinks, Happy, Laughing, Surprised, Angry, Sad).
+[engine/eyes-expressions.jpg](engine/eyes-expressions.jpg) (ten at full strength, both frames, tiles at half size), [engine/brows-inner-raise.jpg](engine/brows-inner-raise.jpg) (Sad, Worried, Fearful, Crying, Frustrated at 0.8 of full size) and [engine/eyes-faces.jpg](engine/eyes-faces.jpg) (whole faces at a third: rest, blinks, Happy, Laughing, Surprised, Angry, Sad).
 
 | Expression | From the nose up |
 |---|---|
-| Angry | Reads at 1 (brows down and in, eyes narrowed from above and below); mild at 0.5. |
-| Surprised | Reads at both (brows up, white over the iris). |
-| Fearful | Wide eyes and raised brows; without oblique brows it is close to Surprised. |
+| Angry | Reads (brows down and in, eyes narrowed from above and below). |
+| Surprised | Reads (brows up, white over the iris). |
+| Fearful | Reads: wide eyes under brows raised with their inner ends highest. The inner ends go very high (0.7 of `Brow_Raise` and of `Brow_Inward` together lift them 11 mm). |
+| Sad, Worried | Read: the brows slope up to their inner ends, Sad's over lowered lids, Worried's over slightly widened eyes. The slope is one straight line from tail to inner end. |
+| Crying | Brows as Sad's at full strength, eyes all but shut. |
 | Confused | Reads: one brow up, the other down with its eye narrowed. |
 | Disgusted | Lowered brows and narrowed eyes; from the nose up it is a milder Angry (the nose and lip carry it). |
-| Determined, Frustrated | Lowered brows, slightly narrowed eyes; both a mild Angry, as before. |
-| Sleepy | Heavy lids at 0.5; at 1 the eyes are 3.2 mm slits whose whites are broken by dark shapes (below). |
-| Sad, Worried | Do not read (the inner brow raise, above). |
+| Determined, Frustrated | Lowered brows, slightly narrowed eyes; both a mild Angry. |
+| Sleepy | Heavy lids at 0.5; at 1 the eyes are 3 mm slits, shaded under the lid. |
+| Happy, Laughing | The eyes narrow from below into arches; Laughing's are dark slits 2 mm tall (round 2). |
 
-Recipes are not edited here. With the controls as they are, nothing set by hand through `AXCENITY_CAPTURE_FACE` makes Sad or Worried read better than `Brow_Raise` with `Brow_Inward` does in the sheet above.
+Recipes are not edited here. Numbers that would bring the brows nearer the reference faces, for whoever owns the recipes: Sad `Brow_Inward` 0.5 (0.7), Worried 0.6 (0.8), Fearful `Brow_Inward` 0.4 (0.7) with `Brow_Raise` left at 0.7, Crying 0.8 (1.0); Laughing, see round 2.
+
+## Round 2
+
+Found from the second review's captures and by taking things out of the build one at a time (a build without skin maps, without the lashes, without the brows, without all three parts, and with the film at one strength all over: none of those is committed).
+
+### The laughing and squinting eye
+
+**Found.**
+
+- *The shape.* The squint's closing line followed the opening, which left it 1.3 mm higher at the middle than at the corners, and the upper lid came only 0.60 of the way down to it: a slit with a nearly straight floor and roof.
+- *The white.* Three things kept it bright. The film's darkness was set by shares of the opening, so as the lids came together it shrank with them and the middle of the slit stayed clear. The film did not darken at all: the renderer's screen-space occlusion darkens the eyeball in its socket to about 0.58, and it is worked out on the nearest surface drawn, and a film across the opening, flush with the lids' edges, has none. Measured on one pixel of the white at rest (sRGB): no film 72, the round 1 film about 92, a film of alpha 0.2 all over 83, of 0.4 72, of 0.78 42. And the tear line ran along both lids a sixth of the opening wide (1.9 mm), white.
+- On the feminine frame the new film first lay partly inside the eyeball (a pale patch beside the iris): its height over the eye was worked out on the masculine eyeball for the frame's shape too.
+
+**Changed.**
+
+- The squint's line is arched, 1.2 mm higher at the middle (`face.SQUINT_ARCH`), and the upper lid comes 0.80 of the way down onto it (`SQUINT_UPPER`). `Eye_Squint` and `Cheek_Raise` still share one straight path of the lower lid (0.60 and 0.40).
+- The film is one sheet from corner to corner (`eyes.FILM_ROWS`): its rows keep their distance from the upper lid's edge (and two from the lower's) and stop at the other lid, so a narrowed eye has only the dark rows left in it, and the corners are dark at rest. It is black (a rough metal: as a dielectric it reflected 4% of the sky) and nowhere clearer than 0.42, the shade the renderer's occlusion gave the eyeball; under the upper lid it is 0.88 for 1.5 mm and falls to 0.42 by 5 mm. Under the frame's shape and the identity's it goes with the lids.
+- The tear line is the lower lid's, half a millimetre wide.
+
+**Now** ([engine/eyes-rest.jpg](engine/eyes-rest.jpg), [engine/eyes-squint.jpg](engine/eyes-squint.jpg), [engine/eyes-squint-hard.jpg](engine/eyes-squint-hard.jpg), and at twice the size [engine/eyes-laugh-close.jpg](engine/eyes-laugh-close.jpg)): at rest the whites are darker under the upper lid and into both corners, in both lights, the same on both frames. Laughing is a dark arch under the lashes, the white in it dark, on both frames in both lights; with both controls at 1 the eye is a dark line.
+
+| `Eye_Squint`, `Cheek_Raise` | Opening at the middle between the lids' inner edges (mm) | Between the lash lines |
+|---|---|---|
+| rest | 11.4 | 10.2 |
+| 1, 0 | 3.8 | 3.5 |
+| 0, 1 | 8.3 | 7.2 |
+| 0.85, 0.9 (Laughing) | 2.2 | 1.9 |
+| 1, 1 | 0.7 | 0.6 |
+| 0.85, 0.9 with `Eye_Closed` 0.1 | 1.0 | 0.8 |
+| 0.85, 0.9 with `Eye_Closed` 0.2 | -0.1 (the lids overlap) | -0.25 |
+| 1, 1 with `Eye_Closed` 0.1 | -0.4 | -0.5 |
+
+`Eye_Closed` on top does not close a laugh cleanly: at 0.2 the two lids' edges pass each other by a quarter of a millimetre and show as a dashed line (bottom rows of the squint sheets). The clean ways to a nearly shut laugh are the two controls themselves: 1 and 1 leaves 0.7 mm, 0.95 and 0.95 about 1.2 mm.
+
+**What a blink has left** (for the engine's rule that holds a blink back): with `Eye_Squint` at 1 a blink of 0.31 closes the eye (the control has used 0.69 of it), `Cheek_Raise` at 1 leaves 0.70 (0.30 used), `Brow_Lower` at 1 leaves 0.78 (0.22 used); both of the first two at 1 leave 0.05.
+
+### `Brow_Lower` and Angry: the streaks on the upper lid
+
+**Found.** They are in a build without skin maps, so not texels. The brow's shapes put the skin back on its resting surface from the seventh loop round the eye, which is the brow bone's overhang: lowered and slid on that surface it went over the edge of the bone into the hollow above the lid. On the feminine frame, at the outer half of the eye, the seventh loop's height over the eyeball fell from 5.0 to 2.6 mm; the fold was pressed flat, its three loops within 2 mm of each other, and their normals turned by 20 degrees and more (one from facing down to facing up): thin strips turned to the light. On the masculine frame the fold's loops also passed each other (12 pairs of crossing triangles round one eye, 2 at rest).
+
+**Changed.** The brow's shapes leave the fold and the overhang off the resting surface (`face.BROW_SLIDES_FROM`: they slide from the eighth loop, fully from the eleventh) and hold the fold's two loops nearly alike (`BROW_ON_LID`).
+
+**Now** ([engine/brows-controls.jpg](engine/brows-controls.jpg), [engine/brows-controls-hard.jpg](engine/brows-controls-hard.jpg), Angry in [engine/eyes-expressions.jpg](engine/eyes-expressions.jpg)): the lowered lid is one smooth band; the fold's normals turn 6 degrees at most at the place measured; crossing pairs under `Brow_Lower` on the masculine frame 0 and 1 (10 and 7). Under the hard light two thin bright lines still run along the masculine lid (its edge and the fold's).
+
+### The lit blotch on a closed lid
+
+**Found.** It is the same with the lashes left out, with the brows left out, and with lashes, brows and eye shell all left out: no card casts it. (A blended material is not a shadow caster in the renderer at all: `Blend` is drawn see-through, and only solid draws cast.) The shadow round it is the head's own, the brow ridge's and the nose's, and the blotch is the one part of the closed lid's dome turned to the lamp. Nothing was changed. What would lessen it: a closed lid that lies closer to the eyeball than a straight path lets it (an in-between shape in the engine; its outer edge stands 3.4 mm off the eyeball now), or a softer shadow edge in the renderer.
+
+### Sleepy and the half blink: the dark shapes on the whites
+
+**Found.** With the lashes left out they are gone; with the film left in alone there was only its own band. They were the upper lashes' card: on the straight path between curled up at rest and turned down on a closed lid, a half-shut eye's lashes point at the viewer, and a card seen nearly on edge, splayed toward its ends, is dark straight-edged pieces across the top of the opening. The solid root of the lash texture made them black.
+
+**Changed.** The lashes' root line is thinner (5 to 10% of the lash) and there are fewer lashes (120); the upper lashes leave the lid a little higher and a closing lid turns them 1.3 times as far as itself; and the film now shades the half-shut eye from the lid down.
+
+**Now** ([engine/eyes-closed.jpg](engine/eyes-closed.jpg), [engine/eyes-closed-close.jpg](engine/eyes-closed-close.jpg)): the half-shut eye is shaded from the upper lid down with a thin dark edge of lashes. Paler three-cornered areas remain low on the whites beside the iris (the film's rows run parallel to the upper lid's straight edges).
+
+### `Eye_Wide`, feminine: the streaks above the lid
+
+**Found.** As the upper lid went up, the lower of the fold's two loops (which took 0.55 of the turn) passed the upper one (0.28): the crease turned inside out and its strip faced the light. On the masculine frame they crossed (8 pairs round one eye).
+
+**Changed.** An upper lid drawn up gathers its skin under the fold by weights of its own (`lids.SKIN_UP`): the fold's two loops go up together.
+
+**Now** ([engine/eyes-wide.jpg](engine/eyes-wide.jpg)): crossing pairs under `Eye_Wide` on the masculine frame 2 and 2 (6 and 7). The lid's margin shows as a thin pale rim over the white. On the feminine frame a short faint streak is still there above the key-side lid, in `Eye_Wide` and in Surprised: less than it was, not gone.
+
+### The lids' outline
+
+Not started. It is 8 vertices along the upper lid's edge and 12 along the lower; a narrowed eye's arch is three or four straight pieces for that reason.
 
 ## Checks
 
 On the committed build:
 
-- `face_checks.py --check`: exit 1 with 1 failure, the masculine `Mouth_Left`'s one tooth point (to 0.65 mm), as before. `Blink` and `Eye_Closed`: no ray bare on either frame. Half-way blinks: no lid vertex in the opaque eyeball; lid vertices in the clear cornea 3, 6 and 0 at a quarter, a half and three quarters (6, 8 and 0 before; to 0.56 mm); eyeball vertices in the lid 0, 1 and 0 on both frames (2, 0, 0 and 1, 0, 0 before).
-- Reported, not held: crossing pairs of the head's triangles, less the resting face's, on the masculine frame: `Brow_Lower_Left` 10 and `_Right` 7 (none before), `Eye_Wide` 6 and 7 (2 and none), Disgusted 7 (none); none of these on the feminine frame. `Eye_Squint` 0 (17 and 20 before), Crying 0 (59).
-- `cargo nextest run -p axcenity-anim -p axcenity-avatar`: 222 pass. The body's shape list is unchanged (48 live, 142 in all).
-- Triangles: `Lashes` 88 (160), `Brows` 352 (112), `EyeShell` 208.
+- `face_checks.py --check`: exit 0, 0 failures. `Blink` and `Eye_Closed`: no ray bare on either frame.
+- Reported, not held: one lid vertex stands in the clear cornea under `Eye_Squint` and under `Cheek_Raise` (to 0.29 mm), two in Happy and Disgusted (to 0.26 mm): each control alone is part of the way along the straight path the two share, which cuts under the cornea's curve. None before.
+- `cargo nextest run -p axcenity-anim -p axcenity-avatar --no-fail-fast`: 223 pass.
 
 ## Still short
 
-1. **Sad and Worried** have no inner brow raise to use (section 5).
+1. **The laugh's arch is made of straight pieces** (the lids' vertices), its inner end stays a little open, and on the feminine frame a faint pale patch remains on the skin under the inner corner (round 1's: a shape's normals are stored as changes from the masculine frame's).
 2. **No creases.** A laughing eye has no lines fanning from its outer corner, lowered brows no furrow between them and raised brows no lines across the forehead: geometry at this density cannot fold that finely and the skin has no wrinkle maps.
-3. **The slit of a squint is pale.** The whites are lit as at rest (the eye's shading is CO7's), so a laughing eye is a pale slit under dark lashes where the photographs have a dark crescent; the lower lashes hardly show.
-4. **The squint's inner corner** stays a little open (the lower lid is held there), and at `Eye_Squint` with `Cheek_Raise` both at 1 a faint pale mark remains beside it on the feminine frame. Its cause is not proven: it is in the skin's shading, not in any part (it stays with the eye shell, the lashes, the eyeballs and the simpler copies each taken out), and the likeliest is that a shape's normals are stored as changes from the masculine frame's where the two frames' skin differs.
-5. **A half-shut eye** (`Blink` 0.5, Sleepy at 1): the whites are broken by dark, straight-edged shapes next to the iris, as they were before this work. The cause was not found (the occlusion film's coarse rings, the lash cards' shadows, or both).
-6. **`Brow_Lower` on the feminine frame** shows the lowered lid as a pale band in the key light: the softened lid is smoother than the skin round it.
-7. **`Brow_Lower` with `Brow_Inward`, both at 1** (no recipe asks for it): a short crease between the brows on the masculine frame.
-8. **The lids' outline is angular** at 4K (8 vertices along the upper lid's edge), most with the eye wide.
-9. **A blink during a squint.** Shapes add: `Blink` on top of Laughing carries the upper lid past the lower one. The engine scales a blink by what `Eye_Closed` leaves open, not by a squint.
-10. **Lashes and brows are cards.** Close up a brow is a dark mass with hairs at its edges; the lashes of the two lids do not interleave.
-11. Under the hard light a patch of the closed feminine lid is stippled where it is lit (the renderer's shadow edge at a grazing light; it is in the starting build's pictures too).
+3. **The eye is shaded by a film, not by the renderer.** It is right for one head-on light; it does not know where the light is, and where it is drawn the renderer's own occlusion is lost (the film stands in for it). The eye's shading is CO7's.
+4. **A half-shut eye** has paler three-cornered areas low on its whites.
+5. **The closed lid's lit blotch** under a side light (above): not a card's shadow; not changed.
+6. **`Brow_Lower` under the hard light**: two thin bright lines along the masculine lid.
+7. **`Brow_Inward`** tilts the brow as one straight line and leaves a pale swelling between the inner ends, most in Fearful.
+8. **`Eye_Wide`, feminine**: a short faint streak above the key-side lid remains.
+9. **The lids' outline is angular** at 4K.
+10. **Lashes and brows are cards.** Close up a brow is a dark mass with hairs at its edges; the lashes of the two lids do not interleave; a closed eye's lashes are longer than round 1's.
+11. Under the hard light a patch of the closed feminine lid is stippled where it is lit (the renderer's shadow edge at a grazing light).

@@ -495,7 +495,7 @@ fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
     assert!((weight("Eye_Squint_Left") - 1.0).abs() < 1e-4);
     assert!((weight("Cheek_Raise_Left") - 1.0).abs() < 1e-4);
     assert!(
-        (weight("Blink_Left") - (1.0 - 0.6 - 0.22)).abs() < 1e-4,
+        (weight("Blink_Left") - (1.0 - 0.69 - 0.3)).abs() < 1e-4,
         "{}",
         weight("Blink_Left")
     );
@@ -733,7 +733,7 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
 
     // The eyes blink by themselves within the longest wait between
     // blinks, and the expression stays on. Happy's squint (0.3, through
-    // the mask) has the lids 0.18 of the way shut already, and the blink
+    // the mask) has the lids 0.21 of the way shut already, and the blink
     // closes the rest.
     let mut motion = crate::face_play::FaceMotion::new(3);
     let mut closed = 0.0f32;
@@ -742,7 +742,7 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
         assert!((at(&controls, "Eye_Squint_Left") - 0.3).abs() < 1e-4);
         closed = closed.max(at(&controls, "Blink_Left").min(at(&controls, "Blink_Right")));
     }
-    assert!((closed - (1.0 - 0.6 * 0.3)).abs() < 1e-3, "{closed}");
+    assert!((closed - (1.0 - 0.69 * 0.3)).abs() < 1e-3, "{closed}");
     assert_eq!(world.face(face).unwrap().expressions.len(), 1);
 }
 

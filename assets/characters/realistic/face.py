@@ -265,15 +265,28 @@ EXPRESSIONS = [
 # raised cheek pushes the lower lid toward the same line.
 SQUINT = 0.60
 SQUINT_MEET = 0.56
+# The line is arched: this much higher at the middle of the eye than a
+# line that followed the opening (metres), so a narrowed eye is a crescent,
+# its lower lid pushed up most at the middle. And the upper lid comes this
+# far of its way down onto it in a squint.
+SQUINT_ARCH = 0.0012
+SQUINT_UPPER = 0.80
 CHEEK_LID = 0.40
 # The brow's skin moves whole within this of the brow's line (metres), and
 # each loop of the upper lid's skin takes this much of the brow's move
 # (the loops from the lash line up to the fold under the brow).
 BROW_WHOLE = 0.0065
-BROW_ON_LID = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.08, 4: 0.20, 5: 0.38, 6: 0.60, 7: 0.85}
+BROW_ON_LID = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.08, 4: 0.20, 5: 0.42, 6: 0.50, 7: 0.80}
 # How much of a raised cheek and of a lowered brow a blink has.
 BLINK_CHEEK = 0.22
 BLINK_BROW = 0.14
+# The loop round the eye from which a brow's shapes begin to put the skin
+# back on its resting surface (all the way three loops on). The loops
+# under it are the fold and the brow bone's overhang: slid on the resting
+# surface, a lowered brow's skin went over the edge of the bone into the
+# hollow above the lid, the fold was pressed flat and its loops lay as
+# thin strips turned up to the light (streaks across the upper lid).
+BROW_SLIDES_FROM = 8.0
 # How far a lowered brow brings the upper lid down (a share of the way to
 # closed).
 BROW_PRESSES = 0.22
@@ -816,8 +829,9 @@ class Face:
 
     # -- the expression shapes ---------------------------------------------
 
-    def _lids(self, s, upper=None, lower=None, meet=lids.MEET, ease=False):
-        return lids.deltas(self.P, self.eye[s].lid(self.P, upper_to=upper, lower_to=lower, meet=meet, ease=ease))
+    def _lids(self, s, upper=None, lower=None, meet=lids.MEET, ease=False, arch=0.0):
+        return lids.deltas(self.P, self.eye[s].lid(self.P, upper_to=upper, lower_to=lower, meet=meet, ease=ease,
+                                                   arch=arch))
 
     def _moved(self, offsets, **kw):
         return self.shape(self.P + offsets, **kw)
@@ -937,7 +951,7 @@ class Face:
         amount = self.skin.astype(np.float64)
         for eye in self.eye.values():
             for i in eye.idx:
-                amount[i] = min(amount[i], float(smoothstep(6.0, 8.0, eye.step[i])))
+                amount[i] = min(amount[i], float(smoothstep(BROW_SLIDES_FROM, BROW_SLIDES_FROM + 3.0, eye.step[i])))
         return amount
 
     def glabella(self):
@@ -986,8 +1000,9 @@ class Face:
             # straight lines, and two arcs' own chords added together
             # carried the lid 3 mm forward off the eyeball, its skin
             # twisted at the inner corner.
-            narrowed = self._lids(s, None, 1.0, SQUINT_MEET, ease=True)
-            S[f"Eye_Squint_{side}"] = add(self._lids(s, SQUINT, None, SQUINT_MEET, ease=True), scale(narrowed, SQUINT),
+            narrowed = self._lids(s, None, 1.0, SQUINT_MEET, ease=True, arch=SQUINT_ARCH)
+            S[f"Eye_Squint_{side}"] = add(self._lids(s, SQUINT_UPPER, None, SQUINT_MEET, ease=True, arch=SQUINT_ARCH),
+                                          scale(narrowed, SQUINT),
                                           scale(cheek_up, 0.55))
             # (Wide: the upper lid's edge clears the top of the iris by
             # about 2 mm of white.)
@@ -1022,12 +1037,16 @@ class Face:
             S[f"Blink_{side}"] = add(S[f"Blink_{side}"], scale(cheek_up, BLINK_CHEEK), scale(lowered, BLINK_BROW))
             # The inner end in and up, as in worry (the control's meaning in
             # the engine, and what Sad, Worried, Fearful and Crying use it
-            # for): the inner half rises and comes toward the middle, the
-            # tail dips a little, and the skin between bunches forward.
+            # for): the inner third rises and comes toward the middle, the
+            # rest of the brow stays nearly where it was (the brow bends
+            # there; raised over its whole inner half and dipped at the
+            # tail it tilted as one straight bar), and the skin between
+            # bunches forward.
+            kink = 1.0 - smoothstep(0.0, 0.42, along)
             outer = smoothstep(0.45, 1.0, along)
             S[f"Brow_Inward_{side}"] = self._moved(
-                vec(w * inner, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0026)
-                + (bunch * 0.0024)[:, None] * N, slide=on_skull, teeth=False)
+                vec(w * kink, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0010)
+                + (bunch * 0.0015)[:, None] * N, slide=on_skull, teeth=False)
             # The mouth's corners, the lips and the nose: each side's
             # offsets are kept, and made into shapes below.
             X, sl = self.smile(s)
