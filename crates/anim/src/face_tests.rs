@@ -467,7 +467,7 @@ fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
         &mut world,
         body,
         &[
-            ("Eye_Squint_Left", 1.0),
+            ("Eye_Squint_Left", 0.5),
             ("Cheek_Raise_Left", 1.0),
             ("Blink_Left", 1.0),
             ("Brow_Lower_Right", 0.5),
@@ -492,15 +492,15 @@ fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
         posed.morph_weights()[index]
     };
     // What narrows the eye is left as it was.
-    assert!((weight("Eye_Squint_Left") - 1.0).abs() < 1e-4);
+    assert!((weight("Eye_Squint_Left") - 0.5).abs() < 1e-4);
     assert!((weight("Cheek_Raise_Left") - 1.0).abs() < 1e-4);
     assert!(
-        (weight("Blink_Left") - (1.0 - 0.69 - 0.3)).abs() < 1e-4,
+        (weight("Blink_Left") - (1.0 - 0.5 * 0.71 - 0.31)).abs() < 1e-4,
         "{}",
         weight("Blink_Left")
     );
     assert!(
-        (weight("Blink_Right") - (1.0 - 0.25 - 0.5 * 0.22)).abs() < 1e-4,
+        (weight("Blink_Right") - (1.0 - 0.25 - 0.5 * 0.26)).abs() < 1e-4,
         "{}",
         weight("Blink_Right")
     );
@@ -742,7 +742,7 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
         assert!((at(&controls, "Eye_Squint_Left") - 0.3).abs() < 1e-4);
         closed = closed.max(at(&controls, "Blink_Left").min(at(&controls, "Blink_Right")));
     }
-    assert!((closed - (1.0 - 0.69 * 0.3)).abs() < 1e-3, "{closed}");
+    assert!((closed - (1.0 - 0.71 * 0.3)).abs() < 1e-3, "{closed}");
     assert_eq!(world.face(face).unwrap().expressions.len(), 1);
 }
 
