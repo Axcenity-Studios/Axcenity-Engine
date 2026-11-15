@@ -16,17 +16,19 @@ Milestone CO5 of [the plan](../../../../plans/axcenity-engine-character-studio.m
 
 ## Numbers
 
-From [measurements.json](measurements.json) (`measure.py --package realistic --only files,weights,clipping,face,shapes,sliders,proportions,deformation,twist --check assets/characters/realistic/qa/thresholds.json --strict`: passed).
+From [measurements.json](measurements.json) (`measure.py --package realistic --only files,weights,clipping,face,shapes,sliders,proportions,deformation,twist --check assets/characters/realistic/qa/thresholds.json --strict`: **failed**, on the shoulder only: two limits (150° under CO4's 0.54 on both frames) and four targets; everything else holds).
 
 | Measure | Target | CO4 (masculine, feminine) | CO5 |
 |---|---|---|---|
-| Shoulder raised 150°: local volume kept | at least 0.8 | 0.562, 0.561 | **0.86, 0.925** |
-| Shoulder at 90°: local volume kept | the stylized body's 0.853, 0.992 | 0.813, 0.831 | **0.955, 1.001** |
+| Shoulder raised 150°: local volume kept | at least 0.8 | 0.562, 0.561 | **0.463, 0.513: not met, and under CO4's limit of 0.54** |
+| Shoulder at 90°: local volume kept | the stylized body's 0.853, 0.992 | 0.813, 0.831 | 0.847, 0.88: not met |
 | Elbow 135°, knee 135°: ring area kept | at least 0.6 | 0.757, 0.758 and 0.74, 0.75 | unchanged |
 | Eyes and teeth in flesh at rest | 0 | 0 | 0 |
 | Pairs of sliders at the ends of their ranges that make the body newly cross itself | 0 | not measured | **0 of 351 pairs (1,352 bodies) on each frame** |
 | A slider alone that newly crosses | 0 | not measured | 0 of 53 ends |
 | A shape slider alone that puts skin in an eye or the teeth | 0 | not measured | 0 of 36 ends |
+
+**The shoulder, and why its number went down.** The first corrective shapes of this milestone moved the skin out from the joint until this measure read 0.86: fitted to the measure, and it looked it (a ball with a notch). They were replaced by a delta mush of the pose (the package README says how), which is shaped by nothing but the pose and the rest shape. The picture is right now ([shoulders_masculine.png](shoulders_masculine.png), [engine/cheer_shoulders_after.png](engine/cheer_shoulders_after.png)) and the measure is lower than with no corrective at all. One other number points the same way as the picture: the whole body's enclosed volume at 150° is +0.09 litre (masculine) and -0.05 litre (feminine) from rest with the shapes, against +0.52 and +0.28 litre for skinning alone. Why the local measure (the skin within 9 cm of the joint, as volume seen from the joint) falls while both improve hasn't been established: the smoothed skin may simply lie outside that 9 cm, or closer to the joint on top. The limit and the target are left as they are; the decision is the lead's and Paul's.
 
 **Crossings before any shape.** The masculine neutral has 60 pairs of crossing triangles and the feminine 68 (between toes, and inside the head), which are the bundle's own. "Newly" leaves those out, and pairs that already touch within 4 mm in the neutral (closed lips, neighbouring toes).
 
@@ -49,14 +51,18 @@ Looked at against anatomy: where fat sits (belly, flanks, chest, hips and thighs
 - **[build_details_masculine.png](build_details_masculine.png), [build_details_feminine.png](build_details_feminine.png)** (Blender, clay). *Good:* no hard line under the pectorals, no crease across the lower belly, no dark slot at the armpits; the feminine heavy and soft body has the fold under the breast and the hip shelf. *Wrong:* a faint horizontal fold remains across the masculine heavy and soft belly; the feminine heavy and muscular shoulder is lumpy where the trapezius meets it; clay at this light is flat, so fine faults could hide here that the engine sheets would show.
 - **[build_grid_masculine.png](build_grid_masculine.png), [build_grid_feminine.png](build_grid_feminine.png)**: nine bodies each; no step between neighbours looks like a jump.
 - **[build_regions_masculine.png](build_regions_masculine.png), [build_regions_feminine.png](build_regions_feminine.png)**: all sixteen regional sliders; same reading as the engine's.
-- **[deformation_poses.png](deformation_poses.png)**: the shoulder at 90° is clean. At 150° the cap is back (it was caved in CO4's sheet) but it is a smooth mass with a notch where it meets the neck, not a deltoid; the armpit is still a plain stretch.
+- **[shoulders_masculine.png](shoulders_masculine.png), [shoulders_feminine.png](shoulders_feminine.png)** (clay under one lamp from the side, since flat clay hid the first shapes' faults): the arm at 150° from the front, back and above, at 90°, and the Cheer clip at 0.8 s. *Good:* one slope from the neck across the trapezius onto the arm in every view, no step, no ball; the armpit is a hollow with the pectoral's edge running into the arm. *Wrong:* at 150° a tight valley is left where the arm meets the neck (the collarbone doesn't lift in this pose); the deltoid has no form of its own (it is a smooth slope, not a muscle); and, not the shoulder's doing, **a jagged fold under each feminine breast**, there at rest too (the feminine frame's fold on 25 mm quads; the flat studio hid it).
+- **[engine/cheer_shoulders_after.png](engine/cheer_shoulders_after.png)** beside [engine/cheer_shoulders_before.png](engine/cheer_shoulders_before.png) (the engine, Cheer at 0.8 s, same crop; masculine, feminine, the stylized body). *Good:* the step at the top of each shoulder and the ball behind it are gone on both frames. *Wrong:* the armpit's front edge is a hard shadow line, and the back of the masculine shoulder still shows a ridge where the arm's skin meets the back's.
+- **[engine/cheer_shoulders_builds.png](engine/cheer_shoulders_builds.png)**: the same pose on the heavy and muscular and the heavy and soft bodies, both frames (front, back, three-quarter). The shapes ride on the baked builds without a step. *Wrong:* the armpit is a deep dark pit on the heavy bodies, and the heavy arms' own lumps show on the feminine back.
+- **[deformation_poses.png](deformation_poses.png)**: the QA poses in the flat studio; the shoulder tiles are the same shapes as above.
 
 ## Still short
 
 1. Muscle definition and the fat body's smoothness need the normal-map layers (CO7): today one map, baked from the athletic sculpt, is on every body.
 2. The heavy and muscular corner; the face under fat; the masculine slight body (above).
 3. Correspondence along the limbs is as loose as in the spike (1 to 3 cm); only the navel and nipples are pinned.
-4. Corrective shapes exist for one motion (the arm raised sideways). Elbow, knee, hip and the arm raised forward have none; the shoulder's is built to the QA measure and by eye, not from a scan or a simulation.
+4. Corrective shapes exist for one motion (the arm raised sideways, collarbone still). Elbow, knee, hip, the arm raised forward and a turned collarbone have none. The shoulder's local-volume number is under its target and its old limit (above).
+8. A jagged fold under each feminine breast at rest (CO4's frame shape on a coarse mesh), found under the raking light.
 5. The hips can't narrow, and the proportion sliders stop at 15%: the body crosses itself beyond.
 6. The eyes and teeth don't follow body shapes because no shape moves the skin near them. If CO6 wants a fat face (jowls up to the lips, heavy lids), the held zone (`shapes.face_hold`) has to shrink and the eyes and teeth have to follow.
 7. `assets/characters/benchmarks/make.py` names the realistic body's slim case `{"fat": 0, "muscle": 0, "weight": -1}`; with these parameters it should be `{"fat": -1}` (and heavy-and-soft `{"fat": 1, "muscle": -1}` is worth adding). Not changed here.

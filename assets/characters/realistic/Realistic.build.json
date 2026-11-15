@@ -285,21 +285,21 @@
  },
  "corrective_shapes": {
   "Level": {
-   "kept": 0.955,
-   "largest_move_mm": 11.5,
-   "local_volume_before": 0.813,
+   "largest_move_mm": 16.9,
    "pose": "shoulder_abd_90",
-   "rest_distance_factor": 1.052,
-   "vertices": 477
+   "vertices": 673
   },
   "Raised": {
-   "kept": 0.86,
-   "largest_move_mm": 56.5,
-   "local_volume_before": 0.562,
+   "largest_move_mm": 39.1,
    "pose": "shoulder_abd_150",
-   "rest_distance_factor": 1.15,
-   "vertices": 497
-  }
+   "vertices": 701
+  },
+  "method": "delta mush",
+  "region_m": [
+   0.11,
+   0.21
+  ],
+  "smoothings": 24
  },
  "correctives": [
   {

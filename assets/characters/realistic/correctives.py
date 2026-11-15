@@ -1,7 +1,7 @@
-"""Pose-driven corrective shapes (CO5): what linear skinning loses at the
-shoulder when the arm is raised, put back by shapes the engine leans on
-as the upper arm turns (`crates/anim/src/correctives.rs`; the QA scripts'
-`Character.drive` does the same).
+"""Pose-driven corrective shapes (CO5): what linear skinning loses round
+the shoulder when the arm is raised, put back by shapes the engine leans
+on as the upper arm turns (`crates/anim/src/correctives.rs`; the QA
+scripts' `Character.drive_correctives` does the same).
 
 **The rule** (written to `Realistic.build.json` as `correctives`, the form
 architecture.md section 7 keeps for the manifest): `{shape, bone, axis,
@@ -13,17 +13,27 @@ rest), and its angle about the axis is the twist part of it
 (`twist_angle`), so an arm swung forward instead of raised leans on these
 shapes only as far as it is also raised.
 
-**The shapes.** Raised with the whole turn at the shoulder joint, the
-skin over the joint is pulled in toward it: the deltoid's cap flattens
-and the top of the shoulder caves. Two shapes per side put the cap back,
-`Corrective_Shoulder_Level_*` (full with the arm level, 45 degrees up
-from rest) and `Corrective_Shoulder_Raised_*` (what the arm 150 degrees
-from hanging needs on top of it). Each is made in its pose: the skin
-within `REACH` of the joint is moved back out along the line from the
-joint toward the distance it has from it at rest (times a factor found so
-the joint keeps `KEEP` of its local volume, the QA scripts' measure),
-smoothed, and carried to the rest pose by each vertex's own skinning
-matrix, so the engine's skinning lands it where it was made.
+**The shapes** are a better deformation of the same pose, not a fit to
+any measure. Linear skinning turns each piece of skin rigidly with a mix
+of bones, which keeps the skin's detail and loses its volume where the
+bones part ways: the top of the shoulder caves and the armpit folds.
+Smoothing the posed skin gets the broad form right and loses the
+detail. **Delta mush** takes the broad form from the one and the detail
+from the other: the body is smoothed at rest and each vertex's offset
+from its own smoothed place is kept, in the frame of the smoothed
+surface there (its normal and a tangent); the posed body is smoothed the
+same way, and each vertex is put back at its kept offset in the posed
+surface's frame (`Mush`). At rest it changes nothing.
+
+A shape is that target less the skinned pose, inside a soft region round
+the shoulder girdle (`girdle`: from the root of the neck along the
+collarbone and down the upper arm, wide enough for the cap, the
+trapezius' slope, the armpit and the edges of the pectoral and the
+latissimus), carried to the rest pose by each vertex's own skinning
+matrix so the engine's skinning lands it where it was made. Two per
+side, each made in its pose: `Corrective_Shoulder_Level_*` (the arm
+level, 45 degrees up from rest) and `Corrective_Shoulder_Raised_*` (what
+the arm 150 degrees from hanging needs on top of it).
 """
 
 import math
@@ -38,10 +48,16 @@ from common import array, evaluated_positions
 HERE = os.path.dirname(os.path.abspath(__file__))
 QA = os.path.join(os.path.dirname(HERE), "humanoid", "qa")
 
-RADIUS = 0.09      # the QA scripts' region round the shoulder joint, metres
-REACH = 0.16       # where the correction has faded out
-# (shape, the QA pose it is made in, degrees up from rest where it starts and is full, local volume kept)
-STAGES = [("Level", "shoulder_abd_90", 0.0, 45.0, 0.955), ("Raised", "shoulder_abd_150", 45.0, 105.0, 0.86)]
+# Delta mush: how many times the skin is smoothed (each time halfway to
+# its neighbours' mean). On this mesh (10 to 25 mm edges at the shoulder)
+# it spreads a bend over about a hand's width, which is how far a
+# shoulder's skin slides.
+SMOOTHINGS = 24
+# The girdle's region: full within NEAR metres of the line from the neck's
+# root to the shoulder joint to the middle of the upper arm, none past FAR.
+NEAR, FAR = 0.11, 0.21
+# (shape, the QA pose it is made in, degrees up from rest where it starts and is full)
+STAGES = [("Level", "shoulder_abd_90", 0.0, 45.0), ("Raised", "shoulder_abd_150", 45.0, 105.0)]
 
 
 def _qa():
@@ -74,55 +90,72 @@ def skin_matrices(armature, weights):
     return np.einsum("vb,bij->vij", weights.W, T)
 
 
-def local_volume(co, tris, centre):
-    a, b, c = (co[tris[:, k]] - centre for k in range(3))
-    return float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6.0)
+class Mush:
+    """Delta mush on one mesh: `target(posed)` is the posed skin with its
+    broad form smoothed and its rest detail put back (module docstring)."""
+
+    def __init__(self, rest, tris, lap, smoothings=SMOOTHINGS):
+        self.tris, self.lap, self.smoothings = tris, lap, smoothings
+        # One neighbour per vertex fixes the tangent of its frame.
+        self.toward = np.zeros(len(rest), dtype=np.int64)
+        self.toward[lap.e[::-1, 0]] = lap.e[::-1, 1]
+        self.toward[lap.e[::-1, 1]] = lap.e[::-1, 0]
+        smooth = self._smooth(rest)
+        frames = self._frames(smooth)
+        self.offset = np.einsum("vij,vj->vi", frames, rest - smooth)
+
+    def _smooth(self, X):
+        for _ in range(self.smoothings):
+            X = (X + self.lap.mean(X)) / 2
+        return X
+
+    def _frames(self, X):
+        """Per vertex, the rows tangent, bitangent, normal of the surface `X`."""
+        a, b, c = (X[self.tris[:, k]] for k in range(3))
+        face = np.cross(b - a, c - a)
+        n = np.zeros_like(X)
+        for k in range(3):
+            np.add.at(n, self.tris[:, k], face)
+        n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+        t = X[self.toward] - X
+        t -= n * np.einsum("ij,ij->i", t, n)[:, None]
+        t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-12)
+        return np.stack([t, np.cross(n, t), n], axis=1)
+
+    def target(self, posed):
+        smooth = self._smooth(posed)
+        return smooth + np.einsum("vji,vj->vi", self._frames(smooth), self.offset)
 
 
-def _fade(distance):
-    t = np.clip((REACH - distance) / (REACH - RADIUS * 1.15), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
-
-
-def hold(rest, posed, c_rest, c_posed, tris, keep, lap):
-    """`posed` with the skin round the joint moved back out so the joint
-    keeps `keep` of its local volume; and the factor on the rest
-    distance that took."""
-    r0 = np.linalg.norm(rest - c_rest, axis=1)
-    out = posed - c_posed
-    r1 = np.maximum(np.linalg.norm(out, axis=1), 1e-9)
-    fade = _fade(r0)
-    region = r0 < RADIUS
-    inside = tris[region[tris].all(axis=1)]
-    v0 = local_volume(rest, inside, c_rest)
-
-    def at(s):
-        radius = r1 + fade * np.maximum(s * r0 - r1, 0.0)
-        moved = c_posed + out * (radius / r1)[:, None]
-        delta = moved - posed
-        # Smoothed, so the cap has no facets; twice is enough at this size.
-        for _ in range(2):
-            delta = (delta + lap.mean(delta)) / 2
-        return posed + delta
-
-    low, high = 0.7, 1.5
-    for _ in range(24):
-        mid = (low + high) / 2
-        if local_volume(at(mid), inside, c_posed) / v0 < keep:
-            low = mid
-        else:
-            high = mid
-    return at(high), high, local_volume(posed, inside, c_posed) / v0
+def girdle(rest, armature, side):
+    """Per vertex, 0 to 1: the soft region round side `side`'s shoulder
+    girdle, by distance from the line neck's root, shoulder joint, middle
+    of the upper arm, and only on that side of the body."""
+    head = lambda name: np.array(armature.data.bones[name].head_local)  # noqa: E731
+    joint, elbow = head(side + "UpperArm"), head(side + "LowerArm")
+    path = [head(side + "Shoulder"), joint, joint + (elbow - joint) * 0.55]
+    away = np.full(len(rest), np.inf)
+    for a, b in zip(path, path[1:]):
+        t = np.clip(((rest - a) @ (b - a)) / ((b - a) @ (b - a)), 0.0, 1.0)
+        away = np.minimum(away, np.linalg.norm(rest - (a + t[:, None] * (b - a)), axis=1))
+    m = np.clip((FAR - away) / (FAR - NEAR), 0.0, 1.0)
+    m = m * m * (3.0 - 2.0 * m)
+    # Nothing across the middle of the body, and nothing on the head.
+    s = 1.0 if side == "Left" else -1.0
+    m *= np.clip(rest[:, 0] * s / 0.03, 0.0, 1.0)
+    m *= np.clip((head("Head")[2] - 0.02 - rest[:, 2]) / 0.04, 0.0, 1.0)
+    return m
 
 
 def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
     """The corrective shapes as rest-pose offsets, and their rules:
-    ({shape: offsets}, [rule]). `custom` is the build data's twist and
-    helper lists; `mirror` each vertex's mirror vertex."""
+    ({shape: offsets}, [rule], report). `custom` is the build data's
+    twist and helper lists; `mirror` each vertex's mirror vertex."""
     Q, rig = posed_rig(armature, custom)
     rest = array(P)
     side = "Left"
-    c_rest = np.array(armature.data.bones[side + "UpperArm"].head_local)
+    mush = Mush(rest, tris, lap)
+    region = girdle(rest, armature, side)
 
     def raise_axis(s):
         """The axis side `s`'s arm is raised about, in its parent's rest
@@ -134,15 +167,14 @@ def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
             axis = -axis
         return bone.parent.matrix_local.to_3x3().inverted() @ axis
 
-    shapes, rules, report = {}, [], {}
+    shapes, rules, report = {}, [], {"method": "delta mush", "smoothings": SMOOTHINGS, "region_m": [NEAR, FAR]}
     so_far = np.zeros_like(rest)
-    for name, pose, start, full, keep in STAGES:
+    for name, pose, start, full in STAGES:
         Q.apply_pose(rig, pose)
         posed = evaluated_positions(body)
-        c_posed = np.array(armature.pose.bones[side + "UpperArm"].head)
-        target, factor, before = hold(rest, posed, c_rest, c_posed, tris, keep, lap)
+        delta = (mush.target(posed) - posed) * region[:, None]
         M = skin_matrices(armature, weights)
-        total = np.einsum("vij,vj->vi", np.linalg.inv(M), target - posed)
+        total = np.einsum("vij,vj->vi", np.linalg.inv(M), delta)
         left = total - so_far
         left[np.linalg.norm(left, axis=1) < 2e-5] = 0.0
         so_far = so_far + left
@@ -152,12 +184,11 @@ def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
             shapes[shape] = d
             rules.append({"shape": shape, "bone": s + "UpperArm", "axis": [round(v, 5) for v in raise_axis(s)],
                           "angles": [start, full]})
-        report[name] = {"pose": pose, "local_volume_before": round(before, 3), "kept": keep,
-                        "rest_distance_factor": round(factor, 3),
-                        "largest_move_mm": round(float(np.linalg.norm(left, axis=1).max()) * 1000, 1),
-                        "vertices": int((np.linalg.norm(left, axis=1) > 0).sum())}
-        log(f"  corrective {name}: {pose} kept {before:.3f} of its local volume, now {keep}; "
-            f"rest distance times {factor:.3f}, largest move {report[name]['largest_move_mm']} mm")
+        moved = np.linalg.norm(delta, axis=1)
+        report[name] = {"pose": pose, "largest_move_mm": round(float(moved.max()) * 1000, 1),
+                        "vertices": int((moved > 2e-5).sum())}
+        log(f"  corrective {name}: {pose}, {report[name]['vertices']} vertices, "
+            f"largest move {report[name]['largest_move_mm']} mm")
     rig.pose_reset()
     return shapes, rules, report
 

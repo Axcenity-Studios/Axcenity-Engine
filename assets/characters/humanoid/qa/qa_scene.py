@@ -630,7 +630,33 @@ def pose_take(ch, take_arm, action, at, retarget=True):
         update()
     ch.set_eyes()
     ch.drive()
+    ch.drive_correctives()
     update()
+
+
+def raking_light(target, back=False, strength=5.0):
+    """One hard light across the surface for a sheet that has to show
+    relief (steps, notches, creases), with the studio's own lights off
+    and its sky turned down. Only for sheets that say so: the comparable
+    sheets keep the studio as it is."""
+    scene = bpy.context.scene
+    for o in scene.objects:
+        if o.type == "LIGHT":
+            o.hide_render = True
+    world = scene.world.node_tree.nodes.get("Background") if scene.world and scene.world.use_nodes else None
+    if world is not None:
+        world.inputs[1].default_value = min(world.inputs[1].default_value, 0.12)
+    # A small lamp inside the studio, not a sun: the studio's back wall would shade a sun from behind.
+    data = bpy.data.lights.new("Raking", "POINT")
+    data.energy = strength * 160.0
+    data.shadow_soft_size = 0.04
+    light = bpy.data.objects.new("Raking", data)
+    scene.collection.objects.link(light)
+    t = Vector(target)
+    # From the viewer's side, above and well off to one side: relief shows, and the head's shadow falls clear.
+    light.location = t + Vector((1.3, 1.7 if back else -1.7, 1.5))
+    look_at(light, t)
+    return light
 
 
 def glb_images(path):

@@ -20,7 +20,7 @@ python -I assets/characters/realistic/build.py --out assets/characters/realistic
 python -I assets/characters/catalogue.py
 ```
 
-`--texture-size 4096` bakes the hero texture set (2048 is committed, to keep the package near 20 MB); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `parts.py` (eyes, teeth), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `regions.py`, `lods.py` and `manifests.py`. It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
+`--texture-size 4096` bakes the hero texture set (2048 is committed; the package is 31 MB with it, 20.5 MB of that `RealisticParts.glb`); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `parts.py` (eyes, teeth), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `regions.py`, `lods.py` and `manifests.py`. It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
 
 After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 
@@ -139,7 +139,11 @@ The engine reads `_LOD1` and `_LOD2` objects in a file as a model's levels of de
 
 ## Corrective shapes (CO5)
 
-Four **live** shapes, set on every pose by `crates/anim/src/correctives.rs` (and by the QA scripts' `Character.drive_correctives`): `Corrective_Shoulder_Level_Left/Right` and `Corrective_Shoulder_Raised_Left/Right`. The rule is in `Realistic.build.json` (`correctives`): a shape's weight is how far its bone (the upper arm) has turned from rest about an axis in its parent's rest space, 0 at `angles[0]` degrees and 1 at `angles[1]`: `Level` from 0 to 45 (the arm level), `Raised` from 45 to 105 (150 degrees from hanging). They put the deltoid's cap back out when the arm is raised with the whole turn at the shoulder joint: the joint keeps 0.955 of its local volume with the arm level (0.81 without) and 0.86 raised to 150 degrees (0.56 without). Made for raising the arm sideways; an arm swung forward leans on them only as far as it is also raised.
+Four **live** shapes, set on every pose by `crates/anim/src/correctives.rs` (and by the QA scripts' `Character.drive_correctives`): `Corrective_Shoulder_Level_Left/Right` and `Corrective_Shoulder_Raised_Left/Right`. The rule is in `Realistic.build.json` (`correctives`): a shape's weight is how far its bone (the upper arm) has turned from rest about an axis in its parent's rest space, 0 at `angles[0]` degrees and 1 at `angles[1]`: `Level` from 0 to 45 (the arm level), `Raised` from 45 to 105 (150 degrees from hanging).
+
+They are a **delta mush** of the two poses (`correctives.Mush`): the skinned pose smoothed (24 times, each halfway to the neighbours' mean), with each vertex's rest-pose offset from its own smoothed place put back in the smoothed surface's frame. A shape is that target less the skinned pose inside a soft region round the shoulder girdle (full within 11 cm of the line neck's root, shoulder joint, middle of the upper arm; none past 21 cm), carried to rest by each vertex's skinning matrix. Nothing in them is solved against a measure. What they do: the skin runs in one slope from the neck across the trapezius onto the arm instead of caving at the joint, and the armpit is a hollow instead of a fold. With them the whole body's enclosed volume at 150 degrees is within 0.1 litre of its rest volume (skinning alone adds 0.5 litre of overlap). The QA scripts' local-volume measure at the joint reads **lower** with them (0.463 masculine, 0.513 feminine at 150 degrees, against 0.56 for skinning alone); why that measure falls while the picture and the whole volume improve hasn't been established. See `docs/development/character-studio/co5/README.md`.
+
+Made for raising the arm sideways with the collarbone still; an arm swung forward leans on them only as far as it is also raised. The starter animations don't turn the collarbones at all (their `LeftShoulder` and `RightShoulder` keys are the rest pose), so that is the case clips play today.
 
 ## Proportions (CO5)
 
@@ -147,7 +151,7 @@ The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim`
 
 ## Known limits
 
-- The raised shoulder is held by corrective shapes made for raising the arm sideways (0.86 of its local volume at 150 degrees); raised forward or with the collarbone moving, it has none. The cap they rebuild is a smooth mass, lumpy where it meets the neck.
+- The raised shoulder's corrective shapes are made for raising the arm sideways with the collarbone still; raised forward, or on a rig that turns the collarbone, the shoulder has only its skinning. At 150 degrees a tight valley remains where the arm meets the neck.
 - The body's shapes are MakeHuman's anatomy at this mesh's resolution: the heavy and muscular corner is still a bodybuilder's build, and muscle definition finer than 25 mm isn't in the geometry (a normal-map layer, CO7).
 - The hips can't be made narrower, and the proportion sliders stop at 15% either way.
 - With the jaw open a few teeth points pass through the lower lip's inner side (6 masculine, 14 feminine, up to 3.4 mm); at rest none do. CO6's jaw shapes should cover it.

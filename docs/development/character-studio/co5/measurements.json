@@ -668,10 +668,10 @@
    "Masculine_Muscle_Up": 44.23,
    "Masculine_Muscle_Up_Fat_Down": 23.18,
    "Masculine_Muscle_Up_Fat_Up": 65.91,
-   "Corrective_Shoulder_Level_Left": 11.52,
-   "Corrective_Shoulder_Level_Right": 11.52,
-   "Corrective_Shoulder_Raised_Left": 56.5,
-   "Corrective_Shoulder_Raised_Right": 56.5
+   "Corrective_Shoulder_Level_Left": 16.98,
+   "Corrective_Shoulder_Level_Right": 16.98,
+   "Corrective_Shoulder_Raised_Left": 29.79,
+   "Corrective_Shoulder_Raised_Right": 29.79
   },
   "body_shape_verts_moved_over_0.5mm": {
    "Frame_Feminine": 10582,
@@ -723,10 +723,10 @@
    "Masculine_Muscle_Up": 3972,
    "Masculine_Muscle_Up_Fat_Down": 3360,
    "Masculine_Muscle_Up_Fat_Up": 3843,
-   "Corrective_Shoulder_Level_Left": 371,
-   "Corrective_Shoulder_Level_Right": 371,
-   "Corrective_Shoulder_Raised_Left": 403,
-   "Corrective_Shoulder_Raised_Right": 403
+   "Corrective_Shoulder_Level_Left": 502,
+   "Corrective_Shoulder_Level_Right": 502,
+   "Corrective_Shoulder_Raised_Left": 527,
+   "Corrective_Shoulder_Raised_Right": 527
   },
   "eyeball_diameter_mm": 24.53,
   "iris_diameter_mm": 10.68,
@@ -1369,14 +1369,14 @@
     "region_radius_m": 0.1
    },
    "shoulder_abd_90": {
-    "local_volume_ratio": 0.955,
-    "ring_area_ratio": 1.112,
+    "local_volume_ratio": 0.847,
+    "ring_area_ratio": 1.034,
     "ring_points": 14,
     "region_radius_m": 0.09
    },
    "shoulder_abd_150": {
-    "local_volume_ratio": 0.86,
-    "ring_area_ratio": 1.388,
+    "local_volume_ratio": 0.463,
+    "ring_area_ratio": 0.929,
     "ring_points": 14,
     "region_radius_m": 0.09
    },
@@ -1418,14 +1418,14 @@
     "region_radius_m": 0.1
    },
    "shoulder_abd_90": {
-    "local_volume_ratio": 1.001,
-    "ring_area_ratio": 1.12,
+    "local_volume_ratio": 0.88,
+    "ring_area_ratio": 0.974,
     "ring_points": 33,
     "region_radius_m": 0.09
    },
    "shoulder_abd_150": {
-    "local_volume_ratio": 0.925,
-    "ring_area_ratio": 1.344,
+    "local_volume_ratio": 0.513,
+    "ring_area_ratio": 0.82,
     "ring_points": 33,
     "region_radius_m": 0.09
    },
