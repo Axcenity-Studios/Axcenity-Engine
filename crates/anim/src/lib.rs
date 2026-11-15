@@ -36,6 +36,7 @@ mod bones;
 mod cleanup;
 mod clip;
 mod controller;
+pub mod correctives;
 mod easing;
 mod face;
 mod face_play;

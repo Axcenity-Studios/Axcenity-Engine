@@ -260,10 +260,15 @@ fn skinned(
     shape: &mut [glam::Vec3],
 ) -> Option<Posed> {
     crate::twist::drive(rig, pose, shape);
-    match face {
+    let mut posed = match face {
         Some(face) => face.pose(model, rig, pose.clone(), shape),
         None => model.pose_shaped(pose, shape),
-    }
+    }?;
+    // The pose-driven corrective shapes' one call site (CO5,
+    // `correctives.rs`): leaned on for the finished pose, after the face's
+    // own shapes are set.
+    crate::correctives::drive(model, rig, pose, &mut posed);
+    Some(posed)
 }
 
 /// [`skinned`] for a model without a face, for `twist.rs`'s test of the

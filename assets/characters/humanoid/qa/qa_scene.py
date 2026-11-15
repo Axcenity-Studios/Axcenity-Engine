@@ -289,6 +289,7 @@ class Character:
     def pose_reset(self):
         for pb in self.arm.pose.bones:
             pb.matrix_basis = Matrix()
+        self.set_correctives({})
         self.set_eyes()
         update()
 
@@ -340,6 +341,32 @@ class Character:
                 at = rest.to_translation() + (src.to_translation() - src_rest.to_translation())
                 local = Matrix.Translation(at) @ (part.to_matrix() @ rest.to_3x3()).to_4x4()
                 pb.matrix_basis = rest.inverted() @ local
+
+    def set_correctives(self, weights):
+        """Sets the pose-driven shapes (the customization data's
+        `correctives`) on every part that has them; the ones not in
+        `weights` to 0."""
+        for rule in self.custom.get("correctives", []):
+            for o in self.parts.values():
+                sk = o.data.shape_keys
+                if sk and rule["shape"] in sk.key_blocks:
+                    sk.key_blocks[rule["shape"]].value = weights.get(rule["shape"], 0.0)
+
+    def drive_correctives(self):
+        """Leans on the pose-driven shapes for the pose the skeleton is
+        in, by the rule `anim`'s `correctives.rs` applies: a shape's
+        weight is how far its bone has turned from rest about the rule's
+        axis (in the bone's parent's rest space), from 0 at
+        `angles[0]` degrees to 1 at `angles[1]`."""
+        weights = {}
+        for rule in self.custom.get("correctives", []):
+            name = rule["bone"]
+            turn = (self._local(name) @ self._local(name, posed=False).inverted()).to_quaternion()
+            angle = math.degrees(twist_angle(turn, Vector(rule["axis"])))
+            start, full = rule["angles"]
+            weights[rule["shape"]] = min(1.0, max(0.0, (angle - start) / (full - start)))
+        self.set_correctives(weights)
+        return weights
 
     def bend(self, bone, axis, deg, toward=None):
         """Turns `bone` by `deg` about `axis` (armature space, through its
@@ -453,6 +480,7 @@ def apply_pose(ch, name):
     ch.pose_reset()
     POSES[name][0](ch)
     ch.drive()
+    ch.drive_correctives()
     update()
 
 

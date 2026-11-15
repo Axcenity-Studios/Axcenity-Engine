@@ -324,7 +324,8 @@ def mixed(shapes, values, frame):
 
 def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print):
     """Every body shape as offsets from each frame's rest positions:
-    ({shape name: (frame, offsets)}, report). `source` and `rest` are
+    ({shape name: (frame, offsets)}, report, the mesh's triangles,
+    Laplacian and mirror pairing for whoever works on it next). `source` and `rest` are
     {frame: positions} in the bundle's pose and the rest pose; `weights`
     the skin's; `eyes` and `eye_radius` {frame: ...}."""
     geom, transfer = _transfer()
@@ -383,7 +384,7 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print):
     report["shapes"] = len(out)
     report["place"] = {f: {a: list(PLACE[f][a]) for a in AXES} for f in FRAMES}
     report["local"] = LOCAL
-    return out, report
+    return out, report, {"tris": tris, "lap": lap, "mirror": mirror}
 
 
 def add_keys(body, shapes, rest):
