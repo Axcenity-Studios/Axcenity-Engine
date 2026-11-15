@@ -8,7 +8,7 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 | `Realistic.base.json` | The base model manifest (written by `manifests.py`). |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
-| `source/` | The vendored source meshes and `extract.py`, which made them. |
+| `source/` | The vendored source meshes and `extract.py`, which made them; `body_shapes.npz`, MakeHuman's bodies on this topology (CO5, below). |
 | `qa/thresholds.json` | The limits `measure.py --package realistic --check` holds the build to. |
 
 ## Building
@@ -20,7 +20,7 @@ python -I assets/characters/realistic/build.py --out assets/characters/realistic
 python -I assets/characters/catalogue.py
 ```
 
-`--texture-size 4096` bakes the hero texture set (2048 is committed, to keep the package near 20 MB); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `parts.py` (eyes, teeth), `rig.py` (skeleton, weights), `regions.py`, `lods.py` and `manifests.py`. It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
+`--texture-size 4096` bakes the hero texture set (2048 is committed, to keep the package near 20 MB); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `skin.py` (bakes), `parts.py` (eyes, teeth), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `regions.py`, `lods.py` and `manifests.py`. It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
 
 After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 
@@ -110,9 +110,46 @@ Fourteen regions, so clothing can hide the skin it covers (ADR-0035): `head`, `n
 
 The engine reads `_LOD1` and `_LOD2` objects in a file as a model's levels of detail and pairs them with the full primitives by material name (`docs/rendering/models.md`). `Body_LOD1` (10,500 triangles) holds back the face, hands and joint rings; `Body_LOD2` (5,000) is a plain error-driven collapse. Both keep the skeleton, four weights per vertex, texture coordinates, materials, regions and `Frame_Feminine`. `Eyes` and `Teeth` have no copies of their own.
 
+## Body shapes (CO5)
+
+`Body` and both of its copies carry 53 blend shapes: `Frame_Feminine`, 48 for muscle and fat (`shapes.py`) and 4 pose-driven correctives (`correctives.py`). The first 49 are **identity** shapes: a character's description sets them once and the engine bakes them into its model (ADR-0038). `RealisticParts.glb` is 20.5 MB with them (10.2 MB before).
+
+**Source.** MakeHuman's CC0 targets (base mesh and 24 macro targets at the pinned commit in `../transfer/makehuman.sha256`; licence record in `../transfer/shapes/LICENCE-RECORD.md`), carried onto this topology by `../transfer/` and vendored as `source/body_shapes.npz` (0.43 MB: 16 sculpted bodies as offsets, 8 per frame, in the bundle's pose). The build needs neither MakeHuman's files nor the network. To regenerate the file, see `docs/development/character-studio/co5/README.md`.
+
+**The sliders.** MakeHuman sculpted nine bodies per gender, muscle (min, average, max) by weight (min, average, max), and mixes them bilinearly. `muscle` and `fat` walk a part of that grid from where each frame's own body sits on it (`shapes.PLACE`), so the body is always `base + F(m, w) - F(m0, w0)` and 0 on both sliders is the bundle's body unchanged:
+
+| Frame | The base sits at (muscle, weight) | `muscle` -1 to 1 reaches | `fat` -1 to 1 reaches |
+| --- | --- | --- | --- |
+| Masculine | 0.45, 0.30 | -0.6 to 1.0 | -0.75 to 0.85 |
+| Feminine | 0, 0 | -0.7 to 0.9 | -0.75 to 0.85 |
+
+- The masculine body is placed above MakeHuman's average because the bundle's is athletic: its slim and slight ends take off muscle and mass the base starts with, so slim reads slim. The placement was chosen from the renders; a fit of five girths and the volume to MakeHuman's own grid says (0.15, 0.80), which reads the base's broader frame as weight and makes the slim end gaunt.
+- The ends are inside MakeHuman's square (it runs -1 to 1) where its bodies are caricatures: its gaunt bodies below -0.75 weight, its obese and comic-book bodies above 0.85.
+- `fat` is MakeHuman's weight axis: with little muscle it is fat, with much it is bulk. The fat body is `fat` 1 with `muscle` -1.
+- In the manifest every shape is a corner with the frame: per frame four shapes driven by one slider (`<Frame>_Muscle_Up`, `_Muscle_Down`, `_Fat_Up`, `_Fat_Down`) and four by the product of two (`<Frame>_Muscle_Up_Fat_Up`, …). The spans are in `shapes.corners()`.
+
+**Per region.** `fat_<region>` and `muscle_<region>` for chest, shoulders, arms, abdomen, back, hips, thighs and calves (advanced, -1 to 1): up to 0.6 of the step to the heavy and soft body (fat) or the heavy and muscular one (muscle) inside the region, added or taken off. Regions are smooth and come from the skin's bone weights, so they add up to one over the trunk and limbs.
+
+**What holds the shapes back.**
+- *Bone.* Fat shapes are held to 15% over the skull above the eyes, the collarbones, the elbows' points, wrists, kneecaps, the shins' front, ankles, hands and feet (`shapes.bony`).
+- *Eyes and mouth.* No shape moves the lids, the sockets, the lips' edges or the mouth's inside (`shapes.face_hold`), so the eyes and teeth stay fitted at every setting.
+- *Crossing.* The heaviest combinations are checked in the rest pose and every shape of the frame is scaled down smoothly round the places where they made the body cross itself (`Realistic.build.json`, `body_shapes.frames.*.kept_apart`): on the masculine frame at the armpits and between the thighs (the heavy and soft body 221 vertices, the heavy and muscular one 431, the slight one 206, to 0.26 of the shape at the least), on the feminine frame 94 and 137 vertices (to 0.64).
+
+**Not in the geometry.** The base mesh's trunk quads are 25 mm wide. MakeHuman's finer detail (abdominal lines, the cut between thigh muscles, the navel's folds) is averaged out when its offsets are sampled (`transfer.py`, `filtered`), on purpose: point-sampled, it folded into a crease across the belly and a hard line under the chest. That definition belongs in a normal-map layer the muscle slider blends in (CO7).
+
+## Corrective shapes (CO5)
+
+Four **live** shapes, set on every pose by `crates/anim/src/correctives.rs` (and by the QA scripts' `Character.drive_correctives`): `Corrective_Shoulder_Level_Left/Right` and `Corrective_Shoulder_Raised_Left/Right`. The rule is in `Realistic.build.json` (`correctives`): a shape's weight is how far its bone (the upper arm) has turned from rest about an axis in its parent's rest space, 0 at `angles[0]` degrees and 1 at `angles[1]`: `Level` from 0 to 45 (the arm level), `Raised` from 45 to 105 (150 degrees from hanging). They put the deltoid's cap back out when the arm is raised with the whole turn at the shoulder joint: the joint keeps 0.955 of its local volume with the arm level (0.81 without) and 0.86 raised to 150 degrees (0.56 without). Made for raising the arm sideways; an arm swung forward leans on them only as far as it is also raised.
+
+## Proportions (CO5)
+
+The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim` takes 0.5 to 1.5; this body's manifest offers **0.85 to 1.15** (`manifests.PROPORTION_RANGE`), and the hips only widen (**1 to 1.15**): at the wide ends the skin crosses itself (shoulders at half width put the arms through the chest, 282 pairs of triangles; hips 2% narrower already cross at the crotch of a heavy masculine body). With these ranges every pair of the manifest's 28 parameters at the ends of their ranges, on both frames, leaves the body free of new crossings (`measure.py --only ...,sliders`: 351 pairs, 1,352 bodies per frame).
+
 ## Known limits
 
-- The shoulder raised 150 degrees keeps 0.56 of its local volume (the target is 0.8): the whole turn is done at the shoulder joint, with no collarbone motion or corrective shapes.
+- The raised shoulder is held by corrective shapes made for raising the arm sideways (0.86 of its local volume at 150 degrees); raised forward or with the collarbone moving, it has none. The cap they rebuild is a smooth mass, lumpy where it meets the neck.
+- The body's shapes are MakeHuman's anatomy at this mesh's resolution: the heavy and muscular corner is still a bodybuilder's build, and muscle definition finer than 25 mm isn't in the geometry (a normal-map layer, CO7).
+- The hips can't be made narrower, and the proportion sliders stop at 15% either way.
 - With the jaw open a few teeth points pass through the lower lip's inner side (6 masculine, 14 feminine, up to 3.4 mm); at rest none do. CO6's jaw shapes should cover it.
 - One normal and occlusion map serves both frames, so detail that sits differently on the two (the upper eyelid's fold) is softened or slightly misplaced on the feminine frame: two short dark marks above each feminine eye.
 - No subsurface map, no hair, brows or lashes; the eyes are a plain sclera and a painted iris.

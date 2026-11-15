@@ -27,8 +27,10 @@ frame's share (`manifest_entries`; architecture.md section 7).
 
 **Per region.** `fat_<region>` and `muscle_<region>` (chest, shoulders,
 arms, abdomen, back, hips, thighs, calves) add or take off up to `LOCAL`
-of the whole slider's upward step inside a smooth region (the regions
-come from the skin's bone weights and add up to one over the body).
+of the step to the sliders' heavy corner inside a smooth region: for fat
+the heavy and soft body (muscle -1, fat 1), for muscle the heavy and
+muscular one (both 1). The regions come from the skin's bone weights and
+add up to one over the body.
 
 **Fat keeps off bone** (`bony`): the skull, collarbones, elbows, wrists,
 kneecaps, the shins' front, ankles, hands and feet hold back the fat
@@ -62,7 +64,7 @@ PLACE = {
     "Feminine": {"muscle": (0.0, -0.7, 0.9), "fat": (0.0, -0.75, 0.85)},
 }
 REGIONS = ("chest", "shoulders", "arms", "abdomen", "back", "hips", "thighs", "calves")
-LOCAL = 0.5       # a region's slider at 1, as a share of the whole slider's upward step
+LOCAL = 0.6       # a region's slider at 1, as a share of the step to the sliders' heavy corner
 HOLD = 0.85       # how much of a fat shape the bony places hold back
 STEP = 2e-5       # the packed file's step, metres
 
@@ -305,14 +307,22 @@ def unpack(path=PACK):
 
 
 def composites(frame):
-    """The heaviest slider settings of a frame: {name: values}. What
-    crosses nowhere here crosses nowhere with less."""
+    """The slider settings of a frame that are checked for crossings and
+    kept apart: {name: values}. The four corners of the two whole-body
+    sliders with every region's slider pushed the same way, the heaviest
+    first, then each slider's own ends."""
     every = lambda title, v: {f"{title}_{r}": v for r in REGIONS}  # noqa: E731
     return {
         "heavy and soft": {"muscle": -1.0, "fat": 1.0, **every("fat", 1.0)},
         "heavy and muscular": {"muscle": 1.0, "fat": 1.0, **every("fat", 1.0), **every("muscle", 1.0)},
+        "slight": {"muscle": -1.0, "fat": -1.0, **every("fat", -1.0), **every("muscle", -1.0)},
+        "lean and muscular": {"muscle": 1.0, "fat": -1.0, **every("fat", -1.0), **every("muscle", 1.0)},
         "muscular": {"muscle": 1.0, "fat": 0.0, **every("muscle", 1.0)},
         "heavy": {"muscle": 0.0, "fat": 1.0, **every("fat", 1.0)},
+        "slim": {"muscle": 0.0, "fat": -1.0, **every("fat", -1.0)},
+        "soft": {"muscle": -1.0, "fat": 0.0, **every("muscle", -1.0)},
+        "slight, whole sliders only": {"muscle": -1.0, "fat": -1.0},
+        "lean and muscular, whole sliders only": {"muscle": 1.0, "fat": -1.0},
     }
 
 
@@ -343,12 +353,16 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print):
         normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
         corner = {name: transfer.reframe(d, P0, P, edges) for name, d in packed[frame].items()}
         shapes = engine_shapes(Grid(corner), frame)
-        # Per region: a share of the whole sliders' upward steps.
-        m0, _, m_hi = PLACE[frame]["muscle"]
+        # Per region: a share of the step to the sliders' heavy corners. Fat
+        # in one place is the heavy and soft body's there (MakeHuman's fat is
+        # in its low-muscle bodies: weight alone, at average muscle, is
+        # mild); muscle in one place is the heavy and muscular body's (tone
+        # and mass together, which is what a bigger muscle is).
+        m0, m_lo, m_hi = PLACE[frame]["muscle"]
         w0, _, w_hi = PLACE[frame]["fat"]
-        fat_up = (w_hi - w0) * shapes[f"{frame}_Fat_Up"]
-        # More muscle in one place is tone and mass: MakeHuman's muscle and half its weight step.
-        muscle_up = Grid(corner).at(m_hi, w0 + 0.5 * (w_hi - w0)) - Grid(corner).at(m0, w0)
+        here = Grid(corner).at(m0, w0)
+        fat_up = Grid(corner).at(m_lo, w_hi) - here
+        muscle_up = Grid(corner).at(m_hi, w_hi) - here
         regions = region_weights(weights, normals, lap)
         for region, share in regions.items():
             shapes[f"{frame}_Fat_{region.capitalize()}"] = fat_up * share[:, None]

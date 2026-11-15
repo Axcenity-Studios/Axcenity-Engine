@@ -89,6 +89,16 @@
       "category": "body"
     },
     {
+      "id": "build",
+      "label": "Build",
+      "category": "body"
+    },
+    {
+      "id": "build_regions",
+      "label": "Build by region",
+      "category": "body"
+    },
+    {
       "id": "proportions",
       "label": "Proportions",
       "category": "body"
@@ -686,16 +696,16 @@
       "label": "Height",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "BodyHeight",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ]
@@ -705,16 +715,16 @@
       "label": "Leg length",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "LegLength",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -725,16 +735,16 @@
       "label": "Arm length",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "ArmLength",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -745,16 +755,16 @@
       "label": "Shoulder width",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "ShoulderWidth",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -765,16 +775,16 @@
       "label": "Waist width",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "WaistWidth",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -785,16 +795,16 @@
       "label": "Hip width",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        1.0,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "HipWidth",
           "from": [
-            0.5,
-            1.5
+            1.0,
+            1.15
           ]
         }
       ],
@@ -805,16 +815,16 @@
       "label": "Head size",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "HeadSize",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -825,16 +835,16 @@
       "label": "Hand size",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "HandSize",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
@@ -845,20 +855,1828 @@
       "label": "Foot size",
       "group": "proportions",
       "range": [
-        0.5,
-        1.5
+        0.85,
+        1.15
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "FootSize",
           "from": [
-            0.5,
-            1.5
+            0.85,
+            1.15
           ]
         }
       ],
       "advanced": true
+    },
+    {
+      "id": "muscle",
+      "label": "Muscle",
+      "group": "build",
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "fat",
+      "label": "Body fat",
+      "group": "build",
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "muscle_chest",
+      "label": "Chest muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_chest",
+      "label": "Chest fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_shoulders",
+      "label": "Shoulders muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_shoulders",
+      "label": "Shoulders fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_arms",
+      "label": "Arms muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_arms",
+      "label": "Arms fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_abdomen",
+      "label": "Abdomen muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_abdomen",
+      "label": "Abdomen fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_back",
+      "label": "Back muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_back",
+      "label": "Back fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_hips",
+      "label": "Hips muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_hips",
+      "label": "Hips fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_thighs",
+      "label": "Thighs muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_thighs",
+      "label": "Thighs fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_calves",
+      "label": "Calves muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_calves",
+      "label": "Calves fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    }
+  ],
+  "corners": [
+    {
+      "shape": "Masculine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
     }
   ],
   "regions": [

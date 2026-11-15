@@ -1,5 +1,5 @@
 {
- "about": "Limits measure.py --package realistic --check holds the realistic body to (Character Studio overhaul CO4). A measure is named by its path in measurements.json. `at_most` and `at_least` are what the build has reached and must keep (they only tighten; never loosen one without renders showing the cause isn't visible, and the lead's agreement). `within` holds each proportion to 12.5% either side of Drillis and Contini's figure (the stylized body is outside most of them). `targets` are the Stage 3 targets of docs/development/character-studio/testing.md the build has not reached: --check prints them as not met and still passes on the limits; --strict fails on them too. A target moves into `at_least` when it is met.",
+ "about": "Limits measure.py --package realistic --check holds the realistic body to (Character Studio overhaul CO4 and CO5). A measure is named by its path in measurements.json. at_most and at_least are what the build has reached and must keep (they only tighten; never loosen one without renders showing the cause isn't visible, and the lead's agreement). within holds each proportion to 12.5% either side of Drillis and Contini's figure (the stylized body is outside most of them). targets are the targets of docs/development/character-studio/testing.md the build has not reached: --check prints them as not met and still passes on the limits; --strict fails on them too. A target moves into at_least when it is met: the shoulder raised 150 degrees did in CO5 (corrective shapes), and the shoulder at 90 degrees is held to the stylized body's numbers (0.853 and 0.992). The sliders entries need measure.py --only with sliders in the list (every pair of the manifest's parameters at the ends of their ranges, both frames, in the rest pose): no body may newly cross itself, and no shape slider may put skin in the eyes or the teeth.",
  "at_most": {
   "face/masculine/neutral/skin_inside_eyeball_verts": 0,
   "face/masculine/neutral/front_eye_inside_lid_flesh_verts": 0,
@@ -16,17 +16,23 @@
   "weights/Body_LOD2/over_4_influences": 0,
   "weights/cross_side_weights/verts": 4,
   "deformation/masculine/fist/hand_self_intersections_at_rest": 0,
-  "deformation/feminine/fist/hand_self_intersections_at_rest": 0
+  "deformation/feminine/fist/hand_self_intersections_at_rest": 0,
+  "sliders/frames/masculine/bodies_with_new_crossings": 0,
+  "sliders/frames/masculine/alone_with_new_crossings": 0,
+  "sliders/frames/masculine/alone_eye_or_teeth_in_flesh": 0,
+  "sliders/frames/feminine/bodies_with_new_crossings": 0,
+  "sliders/frames/feminine/alone_with_new_crossings": 0,
+  "sliders/frames/feminine/alone_eye_or_teeth_in_flesh": 0
  },
  "at_least": {
   "deformation/masculine/elbow_135/ring_area_ratio": 0.6,
   "deformation/feminine/elbow_135/ring_area_ratio": 0.6,
   "deformation/masculine/knee_135/ring_area_ratio": 0.6,
   "deformation/feminine/knee_135/ring_area_ratio": 0.6,
-  "deformation/masculine/shoulder_abd_90/local_volume_ratio": 0.78,
-  "deformation/feminine/shoulder_abd_90/local_volume_ratio": 0.78,
-  "deformation/masculine/shoulder_abd_150/local_volume_ratio": 0.54,
-  "deformation/feminine/shoulder_abd_150/local_volume_ratio": 0.54,
+  "deformation/masculine/shoulder_abd_90/local_volume_ratio": 0.853,
+  "deformation/feminine/shoulder_abd_90/local_volume_ratio": 0.992,
+  "deformation/masculine/shoulder_abd_150/local_volume_ratio": 0.8,
+  "deformation/feminine/shoulder_abd_150/local_volume_ratio": 0.8,
   "twist/masculine/forearm_twist_90/ring_area_ratio_min": 0.84,
   "twist/feminine/forearm_twist_90/ring_area_ratio_min": 0.84,
   "twist/masculine/upper_arm_twist_70/ring_area_ratio_min": 0.9,
@@ -35,30 +41,82 @@
   "twist/feminine/thigh_twist_45/ring_area_ratio_min": 0.95
  },
  "within": {
-  "proportions/masculine/height_m": [1.749, 1.751],
-  "proportions/masculine/heads_tall": [7.3, 8.1],
-  "proportions/feminine/heads_tall": [7.3, 8.1],
-  "proportions/masculine/shoulder_width_ratio_bideltoid": [0.227, 0.291],
-  "proportions/feminine/shoulder_width_ratio_bideltoid": [0.227, 0.291],
-  "proportions/masculine/hand_length_ratio": [0.0945, 0.1215],
-  "proportions/feminine/hand_length_ratio": [0.0945, 0.1215],
-  "proportions/masculine/foot_length_ratio": [0.133, 0.171],
-  "proportions/feminine/foot_length_ratio": [0.133, 0.171],
-  "proportions/masculine/upper_arm_ratio": [0.163, 0.209],
-  "proportions/feminine/upper_arm_ratio": [0.163, 0.209],
-  "proportions/masculine/forearm_ratio": [0.128, 0.164],
-  "proportions/feminine/forearm_ratio": [0.128, 0.164],
-  "proportions/masculine/knee_height_ratio": [0.249, 0.321],
-  "proportions/feminine/knee_height_ratio": [0.249, 0.321],
-  "proportions/masculine/hip_joint_height_ratio": [0.464, 0.596],
-  "proportions/feminine/hip_joint_height_ratio": [0.464, 0.596],
-  "proportions/masculine/eye_height_ratio": [0.9, 0.97],
-  "proportions/feminine/eye_height_ratio": [0.9, 0.97]
+  "proportions/masculine/height_m": [
+   1.749,
+   1.751
+  ],
+  "proportions/masculine/heads_tall": [
+   7.3,
+   8.1
+  ],
+  "proportions/feminine/heads_tall": [
+   7.3,
+   8.1
+  ],
+  "proportions/masculine/shoulder_width_ratio_bideltoid": [
+   0.227,
+   0.291
+  ],
+  "proportions/feminine/shoulder_width_ratio_bideltoid": [
+   0.227,
+   0.291
+  ],
+  "proportions/masculine/hand_length_ratio": [
+   0.0945,
+   0.1215
+  ],
+  "proportions/feminine/hand_length_ratio": [
+   0.0945,
+   0.1215
+  ],
+  "proportions/masculine/foot_length_ratio": [
+   0.133,
+   0.171
+  ],
+  "proportions/feminine/foot_length_ratio": [
+   0.133,
+   0.171
+  ],
+  "proportions/masculine/upper_arm_ratio": [
+   0.163,
+   0.209
+  ],
+  "proportions/feminine/upper_arm_ratio": [
+   0.163,
+   0.209
+  ],
+  "proportions/masculine/forearm_ratio": [
+   0.128,
+   0.164
+  ],
+  "proportions/feminine/forearm_ratio": [
+   0.128,
+   0.164
+  ],
+  "proportions/masculine/knee_height_ratio": [
+   0.249,
+   0.321
+  ],
+  "proportions/feminine/knee_height_ratio": [
+   0.249,
+   0.321
+  ],
+  "proportions/masculine/hip_joint_height_ratio": [
+   0.464,
+   0.596
+  ],
+  "proportions/feminine/hip_joint_height_ratio": [
+   0.464,
+   0.596
+  ],
+  "proportions/masculine/eye_height_ratio": [
+   0.9,
+   0.97
+  ],
+  "proportions/feminine/eye_height_ratio": [
+   0.9,
+   0.97
+  ]
  },
- "targets": {
-  "at_least": {
-   "deformation/masculine/shoulder_abd_150/local_volume_ratio": 0.8,
-   "deformation/feminine/shoulder_abd_150/local_volume_ratio": 0.8
-  }
- }
+ "targets": {}
 }

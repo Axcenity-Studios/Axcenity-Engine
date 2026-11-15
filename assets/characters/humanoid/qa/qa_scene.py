@@ -212,6 +212,80 @@ class Character:
         w = manifest_weights(self.manifest, values)
         self.set_look(frame=values.get("frame", 0.0), build=w)
 
+    def set_body_sliders(self, values):
+        """The rest pose reshaped by `anim`'s body sliders ({attribute:
+        value}, 1 changes nothing), as `anim::BodyShape::apply` reshapes
+        a pose: bones stretched along their length (`BodyHeight`,
+        `LegLength`, `ArmLength`, `ShoulderWidth`), widened
+        (`ShoulderWidth`, `WaistWidth`, `HipWidth`) or grown with
+        everything on them (`HeadSize`, `HandSize`, `FootSize`), each
+        bone's scale its own and its children moved along with it; the
+        hips raised by what the legs gained. Twist and helper bones take
+        their limb's and their joint's scale, as `twist.rs` gives them.
+        Only for the rest pose: it places every bone itself."""
+        get = lambda name: float(values.get(name, 1.0))  # noqa: E731
+        bones = self.arm.data.bones
+        scale = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+        mult = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+
+        def stretch(name, factor, axis=1):
+            if name in scale:
+                scale[name][axis] *= factor
+                for child in bones[name].children:
+                    mult[child.name][axis] *= factor
+
+        def grow(name, factor):
+            if name not in scale or factor == 1.0:
+                return
+            scale[name] *= factor
+            for child in bones[name].children_recursive:
+                scale[child.name] *= factor
+                mult[child.name] *= factor
+
+        height, arms, shoulders = get("BodyHeight"), get("ArmLength"), get("ShoulderWidth")
+        legs = get("LegLength") * height
+        for name in ("Spine", "Chest", "UpperChest"):
+            stretch(name, height)
+        for side, _ in SIDES:
+            for name in ("UpperLeg", "LowerLeg"):
+                stretch(side + name, legs)
+            for name in ("UpperArm", "LowerArm"):
+                stretch(side + name, arms)
+            stretch(side + "Shoulder", shoulders)
+        stretch("UpperChest", math.sqrt(shoulders), axis=0)
+        stretch("Spine", get("WaistWidth"), axis=0)
+        stretch("Hips", get("HipWidth"), axis=0)
+        grow("Head", get("HeadSize"))
+        for side, _ in SIDES:
+            grow(side + "Hand", get("HandSize"))
+            grow(side + "Foot", get("FootSize"))
+        # The driven bones: a twist bone takes its limb's scale, a helper its joint's, and sits on it.
+        local = {b.name: (b.parent.matrix_local.inverted() @ b.matrix_local if b.parent else b.matrix_local.copy())
+                 for b in bones}
+        moved = {name: Vector([m.to_translation()[k] * mult[name][k] for k in range(3)]) for name, m in local.items()}
+        for t in self.custom.get("twists", []):
+            for side, _ in SIDES:
+                if side + t["bone"] in scale:
+                    scale[side + t["bone"]] = scale[side + t["inside"]].copy()
+        for h in self.custom.get("helpers", []):
+            for side, _ in SIDES:
+                name, reads = side + h["bone"], side + h["reads"]
+                if name in scale:
+                    scale[name] = scale[reads].copy()
+                    moved[name] = moved[reads] + (local[name].to_translation() - local[reads].to_translation())
+        if legs != 1.0:
+            length = lambda a, b: (bones[b].head_local - bones[a].head_local).length  # noqa: E731
+            leg = length("LeftUpperLeg", "LeftLowerLeg") + length("LeftLowerLeg", "LeftFoot")
+            up = bones["Hips"].parent.matrix_local.to_3x3().inverted() @ UP if bones["Hips"].parent else UP
+            moved["Hips"] = moved["Hips"] + up * leg * (legs - 1.0)
+        # Parents first: each bone at its moved place in its parent's unscaled frame, with its own scale.
+        frame = {}
+        for b in bones:
+            parent = frame[b.parent.name] if b.parent else Matrix()
+            frame[b.name] = parent @ Matrix.Translation(moved[b.name]) @ local[b.name].to_3x3().to_4x4()
+            self.arm.pose.bones[b.name].matrix = frame[b.name] @ Matrix.Diagonal(scale[b.name]).to_4x4()
+            update()
+
     def set_frame_bones(self, frame):
         """Moves the rest skeleton by Frame_Feminine's bone offsets (eyes
         are moved in the pose, `set_eyes`). The mesh at rest is unchanged;

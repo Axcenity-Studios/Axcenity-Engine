@@ -126,7 +126,7 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
                     );
                     let was = resolved_neutral.attributes[&driver.attribute];
                     let now = resolved.attributes[&driver.attribute];
-                    assert!((now - was).abs() > 0.1, "{at}: {was} to {now}");
+                    assert!((now - was).abs() > 0.05, "{at}: {was} to {now}");
                 }
             } else {
                 let moved = rest(&model.bake(&resolved.identity));
@@ -138,8 +138,9 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
             checked += 1;
         }
     }
-    // Frame (one end), muscle and fat, sixteen regions, nine proportions.
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9));
+    // Frame (one end), muscle and fat, sixteen regions, nine proportions
+    // (the hips only widen: one end).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1);
 }
 
 /// The two whole-body sliders are not one slider twice: each corner of
@@ -193,4 +194,31 @@ fn muscle_and_fat_make_four_different_corners() {
             .fold(0.0, f32::max);
         assert!(off > SEEN, "frame {frame}: the corner adds {off} m");
     }
+}
+
+/// What a description drives is baked and gone from the model's blend
+/// shapes; what is left is live, and that is exactly the pose-driven
+/// corrective shapes (`anim`'s `correctives.rs` sets them every pose).
+#[test]
+fn a_baked_body_keeps_only_its_corrective_shapes() {
+    let library = library();
+    let model = body(&library);
+    assert_eq!(model.morph_targets.len(), 53);
+    let resolved = resolve(&library, &Description::new("Neutral", BASE)).unwrap();
+    let baked = model.bake(&resolved.identity);
+    let mut left: Vec<&str> = baked
+        .morph_targets
+        .iter()
+        .map(|target| target.name.as_str())
+        .collect();
+    left.sort_unstable();
+    assert_eq!(
+        left,
+        [
+            "Corrective_Shoulder_Level_Left",
+            "Corrective_Shoulder_Level_Right",
+            "Corrective_Shoulder_Raised_Left",
+            "Corrective_Shoulder_Raised_Right",
+        ]
+    );
 }

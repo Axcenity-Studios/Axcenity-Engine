@@ -65,6 +65,296 @@
    "parent": "RightUpperLeg"
   }
  ],
+ "body_shapes": {
+  "frames": {
+   "Feminine": {
+    "bony_vertices": 4396,
+    "held_face_vertices": 1397,
+    "kept_apart": {
+     "heavy": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "heavy and muscular": {
+      "crossings_before": 2,
+      "least_factor": 0.8,
+      "left": 0,
+      "vertices_cut": 94
+     },
+     "heavy and soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slight": {
+      "crossings_before": 18,
+      "least_factor": 0.64,
+      "left": 0,
+      "vertices_cut": 137
+     },
+     "slight, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slim": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     }
+    },
+    "largest_move_mm": {
+     "Feminine_Fat_Abdomen": 36.5,
+     "Feminine_Fat_Arms": 25.8,
+     "Feminine_Fat_Back": 60.3,
+     "Feminine_Fat_Calves": 15.8,
+     "Feminine_Fat_Chest": 16.6,
+     "Feminine_Fat_Down": 28.7,
+     "Feminine_Fat_Hips": 25.7,
+     "Feminine_Fat_Shoulders": 20.1,
+     "Feminine_Fat_Thighs": 36.7,
+     "Feminine_Fat_Up": 21.7,
+     "Feminine_Muscle_Abdomen": 8.2,
+     "Feminine_Muscle_Arms": 47.8,
+     "Feminine_Muscle_Back": 50.2,
+     "Feminine_Muscle_Calves": 18.9,
+     "Feminine_Muscle_Chest": 7.1,
+     "Feminine_Muscle_Down": 31.4,
+     "Feminine_Muscle_Down_Fat_Down": 66.2,
+     "Feminine_Muscle_Down_Fat_Up": 101.5,
+     "Feminine_Muscle_Hips": 4.9,
+     "Feminine_Muscle_Shoulders": 29.6,
+     "Feminine_Muscle_Thighs": 33.9,
+     "Feminine_Muscle_Up": 26.1,
+     "Feminine_Muscle_Up_Fat_Down": 25.5,
+     "Feminine_Muscle_Up_Fat_Up": 58.3
+    },
+    "neutral_crossings": 68
+   },
+   "Masculine": {
+    "bony_vertices": 4369,
+    "held_face_vertices": 1435,
+    "kept_apart": {
+     "heavy": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "heavy and muscular": {
+      "crossings_before": 129,
+      "least_factor": 0.41,
+      "left": 0,
+      "vertices_cut": 431
+     },
+     "heavy and soft": {
+      "crossings_before": 31,
+      "least_factor": 0.262,
+      "left": 0,
+      "vertices_cut": 221
+     },
+     "lean and muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slight": {
+      "crossings_before": 24,
+      "least_factor": 0.64,
+      "left": 0,
+      "vertices_cut": 206
+     },
+     "slight, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slim": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     }
+    },
+    "largest_move_mm": {
+     "Masculine_Fat_Abdomen": 51.5,
+     "Masculine_Fat_Arms": 23.4,
+     "Masculine_Fat_Back": 40.6,
+     "Masculine_Fat_Calves": 17.6,
+     "Masculine_Fat_Chest": 22.7,
+     "Masculine_Fat_Down": 18.1,
+     "Masculine_Fat_Hips": 29.5,
+     "Masculine_Fat_Shoulders": 27.1,
+     "Masculine_Fat_Thighs": 45.1,
+     "Masculine_Fat_Up": 37.6,
+     "Masculine_Muscle_Abdomen": 19.4,
+     "Masculine_Muscle_Arms": 39.1,
+     "Masculine_Muscle_Back": 36.8,
+     "Masculine_Muscle_Calves": 25.8,
+     "Masculine_Muscle_Chest": 15.9,
+     "Masculine_Muscle_Down": 71.3,
+     "Masculine_Muscle_Down_Fat_Down": 88.9,
+     "Masculine_Muscle_Down_Fat_Up": 97.8,
+     "Masculine_Muscle_Hips": 6.2,
+     "Masculine_Muscle_Shoulders": 39.2,
+     "Masculine_Muscle_Thighs": 23.9,
+     "Masculine_Muscle_Up": 44.2,
+     "Masculine_Muscle_Up_Fat_Down": 23.2,
+     "Masculine_Muscle_Up_Fat_Up": 65.9
+    },
+    "neutral_crossings": 61
+   }
+  },
+  "local": 0.6,
+  "place": {
+   "Feminine": {
+    "fat": [
+     0.0,
+     -0.75,
+     0.85
+    ],
+    "muscle": [
+     0.0,
+     -0.7,
+     0.9
+    ]
+   },
+   "Masculine": {
+    "fat": [
+     0.3,
+     -0.75,
+     0.85
+    ],
+    "muscle": [
+     0.45,
+     -0.6,
+     1.0
+    ]
+   }
+  },
+  "shapes": 48
+ },
+ "corrective_shapes": {
+  "Level": {
+   "kept": 0.955,
+   "largest_move_mm": 11.5,
+   "local_volume_before": 0.813,
+   "pose": "shoulder_abd_90",
+   "rest_distance_factor": 1.052,
+   "vertices": 477
+  },
+  "Raised": {
+   "kept": 0.86,
+   "largest_move_mm": 56.5,
+   "local_volume_before": 0.562,
+   "pose": "shoulder_abd_150",
+   "rest_distance_factor": 1.15,
+   "vertices": 497
+  }
+ },
+ "correctives": [
+  {
+   "angles": [
+    0.0,
+    45.0
+   ],
+   "axis": [
+    0.0,
+    -0.37768,
+    0.92594
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Level_Left"
+  },
+  {
+   "angles": [
+    0.0,
+    45.0
+   ],
+   "axis": [
+    0.0,
+    0.37698,
+    -0.92622
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Level_Right"
+  },
+  {
+   "angles": [
+    45.0,
+    105.0
+   ],
+   "axis": [
+    0.0,
+    -0.37768,
+    0.92594
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Raised_Left"
+  },
+  {
+   "angles": [
+    45.0,
+    105.0
+   ],
+   "axis": [
+    0.0,
+    0.37698,
+    -0.92622
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Raised_Right"
+  }
+ ],
  "eyes": {
   "feminine": {
    "eyeball_front_in_flesh": 0,

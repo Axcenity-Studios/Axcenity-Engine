@@ -409,7 +409,7 @@ class Run:
         for kind in ("fat", "muscle"):
             for region in regions:
                 ch.set_sliders({"frame": value, f"{kind}_{region}": 1.0})
-                tiles.append(self.tile(cam, f"region_{frame}_{kind}_{region}", ((0.0, -4.72, 0.95), (0.0, 0.0, 0.92), 85)))
+                tiles.append(self.tile(cam, f"region_{frame}_{kind}_{region}", ((0.0, -3.3, 1.12), (0.0, 0.0, 1.09), 85)))
                 labels.append(f"{kind}_{region} +1")
         Q.turn_character(ch, 0)
         self.save(f"build_regions_{frame}", tiles, len(regions), labels, f"One region's slider at a time, {frame}, clay",
