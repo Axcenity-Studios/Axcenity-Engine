@@ -75,7 +75,7 @@ RAISED = {1: 1.0, 2: 1.0, 3: 1.0, 4: 0.95, 5: 0.70, 6: 0.35, 7: 0.10}
 # lower lid rises a fifth of the way, the upper comes down the rest. (The
 # further the upper lid travels, the further its straight path cuts under
 # the eyeball's curve and the higher the closed lid must stand to clear
-# it: 2.5 mm at a tenth, 1.4 mm at a fifth.)
+# it: its inner edge 2.2 mm off the eyeball at a tenth, 1.3 mm at a fifth.)
 MEET = 0.20
 # How far inside each corner of the eye the closing line starts running
 # straight to the corner (metres).
