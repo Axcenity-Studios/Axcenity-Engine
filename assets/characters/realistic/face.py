@@ -825,10 +825,14 @@ class Face:
             # dropped on a still face. (`Eye_Closed`, an eye at rest, has
             # the lids alone.)
             S[f"Blink_{side}"] = add(S[f"Blink_{side}"], scale(cheek_up, BLINK_CHEEK), scale(lowered, BLINK_BROW))
-            # Drawn together (corrugator): the inner half toward the
-            # middle, level, the skin between bunching forward.
+            # The inner end in and up, as in worry (the control's meaning in
+            # the engine, and what Sad, Worried, Fearful and Crying use it
+            # for): the inner half rises and comes toward the middle, the
+            # tail dips a little, and the skin between bunches forward.
+            outer = smoothstep(0.45, 1.0, along)
             S[f"Brow_Inward_{side}"] = self._moved(
-                together(0.0048) + (bunch * 0.0024)[:, None] * N, slide=on_skull, teeth=False)
+                vec(w * inner, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0026)
+                + (bunch * 0.0024)[:, None] * N, slide=on_skull, teeth=False)
             # The mouth's corners, the lips and the nose: each side's
             # offsets are kept, and made into shapes below.
             X, sl = self.smile(s)
