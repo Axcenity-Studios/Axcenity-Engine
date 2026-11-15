@@ -60,7 +60,7 @@ pub(crate) struct View {
 }
 
 /// The cameras, in the order the sheet shows them.
-pub(crate) const VIEWS: [View; 5] = [
+pub(crate) const VIEWS: [View; 6] = [
     View {
         name: "front",
         eye: [0.0, 2.6, -9.5],
@@ -88,6 +88,14 @@ pub(crate) const VIEWS: [View; 5] = [
     View {
         name: "face",
         eye: [-0.35, 4.62, -2.3],
+        target: [0.0, 4.58, 0.0],
+        fov: 30.0,
+    },
+    // Straight on, where `face` stands a little to one side: a mouth or a
+    // brow that is higher on one side shows here and nowhere else (CO6).
+    View {
+        name: "face-front",
+        eye: [0.0, 4.6, -2.3],
         target: [0.0, 4.58, 0.0],
         fov: 30.0,
     },
@@ -764,6 +772,9 @@ fn the_same_description_captures_identical_pictures_and_every_view_is_drawn() {
     );
     // The sheet holds them all, at half size.
     let (width, height, sheet) = contact_sheet(&first, settings.size);
-    assert_eq!((width, height), (160 * 5, 90 * 2));
+    assert_eq!(
+        (width, height),
+        (160 * VIEWS.len() as u32, 90 * LIGHTS.len() as u32)
+    );
     assert_eq!(sheet.len(), (width * height * 4) as usize);
 }
