@@ -54,6 +54,9 @@ FILM_RINGS = ((0.0, 0.0), (0.3, 0.0008), (0.65, 0.0014), (1.0, 0.0015))
 TEAR_REACH = 0.16
 # How far the film and the tear line draw back behind closed lids (metres).
 TUCK = 0.0009
+# The film and the tear line leave out the corners of the eye, where the
+# lids are nearer each other than this at rest (metres).
+CORNER = 0.0035
 
 
 def _dir(theta, phi):
@@ -348,6 +351,8 @@ def shell(face, out_dir):
             end = other[0] if t[k] < t[other[0]] else other[-1]
             return [(int(ring[end]), 1.0)]
 
+        room = [float(np.linalg.norm(P[ring[k]] - sum(P[i] * w for i, w in partner(k)))) for k in range(count)]
+
         def vertex(k, toward, lift):
             pieces = [(int(ring[k]), 1.0 - 0.5 * toward)] + [(i, w * 0.5 * toward) for i, w in partner(k)]
             at = sum(P[i] * w for i, w in pieces)
@@ -361,6 +366,10 @@ def shell(face, out_dir):
             for (ra, va), (rb, vb) in zip(zip(rings, values), zip(rings[1:], values[1:])):
                 for k in range(count):
                     j = (k + 1) % count
+                    # None in the corners, where the lids hardly part: a
+                    # film there has nowhere to go when they close.
+                    if min(room[k], room[j]) < CORNER:
+                        continue
                     faces.append((ra[k], ra[j], rb[j], rb[k]))
                     mats.append(material)
                     uvs.append([(k / count, va), ((k + 1) / count, va), ((k + 1) / count, vb), (k / count, vb)])

@@ -100,11 +100,11 @@ def soften_lids(body, topo, P, eyes, radius, maps):
         mask = mask.filter(ImageFilter.GaussianBlur(w / 500.0))
         m = np.asarray(mask, dtype=np.float32)[:, :, None] / 255.0
         src = np.asarray(picture.convert("RGB"), dtype=np.float32)
-        soft = np.asarray(picture.convert("RGB").filter(ImageFilter.GaussianBlur(w / 110.0)), dtype=np.float32)
+        soft = np.asarray(picture.convert("RGB").filter(ImageFilter.GaussianBlur(w / 170.0)), dtype=np.float32)
         if key == "normal":
             # And most of the way to flat: a crease baked for the open lid
             # is wrong on the closed one.
-            soft = 0.3 * soft + 0.7 * np.array([128.0, 128.0, 255.0], dtype=np.float32)
+            soft = 0.5 * soft + 0.5 * np.array([128.0, 128.0, 255.0], dtype=np.float32)
         out = src * (1.0 - m) + soft * m
         changed = int((m[:, :, 0] > 0.5).sum())
         result = Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8))
@@ -155,6 +155,7 @@ EXPRESSIONS = [
 EYE_GROWS = 1.12
 SKIN_GROWS = 1.20
 MOUTH_RISES = 0.0045
+JAW_SHIFTS = 0.0050
 # How far Jaw_Forward brings the jaw (metres).
 JAW_FORWARD = 0.0055
 
@@ -521,6 +522,8 @@ class Face:
         P, c = self.P, self.corner[s]
         pull = self.cheek_point(s) - c
         pull /= np.linalg.norm(pull)
+        pull = pull + np.array([s * 0.25, 0.45, 0.0])
+        pull /= np.linalg.norm(pull)
         d = np.linalg.norm(P - c, axis=1)
         # The lips follow their corner along their length; the skin round
         # the corner follows by distance.
@@ -529,19 +532,18 @@ class Face:
         round_corner = gauss(d, 0.021) * self.side(s)
         w = np.maximum(lips, round_corner)
         w[self.lid | self.socket] = 0.0
-        move = w[:, None] * pull * (0.0115 * amount)
+        move = w[:, None] * pull * (0.0128 * amount)
         # The upper lip lifts a little with it.
-        move[:, 2] += self.lipness * self.upper_side * smoothstep(-0.3, 0.8, along) * 0.0026 * amount
         # The cheek, pushed up and out ahead of the corner.
         bulge_at = self.on_skin(c + pull * 0.027 + np.array([0.0, 0.0, 0.004]))
         cheek = self.near(bulge_at, 0.019) * self.side(s) * self.skin * ~self.lid
-        move += (cheek * 0.0050 * amount)[:, None] * self.N + (cheek * 0.0046 * amount)[:, None] * np.array([0.0, 0.0, 1.0])
+        move += (cheek * 0.0060 * amount)[:, None] * self.N + (cheek * 0.0052 * amount)[:, None] * np.array([0.0, 0.0, 1.0])
         # The fold between the nose's wing and the corner sinks.
         wing = self.on_skin(self.nose_tip + np.array([s * 0.021, 0.018, -0.006]))
         low = self.on_skin(c + np.array([s * 0.009, -0.004, 0.004]))
         knee = self.on_skin(0.5 * (wing + low) + np.array([s * 0.004, 0.0, 0.0]))
         fold_d, _, _ = polyline_nearest(P, np.array([wing, knee, low]))
-        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * 0.0020 * amount)[:, None] * self.N
+        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * 0.0030 * amount)[:, None] * self.N
         slide = np.where(self.skin, 1.0 - np.clip(self.lipness * 1.6, 0.0, 1.0), 0.0) * 0.85
         return P + move, slide
 
@@ -615,13 +617,15 @@ class Face:
         for side, s in SIDES:
             out = np.array([float(s), 0.0, 0.0])
             cheek = self.cheek(s)
-            cheek_up = self._moved(vec(cheek, up * 0.0056) + (cheek * 0.0026)[:, None] * N, slide=None, teeth=False)
+            cheek_up = self._moved(vec(cheek, up * 0.0072) + (cheek * 0.0034)[:, None] * N, slide=None, teeth=False)
             # Eyes.
             S[f"Blink_{side}"] = self._lids(s, 1.0, 1.0)
             S[f"Eye_Closed_{side}"] = self._lids(s, 1.0, 1.0)
-            S[f"Eye_Squint_{side}"] = add(self._lids(s, 0.18, 0.46), scale(cheek_up, 0.35))
+            # (A lower lid's share is of the way to the closing line, a
+            # tenth of the opening above it: past 1 it goes on up.)
+            S[f"Eye_Squint_{side}"] = add(self._lids(s, 0.30, 3.4), scale(cheek_up, 0.55))
             S[f"Eye_Wide_{side}"] = self._lids(s, -0.32, -0.10)
-            S[f"Cheek_Raise_{side}"] = add(cheek_up, self._lids(s, None, 0.34))
+            S[f"Cheek_Raise_{side}"] = add(cheek_up, self._lids(s, None, 2.3))
             # Brows.
             w, along = self.brow(s)
             profile = 0.75 + 0.25 * smoothstep(0.0, 0.45, along)
@@ -703,7 +707,7 @@ class Face:
         S["Cheek_Puff"] = self._moved(puff, slide=None)
         # The jaw: the bone turns; these shapes put right what the turn
         # alone gets wrong.
-        S["Jaw_Open"] = self.jaw_open()
+        S["Jaw_Open"] = self.clear_with(self.jaw_open(), add(S["Mouth_Smile_Left"], S["Mouth_Smile_Right"]))
         for side, s in SIDES:
             posed = self.jaw.pose(P, 0.0, s * JAW_SIDE_DEG)
             S[f"Jaw_{side}"] = self.shape(posed, side_deg=s * JAW_SIDE_DEG)
@@ -729,22 +733,39 @@ class Face:
         share = self.jaw.w * (1.0 - self.jaw.w) * 4.0
         hollow = share * smoothstep(0.024, 0.04, np.abs(P[:, 0])) * self.skin * (1.0 - self.lipness)
         X -= (hollow * 0.0022)[:, None] * self.N
-        shape = self.shape(X, open_deg=JAW_OPEN_DEG)
-        # Part of the way open the same shape is at part weight: what the
-        # lips then still need to stay off the teeth is added in full.
-        for part in (0.5, 0.25, 0.1):
-            offsets = np.zeros_like(P)
-            for i, d in shape.items():
-                offsets[i] = d
-            for frame in ([{"P": P, "jaw": self.jaw, "teeth": self.teeth}] + ([self.other] if self.other else [])):
+        # (Tried and withdrawn in review round 3: easing the jaw's hold
+        # toward the corners and drawing them in 7 mm made the opening an
+        # oval but put the mouth's lining through the cheek; see
+        # docs/development/character-studio/co6/README.md.)
+        return self.shape(X, open_deg=JAW_OPEN_DEG)
+
+    def clear_with(self, shape, other, parts=(1.0, 0.6), most=0.002):
+        """The jaw's shape with what it takes to keep the lips off the
+        teeth when `other` (both smiles) is on as well, with the jaw all
+        the way and part of the way open: a laugh is the two together.
+        What is added per vertex is held to `most` (a small need part of
+        the way open is not multiplied into a spike at full)."""
+        P = self.P
+        offsets = np.zeros_like(P)
+        for i, d in shape.items():
+            offsets[i] = d
+        extra = np.zeros_like(P)
+        for i, d in other.items():
+            extra[i] = d
+        frames = [{"P": P, "jaw": self.jaw, "teeth": self.teeth}] + ([self.other] if self.other else [])
+        for part in parts:
+            for frame in frames:
                 jaw = frame["jaw"]
-                posed = jaw.pose(frame["P"] + offsets * part, JAW_OPEN_DEG * part)
-                more = self.off_teeth(posed, JAW_OPEN_DEG * part, teeth=frame["teeth"], jaw=jaw) - posed
+                posed = jaw.pose(frame["P"] + offsets * part + extra, JAW_OPEN_DEG * part)
+                more = self.spread(self.off_teeth(posed, JAW_OPEN_DEG * part, teeth=frame["teeth"], jaw=jaw) - posed)
                 moved = np.where(np.linalg.norm(more, axis=1) > 1e-7)[0]
-                if len(moved):
-                    offsets[moved] += jaw.unpose(more[moved], JAW_OPEN_DEG * part, 0.0, moved) / part
-            shape = {int(i): offsets[i].copy() for i in np.where(np.linalg.norm(offsets, axis=1) > 2e-5)[0]}
-        return shape
+                if not len(moved):
+                    continue
+                add_on = jaw.unpose(more[moved], JAW_OPEN_DEG * part, 0.0, moved) / part
+                size = np.linalg.norm(add_on, axis=1)
+                add_on *= np.minimum(1.0, most / np.maximum(size, 1e-12))[:, None]
+                offsets[moved] += add_on
+        return {int(i): offsets[i].copy() for i in np.where(np.linalg.norm(offsets, axis=1) > 2e-5)[0]}
 
 
     # -- identity (Character Studio's face parameters) -----------------------
@@ -810,8 +831,10 @@ class Face:
             # Brows.
             bw, along_brow = self.brow(s)
             put(f"Face_Brow_Height_{side}", vec(bw, up * 0.0052), slide=skin, teeth=False)
-            arch = gauss(along_brow - 0.62, 0.40) - 0.35 * gauss(along_brow - 0.0, 0.35)
-            put(f"Face_Brow_Arch_{side}", vec(bw * arch, up * 0.0074), slide=skin, teeth=False)
+            # (One broad rise about the arch: with the inner end pushed
+            # the other way the brow bent into a hook.)
+            arch = gauss(along_brow - 0.60, 0.50)
+            put(f"Face_Brow_Arch_{side}", vec(bw * arch, up * 0.0064), slide=skin, teeth=False)
             # The nose's wing, the cheek, the jaw's corner, the mouth's corner, the ear.
             wing = self.on_skin(self.nose_tip + np.array([s * 0.019, 0.016, -0.004]))
             nw = self.near(wing, 0.013) * skin * self.side(s, 0.004)
@@ -857,12 +880,14 @@ class Face:
         # The chin and the jaw.
         # (The mouth's lining goes less far than the chin's skin: the
         # lower teeth stand in it.)
-        chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness)             * (self.skin + 0.35 * self.lining)
+        chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness)             * (self.skin + 0.15 * self.lining)
         put("Face_Chin_Length", vec(chin, up * -0.0062))
         put("Face_Chin_Forward", vec(chin, back * -0.0056))
         put("Face_Chin_Width", np.stack([P[:, 0] * chin * 0.36, np.zeros(len(P)), np.zeros(len(P))], axis=1))
-        jaw_all = self.jaw.w * self.topo.is_head * (1.0 - self.lipness) * skin
-        put("Face_Jaw_Shift", vec(jaw_all, np.array([0.0050, 0.0, 0.0])))
+        # (The mouth's lining and the lower teeth go with the jaw's skin:
+        # `build` gives the teeth the same shape.)
+        jaw_all = self.jaw.w * self.topo.is_head * (1.0 - self.lipness) * (self.skin | self.lining)
+        put("Face_Jaw_Shift", vec(jaw_all, np.array([JAW_SHIFTS, 0.0, 0.0])), teeth=False)
         # The lips. A point of one lip and the point of the other it
         # touches move alike, so the mouth stays closed.
         red = gauss(self.d_line - 0.0055, 0.0042) * skin * self.corner_taper(0.55)
@@ -949,6 +974,10 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     key = teeth.shape_key_add(name="Face_Mouth_Height", from_mix=False)
     for i, p in enumerate(points):
         key.data[i].co = p + lift
+    key.value = 0.0
+    key = teeth.shape_key_add(name="Face_Jaw_Shift", from_mix=False)
+    for i in np.nonzero(~upper)[0]:
+        key.data[i].co = points[i] + np.array([JAW_SHIFTS, 0.0, 0.0])
     key.value = 0.0
     bones = {}
     for name, (_, changes) in identity.items():

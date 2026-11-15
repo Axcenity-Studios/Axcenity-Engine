@@ -98,7 +98,7 @@ def brow_texture(out_dir):
         x0, y0 = u * w, v * h
         x1, y1 = x0 + math.cos(angle) * length, y0 - math.sin(angle) * length
         draw.line([(x0, y0), (x1, y1)], fill=255, width=max(1, int(scale * 2.2)))
-    return _strands(os.path.join(out_dir, "RealisticBrows.png"), (512, 128), 1100, 9, one, most=0.95)
+    return _strands(os.path.join(out_dir, "RealisticBrows.png"), (512, 128), 1600, 9, one, most=0.95)
 
 
 def _material(name, texture, cut=True):

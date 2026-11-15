@@ -48,7 +48,7 @@ IRIS_COLOUR = (0.36, 0.24, 0.14)
 # The jaw's face sets: the gums, the palate, the floor with the tongue;
 # every other set is a tooth.
 FS_UPPER_GUM, FS_LOWER_GUM, FS_PALATE, FS_FLOOR = 93, 155, 157, 31
-TEETH_TRIANGLES = 3600
+TEETH_TRIANGLES = 7200
 # The mouth's bag is never widened to nearer the face's skin than this (metres).
 UNDER_SKIN = 0.0028
 # How far the Jaw_Forward control brings the lower teeth (the body's shape
@@ -379,8 +379,8 @@ def _tongue(lower_teeth, k):
         y = tip_y + (root_y - tip_y) * t
         half = 0.0165 * k * min(1.0, (0.10 + t) ** 0.55 * 1.25) * (1.0 - 0.12 * max(0.0, t - 0.75) / 0.25)
         half = max(0.003 * k, min(half, room(y) - 0.0018 * k))
-        thick = k * (0.0038 + 0.0085 * min(1.0, t * 1.8))
-        top = k * (-0.0046 + 0.0030 * t + 0.0050 * max(0.0, t - 0.6) / 0.4)
+        thick = k * (0.0046 + 0.0095 * min(1.0, t * 1.8))
+        top = k * (-0.0022 + 0.0020 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
         for j in range(around):
             a = 2.0 * math.pi * j / around
             x, lift = math.sin(a), math.cos(a)        # round the section, from its top
@@ -397,7 +397,7 @@ def _tongue(lower_teeth, k):
             faces.append((a, b, b + around, a + around))
     # The tip is closed with a fan; the root is hidden in the throat.
     tip = len(points)
-    points.append((0.0, tip_y - 0.0022 * k, k * (-0.0046 - 0.0019)))
+    points.append((0.0, tip_y - 0.0022 * k, k * (-0.0022 - 0.0023)))
     along.append(1.0)
     for j in range(around):
         faces.append((tip, (j + 1) % around, j))

@@ -261,6 +261,18 @@ class Eye:
                 d = turned - self.c
                 length = np.linalg.norm(d, axis=1)
                 turned = self.c + d * ((length + 2.0 * short) / length)[:, None]
+        # Raising the lining for the half-way path must not put it over
+        # the lid's own skin: skin near any lining stands above it.
+        lining = np.where(step <= 0)[0]
+        if len(lining):
+            height = np.linalg.norm(turned[lining] - self.c, axis=1)
+            for k in np.where((step >= 2) & moved)[0]:
+                near = np.linalg.norm(turned[lining] - turned[k], axis=1) < 0.004
+                if near.any():
+                    need = height[near].max() + OVER_LINING
+                    have = np.linalg.norm(turned[k] - self.c)
+                    if have < need:
+                        turned[k] = self.c + (turned[k] - self.c) * (need / have)
         return {int(i): turned[k] for k, i in enumerate(idx) if moved[k]}
 
     def seat(self, P):

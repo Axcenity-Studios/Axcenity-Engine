@@ -173,3 +173,25 @@ Sheets in [engine/](engine/): a row per pose; in a row the masculine frame's stu
 9. In the engine a cut-out (MASK) card on a skinned, morphed part shows the backdrop through the skin behind its clear pixels; the face's cards are blended to avoid it. Worth a look in the renderer before hair (CO8).
 10. The simpler copies were looked at in Blender only (`face_lods.png`); the alpha parts in a full-body engine view were seen only as the three-quarter column of the sheets, where brows and lash lines draw and nothing stands out.
 11. `measure.py`'s `sliders` section (every pair of parameters) was not run with the face's 45 parameters added: it is some eight times the pairs it was.
+
+## Review round 3, part 1 (open mouth, smile, laugh)
+
+Engine, 3840 x 2160, studio light, both frames; a row per pose: masculine front, masculine face view, feminine front, feminine face view, feminine three-quarter.
+
+- **[engine/close-open-mouth-and-smile.jpg](engine/close-open-mouth-and-smile.jpg)**: jaw open 0.5 and 1, the smile with the lips closed, Surprised.
+- **[engine/close-happy-laughing-squint.jpg](engine/close-happy-laughing-squint.jpg)**: Happy, Laughing 0.5 and 1, squint with cheek raise at 0.5 and 1, blink 1.
+- **[engine/close-jaw.jpg](engine/close-jaw.jpg)**, **[engine/close-blink.jpg](engine/close-blink.jpg)**: mouth and eye crops from the first build of this round (before the smile and squint changes).
+
+What changed:
+
+- **The spike in the mouth's floor** was `Jaw_Open`'s own shape: what the lips needed to stay off the teeth with the jaw a tenth open was divided by that tenth, so half a millimetre became a five millimetre spike at full. That step is gone; a laugh (jaw and both smiles together) is cleared instead, with what is added held to 2 mm (`Face.clear_with`).
+- **Teeth**: 7,200 triangles instead of 3,600 (the part is 7,493 with the tongue; the file grew 0.13 MB). Each tooth now reads as a tooth.
+- **The eyes smile.** `Eye_Squint` and `Cheek_Raise` raise the lower lid by a third and a quarter of the eye's opening (they raised it by a twentieth) and lift the cheek 7 mm, so Happy narrows the eyes and Laughing nearly shuts them from below.
+- **The smile** pulls the corners back toward the ears as well as up, with a deeper fold and a fuller cheek, and no longer lifts the upper lip: `Mouth_Smile` alone keeps the lips together, `Mouth_Open` and `Upper_Lip_Raise` part them.
+- **The tongue** lies 2.4 mm higher and is fuller.
+- **The film and tear line** leave out the eye's corners; a lid's skin stands over its lining after the half-way raise; the lid texels are blurred less and flattened less.
+- **Identity**: `brow_arch` is one broad rise (no hook); `jaw_shift` takes the lining and the lower teeth with it; `chin_length` moves the lining less.
+
+**Not solved: the open mouth is still a box.** An attempt to make it an oval (the jaw's hold eased toward half along the lips near the corners, the corners drawn in 7 mm) did narrow and round the opening, but put the mouth's lining through the cheek beside the nose at full opening on both frames (50 and 53 crossing pairs by `face_checks.py`, red patches in the engine picture) and left a pinched fold beside the corner. It was withdrawn; `Jaw_Open` is the corner-in shape of the round before, less the spike. What it would take: the jaw's weights themselves falling off along the lips from chin to corner (`rig.py`), the cheek's lining weighted with the cheek's skin so the two cannot part, and then a corrective shape for the lips' curve.
+
+Also still short after this part: at squint and cheek raise both at 1 the eye is all but shut and its lid line is ragged; at 4K the resting lips show a thin pale line between them (the upper teeth through the gap the seal leaves); the masculine smile's resting asymmetry (0.7 mm between the head's halves) was not looked at again; the reference photographs were not opened for lack of room in the session, so every reading here is against the lead's written description of them, not the photographs.
