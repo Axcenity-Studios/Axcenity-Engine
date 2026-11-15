@@ -355,3 +355,78 @@ Identity ends (reported): `chin_forward` at -1 no longer puts the lining through
 7. **The upper teeth's height** is 1.5 to 3 mm lower under the lips than the measured display at rest (above).
 8. **The mouth's back is black**, with no palate or throat to be seen; the photographs show dark red there under a camera's flash. The shade is one baked guess for every light.
 9. The eyes' share of Laughing's and Crying's crossings is untouched (the lids are not this work's); the feminine `Jaw_Left` and `Jaw_Right` keep 10 and 14 pairs at one corner of the mouth, and the masculine smile 9 and 8.
+
+## The mouth, round 2
+
+Engine, 3840 x 2160, the straight-on `face-front` view, the mouth cut at full size; a row per pose, the masculine frame then the feminine.
+
+- **[engine/mouth-closed.jpg](engine/mouth-closed.jpg)**: rest, the smile with the lips closed, Happy, Sad, Worried, Frustrated, Angry, Determined (studio light).
+- **[engine/mouth-closed-hard.jpg](engine/mouth-closed-hard.jpg)**: rest, Happy, Worried, Angry under the hard light.
+- **[engine/teeth-open.jpg](engine/teeth-open.jpg)**: `Jaw_Open` 0.5 and 1, Surprised, Fearful.
+- **[engine/teeth-smile.jpg](engine/teeth-smile.jpg)**: Laughing, Excited, Crying, Disgusted.
+- **[engine/teeth-hard-light.jpg](engine/teeth-hard-light.jpg)**: `Jaw_Open` 1, Laughing and Excited under the hard light.
+- **[engine/teeth-close.jpg](engine/teeth-close.jpg)**: Laughing's upper row and the closed smile at twice the size.
+
+- **[engine/teeth-other.jpg](engine/teeth-other.jpg)**: `Tongue_Out` with the jaw half open.
+
+(`teeth-before.jpg` is the last section's: the commit that work started from.)
+
+### 1. The mouth the same on both sides
+
+How far a vertex of the mouth's skin lies from the mirror image of its opposite number (millimetres, the furthest):
+
+| | Masculine before | now | Feminine before | now |
+|---|---|---|---|---|
+| Rest | 0.52 | 0.00 | 1.20 | 0.00 |
+| `Mouth_Pucker` | 0.76 | 0.00 | 1.13 | 0.00 |
+| `Mouth_Smile` left + right | 1.60 | 0.00 | 2.27 | 0.00 |
+| Every other mouth shape and pair | 0.51 to 1.10 | 0.00 | 1.06 to 1.22 | 0.00 |
+| `Cheek_Raise` left + right (an eye shape) | 0.52 | 0.05 | 1.20 | 0.05 |
+
+What broke the mirror, in the order found: the bundle's own lips (0.3 mm masculine, 1.3 mm feminine); the seal (rays, and which way each quad is cut); every shape, which is made from nearest points and rays on a face that isn't even, so its two halves differ (the smile most: its cheek point is found from each eye); the jaw's hold on the lips; in the teeth, the lower gum's keel, gathered by nearness (2.45 mm at 24 hidden vertices) and one gum vertex left on one side by a tie in the inside-a-tooth test (0.99 mm).
+
+What changed: `face.prepare` makes the mouth even at rest (everything within 40 mm of the lips' line, easing to nothing at 56 mm, and all of the lining), before the seal and again after it and after room is made for the jaw; the jaw's weights are made even over the same region; `Face.evened` makes every symmetric mouth shape its own mirror image and every left and right pair mirror images of each other, then takes the lips off each other again (the mean of two halves can cross where neither did) and makes them even once more; the keel is gathered onto stops chosen on one side and mirrored.
+
+Held: `face_checks.py` now measures `mouth_asymmetry_mm`, `teeth_asymmetry_mm` and `tongue_asymmetry_mm` in every pose that is the same on both sides (rest, the controls with no left and right, seven left and right pairs together, the twelve visemes, the expressions whose recipes are even) and fails over **0.1 mm**. The largest now: mouth 0.07 (Laughing: its eye and cheek shapes reach into the mouth's region) mm, teeth 0.00 mm, tongue 0.00 mm.
+
+### 2. Nothing lighter than the lips between closed lips
+
+What parts the lips in the closed-mouth recipes is not a hair of error but controls that mean to: `Mouth_Narrow` 0.2 lifts the upper lip 0.24 mm and lowers the lower 0.4 mm (Worried, Determined); `Nose_Sneer` raises the upper lip 2.5 mm a side at 1, so 0.4 mm at 0.15 (Frustrated) and 0.8 mm at 0.3 (Angry); `Upper_Lip_Raise` 0.2 adds 0.9 mm (Angry: 1.7 mm in all); `Jaw_Forward` 0.2 carries the lower lip 1.1 mm forward from under the upper. The body's lips meet along a line, with the upper teeth 2.7 mm behind it.
+
+`LipSeal` (new part, 68 triangles, `face.lip_seal`) is the depth real lips touch over: a flap hanging 1.4 mm from the upper lip's underside and one standing 1.8 mm up from the lower lip's top, each bound vertex by vertex to the loop behind its lip's edge, taking that vertex's move in every shape and its share of the jaw. Closed, each is inside the other lip. Parted by up to 3 mm, the mouth shows them, dark, in front of the teeth. The controls that bare the teeth draw them back (`Jaw_Open`, `Mouth_Open`, `Upper_Lip_Raise`, `Lower_Lip_Lower` all of it, `Nose_Sneer` half the upper one).
+
+Seen ([engine/mouth-closed.jpg](engine/mouth-closed.jpg), [engine/mouth-closed-hard.jpg](engine/mouth-closed-hard.jpg)): in all eight closed-mouth poses on both frames under the studio light, and in rest, Happy, Worried and Angry under the hard light, the line between the lips is dark from corner to corner at full size, with no enamel in it; at twice the size the closed smile, Worried at 0.5 and Angry at 0.5 are the same ([engine/teeth-close.jpg](engine/teeth-close.jpg)). Angry at 1 parts the lips 1.7 mm and shows the flaps as a dark band, not teeth. The other four poses were not looked at under the hard light, and no pose but those three at twice the size.
+
+### 3. The open mouth
+
+- **Dark red, not black.** The engine's own shadows and screen-space occlusion already darken a mouth; the last section's bake on top of them made the black hole. The lining now keeps 0.45 of its light at the back (0.04 before) and only the throat's middle goes near black; the gums and palate fall to 0.3 at the back (0.1); the lining's occlusion takes less (the shade to the power 0.4). **What albedo and occlusion can and cannot do:** occlusion dims only the sky's light and its reflection, so it is right in the studio (mostly sky light) and does nothing under a lamp; albedo dims every light alike, so it is the only thing that works under the hard light, and too much of it is a black hole in the studio. The shade is divided between the two, so under the hard light the inside is lighter than under the studio's than a real mouth's would be. A proper answer is the engine shading a mouth's inside (or the lamp's shadow reaching into it).
+- **The tongue fills the floor.** Its top at the tip is 3.8 mm under the plane the teeth meet on, a millimetre under the lower incisors' edges (6.5 mm before); with the jaw open its root sinks 6 mm (15), it is hollowed 0.8 mm (2.5) and thinned by 0.3 (0.65). `Tongue_Out` rises 7.8 mm (10.5) from the higher rest.
+- **The lower front teeth show.** The last round stood the lower lip 5 mm higher on an open jaw to cover them; it is 1.2 mm now. Seen ([engine/teeth-open.jpg](engine/teeth-open.jpg)): a row of lower teeth over the lip at `Jaw_Open` 1 (thin) and in Surprised (clear), on both frames; at `Jaw_Open` 0.5 none show yet.
+
+### 4. The corners of an open mouth
+
+Not solved. The lower back teeth are lit to match the darker red round them (0.3 at the first premolar to 0.06 at the second molar) instead of near black, so they no longer stand as black saw teeth in the corners, but they are still there as shapes, and the notch at one corner of `Jaw_Open` 1 and Laughing was not looked into. What it needs: the lower lip and the cheek's lining carried round the corner in front of the lower back teeth as the jaw opens (the lining's faces there are a centimetre wide), which is the corner's weights and `Jaw_Open`'s shape again.
+
+### 5. The closed smile
+
+Not solved. The corner travels 7.0 mm out, 8.7 mm up and 6.8 mm back (13.1 mm in all) on both frames, which widens the mouth by a quarter: the travel was not what is short. The cheek's bulge is now 7.2 mm out and 6.2 mm up (6.0 and 5.2) and the fold from the nose's wing 4.2 mm deep (3.0). **The lips' line still meets in a point in the middle** ([engine/mouth-closed.jpg](engine/mouth-closed.jpg), [engine/teeth-close.jpg](engine/teeth-close.jpg)). Found why: a lip vertex takes the larger of two shares of the pull, its own along the lip and the skin's by distance from the corner (a bell 21 mm wide), and over most of the lip the skin's is the larger, which rises evenly from the middle to each corner: two straight halves. The lips' own share now goes by the square of the way to the corner, which changes little while the other governs. Giving the lips only their own share was tried and withdrawn: it left `face_checks.py` with one failure (Excited, masculine: one point of the teeth read as inside the flesh), which is the smile's corner under the open jaw again. What it needs: the two shares blended along the lip instead of the larger taken, with the open smile's corner checked as it is changed.
+
+### 6. Small things
+
+- The lit speck of gum beside an upper lateral (Fearful, masculine): not looked into this round.
+- **The upper incisors' height.** Their edge is 4.9 mm under the closed lips' line; measured adults show 1.9 to 3.4 mm of them under the upper lip at rest. With Happy's lips closed nothing argues for the low place any more, and Laughing and Excited would show the whole crown with the gum's edge. Recommended: raise the jaw 1.5 mm (`parts.BITE_UNDER_LIPS` 0.0015 to 0) and take the same off `face.JAW_UPPER_LIP_UP` (3.8 to 2.3 mm) so an open jaw shows what it shows now. Not done here: it moves every picture of the teeth, and wants its own look.
+
+### Checks
+
+`face_checks.py --check`: **exit 0, 0 failures** ([face-checks-run.txt](face-checks-run.txt), [face_checks.json](face_checks.json)), with the three new measures. `anim` and `avatar`: 223 pass. No limit or measure was loosened. `RealisticParts.glb` is 30.60 MB.
+
+### Still short of the photographs
+
+1. **The closed smile's lip line is a shallow V** on both frames (5, above), and the cheek and fold are only a little stronger: against the reference's one upward curve and full cheek this is the furthest of the closed mouths.
+2. **The corners of an open mouth** (4): the lower back teeth still show as dim shapes in both corners at `Jaw_Open` 1, Laughing and Crying, and the notch at one corner was not looked into.
+3. **The inside under the two lights.** Dark red with a black throat under the studio's light; under the hard light the same bake leaves it lighter than a real mouth's would be, since no lamp's shadow reaches in.
+4. **Angry at 1** shows a dark band between the lips 1.7 mm apart, where the recipe's `Upper_Lip_Raise` 0.2 and `Nose_Sneer` 0.3 mean teeth or mean nothing. For lips together: both to 0, or `Nose_Sneer` to 0.15 at most. Worried and Determined part 0.6 mm by `Mouth_Narrow` 0.2; `Mouth_Pucker` 0.2 in its place keeps them together.
+5. **The speckle on teeth** half in the upper lip's shadow, the missing gloss, the gum's edge in straight pieces, the tongue's plain surface: as the last section left them.
+6. **No lower teeth at `Jaw_Open` 0.5**, and only a thin row at 1 (3). **The upper incisors' height** (6) and the gum's speck in Fearful: not done.
+7. `LipSeal` was seen only from the front. From below or the side with the mouth a little open it is two thin dark walls behind the lips; no picture was taken of that.
+

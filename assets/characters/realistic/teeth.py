@@ -115,14 +115,17 @@ DEPTH = ((0.0, 1.0), (0.004, 0.97), (0.009, 0.84), (0.016, 0.60), (0.024, 0.38),
          (0.060, 0.04))
 # (The lower teeth stand behind the lower lip and under the upper row:
 # less reaches them, and less still at the sides.)
-DEPTH_LOWER = ((0.0, 0.85), (0.004, 0.80), (0.009, 0.55), (0.016, 0.22), (0.024, 0.08), (0.032, 0.04), (0.043, 0.02),
-               (0.060, 0.01))
+DEPTH_LOWER = ((0.0, 0.85), (0.004, 0.80), (0.009, 0.55), (0.016, 0.30), (0.024, 0.18), (0.032, 0.10), (0.043, 0.06),
+               (0.060, 0.03))
 # A shade is divided between the colour (to the power `IN_COLOUR`: all
 # of a lamp's light is dimmed by it) and the occlusion (`IN_OCCLUSION`:
 # the sky's light and its reflection are dimmed by both). The engine's
 # own shadows and screen-space occlusion darken a mouth further.
 IN_COLOUR = 0.5
-IN_OCCLUSION = 0.7
+IN_OCCLUSION = 0.8
+# The gums and the palate by how far back they are: they are the mouth's
+# dark red inside, which goes to near black only at the throat.
+DEPTH_GUMS = ((0.0, 1.0), (0.009, 0.9), (0.016, 0.75), (0.024, 0.6), (0.032, 0.46), (0.043, 0.32), (0.060, 0.14))
 
 
 def srgb_to_linear(c):
@@ -550,14 +553,13 @@ def paint(points, normals, polys, info, ks):
         edge = z.min() if up_of[key] else z.max()
         ramp[idx] += 0.5 * (1.0 - step(0.0004 * ks, 0.0026 * ks, np.abs(z - edge))) * (ramp[idx] / 0.5)
     gums = np.nonzero(~is_tooth)[0]
+    deep = np.interp(points[:, 1] / ks, [d[0] for d in DEPTH_GUMS], [d[1] for d in DEPTH_GUMS]) * np.where(upper, 1.0, 0.85)
     crowns = {up: BVHTree.FromPolygons(pts, [p for p, t in zip(polys, info["is_tooth_face"]) if t and bool(upper[p[0]]) == up])
               for up in (True, False)}
     for i in gums:
         d = distance(crowns[bool(upper[i])], points[i], 0.012 * ks) / ks
         ramp[i] = step(0.0, 0.0095, d)
-        shade[i] = (0.55 + 0.45 * step(0.0, 0.0014, d)) * inward[i] * depth[i]
-        if info["palate"][i]:
-            shade[i] *= 0.45
+        shade[i] = (0.55 + 0.45 * step(0.0, 0.0014, d)) * (0.7 + 0.3 * inward[i]) * deep[i]
     uv[:] = place(ramp, shade)
     return uv
 
@@ -575,5 +577,5 @@ def paint_tongue(along, around):
     # (What shows of a tongue from the front of an open mouth is its back
     # third, as a ramp rising behind the lower lip: the shade falls
     # there, and is not near black at the root, or no tongue shows.)
-    shade = (0.30 + 0.60 * step(0.0, 0.35, along)) * (0.55 + 0.45 * step(-0.4, 0.3, up))
+    shade = (0.42 + 0.53 * step(0.0, 0.35, along)) * (0.55 + 0.45 * step(-0.4, 0.3, up))
     return place(ramp, shade)

@@ -32,7 +32,7 @@ MANIFEST_FILE = "Realistic.base.json"
 FACE_PROFILE = "axcenity"
 
 # The parts always worn with the body.
-FACE_PARTS = ["Eyes", "Teeth", "EyeShell", "Lashes", "Brows"]
+FACE_PARTS = ["Eyes", "Teeth", "EyeShell", "Lashes", "Brows", "LipSeal"]
 
 GROUPS = [
     ("frame", "Frame", "body"),
@@ -55,7 +55,7 @@ PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
 # Every material of the body and its parts, and how it is lit.
 SHADING = {
     "Skin": "skin", "Mouth": "standard", "Iris": "eye", "Sclera": "eye",
-    "Teeth": "standard", "Gums": "standard", "Tongue": "standard",
+    "Teeth": "standard", "Gums": "standard", "Tongue": "standard", "LipSeal": "standard",
     # The face's parts (CO6; eyes.py, lashes.py).
     "Cornea": "eye", "EyeOcclusion": "standard", "TearLine": "standard", "Lashes": "hair", "Brows": "hair",
 }

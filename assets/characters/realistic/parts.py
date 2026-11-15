@@ -371,6 +371,11 @@ def make_room(body, P, lm, jaw_points, opening, margin=0.002):
     return out, nearest
 
 
+# The tongue's top at its tip, under the plane the teeth meet on (metres
+# at the jaw's size): a millimetre under the lower incisors' edges, so it
+# fills the floor of an open mouth (6.5 mm under, it lay as a slab on the
+# lower lip with a void over it).
+TONGUE_TOP = -0.0038
 # The tongue's mesh: rings from the tip to the root, points round each.
 TONGUE_ROWS, TONGUE_AROUND = 14, 16
 
@@ -404,7 +409,7 @@ def _tongue(lower_teeth, k):
         half *= 1.0 - 0.10 * max(0.0, t - 0.75) / 0.25
         half = max(0.002 * k, min(half, room(y) - 0.0018 * k))
         thick = k * (0.0030 + 0.0111 * min(1.0, t * 2.2) ** 0.8)
-        top = k * (-0.0065 + 0.0022 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
+        top = k * (TONGUE_TOP + 0.0020 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
         for j in range(around):
             a = 2.0 * math.pi * j / around
             x, lift = math.sin(a), math.cos(a)        # round the section, from its top
@@ -422,7 +427,7 @@ def _tongue(lower_teeth, k):
             faces.append((a, b, b + around, a + around))
     # The tip is closed with a fan; the root is hidden in the throat.
     tip = len(points)
-    points.append((0.0, tip_y - 0.0004 * k, k * (-0.0065 - 0.0015)))
+    points.append((0.0, tip_y - 0.0004 * k, k * (TONGUE_TOP - 0.0015)))
     along.append(1.0)
     around_of.append((0.0, 0.0))
     for j in range(around):
@@ -446,7 +451,7 @@ def _tongue_shapes(points, along, k):
     mid = np.median(P[:, 2])
     # (From its low rest over the lower teeth and the lower lip, which
     # stands higher on an open jaw.)
-    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0105 * k * reach
+    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0078 * k * reach
     out["Tongue_Out"] = forward
     for name, lift, back in (("Tongue_Up", 0.0105, 0.0030), ("Tongue_Down", -0.0045, 0.0040)):
         Q = P.copy()

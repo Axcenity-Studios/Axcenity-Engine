@@ -6112,7 +6112,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 4,
+     "self_crossing": 0,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,

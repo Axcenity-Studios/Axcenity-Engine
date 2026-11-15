@@ -296,7 +296,7 @@ JAW_FORWARD = 0.0055
 JAW_GLIDE = 0.019
 # The lower lip stands this much higher than the turn leaves it: it
 # covers the lower teeth, whose tips the turn alone raises over it.
-JAW_LIP_UP = 0.0050
+JAW_LIP_UP = 0.0012
 JAW_LIP_BACK = 0.0020
 # How much of `JAW_LIP_UP` each loop of the lower lip takes (by loop from
 # the fold behind the lip: `mouth.Mouth.lower`).
@@ -319,9 +319,9 @@ UPPER_LINING_RISES = {1: 1.0, 2: 0.9, 3: 0.6, 4: 0.3}
 # nearly level), is hollowed by `TONGUE_HOLLOW` along its middle, is thinner
 # from below by `TONGUE_THINS` of itself (it stays off the mouth's
 # floor), and spreads to `TONGUE_ROOM` from the lower teeth.
-TONGUE_SINKS = 0.015
-TONGUE_HOLLOW = 0.0025
-TONGUE_THINS = 0.65
+TONGUE_SINKS = 0.006
+TONGUE_HOLLOW = 0.0008
+TONGUE_THINS = 0.30
 TONGUE_ROOM = 0.0006
 
 
@@ -840,7 +840,11 @@ class Face:
         # The lips follow their corner along their length; the skin round
         # the corner follows by distance.
         along = np.clip(self.u * s, -1.0, 1.0)
-        lips = self.lipness * smoothstep(-0.35, 1.0, along) ** 1.15
+        # (By the square of the way to the corner, with a little from
+        # across the middle: the two sides together leave the lips' line
+        # one curve, level in the middle. Rising evenly from the middle,
+        # it met there in a point.)
+        lips = self.lipness * (0.85 * np.clip(along, 0.0, 1.0) ** 2 + 0.15 * smoothstep(-0.6, 1.0, along))
         round_corner = gauss(d, 0.021) * self.side(s)
         w = np.maximum(lips, round_corner)
         w[self.lid | self.socket] = 0.0
@@ -849,13 +853,13 @@ class Face:
         # The cheek, pushed up and out ahead of the corner.
         bulge_at = self.on_skin(c + pull * 0.027 + np.array([0.0, 0.0, 0.004]))
         cheek = self.near(bulge_at, 0.019) * self.side(s) * self.skin * ~self.lid
-        move += (cheek * 0.0060 * amount)[:, None] * self.N + (cheek * 0.0052 * amount)[:, None] * np.array([0.0, 0.0, 1.0])
+        move += (cheek * 0.0072 * amount)[:, None] * self.N + (cheek * 0.0062 * amount)[:, None] * np.array([0.0, 0.0, 1.0])
         # The fold between the nose's wing and the corner sinks.
         wing = self.on_skin(self.nose_tip + np.array([s * 0.021, 0.018, -0.006]))
         low = self.on_skin(c + np.array([s * 0.009, -0.004, 0.004]))
         knee = self.on_skin(0.5 * (wing + low) + np.array([s * 0.004, 0.0, 0.0]))
         fold_d, _, _ = polyline_nearest(P, np.array([wing, knee, low]))
-        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * 0.0030 * amount)[:, None] * self.N
+        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * 0.0042 * amount)[:, None] * self.N
         slide = np.where(self.skin, 1.0 - np.clip(self.lipness * 1.6, 0.0, 1.0), 0.0) * 0.85
         return P + move, slide
 
@@ -1366,6 +1370,100 @@ def _teeth_follow(teeth, lift):
     key.value = 0.0
 
 
+# The lips' wet inner faces lie on each other over some millimetres of
+# depth in front of the teeth, so a mouth parted by a hair shows dark
+# between the lips, not enamel. The body's lips meet along a line. `LipSeal`
+# is that depth: a flap hanging this far (metres) from the upper lip's
+# underside and one standing this far up from the lower lip's top, each
+# riding its own lip a few millimetres behind its edge, inside the other
+# lip's flesh while the mouth is closed. Together they close the first
+# 3 mm of any parting.
+SEAL_HANGS = 0.0014
+SEAL_STANDS = 0.0018
+# The controls that open the mouth to show the teeth take the flaps away:
+# control -> (how much of the upper flap, of the lower flap) at full weight.
+# (The left and right lip controls take their own side's.)
+SEAL_OPENS = {"Jaw_Open": (1.0, 1.0), "Mouth_Open": (1.0, 1.0), "Upper_Lip_Raise": (1.0, 0.0),
+              "Lower_Lip_Lower": (0.0, 1.0), "Nose_Sneer": (0.5, 0.0)}
+# Where in the gums' palette the flaps are: the lining's red, in shade.
+SEAL_PLACE = (1.0, 0.22)
+
+
+def lip_seal(face, F, shapes, jaw_w):
+    """The `LipSeal` object (the notes above): two strips bound vertex by
+    vertex to the loop behind each lip's edge, with every shape of the
+    body's that moves those vertices, `Frame_Feminine`, and the jaw's
+    hold on them."""
+    import bpy
+    import teeth as jawlib
+    from common import new_object, shade_smooth
+    M, lips = face.P, face.mouth
+    reach = 0.95 * lips.half
+    points, bound, free, faces = [], [], [], []
+    for flap, (loop, way, tall) in enumerate(((lips.under[1], -1.0, SEAL_HANGS),
+                                              (lips.lower[mouth.CREST - 1], 1.0, SEAL_STANDS))):
+        chain = [int(i) for i in sorted(loop, key=lambda i: M[i][0]) if abs(M[i][0]) < reach]
+        first = len(points)
+        for i in chain:
+            taper = max(0.0, 1.0 - (abs(M[i][0]) / reach) ** 4)
+            for is_free in (False, True):
+                rise = way * tall * taper if is_free else -way * 0.0006
+                points.append(np.array([0.0, 0.0005, rise]))
+                bound.append(i)
+                free.append((flap, way * tall * taper) if is_free else None)
+        for k in range(len(chain) - 1):
+            a = first + 2 * k
+            faces.append((a, a + 2, a + 3, a + 1))
+    bound = np.array(bound, dtype=np.int64)
+    points = np.array(points)
+    mesh = bpy.data.meshes.new("LipSeal")
+    mesh.from_pydata([tuple(p) for p in M[bound] + points], [], faces)
+    mesh.update()
+    seal = new_object("LipSeal", mesh)
+    material = bpy.data.materials.get("LipSeal")
+    if material is None:
+        material = bpy.data.materials["Gums"].copy()
+        material.name = "LipSeal"
+        material.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.8
+    mesh.materials.append(material)
+    layer = mesh.uv_layers.new(name="UVMap")
+    uv = jawlib.place(np.array([SEAL_PLACE[0]]), np.array([SEAL_PLACE[1]]))[0]
+    for loop in mesh.loops:
+        layer.data[loop.index].uv = uv
+    for name, share in (("Head", 1.0 - jaw_w[bound]), ("Jaw", jaw_w[bound])):
+        group = seal.vertex_groups.new(name=name)
+        for k, w in enumerate(share):
+            if w > 1e-4:
+                group.add([k], float(w), "REPLACE")
+    # The shapes: each vertex takes its lip vertex's move, and the free
+    # edge of a flap is drawn back by the controls that bare the teeth.
+    rest = M[bound] + points
+    seal.shape_key_add(name="Basis", from_mix=False)
+    key = seal.shape_key_add(name="Frame_Feminine", from_mix=False)
+    for k, p in enumerate(F[bound] + points):
+        key.data[k].co = p
+    key.value = 0.0
+    side = {"Left": face.side(1)[bound], "Right": face.side(-1)[bound]}
+    for name, shape in shapes.items():
+        offsets = np.array([shape.get(int(i), np.zeros(3)) for i in bound])
+        base, part = name, None
+        for tag in ("Left", "Right"):
+            if name.endswith("_" + tag):
+                base, part = name[:-len(tag) - 1], side[tag]
+        if base in SEAL_OPENS:
+            for k, held in enumerate(free):
+                if held is not None:
+                    offsets[k, 2] -= held[1] * SEAL_OPENS[base][held[0]] * (1.0 if part is None else part[k])
+        if np.abs(offsets).max() < 2e-5:
+            continue
+        key = seal.shape_key_add(name=name, from_mix=False)
+        for k, d in enumerate(offsets):
+            key.data[k].co = rest[k] + d
+        key.value = 0.0
+    shade_smooth(seal)
+    return seal
+
+
 # -- the build's hook -----------------------------------------------------------
 
 def to_gltf(d):
@@ -1436,6 +1534,7 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     quads = [tuple(p.vertices) for p in brow.data.polygons]
     hair.add_shapes(brow, {name: hair.follow_bound(face, bound, at, quads, following[name]) for name in order})
     made["Brows"] = brow
+    made["LipSeal"] = lip_seal(face, F, shapes, jaw_w)
     # The teeth go where the mouth goes (and their simpler copies alike).
     lift = identity["Face_Mouth_Height"][0][face.mouth.mid]
     for part in (teeth, *teeth_copies):

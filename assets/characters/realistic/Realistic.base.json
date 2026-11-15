@@ -11,7 +11,8 @@
       "AxcenityRealistic/Teeth",
       "AxcenityRealistic/EyeShell",
       "AxcenityRealistic/Lashes",
-      "AxcenityRealistic/Brows"
+      "AxcenityRealistic/Brows",
+      "AxcenityRealistic/LipSeal"
     ]
   },
   "skeleton": {
@@ -3841,6 +3842,10 @@
     {
       "name": "Lashes",
       "shading": "hair"
+    },
+    {
+      "name": "LipSeal",
+      "shading": "standard"
     },
     {
       "name": "Mouth",

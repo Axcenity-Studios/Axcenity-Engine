@@ -4,7 +4,7 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 
 | File | What it is |
 | --- | --- |
-| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`. The skin maps are inside it. |
+| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`, `LipSeal`. The skin maps are inside it. |
 | `Realistic.base.json` | The base model manifest (written by `manifests.py`). |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
@@ -105,6 +105,8 @@ The engine lights a mouth's inside like the face, so its shade is baked (`teeth.
 
 - **`Teeth`, `Gums`, `Tongue`** each have a 64 px palette image (`RealisticTeeth`, `RealisticGums`, `RealisticTongue`: about 2 kB each): across it the material's colours (a tooth's neck, enamel and thin edge; the gum's edge, the firm gum and the redder lining; the tongue's groove and back), up it from no light to full light. A vertex's texture coordinates are its place in it, so `TEXCOORD_0` on `Teeth` is a colour and a shade per vertex, not an unwrap. One occlusion image (`RealisticMouthOcclusion`) is laid out alike. Roughness is a number per material (0.16, 0.34, 0.46). A real texture for the teeth would need the teeth unwrapped first.
 - **`Mouth`** (the lining, on `Body`) is darkened in the skin's albedo and occlusion by how far it is from the lips' line, and is matt for the first 5 mm inside the lips (roughness in the skin's map), so it doesn't mirror the sky between closed lips.
+- **`LipSeal`** (68 triangles, material `LipSeal`: the gums' palette in shade) is the depth the lips touch over: a flap hanging 1.4 mm from the upper lip's underside and one standing 1.8 mm up from the lower lip's top, each riding its own lip a few millimetres behind its edge, inside the other lip while the mouth is closed. A mouth parted by up to 3 mm shows dark between the lips, not the teeth behind; `Jaw_Open`, `Mouth_Open`, `Upper_Lip_Raise`, `Lower_Lip_Lower` and `Nose_Sneer` draw the flaps back.
+- **Even.** The mouth's resting form, the jaw's hold on it and every mouth shape are mirror images across the middle (`face.prepare`, `Face.evened`; the bundle's lips are not), and `face_checks.py` holds that to 0.1 mm.
 - **Size and place.** The jaw is 0.85 of the bundle's (adult teeth: the sources are in the face's notes) and stands 2.7 mm behind the upper lip's inner side on both frames.
 - **`Teeth_LOD1`, `Teeth_LOD2`** are made by the build (`teeth.LEVELS`). The engine draws the first whenever the part is under 30% of the view's height, which is every picture of a whole face, so its upper front teeth and its gums' edges are the full object's.
 

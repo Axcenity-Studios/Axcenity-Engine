@@ -49,7 +49,17 @@ INNER_LIP = (0.50, 0.19, 0.21)      # the lips' inner sides at their edges
 # What light is left on the mouth's lining by how far (metres) it is from
 # the line the lips meet on: the cheeks' insides by the corners are lit,
 # the back of the mouth is nearly black.
-MOUTH_SHADE = ((0.006, 1.0), (0.015, 0.75), (0.028, 0.36), (0.045, 0.10), (0.060, 0.04))
+MOUTH_SHADE = ((0.006, 1.0), (0.020, 0.85), (0.040, 0.62), (0.060, 0.45))
+# (The engine's own shadows and screen-space occlusion already make the
+# back of an open mouth dark: with more than this baked on top it was a
+# flat black hole.) Only the throat is near black: the lining further
+# than the first of these from the lips' line, by how near it is to the
+# middle of the mouth's back (to this share within the second distance,
+# none of it beyond the third; metres).
+THROAT = (0.042, 0.15, 0.005, 0.020)
+# How much of the lining's shade goes into its occlusion (`teeth.IN_COLOUR`
+# of it is in its colour).
+LINING_OCCLUDES = 0.4
 # The upper lip's underside lies on the lower lip while the mouth is
 # closed, and is wet: seen through the hair's breadth between the lips it
 # mirrored the studio's floor as a pale line along the mouth. So by how
@@ -272,6 +282,10 @@ def _mouth_shade(body, P, lm, size):
         away[bag] = np.minimum(away[bag], np.linalg.norm(X[bag] - (a + t[:, None] * (b - a)), axis=1))
     lit = np.ones(len(X))
     lit[bag] = np.interp(away[bag], [d for d, _ in MOUTH_SHADE], [v for _, v in MOUTH_SHADE])
+    middle = line[len(line) // 2]
+    off_axis = np.hypot(X[bag][:, 0] - middle[0], X[bag][:, 2] - (middle[2] - 0.004))
+    throat = THROAT[1] + (1.0 - THROAT[1]) * _step(THROAT[2], THROAT[3], off_axis)
+    lit[bag] *= np.where(away[bag] > THROAT[0], throat, 1.0)
     edge, wet = np.ones(len(X)), np.ones(len(X))
     edge[bag] = np.interp(away[bag], [d for d, _, _ in LIP_EDGE], [v for _, v, _ in LIP_EDGE])
     wet[bag] = np.interp(away[bag], [d for d, _, _ in LIP_EDGE], [(1.0 - r) / (1.0 - WET) for _, _, r in LIP_EDGE])
@@ -667,10 +681,10 @@ def bake(body, source, lm, size, out_dir):
     # the engine lights it like the face. The shade is in the colour.
     # (Divided between the colour and the occlusion, which takes the
     # sky's light and its reflection off: `teeth.IN_COLOUR`.)
-    from teeth import IN_COLOUR, IN_OCCLUSION
+    from teeth import IN_COLOUR
     shade, edge, wet = _mouth_shade(body, source["Masculine"], lm, size)
     albedo = albedo * (shade ** IN_COLOUR)[:, :, None]
-    ao = ao * shade ** IN_OCCLUSION * edge
+    ao = ao * shade ** LINING_OCCLUDES * edge
     roughness = np.where(hidden, 1.0 - (1.0 - WET) * wet, roughness)
 
     from PIL import Image
