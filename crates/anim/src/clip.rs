@@ -13,7 +13,7 @@ use glam::{Mat4, Quat, Vec3};
 use crate::bones::{bone_from_numbers, bone_paths, find_bone};
 use crate::files::{ClipFile, PropertyName, TakeLink};
 use crate::property_clip::{EvaluatedProperty, PropertyClip, sample_track};
-use crate::retarget::{HumanoidMap, Retarget, RetargetProfile};
+use crate::retarget::{HumanoidMap, Retarget, RetargetProfile, rest_arm_angle};
 
 /// A clip ready to play on one thing: its property tracks checked and,
 /// with a rig, its take and bone tracks bound to the rig's bones (matched
@@ -323,6 +323,43 @@ fn link_time(link: &TakeLink, through: f64) -> f64 {
     link.start + through * (link.end - link.start)
 }
 
+/// How far a bone's rest offset may be from the take's (as a share of the
+/// longer one) and still be the same skeleton.
+const SAME_LENGTH: f32 = 0.05;
+
+/// Whether playing `take` by bone name would give `rig`'s humanoid bones
+/// other lengths than their own: the take was made on a skeleton named like
+/// `rig` whose bones rest at other offsets, and its tracks key those
+/// offsets. Only said of skeletons that rest in the same pose (arms within
+/// 10 degrees), which is what playing through roles needs.
+fn reshapes(take: &Take, binding: &[Option<usize>], rig: &Rig, map: &HumanoidMap) -> bool {
+    let differs = take.tracks.iter().zip(binding).any(|(track, bound)| {
+        let Some(bone) = bound.filter(|&bone| map.bones().any(|role| role == bone)) else {
+            return false;
+        };
+        if rig.bones[bone].parent.is_none() || track.translation.times.is_empty() {
+            return false;
+        }
+        let Some(source) = take.skeleton.iter().find(|bone| bone.name == track.bone) else {
+            return false;
+        };
+        let (from, to) = (source.rest.translation, rig.bones[bone].rest.translation);
+        let longer = from.length().max(to.length());
+        longer > 1e-4 && from.distance(to) > SAME_LENGTH * longer
+    });
+    if !differs {
+        return false;
+    }
+    let source = HumanoidMap::detect(&take.skeleton);
+    match (
+        rest_arm_angle(&take.skeleton, &source),
+        rest_arm_angle(&rig.bones, map),
+    ) {
+        (Some(a), Some(b)) => (a - b).abs() < 10.0,
+        _ => false,
+    }
+}
+
 impl BoundTake {
     /// Binds `link`'s take, found by name in `takes`, to `rig`.
     fn bind(
@@ -355,8 +392,12 @@ impl BoundTake {
         // clip has no retarget profile asking for retargeting anyway.
         let (map, _) = HumanoidMap::for_skeleton(&rig.bones, rigs);
         let named = map.bones().any(|bone| binding.contains(&Some(bone)));
+        // The same names on a body of other proportions (another base model
+        // of the character library) also play through roles: by name, the
+        // take's own bone offsets would reshape the body.
+        let reshaped = named && profile.is_none() && reshapes(&takes[take], &binding, rig, &map);
         let mut retarget = None;
-        if (profile.is_some() || !named) && !takes[take].tracks.is_empty() {
+        if (profile.is_some() || !named || reshaped) && !takes[take].tracks.is_empty() {
             match Retarget::new(&takes[take], rig, rigs, profile) {
                 Ok(bound) => retarget = Some(bound),
                 Err(why) if !binding.iter().any(Option::is_some) => {

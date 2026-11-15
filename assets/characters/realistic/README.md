@@ -87,7 +87,7 @@ The 56 bones of the humanoid convention with the same names, plus 16 the build a
 | `LowerArmTwist`, `LowerLegTwist` | the limb's lower bone | Turns by half of the hand's or foot's twist about the limb's length. |
 | `ShoulderHelper`, `ElbowHelper`, `HipHelper`, `KneeHelper` | the joint's parent | Sits on the joint and turns half as far as the bone it reads (`UpperArm`, `LowerArm`, `UpperLeg`, `LowerLeg`), which holds the joint's volume when it bends. |
 
-At most four weights per vertex on every mesh. A clip made for the stylized humanoid must be **retargeted** onto this skeleton (its bones are other lengths); bound by bone name it would bring the stylized bone offsets with it (last tile of `clips.png`).
+At most four weights per vertex on every mesh. A clip made for the stylized humanoid is **retargeted** onto this skeleton (its bones are other lengths): bound by bone name it would bring the stylized bone offsets with it (last tile of `clips.png`), so `anim` plays such a take through humanoid roles (`clip.rs`, `reshapes`).
 
 ## Texture coordinates and skin maps
 

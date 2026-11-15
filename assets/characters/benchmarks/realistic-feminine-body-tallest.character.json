@@ -1,0 +1,10 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-body-tallest",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 1,
+    "height": 1.5,
+    "leg_length": 1.5
+  }
+}

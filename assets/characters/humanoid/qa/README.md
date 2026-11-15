@@ -40,7 +40,7 @@ Both scripts take `--package` (`stylized`, the default, or `realistic`), which p
 .bpy/bin/python -I assets/characters/humanoid/qa/render_baseline.py --package realistic --out docs/development/character-studio/co4
 ```
 
-- A package without a wardrobe, hair or face shapes skips those sections and sheets, and gets `twist_poses`, `clips` (the starter animations retargeted onto it, as `anim`'s `retarget.rs` does; the last tile is the same take bound by bone name), `lods` and `skin_maps` instead (`--only` takes these names too).
+- A package without a wardrobe, hair or face shapes skips those sections and sheets, and gets `twist_poses`, `clips` (the starter animations retargeted onto it, as `anim`'s `retarget.rs` does; the last tile is the same take bound by bone name, which the engine no longer does for a body of other proportions), `lods` and `skin_maps` instead (`--only` takes these names too).
 - Twist and helper bones (`Realistic.build.json` lists them and their rules) are turned in every pose as `crates/anim/src/twist.rs` turns them in the engine (`Character.drive` in `qa_scene.py`). When that rule changes, change both.
 - `twist` in the measurements: a limb turned about its own length (`forearm_twist_90`, `upper_arm_twist_70`, `thigh_twist_45`), with the smallest cross-section area along it, posed over rest (`ring_area_ratio_min`; 1 is no pinching, a limb without twist bones collapses toward the joint).
 - A thresholds file may hold `at_least`, `at_most` and `within` limits by a measure's path (`deformation/masculine/elbow_135/ring_area_ratio`), and `targets` with the same keys for what the build is meant to reach but hasn't: `--check` prints unmet targets and still passes on the limits; `--strict` fails on them too.
