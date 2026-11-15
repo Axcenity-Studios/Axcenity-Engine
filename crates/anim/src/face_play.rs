@@ -242,15 +242,16 @@ pub(crate) struct FaceLayers {
 /// How much of the way to shut each control already takes an eye at 1,
 /// which a blink then leaves alone. A head made for the standard controls
 /// is built to these shares (the realistic head's squint takes its lids
-/// 0.6 of the way to meeting, a raised cheek and a lowered brow 0.22).
+/// 0.69 of the way to meeting, a raised cheek 0.3 and a lowered brow
+/// 0.22).
 type BlinkYields = (&'static str, [(&'static str, f32); 4]);
 const BLINK_YIELDS: [BlinkYields; 2] = [
     (
         "Blink_Left",
         [
             ("Eye_Closed_Left", 1.0),
-            ("Eye_Squint_Left", 0.6),
-            ("Cheek_Raise_Left", 0.22),
+            ("Eye_Squint_Left", 0.69),
+            ("Cheek_Raise_Left", 0.3),
             ("Brow_Lower_Left", 0.22),
         ],
     ),
@@ -258,8 +259,8 @@ const BLINK_YIELDS: [BlinkYields; 2] = [
         "Blink_Right",
         [
             ("Eye_Closed_Right", 1.0),
-            ("Eye_Squint_Right", 0.6),
-            ("Cheek_Raise_Right", 0.22),
+            ("Eye_Squint_Right", 0.69),
+            ("Cheek_Raise_Right", 0.3),
             ("Brow_Lower_Right", 0.22),
         ],
     ),
