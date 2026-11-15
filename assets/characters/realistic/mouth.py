@@ -28,11 +28,11 @@ from facetopo import FS_HEAD, FS_MOUTH_LOWER, FS_MOUTH_UPPER, FS_MUZZLE, smooths
 
 # How far each loop of the lower lip rises with its top when the lips are
 # sealed (by loop, from the floor of the mouth).
-SEAL = {0: 0.0, 1: 0.55, 2: 1.0, 3: 1.0, 4: 0.8, 5: 0.45, 6: 0.15}
+SEAL = {0: 0.0, 1: 0.35, 2: 0.75, 3: 1.0, 4: 0.8, 5: 0.45, 6: 0.15}
 # The loop of the lower lip that meets the upper lip: its top's front.
 CREST = 3
 # The lips touch with this much room (metres).
-TOUCH = 0.00015
+TOUCH = 0.0003
 
 
 class Mouth:
@@ -88,5 +88,35 @@ class Mouth:
         x = P[idx][:, 0]
         rise = np.interp(x, xs, gaps, left=0.0, right=0.0)
         rise *= 1.0 - smoothstep(0.82 * self.half, 0.98 * self.half, np.abs(x))
-        out[idx, 2] += rise * share
-        return out, float((rise * share).max())
+        rise = rise * share
+        # No vertex rises further than its own room under the upper lip
+        # (the lip's top is wider than its crest, and the upper lip
+        # overhangs it unevenly): the lips touch, they don't cross.
+        topo = self.topo
+        tree = topo.bvh(P, {k for k, s in enumerate(topo.sets) if s in (FS_HEAD, FS_MOUTH_UPPER)})
+        for k, i in enumerate(idx):
+            if rise[k] > 0.0:
+                hit = tree.ray_cast(Vector(P[i]), Vector((0.0, 0.0, 1.0)), 0.02)
+                if hit[0] is not None:
+                    rise[k] = min(rise[k], max(0.0, float(hit[3]) - TOUCH))
+        out[idx, 2] += rise
+        # And the other way: where a face of the raised lip now lies over
+        # a vertex of the upper lip's underside, its corners come down.
+        from mathutils.bvhtree import BVHTree
+        sealed = set(int(i) for i in idx)
+        tris = [tuple(int(i) for i in t) for t in topo.tris if all(int(i) in sealed for i in t)]
+        above = [int(i) for i in self.edge] + [int(i) for k in (1, 2) for i in self.under[k]]
+        reach = 0.004
+        for _ in range(4):
+            lower = BVHTree.FromPolygons([tuple(q) for q in out], tris, all_triangles=True)
+            down = {}
+            for i in above:
+                hit = lower.ray_cast(Vector(out[i]) + Vector((0.0, 0.0, reach)), Vector((0.0, 0.0, -1.0)), reach + TOUCH)
+                if hit[0] is not None:
+                    for j in tris[hit[2]]:
+                        down[j] = max(down.get(j, 0.0), reach + TOUCH - float(hit[3]))
+            if not down:
+                break
+            for j, by in down.items():
+                out[j, 2] -= by
+        return out, float((out[idx, 2] - P[idx, 2]).max())

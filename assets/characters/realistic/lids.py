@@ -46,6 +46,11 @@ CLEARANCE = 0.0005
 # The lining under a lid (hidden) keeps this far off the eyeball: its flat
 # faces, stretched by a lid's turn, then stay off the round eyeball.
 UNDER_LID = 0.0009
+# A turned lid's skin (from its outer rim out) ends at least this far
+# above the height its lining keeps: the lining never shows through it.
+OVER_LINING = 0.0005
+# How many times the lid's skin has its turn averaged with its neighbours'.
+SMOOTH = 3
 # Half way along a shape's path a lid vertex is at least this far above
 # the white of the eye.
 CLEAR = 0.0005
@@ -223,6 +228,27 @@ class Eye:
         length = np.linalg.norm(d, axis=1)
         unit = d / np.maximum(length, 1e-12)[:, None]
         turned = self.c + unit * (self.ball.height(unit) + rest_height)[:, None]
+        # The lid's skin beyond its rim takes the turn smoothly: each
+        # vertex's move is averaged with its neighbours' (the rim and the
+        # lining keep theirs), so no loop folds against the next where
+        # the turn dies out at the corners.
+        step = np.array([self.step[i] for i in idx])
+        where = {int(i): k for k, i in enumerate(idx)}
+        move = turned - X
+        loose = [k for k in range(len(idx)) if step[k] >= 3]
+        for _ in range(SMOOTH):
+            new = move.copy()
+            for k in loose:
+                nb = [move[where[j]] if j in where else np.zeros(3) for j in self.topo.nbr[int(idx[k])]]
+                new[k] = 0.5 * move[k] + 0.5 * np.mean(nb, axis=0)
+            move = new
+        moved = np.linalg.norm(move, axis=1) > 1e-7
+        # A lid's skin stays over its own lining as it turns: the further
+        # a vertex has come, the nearer it is held to that height.
+        far = np.clip(np.linalg.norm(move, axis=1) / 0.002, 0.0, 1.0)
+        over = np.maximum(rest_height, np.where(step >= 2, UNDER_LID + OVER_LINING, 0.0))
+        rest_height = rest_height + (over - rest_height) * far
+        turned = self.ball.lift(X + move, rest_height)
         if clear:
             # The straight path's middle clears the white of the eye:
             # raise the far end where it wouldn't.

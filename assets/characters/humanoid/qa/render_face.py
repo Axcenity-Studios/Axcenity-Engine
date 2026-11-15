@@ -181,6 +181,39 @@ class Run:
                 labels.append(f"{fname[:4]} {label}")
         self.save("face_sidelit", tiles, 8, labels, "Lids and lips under one low side light")
 
+    def face_lods(self):
+        """Blink, jaw open and smile on the body and on its two simpler
+        copies (each drawn with the eyes and teeth)."""
+        ch, cam = self.scene(300, 300)
+        poses = [("blink", both("Blink")), ("jaw open", {"Jaw_Open": 1}), ("smile", both("Mouth_Smile"))]
+        tiles, labels = [], []
+        for fname, frame in FRAMES:
+            for level in ("Body", "Body_LOD1", "Body_LOD2"):
+                if level not in ch.parts:
+                    continue
+                ch.show_only([level, "Eyes", "Teeth"])
+                for label, weights in poses:
+                    FC.pose(ch, frame, weights)
+                    tiles.append(self.shot(cam, ch, f"lod_{fname}_{level}_{label}".replace(" ", "_"), "face"))
+                    labels.append(f"{fname[:4]} {level} {label}")
+        self.save("face_lods", tiles, 9, labels, "Blink, jaw open and smile on the body and its two simpler copies")
+
+    def face_under_chin(self):
+        """The jaw closed and open from below: nothing of the mouth's
+        inside may come through the skin under the chin."""
+        ch, cam = self.scene(480, 480)
+        tiles, labels = [], []
+        for fname, frame in FRAMES:
+            for label, weights in (("rest", {}), ("jaw open", {"Jaw_Open": 1}), ("jaw open + smile", dict(both("Mouth_Smile"), Jaw_Open=1))):
+                FC.pose(ch, frame, weights)
+                z = self.eye_z(ch)
+                for side in (0.28, -0.28):
+                    path = Q.shot(cam, os.path.join(self.tmp, f"chin_{fname}_{label}_{side}.png".replace(" ", "_")),
+                                  (side, -0.62, z - 0.50), (0.0, -0.08, z - 0.14), 85)
+                    tiles.append(path)
+                    labels.append(f"{fname[:4]} {label}")
+        self.save("face_under_chin", tiles, 6, labels, "From under the chin: jaw closed and open")
+
     def face_visemes(self):
         self.grid("face_visemes", list(FC.visemes().items()), "mouth", "Visemes (the built-in map, jaw share 0.4)", cols=6)
 
@@ -201,7 +234,7 @@ class Run:
         self.save("face_identity", tiles, 12, labels, "Face identity parameters at -1 and +1")
 
 
-SHEETS = ["face_rest", "face_blink", "face_sidelit", "face_controls_eyes", "face_controls_mouth", "face_clay", "face_visemes",
+SHEETS = ["face_rest", "face_blink", "face_sidelit", "face_lods", "face_under_chin", "face_controls_eyes", "face_controls_mouth", "face_clay", "face_visemes",
           "face_expressions", "face_identity"]
 
 

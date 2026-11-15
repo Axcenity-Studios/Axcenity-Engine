@@ -158,3 +158,51 @@ fn the_faces_parts_carry_the_shapes_they_follow() {
         }
     }
 }
+
+/// The ARKit mapping (CO6): the engine's built-in `arkit` profile says
+/// which control each of ARKit's face shapes plays. Every control it
+/// uses is one this head plays, through the `axcenity` profile, by a
+/// shape that moves vertices (the body's, or the tongue's part's) or by
+/// an eye or jaw bone. So ARKit face data mapped onto the controls
+/// drives the realistic head with nothing dropped but the seven ARKit
+/// shapes the controls have no place for (`co6/README.md` lists them).
+#[test]
+fn every_control_the_arkit_profile_uses_plays_on_the_realistic_head() {
+    use axcenity_core::face::face_control;
+
+    let manifest = manifest();
+    let name = manifest["face"]["profile"].as_str().unwrap();
+    let body = object(manifest["model"]["body"].as_str().unwrap());
+    let (rig, problems) = FaceRig::bind(&body, name, &built_in_face_profile(name).unwrap());
+    assert!(problems.is_empty());
+    let on_body = moving_shapes(&body);
+    let on_teeth = moving_shapes(&part(&manifest, "Teeth"));
+    let by_bone = [
+        "Eye_Look_Up",
+        "Eye_Look_Down",
+        "Eye_Look_Left",
+        "Eye_Look_Right",
+        "Jaw_Open",
+        "Jaw_Left",
+        "Jaw_Right",
+    ];
+    let arkit = built_in_face_profile("arkit").unwrap();
+    let mut played = 0;
+    for (control, shapes) in &arkit.controls {
+        assert!(!shapes.is_empty(), "{control} names no ARKit shape");
+        let index = face_control(control).unwrap_or_else(|| panic!("{control} isn't a control"));
+        assert!(
+            rig.moves(index),
+            "{control} moves nothing on the realistic head"
+        );
+        let moving = on_body.contains(control.as_str()) || on_teeth.contains(control.as_str());
+        assert!(
+            moving || by_bone.contains(&control.as_str()),
+            "{control} has neither a moving shape nor a bone"
+        );
+        played += 1;
+    }
+    // All the standard controls but Tongue_Up and Tongue_Down, which
+    // ARKit has no shape for.
+    assert_eq!(played, FACE_CONTROLS.len() - 2);
+}

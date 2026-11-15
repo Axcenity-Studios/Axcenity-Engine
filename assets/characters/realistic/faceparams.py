@@ -8,8 +8,10 @@ to 1, 0 being the face as built. A paired feature has a parameter a side
 The middle of the face has single parameters, and three that push it off
 centre (`nose_tilt`, `jaw_shift`, in the advanced view).
 
-`pupil_size` drives `Pupil_Size`, a shape of the `Eyes` part (the body
-carries an empty shape of that name).
+The pupil has no parameter: `Pupil_Size` is a shape of the `Eyes` part
+that moves 1.3 mm of the eye, which is not a slider's worth (a parameter
+has to be seen on the body); the eye shading's `pupil_size` (CO7) or a
+script setting the part's shape is what should drive it.
 """
 
 # (group id, label): all in the studio's `face` category.
@@ -46,7 +48,6 @@ PAIRED = [
 
 # Single: (shape, id, label, group, advanced).
 SINGLE = [
-    ("Pupil_Size", "pupil_size", "Pupil size", "eyes", False),
     ("Face_Brow_Ridge", "brow_ridge", "Brow ridge", "brows", False),
     ("Face_Nose_Length", "nose_length", "Nose length", "nose", False),
     ("Face_Nose_Bridge", "nose_bridge", "Nose bridge", "nose", False),

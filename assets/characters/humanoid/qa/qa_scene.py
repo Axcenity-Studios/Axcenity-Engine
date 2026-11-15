@@ -112,7 +112,8 @@ def load_custom(path=CUSTOM_PATH):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if "frame" in data and "body" not in data:
-        data = dict(data, body={"Frame_Feminine": data["frame"]}, face={}, masks=[], parts={}, hair=[],
+        data = dict(data, body={"Frame_Feminine": data["frame"]},
+                    face=(data.get("face") or {}).get("face_identity", {}), masks=[], parts={}, hair=[],
                     default={"outfit": [], "hair": None})
     return data
 

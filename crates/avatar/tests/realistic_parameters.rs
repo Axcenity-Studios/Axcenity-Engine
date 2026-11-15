@@ -139,8 +139,8 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
         }
     }
     // Frame (one end), muscle and fat, sixteen regions, nine proportions
-    // (the hips only widen: one end).
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1);
+    // (the hips only widen: one end), and the face's 45 parameters (CO6).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1 + 2 * 45);
 }
 
 /// The two whole-body sliders are not one slider twice: each corner of
@@ -246,5 +246,7 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // 4 corrective shapes and the 44 expression shapes (the 48 face
     // controls less the four eye looks, which are bones).
     assert_eq!(left.len(), 48, "{left:?}");
-    assert_eq!(model.morph_targets.len(), 143);
+    // (One less than at the merge: the body no longer carries `Pupil_Size`,
+    // which is the eyes' own shape and no slider's.)
+    assert_eq!(model.morph_targets.len(), 142);
 }

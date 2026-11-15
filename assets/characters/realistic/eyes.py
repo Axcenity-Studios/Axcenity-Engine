@@ -52,6 +52,8 @@ SCLERA_SPAN = 115.0
 # line between the lids (0 to 1), and how high it stands over the white.
 FILM_RINGS = ((0.0, 0.0), (0.3, 0.0008), (0.65, 0.0014), (1.0, 0.0015))
 TEAR_REACH = 0.16
+# How far the film and the tear line draw back behind closed lids (metres).
+TUCK = 0.0009
 
 
 def _dir(theta, phi):
@@ -307,7 +309,11 @@ def follow(face, mix, shape, lids):
         gap_rest = np.linalg.norm(P[m["own"]] - sum(P[i] * w for i, w in m["across"]))
         gap = np.linalg.norm(at(m["own"]) - sum(at(i) * w for i, w in m["across"]))
         share = min(1.0, gap / max(gap_rest, 1e-9))
-        out[k] = ball.lift(moved[None], m["lift"] * share)[0] * share + moved * (1.0 - share) - lifted
+        # (And drawn back toward the eyeball as they meet: nothing of
+        # the film or the tear line is left in the closed lids' seam.)
+        away = moved - ball.c
+        tucked = moved - away / max(np.linalg.norm(away), 1e-9) * TUCK
+        out[k] = ball.lift(moved[None], m["lift"] * share)[0] * share + tucked * (1.0 - share) - lifted
     return out
 
 

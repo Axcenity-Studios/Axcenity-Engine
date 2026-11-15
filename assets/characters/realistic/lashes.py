@@ -25,10 +25,10 @@ from facetopo import SIDES, nearest, rotate_about
 LASH = {True: 0.0088, False: 0.0042}
 # Half the brow card's height, its segments along and how far it floats
 # over the skin.
-BROW_HALF = 0.0062
+BROW_HALF = 0.0078
 BROW_SEGMENTS = 14
 BROW_LIFT = 0.0005
-HAIR = (0.030, 0.020, 0.014)
+HAIR = (0.020, 0.013, 0.009)
 
 
 def _strands(path, size, count, seed, draw_one, most=1.0):
@@ -64,9 +64,22 @@ def lash_texture(out_dir):
         for k in range(1, steps + 1):
             t = k / steps
             at = (x + lean * t * t, h - 1 - length * t)
-            draw.line([last, at], fill=255, width=max(1, int(round(scale * (2.6 - 1.9 * t)))))
+            draw.line([last, at], fill=255, width=max(1, int(round(scale * (4.2 - 3.0 * t)))))
             last = at
-    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (256, 64), 85, 5, one)
+
+    def fringe(draw, rng, w, h, scale):
+        # The lash line itself: where the lashes leave the lid they
+        # stand too close to tell apart.
+        x = rng.uniform(0.0, 1.0) * w
+        draw.line([(x, h - 1), (x + rng.normal(0, 0.01) * w, h - 1 - rng.uniform(0.16, 0.30) * h)], fill=255,
+                  width=int(scale * 5))
+
+    def both(draw, rng, w, h, scale):
+        one(draw, rng, w, h, scale)
+        for _ in range(3):
+            fringe(draw, rng, w, h, scale)
+
+    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (256, 64), 110, 5, both)
 
 
 def brow_texture(out_dir):
@@ -75,7 +88,7 @@ def brow_texture(out_dir):
     the first two thirds, thinning out."""
     def one(draw, rng, w, h, scale):
         u = rng.uniform(0.02, 0.98) ** 0.9
-        thick = 0.34 * (1.0 - 0.72 * max(0.0, u - 0.3) / 0.7) * min(1.0, 0.35 + u * 4.0)
+        thick = 0.40 * (1.0 - 0.70 * max(0.0, u - 0.3) / 0.7) * min(1.0, 0.45 + u * 4.0)
         centre = 0.52 - 0.10 * math.sin(u * math.pi * 0.9)
         v = centre + rng.uniform(-1.0, 1.0) * thick
         angle = math.radians(80.0 - 78.0 * min(1.0, u * 1.35) + rng.normal(0.0, 9.0))
@@ -84,15 +97,13 @@ def brow_texture(out_dir):
         length = rng.uniform(0.10, 0.20) * h * 2.2
         x0, y0 = u * w, v * h
         x1, y1 = x0 + math.cos(angle) * length, y0 - math.sin(angle) * length
-        draw.line([(x0, y0), (x1, y1)], fill=255, width=max(1, int(scale * 1.5)))
-    return _strands(os.path.join(out_dir, "RealisticBrows.png"), (512, 128), 420, 9, one, most=0.82)
+        draw.line([(x0, y0), (x1, y1)], fill=255, width=max(1, int(scale * 2.2)))
+    return _strands(os.path.join(out_dir, "RealisticBrows.png"), (512, 128), 1100, 9, one, most=0.95)
 
 
 def _material(name, texture, cut=True):
-    """Hair drawn on a card: cut out by the texture's alpha (`cut`: glTF
-    alphaMode MASK, for the lashes' fine ends) or blended by it (the
-    brows, whose hairs are finer than a pixel at most distances and read
-    as a soft patch)."""
+    """Hair drawn on a card: blended by the texture's alpha, or with
+    `cut` cut out by it (glTF alphaMode MASK; not used: see `lashes`)."""
     m = bpy.data.materials.get(name)
     if m is not None:
         return m
@@ -182,7 +193,10 @@ def lashes(face, out_dir):
                         quad, uv = quad[::-1], uv[::-1]
                     faces.append(quad)
                     uvs.append(uv)
-    obj = _object("Lashes", pts, faces, uvs, _material("Lashes", lash_texture(out_dir)))
+    # Blended, not cut out: in the engine a cut-out card on the face
+    # shows the backdrop through the skin behind its clear parts (seen
+    # as a grey band under the eye in CO6's first captures).
+    obj = _object("Lashes", pts, faces, uvs, _material("Lashes", lash_texture(out_dir), cut=False))
     return obj, roots
 
 
@@ -266,10 +280,14 @@ def brows(face, out_dir):
     return obj, bound
 
 
-def follow_bound(bound, shape):
-    """Offsets of vertices bound to the skin under a body shape."""
+def follow_bound(bound, shape, rows=3):
+    """Offsets of the brows' vertices under a body shape. A card's `rows`
+    vertices across the brow all move as the skin under its middle one
+    does: the card rides the brow whole, it is not pulled apart where the
+    skin above the brow moves less than the skin below it."""
     out = np.zeros((len(bound), 3))
-    for k, (tri, shares) in enumerate(bound):
+    for k in range(len(bound)):
+        tri, shares = bound[rows * (k // rows) + rows // 2]
         for i, w in zip(tri, shares):
             d = shape.get(int(i))
             if d is not None:

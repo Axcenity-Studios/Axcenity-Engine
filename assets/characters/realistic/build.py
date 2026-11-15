@@ -93,6 +93,8 @@ def build(out_dir, texture_size=2048, bakes=True):
     topo = face.topo_of(body_obj.data, sets)
     m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f)
     M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
+    if maps:
+        face_rest["lid_texels_softened"] = face.soften_lids(body_obj, topo, m_face, eyes_m, eye_radius, maps)
     eyes = eyelib.eyes(eyes_m, eye_radius, parts.iris_texture(out_dir), out_dir)
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
