@@ -25,7 +25,7 @@ What the engine doesn't do, or does with a known flaw, today. Each entry names w
 - AMD/Vulkan/Windows: the sky clear isn't sRGB-encoded through an sRGB view (`docs/rendering/pipeline.md`).
 - Lights are tiled in 2D, not clustered; rect lights use a representative point.
 - No vertex colors or `KHR_materials_emissive_strength` from glTF; FBX uses the first UV set; glTF animations are read as bone takes, but their morph target weight channels aren't.
-- Humanoid retargeting finds roles by bone names only: a skeleton with unusual names can't be mapped by hand yet; fingers aren't retargeted (`docs/rendering/animation.md`).
+- Humanoid retargeting finds roles by bone names or by a rig definition of the project's (`assets/rigs/*.rig.json`); a retargeted take moves role bones only, so a bone without a role keeps its place (`docs/rendering/animation.md`).
 
 ## Physics
 
@@ -51,6 +51,14 @@ The Character Runtime (Character Studio overhaul CO3; [Characters](../Engine-Sys
 - **Binding-fitted and socket items have no shipped content** (CO9, CO10): every item in the built-in library fits by its own copies of the body's shapes. A `binding` item would be drawn as a plain skinned part, unfitted.
 - **A character's parts pick their levels of detail one by one.** A small part (underwear, eyes, brows) switches to a simpler copy nearer the camera than the body does, and a simplified garment doesn't keep its clearance from the skin: from about 9 studs the stylized character's skin shows through its underwear in blotches (seen in CO2's in-engine captures, which record each part's level in `captures.json`). Fixing it is CO18's "character LOD sets switched together", with CO9's region hiding (the body under a garment isn't drawn) and CO4's constrained LODs; until then judge clothing fit in the captures' full-detail view and in the Blender harness.
 - **The identity bake's cost isn't measured** (CO18). A derived model is baked again in every run and whenever its base model is reloaded, never cooked, and each distinct description makes its own.
+
+The realistic base body (Character Studio overhaul CO4, built and waiting for review; [Characters](../Engine-Systems/Characters.md#the-realistic-base-body), `docs/development/character-studio/testing.md`). Numbers are **Measured** with the Blender QA harness (`measure.py --package realistic`; masculine / feminine frame) and kept in `docs/development/character-studio/co4/measurements.json`:
+
+- **`axcenity/realistic` is not yet a usable character family.** It has one body shape (`Frame_Feminine`); the body shapes arrive in CO5 and the face in CO6. It has no items, face shapes or hair, and the library written into a project is still the stylized package alone.
+- **The raised shoulder misses its target.** With the arm raised 150 degrees the shoulder keeps 0.562 / 0.561 of its local volume; the target is 0.8 or more. A crease between collar and arm and a flattened deltoid show in the pose sheet. The corrective shapes are CO5's. The other CO4 targets are met: the elbow at 135 degrees keeps 0.757 / 0.758 and the knee 0.74 / 0.75 of the ring area (0.6 or more), no face vertex above the head joint carries `Neck` weight (the stylized body has 911), and eyes and teeth don't interpenetrate at rest.
+- **Still short elsewhere on that body:** the fist self-intersects (247 / 199 triangle pairs), the teeth touch the lower lip's inner side with the jaw open, and the lips rest about 2 mm apart (CO6).
+- **One contract test is red on purpose.** `avatar`'s `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` (`crates/avatar/tests/shipped_library.rs`) fails for `axcenity/realistic` on a floor in the test itself (a base body has more than 10 shapes), because the body has one shape until CO5 adds the body shapes. The manifest's own check against its model passes. It is not an accepted baseline.
+- **Twist and helper bones are found by name.** No manifest field describes the driver rule yet, so only a skeleton that uses the names in `crates/anim/src/twist.rs` is driven ([Animation](../Engine-Systems/Animation.md)).
 
 ## Editor
 

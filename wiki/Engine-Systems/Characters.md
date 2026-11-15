@@ -5,16 +5,16 @@ status: current
 implementation: implemented
 crates: [character, gameplay, avatar, assets]
 source: [crates/character/src/lib.rs, crates/character/src/seat.rs, crates/character/src/rig.rs, crates/gameplay/src/description.rs, crates/gameplay/src/description_system.rs, crates/avatar/src/resolve.rs, crates/assets/src/model/identity.rs, crates/assets/src/derived.rs, crates/core/src/material_values.rs, crates/scene/src/material.rs, crates/project/src/character_library.rs]
-docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md, docs/development/character-studio/architecture.md, crates/gameplay/CLAUDE.md]
+docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md, docs/development/character-studio/architecture.md, docs/development/character-studio/testing.md, crates/gameplay/CLAUDE.md]
 verified: 2026-11-14
-verified_commit: f903964e
+verified_commit: 5971bc70
 tags: [system/character, gameplay]
 ---
 
 # Characters
 
 > [!summary]
-> `character` steps `ThirdPersonController` and `FirstPersonController` Instances (declared in `core`) with the same **kinematic** movement code: ray probes (`physics::cast_ray_excluding`), not a physics body. Walk, run and crouch are built-in modes; jump, slopes and step-up are movement on those modes; a custom `Movement` name hands motion to scripts. It also seats characters (Seats and VehicleSeats), rides anchored moving platforms, and provides the default character rig. Humanoids, Players and spawning live in `script` on top of it. **Implemented.** What a character looks like is separate: the **Character Runtime** (Character Studio overhaul CO3, in `gameplay`, `avatar`, `assets`, `anim` and `scene`) applies a character **description** to a character's Model; see [Applying a description](#applying-a-description-character-runtime). **Built in CO3, pending review** ([ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) is Proposed).
+> `character` steps `ThirdPersonController` and `FirstPersonController` Instances (declared in `core`) with the same **kinematic** movement code: ray probes (`physics::cast_ray_excluding`), not a physics body. Walk, run and crouch are built-in modes; jump, slopes and step-up are movement on those modes; a custom `Movement` name hands motion to scripts. It also seats characters (Seats and VehicleSeats), rides anchored moving platforms, and provides the default character rig. Humanoids, Players and spawning live in `script` on top of it. **Implemented.** What a character looks like is separate: the **Character Runtime** (Character Studio overhaul CO3, in `gameplay`, `avatar`, `assets`, `anim` and `scene`) applies a character **description** to a character's Model; see [Applying a description](#applying-a-description-character-runtime). **Built in CO3, pending review** ([ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) is Proposed). A second base model, [the realistic base body](#the-realistic-base-body), is **built in CO4 and waits for review**; it is not yet a family characters are made from.
 
 ## Architecture and flow
 
@@ -63,6 +63,15 @@ flowchart LR
 - **Scripts** reach all of it through `HumanoidDescription`'s methods, `Humanoid:ApplyDescription`, `Humanoid:GetAppliedDescription` (a copy) and `Players:CreateHumanoidModelFromDescription` (a copy of the StarterCharacter with the description applied): `docs/scripting/api-character.md`.
 - **The library in a project.** `project::add_character_library` (`crates/project/src/character_library.rs`) writes the engine's built-in package (the stylized humanoid's manifests, `HumanoidParts.glb` and a catalogue) into a project's `assets/characters/`, keeping files already there. `project::add_default_humanoid` calls it first, so the library arrives with the default character: a new project with a character, Insert ▸ Character, Character Studio's workspace folder and the visual QA capture's stage. A project made before CO3 has none until Insert ▸ Character is used, and a packed game from such a project has none ([Known limitations](../Roadmap/Known-Limitations.md#characters)).
 
+## The realistic base body
+
+Built in Character Studio overhaul CO4, waiting for review ([ADR-0032](../Architecture/Architecture-Decisions/ADR-0032-Semi-Realistic-Default-Character-Family.md)). The package's own README, beside its files in the repository's `assets/characters/realistic/` folder, describes the build; the contract is `docs/development/character-studio/architecture.md` (sections 6 and 12).
+
+- **What it is.** The base model family `axcenity/realistic`: the manifest `Realistic.base.json` and the model `RealisticParts.glb`, with the skeleton `AxcenityRealistic`, the body `AxcenityRealistic/Body`, the parts `Eyes` and `Teeth`, and two simpler copies of the body (`Body_LOD1`, `Body_LOD2`). Its 14 body regions are stored twice, as the index map `RealisticRegions.png` and as the body's `TEXCOORD_1` ([ADR-0035](../Architecture/Architecture-Decisions/ADR-0035-Clothing-Fits-By-Surface-Binding-With-Region-Hiding.md); nothing is hidden by them until CO9). Its `build.py` makes all of it from Blender Studio's Human Base Meshes v1.4.1, which are CC0.
+- **Skeleton.** The 56 bones of the humanoid convention, named as the stylized humanoid's are, plus 16: eight twist bones and eight helper bones, listed in the manifest's `skeleton.added_bones`. No clip keys them; `anim` turns them by name just before the skin is posed ([Animation](Animation.md)).
+- **Clips.** The starter animations were made on the stylized skeleton, whose bones have the same names and other lengths. `anim` plays such a take through humanoid roles, not by name, so the realistic body keeps its own proportions ([Animation](Animation.md)).
+- **Not yet usable as a character family.** The body has one shape (`Frame_Feminine`). The body shapes arrive in CO5 and the face in CO6, and it has no items, face shapes or hair. The library `project` writes into a project is still the stylized package alone (`crates/project/src/character_library.rs`). What it measures against its targets, and what is still short, is in [Known limitations](../Roadmap/Known-Limitations.md#characters) and `docs/development/character-studio/testing.md`.
+
 ## Dependencies
 
 `core`, `anim` (seat `Sit` state), `assets`, `physics`. **`physics` must never depend on it**; `nav` may. The Character Runtime is not in the `character` crate: the applier is in `gameplay`, which depends on `avatar` for it; `avatar` itself makes no Instances.
@@ -73,11 +82,11 @@ flowchart LR
 
 ## Testing
 
-`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset). The Character Runtime: `avatar` `tests::resolving`; `assets` `model::identity::tests` and `derived::tests`; `crates/gameplay/src/description_tests.rs` (changing a description, and scripts doing it on both sides); the player's `default_humanoid_tests/description.rs` (parts worn, identity baked, eyes carried by the frame's bones, body sliders, material values, a kept description applied again) and `default_humanoid_tests/description_lua.rs`; the editor's `a_character_file_applied_in_a_game_matches_the_workspaces_preview` (the applier and Character Studio's preview put every corner in the same place). Visual QA: `crates/player/src/character_capture.rs` draws a character from a description file with the player's renderer (five fixed cameras, two lighting presets; the `capture_characters` tool), the same input giving the same pictures; the benchmark characters are `assets/characters/benchmarks/` (`docs/development/character-studio/visual-qa.md`).
+`crates/character/src/tests.rs`, `tests/seat.rs`; player tests `seat_tests.rs`, `vehicle_tests.rs`, `spawn_tests.rs`, `humanoid_tests.rs`, `default_humanoid_tests.rs` (the default humanoid asset). The Character Runtime: `avatar` `tests::resolving`; `assets` `model::identity::tests` and `derived::tests`; `crates/gameplay/src/description_tests.rs` (changing a description, and scripts doing it on both sides); the player's `default_humanoid_tests/description.rs` (parts worn, identity baked, eyes carried by the frame's bones, body sliders, material values, a kept description applied again) and `default_humanoid_tests/description_lua.rs`; the editor's `a_character_file_applied_in_a_game_matches_the_workspaces_preview` (the applier and Character Studio's preview put every corner in the same place). Visual QA: `crates/player/src/character_capture.rs` draws a character from a description file with the player's renderer (five fixed cameras, two lighting presets; the `capture_characters` tool), the same input giving the same pictures; the benchmark characters are `assets/characters/benchmarks/` (`docs/development/character-studio/visual-qa.md`). The realistic body is measured and rendered in Blender (`measure.py` and `render_baseline.py` with `--package realistic`, held to the package's `qa/thresholds.json`); its numbers are `docs/development/character-studio/co4/measurements.json`, with its sheets beside that file.
 
 ## Limitations
 
-The bake's cost isn't measured (**Unverified**; CO18 measures characters). The rest of the Character Runtime's limits (the editor's edit mode, values not drawn until CO7, no content yet for binding-fitted and socket items) are in [Known limitations](../Roadmap/Known-Limitations.md#characters).
+The bake's cost isn't measured (**Unverified**; CO18 measures characters). The rest of the Character Runtime's limits (the editor's edit mode, values not drawn until CO7, no content yet for binding-fitted and socket items) are in [Known limitations](../Roadmap/Known-Limitations.md#characters), with the realistic base body's (the shoulder target not met, one contract test left red until CO5).
 
 ## Development guidance
 
