@@ -25,7 +25,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import features  # noqa: E402
 import geom  # noqa: E402
+import marks  # noqa: E402
 import skeleton  # noqa: E402
 from register import fit  # noqa: E402
 
@@ -53,6 +55,7 @@ def parts(V, lm):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", required=True)
+    ap.add_argument("--features", action="store_true", help="with the surface landmarks pinned (CO5)")
     a = ap.parse_args()
     M = np.load(os.path.join(a.work, "makehuman.npz"))
     names = M["joint_names"].tolist()
@@ -60,9 +63,19 @@ def main():
     lm_a = skeleton.makehuman_landmarks(dict(zip(names, M["joints_male"])), A)
     lm_b = skeleton.makehuman_landmarks(dict(zip(names, M["joints_female"])), B)
     src, dst, _ = skeleton.control_pairs(lm_a, lm_b)
-    warped = geom.rbf_warp(src, dst, A)
     tris, edges = geom.triangles(M["faces"]), geom.edges(M["faces"])
-    wrapped = fit(warped, tris, edges, B, tris, log=lambda *_: None)
+    pins = None
+    if a.features:
+        # As register.py pins them (both bodies are MakeHuman's here, so
+        # the navel and nipples come from the topology on both).
+        fa, ca = features.surface_landmarks(A, tris, lm_a, shaped=A + M["corner_male_maxmuscle_averageweight"])
+        fb, cb = features.surface_landmarks(B, tris, lm_b, shaped=B + M["corner_female_maxmuscle_averageweight"])
+        ma, mb = marks.by_density(A, M["faces"], lm_a)[0], marks.by_density(B, M["faces"], lm_b)[0]
+        names_f, src_f, dst_f = features.pairs(fa, ca, fb, cb, ma, mb, log=print)
+        pins = (np.array([int(np.argmin(((A - p) ** 2).sum(axis=1))) for p in src_f]), dst_f)
+        src, dst = np.vstack([src, src_f]), np.vstack([dst, dst_f])
+    warped = geom.rbf_warp(src, dst, A)
+    wrapped = fit(warped, tris, edges, B, tris, log=lambda *_: None, pins=pins)
     part = parts(B, lm_b)
     print("| Part | Vertices | Before any alignment: median mm | After the landmark warp: median, 95% mm | "
           "After the fit: median, 95%, largest mm |")

@@ -63,6 +63,48 @@ JAW_OPEN_DEG = 25.0  # crates/assets/src/face_profile.rs: jaw_open limit
 BUILDS = ("Build_Heavy", "Build_Slim", "Build_Muscular")
 
 
+def load_manifest(parts_path):
+    """The base model manifest beside a parts file (None if it has none)."""
+    folder = os.path.dirname(parts_path)
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".base.json"):
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def span(value, source=None, to=None):
+    """`avatar::span`: a value through its `from` span onto its `to` span."""
+    source = source or [0.0, 1.0]
+    to = to or source
+    length = source[1] - source[0]
+    if length == 0:
+        return to[0]
+    t = min(1.0, max(0.0, (value - source[0]) / length))
+    return to[0] + (to[1] - to[0]) * t
+
+
+def manifest_weights(manifest, values):
+    """{shape: weight} for slider `values` ({parameter id: value}; the
+    rest at their defaults) by the manifest's rule, as `avatar::resolve`
+    does it: each parameter's shape drivers plus each corner's product
+    of factors."""
+    value = {}
+    for p in manifest["parameters"]:
+        v = values.get(p["id"], p.get("default", 0.0))
+        value[p["id"]] = min(p["range"][1], max(p["range"][0], v))
+    out = {}
+    for p in manifest["parameters"]:
+        for d in p.get("shapes", []):
+            out[d["shape"]] = out.get(d["shape"], 0.0) + span(value[p["id"]], d.get("from"), d.get("to"))
+    for c in manifest.get("corners", []):
+        w = 1.0
+        for f in c["factors"]:
+            w *= span(value[f["parameter"]], f.get("from"), f.get("to"))
+        out[c["shape"]] = out.get(c["shape"], 0.0) + w
+    return out
+
+
 def load_custom(path=CUSTOM_PATH):
     """A package's customization data, in the stylized file's layout. The
     realistic package's build data (`frame`, `twists`, `helpers`) is read
@@ -113,6 +155,7 @@ class Character:
                 self.defaults[name] = {kb.name: kb.value for kb in sk.key_blocks[1:]}
                 for kb in sk.key_blocks[1:]:
                     kb.slider_min = -1.0
+        self.manifest = load_manifest(path)
 
     @staticmethod
     def _mode(obj, mode):
@@ -162,6 +205,12 @@ class Character:
         self.look = {"frame": frame, "face": dict(face or {})}
         self.set_eyes()
         update()
+
+    def set_sliders(self, values):
+        """The look the manifest gives slider `values` ({parameter id:
+        value}): every shape it drives, and the frame's bones and eyes."""
+        w = manifest_weights(self.manifest, values)
+        self.set_look(frame=values.get("frame", 0.0), build=w)
 
     def set_frame_bones(self, frame):
         """Moves the rest skeleton by Frame_Feminine's bone offsets (eyes

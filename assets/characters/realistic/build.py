@@ -34,6 +34,7 @@ import manifests  # noqa: E402
 import parts  # noqa: E402
 import regions  # noqa: E402
 import rig  # noqa: E402
+import shapes  # noqa: E402
 import skin  # noqa: E402
 import uvs  # noqa: E402
 from common import face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
@@ -103,6 +104,12 @@ def build(out_dir, texture_size=2048, bakes=True):
     skin.materials(body_obj, sets, maps)
     shade_smooth(body_obj)
     add_shape(body_obj, "Frame_Feminine", P, F.P)
+    # The body's muscle and fat shapes (CO5), on both frames.
+    both = lambda m, f: {"Masculine": m, "Feminine": f}  # noqa: E731
+    body_shapes, shape_report = shapes.build(
+        body_obj, source, both(P, F.P), lm, both(joints, joints_f), weights, both(eyes_m, eyes_f),
+        both(eye_radius, eye_radius_f))
+    shapes.add_keys(body_obj, body_shapes, both(P, F.P))
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
     copies = lods.build(body_obj, armature, lm, P, joints, face_regions)
     for copy in copies:
@@ -128,6 +135,7 @@ def build(out_dir, texture_size=2048, bakes=True):
         "textures": maps["report"] if maps else {"size": 0},
         "eyes": {"masculine": eye_fit, "feminine": eye_fit_f},
         "teeth": teeth_fit,
+        "body_shapes": shape_report,
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
     objects.update({c.name: c for c in copies})

@@ -357,6 +357,64 @@ class Run:
         take("hip_flex_100 from behind", ((1.0, 1.3, 0.75), (0.09, 0.05, 0.80), 85), pose="hip_flex_100")
         self.save("details", tiles, 4, labels, "Details: eyes, mouth, hands, feet and the joints' other sides")
 
+    def build_grid(self, frame):
+        """The body over muscle (across) by fat (down), clay: the two
+        whole-body sliders at their ends and their middle."""
+        ch, cam = self.scene(self.a.parts, 300, 400)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        Q.turn_character(ch, 25)
+        tiles, labels = [], []
+        for fat in (1.0, 0.0, -1.0):
+            for muscle in (-1.0, 0.0, 1.0):
+                ch.set_sliders({"frame": value, "muscle": muscle, "fat": fat})
+                tiles.append(self.tile(cam, f"build_{frame}_{muscle}_{fat}", ((0.0, -4.72, 0.95), (0.0, 0.0, 0.92), 85)))
+                labels.append(f"muscle {muscle:+g}, fat {fat:+g}")
+        Q.turn_character(ch, 0)
+        self.save(f"build_grid_{frame}", tiles, 3, labels, f"Muscle by fat, {frame}, clay", grey=True)
+
+    def build_details(self, frame):
+        """The trunk close up, front and back, at the sliders' corners:
+        the sheet to judge the anatomy by."""
+        ch, cam = self.scene(self.a.parts, 360, 440)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        looks = [("neutral", {}), ("heavy and soft", {"muscle": -1.0, "fat": 1.0}),
+                 ("heavy and muscular", {"muscle": 1.0, "fat": 1.0}), ("heavy", {"fat": 1.0}),
+                 ("slim", {"fat": -1.0}), ("slight", {"muscle": -1.0, "fat": -1.0}),
+                 ("muscular", {"muscle": 1.0}), ("lean and muscular", {"muscle": 1.0, "fat": -1.0})]
+        tiles, labels = [], []
+        for turn, side in ((15, "front"), (195, "back")):
+            Q.turn_character(ch, turn)
+            for name, values in looks:
+                ch.set_sliders(dict(values, frame=value))
+                tiles.append(self.tile(cam, f"detail_{frame}_{side}_{name}", ((0.0, -2.6, 1.18), (0.0, 0.0, 1.14), 85)))
+                labels.append(f"{name}, {side}")
+        Q.turn_character(ch, 0)
+        self.save(f"build_details_{frame}", tiles, 4, labels, f"The trunk at the sliders' corners, {frame}, clay",
+                  grey=True)
+
+    def build_regions(self, frame):
+        """Each region's fat and muscle slider alone, at 1 (and the
+        whole-body sliders at 0), clay."""
+        ch, cam = self.scene(self.a.parts, 260, 400)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        regions = [p["id"][len("fat_"):] for p in ch.manifest["parameters"] if p["id"].startswith("fat_")]
+        Q.turn_character(ch, 25)
+        tiles, labels = [], []
+        for kind in ("fat", "muscle"):
+            for region in regions:
+                ch.set_sliders({"frame": value, f"{kind}_{region}": 1.0})
+                tiles.append(self.tile(cam, f"region_{frame}_{kind}_{region}", ((0.0, -4.72, 0.95), (0.0, 0.0, 0.92), 85)))
+                labels.append(f"{kind}_{region} +1")
+        Q.turn_character(ch, 0)
+        self.save(f"build_regions_{frame}", tiles, len(regions), labels, f"One region's slider at a time, {frame}, clay",
+                  grey=True)
+
     def twist_poses(self):
         """The limbs turned about their length, clay with wireframe: a
         forearm, an upper arm and a thigh (measure.py's twist poses), and
@@ -528,6 +586,10 @@ def main():
     r = Run(a)
     only = [s for s in a.only.split(",") if s] or (SHEETS if a.package == "stylized" else BARE_SHEETS)
     for s in only:
+        if s.startswith("build_"):
+            kind, frame = s.rsplit("_", 1)
+            getattr(r, kind)(frame)
+            continue
         if s.startswith("turnaround_"):
             r.turnaround(s.split("_", 1)[1])
         else:

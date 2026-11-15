@@ -39,6 +39,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import features  # noqa: E402
 import geom  # noqa: E402
 import skeleton  # noqa: E402
 
@@ -94,9 +95,15 @@ def barycentric(p, a, b, c):
     return np.stack([1 - v - w, v, w], axis=1)
 
 
-def fit(X0, tris_x, edges_x, target, tris_t, log=print):
+PIN = 30.0  # a pinned vertex's pull, in vertices' worth of surface
+
+
+def fit(X0, tris_x, edges_x, target, tris_t, log=print, pins=None):
     """`X0` (MakeHuman's mesh after the warp) fitted to the surface
-    `target`. Returns the fitted positions."""
+    `target`. `pins` is (vertex indices, positions): vertices held at
+    known places on the target (the surface landmarks, `features.py`),
+    so the fit can't slide the skin along the body past them. Returns
+    the fitted positions."""
     n = len(X0)
     lap = geom.Laplacian(n, edges_x)
     area = geom.vertex_areas(X0, tris_x)
@@ -128,6 +135,10 @@ def fit(X0, tris_x, edges_x, target, tris_t, log=print):
                 np.add.at(gb, t[:, k], wk[:, None] * (X[t[:, k]] + pull - X0[t[:, k]]))
             total = w + wb
             goal = (goal * w[:, None] + gb) / np.maximum(total, 1e-12)[:, None]
+            if pins is not None:
+                idx, at = pins
+                goal[idx] = (goal[idx] * total[idx, None] + PIN * (at - X0[idx])) / (total[idx, None] + PIN)
+                total[idx] += PIN
             U = geom.smooth_fit(lap, total, goal, stiffness, U, 400)
         gap = np.linalg.norm(hit - X, axis=1)[ok]
         log(f"    stiffness {stiffness:6.1f}: matched {ok.mean() * 100:5.1f}% of MakeHuman's vertices, "
@@ -158,10 +169,24 @@ def main():
         lm_r = skeleton.realistic_landmarks(P, sets, skeleton.hip_rule(joints, N))
         posed, lm_p = skeleton.repose(P, faces_r, lm_r, lm_m)
         src, dst, keys = skeleton.control_pairs(lm_m, lm_p)
+        # The surface landmarks (CO5): found on both bodies the same way,
+        # plus the navel and nipples from `marks.py` when it has run.
+        muscular = N + M[f"corner_{gender}_maxmuscle_averageweight"]
+        fm, cm = features.surface_landmarks(N, tris_m, lm_m, shaped=muscular)
+        fr, cr = features.surface_landmarks(posed, tris_r, lm_p)
+        marks = os.path.join(a.work, "marks.npz")
+        mm = mr = None
+        if os.path.exists(marks):
+            K = np.load(marks)
+            mm = {k[len(f"makehuman_{frame}_"):]: K[k] for k in K.files if k.startswith(f"makehuman_{frame}_")}
+            mr = {k[len(f"realistic_{frame}_"):]: K[k] for k in K.files if k.startswith(f"realistic_{frame}_")}
+        pinned, src_f, dst_f = features.pairs(fm, cm, fr, cr, mm, mr, log=print)
+        pin_idx = np.array([int(np.argmin(((N - p) ** 2).sum(axis=1))) for p in src_f])
+        src, dst = np.vstack([src, src_f]), np.vstack([dst, dst_f])
         warped = geom.rbf_warp(src, dst, N)
         print(f"{frame}: posed (moved up to {np.linalg.norm(posed - P, axis=1).max() * 1000:.0f} mm); "
               f"landmarks moved MakeHuman by a median {np.median(np.linalg.norm(dst - src, axis=1)) * 1000:.0f} mm")
-        wrapped = fit(warped, tris_m, edges_m, posed, tris_r)
+        wrapped = fit(warped, tris_m, edges_m, posed, tris_r, pins=(pin_idx, dst_f))
         out[f"posed_{frame}"] = posed
         out[f"warped_{frame}"] = warped
         out[f"wrapped_{frame}"] = wrapped

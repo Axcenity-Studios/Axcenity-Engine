@@ -55,7 +55,17 @@ import mh  # noqa: E402
 import skeleton  # noqa: E402
 from register import FRAMES, Surface, barycentric  # noqa: E402
 
-METHODS = ("nearest", "fit", "frames", "symmetric", "full")
+METHODS = ("nearest", "fit", "frames", "symmetric", "full", "filtered")
+# `filtered` (CO5, what the realistic package vendors): `symmetric`, with
+# MakeHuman's offsets averaged over each realistic vertex's own patch of
+# skin before they are sampled. MakeHuman's mesh is finer than ours on
+# the trunk (17 mm edges, 5 mm at the navel, against our 25 mm), and a
+# point sample of a finer field folds what it can't hold into something
+# else: the navel became a crease across the belly, a pectoral's edge a
+# hard line. The reach is this share of the vertex's mean edge length,
+# so hands and faces, where ours is the finer mesh, are sampled as before.
+# It isn't kept apart here: the build does that in the engine's rest pose.
+FILTER = 0.6
 REACH = 0.04
 NEAR_SKIN = 8  # skin vertices an inside vertex follows
 
@@ -77,7 +87,7 @@ class Mapping:
     """Where each realistic vertex lies on MakeHuman's mesh `X` (wrapped
     or only warped), and how offsets are carried there."""
 
-    def __init__(self, N, X, tris_m, edges_m, posed, tris_r, inside, lap_r, frames):
+    def __init__(self, N, X, tris_m, edges_m, posed, tris_r, inside, lap_r, frames, filtered=False):
         surf = Surface(X, tris_m)
         normals = geom.vertex_normals(posed, tris_r)
         hit, tri, ok = surf.nearest(posed, normals, REACH)
@@ -96,6 +106,9 @@ class Mapping:
         w = 1.0 / (np.take_along_axis(dist, near, axis=1) ** 2 + 1e-8)
         self.skin, self.skin_w = skin[near], w / w.sum(axis=1, keepdims=True)
         self.lost = ~ok & ~inside
+        self.patch = None
+        if filtered:
+            self.patch = self._patches(X, tris_m, hit, posed, lap_r)
         if frames:
             R, s = geom.local_frames(N, X, edges_m, rings=2)
             # The scale varies smoothly over a body; its noise is the fit's.
@@ -106,6 +119,31 @@ class Mapping:
             self.R, self.s = R, s[:, 0]
         else:
             self.R = None
+
+    def _patches(self, X, tris_m, hit, posed, lap_r):
+        """Per matched realistic vertex: MakeHuman's vertices within its
+        reach of where it lies on MakeHuman's surface, and their weights
+        (a bell over the distance, times each vertex's area)."""
+        from mathutils.kdtree import KDTree
+        tree = KDTree(len(X))
+        for j, p in enumerate(X):
+            tree.insert(tuple(p), j)
+        tree.balance()
+        area = geom.vertex_areas(X, tris_m)
+        e = lap_r.e
+        length = np.linalg.norm(posed[e[:, 0]] - posed[e[:, 1]], axis=1)
+        mean = (np.bincount(e[:, 0], length, len(posed)) + np.bincount(e[:, 1], length, len(posed)))             / np.maximum(lap_r.count, 1)
+        reach = FILTER * mean
+        out = {}
+        for i in np.flatnonzero(self.ok):
+            found = tree.find_range(tuple(hit[i]), 2.0 * reach[i])
+            if len(found) < 4:
+                continue
+            idx = np.array([j for _, j, _ in found])
+            dist = np.array([d for _, _, d in found])
+            w = np.exp(-0.5 * (dist / reach[i]) ** 2) * area[idx]
+            out[i] = (idx, w / w.sum())
+        return out
 
     def _spread(self, out):
         """Fills the rows with no match: unmatched skin by the smoothest
@@ -123,7 +161,11 @@ class Mapping:
         realistic vertex."""
         if self.R is not None:
             D = np.einsum("nij,nj->ni", self.R, D) * self.s[:, None]
-        return self._spread(sum(D[self.tri[:, k]] * self.bary[:, k:k + 1] for k in range(3)))
+        out = sum(D[self.tri[:, k]] * self.bary[:, k:k + 1] for k in range(3))
+        if self.patch:
+            for i, (idx, w) in self.patch.items():
+                out[i] = w @ D[idx]
+        return self._spread(out)
 
     def sample(self, values):
         """A per-vertex value of MakeHuman's mesh sampled per realistic vertex."""
@@ -207,7 +249,8 @@ def run(work, method="full", log=print):
     for frame, gender in FRAMES:
         N, posed, P = M[f"neutral_{gender}"], G[f"posed_{frame}"], R[frame]
         X = G[f"warped_{frame}"] if method == "nearest" else G[f"wrapped_{frame}"]
-        m = Mapping(N, X, tris_m, edges_m, posed, tris_r, inside, lap_r, method not in ("nearest", "fit"))
+        m = Mapping(N, X, tris_m, edges_m, posed, tris_r, inside, lap_r, method not in ("nearest", "fit"),
+                    filtered=method == "filtered")
         known = crossing_pairs(posed, tris_r) if method == "full" else None
         maps[frame] = m
         log(f"{frame} ({method}): {m.ok.sum()} of {len(posed)} vertices mapped "
@@ -216,7 +259,7 @@ def run(work, method="full", log=print):
             f"largest {m.gap[m.ok].max() * 1000:.1f} mm")
         for name, D in shape_names(M, gender).items():
             d = m.carry(D)
-            if method in ("symmetric", "full"):
+            if method in ("symmetric", "full", "filtered"):
                 d = symmetric(d, mirror)
             if method == "full":
                 d, factor, left = apart(posed, d, tris_r, lap_r, mirror, known)
