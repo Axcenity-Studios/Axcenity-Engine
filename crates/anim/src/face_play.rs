@@ -239,6 +239,32 @@ pub(crate) struct FaceLayers {
     pub settings: Vec<FaceLayerSetting>,
 }
 
+/// How much of the way to shut each control already takes an eye at 1,
+/// which a blink then leaves alone. A head made for the standard controls
+/// is built to these shares (the realistic head's squint takes its lids
+/// 0.6 of the way to meeting, a raised cheek and a lowered brow 0.22).
+type BlinkYields = (&'static str, [(&'static str, f32); 4]);
+const BLINK_YIELDS: [BlinkYields; 2] = [
+    (
+        "Blink_Left",
+        [
+            ("Eye_Closed_Left", 1.0),
+            ("Eye_Squint_Left", 0.6),
+            ("Cheek_Raise_Left", 0.22),
+            ("Brow_Lower_Left", 0.22),
+        ],
+    ),
+    (
+        "Blink_Right",
+        [
+            ("Eye_Closed_Right", 1.0),
+            ("Eye_Squint_Right", 0.6),
+            ("Cheek_Raise_Right", 0.22),
+            ("Brow_Lower_Right", 0.22),
+        ],
+    ),
+];
+
 impl FaceLayers {
     /// The face's controls: every layer over the ones under it. `rig` and
     /// `pose` (the body's, done) aim the gaze.
@@ -267,16 +293,21 @@ impl FaceLayers {
         for value in &mut out {
             *value = value.clamp(0.0, 1.0);
         }
-        // `Blink` and `Eye_Closed` both close a lid: a blink closes only
-        // what a closed eye leaves open, so the two together never close
-        // it further than shut.
-        for (blink, closed) in [
-            ("Blink_Left", "Eye_Closed_Left"),
-            ("Blink_Right", "Eye_Closed_Right"),
-        ] {
-            if let (Some(blink), Some(closed)) = (face_control(blink), face_control(closed)) {
-                out[blink] = out[blink].min(1.0 - out[closed]);
-            }
+        // `Blink` and `Eye_Closed` both close a lid, and a squint, a raised
+        // cheek and a lowered brow each close part of it. Blend shapes add,
+        // so a blink closes only what the others leave open, or the upper
+        // lid would go on past the lower one (a blink during a laugh).
+        for (blink, yields) in BLINK_YIELDS {
+            let Some(blink) = face_control(blink) else {
+                continue;
+            };
+            let closed: f32 = yields
+                .iter()
+                .filter_map(|(control, share)| {
+                    face_control(control).map(|index| out[index] * share)
+                })
+                .sum();
+            out[blink] = out[blink].min((1.0 - closed).max(0.0));
         }
         out
     }
