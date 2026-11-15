@@ -1,0 +1,10 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-body-lean-muscular",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -1,
+    "frame": 0,
+    "muscle": 1
+  }
+}

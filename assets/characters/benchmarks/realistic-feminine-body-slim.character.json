@@ -3,8 +3,7 @@
   "name": "realistic-feminine-body-slim",
   "base": "axcenity/realistic",
   "parameters": {
-    "fat": 0.0,
-    "frame": 1,
-    "muscle": 0.0
+    "fat": -1,
+    "frame": 1
   }
 }

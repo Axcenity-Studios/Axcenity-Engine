@@ -3,8 +3,7 @@
   "name": "realistic-masculine-body-slim",
   "base": "axcenity/realistic",
   "parameters": {
-    "fat": 0.0,
-    "frame": 0,
-    "muscle": 0.0
+    "fat": -1,
+    "frame": 0
   }
 }
