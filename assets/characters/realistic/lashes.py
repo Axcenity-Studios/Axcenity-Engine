@@ -3,11 +3,14 @@ overhaul CO6): thin strips with hair drawn on them and cut out by the
 texture's alpha, the form facial hair takes on every GPU (ADR-0037).
 
 - `Lashes`: for each lid a strip rooted on the lid's outer edge (the
-  lash line), bent once along its length so the lashes curl. Its roots
-  are the lid's own vertices; the rest of a lash turns with its root
-  about the eyeball when a shape moves the lid.
+  lash line) between the corners of the eye, bent once along its length
+  so the lashes curl. Its roots are the lid's own vertices; the rest of
+  a lash turns with its root about the eyeball when a shape moves the
+  lid, and is kept off the skin under every shape (`off_skin`).
 - `Brows`: a strip laid on the skin along each brow, each vertex bound
-  to the skin under it, so it follows every shape that moves the brow.
+  to the point of the skin under it, so it follows every shape that
+  moves the brow; no face of it comes nearer the skin than `BROW_CLEAR`
+  at rest or under a shape (`over_skin`).
 
 Both follow the body by blend shapes of the body's shapes' names
 (`follow`), which is how the engine drives a part (architecture 14).
@@ -23,15 +26,28 @@ from facetopo import SIDES, nearest, rotate_about
 
 # Lash length at its longest (metres), upper and lower lid.
 LASH = {True: 0.0088, False: 0.0042}
-# Half the brow card's height, its segments along and how far it floats
-# over the skin.
+# Half the brow card's height, its segments along and across, and how far
+# it floats over the skin (at its vertices; nowhere nearer than
+# `BROW_CLEAR`).
 BROW_HALF = 0.0078
-BROW_SEGMENTS = 14
-BROW_LIFT = 0.0005
+BROW_SEGMENTS = 22
+BROW_ROWS = 5
+BROW_LIFT = 0.0008
+BROW_CLEAR = 0.0003
 HAIR = (0.020, 0.013, 0.009)
+# Lashes grow from the lid's outer edge between the corners of the eye,
+# not within this of a corner (metres): the edge's vertices there run
+# round the corner, and a strip through them stood up in zigzags.
+LASH_FROM_CORNER = 0.0006
+# How far a closed upper lid's lashes go from curled to straight.
+LASH_STRAIGHTENS = 0.75
+# How much of an upper lid's upward turn its lashes take.
+LASH_TURNS_UP = 0.3
+# A lash keeps this far off the skin under every shape (metres).
+LASH_OFF_SKIN = 0.0004
 
 
-def _strands(path, size, count, seed, draw_one, most=1.0):
+def _strands(path, size, count, seed, draw_one, most=1.0, gain=1.6):
     from PIL import Image, ImageDraw, ImageFilter
     rng = np.random.default_rng(seed)
     scale = 4
@@ -42,7 +58,7 @@ def _strands(path, size, count, seed, draw_one, most=1.0):
         draw_one(draw, rng, w, h, scale)
     mask = mask.filter(ImageFilter.GaussianBlur(scale * 0.45)).resize(size, Image.LANCZOS)
     alpha = np.asarray(mask, dtype=np.float32) / 255.0
-    alpha = np.clip(alpha * 1.6, 0.0, 1.0) * most
+    alpha = np.clip(alpha * gain, 0.0, 1.0) * most
     px = np.zeros((size[1], size[0], 4), dtype=np.uint8)
     px[:, :, :3] = (np.array(HAIR) ** (1 / 2.2) * 255 + 0.5).astype(np.uint8)
     px[:, :, 3] = (alpha * 255 + 0.5).astype(np.uint8)
@@ -56,30 +72,33 @@ def lash_texture(out_dir):
     """Lashes from the lid (the image's bottom) to their tips: curved,
     thinning, of uneven length, some in pairs."""
     def one(draw, rng, w, h, scale):
+        # A lash: thick at the lid, a point at its tip, leaning with its
+        # neighbours (lashes stand in tufts) and a little on its own.
         x = rng.uniform(0.01, 0.99) * w
-        length = rng.uniform(0.55, 0.98) * h
-        lean = rng.normal(0.0, 0.05) * h
-        steps = 10
+        length = rng.uniform(0.45, 0.98) * h
+        lean = (0.07 * math.sin(x / w * 61.0) + rng.normal(0.0, 0.06)) * h
+        steps = 12
         last = (x, h - 1)
         for k in range(1, steps + 1):
             t = k / steps
             at = (x + lean * t * t, h - 1 - length * t)
-            draw.line([last, at], fill=255, width=max(1, int(round(scale * (4.2 - 3.0 * t)))))
+            draw.line([last, at], fill=255, width=max(1, int(round(scale * (4.6 - 3.4 * t)))))
             last = at
 
     def fringe(draw, rng, w, h, scale):
-        # The lash line itself: where the lashes leave the lid they
-        # stand too close to tell apart.
+        # The lash line itself, a thin dark edge: where the lashes leave
+        # the lid they stand too close to tell apart. (Kept low: a tall
+        # fringe made a closed eye's lashes one grey band.)
         x = rng.uniform(0.0, 1.0) * w
-        draw.line([(x, h - 1), (x + rng.normal(0, 0.01) * w, h - 1 - rng.uniform(0.16, 0.30) * h)], fill=255,
-                  width=int(scale * 5))
+        draw.line([(x, h - 1), (x + rng.normal(0, 0.006) * w, h - 1 - rng.uniform(0.08, 0.17) * h)], fill=255,
+                  width=int(scale * 4))
 
     def both(draw, rng, w, h, scale):
         one(draw, rng, w, h, scale)
-        for _ in range(3):
+        for _ in range(2):
             fringe(draw, rng, w, h, scale)
 
-    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (256, 64), 110, 5, both)
+    return _strands(os.path.join(out_dir, "RealisticLashes.png"), (512, 128), 150, 5, both, gain=2.6)
 
 
 def brow_texture(out_dir):
@@ -87,23 +106,31 @@ def brow_texture(out_dir):
     growing up at the inner end and lying over toward the tail, thick in
     the first two thirds, thinning out."""
     def one(draw, rng, w, h, scale):
-        u = rng.uniform(0.02, 0.98) ** 0.9
-        thick = 0.40 * (1.0 - 0.70 * max(0.0, u - 0.3) / 0.7) * min(1.0, 0.45 + u * 4.0)
+        u = rng.uniform(0.03, 0.93) ** 0.9
+        # Thick over its first two thirds, thinning to a point at the
+        # tail (it ended square, at full height, at the card's end);
+        # sparser toward its upper and lower edges.
+        thick = 0.34 * (1.0 - max(0.0, u - 0.30) / 0.66) ** 0.8 * min(1.0, 0.50 + u * 4.0)
         centre = 0.52 - 0.10 * math.sin(u * math.pi * 0.9)
-        v = centre + rng.uniform(-1.0, 1.0) * thick
+        v = centre + (rng.uniform(-1.0, 1.0) + rng.uniform(-1.0, 1.0)) * 0.5 * thick
         angle = math.radians(80.0 - 78.0 * min(1.0, u * 1.35) + rng.normal(0.0, 9.0))
         if v < centre:
             angle = -angle * 0.45
-        length = rng.uniform(0.10, 0.20) * h * 2.2
+        length = rng.uniform(0.10, 0.20) * h * 2.2 * (1.0 - 0.6 * max(0.0, u - 0.5) / 0.5)
         x0, y0 = u * w, v * h
         x1, y1 = x0 + math.cos(angle) * length, y0 - math.sin(angle) * length
         draw.line([(x0, y0), (x1, y1)], fill=255, width=max(1, int(scale * 2.2)))
     return _strands(os.path.join(out_dir, "RealisticBrows.png"), (512, 128), 1600, 9, one, most=0.95)
 
 
-def _material(name, texture, cut=True):
+def _material(name, texture, cut=True, matte=False):
     """Hair drawn on a card: blended by the texture's alpha, or with
-    `cut` cut out by it (glTF alphaMode MASK; not used: see `lashes`)."""
+    `cut` cut out by it (glTF alphaMode MASK; not used: see `lashes`).
+    `matte`: a card shaded as a smooth dielectric reflects 4% of the sky
+    whatever its colour, which on a card this dark is most of its light
+    (a closed eye's lashes read grey, and a raised brow, turned up to
+    the sky, went pale). As a rough metal the card reflects only its own
+    colour: dark, without sheen."""
     m = bpy.data.materials.get(name)
     if m is not None:
         return m
@@ -111,8 +138,8 @@ def _material(name, texture, cut=True):
     m.use_nodes = True
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs["Roughness"].default_value = 0.55
-    bsdf.inputs["Metallic"].default_value = 0.0
+    bsdf.inputs["Roughness"].default_value = 1.0 if matte else 0.55
+    bsdf.inputs["Metallic"].default_value = 1.0 if matte else 0.0
     tex = nt.nodes.new("ShaderNodeTexImage")
     tex.image = texture
     tex.extension = "EXTEND"
@@ -157,13 +184,14 @@ def lashes(face, out_dir):
     for _, s in SIDES:
         eye = face.eye[s]
         for upper in (True, False):
-            loop = [i for i in eye.loops[2] if eye.upper[i] == upper]
+            loop = [i for i in eye.loops[2] if eye.upper[i] == upper
+                    and eye.t_in + LASH_FROM_CORNER < float(eye.along(P[i])[0]) < eye.t_out - LASH_FROM_CORNER]
             loop.sort(key=lambda i: float(eye.along(P[i])[0]))
             t = np.array([float(eye.along(P[i])[0]) for i in loop])
             share = np.clip((t - eye.t_in) / (eye.t_out - eye.t_in), 0.0, 1.0)
             rows = []
             for i, u in zip(loop, share):
-                # Longest past the middle, nothing at the corners.
+                # Longest past the middle, short at the strip's ends.
                 length = LASH[upper] * (0.04 + 0.96 * max(0.0, math.sin(math.pi * min(1.0, u ** 0.8))) ** 0.7)
                 radial = P[i] - eye.c
                 radial /= np.linalg.norm(radial)
@@ -172,7 +200,12 @@ def lashes(face, out_dir):
                     first = 0.35 * radial + 0.75 * eye.fwd + fan - 0.15 * up
                     second = first / np.linalg.norm(first) + 0.9 * up
                 else:
-                    first = 0.35 * radial + 0.70 * eye.fwd + fan - 0.40 * up
+                    # (Out of the lid along the normal of the skin just
+                    # under its edge, which slopes forward: a lash set by
+                    # the eye's axes alone lay in that skin.)
+                    below = [j for j in face.topo.nbr[i] if eye.step.get(j) == 3] or [i]
+                    out = face.N[below].mean(axis=0)
+                    first = 0.80 * out / np.linalg.norm(out) + 0.25 * eye.fwd + fan - 0.45 * up
                     second = first / np.linalg.norm(first) - 0.25 * up
                 first /= np.linalg.norm(first)
                 second /= np.linalg.norm(second)
@@ -196,8 +229,32 @@ def lashes(face, out_dir):
     # Blended, not cut out: in the engine a cut-out card on the face
     # shows the backdrop through the skin behind its clear parts (seen
     # as a grey band under the eye in CO6's first captures).
-    obj = _object("Lashes", pts, faces, uvs, _material("Lashes", lash_texture(out_dir), cut=False))
+    # No lash lies in the skin at rest.
+    pts = list(off_skin(face, face.P, np.array(pts), roots))
+    obj = _object("Lashes", pts, faces, uvs, _material("Lashes", lash_texture(out_dir), cut=False, matte=True))
     return obj, roots
+
+
+def off_skin(face, P, points, roots, moved=None):
+    """`points` (the lashes' vertices) with those that lie in or on the
+    head's skin at positions `P` moved out to `LASH_OFF_SKIN` over it. A
+    root (the first of each three) stays on its lid; only vertices whose
+    root is in `moved` (or all) are looked at."""
+    from mathutils import Vector
+    from facetopo import FS_HEAD, FS_MUZZLE
+    outer = {k for k, fs in enumerate(face.topo.sets) if fs in (FS_HEAD, FS_MUZZLE)}
+    tree = face.topo.bvh(P, outer)
+    out = np.array(points, dtype=np.float64)
+    for k in range(len(out)):
+        if k % 3 == 0 or (moved is not None and roots[k][0] not in moved):
+            continue
+        loc, normal, _, _ = tree.find_nearest(Vector(out[k]), 0.006)
+        if loc is None:
+            continue
+        height = float((Vector(out[k]) - loc).dot(normal))
+        if height < LASH_OFF_SKIN:
+            out[k] = np.array(loc) + np.array(normal) * LASH_OFF_SKIN
+    return out
 
 
 def follow_lashes(face, points, roots, shape, lids=True):
@@ -218,9 +275,31 @@ def follow_lashes(face, points, roots, shape, lids=True):
         reach = max(float(eye.reach(before[None])[0]), 1e-6)
         angle = (math.asin(max(-1.0, min(1.0, float(eye.rise(after[None])[0]) / reach)))
                  - math.asin(max(-1.0, min(1.0, float(eye.rise(before[None])[0]) / reach))))
+        if angle > 0 and eye.upper[i]:
+            # An upper lid drawn up slides under the fold above it; its
+            # lashes keep most of their own direction (turned all the
+            # way with the lid they lay flat on the fold).
+            angle *= LASH_TURNS_UP
         turned = rotate_about(points[k][None], eye.c, eye.turn_axis, angle)[0]
         carried = rotate_about(before[None], eye.c, eye.turn_axis, angle)[0]
         out[k] = turned + (after - carried) - points[k]
+        if k % 3 == 2 and angle < 0 and eye.upper[i]:
+            # An upper lid coming down lays its lashes out straighter: with
+            # their full curl a closed lid's lashes point their outer halves
+            # straight at the viewer, and the fringe ends in a cut line.
+            root, mid, tip = (points[j] + out[j] for j in (k - 2, k - 1, k))
+            length = np.linalg.norm(tip - mid)
+            along, curled = (mid - root) / max(np.linalg.norm(mid - root), 1e-9), (tip - mid) / max(length, 1e-9)
+            way = curled + (along - curled) * (LASH_STRAIGHTENS * min(1.0, -angle / 0.6))
+            out[k] = mid + way / np.linalg.norm(way) * length - points[k]
+    if lids and any(i in shape for i, _ in roots):
+        # And off the skin as the shape leaves it: an upper lid drawn up
+        # (eyes wide, a raised brow) turns its lashes into the fold above
+        # it, a lower lid pushed up turns its own into the lid.
+        posed = P.copy()
+        for i, d in shape.items():
+            posed[i] += d
+        out = off_skin(face, posed, points + out, roots, moved=shape) - points
     return out
 
 
@@ -238,14 +317,10 @@ def brows(face, out_dir):
     from mathutils.bvhtree import BVHTree
     tree = BVHTree.FromPolygons([tuple(p) for p in P], tris, all_triangles=True)
     pts, faces, uvs, bound = [], [], [], []
+    rows = np.linspace(-1.0, 1.0, BROW_ROWS)
     for _, s in SIDES:
-        a, b, c = face.brow_line(s)
         # From a little before the inner end to a little past the tail.
-        curve = []
-        for k in range(BROW_SEGMENTS + 1):
-            t = -0.06 + 1.14 * k / BROW_SEGMENTS
-            ctrl = 2.0 * b - 0.5 * (a + c)        # the curve passes through the arch
-            curve.append((1 - t) ** 2 * a + 2 * (1 - t) * t * ctrl + t ** 2 * c)
+        curve = face.brow_curve(s, BROW_SEGMENTS, -0.06, 1.08)
         base = len(pts)
         for k, at in enumerate(curve):
             ahead = curve[min(k + 1, BROW_SEGMENTS)] - curve[max(k - 1, 0)]
@@ -255,7 +330,7 @@ def brows(face, out_dir):
             if across[2] < 0:
                 across = -across
             across /= np.linalg.norm(across)
-            for row in (-1.0, 0.0, 1.0):
+            for row in rows:
                 loc, normal, index, _ = tree.find_nearest(Vector(at + across * row * BROW_HALF), 0.05)
                 tri = tris[index]
                 va, vb, vc = (P[i] for i in tri)
@@ -267,32 +342,70 @@ def brows(face, out_dir):
                 bound.append((tri, (1.0 - v - w, v, w)))
                 pts.append(np.array(loc) + np.array(normal) * BROW_LIFT)
         for k in range(BROW_SEGMENTS):
-            for row in range(2):
-                i0, i1 = base + 3 * k + row, base + 3 * (k + 1) + row
+            for row in range(BROW_ROWS - 1):
+                i0, i1 = base + BROW_ROWS * k + row, base + BROW_ROWS * (k + 1) + row
                 quad = (i0, i1, i1 + 1, i0 + 1)
                 u0, u1 = k / BROW_SEGMENTS, (k + 1) / BROW_SEGMENTS
-                uv = [(u0, row / 2), (u1, row / 2), (u1, (row + 1) / 2), (u0, (row + 1) / 2)]
+                v0, v1 = row / (BROW_ROWS - 1), (row + 1) / (BROW_ROWS - 1)
+                uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
                 if s < 0:
                     quad, uv = quad[::-1], uv[::-1]
                 faces.append(quad)
                 uvs.append(uv)
-    obj = _object("Brows", pts, faces, uvs, _material("Brows", brow_texture(out_dir), cut=False))
+    pts = list(over_skin(tree, np.array(pts), faces))
+    obj = _object("Brows", pts, faces, uvs, _material("Brows", brow_texture(out_dir), cut=False, matte=True))
     return obj, bound
 
 
-def follow_bound(bound, shape, rows=3):
-    """Offsets of the brows' vertices under a body shape. A card's `rows`
-    vertices across the brow all move as the skin under its middle one
-    does: the card rides the brow whole, it is not pulled apart where the
-    skin above the brow moves less than the skin below it."""
+def over_skin(tree, points, faces, rounds=6):
+    """`points` (a card's vertices) raised where the card's faces come
+    nearer the skin in `tree` than `BROW_CLEAR`: a flat face between
+    vertices on a rounded brow cuts under it, and the skin showed through
+    the hair as light holes. Tried at each face's middle and edges."""
+    from mathutils import Vector
+    out = np.array(points, dtype=np.float64)
+    spots = ((0.25, 0.25, 0.25, 0.25), (0.5, 0.5, 0.0, 0.0), (0.0, 0.5, 0.5, 0.0), (0.0, 0.0, 0.5, 0.5),
+             (0.5, 0.0, 0.0, 0.5), (0.5, 0.0, 0.5, 0.0), (0.0, 0.5, 0.0, 0.5))
+    for _ in range(rounds):
+        low = False
+        for face in faces:
+            corners = list(face)
+            for shares in spots:
+                at = sum(out[i] * w for i, w in zip(corners, shares))
+                loc, normal, _, _ = tree.find_nearest(Vector(at), 0.01)
+                if loc is None:
+                    continue
+                short = BROW_CLEAR - float((Vector(at) - loc).dot(normal))
+                if short > 1e-6:
+                    low = True
+                    for i, w in zip(corners, shares):
+                        if w:
+                            out[i] += np.array(normal) * short * 1.2
+        if not low:
+            break
+    return out
+
+
+def follow_bound(face, bound, points, faces, shape):
+    """Offsets of the brows' vertices under a body shape: each moves as
+    the point of the skin it lies on does (hair is rooted in the skin;
+    the brow's shapes move the skin under the card nearly as one, so the
+    card is not pulled apart), and is then kept over the skin as the
+    shape leaves it."""
     out = np.zeros((len(bound), 3))
-    for k in range(len(bound)):
-        tri, shares = bound[rows * (k // rows) + rows // 2]
+    for k, (tri, shares) in enumerate(bound):
         for i, w in zip(tri, shares):
             d = shape.get(int(i))
             if d is not None:
                 out[k] += w * d
-    return out
+    if not np.abs(out).max() > 1e-7:
+        return out
+    from facetopo import FS_HEAD
+    posed = face.P.copy()
+    for i, d in shape.items():
+        posed[i] += d
+    tree = face.topo.bvh(posed, {k for k, fs in enumerate(face.topo.sets) if fs == FS_HEAD})
+    return over_skin(tree, points + out, faces) - points
 
 
 def add_shapes(obj, shapes, least=2e-5):

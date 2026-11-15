@@ -30,6 +30,8 @@ from facetopo import SIDES, Topo, nearest, smoothstep
 # The textures the face's parts are built with (embedded in the model
 # file; the build removes the loose files).
 IMAGES = ("RealisticSclera.png", "RealisticEyeOcclusion.png", "RealisticLashes.png", "RealisticBrows.png")
+# How much rougher the softened lids are than the skin round them.
+LID_ROUGHER = 0.14
 # How much of the masculine lids each loop round the feminine eye takes
 # (by loop from the rim; the lining takes all of it).
 SHARE_LIDS = {5: 0.75, 6: 0.5, 7: 0.25}
@@ -82,29 +84,68 @@ def soften_lids(body, topo, P, eyes, radius, maps):
     from PIL import Image, ImageDraw, ImageFilter
     layer = body.data.uv_layers[0].data
     lid = np.zeros(topo.count, dtype=bool)
+    round_eye = np.zeros(topo.count, dtype=bool)
+    rings = []
     for _, s in SIDES:
         eye = lids.Eye(topo, P, s, eyes[s], radius)
-        lid[[i for i in eye.idx if 1 <= eye.step[i] <= 6 and eye.upper[i]]] = True
+        # (To two loops above the fold: the mask's soft edge then lies
+        # well outside the fold's strip, which a closed lid draws out
+        # most, and outside the skin a low light grazes on a closed lid.)
+        lid[[i for i in eye.idx if 1 <= eye.step[i] <= 8 and eye.upper[i]]] = True
+        round_eye[[i for i in eye.idx if eye.step[i] >= 1]] = True
+        rings.append(set(eye.loops[1]))
+    # The skin's faces round each eye, and the opening between the lids
+    # as the texture has it: no face lies there (the lining is an island
+    # of its own), and what the bake left in it is darker than the lids.
+    skin_faces, lid_faces, opening = [], [], [{} for _ in rings]
+    for poly in body.data.polygons:
+        if all(round_eye[v] for v in poly.vertices):
+            uv = [tuple(layer[k].uv) for k in poly.loop_indices]
+            skin_faces.append(uv)
+            if all(lid[v] for v in poly.vertices):
+                lid_faces.append(uv)
+            for v, at in zip(poly.vertices, uv):
+                for ring, found in zip(rings, opening):
+                    if v in ring:
+                        found[v] = at
     changed = 0
     for key in ("albedo", "normal", "orm"):
         image = maps[key]
         path = bpy_path(image)
         picture = Image.open(path)
         w, h = picture.size
-        mask = Image.new("L", (w, h), 0)
-        draw = ImageDraw.Draw(mask)
-        for poly in body.data.polygons:
-            if all(lid[v] for v in poly.vertices):
-                uv = [layer[k].uv for k in poly.loop_indices]
-                draw.polygon([(u * w, (1.0 - v) * h) for u, v in uv], fill=255)
-        mask = mask.filter(ImageFilter.GaussianBlur(w / 500.0))
+        px = lambda uv: [(u * w, (1.0 - v) * h) for u, v in uv]  # noqa: E731
+        mask, valid = Image.new("L", (w, h), 0), Image.new("L", (w, h), 0)
+        draw, draw_valid = ImageDraw.Draw(mask), ImageDraw.Draw(valid)
+        for uv in skin_faces:
+            draw_valid.polygon(px(uv), fill=255)
+        for uv in lid_faces:
+            draw.polygon(px(uv), fill=255)
+        for found in opening:
+            at = np.array(list(found.values()))
+            middle = at.mean(axis=0)
+            order = np.argsort(np.arctan2(at[:, 1] - middle[1], at[:, 0] - middle[0]))
+            draw.polygon(px(at[order]), fill=255)
+            draw_valid.polygon(px(at[order]), fill=0)
+        mask = mask.filter(ImageFilter.GaussianBlur(w / 400.0))
         m = np.asarray(mask, dtype=np.float32)[:, :, None] / 255.0
         src = np.asarray(picture.convert("RGB"), dtype=np.float32)
-        soft = np.asarray(picture.convert("RGB").filter(ImageFilter.GaussianBlur(w / 170.0)), dtype=np.float32)
+        # The lid's skin as the mean of the skin round the eye (the
+        # opening's texels left out of the mean). It has to be even along
+        # the lid: a closed lid's skin is a dozen texels from lash line to
+        # fold, drawn out over a centimetre, and any difference between
+        # neighbouring texels along the lid is a streak down it.
+        weight = np.asarray(valid, dtype=np.float32)[:, :, None] / 255.0
+        soft = _blurred(src * weight, w / 90.0) / np.maximum(_blurred(weight, w / 90.0), 1e-3)
         if key == "normal":
-            # And most of the way to flat: a crease baked for the open lid
-            # is wrong on the closed one.
-            soft = 0.5 * soft + 0.5 * np.array([128.0, 128.0, 255.0], dtype=np.float32)
+            # And nearly flat: a crease baked for the open lid is wrong
+            # on the closed one.
+            soft = 0.05 * soft + 0.95 * np.array([128.0, 128.0, 255.0], dtype=np.float32)
+        elif key == "orm":
+            # And a little rougher (the green channel): flat and as glossy
+            # as the skin round it, a lowered lid caught the light as one
+            # bright band.
+            soft[:, :, 1] = np.minimum(soft[:, :, 1] + LID_ROUGHER * 255.0, 235.0)
         out = src * (1.0 - m) + soft * m
         changed = int((m[:, :, 0] > 0.5).sum())
         result = Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8))
@@ -114,6 +155,23 @@ def soften_lids(body, topo, P, eyes, radius, maps):
             result.save(path, optimize=True)
         image.reload()
     return changed
+
+
+def _blurred(a, sigma):
+    """`a` (rows x columns x channels, floats) blurred to about a
+    Gaussian of `sigma` texels: three box blurs along each axis."""
+    half = max(1, int(round(sigma * 0.5 * (12.0 / 3.0 + 1.0) ** 0.5 - 0.5)))
+    out = np.asarray(a, dtype=np.float64)
+    for axis in (0, 1):
+        for _ in range(3):
+            pad = [(0, 0)] * out.ndim
+            pad[axis] = (half + 1, half)
+            total = np.cumsum(np.pad(out, pad, mode="edge"), axis=axis)
+            n = out.shape[axis]
+            upper = np.take(total, np.arange(2 * half + 1, 2 * half + 1 + n), axis=axis)
+            lower = np.take(total, np.arange(0, n), axis=axis)
+            out = (upper - lower) / (2 * half + 1)
+    return out.astype(np.float32)
 
 
 def bpy_path(image):
@@ -149,6 +207,25 @@ EXPRESSIONS = [
     "Jaw_Open", "Jaw_Forward", "Jaw_Left", "Jaw_Right",
     "Tongue_Out", "Tongue_Up", "Tongue_Down",
 ]
+# A squint: how far its lids go toward the line they would meet on, and
+# where in the opening that line lies (from the lower rim); how far a
+# raised cheek pushes the lower lid toward the same line.
+SQUINT = 0.60
+SQUINT_MEET = 0.56
+CHEEK_LID = 0.40
+# The brow's skin moves whole within this of the brow's line (metres), and
+# each loop of the upper lid's skin takes this much of the brow's move
+# (the loops from the lash line up to the fold under the brow).
+BROW_WHOLE = 0.0065
+BROW_ON_LID = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.08, 4: 0.20, 5: 0.38, 6: 0.60, 7: 0.85}
+# How much of a raised cheek and of a lowered brow a blink has.
+BLINK_CHEEK = 0.22
+BLINK_BROW = 0.14
+# How far a lowered brow brings the upper lid down (a share of the way to
+# closed).
+BROW_PRESSES = 0.22
+# How much of the cheek's lift each loop of the lower lid's skin takes.
+CHEEK_ON_LID = {3: 0.15, 4: 0.40, 5: 0.65, 6: 0.85, 7: 1.0}
 # Identity: how much the eyeball and the lids' rims grow at eye size +1,
 # how much the skin further out does, and how far the mouth rises at
 # mouth height +1 (metres).
@@ -640,8 +717,8 @@ class Face:
 
     # -- the expression shapes ---------------------------------------------
 
-    def _lids(self, s, upper=None, lower=None):
-        return lids.deltas(self.P, self.eye[s].lid(self.P, upper_to=upper, lower_to=lower))
+    def _lids(self, s, upper=None, lower=None, meet=lids.MEET, ease=False):
+        return lids.deltas(self.P, self.eye[s].lid(self.P, upper_to=upper, lower_to=lower, meet=meet, ease=ease))
 
     def _moved(self, offsets, **kw):
         return self.shape(self.P + offsets, **kw)
@@ -722,22 +799,62 @@ class Face:
             out.append(self.on_skin(eye.c + eye.axis * t + eye.up * rise + eye.fwd * 0.03))
         return np.array(out)
 
+    def brow_curve(self, s, count=24, start=0.0, end=1.0):
+        """`count` + 1 points of the brow's line (through the three of
+        `brow_line`), from `start` to `end` of the way along it (0 the
+        inner end, 1 the tail; the brows' card runs a little past both)."""
+        a, b, c = self.brow_line(s)
+        ctrl = 2.0 * b - 0.5 * (a + c)        # the curve passes through the arch
+        t = np.linspace(start, end, count + 1)[:, None]
+        return (1 - t) ** 2 * a + 2 * (1 - t) * t * ctrl + t ** 2 * c
+
     def brow(self, s):
         """(weight, how far along the brow from its inner end 0 to its
-        tail 1): the brow's skin, reaching further up the forehead than
-        down toward the lid."""
-        line = self.brow_line(s)
-        d, on, along = polyline_nearest(self.P, line)
+        tail 1): the brow's skin. All of it under the brow's hair
+        (`BROW_WHOLE` either side of the brow's line), so the hair's card
+        rides the skin without being stretched; easing off further up the
+        forehead than down toward the eye, where the fold over the upper
+        lid takes less of it loop by loop and the lid's rim none."""
+        d, on, along = polyline_nearest(self.P, self.brow_curve(s))
         above = smoothstep(-0.004, 0.004, self.P[:, 2] - on[:, 2])
-        w = gauss(d, 0.013 + 0.016 * above) * self.skin * self.side(s, 0.006)
-        w[self.lid] *= 0.0
+        past = np.maximum(d / (1.0 + 0.6 * above) - BROW_WHOLE, 0.0)
+        w = gauss(past, 0.012) * self.skin * self.side(s, 0.006)
+        eye = self.eye[s]
+        for i in eye.idx:
+            if eye.upper[i] and eye.step[i] in BROW_ON_LID:
+                w[i] *= BROW_ON_LID[eye.step[i]]
+        lower = np.array([i for i in eye.idx if not eye.upper[i] and eye.step[i] <= 4], dtype=np.int64)
+        w[lower] = 0.0
         return w, along
+
+    def brow_slide(self):
+        """How much the brows' shapes put the skin back on its resting
+        surface: all the way over the skull, not at all on the lids and
+        the fold over them (the nearest point of a fold is across it)."""
+        amount = self.skin.astype(np.float64)
+        for eye in self.eye.values():
+            for i in eye.idx:
+                amount[i] = min(amount[i], float(smoothstep(6.0, 8.0, eye.step[i])))
+        return amount
+
+    def glabella(self):
+        """The skin between the brows' inner ends, as a weight."""
+        ends = [self.brow_line(s)[0] for _, s in SIDES]
+        at = self.on_skin(0.5 * (ends[0] + ends[1]) + np.array([0.0, -0.01, 0.0]))
+        return self.near(at, 0.009) * self.skin
 
     def cheek(self, s):
         """The cheek under the eye (the skin a squint or a smile lifts)."""
         at = self.on_skin(self.eye[s].c + np.array([s * 0.010, -0.012, -0.026]))
         w = self.near(at, 0.019) * self.skin * self.side(s)
         w[self.lid] = 0.0
+        # The lower lid's skin takes more of it loop by loop from the
+        # lash line down (the lid's own turn moves the rim): cut off at
+        # the lid's border, the cheek rose as a shelf under the eye.
+        eye = self.eye[s]
+        for i in eye.idx:
+            if not eye.upper[i] and eye.step[i] in CHEEK_ON_LID:
+                w[i] = float(gauss(np.linalg.norm(self.P[i] - at), 0.019)) * CHEEK_ON_LID[eye.step[i]]
         return w
 
     def expressions(self):
@@ -757,25 +874,57 @@ class Face:
             # Eyes.
             S[f"Blink_{side}"] = self._lids(s, 1.0, 1.0)
             S[f"Eye_Closed_{side}"] = self._lids(s, 1.0, 1.0)
-            # (A lower lid's share is of the way to the closing line, a
-            # tenth of the opening above it: past 1 it goes on up.)
-            S[f"Eye_Squint_{side}"] = add(self._lids(s, 0.30, 3.4), scale(cheek_up, 0.55))
-            S[f"Eye_Wide_{side}"] = self._lids(s, -0.32, -0.10)
-            S[f"Cheek_Raise_{side}"] = add(cheek_up, self._lids(s, None, 2.3))
+            # A squint's lids go part of the way to a line of their own
+            # just above the middle of the opening: the lower lid rises a
+            # third of the opening, the upper comes down a quarter. A raised
+            # cheek pushes the lower lid a quarter of the opening up. The
+            # two together (a laugh) bring the lower lid to that line, and
+            # each has its share of that one straight path: shapes add in
+            # straight lines, and two arcs' own chords added together
+            # carried the lid 3 mm forward off the eyeball, its skin
+            # twisted at the inner corner.
+            narrowed = self._lids(s, None, 1.0, SQUINT_MEET, ease=True)
+            S[f"Eye_Squint_{side}"] = add(self._lids(s, SQUINT, None, SQUINT_MEET, ease=True), scale(narrowed, SQUINT),
+                                          scale(cheek_up, 0.55))
+            # (Wide: the upper lid's edge clears the top of the iris by
+            # about 2 mm of white.)
+            S[f"Eye_Wide_{side}"] = self._lids(s, -0.50, -0.10)
+            S[f"Cheek_Raise_{side}"] = add(cheek_up, scale(narrowed, CHEEK_LID))
             # Brows.
             w, along = self.brow(s)
+            # (The skin between the brows bunches forward as they come
+            # down or together; it stays off its resting surface there.)
+            bunch = self.glabella() * self.side(s, 0.006)
+            on_skull = self.brow_slide() * (1.0 - np.clip(bunch * 2.0, 0.0, 1.0))
+            # Raised (frontalis): the whole brow, its inner end a little
+            # less; the fold under it is drawn up and the lid follows.
             profile = 0.75 + 0.25 * smoothstep(0.0, 0.45, along)
-            S[f"Brow_Raise_{side}"] = add(self._moved(vec(w * profile, up * 0.0105), slide=whole * self.skin, teeth=False),
-                                          self._lids(s, -0.10, None))
+            S[f"Brow_Raise_{side}"] = add(self._moved(vec(w * profile, up * 0.0105), slide=on_skull, teeth=False),
+                                          self._lids(s, -0.12, None))
+            # Lowered (the depressors): the inner end down and toward the
+            # other, the tail less; the fold comes down on the upper lid,
+            # which narrows the eye from above.
             inner = 1.0 - smoothstep(0.0, 0.55, along)
-            S[f"Brow_Lower_{side}"] = add(
-                self._moved(vec(w * (0.45 + 0.55 * inner), up * -0.0078) + vec(w * inner, out * -0.0036),
-                            slide=whole * self.skin, teeth=False),
-                self._lids(s, 0.14, None))
+            # (No vertex is drawn more than part of its way to the middle
+            # of the face: the two sides' skin met there and folded over
+            # in a hairline crease.)
+            together = lambda reach: vec(np.minimum(w * inner * reach, 0.4 * np.abs(P[:, 0])), out * -1.0)  # noqa: E731
+            lowered = self._moved(vec(w * (0.45 + 0.55 * inner), up * -0.0078) + together(0.0036)
+                                  + (bunch * 0.0016)[:, None] * N, slide=on_skull, teeth=False)
+            S[f"Brow_Lower_{side}"] = add(lowered, self._lids(s, BROW_PRESSES, None))
+            # The muscle that shuts an eye also draws the cheek up and the
+            # brow down a little: one eye shut alone is a wink, not a lid
+            # dropped on a still face. (`Eye_Closed`, an eye at rest, has
+            # the lids alone.)
+            S[f"Blink_{side}"] = add(S[f"Blink_{side}"], scale(cheek_up, BLINK_CHEEK), scale(lowered, BLINK_BROW))
+            # The inner end in and up, as in worry (the control's meaning in
+            # the engine, and what Sad, Worried, Fearful and Crying use it
+            # for): the inner half rises and comes toward the middle, the
+            # tail dips a little, and the skin between bunches forward.
             outer = smoothstep(0.45, 1.0, along)
             S[f"Brow_Inward_{side}"] = self._moved(
-                vec(w * inner, up * 0.0082 + out * -0.0034) + vec(w * outer, up * -0.0026),
-                slide=whole * self.skin, teeth=False)
+                vec(w * inner, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0026)
+                + (bunch * 0.0024)[:, None] * N, slide=on_skull, teeth=False)
             # The mouth's corners, the lips and the nose: each side's
             # offsets are kept, and made into shapes below.
             X, sl = self.smile(s)
@@ -1178,7 +1327,9 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     hair.add_shapes(lash, {name: hair.follow_lashes(face, at, roots, following[name], name in lids) for name in order})
     made["Lashes"] = lash
     brow, bound = hair.brows(face, out_dir)
-    hair.add_shapes(brow, {name: hair.follow_bound(bound, following[name]) for name in order})
+    at = np.array([v.co[:] for v in brow.data.vertices])
+    quads = [tuple(p.vertices) for p in brow.data.polygons]
+    hair.add_shapes(brow, {name: hair.follow_bound(face, bound, at, quads, following[name]) for name in order})
     made["Brows"] = brow
     # The teeth go where the mouth goes (and their simpler copies alike).
     lift = identity["Face_Mouth_Height"][0][face.mouth.mid]
