@@ -51,6 +51,7 @@ mod retarget;
 pub mod sequence;
 mod sockets;
 mod threads;
+pub mod twist;
 
 pub use animators::{
     AnimatorEvent, AnimatorView, Animators, FadeView, FiredView, LayerView, LoadedClip,

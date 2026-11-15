@@ -1,0 +1,1045 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic",
+  "label": "Realistic",
+  "family": "realistic",
+  "model": {
+    "file": "RealisticParts.glb",
+    "body": "AxcenityRealistic/Body",
+    "parts": [
+      "AxcenityRealistic/Eyes",
+      "AxcenityRealistic/Teeth"
+    ]
+  },
+  "skeleton": {
+    "convention": "humanoid",
+    "height": 1.75,
+    "pose": "a-pose-45",
+    "added_bones": [
+      {
+        "name": "LeftUpperArmTwist",
+        "parent": "LeftUpperArm"
+      },
+      {
+        "name": "LeftLowerArmTwist",
+        "parent": "LeftLowerArm"
+      },
+      {
+        "name": "LeftUpperLegTwist",
+        "parent": "LeftUpperLeg"
+      },
+      {
+        "name": "LeftLowerLegTwist",
+        "parent": "LeftLowerLeg"
+      },
+      {
+        "name": "LeftShoulderHelper",
+        "parent": "LeftShoulder"
+      },
+      {
+        "name": "LeftElbowHelper",
+        "parent": "LeftUpperArm"
+      },
+      {
+        "name": "LeftHipHelper",
+        "parent": "Hips"
+      },
+      {
+        "name": "LeftKneeHelper",
+        "parent": "LeftUpperLeg"
+      },
+      {
+        "name": "RightUpperArmTwist",
+        "parent": "RightUpperArm"
+      },
+      {
+        "name": "RightLowerArmTwist",
+        "parent": "RightLowerArm"
+      },
+      {
+        "name": "RightUpperLegTwist",
+        "parent": "RightUpperLeg"
+      },
+      {
+        "name": "RightLowerLegTwist",
+        "parent": "RightLowerLeg"
+      },
+      {
+        "name": "RightShoulderHelper",
+        "parent": "RightShoulder"
+      },
+      {
+        "name": "RightElbowHelper",
+        "parent": "RightUpperArm"
+      },
+      {
+        "name": "RightHipHelper",
+        "parent": "Hips"
+      },
+      {
+        "name": "RightKneeHelper",
+        "parent": "RightUpperLeg"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "frame",
+      "label": "Frame",
+      "category": "body"
+    },
+    {
+      "id": "proportions",
+      "label": "Proportions",
+      "category": "body"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "frame",
+      "label": "Masculine to feminine",
+      "group": "frame",
+      "range": [
+        0,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Frame_Feminine"
+        }
+      ],
+      "bones": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.024,
+            0.0192
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            -0.05674,
+            0.00464
+          ]
+        },
+        {
+          "bone": "Hips",
+          "offset": [
+            0.0,
+            -0.01394,
+            0.01051
+          ]
+        },
+        {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            -0.05744,
+            0.00388
+          ]
+        },
+        {
+          "bone": "LeftElbowHelper",
+          "offset": [
+            -0.03057,
+            -0.02455,
+            -0.02851
+          ]
+        },
+        {
+          "bone": "LeftEye",
+          "offset": [
+            0.00018,
+            -0.05211,
+            5e-05
+          ],
+          "scale": 0.9868
+        },
+        {
+          "bone": "LeftFoot",
+          "offset": [
+            -0.00357,
+            0.00497,
+            0.01663
+          ]
+        },
+        {
+          "bone": "LeftHand",
+          "offset": [
+            -0.02949,
+            -0.02554,
+            -0.03968
+          ]
+        },
+        {
+          "bone": "LeftHipHelper",
+          "offset": [
+            -0.00294,
+            -0.01314,
+            -0.0163
+          ]
+        },
+        {
+          "bone": "LeftIndexDistal",
+          "offset": [
+            -0.02903,
+            -0.03749,
+            -0.03803
+          ]
+        },
+        {
+          "bone": "LeftIndexIntermediate",
+          "offset": [
+            -0.0289,
+            -0.03769,
+            -0.0388
+          ]
+        },
+        {
+          "bone": "LeftIndexProximal",
+          "offset": [
+            -0.02745,
+            -0.03453,
+            -0.03952
+          ]
+        },
+        {
+          "bone": "LeftKneeHelper",
+          "offset": [
+            -0.00554,
+            -0.00469,
+            0.00902
+          ]
+        },
+        {
+          "bone": "LeftLittleDistal",
+          "offset": [
+            -0.03263,
+            -0.02941,
+            -0.03923
+          ]
+        },
+        {
+          "bone": "LeftLittleIntermediate",
+          "offset": [
+            -0.0319,
+            -0.02988,
+            -0.04076
+          ]
+        },
+        {
+          "bone": "LeftLittleProximal",
+          "offset": [
+            -0.02987,
+            -0.02974,
+            -0.04267
+          ]
+        },
+        {
+          "bone": "LeftLowerArm",
+          "offset": [
+            -0.03057,
+            -0.02455,
+            -0.02851
+          ]
+        },
+        {
+          "bone": "LeftLowerArmTwist",
+          "offset": [
+            -0.03003,
+            -0.02504,
+            -0.0341
+          ]
+        },
+        {
+          "bone": "LeftLowerLeg",
+          "offset": [
+            -0.00554,
+            -0.00469,
+            0.00902
+          ]
+        },
+        {
+          "bone": "LeftLowerLegTwist",
+          "offset": [
+            -0.00456,
+            0.00014,
+            0.01282
+          ]
+        },
+        {
+          "bone": "LeftMiddleDistal",
+          "offset": [
+            -0.03092,
+            -0.0381,
+            -0.04065
+          ]
+        },
+        {
+          "bone": "LeftMiddleIntermediate",
+          "offset": [
+            -0.03,
+            -0.03759,
+            -0.04043
+          ]
+        },
+        {
+          "bone": "LeftMiddleProximal",
+          "offset": [
+            -0.02862,
+            -0.03456,
+            -0.03993
+          ]
+        },
+        {
+          "bone": "LeftRingDistal",
+          "offset": [
+            -0.03121,
+            -0.03353,
+            -0.04225
+          ]
+        },
+        {
+          "bone": "LeftRingIntermediate",
+          "offset": [
+            -0.03172,
+            -0.03446,
+            -0.04203
+          ]
+        },
+        {
+          "bone": "LeftRingProximal",
+          "offset": [
+            -0.02986,
+            -0.03255,
+            -0.04101
+          ]
+        },
+        {
+          "bone": "LeftShoulder",
+          "offset": [
+            -0.0007,
+            -0.04438,
+            0.00222
+          ]
+        },
+        {
+          "bone": "LeftShoulderHelper",
+          "offset": [
+            -0.02202,
+            -0.03299,
+            -0.0006
+          ]
+        },
+        {
+          "bone": "LeftThumbDistal",
+          "offset": [
+            -0.02975,
+            -0.02678,
+            -0.03799
+          ]
+        },
+        {
+          "bone": "LeftThumbIntermediate",
+          "offset": [
+            -0.02789,
+            -0.02764,
+            -0.039
+          ]
+        },
+        {
+          "bone": "LeftThumbProximal",
+          "offset": [
+            -0.02855,
+            -0.02627,
+            -0.03928
+          ]
+        },
+        {
+          "bone": "LeftToes",
+          "offset": [
+            -0.02549,
+            -0.0007,
+            0.01715
+          ]
+        },
+        {
+          "bone": "LeftUpperArm",
+          "offset": [
+            -0.02202,
+            -0.03299,
+            -0.0006
+          ]
+        },
+        {
+          "bone": "LeftUpperArmTwist",
+          "offset": [
+            -0.0227,
+            -0.03231,
+            -0.00284
+          ]
+        },
+        {
+          "bone": "LeftUpperLeg",
+          "offset": [
+            -0.00294,
+            -0.01314,
+            -0.0163
+          ]
+        },
+        {
+          "bone": "LeftUpperLegTwist",
+          "offset": [
+            -0.00315,
+            -0.01246,
+            -0.01427
+          ]
+        },
+        {
+          "bone": "Neck",
+          "offset": [
+            0.0,
+            -0.0455,
+            0.00366
+          ]
+        },
+        {
+          "bone": "RightElbowHelper",
+          "offset": [
+            0.03026,
+            -0.0243,
+            -0.02814
+          ]
+        },
+        {
+          "bone": "RightEye",
+          "offset": [
+            -0.00018,
+            -0.05211,
+            5e-05
+          ],
+          "scale": 0.9868
+        },
+        {
+          "bone": "RightFoot",
+          "offset": [
+            0.00357,
+            0.00495,
+            0.01661
+          ]
+        },
+        {
+          "bone": "RightHand",
+          "offset": [
+            0.02918,
+            -0.02529,
+            -0.03967
+          ]
+        },
+        {
+          "bone": "RightHipHelper",
+          "offset": [
+            0.00294,
+            -0.01314,
+            -0.01632
+          ]
+        },
+        {
+          "bone": "RightIndexDistal",
+          "offset": [
+            0.02805,
+            -0.03673,
+            -0.03796
+          ]
+        },
+        {
+          "bone": "RightIndexIntermediate",
+          "offset": [
+            0.02812,
+            -0.0371,
+            -0.03884
+          ]
+        },
+        {
+          "bone": "RightIndexProximal",
+          "offset": [
+            0.02649,
+            -0.03402,
+            -0.03943
+          ]
+        },
+        {
+          "bone": "RightKneeHelper",
+          "offset": [
+            0.00561,
+            -0.00451,
+            0.00941
+          ]
+        },
+        {
+          "bone": "RightLittleDistal",
+          "offset": [
+            0.0318,
+            -0.02877,
+            -0.03917
+          ]
+        },
+        {
+          "bone": "RightLittleIntermediate",
+          "offset": [
+            0.0311,
+            -0.02926,
+            -0.04074
+          ]
+        },
+        {
+          "bone": "RightLittleProximal",
+          "offset": [
+            0.02891,
+            -0.02904,
+            -0.04254
+          ]
+        },
+        {
+          "bone": "RightLowerArm",
+          "offset": [
+            0.03026,
+            -0.0243,
+            -0.02814
+          ]
+        },
+        {
+          "bone": "RightLowerArmTwist",
+          "offset": [
+            0.02972,
+            -0.0248,
+            -0.0339
+          ]
+        },
+        {
+          "bone": "RightLowerLeg",
+          "offset": [
+            0.00561,
+            -0.00451,
+            0.00941
+          ]
+        },
+        {
+          "bone": "RightLowerLegTwist",
+          "offset": [
+            0.00459,
+            0.00022,
+            0.01301
+          ]
+        },
+        {
+          "bone": "RightMiddleDistal",
+          "offset": [
+            0.02997,
+            -0.03737,
+            -0.04062
+          ]
+        },
+        {
+          "bone": "RightMiddleIntermediate",
+          "offset": [
+            0.02923,
+            -0.03692,
+            -0.04034
+          ]
+        },
+        {
+          "bone": "RightMiddleProximal",
+          "offset": [
+            0.02753,
+            -0.03413,
+            -0.03982
+          ]
+        },
+        {
+          "bone": "RightRingDistal",
+          "offset": [
+            0.03031,
+            -0.03285,
+            -0.04221
+          ]
+        },
+        {
+          "bone": "RightRingIntermediate",
+          "offset": [
+            0.0309,
+            -0.0338,
+            -0.04198
+          ]
+        },
+        {
+          "bone": "RightRingProximal",
+          "offset": [
+            0.029,
+            -0.032,
+            -0.0408
+          ]
+        },
+        {
+          "bone": "RightShoulder",
+          "offset": [
+            0.0007,
+            -0.04438,
+            0.00222
+          ]
+        },
+        {
+          "bone": "RightShoulderHelper",
+          "offset": [
+            0.02163,
+            -0.03282,
+            -0.00083
+          ]
+        },
+        {
+          "bone": "RightThumbDistal",
+          "offset": [
+            0.02893,
+            -0.02623,
+            -0.03797
+          ]
+        },
+        {
+          "bone": "RightThumbIntermediate",
+          "offset": [
+            0.02709,
+            -0.0271,
+            -0.03897
+          ]
+        },
+        {
+          "bone": "RightThumbProximal",
+          "offset": [
+            0.02804,
+            -0.02593,
+            -0.03925
+          ]
+        },
+        {
+          "bone": "RightToes",
+          "offset": [
+            0.02551,
+            -0.0007,
+            0.01716
+          ]
+        },
+        {
+          "bone": "RightUpperArm",
+          "offset": [
+            0.02163,
+            -0.03282,
+            -0.00083
+          ]
+        },
+        {
+          "bone": "RightUpperArmTwist",
+          "offset": [
+            0.02232,
+            -0.03214,
+            -0.00301
+          ]
+        },
+        {
+          "bone": "RightUpperLeg",
+          "offset": [
+            0.00294,
+            -0.01314,
+            -0.01632
+          ]
+        },
+        {
+          "bone": "RightUpperLegTwist",
+          "offset": [
+            0.00315,
+            -0.01245,
+            -0.01427
+          ]
+        },
+        {
+          "bone": "Spine",
+          "offset": [
+            0.0,
+            -0.01659,
+            0.01051
+          ]
+        },
+        {
+          "bone": "UpperChest",
+          "offset": [
+            0.0,
+            -0.03518,
+            0.01112
+          ]
+        }
+      ]
+    },
+    {
+      "id": "height",
+      "label": "Height",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "BodyHeight",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leg_length",
+      "label": "Leg length",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "LegLength",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "arm_length",
+      "label": "Arm length",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "ArmLength",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "shoulder_width",
+      "label": "Shoulder width",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "ShoulderWidth",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "waist_width",
+      "label": "Waist width",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "WaistWidth",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "hip_width",
+      "label": "Hip width",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HipWidth",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "head_size",
+      "label": "Head size",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HeadSize",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "hand_size",
+      "label": "Hand size",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HandSize",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "foot_size",
+      "label": "Foot size",
+      "group": "proportions",
+      "range": [
+        0.5,
+        1.5
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "FootSize",
+          "from": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "advanced": true
+    }
+  ],
+  "regions": [
+    {
+      "id": "head",
+      "label": "Head",
+      "map_index": 1
+    },
+    {
+      "id": "neck",
+      "label": "Neck",
+      "map_index": 2
+    },
+    {
+      "id": "torso",
+      "label": "Torso",
+      "map_index": 3
+    },
+    {
+      "id": "waist",
+      "label": "Waist",
+      "map_index": 4
+    },
+    {
+      "id": "hips",
+      "label": "Hips",
+      "map_index": 5
+    },
+    {
+      "id": "upper_arms_top",
+      "label": "Upper arms (top)",
+      "map_index": 6
+    },
+    {
+      "id": "upper_arms_low",
+      "label": "Upper arms (low)",
+      "map_index": 7
+    },
+    {
+      "id": "forearms",
+      "label": "Forearms",
+      "map_index": 8
+    },
+    {
+      "id": "hands",
+      "label": "Hands",
+      "map_index": 9
+    },
+    {
+      "id": "thighs_top",
+      "label": "Thighs (top)",
+      "map_index": 10
+    },
+    {
+      "id": "thighs_low",
+      "label": "Thighs (low)",
+      "map_index": 11
+    },
+    {
+      "id": "shins_top",
+      "label": "Shins (top)",
+      "map_index": 12
+    },
+    {
+      "id": "shins_low",
+      "label": "Shins (low)",
+      "map_index": 13
+    },
+    {
+      "id": "feet",
+      "label": "Feet",
+      "map_index": 14
+    }
+  ],
+  "slots": [
+    {
+      "id": "hair",
+      "label": "Hairstyle",
+      "category": "hair",
+      "empty_label": "Bald"
+    },
+    {
+      "id": "underwear_top",
+      "label": "Underwear top",
+      "category": "clothing"
+    },
+    {
+      "id": "underwear_bottom",
+      "label": "Underwear",
+      "category": "clothing"
+    },
+    {
+      "id": "top",
+      "label": "Top",
+      "category": "clothing"
+    },
+    {
+      "id": "outerwear",
+      "label": "Outerwear",
+      "category": "clothing"
+    },
+    {
+      "id": "bottom",
+      "label": "Bottoms",
+      "category": "clothing"
+    },
+    {
+      "id": "shoes",
+      "label": "Shoes",
+      "category": "clothing"
+    }
+  ],
+  "sockets": [
+    {
+      "name": "HeadSocket",
+      "bone": "Head"
+    },
+    {
+      "name": "BackSocket",
+      "bone": "UpperChest"
+    },
+    {
+      "name": "HipsSocket",
+      "bone": "Hips"
+    },
+    {
+      "name": "LeftHandSocket",
+      "bone": "LeftHand"
+    },
+    {
+      "name": "RightHandSocket",
+      "bone": "RightHand"
+    },
+    {
+      "name": "LeftFootSocket",
+      "bone": "LeftFoot"
+    },
+    {
+      "name": "RightFootSocket",
+      "bone": "RightFoot"
+    }
+  ],
+  "materials": [
+    {
+      "name": "Gums",
+      "shading": "standard"
+    },
+    {
+      "name": "Iris",
+      "shading": "eye"
+    },
+    {
+      "name": "Mouth",
+      "shading": "standard"
+    },
+    {
+      "name": "Sclera",
+      "shading": "eye"
+    },
+    {
+      "name": "Skin",
+      "shading": "skin"
+    },
+    {
+      "name": "Teeth",
+      "shading": "standard"
+    },
+    {
+      "name": "Tongue",
+      "shading": "standard"
+    }
+  ],
+  "face": {
+    "profile": "axcenity",
+    "eye_bones": [
+      "LeftEye",
+      "RightEye"
+    ],
+    "jaw_bone": "Jaw"
+  },
+  "defaults": {
+    "items": []
+  }
+}

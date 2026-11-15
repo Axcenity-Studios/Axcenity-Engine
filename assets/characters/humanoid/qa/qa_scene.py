@@ -5,6 +5,11 @@ face and expression shapes, clothing masks, the bone offsets the
 customization file lists), poses the skeleton with fixed test poses, gives
 deformed geometry for measuring, and sets up one fixed studio for renders.
 
+The scripts measure either base model package (`PACKAGES`): the stylized
+humanoid (the default) or the realistic body, whose twist and helper bones
+are turned here as `anim`'s `twist.rs` turns them in the engine
+(`Character.drive`), so what's measured is what a game shows.
+
 Blender space: metres, Z up, the character faces -Y, its left is +X.
 """
 
@@ -14,12 +19,38 @@ import os
 
 import bpy
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 from mathutils.bvhtree import BVHTree
 
 QA_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSET_DIR = os.path.dirname(QA_DIR)
 CUSTOM_PATH = os.path.join(ASSET_DIR, "Humanoid.customization.json")
+LIBRARY_DIR = os.path.dirname(ASSET_DIR)
+
+# The base model packages the scripts know: where each one's files are.
+# `default` is the single-file default character (the stylized package's
+# only), `custom` what its shapes move besides vertices.
+PACKAGES = {
+    "stylized": {
+        "dir": ASSET_DIR,
+        "parts": "HumanoidParts.glb",
+        "default": "Humanoid.glb",
+        "custom": "Humanoid.customization.json",
+    },
+    "realistic": {
+        "dir": os.path.join(LIBRARY_DIR, "realistic"),
+        "parts": "RealisticParts.glb",
+        "default": None,
+        "custom": "Realistic.build.json",
+    },
+}
+
+
+def package_paths(name):
+    """(parts file, default file or None, customization file) of a package."""
+    pack = PACKAGES[name]
+    join = lambda f: os.path.join(pack["dir"], f) if f else None  # noqa: E731
+    return join(pack["parts"]), join(pack["default"]), join(pack["custom"])
 
 FWD = Vector((0, -1, 0))
 BACK = Vector((0, 1, 0))
@@ -33,8 +64,15 @@ BUILDS = ("Build_Heavy", "Build_Slim", "Build_Muscular")
 
 
 def load_custom(path=CUSTOM_PATH):
+    """A package's customization data, in the stylized file's layout. The
+    realistic package's build data (`frame`, `twists`, `helpers`) is read
+    into it: its frame's bone offsets as `Frame_Feminine`'s, no garments."""
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if "frame" in data and "body" not in data:
+        data = dict(data, body={"Frame_Feminine": data["frame"]}, face={}, masks=[], parts={}, hair=[],
+                    default={"outfit": [], "hair": None})
+    return data
 
 
 def gltf_to_blender(d):
@@ -205,6 +243,55 @@ class Character:
         self.set_eyes()
         update()
 
+    # -- twist and helper bones ------------------------------------------------------
+
+    def _local(self, name, posed=True):
+        """A bone's transform in its parent's space, at rest or as posed."""
+        bone = self.arm.data.bones[name]
+        rest = bone.matrix_local
+        if bone.parent:
+            rest = bone.parent.matrix_local.inverted() @ rest
+        return rest @ self.arm.pose.bones[name].matrix_basis if posed else rest
+
+    def drive(self):
+        """Turns the skeleton's twist and helper bones for the pose it's
+        in, by the rule `anim`'s `twist.rs` applies after every pose (the
+        customization data lists them; a skeleton without any is left
+        alone). A twist bone takes `share` of the twist of the bone it
+        reads about the limb's axis (a negative share undoes that much of
+        its own parent's twist). A helper takes `share` of its source
+        bone's whole turn and stays on its joint."""
+        bones = self.arm.pose.bones
+        for t in self.custom.get("twists", []):
+            for side, _ in SIDES:
+                pb = bones.get(side + t["bone"])
+                if pb is None:
+                    continue
+                inside, reads = side + t["inside"], side + t["reads"]
+                if reads == inside:
+                    # The limb's own turn from rest, in its own axes.
+                    turn = bones[inside].matrix_basis.to_quaternion()
+                else:
+                    # The next bone's turn from rest, in the limb's axes.
+                    turn = (self._local(reads) @ self._local(reads, posed=False).inverted()).to_quaternion()
+                angle = twist_angle(turn, Vector((0.0, 1.0, 0.0)))
+                rest = self._local(pb.name, posed=False)
+                local = Matrix.Rotation(angle * t["share"], 4, "Y") @ rest
+                pb.matrix_basis = rest.inverted() @ local
+        for h in self.custom.get("helpers", []):
+            for side, _ in SIDES:
+                pb = bones.get(side + h["bone"])
+                if pb is None:
+                    continue
+                reads = side + h["reads"]
+                src_rest, src = self._local(reads, posed=False), self._local(reads)
+                turn = (src @ src_rest.inverted()).to_quaternion()
+                part = Quaternion().slerp(turn, h["share"])
+                rest = self._local(pb.name, posed=False)
+                at = rest.to_translation() + (src.to_translation() - src_rest.to_translation())
+                local = Matrix.Translation(at) @ (part.to_matrix() @ rest.to_3x3()).to_4x4()
+                pb.matrix_basis = rest.inverted() @ local
+
     def bend(self, bone, axis, deg, toward=None):
         """Turns `bone` by `deg` about `axis` (armature space, through its
         rest head), composed on its current local turn. With `toward`, the
@@ -316,7 +403,116 @@ POSES = {
 def apply_pose(ch, name):
     ch.pose_reset()
     POSES[name][0](ch)
+    ch.drive()
     update()
+
+
+# -- takes -----------------------------------------------------------------------------
+
+def load_takes(path):
+    """Imports an animations file (a skeleton and its clips): the armature
+    and its actions by clip name."""
+    before_objects, before_actions = set(bpy.data.objects), set(bpy.data.actions)
+    bpy.ops.import_scene.gltf(filepath=path)
+    new = [o for o in bpy.data.objects if o not in before_objects]
+    arm = next(o for o in new if o.type == "ARMATURE")
+    for o in new:
+        o.hide_render = True
+    actions = {}
+    for action in bpy.data.actions:
+        if action not in before_actions:
+            actions[action.name.split("_AxcenityHumanoid")[0].split(".")[0]] = action
+    return arm, actions
+
+
+def pose_take(ch, take_arm, action, at, retarget=True):
+    """Poses `ch` from `action` (a clip on `take_arm`'s skeleton) at `at`
+    (0 to 1 through the clip), then drives its twist and helper bones.
+
+    With `retarget`, as the engine retargets a take onto another humanoid
+    (`anim` `retarget.rs`): each bone of the same name is turned by the
+    take's turn from its own rest, in the model's space, onto this
+    skeleton's rest, and the hips travel as far as the take's, scaled by
+    the two skeletons' leg lengths. Without it, as a take bound by bone
+    name plays: every bone takes the take's own place relative to its
+    parent (the take skeleton's bone offsets with it)."""
+    if take_arm.animation_data is None:
+        take_arm.animation_data_create()
+    take_arm.animation_data.action = action
+    slot = getattr(take_arm.animation_data, "action_suitable_slots", None)
+    if slot:
+        take_arm.animation_data.action_slot = slot[0]
+    start, end = action.frame_range
+    bpy.context.scene.frame_set(int(round(start + (end - start) * at)))
+    update()
+    ch.pose_reset()
+    mine, theirs = ch.arm, take_arm
+    rest_of = lambda arm, name: arm.data.bones[name].matrix_local  # noqa: E731
+
+    def leg(arm):
+        hip, knee, foot = (rest_of(arm, "Left" + n).to_translation() for n in ("UpperLeg", "LowerLeg", "Foot"))
+        return (knee - hip).length + (foot - knee).length
+
+    scale = leg(mine) / leg(theirs)
+    # Parents first, so each bone is placed on its posed parent.
+    for bone in mine.data.bones:
+        pb = mine.pose.bones[bone.name]
+        tb = theirs.pose.bones.get(bone.name)
+        if tb is None:
+            continue
+        take_rest = rest_of(theirs, bone.name)
+        if retarget:
+            turn = tb.matrix.to_3x3() @ take_rest.to_3x3().inverted()
+            rotation = turn @ bone.matrix_local.to_3x3()
+            if bone.parent is None or bone.name == "Hips":
+                travel = (tb.matrix.to_translation() - take_rest.to_translation()) * scale
+                head = bone.matrix_local.to_translation() + travel
+            else:
+                parent = mine.pose.bones[bone.parent.name]
+                local = bone.parent.matrix_local.inverted() @ bone.matrix_local
+                head = (parent.matrix @ local).to_translation()
+            pb.matrix = Matrix.Translation(head) @ rotation.to_4x4()
+        else:
+            parent = mine.pose.bones[bone.parent.name].matrix if bone.parent else Matrix()
+            take_parent = tb.parent.matrix if tb.parent else Matrix()
+            pb.matrix = parent @ (take_parent.inverted() @ tb.matrix)
+        update()
+    ch.set_eyes()
+    ch.drive()
+    update()
+
+
+def glb_images(path):
+    """The images embedded in a .glb file, by name, as PIL images."""
+    import io
+    import struct
+    from PIL import Image
+    with open(path, "rb") as f:
+        data = f.read()
+    length = struct.unpack("<I", data[12:16])[0]
+    gltf = json.loads(data[20:20 + length])
+    binary = data[20 + length + 8:]
+    out = {}
+    for image in gltf.get("images", []):
+        view = gltf["bufferViews"][image["bufferView"]]
+        start = view.get("byteOffset", 0)
+        out[image.get("name", str(len(out)))] = Image.open(io.BytesIO(binary[start:start + view["byteLength"]]))
+    return out
+
+
+def twist_angle(turn, axis):
+    """The angle (radians) of the part of the rotation `turn` that turns
+    about `axis` (a unit vector): its twist, with the swing taken out."""
+    along = Vector((turn.x, turn.y, turn.z)).dot(axis)
+    if abs(along) < 1e-12 and abs(turn.w) < 1e-12:
+        return 0.0
+    angle = 2.0 * math.atan2(along, turn.w)
+    # The short way round.
+    if angle > math.pi:
+        angle -= 2.0 * math.pi
+    elif angle < -math.pi:
+        angle += 2.0 * math.pi
+    return angle
 
 
 # -- deformed geometry -----------------------------------------------------------------

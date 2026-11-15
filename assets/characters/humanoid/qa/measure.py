@@ -1,13 +1,17 @@
-"""Measures the default humanoid for defects and writes measurements.json.
+"""Measures a humanoid base model package for defects and writes measurements.json.
 
-    python -I measure.py [--parts HumanoidParts.glb] [--default Humanoid.glb]
-                         [--out measurements.json] [--source-ngons]
+    python -I measure.py [--package stylized|realistic] [--parts FILE] [--default FILE]
+                         [--out measurements.json] [--source-ngons] [--only a,b]
+                         [--check thresholds.json]
 
 Sections: per-object stats and topology, skin weights, clothing and hair
 clipping across frames and builds, joint deformation in fixed test poses,
-face shapes (self-intersection, eyes and lids, teeth), proportions. Every
-distance is in millimetres unless the key says otherwise. Read qa/README.md
-for what each number means.
+face shapes (self-intersection, eyes and lids, teeth), proportions, and
+`twist` (how a limb's cross-sections hold when it turns about its length;
+not run unless asked for, or the package has twist bones). A package
+without garments, hair, a default file or a given shape skips what needs
+them. Every distance is in millimetres unless the key says otherwise. Read
+qa/README.md for what each number means.
 """
 
 import argparse
@@ -177,9 +181,36 @@ def chain_of(name):
     return name
 
 
+def fold(W, custom):
+    """`W` with each twist bone's weight counted as the bone it's inside
+    and each helper's shared between its parent and the bone it reads, so
+    "the skin of the upper arm" means the same with or without them. A
+    skeleton with neither gives `W` back."""
+    twists, helpers = custom.get("twists", []), custom.get("helpers", [])
+    if not twists and not helpers:
+        return W
+    to = {}
+    for side in ("Left", "Right"):
+        for t in twists:
+            to[side + t["bone"]] = [(side + t["inside"], 1.0)]
+        for h in helpers:
+            parent = h["parent"] if h["parent"] == "Hips" else side + h["parent"]
+            to[side + h["bone"]] = [(parent, 0.5), (side + h["reads"], 0.5)]
+    out = []
+    for d in W:
+        f = {}
+        for b, w in d.items():
+            for name, share in to.get(b, [(b, 1.0)]):
+                f[name] = f.get(name, 0.0) + w * share
+        out.append(f)
+    return out
+
+
 def weights_report(ch):
     out = {}
     segs = bone_segments(ch)
+    added = {s + t["bone"] for s in ("Left", "Right") for t in ch.custom.get("twists", []) + ch.custom.get("helpers", [])}
+    segs = {b: seg for b, seg in segs.items() if b not in added}
     for name, obj in ch.parts.items():
         names = {vg.index: vg.name for vg in obj.vertex_groups}
         over4 = unnorm = none = 0
@@ -210,6 +241,7 @@ def weights_report(ch):
     all_bones = [b.name for b in ch.arm.data.bones]
     out["Body"]["bones_without_weights"] = [b for b in all_bones if b not in per_bone]
     out["Body"]["vertices_per_bone"] = dict(sorted(per_bone.items()))
+    W = fold(W, ch.custom)
     # Fingers: weight on a finger bone where another chain's bone is nearer.
     P = [v.co.copy() for v in body.data.vertices]
     fingers = {}
@@ -258,17 +290,22 @@ def weights_report(ch):
         top = max(d)
         return [i for i, x in enumerate(d) if x > frac * top]
 
-    upper_lip = moved_by("Upper_Lip_Raise")
-    lower_lip = moved_by("Lower_Lip_Lower")
-    jaw_u = [W[i].get("Jaw", 0.0) for i in upper_lip]
-    jaw_l = [W[i].get("Jaw", 0.0) for i in lower_lip]
+    lips = {}
+    if "Upper_Lip_Raise" in sk and "Lower_Lip_Lower" in sk:
+        upper_lip = moved_by("Upper_Lip_Raise")
+        lower_lip = moved_by("Lower_Lip_Lower")
+        jaw_u = [W[i].get("Jaw", 0.0) for i in upper_lip]
+        jaw_l = [W[i].get("Jaw", 0.0) for i in lower_lip]
+        lips = {
+            "upper_lip_verts": len(upper_lip), "upper_lip_jaw_weight_mean": round(float(np.mean(jaw_u)), 3),
+            "upper_lip_jaw_weight_max": round(float(np.max(jaw_u)), 3),
+            "lower_lip_verts": len(lower_lip), "lower_lip_jaw_weight_mean": round(float(np.mean(jaw_l)), 3),
+            "lower_lip_jaw_weight_min": round(float(np.min(jaw_l)), 3),
+        }
     face_verts = [i for i, p in enumerate(P) if p.z > ch.head("Head").z + 0.02 and p.y < ch.head("Head").y - 0.04]
     neck_on_face = [W[i].get("Neck", 0.0) for i in face_verts]
     out["face_weights"] = {
-        "upper_lip_verts": len(upper_lip), "upper_lip_jaw_weight_mean": round(float(np.mean(jaw_u)), 3),
-        "upper_lip_jaw_weight_max": round(float(np.max(jaw_u)), 3),
-        "lower_lip_verts": len(lower_lip), "lower_lip_jaw_weight_mean": round(float(np.mean(jaw_l)), 3),
-        "lower_lip_jaw_weight_min": round(float(np.min(jaw_l)), 3),
+        **lips,
         "face_front_verts_above_head_joint": len(face_verts),
         "face_verts_with_neck_weight_gt_0.1": sum(1 for w in neck_on_face if w > 0.1),
         "face_neck_weight_max": round(float(max(neck_on_face)), 3),
@@ -277,8 +314,11 @@ def weights_report(ch):
     # Jaw: how far up the face its weights reach (mouth line = the upper
     # teeth's lowest point).
     teeth = ch.parts.get("Teeth")
-    tn = {vg.index: vg.name for vg in teeth.vertex_groups}
-    upper = [v.co.z for v in teeth.data.vertices if any(tn[g.group] == "Head" and g.weight > 0.5 for g in v.groups)]
+    upper = []
+    if teeth is not None:
+        tn = {vg.index: vg.name for vg in teeth.vertex_groups}
+        upper = [v.co.z for v in teeth.data.vertices
+                 if any(tn[g.group] == "Head" and g.weight > 0.5 for g in v.groups)]
     mouth_z = min(upper) if upper else None
     jaw = [(P[i], d["Jaw"]) for i, d in enumerate(W) if d.get("Jaw", 0) > 0.05]
     above = [w for p, w in jaw if mouth_z is not None and p.z > mouth_z + 0.004 and p.y < -0.05]
@@ -574,16 +614,21 @@ EXPRESSIONS = {
 def face_report(ch):
     out = {}
     z_neck = ch.head("Head").z - 0.02
+    has = {kb.name for kb in ch.parts["Body"].data.shape_keys.key_blocks}
     for f in (0.0, 1.0):
         fr = {}
         base = None
         configs = [("neutral", {}, {}, None)]
         for name in FACE_SHAPES:
+            if name not in has:
+                continue
             for w in (-1.0, 1.0):
                 configs.append((f"{name}{w:+.0f}", {name: w}, {}, None))
         for name, (expr, pose) in EXPRESSIONS.items():
-            if name != "neutral":
-                configs.append((name, {}, expr, pose))
+            # An expression needs its shapes; one with a pose (the jaw's
+            # bone) is still measured on a body without them.
+            if name != "neutral" and (all(k in has for k in expr) or pose):
+                configs.append((name, {}, {k: w for k, w in expr.items() if k in has}, pose))
         for label, face, expr, pose in configs:
             ch.set_look(frame=f, face=face, expr=expr)
             ch.pose_reset()
@@ -671,10 +716,13 @@ def local_volume(co, tris, c):
     return float(np.einsum("ij,ij->i", a, np.cross(b, d)).sum() / 6.0)
 
 
-def deformation(ch, W, default_path):
+HAND_BONES = ("Hand", "Thumb", "Index", "Middle", "Ring", "Little")
+
+
+def deformation(ch, W, default_path, package="stylized"):
     out = {}
     outfit = ch.custom["default"]["outfit"]
-    WT = obj_weights(ch.parts["Shirt_Tee"])
+    WT = obj_weights(ch.parts["Shirt_Tee"]) if "Shirt_Tee" in ch.parts else None
     for f in (0.0, 1.0):
         fr = {}
         ch.set_look(frame=f)
@@ -708,25 +756,32 @@ def deformation(ch, W, default_path):
                 hand = (rest.co[:, 0] > 0.3) & (rest.co[:, 2] < 1.1)
                 if f:
                     hand = (rest.co[:, 0] > 0.25) & (rest.co[:, 2] < 1.12)
+                if package != "stylized":
+                    # The left hand, by what it's weighted to.
+                    hand = np.array([sum(w for b, w in d.items() if b.startswith("Left") and
+                                         any(k in b for k in HAND_BONES)) > 0.5 for d in W])
                 ht = body.tris[hand[body.tris].all(axis=1)]
                 res["hand_self_intersecting_tri_pairs"] = self_intersections(body, ht)
                 res["hand_self_intersections_at_rest"] = self_intersections(rest, ht)
             # The default outfit in this pose.
-            ch.set_look(frame=f, masks=ch.masks_for(outfit))
-            Q.apply_pose(ch, pose)
-            body = Q.Geo(ch.parts["Body"])
-            gs = {g: Q.Geo(ch.parts[g]) for g in outfit}
-            merged = Q.merged_bvh(list(gs.values()))
-            res["body_through_outfit"] = poke_stats(body, merged, W)
-            res["tee_through_jacket"] = poke_stats(gs["Shirt_Tee"], gs["Jacket_Cropped"].bvh, WT,
-                                                   idx=facing_out(gs["Shirt_Tee"], body))
-            wg = Q.band_gaps(merged, body.bvh, 0.88, 1.20, skip=arm_face(body, W))
-            res["waist_gap_mm_max"] = max(wg.values())
-            res["waist_gap_mm_sum_16_dirs"] = round(sum(wg.values()), 1)
+            if outfit:
+                ch.set_look(frame=f, masks=ch.masks_for(outfit))
+                Q.apply_pose(ch, pose)
+                body = Q.Geo(ch.parts["Body"])
+                gs = {g: Q.Geo(ch.parts[g]) for g in outfit}
+                merged = Q.merged_bvh(list(gs.values()))
+                res["body_through_outfit"] = poke_stats(body, merged, W)
+                res["tee_through_jacket"] = poke_stats(gs["Shirt_Tee"], gs["Jacket_Cropped"].bvh, WT,
+                                                       idx=facing_out(gs["Shirt_Tee"], body))
+                wg = Q.band_gaps(merged, body.bvh, 0.88, 1.20, skip=arm_face(body, W))
+                res["waist_gap_mm_max"] = max(wg.values())
+                res["waist_gap_mm_sum_16_dirs"] = round(sum(wg.values()), 1)
             fr[pose] = res
             ch.set_look(frame=f)
             ch.pose_reset()
         out["feminine" if f else "masculine"] = fr
+    if not default_path:
+        return out
     # Humanoid.glb (the shipped default, its hidden skin removed): do the
     # trimmed body's cut edges stay under the clothes?
     holes = {}
@@ -753,6 +808,73 @@ def deformation(ch, W, default_path):
         holes[pose] = {"cut_edge_verts": len(edge_verts), "uncovered": unc}
     out["default_file_cut_edges"] = holes
     del sel
+    return out
+
+
+# -- twist -------------------------------------------------------------------------
+
+# (name, bone turned about its own length, degrees, the limb's bones from the
+# body outward). Turning a hand or an arm about its length is what a plain
+# two-bone blend handles worst: the skin between the bones winds up like a
+# sweet wrapper. Twist bones spread the turn along the limb.
+TWIST_POSES = [
+    ("forearm_twist_90", "LeftHand", 90.0, ("LeftLowerArm", "LeftHand")),
+    ("upper_arm_twist_70", "LeftUpperArm", 70.0, ("LeftShoulder", "LeftUpperArm", "LeftLowerArm")),
+    ("thigh_twist_45", "LeftUpperLeg", 45.0, ("Hips", "LeftUpperLeg", "LeftLowerLeg")),
+]
+
+
+def twist_report(ch, W):
+    """For each twist pose: the limb's cross-sections (rings of the rest
+    mesh's edges crossing planes along the turned bone's parent segment
+    and its own), posed area over rest. A wound-up limb's smallest ring
+    falls far under 1."""
+    out = {}
+    me = ch.parts["Body"].data
+    for f in (0.0, 1.0):
+        fr = {}
+        ch.set_look(frame=f)
+        ch.pose_reset()
+        rest = Q.Geo(ch.parts["Body"])
+        P = [Vector(p) for p in rest.co]
+        for name, bone, deg, chain in TWIST_POSES:
+            # Planes along the segment the twist is spread over: the turned
+            # bone's parent for a hand, the bone itself for an arm or thigh.
+            seg = chain[-2] if bone == chain[-1] else bone
+            a, b = ch.head(seg), ch.tail(seg)
+            n = (b - a).normalized()
+            limb = set(chain)
+            rings = []
+            for k in range(1, 12):
+                c = a.lerp(b, k / 12.0)
+                pts = []
+                for e in me.edges:
+                    i, j = e.vertices
+                    da, db = (P[i] - c).dot(n), (P[j] - c).dot(n)
+                    if da * db > 0 or da == db:
+                        continue
+                    t = da / (da - db)
+                    x = P[i].lerp(P[j], t)
+                    if (x - c).length > 0.16:
+                        continue
+                    if sum(W[i].get(bb, 0) for bb in limb) + sum(W[j].get(bb, 0) for bb in limb) < 1.6:
+                        continue
+                    pts.append((i, j, t))
+                u = n.orthogonal().normalized()
+                w = n.cross(u)
+                pts.sort(key=lambda q: math.atan2((P[q[0]].lerp(P[q[1]], q[2]) - c).dot(w),
+                                                  (P[q[0]].lerp(P[q[1]], q[2]) - c).dot(u)))
+                rings.append(pts)
+            a0 = [ring_area(rest.co, r) for r in rings]
+            ch.pose_reset()
+            ch.bend(bone, n, deg)
+            ch.drive()
+            Q.update()
+            posed = Q.Geo(ch.parts["Body"])
+            ratios = [round(ring_area(posed.co, r) / x, 3) for r, x in zip(rings, a0) if x > 0]
+            fr[name] = {"ring_area_ratio_min": min(ratios), "ring_area_ratios": ratios}
+            ch.pose_reset()
+        out["feminine" if f else "masculine"] = fr
     return out
 
 
@@ -847,6 +969,8 @@ def shapes_report(ch):
     out["eyeball_diameter_mm"] = mm((co[left].max(0) - co[left].min(0)).max())
     out["iris_diameter_mm"] = mm(max(ic[:, 0].max() - ic[:, 0].min(), ic[:, 2].max() - ic[:, 2].min()))
     out["reference_eye"] = "adult eyeball about 24 mm, iris about 11.7 mm (scale by the head height ratio for this head)"
+    if "Shoes_Sneakers" not in ch.parts:
+        return out
     shoes = ch.parts["Shoes_Sneakers"].data
     smats = [m.name for m in shoes.materials]
     sco = np.array([v.co[:] for v in shoes.vertices])
@@ -873,13 +997,13 @@ def shapes_report(ch):
 
 # -- main ----------------------------------------------------------------------------
 
-def file_report(path):
+def file_report(path, custom=None):
     Q.reset()
-    raw = Q.Character(path, merge_vertices=False)
+    raw = Q.Character(path, merge_vertices=False, custom=custom)
     stats = {n: object_stats(o) for n, o in sorted(raw.parts.items())}
     bones = len(raw.arm.data.bones)
     Q.reset()
-    merged = Q.Character(path, merge_vertices=True)
+    merged = Q.Character(path, merge_vertices=True, custom=custom)
     for n, o in merged.parts.items():
         stats[n]["topology"] = topology(o)
     return {"bones": bones, "objects": stats,
@@ -889,15 +1013,25 @@ def file_report(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--parts", default=os.path.join(Q.ASSET_DIR, "HumanoidParts.glb"))
-    ap.add_argument("--default", default=os.path.join(Q.ASSET_DIR, "Humanoid.glb"))
+    ap.add_argument("--package", default="stylized", choices=sorted(Q.PACKAGES))
+    ap.add_argument("--parts", default="", help="the parts file (the package's, unless given)")
+    ap.add_argument("--default", default="", help="the default character file (the package's, if it has one)")
+    ap.add_argument("--custom", default="", help="the customization or build data file (the package's, unless given)")
     ap.add_argument("--out", default="measurements.json")
     ap.add_argument("--source-ngons", action="store_true")
     ap.add_argument("--only", default="", help="comma list of sections to run")
-    ap.add_argument("--check", default="", help="thresholds file: exit 1 if clipping is worse")
+    ap.add_argument("--check", default="", help="thresholds file: exit 1 if a measure is worse")
+    ap.add_argument("--strict", action="store_true",
+                    help="with --check: also exit 1 when one of the file's `targets` isn't met")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
+    parts_path, default_path, custom_path = Q.package_paths(a.package)
+    a.parts = a.parts or parts_path
+    a.default = a.default or default_path
+    custom = Q.load_custom(a.custom or custom_path)
     only = set(filter(None, a.only.split(",")))
-    run = lambda s: not only or s in only  # noqa: E731
+    # `twist` is extra: run when asked for, or for a package with twist bones.
+    extra = {"twist"} if not custom.get("twists") else set()
+    run = lambda s: (s in only) if only else s not in extra  # noqa: E731
     out = {"files": {}, "notes": [
         "Blender space: metres, Z up, the character faces -Y. Distances in mm unless named _m.",
         "Topology counts are on position-merged vertices (glTF splits vertices at UV seams); glTF stores only "
@@ -910,22 +1044,25 @@ def main():
     ]}
     t0 = time.time()
     if run("files"):
-        out["files"]["HumanoidParts.glb"] = file_report(a.parts)
-        out["files"]["Humanoid.glb"] = file_report(a.default)
+        out["files"][os.path.basename(a.parts)] = file_report(a.parts, custom)
+        if a.default:
+            out["files"][os.path.basename(a.default)] = file_report(a.default, custom)
         print("files", round(time.time() - t0, 1))
     if a.source_ngons and run("files"):
         out["source_ngons"] = source_ngons()
     Q.reset()
-    ch = Q.Character(a.parts, merge_vertices=True)
+    ch = Q.Character(a.parts, merge_vertices=True, custom=custom)
     wr, W = weights_report(ch)
     if run("weights"):
         out["weights"] = wr
         print("weights", round(time.time() - t0, 1))
     sk = ch.parts["Body"].data.shape_keys.key_blocks
-    ears = sk["Face_Ears_Size"]
     basis = sk[0]
-    ear_idx = {i for i in range(len(basis.data)) if (ears.data[i].co - basis.data[i].co).length > 1e-6}
-    if run("clipping"):
+    ear_idx = set()
+    if "Face_Ears_Size" in sk:
+        ears = sk["Face_Ears_Size"]
+        ear_idx = {i for i in range(len(basis.data)) if (ears.data[i].co - basis.data[i].co).length > 1e-6}
+    if run("clipping") and custom["default"]["outfit"]:
         out["clipping"] = clipping(ch, W, ear_idx)
         out["face_parts"] = face_parts_report(ch, [
             ("masculine/neutral", {}, None), ("feminine/neutral", {"frame": 1.0}, None),
@@ -947,30 +1084,66 @@ def main():
         out["proportions"] = proportions(ch, W)
         print("proportions", round(time.time() - t0, 1))
     if run("deformation"):
-        out["deformation"] = deformation(ch, W, a.default)
+        out["deformation"] = deformation(ch, W, a.default, a.package)
         print("deformation", round(time.time() - t0, 1))
+    if run("twist"):
+        if a.default:  # `deformation` ends in the default file's scene
+            Q.reset()
+            ch = Q.Character(a.parts, merge_vertices=True, custom=custom)
+        out["twist"] = twist_report(ch, W)
+        print("twist", round(time.time() - t0, 1))
     import json
     with open(a.out, "w", newline="\n") as f:
         json.dump(out, f, indent=1)
         f.write("\n")
     print("wrote", a.out, round(time.time() - t0, 1), "s")
     if a.check:
-        failures = check(out, json.load(open(a.check)))
+        limits = json.load(open(a.check))
+        failures = check(out, limits)
         for line in failures:
             print("WORSE:", line)
-        print("check:", "failed" if failures else "passed")
-        if failures:
+        unmet = check(out, limits.get("targets", {}))
+        for line in unmet:
+            print("TARGET NOT MET:", line)
+        failed = bool(failures) or (a.strict and bool(unmet))
+        print("check:", "failed" if failed else "passed",
+              f"({len(unmet)} targets not met)" if unmet else "")
+        if failed:
             sys.exit(1)
 
 
+def lookup(out, path):
+    """The value at `path` (keys joined by `/`) in the measurements."""
+    at = out
+    for key in path.split("/"):
+        if not isinstance(at, dict) or key not in at:
+            return None
+        at = at[key]
+    return at
+
+
 def check(out, limits):
-    """Where the clipping measurements are worse than `limits` (a
-    thresholds file, see `thresholds.json`): a list of lines, empty when
-    nothing is."""
+    """Where the measurements are worse than `limits` (a thresholds file,
+    see `thresholds.json`): a list of lines, empty when nothing is. A
+    file with `at_least`, `at_most` or `within` holds measures by their
+    path in the measurements (`deformation/masculine/elbow_135/ring_area_ratio`);
+    one with `waist_gap_mm` holds the clipping section. A file's `targets`
+    (the same keys: where the body is meant to get to) are checked apart,
+    by `main`."""
+    failures = []
+    for kind, bad in (("at_least", lambda v, lim: v < lim), ("at_most", lambda v, lim: v > lim),
+                      ("within", lambda v, lim: not lim[0] <= v <= lim[1])):
+        for path, limit in limits.get(kind, {}).items():
+            value = lookup(out, path)
+            if value is None:
+                failures.append(f"{path}: not measured (run every section)")
+            elif bad(value, limit):
+                failures.append(f"{path}: {value}, {kind.replace('_', ' ')} {limit}")
+    if "waist_gap_mm" not in limits:
+        return failures
     c = out.get("clipping")
     if c is None:
         return ["no clipping section (run with --only clipping or all sections)"]
-    failures = []
     for key in ("waist_gap_mm", "tee_alone_waist_gap_mm"):
         worst = max(max(per.values()) for per in c[key].values())
         if worst > limits[key]:
