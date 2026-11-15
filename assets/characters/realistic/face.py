@@ -324,6 +324,12 @@ JAW_CORNER_FORWARD = 0.0025
 JAW_UPPER_LIP_UP = 0.0038
 UPPER_LIP_RISES = {0: 1.0, 1: 0.8, 2: 0.5, 3: 0.25, 4: 0.1}
 UPPER_LINING_RISES = {1: 1.0, 2: 0.9, 3: 0.6, 4: 0.3}
+# A smile: where along a lip (0 the middle, 1 the corner) its own share
+# of the corner's pull begins to give way to the skin's, and where the
+# skin's has all of it (`Face.smile`).
+SMILE_LIPS_OWN = (0.45, 0.95)
+# The power of the way to the corner a lip's own share rises by.
+SMILE_LIPS_CURVE = 2.6
 # The tongue with the jaw open (metres, in the jaw's own space). Turned
 # with the jaw as it rests, it is a ramp from the lower incisors up to
 # the upper molars: it fills the opening and hides the back of the mouth.
@@ -619,7 +625,7 @@ class Face:
                     out[i] -= normal * depth
         return out
 
-    def lips_apart(self, X, rest, step=0.00012, rounds=80):
+    def lips_apart(self, X, rest, step=0.00004, rounds=240):
         """Posed positions `X` with the lips moved off each other where a
         face of one cuts a face of the other (and didn't in `rest`, the
         frame as it rests): the upper lip's corners of the pair go up
@@ -627,7 +633,10 @@ class Face:
         A shape moves both lips by one rule made on the masculine frame;
         the feminine lips lie differently on each other, and the same
         offsets drove one through the other (163 pairs of faces in
-        `Mouth_Pucker`, none on the masculine frame)."""
+        `Mouth_Pucker`, none on the masculine frame). (The step is small
+        beside the room the lips rest with: at 0.12 mm a lip a side, the
+        middle of a closed smile was left 0.3 mm further apart than the
+        lips beside it, a notch in the lips' line.)"""
         from mathutils.bvhtree import BVHTree
         from facetopo import FS_HEAD, FS_MOUTH_LOWER, FS_MOUTH_UPPER, FS_MUZZLE
         near = self.d_line < 0.018
@@ -650,10 +659,17 @@ class Face:
 
         resting = crossing(rest)
         out = X.copy()
-        for _ in range(rounds):
+        last = None
+        for _ in range(rounds + 1):
             pairs = crossing(out) - resting
             if not pairs:
-                break
+                # (Once more for the last that crossed: off each other by
+                # a step, not by nothing.)
+                pairs, last = last, None
+                if not pairs:
+                    break
+            else:
+                last = pairs
             out[sorted({v for i, _ in pairs for v in upper[i]}), 2] += step
             out[sorted({v for _, j in pairs for v in lower[j]}), 2] -= step
         return out
@@ -854,13 +870,28 @@ class Face:
         # The lips follow their corner along their length; the skin round
         # the corner follows by distance.
         along = np.clip(self.u * s, -1.0, 1.0)
-        # (By the square of the way to the corner, with a little from
-        # across the middle: the two sides together leave the lips' line
-        # one curve, level in the middle. Rising evenly from the middle,
-        # it met there in a point.)
-        lips = self.lipness * (0.85 * np.clip(along, 0.0, 1.0) ** 2 + 0.15 * smoothstep(-0.6, 1.0, along))
+        # (By a power of the way to the corner, with a little that passes
+        # from one side to the other across the middle: the two sides'
+        # shares of that add up to the same from side to side, so
+        # together they leave the lips' line one curve, level in the
+        # middle. A share that rose faster on its own side than it fell
+        # on the other left the middle vertex 0.4 mm under its
+        # neighbours, and by the square of the way the lower lip, whose
+        # vertices are 7 mm apart, rose 0.4 mm over its first one: a
+        # point in the middle again, at twice the size.)
+        own = (0.85 * np.clip(along, 0.0, 1.0) ** SMILE_LIPS_CURVE
+               + 0.075 * (1.0 + np.sin(np.clip(along / 0.6, -1.0, 1.0) * np.pi / 2)))
         round_corner = gauss(d, 0.021) * self.side(s)
-        w = np.maximum(lips, round_corner)
+        # The two are blended along the lip: a lip goes by its own share
+        # from the middle out to `SMILE_LIPS_OWN`'s first place and by the
+        # skin's from the second to the corner, where lip and skin are one.
+        # (The larger of the two was taken before, and over most of the lip
+        # that is the skin's, which rises evenly from the middle: the
+        # lips' line was two straight halves that met in a point. The
+        # lips' own share all the way to the corner left them behind the
+        # skin beside them there, and the teeth came through the fold.)
+        theirs = self.lipness * (1.0 - smoothstep(SMILE_LIPS_OWN[0], SMILE_LIPS_OWN[1], along))
+        w = round_corner + (own - round_corner) * theirs
         w[self.lid | self.socket] = 0.0
         move = w[:, None] * pull * (0.0128 * amount)
         # The upper lip lifts a little with it.

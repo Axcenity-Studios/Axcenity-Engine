@@ -615,7 +615,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 10,
+     "self_crossing": 11,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -662,7 +662,7 @@
       9.3
      ],
      "required": true,
-     "self_crossing": 12,
+     "self_crossing": 14,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3064,7 +3064,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 108,
+     "self_crossing": 98,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -3548,7 +3548,7 @@
       9.3
      ],
      "required": false,
-     "self_crossing": 4,
+     "self_crossing": 0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5046,7 +5046,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 290,
+     "self_crossing": 280,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -5530,7 +5530,7 @@
       0.0
      ],
      "required": false,
-     "self_crossing": 186,
+     "self_crossing": 182,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
