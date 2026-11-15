@@ -1,0 +1,10 @@
+cargo nextest run -p axcenity-anim the_eye_and_jaw_turns
+(before the fix in crates/anim/src/animators.rs: the face turned the eye and
+jaw bones in a copy of the pose, so parts that follow the body never got them)
+
+        FAIL [   1.084s] (1/1) axcenity-anim face_tests::the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts
+    test face_tests::the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts ... FAILED
+    panicked at crates\anim\src\face_tests.rs:397:9:
+    Eyes's LeftEye turned 0 degrees, not 30
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 1.08s
+     Summary [   1.085s] 1 test run: 0 passed, 1 failed, 174 skipped

@@ -197,23 +197,37 @@ fn muscle_and_fat_make_four_different_corners() {
 }
 
 /// What a description drives is baked and gone from the model's blend
-/// shapes; what is left is live, and that is exactly the pose-driven
-/// corrective shapes (`anim`'s `correctives.rs` sets them every pose).
+/// shapes; what is left is live: the pose-driven corrective shapes (`anim`'s
+/// `correctives.rs` sets them every pose) and the face's expression shapes
+/// (CO6: `FaceControls` sets them), and nothing else.
 #[test]
-fn a_baked_body_keeps_only_its_corrective_shapes() {
+fn a_baked_body_keeps_only_its_live_shapes() {
     let library = library();
     let model = body(&library);
-    assert_eq!(model.morph_targets.len(), 53);
     let resolved = resolve(&library, &Description::new("Neutral", BASE)).unwrap();
     let baked = model.bake(&resolved.identity);
-    let mut left: Vec<&str> = baked
+    let left: Vec<&str> = baked
         .morph_targets
         .iter()
         .map(|target| target.name.as_str())
         .collect();
-    left.sort_unstable();
+    // Nothing the identity names is left.
+    for layer in &resolved.identity.layers {
+        for (shape, _) in &layer.shapes {
+            assert!(
+                !left.contains(&shape.as_str()),
+                "`{shape}` is identity and was not baked"
+            );
+        }
+    }
+    let mut correctives: Vec<&str> = left
+        .iter()
+        .copied()
+        .filter(|name| name.starts_with("Corrective_"))
+        .collect();
+    correctives.sort_unstable();
     assert_eq!(
-        left,
+        correctives,
         [
             "Corrective_Shoulder_Level_Left",
             "Corrective_Shoulder_Level_Right",
@@ -221,4 +235,16 @@ fn a_baked_body_keeps_only_its_corrective_shapes() {
             "Corrective_Shoulder_Raised_Right",
         ]
     );
+    // The rest are the face's: no body or identity shape by its name.
+    for name in &left {
+        let identity_name = ["Frame_", "Masculine_", "Feminine_", "Face_"]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+            || *name == "Pupil_Size";
+        assert!(!identity_name, "`{name}` is left on the baked body");
+    }
+    // 4 corrective shapes and the 44 expression shapes (the 48 face
+    // controls less the four eye looks, which are bones).
+    assert_eq!(left.len(), 48, "{left:?}");
+    assert_eq!(model.morph_targets.len(), 143);
 }

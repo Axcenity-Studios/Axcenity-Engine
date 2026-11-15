@@ -214,16 +214,19 @@ pub struct FaceStats {
 impl FaceFrame {
     /// Composes the face over the body's `pose` (of `skeleton`), turns the
     /// eye and jaw bones in it, poses `model` and sets its blend shapes.
+    /// The bones are turned in the `pose` the caller keeps, so a
+    /// character's parts with those bones (eyes and teeth of their own,
+    /// which follow that pose by bone name) look and open with the face.
     fn pose(
         &self,
         model: &Model,
         skeleton: &Rig,
-        mut pose: axcenity_assets::Pose,
+        pose: &mut axcenity_assets::Pose,
         shape: &[glam::Vec3],
     ) -> Option<Posed> {
-        let controls = self.layers.compose(&self.rig, Some(skeleton), Some(&pose));
-        self.rig.turn(&mut pose, &controls);
-        let mut posed = model.pose_shaped(&pose, shape)?;
+        let controls = self.layers.compose(&self.rig, Some(skeleton), Some(pose));
+        self.rig.turn(pose, &controls);
+        let mut posed = model.pose_shaped(pose, shape)?;
         self.set_shapes(model, &controls, &mut posed);
         Some(posed)
     }
@@ -261,7 +264,7 @@ fn skinned(
 ) -> Option<Posed> {
     crate::twist::drive(rig, pose, shape);
     let mut posed = match face {
-        Some(face) => face.pose(model, rig, pose.clone(), shape),
+        Some(face) => face.pose(model, rig, pose, shape),
         None => model.pose_shaped(pose, shape),
     }?;
     // The pose-driven corrective shapes' one call site (CO5,

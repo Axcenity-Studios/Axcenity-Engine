@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-chin-forward-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "chin_forward": 1,
+    "frame": 1
+  }
+}

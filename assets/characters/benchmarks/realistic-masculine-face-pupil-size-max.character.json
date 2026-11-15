@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-pupil-size-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "pupil_size": 1
+  }
+}

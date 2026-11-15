@@ -108,10 +108,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 18,
-      "least_factor": 0.64,
+      "crossings_before": 0,
+      "least_factor": 1.0,
       "left": 0,
-      "vertices_cut": 137
+      "vertices_cut": 0
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -158,7 +158,7 @@
      "Feminine_Muscle_Up_Fat_Down": 25.5,
      "Feminine_Muscle_Up_Fat_Up": 58.3
     },
-    "neutral_crossings": 68
+    "neutral_crossings": 130
    },
    "Masculine": {
     "bony_vertices": 4369,
@@ -201,10 +201,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 24,
-      "least_factor": 0.64,
+      "crossings_before": 9,
+      "least_factor": 0.8,
       "left": 0,
-      "vertices_cut": 206
+      "vertices_cut": 100
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -251,7 +251,7 @@
      "Masculine_Muscle_Up_Fat_Down": 23.2,
      "Masculine_Muscle_Up_Fat_Up": 65.9
     },
-    "neutral_crossings": 61
+    "neutral_crossings": 123
    }
   },
   "local": 0.6,
@@ -369,6 +369,284 @@
    "of_socket": 0.892,
    "radius": 0.01227,
    "skin_in_eyeball": 0
+  }
+ },
+ "face": {
+  "expressions": [
+   "Blink_Left",
+   "Blink_Right",
+   "Eye_Closed_Left",
+   "Eye_Closed_Right",
+   "Eye_Squint_Left",
+   "Eye_Squint_Right",
+   "Eye_Wide_Left",
+   "Eye_Wide_Right",
+   "Brow_Raise_Left",
+   "Brow_Raise_Right",
+   "Brow_Lower_Left",
+   "Brow_Lower_Right",
+   "Brow_Inward_Left",
+   "Brow_Inward_Right",
+   "Mouth_Smile_Left",
+   "Mouth_Smile_Right",
+   "Mouth_Frown_Left",
+   "Mouth_Frown_Right",
+   "Mouth_Open",
+   "Mouth_Wide",
+   "Mouth_Narrow",
+   "Mouth_Pucker",
+   "Mouth_Left",
+   "Mouth_Right",
+   "Upper_Lip_Raise",
+   "Lower_Lip_Lower",
+   "Upper_Lip_Raise_Left",
+   "Upper_Lip_Raise_Right",
+   "Lower_Lip_Lower_Left",
+   "Lower_Lip_Lower_Right",
+   "Lip_Corner_Pull_Left",
+   "Lip_Corner_Pull_Right",
+   "Cheek_Raise_Left",
+   "Cheek_Raise_Right",
+   "Cheek_Puff",
+   "Nose_Sneer_Left",
+   "Nose_Sneer_Right",
+   "Jaw_Open",
+   "Jaw_Forward",
+   "Jaw_Left",
+   "Jaw_Right",
+   "Tongue_Out",
+   "Tongue_Up",
+   "Tongue_Down"
+  ],
+  "face_identity": {
+   "Face_Eye_Depth_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.002
+      ]
+     }
+    }
+   },
+   "Face_Eye_Depth_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.002
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0025,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0025,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Size_Left": {
+    "bones": {
+     "LeftEye": {
+      "scale": 1.07
+     }
+    }
+   },
+   "Face_Eye_Size_Right": {
+    "bones": {
+     "RightEye": {
+      "scale": 1.07
+     }
+    }
+   },
+   "Face_Eye_Spacing_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0025,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Spacing_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       -0.0025,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   }
+  },
+  "identity": [
+   "Face_Eye_Height_Left",
+   "Face_Eye_Spacing_Left",
+   "Face_Eye_Depth_Left",
+   "Face_Eye_Size_Left",
+   "Face_Eye_Tilt_Left",
+   "Face_Brow_Height_Left",
+   "Face_Brow_Arch_Left",
+   "Face_Nose_Width_Left",
+   "Face_Cheekbone_Left",
+   "Face_Cheek_Fullness_Left",
+   "Face_Jaw_Width_Left",
+   "Face_Mouth_Width_Left",
+   "Face_Ear_Size_Left",
+   "Face_Ear_Height_Left",
+   "Face_Ear_Out_Left",
+   "Face_Eye_Height_Right",
+   "Face_Eye_Spacing_Right",
+   "Face_Eye_Depth_Right",
+   "Face_Eye_Size_Right",
+   "Face_Eye_Tilt_Right",
+   "Face_Brow_Height_Right",
+   "Face_Brow_Arch_Right",
+   "Face_Nose_Width_Right",
+   "Face_Cheekbone_Right",
+   "Face_Cheek_Fullness_Right",
+   "Face_Jaw_Width_Right",
+   "Face_Mouth_Width_Right",
+   "Face_Ear_Size_Right",
+   "Face_Ear_Height_Right",
+   "Face_Ear_Out_Right",
+   "Face_Nose_Length",
+   "Face_Nose_Tip",
+   "Face_Nose_Bridge",
+   "Face_Nose_Tilt",
+   "Face_Brow_Ridge",
+   "Face_Forehead_Height",
+   "Face_Forehead_Slope",
+   "Face_Head_Width",
+   "Face_Chin_Length",
+   "Face_Chin_Forward",
+   "Face_Chin_Width",
+   "Face_Jaw_Shift",
+   "Face_Lip_Fullness_Upper",
+   "Face_Lip_Fullness_Lower",
+   "Face_Mouth_Height"
+  ],
+  "jaw_open_deg": 25.0,
+  "largest_move_mm": {
+   "Blink_Left": 11.46,
+   "Blink_Right": 11.35,
+   "Brow_Inward_Left": 5.16,
+   "Brow_Inward_Right": 5.08,
+   "Brow_Lower_Left": 4.61,
+   "Brow_Lower_Right": 4.65,
+   "Brow_Raise_Left": 7.6,
+   "Brow_Raise_Right": 7.61,
+   "Cheek_Puff": 9.39,
+   "Cheek_Raise_Left": 3.73,
+   "Cheek_Raise_Right": 3.72,
+   "Eye_Closed_Left": 11.46,
+   "Eye_Closed_Right": 11.35,
+   "Eye_Squint_Left": 1.98,
+   "Eye_Squint_Right": 1.96,
+   "Eye_Wide_Left": 4.24,
+   "Eye_Wide_Right": 4.19,
+   "Face_Brow_Arch_Left": 2.89,
+   "Face_Brow_Arch_Right": 2.87,
+   "Face_Brow_Height_Left": 3.19,
+   "Face_Brow_Height_Right": 3.19,
+   "Face_Brow_Ridge": 2.6,
+   "Face_Cheek_Fullness_Left": 3.53,
+   "Face_Cheek_Fullness_Right": 3.53,
+   "Face_Cheekbone_Left": 3.16,
+   "Face_Cheekbone_Right": 3.16,
+   "Face_Chin_Forward": 4.3,
+   "Face_Chin_Length": 4.78,
+   "Face_Chin_Width": 2.01,
+   "Face_Ear_Height_Left": 3.5,
+   "Face_Ear_Height_Right": 3.5,
+   "Face_Ear_Out_Left": 6.33,
+   "Face_Ear_Out_Right": 6.38,
+   "Face_Ear_Size_Left": 4.61,
+   "Face_Ear_Size_Right": 4.64,
+   "Face_Eye_Depth_Left": 2.0,
+   "Face_Eye_Depth_Right": 2.0,
+   "Face_Eye_Height_Left": 2.5,
+   "Face_Eye_Height_Right": 2.5,
+   "Face_Eye_Size_Left": 1.25,
+   "Face_Eye_Size_Right": 1.25,
+   "Face_Eye_Spacing_Left": 2.5,
+   "Face_Eye_Spacing_Right": 2.5,
+   "Face_Eye_Tilt_Left": 1.8,
+   "Face_Eye_Tilt_Right": 1.81,
+   "Face_Forehead_Height": 8.0,
+   "Face_Forehead_Slope": 4.5,
+   "Face_Head_Width": 3.99,
+   "Face_Jaw_Shift": 3.0,
+   "Face_Jaw_Width_Left": 4.92,
+   "Face_Jaw_Width_Right": 4.92,
+   "Face_Lip_Fullness_Lower": 2.35,
+   "Face_Lip_Fullness_Upper": 2.21,
+   "Face_Mouth_Height": 2.5,
+   "Face_Mouth_Width_Left": 3.2,
+   "Face_Mouth_Width_Right": 3.2,
+   "Face_Nose_Bridge": 2.99,
+   "Face_Nose_Length": 3.01,
+   "Face_Nose_Tilt": 2.21,
+   "Face_Nose_Tip": 3.16,
+   "Face_Nose_Width_Left": 2.83,
+   "Face_Nose_Width_Right": 2.83,
+   "Jaw_Forward": 5.5,
+   "Jaw_Left": 4.31,
+   "Jaw_Open": 5.78,
+   "Jaw_Right": 4.19,
+   "Lip_Corner_Pull_Left": 5.24,
+   "Lip_Corner_Pull_Right": 5.24,
+   "Lower_Lip_Lower": 5.22,
+   "Lower_Lip_Lower_Left": 5.22,
+   "Lower_Lip_Lower_Right": 5.22,
+   "Mouth_Frown_Left": 7.2,
+   "Mouth_Frown_Right": 7.2,
+   "Mouth_Left": 6.89,
+   "Mouth_Narrow": 9.31,
+   "Mouth_Open": 5.75,
+   "Mouth_Pucker": 14.72,
+   "Mouth_Right": 6.89,
+   "Mouth_Smile_Left": 12.48,
+   "Mouth_Smile_Right": 12.47,
+   "Mouth_Wide": 6.6,
+   "Nose_Sneer_Left": 3.94,
+   "Nose_Sneer_Right": 3.91,
+   "Pupil_Size": 0.0,
+   "Tongue_Down": 0.0,
+   "Tongue_Out": 0.0,
+   "Tongue_Up": 0.0,
+   "Upper_Lip_Raise": 4.67,
+   "Upper_Lip_Raise_Left": 4.67,
+   "Upper_Lip_Raise_Right": 4.67
+  },
+  "rest": {
+   "feminine_lids_moved_mm": 3.96,
+   "lining_vertices_lifted": 150,
+   "lips_closed_by_mm": {
+    "feminine": 2.49,
+    "masculine": 1.94
+   }
   }
  },
  "frame": {
@@ -1009,17 +1287,20 @@
  },
  "teeth": {
   "feminine": {
-   "bag_to_skin_mm": 2.0,
-   "behind_lips_mm": 12.4,
+   "bag_to_skin_mm": 2.8,
+   "behind_lips_mm": 6.2,
+   "bite_under_lips_mm": 1.6,
    "points_in_flesh": 0,
-   "scale": 0.97
+   "scale": 1.0
   },
   "masculine": {
-   "bag_to_skin_mm": 2.0,
-   "behind_lips_mm": 8.3,
+   "bag_to_skin_mm": 2.9,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
    "points_in_flesh": 0,
-   "scale": 0.94
-  }
+   "scale": 1.0
+  },
+  "tongue_triangles": 294
  },
  "texture_coordinates": {
   "coverage": 0.663,

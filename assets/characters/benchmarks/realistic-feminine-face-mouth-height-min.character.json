@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-mouth-height-min",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 1,
+    "mouth_height": -1
+  }
+}

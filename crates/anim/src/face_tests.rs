@@ -354,6 +354,53 @@ fn face_controls_turn_a_skinned_characters_eyes() {
     assert!(animators.poses().get(&part).is_none());
 }
 
+/// A character's eyes and teeth are parts of their own, which follow the
+/// body's bones by name (Character Studio's base models): the look and
+/// the jaw a face turns reach them, or the eyes would stare ahead and the
+/// lower teeth stay shut inside an open mouth.
+#[test]
+fn the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts() {
+    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
+    let mesh = |object: &str| format!("realistic/RealisticParts.glb#AxcenityRealistic/{object}");
+    let mut world = World::new();
+    let body = mesh_part(&mut world, &mesh("Body"));
+    let mut parts = Vec::new();
+    for (object, bone, degrees) in [("Eyes", "LeftEye", 30.0_f32), ("Teeth", "Jaw", 25.0)] {
+        let part = world.create(ClassName::MeshPart).unwrap();
+        world
+            .set_property(part, "MeshId", Value::String(mesh(object)))
+            .unwrap();
+        world.set_parent(part, Some(body)).unwrap();
+        parts.push((part, object, bone, degrees));
+    }
+    let face = face_controls(
+        &mut world,
+        body,
+        &[("Eye_Look_Left", 1.0), ("Jaw_Open", 1.0)],
+    );
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    let mut animators = Animators::new();
+    animators.update(&mut world, &assets, FRAME);
+    let errors = animators.take_errors();
+    assert!(errors.is_empty(), "{errors:?}");
+    for (part, object, bone, degrees) in parts {
+        let model = assets.model_blocking(&mesh(object)).unwrap();
+        let rig = model.rig.clone().unwrap();
+        let posed = animators
+            .poses()
+            .get(&part)
+            .unwrap_or_else(|| panic!("{object} follows the body"));
+        let turn = eye_turn(&rig, rig.bone(bone).unwrap(), posed);
+        let turned = turn.angle_between(Quat::IDENTITY).to_degrees();
+        assert!(
+            (turned - degrees).abs() < 1.0,
+            "{object}'s {bone} turned {turned} degrees, not {degrees}"
+        );
+    }
+}
+
 #[test]
 fn face_controls_set_a_still_models_blend_shapes() {
     let folder =
