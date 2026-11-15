@@ -31,7 +31,7 @@ import os
 import bpy
 import numpy as np
 
-from facetopo import LIMBUS_DEG, SIDES, Eyeball
+from facetopo import LIMBUS_DEG, SIDES, Eyeball, smoothstep
 
 SEGMENTS = 24
 # Angles off the eye's axis of the white's rings (from the limbus back)
@@ -362,7 +362,7 @@ def shell(face, out_dir):
             pts.append(at)
             return len(pts) - 1
 
-        def strip(rings, values, material):
+        def strip(rings, values, material, fade=False):
             for (ra, va), (rb, vb) in zip(zip(rings, values), zip(rings[1:], values[1:])):
                 for k in range(count):
                     j = (k + 1) % count
@@ -370,12 +370,18 @@ def shell(face, out_dir):
                     # film there has nowhere to go when they close.
                     if min(room[k], room[j]) < CORNER:
                         continue
+                    # (With `fade` the film thins out toward where it
+                    # stops: its texture is clear at v = 1. Stopped at
+                    # full strength, its end drew a dark edge across the
+                    # white of the eye.)
+                    at = lambda i, v: 1.0 - (1.0 - v) * float(smoothstep(CORNER, 2.2 * CORNER, room[i])) if fade else v  # noqa: E731
                     faces.append((ra[k], ra[j], rb[j], rb[k]))
                     mats.append(material)
-                    uvs.append([(k / count, va), ((k + 1) / count, va), ((k + 1) / count, vb), (k / count, vb)])
+                    uvs.append([(k / count, at(k, va)), ((k + 1) / count, at(j, va)),
+                                ((k + 1) / count, at(j, vb)), (k / count, at(k, vb))])
 
         film = [[vertex(k, toward, lift) for k in range(count)] for toward, lift in FILM_RINGS]
-        strip(film, [toward for toward, _ in FILM_RINGS], "EyeOcclusion")
+        strip(film, [toward for toward, _ in FILM_RINGS], "EyeOcclusion", fade=True)
         tear = [[vertex(k, 0.0, 0.00012) for k in range(count)], [vertex(k, TEAR_REACH, 0.00006) for k in range(count)]]
         strip(tear, [0.0, 1.0], "TearLine")
     order = ["EyeOcclusion", "TearLine"]

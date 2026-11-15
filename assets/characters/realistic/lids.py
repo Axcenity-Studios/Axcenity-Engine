@@ -17,16 +17,24 @@ angle about that line (its *elevation*: 0 straight ahead, up positive)
 and a position along it. Each loop's upper and lower arcs give an
 elevation for every position along the line, so "close" can be said
 exactly: every rim vertex of both lids ends on one closing line, a hair
-apart. Skin further from the rim turns less, and every vertex keeps at
-least its resting height over the eyeball (the cornea's cap included),
-so a closed lid lies over the cornea and nothing passes through it.
+apart. Both edges of a rim go the same share of the way to that line (a
+squint's line lies higher in the opening than a blink's, `meet`), the
+lining by the inner edge's turn and the skin by the outer edge's, each
+loop of skin trailing the one before. Every vertex keeps at least its
+resting height over the eyeball (the cornea's cap included), so a closed
+lid lies over the cornea and nothing passes through it; the rim's outer
+edge ends outside its inner edge by the margin's width, so a closed
+lid's margin lies flat on the other's.
 
 A blend shape moves a vertex in a straight line, and a lid's path is an
 arc: half way through a blink the rim would sink under the eyeball's
-surface by up to a millimetre. The closed lid is therefore raised where
-its vertices travel furthest, by just enough that the straight path's
-middle clears the white of the eye (`CLEAR`); the clear cornea standing
-above the white is the one thing a half blink still dips into.
+surface by up to a millimetre. The closed lid is therefore raised, whole
+(`RAISED`), by just enough that the straight path's middle clears the
+white of the eye at the rim (`CLEAR`); the clear cornea standing above
+the white is the one thing a half blink still dips into. For the same
+reason two shapes that move one lid (a squint and a raised cheek) are
+made as shares of one path (`face.Face.expressions`): two arcs' chords
+added together leave the eyeball.
 """
 
 
@@ -34,14 +42,19 @@ import numpy as np
 
 from facetopo import FS_HEAD, FS_SOCKET, Eyeball, rotate_about, smoothstep
 
-# How much each loop of skin beyond the rim turns with it: the lid proper
-# (loops 3 and 4) nearly all the way, the fold above it (5, 6) unrolling,
-# the brow's edge hardly.
-SKIN = {3: 1.0, 4: 0.92, 5: 0.62, 6: 0.30, 7: 0.10}
-# A closed lid's rims end this far apart (metres), and no vertex of a lid
-# comes nearer the eyeball than this (the lining's flat faces between
-# its vertices then stay off the round eyeball too).
-SEAM = 0.00012
+# How much each loop of skin beyond the rim's outer edge turns with it. Each
+# loop trails the one before, so a closing lid's skin is paid out evenly
+# from the lash line up to the fold (with loops 3 and 4 turning all the way
+# the lash line's strip folded shut and the fold's one strip took all the
+# stretch: streaks down the closed lid).
+SKIN = {3: 0.90, 4: 0.78, 5: 0.55, 6: 0.28, 7: 0.10}
+# A closed lid's rims end this far apart (metres): on one line. (The two
+# rims' vertices lie at different places along it, so their edges already
+# part by up to 0.15 mm where the line bends; with a seam besides, the
+# eyeball showed between them at the inner corner.) No vertex of a lid
+# comes nearer the eyeball than `CLEARANCE` (the lining's flat faces
+# between its vertices then stay off the round eyeball too).
+SEAM = 0.0
 CLEARANCE = 0.0005
 # The lining under a lid (hidden) keeps this far off the eyeball: its flat
 # faces, stretched by a lid's turn, then stay off the round eyeball.
@@ -54,9 +67,26 @@ SMOOTH = 3
 # Half way along a shape's path a lid vertex is at least this far above
 # the white of the eye.
 CLEAR = 0.0005
+# How much of what the rim is raised by for that (below) each loop of the
+# lid takes: the lid is raised whole, its skin outside its inner edge, and
+# the raise dies out toward the fold.
+RAISED = {1: 1.0, 2: 1.0, 3: 1.0, 4: 0.95, 5: 0.70, 6: 0.35, 7: 0.10}
 # How far along the opening the lids meet, from the lower lid's rim: the
-# lower lid rises a tenth of the way, the upper comes down the rest.
-MEET = 0.10
+# lower lid rises a fifth of the way, the upper comes down the rest. (The
+# further the upper lid travels, the further its straight path cuts under
+# the eyeball's curve and the higher the closed lid must stand to clear
+# it: 2.5 mm at a tenth, 1.4 mm at a fifth.)
+MEET = 0.20
+# How far inside each corner of the eye the closing line starts running
+# straight to the corner (metres).
+CORNER_RUN = 0.0022
+# A lid that narrows the eye without closing it (`ease`) reaches its full
+# share this far from the inner and the outer corner (metres), for the
+# upper lid (True) and the lower. The lower lid is held at the inner
+# corner (the tendon there): pushed up at full share 3 mm from it, its
+# edge stood as a ramp over the still skin beside the nose, which lit as
+# a pale patch.
+CORNER_EASE = {True: (0.0025, 0.0025), False: (0.0050, 0.0025)}
 
 
 class Eye:
@@ -104,6 +134,18 @@ class Eye:
             self.arcs[k] = self._arcs(P, self.loops[k])
         self.idx = np.array(sorted(self.step), dtype=np.int64)
         self._classify(P)
+        # The lid margin: how far each vertex of the rim's outer edge is
+        # from the inner edge, and the inner edge's height over the eyeball
+        # by position along the axis, for each lid.
+        self.margin, self.inner_above = {}, {}
+        for upper in (True, False):
+            ends = (self.canthus_in, self.canthus_out)
+            inner = np.array([i for i in self.loops[1] if self.upper[i] == upper or i in ends])
+            inner = inner[np.argsort(self.along(P[inner]))]
+            self.inner_above[upper] = (self.along(P[inner]), np.maximum(self.ball.above(P[inner]), CLEARANCE))
+            for i in self.loops[2]:
+                if self.upper[i] == upper:
+                    self.margin[i] = float(_to_polyline(P[i], P[inner]))
 
     # -- coordinates -----------------------------------------------------
 
@@ -166,64 +208,105 @@ class Eye:
         return self.arc(1, True, t) - self.arc(1, False, t)
 
     def closing_line(self, t, meet=MEET):
-        return self.arc(1, False, t) + meet * self.opening(t)
+        """The height of the line the lids meet on at `t` along the axis:
+        `meet` of the way up the opening, and from `CORNER_RUN` inside
+        each corner straight to the corner. (Both corners are blunt: the
+        rims part by 2 to 4 mm within half a millimetre of them. A line
+        that followed the opening there dropped away from the corner
+        faster than the two rims' vertices could follow alike, and a
+        closed eye kept a small three-cornered hole at its inner corner
+        with the eyeball showing in it.)"""
+        knots = np.linspace(self.t_in + CORNER_RUN, self.t_out - CORNER_RUN, 12)
+        height = self.arc(1, False, knots) + meet * self.opening(knots)
+        ends = self.arc(1, False, np.array([self.t_in, self.t_out]))
+        return np.interp(t, np.concatenate([[self.t_in], knots, [self.t_out]]),
+                         np.concatenate([[ends[0]], height, [ends[1]]]))
 
-    def _to_line(self, X, t, upper, share, loop=1):
+    def _to_line(self, X, t, upper, share, loop=1, meet=MEET):
         """The turn that takes rim points `X` `share` of the way from
         their loop's resting arc to the closing line."""
         seam = 0.5 * SEAM if upper else -0.5 * SEAM
         rest = self.arc(loop, upper, t)
-        target = rest + share * (self.closing_line(t) + seam - rest)
+        target = rest + share * (self.closing_line(t, meet) + seam - rest)
         reach = np.maximum(self.reach(X), 1e-6)
         # A point keeps its distance from the turning line; its height
         # above the line says its angle.
         now = self.rise(X)
         return np.arcsin(np.clip(target / reach, -1.0, 1.0)) - np.arcsin(np.clip(now / reach, -1.0, 1.0))
 
-    def _turns(self, P, upper, share):
+    def _turns(self, P, upper, share, meet=MEET, loop=1, ease=False):
         """The turn (radians, up positive) of one lid's rim by position
-        along the axis: a table (along, angle) from the rim's inner edge."""
+        along the axis: a table (along, angle) from the rim's inner edge
+        (`loop` 1) or its outer edge (2). Nothing turns at the corners."""
         ends = (self.canthus_in, self.canthus_out)
-        loop = np.array([i for i in self.loops[1] if self.upper[i] == upper or i in ends])
-        t = self.along(P[loop])
+        if loop == 1:
+            ring = np.array([i for i in self.loops[1] if self.upper[i] == upper or i in ends])
+        else:
+            ring = np.array([i for i in self.loops[2] if self.upper[i] == upper
+                             and self.t_in < float(self.along(P[i])[0]) < self.t_out])
+        t = self.along(P[ring])
         order = np.argsort(t)
-        loop, t = loop[order], t[order]
-        angle = self._to_line(P[loop], t, upper, share)
-        angle[0] = angle[-1] = 0.0
-        return t, angle
+        ring, t = ring[order], t[order]
+        if ease:
+            # A lid that only narrows the eye does it less toward the
+            # corners (a lid that closes goes all the way everywhere):
+            # at its full share right up to a corner, the lower lid's
+            # edge ran down to the still corner as a lit ridge.
+            inner, outer = CORNER_EASE[bool(upper)]
+            share = share * np.minimum(smoothstep(0.0, inner, t - self.t_in), smoothstep(0.0, outer, self.t_out - t))
+        angle = self._to_line(P[ring], t, upper, share, loop, meet)
+        if loop == 1:
+            angle[0] = angle[-1] = 0.0
+            return t, angle
+        return np.concatenate([[self.t_in], t, [self.t_out]]), np.concatenate([[0.0], angle, [0.0]])
 
-    def lid(self, P, upper_to=None, lower_to=None, clear=True):
+    def lid(self, P, upper_to=None, lower_to=None, clear=True, meet=MEET, ease=False):
         """Positions with the lids turned. `upper_to` and `lower_to` say
         where a lid's rim goes, as a share of the way from its resting
         place to the closing line (1 closes it, negative opens it wider);
-        None leaves that lid alone. Returns {vertex: new position}."""
+        None leaves that lid alone. `meet` is where the closing line lies
+        in the opening (0 the lower rim, 1 the upper): a blink's is low, a
+        squint's near the middle. Both edges of a rim go the same share of
+        the way to one line, so they keep their order at every share (a
+        share past 1 would carry the outer edge, which starts further
+        from the line near the corners, over the inner one). With `ease`
+        the lids go less far toward the corners (a squint). Returns
+        {vertex: new position}."""
         idx = self.idx
         X = P[idx]
-        t = np.clip(self.along(X), self.t_in, self.t_out)
-        ends = (self.canthus_in, self.canthus_out)
+        along = self.along(X)
+        t = np.clip(along, self.t_in, self.t_out)
+        step = np.array([self.step[i] for i in idx])
         angles = np.zeros(len(idx))
+        closing = np.zeros(len(idx))
+        lid_of = np.array([self.upper[i] for i in idx])
         for upper, share in ((True, upper_to), (False, lower_to)):
             if share is None:
                 continue
-            table = self._turns(P, upper, share)
-            mine = np.array([self.upper[i] == upper for i in idx])
-            angles[mine] = np.interp(t[mine], table[0], table[1])
-            # The rim's own two edges go exactly to the line.
-            for loop in (1, 2):
-                rim = np.array([k for k, i in enumerate(idx)
-                                if mine[k] and self.step[i] == loop and i not in ends], dtype=np.int64)
-                if len(rim):
-                    exact = self._to_line(X[rim], t[rim], upper, share, loop)
-                    along = self.along(X[rim])
-                    inside = (along > self.t_in) & (along < self.t_out)
-                    angles[rim] = np.where(inside, exact, angles[rim])
+            mine = lid_of == upper
+            # The lining and the inner edge go by the inner edge's turn,
+            # the outer edge and the skin beyond it by the outer edge's:
+            # the skin then trails its own rim, not the other edge.
+            for loop, which in ((1, mine & (step <= 1)), (2, mine & (step >= 2))):
+                table = self._turns(P, upper, share, meet, loop, ease)
+                angles[which] = np.interp(t[which], table[0], table[1])
+            closing[mine] = min(max(share, 0.0), 1.0)
         angles *= np.array([self.weight[i] for i in idx])
-        moved = np.abs(angles) > 1e-7
         turned = rotate_about(X, self.c, self.turn_axis, angles)
         # Every vertex keeps its resting height over the eyeball, and the
-        # lining stays off it.
-        step = np.array([self.step[i] for i in idx])
+        # lining stays off it. The rim's outer edge stands off the inner
+        # one by the margin's width as the lids meet: a closed lid's
+        # margin lies flat against the other's, its outer edge outermost
+        # (on one height with the inner edge the margin's strip has no
+        # area, and nearer the eyeball than it the lining shows).
         rest_height = np.maximum(self.ball.above(X), np.where(step <= 0, UNDER_LID, CLEARANCE))
+        for k in np.where((step == 2) & (closing > 0))[0]:
+            i = int(idx[k])
+            table = self.inner_above[self.upper[i]]
+            flat = float(np.interp(t[k], table[0], table[1])) + self.margin.get(i, 0.0)
+            # (Not at the corners, where the edges run into each other.)
+            inside = min(along[k] - self.t_in, self.t_out - along[k]) / 0.003
+            rest_height[k] += max(flat - rest_height[k], 0.0) * closing[k] * min(max(inside, 0.0), 1.0)
         d = turned - self.c
         length = np.linalg.norm(d, axis=1)
         unit = d / np.maximum(length, 1e-12)[:, None]
@@ -232,10 +315,12 @@ class Eye:
         # vertex's move is averaged with its neighbours' (the rim and the
         # lining keep theirs), so no loop folds against the next where
         # the turn dies out at the corners.
-        step = np.array([self.step[i] for i in idx])
         where = {int(i): k for k, i in enumerate(idx)}
         move = turned - X
-        loose = [k for k in range(len(idx)) if step[k] >= 3]
+        # (And the outer edge's vertices that run round a corner, outside
+        # the span of the rims: they have no turn of their own.)
+        loose = [k for k in range(len(idx)) if step[k] >= 3
+                 or (step[k] == 2 and not self.t_in < along[k] < self.t_out)]
         for _ in range(SMOOTH):
             new = move.copy()
             for k in loose:
@@ -251,16 +336,31 @@ class Eye:
         turned = self.ball.lift(X + move, rest_height)
         if clear:
             # The straight path's middle clears the white of the eye:
-            # raise the far end where it wouldn't.
-            for _ in range(3):
+            # raise the far end where it wouldn't. A lid is raised whole,
+            # by what its rim needs at each place along the eye: raised
+            # vertex by vertex, the inner edge (which travels furthest)
+            # ended outside the skin and the lining showed as specks.
+            profile = np.array([RAISED.get(int(k), 0.0) for k in step])
+            for _ in range(4):
                 middle = 0.5 * (X + turned)
                 short = (self.r + CLEAR) - np.linalg.norm(middle - self.c, axis=1)
                 short = np.where(moved, np.maximum(short, 0.0), 0.0)
-                if short.max() <= 0:
+                if short.max() <= 1e-7:
                     break
+                lift = short.copy()
+                for upper in (True, False):
+                    rim = np.where((lid_of == upper) & ((step == 1) | (step == 2)))[0]
+                    if not len(rim) or short[rim].max() <= 0:
+                        continue
+                    rim = rim[np.argsort(along[rim])]
+                    need = short[rim]
+                    # (An envelope: each place takes the most its neighbours need.)
+                    need = np.maximum.reduce([need, np.concatenate([need[1:], [0.0]]), np.concatenate([[0.0], need[:-1]])])
+                    mine = np.where((lid_of == upper) & (step >= 1) & moved)[0]
+                    lift[mine] = np.maximum(lift[mine], np.interp(along[mine], along[rim], need) * profile[mine])
                 d = turned - self.c
                 length = np.linalg.norm(d, axis=1)
-                turned = self.c + d * ((length + 2.0 * short) / length)[:, None]
+                turned = self.c + d * ((length + 2.0 * lift) / length)[:, None]
         # Raising the lining for the half-way path must not put it over
         # the lid's own skin: skin near any lining stands above it.
         lining = np.where(step <= 0)[0]
@@ -283,6 +383,14 @@ class Eye:
         step = np.array([self.step[i] for i in self.idx])
         out[self.idx] = self.ball.lift(P[self.idx], np.where(step <= 0, UNDER_LID, CLEARANCE))
         return out
+
+
+def _to_polyline(p, line):
+    """The distance from point `p` to the polyline `line`."""
+    a, b = line[:-1], line[1:]
+    seg = b - a
+    u = np.clip(((p - a) * seg).sum(axis=1) / np.maximum((seg * seg).sum(axis=1), 1e-18), 0.0, 1.0)
+    return np.linalg.norm(a + u[:, None] * seg - p, axis=1).min()
 
 
 def deltas(P, moved):
