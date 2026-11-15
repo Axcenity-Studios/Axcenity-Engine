@@ -36,6 +36,29 @@ From [measurements.json](measurements.json) (`measure.py --package realistic --o
 
 **Kept apart** (`Realistic.build.json`, `body_shapes`): masculine heavy and soft 31 crossings (221 vertices cut, to 0.26 of the shape at the least), heavy and muscular 129 (431, to 0.41), slight 24 (206, to 0.64); feminine heavy and muscular 2 (94, to 0.80), slight 18 (137, to 0.64). All 0 after.
 
+## The fold under the breast
+
+Found under the side lamp, there at rest: the bundle's feminine body has a sharp fold under each breast (up to 49 degrees between neighbouring faces) running askew over quads 25 mm wide, so its edge was stair-stepped with a notch at its outer end. `body.soften_folds` relaxes it on the feminine frame only: the vertices of the edges under the chest that fold inward by more than 24 degrees, or bend outward by more than 26 on the ridge just above, and their neighbours, are moved toward the middle of their own neighbours a little at a time until no edge does (23 vertices were on such edges; the masculine frame is untouched, as are vertex order and count). The breast keeps its form and meets the ribs in a curve; what is lost is the fold's depth.
+
+- **[chest_feminine_before.png](chest_feminine_before.png)** and **[chest_feminine.png](chest_feminine.png)**, **[chest_blend_before.png](chest_blend_before.png)** and **[chest_blend.png](chest_blend.png)** (clay under the side lamp, at rest; default, heavy and soft, slim; front, three-quarter, from below). *Before:* a stepped edge under each breast in the front view and a hooked crease from below, on every build. *After:* a smooth curve in all three views on the default and slim bodies, feminine and blend. *Wrong:* the breast is shallower underneath than the sculpt's and reads a little pointed in the three-quarter view; on the heavy and soft body a short crease is left on the belly from below (that body's own fold, MakeHuman's, not the breast's).
+- **[engine/chest_after.png](engine/chest_after.png)** (the engine: feminine at rest and in Cheer at 0.8 s, then the blend body the same; studio front, three-quarter, hard light) beside **[engine/chest_before_cheer_feminine.png](engine/chest_before_cheer_feminine.png)** (the feminine body in Cheer before). *Before:* the breast's lower edge is faceted in the three-quarter view. *After:* a curve at rest and in Cheer on both. *Wrong:* under the hard light the breast's own shadow has a sharp edge across the ribs (a shadow, not the surface), and the normal map there was baked for the sharper fold, so the shading under the breast is a little flatter than the map expects.
+- What rides on it: both simpler copies take `Frame_Feminine` from the body's surface, so they follow; the feminine build shapes are carried from the bundle's pose by each vertex's local frame and were kept apart again by the build; eyes and teeth are untouched; the slider pairs still make no new crossing on either frame.
+
+## The armpit on heavy bodies
+
+In the engine's Cheer the armpit of the heavy bodies is a near-black patch. It is shadow and occlusion, not crossing skin. `assets/characters/humanoid/qa/posed_crossings.py` ([posed_crossings.json](posed_crossings.json)) counts the pairs of triangles that cross in a pose and don't at rest (nor lie within 4 mm of touching there), with the twist bones and corrective shapes driven:
+
+| Body | shoulder_abd_150: new crossings | Cheer at 0.8 s: new crossings | of them within 22 cm of a shoulder joint | of them in the hands |
+|---|---|---|---|---|
+| masculine default | 0 | 268 | 0 | 268 |
+| masculine heavy and muscular | 0 | 268 | 0 | 268 |
+| masculine heavy and soft | 0 | 306 | 0 | 306 |
+| feminine default | 0 | 240 | 0 | 240 |
+| feminine heavy and muscular | 0 | 240 | 0 | 240 |
+| feminine heavy and soft | 0 | 241 | 0 | 241 |
+
+Nothing crosses round the shoulders on any of them, so nothing was changed. Every new crossing in Cheer is in the fists (fingers passing through each other, the count `measure.py`'s `fist` pose already reports: 247 and 199 for the QA fist). That is CO4's hand weighting, not this milestone's, and is listed below.
+
 ## Tests
 
 - `crates/avatar/tests/realistic_parameters.rs`: every parameter at each end of its range moves the baked body and both simpler copies by more than 2 mm (shape and bone sliders), or changes one of `anim`'s nine body sliders (proportions); muscle and fat make four different corners and the corner isn't the sum of the two; a baked body keeps only its four corrective shapes as live ones. Red first against CO4's files: [red-run-parameters.txt](red-run-parameters.txt).
@@ -51,7 +74,7 @@ Looked at against anatomy: where fat sits (belly, flanks, chest, hips and thighs
 - **[build_details_masculine.png](build_details_masculine.png), [build_details_feminine.png](build_details_feminine.png)** (Blender, clay). *Good:* no hard line under the pectorals, no crease across the lower belly, no dark slot at the armpits; the feminine heavy and soft body has the fold under the breast and the hip shelf. *Wrong:* a faint horizontal fold remains across the masculine heavy and soft belly; the feminine heavy and muscular shoulder is lumpy where the trapezius meets it; clay at this light is flat, so fine faults could hide here that the engine sheets would show.
 - **[build_grid_masculine.png](build_grid_masculine.png), [build_grid_feminine.png](build_grid_feminine.png)**: nine bodies each; no step between neighbours looks like a jump.
 - **[build_regions_masculine.png](build_regions_masculine.png), [build_regions_feminine.png](build_regions_feminine.png)**: all sixteen regional sliders; same reading as the engine's.
-- **[shoulders_masculine.png](shoulders_masculine.png), [shoulders_feminine.png](shoulders_feminine.png)** (clay under one lamp from the side, since flat clay hid the first shapes' faults): the arm at 150° from the front, back and above, at 90°, and the Cheer clip at 0.8 s. *Good:* one slope from the neck across the trapezius onto the arm in every view, no step, no ball; the armpit is a hollow with the pectoral's edge running into the arm. *Wrong:* at 150° a tight valley is left where the arm meets the neck (the collarbone doesn't lift in this pose); the deltoid has no form of its own (it is a smooth slope, not a muscle); and, not the shoulder's doing, **a jagged fold under each feminine breast**, there at rest too (the feminine frame's fold on 25 mm quads; the flat studio hid it).
+- **[shoulders_masculine.png](shoulders_masculine.png), [shoulders_feminine.png](shoulders_feminine.png)** (clay under one lamp from the side, since flat clay hid the first shapes' faults): the arm at 150° from the front, back and above, at 90°, and the Cheer clip at 0.8 s. *Good:* one slope from the neck across the trapezius onto the arm in every view, no step, no ball; the armpit is a hollow with the pectoral's edge running into the arm. *Wrong:* at 150° a tight valley is left where the arm meets the neck (the collarbone doesn't lift in this pose); the deltoid has no form of its own (it is a smooth slope, not a muscle); (The jagged fold under each feminine breast that the first version of this sheet showed was at rest too; it is fixed, see the fold's section.)
 - **[engine/cheer_shoulders_after.png](engine/cheer_shoulders_after.png)** beside [engine/cheer_shoulders_before.png](engine/cheer_shoulders_before.png) (the engine, Cheer at 0.8 s, same crop; masculine, feminine, the stylized body). *Good:* the step at the top of each shoulder and the ball behind it are gone on both frames. *Wrong:* the armpit's front edge is a hard shadow line, and the back of the masculine shoulder still shows a ridge where the arm's skin meets the back's.
 - **[engine/cheer_shoulders_builds.png](engine/cheer_shoulders_builds.png)**: the same pose on the heavy and muscular and the heavy and soft bodies, both frames (front, back, three-quarter). The shapes ride on the baked builds without a step. *Wrong:* the armpit is a deep dark pit on the heavy bodies, and the heavy arms' own lumps show on the feminine back.
 - **[deformation_poses.png](deformation_poses.png)**: the QA poses in the flat studio; the shoulder tiles are the same shapes as above.
@@ -62,7 +85,8 @@ Looked at against anatomy: where fat sits (belly, flanks, chest, hips and thighs
 2. The heavy and muscular corner; the face under fat; the masculine slight body (above).
 3. Correspondence along the limbs is as loose as in the spike (1 to 3 cm); only the navel and nipples are pinned.
 4. Corrective shapes exist for one motion (the arm raised sideways, collarbone still). Elbow, knee, hip, the arm raised forward and a turned collarbone have none. The shoulder's local-volume number is under its target and its old limit (above).
-8. A jagged fold under each feminine breast at rest (CO4's frame shape on a coarse mesh), found under the raking light.
+8. The fold under the feminine breast is a soft curve now, shallower than the sculpt's; the normal map there was baked for the sharper fold.
+9. Fists: 240 to 306 pairs of finger triangles cross in Cheer (and 247 and 199 in the QA fist pose). Not looked into here.
 5. The hips can't narrow, and the proportion sliders stop at 15%: the body crosses itself beyond.
 6. The eyes and teeth don't follow body shapes because no shape moves the skin near them. If CO6 wants a fat face (jowls up to the lips, heavy lids), the held zone (`shapes.face_hold`) has to shrink and the eyes and teeth have to follow.
 7. `assets/characters/benchmarks/make.py` names the realistic body's slim case `{"fat": 0, "muscle": 0, "weight": -1}`; with these parameters it should be `{"fat": -1}` (and heavy-and-soft `{"fat": 1, "muscle": -1}` is worth adding). Not changed here.

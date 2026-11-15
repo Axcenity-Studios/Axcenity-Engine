@@ -456,6 +456,37 @@ class Run:
         self.save(f"shoulders_{frame}", tiles, 4, labels,
                   f"The raised shoulder, {frame}, clay under a raking light", grey=True)
 
+    def chest(self, frame):
+        """The chest close up at rest, clay under one lamp from the side:
+        the default body, the heavy and soft one and the slim one, from
+        the front, three-quarter and below. `frame` is `feminine` or
+        `blend` (halfway). For the fold under the breast, which the flat
+        studio doesn't show."""
+        ch, cam = self.scene(self.a.parts, 440, 440)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = {"masculine": 0.0, "feminine": 1.0, "blend": 0.5}[frame]
+        z = ch.head("LeftUpperArm").z - 0.16
+        centre = (0.0, -0.05, z)
+        builds = [("default", {}), ("heavy and soft", {"muscle": -1.0, "fat": 1.0}), ("slim", {"fat": -1.0})]
+        views = [("front", 0, (0.0, -1.5, z + 0.03)), ("three-quarter", 40, (0.0, -1.5, z + 0.03)),
+                 ("from below", 0, (0.0, -0.95, z - 0.95))]
+        tiles, labels = [], []
+        light = None
+        for name, values in builds:
+            ch.pose_reset()
+            ch.set_sliders(dict(values, frame=value))
+            for view, turn, pos in views:
+                Q.turn_character(ch, turn)
+                if light is not None:
+                    bpy.data.objects.remove(light)
+                light = Q.raking_light(centre)
+                tiles.append(self.tile(cam, f"chest_{frame}_{name}_{view}", (pos, centre, 85)))
+                labels.append(f"{name}, {view}")
+        Q.turn_character(ch, 0)
+        self.save(f"chest_{frame}", tiles, 3, labels, f"The chest at rest, {frame}, clay under a lamp from the side",
+                  grey=True)
+
     def twist_poses(self):
         """The limbs turned about their length, clay with wireframe: a
         forearm, an upper arm and a thigh (measure.py's twist poses), and
@@ -627,6 +658,9 @@ def main():
     r = Run(a)
     only = [s for s in a.only.split(",") if s] or (SHEETS if a.package == "stylized" else BARE_SHEETS)
     for s in only:
+        if s.startswith("chest_"):
+            r.chest(s.split("_", 1)[1])
+            continue
         if s.startswith("shoulders_"):
             r.shoulders(s.split("_", 1)[1])
             continue
