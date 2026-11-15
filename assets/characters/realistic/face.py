@@ -173,30 +173,26 @@ JAW_LIP_BACK = 0.0020
 LIP_RISES = {1: 0.8, 2: 1.0, 3: 1.0, 4: 0.9, 5: 0.65, 6: 0.35, 7: 0.12}
 # The mouth's corners come in round the opening by this much, and
 # forward along the teeth by this much.
-JAW_CORNER_IN = 0.0045
+JAW_CORNER_IN = 0.0025
 JAW_CORNER_FORWARD = 0.0025
+# The upper lip is drawn up off the upper teeth as the jaw opens (its
+# edge by this much, the skin above it less by loop: the lip thins), so
+# the upper row shows as an arc and not under a curtain.
+JAW_UPPER_LIP_UP = 0.0038
+UPPER_LIP_RISES = {0: 1.0, 1: 0.8, 2: 0.5, 3: 0.25, 4: 0.1}
+UPPER_LINING_RISES = {1: 1.0, 2: 0.9, 3: 0.6, 4: 0.3}
 # The tongue with the jaw open (metres, in the jaw's own space). Turned
-# with the jaw as it rests, it is a ramp from the lower incisors to the
-# upper molars: it hides the back of the mouth, and the far row of lower
-# teeth stands bare beside it. So:
-# - its front half stands `TONGUE_RISES` higher, level with the lower
-#   teeth's tops, domed by `TONGUE_DOME` along its middle, and its tip
-#   comes forward and up onto the lower incisors (`TONGUE_TIP`);
-# - its upper side spreads flat (`TONGUE_FLAT` of the way) out to
-#   `TONGUE_ROOM` from the teeth and `TONGUE_OVER` onto their inner cusps;
-# - its back half sinks toward the throat, by `TONGUE_SINKS` at the root
-#   along its middle and `TONGUE_EDGES` less of that at its edges, which
-#   stay up along the teeth, and is thinner by `TONGUE_THINS` of itself
-#   at the root, so it stays off the mouth's floor.
-TONGUE_RISES = 0.0015
-TONGUE_DOME = 0.0020
-TONGUE_TIP = (0.0060, 0.0027)
-TONGUE_FLAT = 0.75
+# with the jaw as it rests, it is a ramp from the lower incisors up to
+# the upper molars: it fills the opening and hides the back of the mouth.
+# A tongue lies low in an open mouth, so toward the root it sinks by
+# `TONGUE_SINKS` (most of what the jaw's turn raises it there: it lies
+# nearly level), is hollowed by `TONGUE_HOLLOW` along its middle, is thinner
+# from below by `TONGUE_THINS` of itself (it stays off the mouth's
+# floor), and spreads to `TONGUE_ROOM` from the lower teeth.
+TONGUE_SINKS = 0.015
+TONGUE_HOLLOW = 0.0025
+TONGUE_THINS = 0.65
 TONGUE_ROOM = 0.0006
-TONGUE_OVER = 0.0030
-TONGUE_SINKS = 0.018
-TONGUE_EDGES = 0.55
-TONGUE_THINS = 0.60
 
 
 def add(*shapes):
@@ -771,9 +767,9 @@ class Face:
         """With the jaw open all the way, what the bone's turn and the
         skin's weights don't give (`rig._jaw` makes the opening an oval):
         the jaw's glide forward, the lower lip standing over the lower
-        teeth, the corners of the mouth drawn in and forward round the
-        opening, the cheeks hollowed a little between the jaws, and the
-        lips off the teeth."""
+        teeth, the upper lip drawn up off the upper ones, the corners of
+        the mouth drawn in and forward round the opening, the cheeks
+        hollowed a little between the jaws, and the lips off the teeth."""
         P = self.P
         posed = self.jaw.pose(P, JAW_OPEN_DEG)
         X = posed.copy()
@@ -788,6 +784,12 @@ class Face:
         X[:, 2] += JAW_LIP_UP * rise
         # (And a little back: turned with the jaw the lip leans out.)
         X[:, 1] += JAW_LIP_BACK * rise
+        lift = np.zeros(len(P))
+        for shares, loops in ((UPPER_LIP_RISES, self.mouth.upper), (UPPER_LINING_RISES, self.mouth.under)):
+            for k, share in shares.items():
+                if k < len(loops):
+                    lift[loops[k]] = share
+        X[:, 2] += JAW_UPPER_LIP_UP * lift * self.corner_taper(0.6)
         for _, s in SIDES:
             corner = X[self.mouth.corner[s]].copy()
             w = gauss(np.linalg.norm(X - corner, axis=1), 0.017) * (self.skin | self.lining)
@@ -969,45 +971,23 @@ class Face:
 def tongue_open(points, lower_teeth):
     """The tongue's offsets at `Jaw_Open` 1 beyond the jaw's glide (its
     points at rest, in `parts._tongue`'s order: rings from the tip, then
-    the tip's point; `lower_teeth` are the lower teeth's points). A
-    tongue lies in the floor of the open mouth from one row of teeth to
-    the other, level with their tops, and falls away toward the throat
-    (the `TONGUE_*` numbers above)."""
+    the tip's point; `lower_teeth` are the lower teeth's points): low
+    and level behind the lower teeth, hollow along its middle, with the
+    back of the mouth open over it (the `TONGUE_*` numbers above)."""
     from parts import TONGUE_AROUND, TONGUE_ROWS
     out = points.copy()
-    forward, up = TONGUE_TIP
-    for row in range(TONGUE_ROWS + 1):
-        # (The last "ring" is the tip's own point.)
-        ring = slice(row * TONGUE_AROUND, (row + 1) * TONGUE_AROUND) if row < TONGUE_ROWS else slice(-1, None)
+    for row in range(1, TONGUE_ROWS):
+        ring = slice(row * TONGUE_AROUND, (row + 1) * TONGUE_AROUND)
         R = points[ring]
-        t = row / (TONGUE_ROWS - 1.0) if row < TONGUE_ROWS else 0.0
-        tip = 1.0 - float(smoothstep(0.0, 0.4, t))
-        out[ring, 1] = R[:, 1] - forward * tip
-        if row == TONGUE_ROWS:
-            out[ring, 2] = R[:, 2] + TONGUE_RISES + up
-            break
+        t = row / (TONGUE_ROWS - 1.0)
         top, low, half = R[:, 2].max(), R[:, 2].min(), max(float(np.abs(R[:, 0]).max()), 1e-6)
         near = lower_teeth[np.abs(lower_teeth[:, 1] - R[:, 1].mean()) < 0.004]
-        room = float(np.abs(near[:, 0]).min()) - TONGUE_ROOM if len(near) and row else half
-        room = max(room, half)
-        over = TONGUE_OVER * float(smoothstep(0.25, 0.6, t)) if len(near) else 0.0
+        room = max(float(np.abs(near[:, 0]).min()) - TONGUE_ROOM, half) if len(near) else half
         across = np.clip(np.abs(R[:, 0]) / half, 0.0, 1.0)
         high = (R[:, 2] - low) / max(top - low, 1e-6)
-        sink = float(smoothstep(0.25, 1.0, t))
-        z = top - (top - R[:, 2]) * (1.0 - TONGUE_THINS * sink)
-        flat = TONGUE_FLAT * float(smoothstep(0.0, 0.3, t)) * np.clip(2.0 * high - 1.0, 0.0, 1.0)
-        z = top - (top - z) * (1.0 - flat)
-        z += TONGUE_RISES * (1.0 - sink) + up * tip - TONGUE_SINKS * sink * (1.0 - TONGUE_EDGES * across ** 2)
-        z += TONGUE_DOME * (1.0 - across ** 2) * high * float(smoothstep(0.0, 0.3, t))
-        # The upper side out over the teeth's inner cusps, and clear of them.
-        upper = np.clip(4.0 * high - 1.0, 0.0, 1.0)
-        x = R[:, 0] * (room + over * upper) / half
-        if over:
-            cusps = near[np.abs(near[:, 0]) < room + TONGUE_ROOM + over + 0.002]
-            on_teeth = np.abs(x) > room - 0.0005
-            if len(cusps):
-                z = np.where(on_teeth, np.maximum(z, cusps[:, 2].max() + 0.0006), z)
-        out[ring, 0], out[ring, 2] = x, z
+        z = top - (top - R[:, 2]) * (1.0 - TONGUE_THINS * t) - TONGUE_SINKS * t
+        z -= TONGUE_HOLLOW * (1.0 - across ** 2) * high * float(smoothstep(0.1, 0.5, t))
+        out[ring, 0], out[ring, 2] = R[:, 0] * (room / half), z
     return out - points
 
 

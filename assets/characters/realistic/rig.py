@@ -385,7 +385,14 @@ def _head_and_neck(w, X, in_sets, J):
 
 # The jaw's hold on the face (`_jaw`).
 # How much of the jaw's turn the corners of the mouth take.
-JAW_CORNER = 0.42
+JAW_CORNER = 0.30
+# The lips' curve between the middle and a corner (`_jaw`): the power of
+# the way along the lip the hold changes by. High, a lip is level across
+# its middle and turns to the corner late (a broad U); it still meets
+# the corner at a slope, so its end stays by the corner (an ellipse's
+# upright end hung the lower lip's red a centimetre under it).
+JAW_UPPER_CURVE = 2.5
+JAW_LOWER_CURVE = 3.0
 # The cheeks: from none of the turn this far above the line from the hinge
 # to the mouth's corner to all of it this far under it (radians about the
 # hinge, so the band is as wide as the jaw's travel is long).
@@ -413,12 +420,11 @@ def _jaw(w, X, mesh, lm, in_sets, of_set, J, nbr):
       corners, where they are one skin, take `JAW_CORNER`. Between, the
       hold follows elliptic coordinates about the two corners: on the
       lips' line, a fraction `u` of the way from the middle to a corner,
-      the upper lip takes `JAW_CORNER * (1 - sqrt(1 - u * u))` and the
-      lower `1 - (1 - JAW_CORNER) * (1 - sqrt(1 - u * u))`, so an open
-      mouth is the two halves of an ellipse (a shallow arch over a deep
-      U) and not a box. The same coordinates carry the rule off the lips
-      smoothly, to none of the turn under the nose and all of it on the
-      chin.
+      the upper lip takes `JAW_CORNER * u ** JAW_UPPER_CURVE` and the
+      lower `1 - (1 - JAW_CORNER) * u ** JAW_LOWER_CURVE`, so an open
+      mouth is a shallow arch over a broad U and not a box. The same
+      coordinates carry the rule off the lips smoothly, to none of the
+      turn under the nose and all of it on the chin.
     - **Inside the mouth** the lips' inner sides go by the same rule as
       their outer sides, so a lip is moved whole. Deeper (`JAW_LINING`),
       where the lining lies on the gums, the upper half goes with the
@@ -448,7 +454,6 @@ def _jaw(w, X, mesh, lm, in_sets, of_set, J, nbr):
     r_left, r_right = np.hypot(x - half, height), np.hypot(x + half, height)
     ring = np.arccosh(np.maximum((r_left + r_right) / (2.0 * half), 1.0))
     along = np.clip((r_right - r_left) / (2.0 * half), -1.0, 1.0)
-    rise = np.sqrt(1.0 - along ** 2)
     # Which lip: over or under the line; on it (the lips touch) by the
     # face set, the lower lip's being the muzzle's and the floor's.
     upper = height > 0.0
@@ -460,7 +465,8 @@ def _jaw(w, X, mesh, lm, in_sets, of_set, J, nbr):
     of[edge] = 1
     close = (np.abs(x) < half) & (np.abs(height) < 0.006) & (of != 0)
     upper[close] = of[close] > 0
-    lips = np.where(upper, JAW_CORNER * (1.0 - rise), 1.0 - (1.0 - JAW_CORNER) * (1.0 - rise))
+    way = np.abs(along)
+    lips = np.where(upper, JAW_CORNER * way ** JAW_UPPER_CURVE, 1.0 - (1.0 - JAW_CORNER) * way ** JAW_LOWER_CURVE)
     # How far the lips' rule reaches round the mouth.
     reach = 1.0 - _smoothstep(JAW_LIPS[0], JAW_LIPS[1], ring)
     field = cheeks + (lips - cheeks) * reach

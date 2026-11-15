@@ -198,11 +198,7 @@ Also still short after this part: at squint and cheek raise both at 1 the eye is
 
 ## Review round 3, part 2 (the open mouth)
 
-Engine, 3840 x 2160, studio light; a row per pose: masculine face view and three-quarter view (the head cut from the full-body picture), then the feminine frame's. The mouths are cut from the pictures at full size.
-
-- **[engine/mouth-open.jpg](engine/mouth-open.jpg)**: the masculine `Jaw_Open` 1 as it was before this part, then rest, `Jaw_Open` 0.5 and 1.
-- **[engine/mouth-smile-laugh.jpg](engine/mouth-smile-laugh.jpg)**: the smile with the lips closed, Happy, Laughing, Surprised.
-- **[engine/mouth-speech.jpg](engine/mouth-speech.jpg)**: `Mouth_Open` 1 and the AI viseme.
+This part's pictures were taken from the `face` view, which stands 9 degrees to one side; they are replaced by part 3's straight-on ones below, and the numbers under "What changed" here are part 2's (part 3 changed the corner's share, the lips' curve and the tongue).
 
 What was found in the mesh (masculine frame, before):
 
@@ -221,13 +217,44 @@ What changed:
 
 Checks: `face_checks.py --check` exits 1 with **1 failure** (masculine `Mouth_Left`, 1 tooth point to 0.65 mm, as before; the feminine `Jaw_Right` is clear), [face-checks-run.txt](face-checks-run.txt) and [face_checks.json](face_checks.json) are this build's, and the table under "Measured" above is still the first hand-back's. `Jaw_Open` puts no lining through the skin on either frame. The Blender sheets beside this file are re-rendered.
 
+What was still short after this part is in part 3, which looked at it from the front.
+
+## Review round 3, part 3 (the mouth from the front)
+
+Engine, 3840 x 2160, studio light, the straight-on `face-front` view; a row per pose: the masculine mouth cut at full size and its three-quarter view (the head cut from the full-body picture, enlarged), then the feminine frame's.
+
+- **[engine/mouth-front-open.jpg](engine/mouth-front-open.jpg)**: rest, `Jaw_Open` 0.5 and 1, Surprised.
+- **[engine/mouth-front-smile.jpg](engine/mouth-front-smile.jpg)**: the smile with the lips closed, Happy, Laughing.
+
+What was found:
+
+- **The lips did not seal** (`mouth.seal`). After sealing, the lower lip's top still stood 0.64 to 1.31 mm under the upper lip over the middle 22 mm on the masculine frame (0.95 mm left of the middle against 0.64 mm right) and 1.35 to 1.46 mm from 5 mm right of the middle to 9 mm left on the feminine (0.3 mm at 9 mm right): the slanted line and the half smile. The sculpts are not the cause of the slant on the masculine frame (its lips differ left from right by 0.09 mm on average, 0.27 mm at most; the feminine by 0.43 and 1.27 mm). The upper lip's underside hangs 1.6 mm lower 4.5 mm behind its edge than at the edge, so the lower lip's loops behind its crest lie under it; the pass that keeps the lips from crossing pulled the crest down together with them. Seen from the front, the gap showed the upper lip's inner lining and a sliver of the upper teeth under it.
+- **The "lip colour outside the lip"** was the lower lip's own red, not the lining's shading (that is masked to the lining's texels). With part 2's ellipse the lower lip left the corner upright: 2 mm from the corner it already had 0.65 of the jaw against the corner's 0.42, so its end hung 8.6 mm under the corner, and the corner was drawn 4.5 mm in past it.
+- **The tongue was made to be seen** in part 2 (raised to the teeth's tops, its tip on the incisors, its sides up along the molars), which from the front is a tongue put out.
+- **The upper lip hung over the teeth**: its edge is 5.3 mm above the upper incisors' edges at rest and nothing raised it as the jaw opened, so two to four teeth showed.
+- **The teeth are large for the head.** At the body's scale the bundle's upper central incisors are 10.3 mm wide, the lower 6.2 mm, and the arch is 70 mm across the last molars and 55 mm deep; adult teeth are about 8.5 mm, 5 mm and 60 mm (the dental anatomy textbooks' crown widths and the usual arch width, recalled and not looked up for this work), so about 0.85 of this size would be believable. See "not done" below.
+- **The feminine U and WQ crossings** are the lips crossing each other where they touch, 10 to 15 mm either side of the middle on the lips' line (52 of 53 and 63 of 63 pairs); `Mouth_Pucker` alone has 167 there with the jaw closed (163 now) and none on the masculine frame. Before part 2 the jaw's 8% opening parted the lips evenly along their length and hid it; now they part less toward the corners.
+
+What changed:
+
+- **The seal** leaves the crest where it has room of its own (over the middle 70% of the lips) and lowers only the loops behind it, then lowers any face that still cuts the upper lip. The lower lip's top is 0.3 mm (the touch room) under the upper lip from side to side on both frames; the feminine mouth has no crossing pair at rest (the source has 42), the masculine its source's 4 at one corner.
+- **Weights**: the corners take 0.30 of the jaw (0.42), and along the lips the hold goes by a power of the way to the corner (`0.30 * u ** 2.5` above, `1 - 0.70 * u ** 3` below): a broad U that meets the corner at a slope, so the lip's end stays by the corner, and the opening is widest in its upper third.
+- **`Jaw_Open`'s shape**: the upper lip's edge rises 3.8 mm off the upper teeth (less above it, so the lip thins) and the corners come in 2.5 mm (4.5).
+- **The tongue** rests 6.5 mm under the plane the teeth meet on at its tip (2.4) and its `Jaw_Open` only lays it level and low: its root sinks 15 mm, it is hollowed 2.5 mm along its middle and thinned from below. `Tongue_Out` rises 4.5 mm more to come from there over the lower lip.
+- **The lining's shade** at the lips' edges is a little darker than the lips (it is what shows as the line between closed lips).
+- The teeth's fit counts the teeth and gums only, not the tongue made to fit them; the fit is as it was (masculine at the bundle's size 2.7 mm behind the lips, feminine at 0.97 of it 6.2 mm behind).
+
+Not done: **the smaller teeth.** A fit at 0.85 of the bundle's size (with the flesh test made by ray parity, which the smaller jaw needs) put the feminine arch 4.1 mm behind the lips and looked right in an open mouth, but `face_checks.py --check` went from 1 failure to 10 (the lining through the skin in `Mouth_Right` and `Jaw_Forward` on both frames, 61 points of the teeth in the flesh in the masculine Disgusted, lips in the teeth in Happy, Determined and Frustrated). It was withdrawn. It needs the lips kept off the teeth in expressions as wholes, and the skin kept over a lining that the teeth push out.
+
+Checks: `face_checks.py --check` exits 1 with **1 failure**, the masculine `Mouth_Left`'s 1 tooth point to 0.65 mm, as before ([face-checks-run.txt](face-checks-run.txt), [face_checks.json](face_checks.json)); `anim` and `avatar`: 222 pass. Reported and not held to 0: on the feminine frame, with the lips now touching from side to side, more head triangles cross in `Cheek_Puff` (22, from 0), `Mouth_Right` (31, from 0), the U and WQ visemes (61 each, from 3 and 4 before part 2), Excited (21, from 4) and Laughing (72, from 52). The Blender sheets beside this file are re-rendered.
+
 **Still short of the photographs:**
 
-1. From the face camera (beside and above the mouth) the far row of lower teeth still shows beside the tongue as a column of three or four pale blocks, in `Jaw_Open` and most in Laughing. The lower arch is tilted with the jaw, so their tops face the camera; the tongue now covers their inner sides only. The arch is also large for the head (71 mm across the molars).
-2. The tongue reads as a slab with a ridge across it, not as flesh: one flat colour, 16 points round, lit like the lips (nothing in the engine shades the inside of a mouth). At `Jaw_Open` 0.5 and in Surprised it fills the opening and no dark shows behind it.
-3. On the feminine frame the teeth stand 6.2 mm behind the lips (2.7 mm on the masculine; the teeth's fit, unchanged), so a dark gap shows between the lower lip and the tongue from above.
-4. The opening is wider than the photographs' in proportion at 0.5 (a long almond) and its corners are rounder than a mouth's at 1; the feminine opening at 1 is taller than wide.
-5. Laughing: the upper teeth's last tooth on the near side hangs below the row like a fang, and the far cheek shows both rows of molars.
-6. The teeth are flat grey (their material is CO7's), and in the full-body views the engine draws `Teeth` at a simpler level, where the tongue is a few blocks.
-7. The feminine U and WQ visemes count more head triangles crossing than before (53 and 63 pairs, from 3 and 4; reported, not held to 0): with a jaw barely open the lips' corners now part less, and the pucker's crossing lips (167 pairs on its own, as before) show there.
-8. At rest a thin pale line still shows between the lips at 4K (as before).
+1. Blocks of lower teeth still show in both corners of `Jaw_Open` 1 and Laughing on the masculine frame, and Laughing's upper row ends in a longer tooth each side: the teeth are 15% too large (above), and that fit is not done.
+2. The feminine teeth still stand 6.2 mm behind the lips.
+3. The tongue is low and hollow now but still a smooth slab of one colour, lit like the lips: nothing in the engine shades the inside of a mouth, so at `Jaw_Open` 0.5 and in Surprised the dark above it is a narrow band.
+4. The lower lip's red is as tall at the sides of an open mouth as at rest, where a mouth's thins toward the corners; lit from one side it reads as a pink strip beside the opening.
+5. A thin pale line still marks the closed lips at 4K (the lining under the upper lip's edge catching the light), and Happy parts the lips by `Mouth_Open` 0.15, so a line of teeth shows in it; the closed-lip smile is `Mouth_Smile` alone.
+6. The feminine opening at `Jaw_Open` 1 is taller than wide.
+7. The crossings listed under "Checks".
+8. The teeth are flat grey (CO7's), and the full-body views draw `Teeth` at a simpler level.

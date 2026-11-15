@@ -45,7 +45,7 @@ SCULPT_LEVELS = 3
 TONE = (0.74, 0.53, 0.43)
 FLESH = (0.42, 0.13, 0.14)          # inside the mouth, the eye sockets
 LIPS = (0.57, 0.27, 0.29)
-INNER_LIP = (0.55, 0.23, 0.25)      # the lips' inner sides at their edges
+INNER_LIP = (0.50, 0.19, 0.21)      # the lips' inner sides at their edges
 # The least occlusion left where the lips touch (the sculpts are closed).
 LIP_SEAM_OCCLUSION = 0.85
 NAIL = (0.86, 0.70, 0.66)

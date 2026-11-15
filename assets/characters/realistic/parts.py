@@ -366,7 +366,8 @@ def _tongue(lower_teeth, k):
     the teeth meet on; y back, z up): (points, quads and triangles, how
     far each point is from the root 0 to the tip 1). It lies inside the
     lower teeth's arch and fills it from side to side, its tip round and
-    thin behind the lower incisors, its back rising toward the throat.
+    thin behind the lower incisors and well under their tips, its back rising
+    toward the throat.
     The points are in rings of `TONGUE_AROUND` from the tip, then the
     tip's own point."""
     lower_teeth = np.asarray(lower_teeth)
@@ -389,7 +390,7 @@ def _tongue(lower_teeth, k):
         half *= 1.0 - 0.10 * max(0.0, t - 0.75) / 0.25
         half = max(0.002 * k, min(half, room(y) - 0.0018 * k))
         thick = k * (0.0030 + 0.0111 * min(1.0, t * 2.2) ** 0.8)
-        top = k * (-0.0024 + 0.0022 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
+        top = k * (-0.0065 + 0.0022 * t + 0.0040 * max(0.0, t - 0.6) / 0.4)
         for j in range(around):
             a = 2.0 * math.pi * j / around
             x, lift = math.sin(a), math.cos(a)        # round the section, from its top
@@ -406,7 +407,7 @@ def _tongue(lower_teeth, k):
             faces.append((a, b, b + around, a + around))
     # The tip is closed with a fan; the root is hidden in the throat.
     tip = len(points)
-    points.append((0.0, tip_y - 0.0004 * k, k * (-0.0024 - 0.0015)))
+    points.append((0.0, tip_y - 0.0004 * k, k * (-0.0065 - 0.0015)))
     along.append(1.0)
     for j in range(around):
         faces.append((tip, (j + 1) % around, j))
@@ -427,8 +428,9 @@ def _tongue_shapes(points, along, k):
     forward[:, 2] += 0.0030 * k * reach
     forward[:, 0] *= 1.0 - 0.22 * reach
     mid = np.median(P[:, 2])
-    # (Over the lower lip, which stands higher on an open jaw.)
-    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0060 * k * reach
+    # (From its low rest over the lower teeth and the lower lip, which
+    # stands higher on an open jaw.)
+    forward[:, 2] = mid + (forward[:, 2] - mid) * (1.0 - 0.25 * reach) + 0.0105 * k * reach
     out["Tongue_Out"] = forward
     for name, lift, back in (("Tongue_Up", 0.0105, 0.0030), ("Tongue_Down", -0.0045, 0.0040)):
         Q = P.copy()
@@ -550,7 +552,8 @@ def teeth(body, P, P_feminine, lm, k):
                 at = np.array([0.0, mouth["front"] + back * k, mouth["z"] - BITE_UNDER_LIPS * k])
                 points = unit * scale + at
                 room, nearest = make_room(body, positions, lm, points[~is_tongue], mouth["opening"])
-                inside = _inside(_body_tree(body, room), points)
+                # (The teeth and gums: the tongue is made to fit them, below.)
+                inside = _inside(_body_tree(body, room), points[~is_tongue])
                 # None of it in the flesh, and 2 mm of flesh left outside the bag.
                 bad = inside + (1000 if nearest < 0.002 else 0)
                 if best is None or bad < best[0]:
