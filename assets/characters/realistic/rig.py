@@ -402,7 +402,7 @@ JAW_CORNER = 0.30
 # the corner at a slope, so its end stays by the corner (an ellipse's
 # upright end hung the lower lip's red a centimetre under it).
 JAW_UPPER_CURVE = 2.5
-JAW_LOWER_CURVE = 3.0
+JAW_LOWER_CURVE = 2.5
 # The cheeks: from none of the turn this far above the line from the hinge
 # to the mouth's corner to all of it this far under it (radians about the
 # hinge, so the band is as wide as the jaw's travel is long).

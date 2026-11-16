@@ -314,6 +314,29 @@ JAW_LIP_BACK = 0.0020
 # How much of `JAW_LIP_UP` each loop of the lower lip takes (by loop from
 # the fold behind the lip: `mouth.Mouth.lower`).
 LIP_RISES = {1: 0.8, 2: 1.0, 3: 1.0, 4: 0.9, 5: 0.65, 6: 0.35, 7: 0.12}
+# Between its middle and each corner the lower lip stands higher again,
+# by this much where it is most (`JAW_LIP_SIDES`: from where along the lip
+# it begins, where it is all there, and where it has gone again by the
+# corner), and comes in toward the teeth by `JAW_LIP_SIDE_IN`. The lower
+# back teeth turn about a hinge they are nearer to than the lip is, so
+# they drop less than the lip in front of them and stand over its rim:
+# seen from the front, a row of teeth climbing each side of the open
+# mouth inside the lip. A lip is stretched from its corner down round the
+# teeth and hides them.
+JAW_LIP_SIDE_UP = 0.0025
+JAW_LIP_SIDE_IN = 0.0010
+JAW_LIP_SIDES = (0.30, 0.70, 0.90)
+# Behind each corner the cheek's lining comes in against the lower back
+# teeth by up to this much (it is kept off them as the lips are): within
+# `JAW_CHEEK_NEAR` of a line from just behind the corner back and down
+# along the lower teeth (`JAW_CHEEK_LINE`: its end from the corner, in
+# toward the middle, back and down, metres). The mouth's bag is made
+# wide of the jaw, and the lower teeth glide forward in it as the jaw
+# opens, so from the front one looked down a gap between cheek and teeth
+# at the molars.
+JAW_CHEEK_IN = 0.0060
+JAW_CHEEK_NEAR = 0.009
+JAW_CHEEK_LINE = (0.003, 0.026, -0.014)
 # The mouth's corners come in round the opening by this much, and
 # forward along the teeth by this much.
 JAW_CORNER_IN = 0.0025
@@ -1181,6 +1204,13 @@ class Face:
         X[:, 2] += JAW_LIP_UP * rise
         # (And a little back: turned with the jaw the lip leans out.)
         X[:, 1] += JAW_LIP_BACK * rise
+        sides = np.zeros(len(P))
+        for i, k in self.mouth.lower_step.items():
+            sides[i] = LIP_RISES.get(k, 0.0)
+        way = np.abs(self.u)
+        sides *= smoothstep(JAW_LIP_SIDES[0], JAW_LIP_SIDES[1], way) * (1.0 - smoothstep(JAW_LIP_SIDES[2], 1.0, way))
+        X[:, 2] += JAW_LIP_SIDE_UP * sides
+        X[:, 0] -= np.sign(P[:, 0]) * JAW_LIP_SIDE_IN * sides
         lift = np.zeros(len(P))
         for shares, loops in ((UPPER_LIP_RISES, self.mouth.upper), (UPPER_LINING_RISES, self.mouth.under)):
             for k, share in shares.items():
@@ -1192,6 +1222,12 @@ class Face:
             w = gauss(np.linalg.norm(X - corner, axis=1), 0.017) * (self.skin | self.lining)
             X[:, 0] -= s * JAW_CORNER_IN * w
             X[:, 1] -= JAW_CORNER_FORWARD * w
+        for _, s in SIDES:
+            corner = X[self.mouth.corner[s]]
+            a = corner + np.array([0.0, 0.004, -0.002])
+            b = corner + np.array([-s * JAW_CHEEK_LINE[0], JAW_CHEEK_LINE[1], JAW_CHEEK_LINE[2]])
+            away, _, _ = polyline_nearest(X, np.array([a, b]))
+            X[:, 0] -= s * JAW_CHEEK_IN * gauss(away, JAW_CHEEK_NEAR) * self.lining
         share = self.jaw.w * (1.0 - self.jaw.w) * 4.0
         hollow = share * smoothstep(0.024, 0.04, np.abs(P[:, 0])) * self.skin * (1.0 - self.lipness)
         X -= (hollow * 0.0022)[:, None] * self.N
@@ -1430,7 +1466,7 @@ def _teeth_follow(teeth, lift):
 # flap that closes the parting: the lower one stands behind the lower
 # lip's crest, and is what a view from above sees.)
 SEAL_HANGS = 0.0022
-SEAL_STANDS = 0.0014
+SEAL_STANDS = 0.0012
 # A flap stands out of its lip along the lip's own middle (`_flesh_axis`),
 # and the controls that part the lips draw it back along that line into
 # the lip: control -> how many times a flap's height it is drawn back at
@@ -1452,8 +1488,12 @@ SEAL_OPENS = {"Jaw_Open": 8.0, "Mouth_Open": 2.6, "Upper_Lip_Raise": 1.55, "Lowe
 # that shows beside an opening mouth is the lip's own inner side and not
 # a black line round it.
 SEAL_PLACE = (1.0, 0.55)
-# A flap's root is this far inside its lip (metres).
+# A flap's root is this far inside its lip (metres), and the flaps end
+# this far of the way from the middle to a corner (the lips are one skin
+# there and part by nothing; nearer the corner a flap's end came out
+# through the cheek's lining where an open jaw draws that in).
 SEAL_ROOT = 0.0006
+SEAL_REACH = 0.82
 
 
 def _flesh_axis(face, loop, skin_loop, lining_loop, lean):
@@ -1488,7 +1528,7 @@ def lip_seal(face, F, shapes, jaw_w):
     import teeth as jawlib
     from common import new_object, shade_smooth
     M, lips = face.P, face.mouth
-    reach = 0.95 * lips.half
+    reach = SEAL_REACH * lips.half
     points, bound, free, faces = [], [], [], []
     upper, lower = lips.under[1], lips.lower[mouth.CREST - 1]
     flaps = ((upper, _flesh_axis(face, upper, lips.upper[3], lips.under[4], 0.45), SEAL_HANGS),
