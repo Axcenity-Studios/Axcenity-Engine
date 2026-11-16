@@ -1,0 +1,53 @@
+{
+  "format_version": 1,
+  "id": "axcenity/sneakers",
+  "label": "Sneakers",
+  "kind": "garment",
+  "slot": "shoes",
+  "layer": 1,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/stylized"
+  ],
+  "model": {
+    "file": "../HumanoidParts.glb",
+    "object": "AxcenityHumanoid/Shoes_Sneakers"
+  },
+  "hides": [
+    "feet"
+  ],
+  "materials": [
+    {
+      "name": "Laces",
+      "shading": "cloth"
+    },
+    {
+      "name": "ShoeAccent",
+      "shading": "standard"
+    },
+    {
+      "name": "Shoes",
+      "shading": "cloth"
+    },
+    {
+      "name": "Sole",
+      "shading": "standard"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Frame_Feminine",
+      "Build_Heavy",
+      "Build_Slim"
+    ]
+  },
+  "tags": [
+    "casual",
+    "trainers"
+  ],
+  "source": {
+    "author": "Axcenity Engine contributors",
+    "licence": "CC0-1.0"
+  }
+}

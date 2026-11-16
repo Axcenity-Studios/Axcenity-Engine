@@ -60,6 +60,8 @@ Every file the engine reads or writes, with its owner and where the full format 
 |---|---|---|
 | `game.axgame` | Packed game: `AXCGAME\0`, version 2, entries with flags, mtime, lengths; zstd per entry when it saves ≥ 5% | `project::packed` |
 | `*.axpkg` | Asset package (zip + manifest) | `project::package` |
+| `*.character.json` | A character: base model, parameter values, worn items, material values (format 2; format 1, Character Studio CS2's `Look`, migrates on load). The workspace still writes format 1 until CO12 | `avatar::Description`; `docs/development/character-studio/architecture.md` §5 |
+| `*.base.json`, `*.item.json`, `catalogue.json` | A character library: base model manifests (parameters, regions, slots, sockets, materials, skeleton, face), item manifests (garments, accessories, grooms) and the generated index; the repository's library is `assets/characters/` (format_version 1 each) | `avatar`; `architecture.md` §6–8, §15 |
 
 ## Engine repository files
 

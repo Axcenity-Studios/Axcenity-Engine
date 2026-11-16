@@ -3,6 +3,58 @@ use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
 
+/// Character Data (overhaul CO1): a character file the workspace saves
+/// (format 1) migrates to a description that, resolved by the stylized base
+/// model's manifest, wears the same parts and leans on the same body shapes
+/// the workspace poses: the new format changes nothing about a character.
+#[test]
+fn a_saved_look_migrates_to_the_same_parts_and_shapes() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+    let (library, _, problems) = axcenity_avatar::Library::read(&root);
+    assert!(problems.is_empty(), "{problems:?}");
+    let masks = garment_masks();
+    let mut looks: Vec<Look> = presets().into_iter().map(|(_, _, look)| look).collect();
+    looks.push(Look {
+        build: 0.7,
+        muscle: 0.3,
+        top: Some("Underwear_Top".to_owned()),
+        outerwear: None,
+        ..Look::default()
+    });
+    for look in looks {
+        let description = axcenity_avatar::Description::from_json(&look.to_json()).unwrap();
+        assert_eq!(description.name, look.name);
+        assert!(description.validate(&library).is_empty(), "{}", look.name);
+        let base = library.base(&description.base).unwrap();
+        let resolved = axcenity_avatar::body_shape_weights(base, &description, &library);
+        let shown = look.shape_weights(&masks);
+        for (shape, weight) in &shown {
+            assert!(
+                (resolved[shape] - weight).abs() < 1e-6,
+                "{}: {shape}",
+                look.name
+            );
+        }
+        for (shape, weight) in &resolved {
+            if !shown.contains_key(shape) {
+                assert_eq!(*weight, 0.0, "{}: {shape}", look.name);
+            }
+        }
+        let worn: Vec<&str> = description
+            .items
+            .iter()
+            .map(|item| {
+                let (part, _) = axcenity_avatar::V1_ITEMS
+                    .iter()
+                    .find(|(_, id)| *id == item.id)
+                    .unwrap();
+                *part
+            })
+            .collect();
+        assert_eq!(worn, look.parts()[FACE_PARTS.len()..], "{}", look.name);
+    }
+}
+
 #[test]
 fn a_look_wears_the_face_and_one_part_per_slot() {
     let look = Look::default();

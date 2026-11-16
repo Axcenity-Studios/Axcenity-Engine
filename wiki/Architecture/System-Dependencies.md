@@ -30,6 +30,7 @@ flowchart BT
   save --> core
   mesh_edit --> core & assets
   cook --> assets
+  avatar --> assets
   collab --> core & net
   blocks --> br
   character --> core & assets & anim & physics
@@ -80,6 +81,7 @@ The server's "no" column is roadmap M8 (PR #13): `script` takes its render data 
 | `terrain` → anything but `core` | Algorithms only; `project` does files, `scene` draws, `physics` collides | `crates/terrain/CLAUDE.md` |
 | `blocks-runtime` → any engine crate | Must stay safe for the player | `crates/blocks-runtime/CLAUDE.md` |
 | `save` → anything but `core`; never the project folder | Saves live in the player's data folder | `crates/save/CLAUDE.md` |
+| `avatar` → anything but `assets` and `core` | Character Data is shared by the editor, player and server; no rendering, UI or Instances ([ADR-0033](Architecture-Decisions/ADR-0033-One-Character-Description-Read-By-Every-Host.md)) | `crates/avatar/CLAUDE.md` |
 | Any cycle | Move the shared type into `core` | Cargo |
 
 ## Where `docs/architecture/crates.md` and the manifests differ

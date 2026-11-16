@@ -1,0 +1,40 @@
+{
+  "format_version": 1,
+  "id": "axcenity/sports-top",
+  "label": "Sports top",
+  "kind": "garment",
+  "slot": "underwear_top",
+  "layer": 0,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/stylized"
+  ],
+  "model": {
+    "file": "../HumanoidParts.glb",
+    "object": "AxcenityHumanoid/Underwear_Top"
+  },
+  "hides": [],
+  "materials": [
+    {
+      "name": "Underwear",
+      "shading": "cloth"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Frame_Feminine",
+      "Build_Heavy",
+      "Build_Slim",
+      "Build_Muscular"
+    ]
+  },
+  "tags": [
+    "underwear",
+    "athletic"
+  ],
+  "source": {
+    "author": "Axcenity Engine contributors",
+    "licence": "CC0-1.0"
+  }
+}

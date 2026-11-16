@@ -645,6 +645,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "axcenity-avatar"
+version = "0.2.0-alpha.1"
+dependencies = [
+ "axcenity-assets",
+ "axcenity-workspace-hack",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "axcenity-blocks"
 version = "0.2.0-alpha.1"
 dependencies = [
@@ -758,6 +769,7 @@ dependencies = [
  "axcenity-anim",
  "axcenity-assets",
  "axcenity-audio",
+ "axcenity-avatar",
  "axcenity-blocks",
  "axcenity-character",
  "axcenity-collab",
@@ -1098,6 +1110,7 @@ version = "0.2.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
+ "axcenity-avatar",
  "axcenity-blocks-runtime",
  "axcenity-core",
  "axcenity-release",
@@ -1428,7 +1441,6 @@ dependencies = [
  "windows-sys 0.52.0",
  "windows-sys 0.61.2",
  "winnow",
- "zeroize",
  "zlib-rs",
 ]
 
