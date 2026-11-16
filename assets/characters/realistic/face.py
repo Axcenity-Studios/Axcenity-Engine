@@ -297,6 +297,26 @@ BROW_SLIDES_FROM = 8.0
 # How far a lowered brow brings the upper lid down (a share of the way to
 # closed).
 BROW_PRESSES = 0.22
+# Identity: how far forward each loop of the upper lid's skin goes for
+# every metre a brow parameter brings it down (and back as it goes up).
+# Both brow parameters at -1 bring the brow down 11 mm, nearly all the
+# height between the brow and the lash line: the fold under the brow came
+# straight down through the lid's skin, which the eyeball holds forward
+# (on the feminine frame the fold stands no further forward than the lid
+# below it). Rolled forward it comes down over the lid, as a hooded lid's
+# fold does. The roll is none at the eye's inner corner and whole from a
+# third of the way along it (`BROW_ROLL_TAPER`, of the way from the inner
+# corner to the outer), and averaged over the lid (`BROW_ROLL_SMOOTH`
+# times): with both brows raised, a roll that changed sharply from loop
+# to loop pinched the fold where it ends at the inner corner.
+BROW_ROLLS = {5: 0.15, 6: 0.25, 7: 0.30, 8: 0.30, 9: 0.20, 10: 0.10}
+BROW_ROLL_TAPER = (-0.1, 0.35)
+BROW_ROLL_SMOOTH = 6
+# How far the brow's skin rises at brow height +1 and at the arch at brow
+# arch +1 (metres). (5.2 and 6.4 mm before: with the skin over the lid no
+# longer put back on its resting surface the shapes' largest moves came
+# out a little smaller, and they are kept at least what they were.)
+BROW_RISES = (0.00533, 0.00648)
 # How much of the cheek's lift each loop of the lower lid's skin takes.
 CHEEK_ON_LID = {3: 0.15, 4: 0.40, 5: 0.65, 6: 0.85, 7: 1.0}
 # Identity: how much the eyeball and the lids' rims grow at eye size +1,
@@ -304,6 +324,19 @@ CHEEK_ON_LID = {3: 0.15, 4: 0.40, 5: 0.65, 6: 0.85, 7: 1.0}
 # mouth height +1 (metres).
 EYE_GROWS = 1.12
 SKIN_GROWS = 1.20
+# A tilted eye's rims keep at least this share of their resting height
+# over the eyeball, at both ends.
+TILT_KEEPS = 0.1
+# ... and how many times the change that keeps them off it is averaged
+# over the lid round them.
+TILT_SPREADS = 4
+# An ear stands out from the head by each point's distance from the head's
+# skin (its root not at all, its rim most): the whole way (4.8 mm out) at
+# this distance, one and a half times as far at most (metres). Measured
+# from a plane inside the head, the ear's root moved 2.5 mm against the
+# skin it grows from, and an ear laid back went into the skin above its
+# root.
+EAR_OUT_REACH = 0.012
 MOUTH_RISES = 0.0045
 JAW_SHIFTS = 0.0050
 # How far Jaw_Forward brings the jaw (metres).
@@ -1371,14 +1404,46 @@ class Face:
             # (The rims only rise and fall: slid sideways against each
             # other they would not meet at the corners.)
             tilt[rims] = (along[rims] * angle[rims])[:, None] * eye.up
+            # (Risen straight, the lower lid's inner edge went 0.4 mm into
+            # the eyeball on the outer half, where the eyeball's surface
+            # faces down. What of a rim vertex's move would bring it nearer
+            # the eyeball than `TILT_KEEPS` of its resting height over it,
+            # at either end, is taken off along the line from the
+            # eyeball's centre, and that change is spread over the lid
+            # round it, so the lid's edge keeps its shape. The rims then
+            # differ only in how far they stand off the eyeball, and still
+            # meet in a blink. Turned with the skin round it instead, the
+            # lower lid left a blink open.)
+            out_of_ball = P[rims] - eye.c
+            out_of_ball /= np.linalg.norm(out_of_ball, axis=1)[:, None]
+            room = np.maximum(eye.ball.above(P[rims]), 0.0) * (1.0 - TILT_KEEPS)
+            radial = (tilt[rims] * out_of_ball).sum(axis=1)
+            excess = np.sign(radial) * np.maximum(np.abs(radial) - room, 0.0)
+            kept_off = np.zeros((len(P), 3))
+            kept_off[rims] = -excess[:, None] * out_of_ball
+            held = rims[np.abs(excess) > 1e-9]
+            tilt += self.topo.smooth(kept_off, TILT_SPREADS, keep=held, among=eye.idx)
             put(f"Face_Eye_Tilt_{side}", tilt, teeth=False)
-            # Brows.
+            # Brows. (The skin is put back on its resting surface as the
+            # brow controls put it, not on the lids and the fold over
+            # them: slid there, the fold of a lowered brow was laid onto
+            # the lid's own skin. The fold rolls forward as it comes down,
+            # `BROW_ROLLS`.)
             bw, along_brow = self.brow(s)
-            put(f"Face_Brow_Height_{side}", vec(bw, up * 0.0052), slide=skin, teeth=False)
+            roll = np.zeros(len(P))
+            span = eye.t_out - eye.t_in
+            for i in eye.idx:
+                if eye.upper[i] and eye.step[i] in BROW_ROLLS:
+                    u = ((P[i] - eye.c) @ eye.axis - eye.t_in) / span
+                    roll[i] = BROW_ROLLS[eye.step[i]] * float(smoothstep(BROW_ROLL_TAPER[0], BROW_ROLL_TAPER[1], u))
+            if BROW_ROLL_SMOOTH:
+                roll = self.topo.smooth(roll, BROW_ROLL_SMOOTH, among=eye.idx)
+            lift = up[None, :] - roll[:, None] * eye.fwd[None, :]
+            put(f"Face_Brow_Height_{side}", (bw * BROW_RISES[0])[:, None] * lift, slide=self.brow_slide(), teeth=False)
             # (One broad rise about the arch: with the inner end pushed
             # the other way the brow bent into a hook.)
             arch = gauss(along_brow - 0.60, 0.50)
-            put(f"Face_Brow_Arch_{side}", vec(bw * arch, up * 0.0064), slide=skin, teeth=False)
+            put(f"Face_Brow_Arch_{side}", (bw * arch * BROW_RISES[1])[:, None] * lift, slide=self.brow_slide(), teeth=False)
             # The nose's wing, the cheek, the jaw's corner, the mouth's corner, the ear.
             wing = self.on_skin(self.nose_tip + np.array([s * 0.019, 0.016, -0.004]))
             nw = self.near(wing, 0.013) * skin * self.side(s, 0.004)
@@ -1398,7 +1463,13 @@ class Face:
             near_ear = self.topo.smooth(ear, 3, keep=np.where(self.ear)[0])
             put(f"Face_Ear_Size_{side}", (P - root) * (near_ear * 0.16)[:, None], teeth=False)
             put(f"Face_Ear_Height_{side}", vec(near_ear, up * 0.0048), teeth=False)
-            reach = np.clip((P[:, 0] * s - root[0] * s) / 0.02, 0.0, 1.5)
+            # (Out by each point's distance from the head's skin:
+            # `EAR_OUT_REACH`.)
+            reach = np.zeros(len(P))
+            for i in np.where(ear > 0.5)[0]:
+                hit = nearest(self.skin_tree, P[i], 0.05)
+                if hit is not None:
+                    reach[i] = min(1.5, float(np.linalg.norm(P[i] - hit[0])) / EAR_OUT_REACH)
             put(f"Face_Ear_Out_{side}", vec(ear * reach, lateral * 0.0048 + back * -0.0016), teeth=False)
         # The middle of the face.
         mid_nose = self.near(self.nose_tip + np.array([0.0, 0.012, 0.004]), 0.024) * skin
@@ -1419,14 +1490,25 @@ class Face:
         put("Face_Forehead_Height", vec(smoothstep(eye_z + 0.025, crown - 0.01, P[:, 2]) * self.topo.is_head, up * 0.0080), teeth=False)
         front = gauss(P[:, 2] - (eye_z + 0.055), 0.03) * smoothstep(-0.06, -0.11, P[:, 1]) * self.topo.is_head * ~self.lid
         put("Face_Forehead_Slope", vec(front, back * -0.0055), teeth=False)
-        temple = gauss(P[:, 2] - (eye_z + 0.02), 0.035) * smoothstep(0.04, 0.07, np.abs(P[:, 0])) * (~self.ear) * self.topo.is_head
+        # (The ears go out with the skin they grow from: left where they
+        # were, the skin round their roots went out through them.)
+        temple = gauss(P[:, 2] - (eye_z + 0.02), 0.035) * smoothstep(0.04, 0.07, np.abs(P[:, 0])) * self.topo.is_head
         put("Face_Head_Width", np.stack([np.sign(P[:, 0]) * temple * 0.0052, np.zeros(len(P)), np.zeros(len(P))], axis=1), teeth=False)
         # The chin and the jaw.
         # (The mouth's lining goes less far than the chin's skin: the
         # lower teeth stand in it.)
         chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness)             * (self.skin + 0.15 * self.lining)
         put("Face_Chin_Length", vec(chin, up * -0.0062))
-        put("Face_Chin_Forward", vec(chin, back * -0.0056))
+        # (Forward and back, the skin inside the lower lip that faces the
+        # lower teeth goes as little as the lining does: as skin it went
+        # back with the chin, 2.8 mm, and the gums' front stood 0.8 mm in
+        # it at -1. The shape is kept off the teeth at +1 only, where it
+        # moves away from them. Holding that skin off the teeth at -1
+        # instead left the lip's flesh between it and the chin's skin
+        # 1 mm thick on the feminine frame, which crossed itself with the
+        # chin shortened or the mouth lowered.)
+        facing_teeth = smoothstep(-0.2, 0.3, N[:, 1]) * self.skin
+        put("Face_Chin_Forward", vec(chin * (1.0 - 0.85 * facing_teeth), back * -0.0056))
         put("Face_Chin_Width", np.stack([P[:, 0] * chin * 0.36, np.zeros(len(P)), np.zeros(len(P))], axis=1))
         # (The mouth's lining and the lower teeth go with the jaw's skin:
         # `build` gives the teeth the same shape.)

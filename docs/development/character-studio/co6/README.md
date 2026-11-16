@@ -106,6 +106,7 @@ python3 -I assets/characters/catalogue.py
 python3 assets/characters/benchmarks/make.py
 PY -I assets/characters/humanoid/qa/face_checks.py --package realistic --out docs/development/character-studio/co6/face_checks.json --check
 PY -I assets/characters/humanoid/qa/render_face.py --package realistic --out docs/development/character-studio/co6
+PY -I assets/characters/humanoid/qa/measure.py --package realistic --only sliders --out docs/development/character-studio/co6/sliders.json --check assets/characters/realistic/qa/thresholds.json
 cargo nextest run -p axcenity-anim -p axcenity-avatar --no-fail-fast
 ```
 
@@ -172,7 +173,7 @@ Sheets in [engine/](engine/): a row per pose; in a row the masculine frame's stu
 8. `Blink` and `Eye_Closed` are separate shapes that add (the lead is looking at it in `anim`).
 9. In the engine a cut-out (MASK) card on a skinned, morphed part shows the backdrop through the skin behind its clear pixels; the face's cards are blended to avoid it. Worth a look in the renderer before hair (CO8).
 10. The simpler copies were looked at in Blender only (`face_lods.png`); the alpha parts in a full-body engine view were seen only as the three-quarter column of the sheets, where brows and lash lines draw and nothing stands out.
-11. `measure.py`'s `sliders` section (every pair of parameters) was not run with the face's 45 parameters added: it is some eight times the pairs it was.
+11. `measure.py`'s `sliders` section (every pair of parameters) was not run with the face's 45 parameters added: it is some eight times the pairs it was. Run since: [Identity parameters at their ends](#identity-parameters-at-their-ends).
 
 ## Review round 3, part 1 (open mouth, smile, laugh)
 
@@ -549,3 +550,117 @@ The incisors' edge stays 4.9 mm under the closed lips' line. Moving it wants the
 4. **The flaps** are in view, as the lining's red, with the lips between 1.5 and 3 mm apart (5 mm for the jaw alone); under 1.5 mm they hide the teeth, and at 2 mm a sliver of enamel shows under them. Every control at full weight together takes a flap out of its lip (never in a recipe or a viseme).
 5. **U and WQ** show the front teeth in an opening 20 mm wide, where a real one is a smaller, darker ring of lips well forward of the teeth: `Mouth_Pucker` gathers the lips to 0.7 of their width and 5.5 mm forward, and would need about half and more. **TH** shows no tongue, and **FV**'s lower lip does not go under the upper teeth.
 6. **A band of dark lining** under the upper lip's edge in every open mouth; the speckle on teeth half in shadow, the missing gloss, the gum's edge and the tongue's plain surface are as round 2 left them.
+
+## Identity parameters at their ends
+
+`measure.py --package realistic --only sliders` sets every pair of the manifest's parameters to every combination of their range ends, on both frames (2,556 pairs, 10,082 bodies a frame), and counts pairs of the body's triangles that newly cross; for each parameter alone it also counts eye and teeth points in the flesh. The package's thresholds hold all of these at 0. It had not been run since the face's 45 parameters were added, and on the build before this section it was red: 14 masculine and 8 feminine bodies with new crossings (brow height with brow arch, the temples with the ears, eye size and eye height with a lowered brow), and 17 parameter ends a frame with eye or teeth points in the flesh.
+
+### What was found
+
+1. **The harness left the eyeballs where they rest.** An eye parameter is a shape that moves the lids and a `bones` driver that moves or scales the eye bone (eye height moves it 4.5 mm). `Character.set_sliders` gave `set_look` the manifest's shape weights as `build`, and `eye_transform` moved the eye bones for the frame and for `face` shapes only, so the lids moved off an eyeball left in place. The engine moves it: `avatar::resolve` sums each parameter's `bones` drivers (an offset times the mapped weight, a scale `1 + (scale - 1) * weight`), and `Model::bake` (`crates/assets/src/model/identity.rs`) carries a model that has none of a layer's shapes (the `Eyes`) by the bone and adds the change to every pose; `gameplay`'s applier bakes `resolved.identity`. Captured in the engine on that build, `eye_height_left` -1 has the iris where it is at rest in the opening, the whole eye about 4 mm lower, and `eye_size_left` -1 a smaller iris, with no eyeball through a lid (the eye shapes are not changed here, so those pictures are the same before and after) ([engine/identity-eyes.jpg](engine/identity-eyes.jpg)). `face_checks.py` already posed the bones and found these ends clean. 13 of the 17 entries on the masculine frame and 14 on the feminine were this; the rest were the tilt and the chin (below) and, on the masculine frame, `eye_size_left` -1, which is a false count (still short, below).
+2. **Brow height and brow arch** at -1 together bring the brow down 11.6 mm, nearly all the height between the brow and the lash line. The identity brow shapes put every skin vertex back on the resting surface, the lids' and the fold's too, so the fold under a lowered brow was laid onto the nearest resting skin, the lid's own: the fold's loops 7 and 8 crossed the lid's loops 2 to 4 (20 to 43 pairs). The brow controls had already learned not to slide there (`brow_slide`). On the feminine frame the fold also stands no further forward than the lid below it, so even unslid it came straight down through the lid. Eye size -1 (the skin round the eye drawn in toward it) and eye height +1 (the lid's skin raised toward the brow) with a lowered brow crossed the same way on the masculine frame.
+3. **Temple width** moved the skin round each ear's root out up to 3.7 mm and left the ear itself where it was (`~self.ear`), so the skin went out through the ear's root; with the ear laid back or raised that was 4 to 15 pairs.
+4. **Ear protrusion** measured each ear point's reach from a plane 12 mm inside the ear's middle, so the ear's root moved 2.5 mm against the skin it grows from; laid back with the ear raised, the ear's root went into the skin above it (4 to 6 pairs).
+5. **Chin forward** at -1 drew back the skin inside the lower lip that faces the teeth (face set 22, counted as skin) by 2.3 to 2.8 mm, and the front of the lower gum stood 0.84 mm in it (4 points); the shape was kept off the teeth at +1 only, where it moves away from them.
+6. **Eye tilt** at +1 raised the rims straight up, so the lower lid's inner edge went 0.4 mm into the eyeball on the outer half, where the eyeball's surface faces down (3 skin points in the eyeball, 1 eyeball point in the lid, on both frames).
+
+### What changed
+
+The harness (`qa_scene.py`): `set_sliders` moves and scales the eye bones by the parameters' `bones` drivers as `avatar::resolve` sums them (`manifest_bones`; the frame's own drivers are still taken from the build data), and `slider_pairs`' notes say why. No limit, threshold or counted quantity changed.
+
+The shapes (`face.py`):
+
+- **Brows**: the identity brow shapes put the skin back on its resting surface as the brow controls do (`brow_slide`: not on the lids and the fold), and the upper lid's loops 5 to 10 roll forward as they come down (`BROW_ROLLS`, up to 0.3 of the drop) and back as they go up, so a much lowered brow's fold comes down over the lid, as a hooded lid's does. The roll is none at the inner corner and whole from a third of the way along the eye, and averaged over the lid (`BROW_ROLL_TAPER`, `BROW_ROLL_SMOOTH`): changing sharply from loop to loop, it pinched the fold's inner end with both brows raised. The brow's rise is 5.33 and 6.48 mm (`BROW_RISES`, 5.2 and 6.4 before) so that the largest moves are no smaller than they were. The masculine frame needs no roll at all (its fold stands forward of the lid); the feminine frame's pair at -1 crossed in 28 places without it and still once (brow arch with eye size) with a roll of 0.2.
+- **Temple width** carries the ears out with the skin they grow from.
+- **Ear protrusion** moves each ear point by its own distance from the head's skin (`EAR_OUT_REACH`, 12 mm for the whole 4.8 mm, at most one and a half times that): the root stays on the head and the rim moves most.
+- **Chin forward**: the skin inside the lower lip that faces the teeth moves as little as the lining (0.15 of the chin's move). Making the shape at its -1 end off the teeth was tried first: it held that skin off the gum but left the lip's flesh 1 mm thick on the feminine frame, which crossed itself with the chin shortened (46 pairs) or the mouth lowered (24).
+- **Eye tilt**: what of a rim vertex's move would take it nearer the eyeball than 0.9 of its resting height over it, at either end, is taken off along the line from the eyeball's centre and spread over the lid round it (`TILT_KEEPS`, `TILT_SPREADS`); the rims still rise and fall alike, and a full blink on a tilted eye leaves no ray bare. Turning the lower lid with the skin round it instead left a blink open (56 rays at -1), and the same change without the spreading moved single vertices of the lid's edge.
+
+Every pair of the face's 45 parameters at its ends was free of new crossings on both frames in a fast copy of the measure first (head triangles only; it gives the same counts as the harness on the build before), then in the harness itself (below).
+
+### Numbers
+
+The sliders check, both frames (10,082 bodies a frame):
+
+| | Masculine before, after | Feminine before, after |
+|---|---|---|
+| Bodies with new crossings | 14, 0 | 8, 0 |
+| Parameter ends alone with new crossings | 0, 0 | 0, 0 |
+| Parameter ends alone with eye or teeth points in the flesh | 17, 3 | 17, 0 |
+
+Each pair that crossed, before and after (pairs of triangles newly crossing):
+
+| Pair | Masculine before, after | Feminine before, after |
+|---|---|---|
+| `brow_height_left=-1, brow_arch_left=-1` | 20, 0 | 43, 0 |
+| `brow_height_right=-1, brow_arch_right=-1` | 24, 0 | 32, 0 |
+| `temple_width=1, ear_out_right=-1` | 15, 0 | 15, 0 |
+| `temple_width=1, ear_out_left=-1` | 12, 0 | 14, 0 |
+| `eye_size_left=-1, brow_arch_left=-1` | 11, 0 | 0, 0 |
+| `eye_size_left=-1, brow_height_left=-1` | 10, 0 | 0, 0 |
+| `eye_size_right=-1, brow_height_right=-1` | 8, 0 | 0, 0 |
+| `eye_size_right=-1, brow_arch_right=-1` | 7, 0 | 0, 0 |
+| `temple_width=1, ear_height_left=1` | 6, 0 | 7, 0 |
+| `ear_height_left=1, ear_out_left=-1` | 6, 0 | 6, 0 |
+| `temple_width=1, ear_height_right=1` | 4, 0 | 6, 0 |
+| `ear_height_right=1, ear_out_right=-1` | 4, 0 | 6, 0 |
+| `eye_height_right=1, brow_height_right=-1` | 3, 0 | 0, 0 |
+| `eye_height_right=1, brow_arch_right=-1` | 3, 0 | 0, 0 |
+
+Each parameter end with eye or teeth points in the flesh: before; with the eyes posed by the harness's correction, on the build before; after. Each cell is skin points in the eyeball / front eyeball points in the lid / teeth points in the lip or gums.
+
+| End | Masculine: before, with the eyes posed, after | Feminine: the same |
+|---|---|---|
+| `eye_height_left=-1` | 53/185/0, 0/0/0, 0/0/0 | 49/186/0, 0/0/0, 0/0/0 |
+| `eye_height_left=1` | 53/115/0, 0/0/0, 0/0/0 | 51/119/0, 0/0/0, 0/0/0 |
+| `eye_height_right=-1` | 53/183/0, 0/0/0, 0/0/0 | 50/185/0, 0/0/0, 0/0/0 |
+| `eye_height_right=1` | 52/116/0, 0/0/0, 0/0/0 | 48/119/0, 0/0/0, 0/0/0 |
+| `eye_spacing_left=-1` | 104/50/0, 0/0/0, 0/0/0 | 96/54/0, 0/0/0, 0/0/0 |
+| `eye_spacing_left=1` | 65/93/0, 0/0/0, 0/0/0 | 63/96/0, 0/0/0, 0/0/0 |
+| `eye_spacing_right=-1` | 106/46/0, 0/0/0, 0/0/0 | 100/54/0, 0/0/0, 0/0/0 |
+| `eye_spacing_right=1` | 64/94/0, 0/0/0, 0/0/0 | 64/96/0, 0/0/0, 0/0/0 |
+| `eye_depth_left=-1` | 116/0/0, 0/0/0, 0/0/0 | 94/0/0, 0/0/0, 0/0/0 |
+| `eye_depth_left=1` | 107/20/0, 0/0/0, 0/0/0 | 94/17/0, 0/0/0, 0/0/0 |
+| `eye_depth_right=-1` | 115/0/0, 0/0/0, 0/0/0 | 95/0/0, 0/0/0, 0/0/0 |
+| `eye_depth_right=1` | 104/22/0, 0/0/0, 0/0/0 | 95/17/0, 0/0/0, 0/0/0 |
+| `eye_size_left=-1` | 116/91/0, 0/1/0, 0/1/0 | 103/110/0, 0/0/0, 0/0/0 |
+| `eye_size_right=-1` | 116/89/0, 0/0/0, 0/0/0 | 101/102/0, 0/0/0, 0/0/0 |
+| `eye_tilt_left=1` | 3/1/0, 3/1/0, 0/1/0 | 3/1/0, 3/1/0, 0/0/0 |
+| `eye_tilt_right=1` | 3/1/0, 3/1/0, 0/1/0 | 3/1/0, 3/1/0, 0/0/0 |
+| `chin_forward=-1` | 0/0/4, 0/0/4, 0/0/0 | 0/0/4, 0/0/4, 0/0/0 |
+
+Each changed shape's largest move (millimetres, left and right; `Realistic.build.json`, `largest_move_mm`):
+
+| Shape | Before | After |
+|---|---|---|
+| `Face_Brow_Height` | 5.47, 5.49 | 5.50, 5.50 |
+| `Face_Brow_Arch` | 6.34, 6.37 | 6.39, 6.38 |
+| `Face_Ear_Out` | 6.75, 6.81 | 7.59, 7.59 |
+| `Face_Head_Width` | 5.19 | 5.19 (and the ears now go with it) |
+| `Face_Chin_Forward` | 5.2 | 5.2 |
+| `Face_Eye_Tilt` | 5.44, 5.43 | 5.44, 5.43 |
+
+The sliders check's output is [sliders.json](sliders.json) and its `--check` run [sliders-check.txt](sliders-check.txt).
+
+### In the engine
+
+3840 x 2160 captures of the description files for every offending pair and end (left side, which the face view is turned toward), before (the build at the start of this section) and after, on both frames, cropped at about full size; each tile is labelled `before` or `final` and with the description's name (`m` masculine, `f` feminine).
+
+- **[engine/identity-eyes.jpg](engine/identity-eyes.jpg)**: rest, `eye_height_left` -1, `eye_size_left` -1, `eye_tilt_left` +1 before and after. The eyeball goes where the lids go; no white or iris shows through a lid. Before, the tilted eye's white ran over the lower lid's edge on the outer half (plainest under the hard light, [engine/identity-tilt-hard.jpg](engine/identity-tilt-hard.jpg), the outer corner close up); after, the lid's edge lies over it, and the corner shows only the thin light line it shows at rest.
+- **[engine/identity-brows.jpg](engine/identity-brows.jpg)**: both brows at -1, eye size -1 with arch -1, eye height +1 with brow height -1, both brows at +1, and brow height +1 alone. Before, a lowered brow left a pale strip under the brow's inner end (the fold's skin turned up to the light) and a hard edge where the fold lay on the lid, with the lashes through it. After, the fold comes down over the lid as a hooded eye's, with no pale strip; at -1 together it covers the lid down to the lashes. Raised together, the fold shows as a lit band over the lid with a small pinched tongue at its inner end (still short, below); the build before had a band less lit, with a grey smear on it, and white marks on the fold with one brow parameter raised.
+- **[engine/identity-ears.jpg](engine/identity-ears.jpg)** (from the front, 9 degrees aside) and **[engine/identity-side.jpg](engine/identity-side.jpg)** (profile; the last two columns are the chin): before, a wider temple left a dark notch where the skin went through the top of the ear's root, and an ear raised and laid back stood a spike of skin at the top of its root; after, the ear's root stays on the head and goes out with it, and an ear laid back turns in at the rim. The chin at -1 recedes as much as before, with no gum through the lip.
+
+### Checks
+
+- `measure.py --only sliders --check`: no new crossings on either frame (0 of 10,082 bodies each) and no parameter end with new crossings; red on one line, `sliders/frames/masculine/alone_eye_or_teeth_in_flesh` 3 (at most 0; still short, 1). Its other lines in that mode say "not measured". About 14 minutes.
+- `measure.py --check` (every other section): red on the shoulder's lines only (`shoulder_abd_150` at 0.463 and 0.513 under 0.54 and the 0.8 target, `shoulder_abd_90` at 0.847 and 0.88 under its targets), as before; its `sliders` lines say "not measured" in that mode.
+- `face_checks.py --check`: **0 failures** ([face-checks-run.txt](face-checks-run.txt), [face_checks.json](face_checks.json)); nothing outside the identity entries changed. Identity entries (reported, not held) that changed: `chin_forward` -1 has no teeth in the flesh (4 points, to 0.84 mm masculine, before) and no lip in the teeth (1); `eye_tilt` +1 has no lid in the eyeball and no eyeball in the lid (3 and 1 on each side and frame before); the masculine brow at -1 has fewer head triangles crossing (`brow_arch_left` 21 to 7, `brow_height_left` 21 to 10, `brow_arch_right` 16 to 1, `brow_height_right` 10 to 3), and at +1 the right brow's two parameters have 1 each (none before). A full blink on every identity end leaves no ray bare, as before. Still not clean (as before, but for the brows): head triangles crossing at `eye_size` -1 (36 and 28, masculine), `brow_ridge` +1 (15 masculine, 6 feminine), `eye_tilt` +1 (5 and 4), `cheekbone` +1 (3 and 5, masculine), the masculine brows (above), and on the feminine frame `lower_lip_fullness` -1 (98) and `nose_length` -1 (8); `jaw_shift` at either end leaves one feminine lip vertex 0.27 mm in the teeth. These count every pair of the head's triangles that cross, also those touching at rest, which the sliders check leaves out.
+- `cargo nextest run -p axcenity-anim -p axcenity-avatar`: 223 pass.
+
+### Still short
+
+1. **The sliders check is red on one line**: `sliders/frames/masculine/alone_eye_or_teeth_in_flesh` is 3 (at most 0): `eye_size_left` -1 (which it counted before this section too, with the eyes posed), `eye_tilt_left` +1 and `eye_tilt_right` +1, one eyeball point each, "0.29 to 0.43 mm in the lid". None is in the lid: each point is in the open eye, 2.4 to 4.7 mm from the lid, and outside the body by three rays' parity; `face_checks.py`, which tests by parity, finds no eyeball in a lid at these ends. `eye_metrics` takes the side of the nearest face, and a point nearest the lid's edge is nearest a vertex that several faces share, at the same distance to a thousandth of a millimetre: which face Blender returns decides the sign. The tilt's real defect (the lower lid's edge 0.25 mm in the eyeball, inside by parity) is gone; moving the lid's edge by tenths of a millimetre to take it out of the eyeball tipped the tie at two such vertices. The measure was not changed (no measure may be retuned to pass): counting a point only where the nearest face's side is its own (its distance to the body no more than its depth) would keep the real case and drop these. That is for the lead to decide.
+2. **Both brows at -1** hood the upper lid down to the lash line, the fold over the lid as a hooded eye's; the lashes are under it. Under the hard light a stippled patch of shadow shows at the inner corner (the renderer's shadow pattern, which shows at the lower lid's inner corner at rest too).
+3. **Both brows at +1** show the fold under the brow as a lit band whose end toward the inner corner is a small pinched tongue (with no roll it is a fainter one): rolled back as it rises, the fold stands a little behind the skin above it (the pair at +1 takes the lid's skin back by up to 2.3 and 2.5 mm, left and right, the brow control's raise by up to 2.0 mm). A blend shape moves its vertices in straight lines, so the roll that keeps a lowered fold off the lid takes a raised one back; the old shapes, which slid the raised fold forward onto the brow bone, laid a lowered one onto the lid. A separate shape for each end of a parameter would let each end go its own way.
+4. `face_checks.py`'s identity entries that are not clean (Checks, above) are as they were, but for the masculine brows: fewer head triangles cross at -1 and one pair crosses at +1 on the right, where none did.
+5. Right-side parameters are on the far side of the face cameras; they were judged from the numbers and from the left side's pictures (each side's shape is made by the same rule on its own side, and differs from the other's mirror image by what the mesh does: at most 0.5 mm for the brows, 0.3 mm for the ear's protrusion).
