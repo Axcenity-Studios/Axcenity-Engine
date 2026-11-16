@@ -20,6 +20,7 @@
 //! lighting, layout or undo is ever written into these files.
 
 mod catalogue;
+mod choices;
 mod description;
 mod ids;
 mod item;
@@ -36,6 +37,7 @@ mod fixtures;
 mod tests;
 
 pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem};
+pub use choices::{chosen_slots, wear_choice, wear_choices};
 pub use description::{DESCRIPTION_VERSION, Description, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, Source, Variant};

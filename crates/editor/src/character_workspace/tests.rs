@@ -91,14 +91,47 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     assert_eq!(workspace.parameter("frame"), 0.0);
     assert_eq!(workspace.worn_in("underwear_top"), None);
 
-    // Something the person picked themselves stays on.
+    // The underwear follows the choice and can't be taken off or swapped:
+    // the Clothing page has no chips for it, and an edit that tries is
+    // put right.
+    let chosen = chosen_slots(&workspace.library(), DEFAULT_BASE);
+    assert_eq!(chosen, ["underwear_bottom", "underwear_top"]);
     workspace.choose(&frame, 1.0);
+    workspace.wear("underwear_top", None);
     workspace.wear("underwear_bottom", Some("axcenity/realistic-boxer-briefs"));
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-briefs")
+    );
+    assert_eq!(
+        workspace.worn_in("underwear_top").as_deref(),
+        Some("axcenity/realistic-sports-bra")
+    );
+    workspace.edit(|description| description.items.clear());
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-briefs")
+    );
     workspace.choose(&frame, 0.0);
+    workspace.wear("underwear_top", Some("axcenity/realistic-sports-bra"));
     assert_eq!(workspace.worn_in("underwear_top"), None);
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
         Some("axcenity/realistic-boxer-briefs")
+    );
+
+    // A saved character without its underwear (an older file) gets it.
+    let mut bare = workspace.description().clone();
+    bare.parameters.insert("frame".to_owned(), 1.0);
+    bare.items.clear();
+    let reopened = CharacterWorkspace::open(&folder, bare, true).unwrap();
+    assert_eq!(
+        reopened.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-briefs")
+    );
+    assert_eq!(
+        reopened.worn_in("underwear_top").as_deref(),
+        Some("axcenity/realistic-sports-bra")
     );
 
     // A value between the two is taken to the nearest choice.
@@ -253,8 +286,13 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     assert_eq!(default_bottom.as_deref(), Some("axcenity/realistic-briefs"));
     assert!(workspace.worn_in("underwear_top").is_some());
 
-    workspace.wear("underwear_bottom", Some("axcenity/realistic-boxer-briefs"));
-    workspace.wear("underwear_top", None);
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    workspace.choose(&frame, 0.0);
     let worn = workspace.worn().join(" ");
     assert!(worn.contains("Underwear_BoxerBriefs"), "{worn}");
     assert!(!worn.contains("Underwear_Briefs"), "{worn}");
@@ -284,13 +322,13 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     );
     workspace.undo();
     assert!(workspace.worn_in("underwear_top").is_some());
-    workspace.undo();
     assert!(!workspace.can_undo());
     workspace.redo();
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
         Some("axcenity/realistic-boxer-briefs")
     );
+    workspace.choose(&frame, 1.0);
 
     workspace.edit(|description| description.name = "Test Hero".to_owned());
     let path = workspace.save().unwrap();

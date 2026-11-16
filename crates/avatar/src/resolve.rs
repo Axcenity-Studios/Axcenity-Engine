@@ -171,7 +171,10 @@ pub enum PartFit {
 
 /// Resolves `description` against `library`, or says why it can't be (no
 /// such base model). Items that can't be worn are left out and listed in
-/// [`Resolved::problems`]; values outside their ranges are clamped.
+/// [`Resolved::problems`]; values outside their ranges are clamped. What a
+/// parameter's choices wear is always worn ([`crate::wear_choices`]: the
+/// realistic body's underwear), so the item indexes in problems are of the
+/// description with it on.
 pub fn resolve(library: &Library, description: &Description) -> Result<Resolved, Problem> {
     let base = library.base(&description.base).ok_or_else(|| {
         Problem::new(
@@ -179,6 +182,9 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             format!("the library has no base model `{}`", description.base),
         )
     })?;
+    let mut dressed = description.clone();
+    crate::wear_choices(&mut dressed, library);
+    let description = &dressed;
     let mesh_id = |owner: &str, model: &ModelRef| -> Option<String> {
         let file = library.path_of(owner, &model.file)?;
         Some(match &model.object {

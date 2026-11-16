@@ -281,3 +281,53 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // card, and a mask shape under each of the three underwear items.)
     assert_eq!(model.morph_targets.len(), 155);
 }
+
+/// The realistic body's underwear comes with Male or Female and is always
+/// worn: a description that leaves it out, swaps it or wears the other
+/// frame's still resolves to the chosen frame's underwear.
+#[test]
+fn the_underwear_is_always_worn_and_follows_the_frame() {
+    let library = library();
+    let worn = |description: &Description| -> Vec<String> {
+        let resolved = resolve(&library, description).unwrap();
+        let mut items: Vec<String> = resolved
+            .parts
+            .iter()
+            .filter_map(|p| p.item.clone())
+            .collect();
+        items.sort();
+        items
+    };
+    assert_eq!(
+        axcenity_avatar::chosen_slots(&library, BASE),
+        ["underwear_bottom", "underwear_top"]
+    );
+
+    let mut male = Description::new("Bare", BASE);
+    assert_eq!(worn(&male), ["axcenity/realistic-boxer-briefs"]);
+    male.items = vec![axcenity_avatar::WornItem::new(
+        "axcenity/realistic-sports-bra",
+    )];
+    assert_eq!(worn(&male), ["axcenity/realistic-boxer-briefs"]);
+
+    let mut female = Description::new("Bare", BASE);
+    female.parameters.insert("frame".to_owned(), 1.0);
+    assert_eq!(
+        worn(&female),
+        ["axcenity/realistic-briefs", "axcenity/realistic-sports-bra"]
+    );
+    female.items = vec![axcenity_avatar::WornItem::new(
+        "axcenity/realistic-boxer-briefs",
+    )];
+    assert_eq!(
+        worn(&female),
+        ["axcenity/realistic-briefs", "axcenity/realistic-sports-bra"]
+    );
+
+    // Already dressed, nothing changes.
+    let mut dressed = female.clone();
+    axcenity_avatar::wear_choices(&mut dressed, &library);
+    let again = dressed.clone();
+    axcenity_avatar::wear_choices(&mut dressed, &library);
+    assert_eq!(dressed, again);
+}
