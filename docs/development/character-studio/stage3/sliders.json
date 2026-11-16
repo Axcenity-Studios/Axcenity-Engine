@@ -1,0 +1,1652 @@
+{
+ "files": {},
+ "notes": [
+  "Blender space: metres, Z up, the character faces -Y. Distances in mm unless named _m.",
+  "Topology counts are on position-merged vertices (glTF splits vertices at UV seams); glTF stores only triangles, so ngons are 0 in the files (see source_ngons for the build's polygons).",
+  "Clipping: a skin vertex is 'covered' when a ray along its normal meets the layer within 5 cm (6 cm for hair), 'poke' when instead the layer's outward face lies up to 3 cm inside the skin. Percentages are of covered vertices.",
+  "Feminine looks move the skeleton by the customization file's Frame_Feminine offsets and the eye bones by their offset and eye_scale (what CS3 is meant to do)."
+ ],
+ "sliders": {
+  "parameters": 73,
+  "frames": {
+   "masculine": {
+    "neutral_crossings": 64,
+    "alone": {
+     "height=0.85": {
+      "new_crossings": 0
+     },
+     "height=1.15": {
+      "new_crossings": 0
+     },
+     "leg_length=0.85": {
+      "new_crossings": 0
+     },
+     "leg_length=1.15": {
+      "new_crossings": 0
+     },
+     "arm_length=0.85": {
+      "new_crossings": 0
+     },
+     "arm_length=1.15": {
+      "new_crossings": 0
+     },
+     "shoulder_width=0.85": {
+      "new_crossings": 0
+     },
+     "shoulder_width=1.15": {
+      "new_crossings": 0
+     },
+     "waist_width=0.85": {
+      "new_crossings": 0
+     },
+     "waist_width=1.15": {
+      "new_crossings": 0
+     },
+     "hip_width=1.15": {
+      "new_crossings": 0
+     },
+     "head_size=0.85": {
+      "new_crossings": 0
+     },
+     "head_size=1.15": {
+      "new_crossings": 0
+     },
+     "hand_size=0.85": {
+      "new_crossings": 0
+     },
+     "hand_size=1.15": {
+      "new_crossings": 0
+     },
+     "foot_size=0.85": {
+      "new_crossings": 0
+     },
+     "foot_size=1.15": {
+      "new_crossings": 0
+     },
+     "muscle=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_chest=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_chest=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_chest=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_chest=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_shoulders=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_shoulders=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_shoulders=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_shoulders=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_arms=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_arms=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_arms=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_arms=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_abdomen=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_abdomen=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_abdomen=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_abdomen=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_back=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_back=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_back=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_back=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_hips=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_hips=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_hips=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_hips=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_thighs=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_thighs=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_thighs=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_thighs=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_calves=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_calves=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_calves=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_calves=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_ridge=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_ridge=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_length=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_length=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_bridge=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_bridge=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tip=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tip=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tilt=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tilt=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_shift=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_shift=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_length=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_length=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_forward=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_forward=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_width=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_width=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "upper_lip_fullness=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "upper_lip_fullness=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "lower_lip_fullness=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "lower_lip_fullness=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_height=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_height=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_height=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_height=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_slope=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_slope=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "temple_width=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "temple_width=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     }
+    },
+    "pairs": 2556,
+    "bodies": 10082,
+    "bodies_with_new_crossings": 0,
+    "new_crossings_largest": 0,
+    "offenders": [],
+    "alone_with_new_crossings": 0,
+    "alone_eye_or_teeth_in_flesh": 0
+   },
+   "feminine": {
+    "neutral_crossings": 26,
+    "alone": {
+     "height=0.85": {
+      "new_crossings": 0
+     },
+     "height=1.15": {
+      "new_crossings": 0
+     },
+     "leg_length=0.85": {
+      "new_crossings": 0
+     },
+     "leg_length=1.15": {
+      "new_crossings": 0
+     },
+     "arm_length=0.85": {
+      "new_crossings": 0
+     },
+     "arm_length=1.15": {
+      "new_crossings": 0
+     },
+     "shoulder_width=0.85": {
+      "new_crossings": 0
+     },
+     "shoulder_width=1.15": {
+      "new_crossings": 0
+     },
+     "waist_width=0.85": {
+      "new_crossings": 0
+     },
+     "waist_width=1.15": {
+      "new_crossings": 0
+     },
+     "hip_width=1.15": {
+      "new_crossings": 0
+     },
+     "head_size=0.85": {
+      "new_crossings": 0
+     },
+     "head_size=1.15": {
+      "new_crossings": 0
+     },
+     "hand_size=0.85": {
+      "new_crossings": 0
+     },
+     "hand_size=1.15": {
+      "new_crossings": 0
+     },
+     "foot_size=0.85": {
+      "new_crossings": 0
+     },
+     "foot_size=1.15": {
+      "new_crossings": 0
+     },
+     "muscle=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_chest=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_chest=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_chest=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_chest=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_shoulders=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_shoulders=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_shoulders=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_shoulders=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_arms=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_arms=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_arms=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_arms=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_abdomen=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_abdomen=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_abdomen=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_abdomen=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_back=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_back=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_back=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_back=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_hips=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_hips=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_hips=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_hips=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_thighs=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_thighs=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_thighs=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_thighs=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_calves=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "muscle_calves=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_calves=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "fat_calves=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_spacing_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_depth_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_size_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "eye_tilt_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_arch_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_ridge=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "brow_ridge=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nostril_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_length=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_length=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_bridge=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_bridge=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tip=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tip=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tilt=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "nose_tilt=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheekbone_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "cheek_fullness_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_shift=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "jaw_shift=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_length=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_length=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_forward=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_forward=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_width=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "chin_width=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_width_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "upper_lip_fullness=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "upper_lip_fullness=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "lower_lip_fullness=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "lower_lip_fullness=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_height=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "mouth_height=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_height=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_height=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_slope=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "forehead_slope=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "temple_width=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "temple_width=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_size_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_height_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_left=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_left=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_right=-1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     },
+     "ear_out_right=1": {
+      "new_crossings": 0,
+      "skin_inside_eyeball_verts": 0,
+      "front_eye_inside_lid_flesh_verts": 0,
+      "teeth_verts_inside_lips_or_gums_flesh": 0
+     }
+    },
+    "pairs": 2556,
+    "bodies": 10082,
+    "bodies_with_new_crossings": 0,
+    "new_crossings_largest": 0,
+    "offenders": [],
+    "alone_with_new_crossings": 0,
+    "alone_eye_or_teeth_in_flesh": 0
+   }
+  }
+ }
+}

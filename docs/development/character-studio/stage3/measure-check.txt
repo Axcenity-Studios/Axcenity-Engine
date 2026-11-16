@@ -1,0 +1,58 @@
+10:28:24 | INFO: Data are loaded, start creating Blender stuff
+10:28:24 | INFO: Blender create Mesh node Body
+10:28:24 | INFO: Blender create Mesh node Body_LOD1
+10:28:24 | INFO: Blender create Mesh node Body_LOD2
+10:28:24 | INFO: Blender create Mesh node Brows
+10:28:24 | INFO: Blender create Mesh node Eyes
+10:28:24 | INFO: Blender create Mesh node EyeShell
+10:28:25 | INFO: Blender create Mesh node Lashes
+10:28:25 | INFO: Blender create Mesh node LipSeal
+10:28:25 | INFO: Blender create Mesh node Teeth
+10:28:25 | INFO: Blender create Mesh node Teeth_LOD1
+10:28:25 | INFO: Blender create Mesh node Teeth_LOD2
+10:28:25 | INFO: glTF import finished in 0.65s
+10:28:25 | INFO: Data are loaded, start creating Blender stuff
+10:28:25 | INFO: Blender create Mesh node Body
+10:28:25 | INFO: Blender create Mesh node Body_LOD1
+10:28:25 | INFO: Blender create Mesh node Body_LOD2
+10:28:26 | INFO: Blender create Mesh node Brows
+10:28:26 | INFO: Blender create Mesh node Eyes
+10:28:26 | INFO: Blender create Mesh node EyeShell
+10:28:26 | INFO: Blender create Mesh node Lashes
+10:28:26 | INFO: Blender create Mesh node LipSeal
+10:28:26 | INFO: Blender create Mesh node Teeth
+10:28:26 | INFO: Blender create Mesh node Teeth_LOD1
+10:28:26 | INFO: Blender create Mesh node Teeth_LOD2
+10:28:26 | INFO: glTF import finished in 0.73s
+files 2.5
+10:28:26 | INFO: Data are loaded, start creating Blender stuff
+10:28:26 | INFO: Blender create Mesh node Body
+10:28:27 | INFO: Blender create Mesh node Body_LOD1
+10:28:27 | INFO: Blender create Mesh node Body_LOD2
+10:28:27 | INFO: Blender create Mesh node Brows
+10:28:27 | INFO: Blender create Mesh node Eyes
+10:28:27 | INFO: Blender create Mesh node EyeShell
+10:28:27 | INFO: Blender create Mesh node Lashes
+10:28:27 | INFO: Blender create Mesh node LipSeal
+10:28:27 | INFO: Blender create Mesh node Teeth
+10:28:27 | INFO: Blender create Mesh node Teeth_LOD1
+10:28:27 | INFO: Blender create Mesh node Teeth_LOD2
+10:28:27 | INFO: glTF import finished in 0.74s
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:32:04)
+weights 3.8
+face 20.1
+shapes 20.5
+proportions 20.6
+deformation 22.1
+twist 24.4
+wrote /home/pjanota/Documents/Axcenity-Engine/docs/development/character-studio/stage3/measurements.json 24.4 s
+WORSE: sliders/frames/masculine/bodies_with_new_crossings: not measured (run every section)
+WORSE: sliders/frames/masculine/alone_with_new_crossings: not measured (run every section)
+WORSE: sliders/frames/masculine/alone_eye_or_teeth_in_flesh: not measured (run every section)
+WORSE: sliders/frames/feminine/bodies_with_new_crossings: not measured (run every section)
+WORSE: sliders/frames/feminine/alone_with_new_crossings: not measured (run every section)
+WORSE: sliders/frames/feminine/alone_eye_or_teeth_in_flesh: not measured (run every section)
+TARGET NOT MET: deformation/masculine/shoulder_abd_90/local_volume_ratio: 0.847, at least 0.853
+TARGET NOT MET: deformation/feminine/shoulder_abd_90/local_volume_ratio: 0.88, at least 0.992
+check: failed (2 targets not met)
+exit 1

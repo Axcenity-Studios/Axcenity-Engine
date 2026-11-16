@@ -88,7 +88,7 @@ Built in Character Studio overhaul CO4, with its body parameters from CO5, waiti
 
 ## Limitations
 
-The bake's cost isn't measured (**Unverified**; CO18 measures characters). The rest of the Character Runtime's limits (the editor's edit mode, values not drawn until CO7, no content yet for binding-fitted and socket items) are in [Known limitations](../Roadmap/Known-Limitations.md#characters), with the realistic base body's (the shoulder target not met, one contract test left red until CO5).
+The bake's cost isn't measured (**Unverified**; CO18 measures characters). The rest of the Character Runtime's limits (the editor's edit mode, values not drawn until CO7, no content yet for binding-fitted and socket items) are in [Known limitations](../Roadmap/Known-Limitations.md#characters), with the realistic base body's (the raised shoulder held by its ring area, not its local volume).
 
 ## Development guidance
 

@@ -775,7 +775,7 @@ class Geo:
             return None
         if getattr(self, "_pseudo", None) is None:
             self._pseudo = PseudoNormals(self.co, self.tris)
-        return self._pseudo.signed(np.array(p, dtype=np.float64), np.array(loc, dtype=np.float64), face)
+        return self._pseudo.signed(np.array(p, dtype=np.float64), face)
 
 
 def merged_bvh(geos):
