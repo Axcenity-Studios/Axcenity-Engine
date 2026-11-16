@@ -11,6 +11,9 @@ use axcenity_core::Value;
 use super::tests::start_example_in;
 use super::*;
 
+mod description;
+mod description_lua;
+
 const MODEL: &str = "assets/models/Humanoid/Humanoid.glb";
 const ANIMATIONS: &str = "assets/models/Humanoid/HumanoidAnimations.glb";
 

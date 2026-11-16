@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-eye-spacing-right-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "eye_spacing_right": 1,
+    "frame": 1
+  }
+}

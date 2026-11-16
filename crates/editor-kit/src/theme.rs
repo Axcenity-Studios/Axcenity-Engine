@@ -1359,6 +1359,7 @@ pub fn class_icon(class: ClassName) -> &'static str {
         ClassName::Tool => icons::SWORD,
         ClassName::Inventory => icons::BACKPACK,
         ClassName::Humanoid => icons::PERSON,
+        ClassName::HumanoidDescription => icons::IDENTIFICATION_CARD,
         ClassName::DamageZone => icons::FIRE,
         ClassName::Script => icons::FILE_CODE,
         ClassName::LocalScript => icons::CODE,

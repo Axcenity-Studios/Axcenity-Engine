@@ -1,0 +1,45 @@
+
+        FAIL [   0.545s] (2/3) axcenity-anim::realistic_face the_faces_parts_carry_the_shapes_they_follow
+  stdout ───
+
+    running 1 test
+    test the_faces_parts_carry_the_shapes_they_follow ... FAILED
+
+    failures:
+
+    failures:
+        the_faces_parts_carry_the_shapes_they_follow
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.53s
+
+  stderr ───
+
+    thread 'the_faces_parts_carry_the_shapes_they_follow' (21760) panicked at crates\anim\tests\realistic_face.rs:55:28:
+    the manifest lists no part `Lashes`
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.550s] (3/3) axcenity-anim::realistic_face the_realistic_bodys_face_fits_its_profile_with_nothing_left_out
+  stdout ───
+
+    running 1 test
+    test the_realistic_bodys_face_fits_its_profile_with_nothing_left_out ... FAILED
+
+    failures:
+
+    failures:
+        the_realistic_bodys_face_fits_its_profile_with_nothing_left_out
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.54s
+
+  stderr ───
+
+    thread 'the_realistic_bodys_face_fits_its_profile_with_nothing_left_out' (19512) panicked at crates\anim\tests\realistic_face.rs:70:5:
+    41 of the 48 standard controls move nothing: Blink_Left, Blink_Right, Eye_Closed_Left, Eye_Closed_Right, Eye_Squint_Left, Eye_Squint_Right, Eye_Wide_Left, Eye_Wide_Right, Brow_Raise_Left, Brow_Raise_Right, Brow_Lower_Left, Brow_Lower_Right, Brow_Inward_Left, Brow_Inward_Right, Mouth_Smile_Left, Mouth_Smile_Right, Mouth_Frown_Left, Mouth_Frown_Right, Mouth_Open, Mouth_Wide, Mouth_Narrow, Mouth_Pucker, Mouth_Left, Mouth_Right, Upper_Lip_Raise, Lower_Lip_Lower, Upper_Lip_Raise_Left, Upper_Lip_Raise_Right, Lower_Lip_Lower_Left, Lower_Lip_Lower_Right, Lip_Corner_Pull_Left, Lip_Corner_Pull_Right, Cheek_Raise_Left, Cheek_Raise_Right, Cheek_Puff, Nose_Sneer_Left, Nose_Sneer_Right, Jaw_Forward, Tongue_Out, Tongue_Up, Tongue_Down.
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.551s] 3 tests run: 0 passed, 3 failed, 0 skipped
+        FAIL [   0.544s] (1/3) axcenity-anim::realistic_face every_standard_control_moves_the_realistic_face
+        FAIL [   0.545s] (2/3) axcenity-anim::realistic_face the_faces_parts_carry_the_shapes_they_follow
+        FAIL [   0.550s] (3/3) axcenity-anim::realistic_face the_realistic_bodys_face_fits_its_profile_with_nothing_left_out
+error: test run failed

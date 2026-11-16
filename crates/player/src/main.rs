@@ -1557,6 +1557,8 @@ mod weather_tests;
 #[cfg(test)]
 mod bench_tests;
 #[cfg(test)]
+mod character_capture;
+#[cfg(test)]
 mod profile_tests;
 
 #[cfg(test)]

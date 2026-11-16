@@ -239,6 +239,33 @@ pub(crate) struct FaceLayers {
     pub settings: Vec<FaceLayerSetting>,
 }
 
+/// How much of the way to shut each control already takes an eye at 1,
+/// which a blink then leaves alone. A head made for the standard controls
+/// is built to these shares: they are the most the realistic head's
+/// squint, raised cheek and lowered brow close its eye anywhere along
+/// the lids (the build measures them, `face.blink_shares` in its report).
+type BlinkYields = (&'static str, [(&'static str, f32); 4]);
+const BLINK_YIELDS: [BlinkYields; 2] = [
+    (
+        "Blink_Left",
+        [
+            ("Eye_Closed_Left", 1.0),
+            ("Eye_Squint_Left", 0.71),
+            ("Cheek_Raise_Left", 0.31),
+            ("Brow_Lower_Left", 0.26),
+        ],
+    ),
+    (
+        "Blink_Right",
+        [
+            ("Eye_Closed_Right", 1.0),
+            ("Eye_Squint_Right", 0.71),
+            ("Cheek_Raise_Right", 0.31),
+            ("Brow_Lower_Right", 0.26),
+        ],
+    ),
+];
+
 impl FaceLayers {
     /// The face's controls: every layer over the ones under it. `rig` and
     /// `pose` (the body's, done) aim the gaze.
@@ -266,6 +293,22 @@ impl FaceLayers {
         }
         for value in &mut out {
             *value = value.clamp(0.0, 1.0);
+        }
+        // `Blink` and `Eye_Closed` both close a lid, and a squint, a raised
+        // cheek and a lowered brow each close part of it. Blend shapes add,
+        // so a blink closes only what the others leave open, or the upper
+        // lid would go on past the lower one (a blink during a laugh).
+        for (blink, yields) in BLINK_YIELDS {
+            let Some(blink) = face_control(blink) else {
+                continue;
+            };
+            let closed: f32 = yields
+                .iter()
+                .filter_map(|(control, share)| {
+                    face_control(control).map(|index| out[index] * share)
+                })
+                .sum();
+            out[blink] = out[blink].min((1.0 - closed).max(0.0));
         }
         out
     }
@@ -707,23 +750,20 @@ mod tests {
     #[test]
     fn asymmetry_keeps_one_side() {
         let mut state = FaceState::default();
-        let mut happy = play("Happy", 0, 0);
-        happy.presence = 1.0;
-        happy.asymmetry = -1.0;
-        state.expressions.push(happy);
+        // (Excited: a recipe with a control in the middle of the face.)
+        let mut excited = play("Excited", 0, 0);
+        excited.presence = 1.0;
+        excited.asymmetry = -1.0;
+        state.expressions.push(excited);
         let layer = advance_expressions(
             &mut state,
             &FaceExpressions::default(),
             0.0,
             &mut Vec::new(),
         );
-        assert_eq!(at(&layer, "Mouth_Smile_Left"), (0.8, 1.0));
+        assert_eq!(at(&layer, "Mouth_Smile_Left"), (1.0, 1.0));
         assert_eq!(at(&layer, "Mouth_Smile_Right"), (0.0, 0.0));
-        assert_eq!(
-            at(&layer, "Mouth_Open"),
-            (0.15, 1.0),
-            "middle controls stay"
-        );
+        assert_eq!(at(&layer, "Mouth_Open"), (0.3, 1.0), "middle controls stay");
     }
 
     #[test]

@@ -1,0 +1,50 @@
+[
+ {
+  "end": "masculine eye_size_left=-1",
+  "side": "Left",
+  "vertex": 401,
+  "pseudo_normal_mm": 4.705,
+  "face_normal_mm": -0.291,
+  "nearest": "edge",
+  "open_edge": false,
+  "faces_on_edge": 2,
+  "ray_parity": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "end": "masculine eye_tilt_left=1",
+  "side": "Left",
+  "vertex": 438,
+  "pseudo_normal_mm": 2.47,
+  "face_normal_mm": -0.43,
+  "nearest": "edge",
+  "open_edge": false,
+  "faces_on_edge": 2,
+  "ray_parity": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "end": "masculine eye_tilt_right=1",
+  "side": "Right",
+  "vertex": 1017,
+  "pseudo_normal_mm": 2.429,
+  "face_normal_mm": -0.298,
+  "nearest": "edge",
+  "open_edge": false,
+  "faces_on_edge": 2,
+  "ray_parity": [
+   0,
+   0,
+   0,
+   0
+  ]
+ }
+]

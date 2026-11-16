@@ -177,7 +177,10 @@ const STATES: [State; 26] = {
 /// a clip per state, the state machine and the `Character` prefab) and
 /// returns the prefab's path. Files already there are kept, so this never
 /// writes over a creator's own (a changed clip or prefab stays changed).
+/// The character library goes with it ([`add_character_library`]), so the
+/// character can be given a description (`Humanoid:ApplyDescription`).
 pub fn add_default_humanoid(project: &Path) -> Result<&'static str, SaveError> {
+    add_character_library(project)?;
     let write = |path: &str, bytes: &[u8]| write_missing(project, path, bytes);
     write(DEFAULT_HUMANOID_MODEL_PATH, DEFAULT_HUMANOID_MODEL)?;
     write(
@@ -197,7 +200,7 @@ pub fn add_default_humanoid(project: &Path) -> Result<&'static str, SaveError> {
 }
 
 /// Writes `bytes` to `path` in `project` unless a file is there already.
-fn write_missing(project: &Path, path: &str, bytes: &[u8]) -> Result<(), SaveError> {
+pub(crate) fn write_missing(project: &Path, path: &str, bytes: &[u8]) -> Result<(), SaveError> {
     let file = project.join(path);
     if file.is_file() {
         return Ok(());

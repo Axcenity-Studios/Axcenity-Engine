@@ -1,0 +1,283 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.5
+   Compiling autocfg v1.5.1
+   Compiling serde_core v1.0.229
+   Compiling libm v0.2.16
+   Compiling getrandom v0.4.3
+   Compiling version_check v0.9.5
+   Compiling serde v1.0.229
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling windows-link v0.2.1
+   Compiling simd-adler32 v0.3.10
+   Compiling typenum v1.20.1
+   Compiling adler2 v2.0.1
+   Compiling memchr v2.8.3
+   Compiling crc32fast v1.5.2
+   Compiling crossbeam-utils v0.8.23
+   Compiling zerocopy v0.8.63
+   Compiling crossbeam-epoch v0.9.21
+   Compiling thiserror v2.0.21
+   Compiling zmij v1.0.23
+   Compiling zlib-rs v0.6.8
+   Compiling foldhash v0.2.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling byteorder v1.5.0
+   Compiling serde_json v1.0.154
+   Compiling log v0.4.34
+   Compiling rawpointer v0.2.1
+   Compiling paste v1.0.15
+   Compiling heapless v0.8.0
+   Compiling getrandom v0.2.17
+   Compiling windows-strings v0.5.1
+   Compiling windows-result v0.4.1
+   Compiling miniz_oxide v0.9.1
+   Compiling hashbrown v0.17.1
+   Compiling once_cell v1.21.4
+   Compiling rayon-core v1.13.0
+   Compiling itoa v1.0.18
+   Compiling hash32 v0.3.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling zeroize v1.9.1
+   Compiling regex-syntax v0.8.11
+   Compiling aho-corasick v1.1.5
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling rand_core v0.6.4
+   Compiling untrusted v0.9.0
+   Compiling parking_lot_core v0.9.12
+   Compiling either v1.19.0
+   Compiling equivalent v1.0.3
+   Compiling rustls-pki-types v1.15.1
+   Compiling ena v0.14.4
+   Compiling miniz_oxide v0.8.9
+   Compiling windows-threading v0.2.1
+   Compiling windows-sys v0.61.2
+   Compiling arrayvec v0.7.8
+   Compiling scopeguard v1.2.0
+   Compiling reborrow v0.5.5
+   Compiling static_assertions v1.1.0
+   Compiling downcast-rs v2.0.2
+   Compiling jobserver v0.1.35
+   Compiling generic-array v0.14.7
+   Compiling pulp v0.22.3
+   Compiling slotmap v1.1.1
+   Compiling pulp-wasm-simd-flag v0.1.1
+   Compiling slab v0.4.12
+   Compiling subtle v2.6.1
+   Compiling rustls v0.23.46
+   Compiling lock_api v0.4.14
+   Compiling tracing-core v0.1.36
+   Compiling zune-inflate v0.2.54
+   Compiling cc v1.8.0
+   Compiling windows-targets v0.52.6
+   Compiling fdeflate v0.3.7
+   Compiling zune-core v0.5.3
+   Compiling bit_field v0.10.3
+   Compiling pxfm v0.1.30
+   Compiling pin-project-lite v0.2.17
+   Compiling num-traits v0.2.19
+   Compiling matrixmultiply v0.3.11
+   Compiling lebe v0.5.3
+   Compiling mint v0.5.9
+   Compiling inflections v1.1.1
+   Compiling zune-jpeg v0.5.15
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling windows-sys v0.52.0
+   Compiling regex-automata v0.4.18
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling glam v0.34.3
+   Compiling byteorder-lite v0.1.0
+   Compiling axcenity-assets v0.2.0-alpha.1 (<home>\Desktop\axcenity-co5-spike\crates\assets)
+   Compiling urlencoding v2.1.3
+   Compiling digest v0.10.7
+   Compiling cipher v0.4.4
+   Compiling lazy_static v1.5.1
+   Compiling base64 v0.13.1
+   Compiling rayon v1.12.0
+   Compiling rustc-hash v2.1.3
+   Compiling flate2 v1.1.10
+   Compiling approx v0.5.1
+   Compiling num-integer v0.1.47
+   Compiling glam v0.33.12
+   Compiling ordered-float v5.5.0
+   Compiling float-cmp v0.10.0
+   Compiling num-rational v0.4.2
+   Compiling texture2ddecoder v0.1.2
+   Compiling bitflags v2.13.2
+   Compiling indexmap v2.14.2
+   Compiling uuid v1.28.0
+   Compiling raw-cpuid v11.6.0
+   Compiling png v0.18.1
+   Compiling moxcms v0.8.1
+   Compiling regex v1.13.1
+   Compiling ring v0.17.14
+   Compiling ufbx v0.11.5
+   Compiling meshopt v0.7.0
+   Compiling bytemuck_derive v1.12.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling num-derive v0.5.1
+   Compiling zerocopy-derive v0.8.63
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+   Compiling nalgebra-macros v0.3.0
+   Compiling profiling-procmacros v1.0.18
+   Compiling tracing-attributes v0.1.31
+   Compiling gltf-derive v1.4.1
+   Compiling rustls-webpki v0.103.16
+   Compiling bytemuck v1.25.2
+   Compiling num-complex v0.4.6
+   Compiling safe_arch v1.2.0
+   Compiling profiling v1.0.18
+   Compiling wide v1.7.1
+   Compiling windows-core v0.62.2
+   Compiling windows-collections v0.3.2
+   Compiling windows-numerics v0.3.1
+   Compiling windows-future v0.3.2
+   Compiling windows v0.62.2
+   Compiling smallvec v1.16.3
+   Compiling font-types v0.12.7
+   Compiling gltf-json v1.4.1
+   Compiling rstar v0.13.0
+   Compiling parking_lot v0.12.5
+   Compiling read-fonts v0.41.0
+   Compiling tracing v0.1.44
+   Compiling half v2.7.1
+   Compiling simba v0.10.2
+   Compiling exr v1.74.2
+   Compiling axcenity-workspace-hack v0.2.0-alpha.1 (<home>\Desktop\axcenity-co5-spike\crates\workspace-hack)
+   Compiling skrifa v0.44.0
+   Compiling image v0.25.10
+   Compiling nalgebra v0.35.0
+   Compiling gltf v1.4.1
+   Compiling glamx v0.3.1
+   Compiling parry3d v0.31.1
+   Compiling rapier3d v0.36.1 (<home>\Desktop\axcenity-co5-spike\vendor\rapier3d)
+   Compiling axcenity-core v0.2.0-alpha.1 (<home>\Desktop\axcenity-co5-spike\crates\core)
+   Compiling axcenity-anim v0.2.0-alpha.1 (<home>\Desktop\axcenity-co5-spike\crates\anim)
+warning: unused import: `crate::twist::twist_angle`
+  --> crates\anim\src\correctives.rs:28:5
+   |
+28 | use crate::twist::twist_angle;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `axcenity-anim` (lib) generated 1 warning (run `cargo fix --lib -p axcenity-anim` to apply 1 suggestion)
+warning: `axcenity-anim` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 57.16s
+────────────
+ Nextest run ID 9afb40c6-d773-4f0b-97d7-a016ecef5efc with nextest profile: default
+    Starting 6 tests across 1 binary (164 tests skipped)
+        FAIL [   0.009s] (1/6) axcenity-anim correctives::tests::a_turn_about_another_axis_doesnt_lean
+  stdout ───
+
+    running 1 test
+    test correctives::tests::a_turn_about_another_axis_doesnt_lean ... FAILED
+
+    failures:
+
+    failures:
+        correctives::tests::a_turn_about_another_axis_doesnt_lean
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'correctives::tests::a_turn_about_another_axis_doesnt_lean' (38916) panicked at crates\anim\src\correctives.rs:181:9:
+    assertion failed: (weight(rest, both, AXIS, 0.0, 45.0) - 0.5).abs() < 0.02
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.014s] (2/6) axcenity-anim correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis
+  stdout ───
+
+    running 1 test
+    test correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis ... FAILED
+
+    failures:
+
+    failures:
+        correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis' (38804) panicked at crates\anim\src\correctives.rs:166:9:
+    assertion failed: (at(75.0) - 0.5).abs() < 1e-4
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.020s] (3/6) axcenity-anim correctives::tests::the_rules_are_the_ones_the_build_states
+  stdout ───
+
+    running 1 test
+    test correctives::tests::the_rules_are_the_ones_the_build_states ... FAILED
+
+    failures:
+
+    failures:
+        correctives::tests::the_rules_are_the_ones_the_build_states
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'correctives::tests::the_rules_are_the_ones_the_build_states' (19504) panicked at crates\anim\src\correctives.rs:204:17:
+    Corrective_Shoulder_Level_Right
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.040s] (4/6) axcenity-anim correctives::tests::a_model_without_corrective_shapes_is_left_alone
+        FAIL [   0.681s] (5/6) axcenity-anim correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives
+  stdout ───
+
+    running 1 test
+    test correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives ... FAILED
+
+    failures:
+
+    failures:
+        correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.67s
+
+  stderr ───
+
+    thread 'correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives' (13840) panicked at crates\anim\src\correctives.rs:246:9:
+    assertion failed: (weight_of("Corrective_Shoulder_Level_Left") - 1.0).abs() < 1e-3
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.684s] (6/6) axcenity-anim correctives::tests::the_shipped_body_has_every_corrective
+  stdout ───
+
+    running 1 test
+    test correctives::tests::the_shipped_body_has_every_corrective ... FAILED
+
+    failures:
+
+    failures:
+        correctives::tests::the_shipped_body_has_every_corrective
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.67s
+
+  stderr ───
+
+    thread 'correctives::tests::the_shipped_body_has_every_corrective' (10464) panicked at crates\anim\src\correctives.rs:217:9:
+    assertion `left == right` failed
+      left: 0
+     right: 4
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.685s] 6 tests run: 1 passed, 5 failed, 164 skipped
+        FAIL [   0.009s] (1/6) axcenity-anim correctives::tests::a_turn_about_another_axis_doesnt_lean
+        FAIL [   0.014s] (2/6) axcenity-anim correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis
+        FAIL [   0.020s] (3/6) axcenity-anim correctives::tests::the_rules_are_the_ones_the_build_states
+        FAIL [   0.681s] (5/6) axcenity-anim correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives
+        FAIL [   0.684s] (6/6) axcenity-anim correctives::tests::the_shipped_body_has_every_corrective
+error: test run failed
+exit 100

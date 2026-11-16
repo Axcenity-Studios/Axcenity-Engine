@@ -36,6 +36,7 @@ mod bones;
 mod cleanup;
 mod clip;
 mod controller;
+pub mod correctives;
 mod easing;
 mod face;
 mod face_play;
@@ -51,6 +52,7 @@ mod retarget;
 pub mod sequence;
 mod sockets;
 mod threads;
+pub mod twist;
 
 pub use animators::{
     AnimatorEvent, AnimatorView, Animators, FadeView, FiredView, LayerView, LoadedClip,

@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-hair-buzz",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    },
+    {
+      "id": "axcenity/hair-buzz"
+    }
+  ]
+}

@@ -420,6 +420,8 @@ impl Assets {
     /// it's loaded or loading already, and returns at once. A failed load is
     /// remembered, as for [`model_blocking`](Self::model_blocking).
     pub fn request_model(&self, mesh_id: &str) -> LoadTicket {
+        // A derived model loads its base; it's baked when asked for.
+        let (mesh_id, _) = crate::split_derived(mesh_id);
         self.request_kind(Kind::Model, mesh_id)
     }
 
@@ -487,6 +489,9 @@ impl Assets {
     /// The model at `mesh_id` if it's loaded, or `None` if it isn't (yet),
     /// or couldn't be. Never loads anything and never waits for a load.
     pub fn model_ready(&self, mesh_id: &str) -> Option<Arc<Model>> {
+        if let Some(derived) = self.derived_ready(mesh_id) {
+            return derived;
+        }
         let resolved = self.resolve(mesh_id);
         let mesh_id: &str = &resolved;
         self.lock().models.get(mesh_id).cloned().flatten()
@@ -499,6 +504,9 @@ impl Assets {
     /// frame. Otherwise it's read before this returns, like
     /// [`model_blocking`](Self::model_blocking).
     pub fn model_slot(&self, mesh_id: &str) -> Slot<Model> {
+        if let Some(derived) = self.derived_slot(mesh_id) {
+            return derived;
+        }
         let resolved = self.resolve(mesh_id);
         let mesh_id: &str = &resolved;
         if mesh_id.is_empty() {

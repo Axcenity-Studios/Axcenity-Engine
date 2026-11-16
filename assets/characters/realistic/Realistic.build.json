@@ -1,0 +1,1393 @@
+{
+ "added_bones": [
+  {
+   "name": "LeftUpperArmTwist",
+   "parent": "LeftUpperArm"
+  },
+  {
+   "name": "LeftLowerArmTwist",
+   "parent": "LeftLowerArm"
+  },
+  {
+   "name": "LeftUpperLegTwist",
+   "parent": "LeftUpperLeg"
+  },
+  {
+   "name": "LeftLowerLegTwist",
+   "parent": "LeftLowerLeg"
+  },
+  {
+   "name": "LeftShoulderHelper",
+   "parent": "LeftShoulder"
+  },
+  {
+   "name": "LeftElbowHelper",
+   "parent": "LeftUpperArm"
+  },
+  {
+   "name": "LeftHipHelper",
+   "parent": "Hips"
+  },
+  {
+   "name": "LeftKneeHelper",
+   "parent": "LeftUpperLeg"
+  },
+  {
+   "name": "RightUpperArmTwist",
+   "parent": "RightUpperArm"
+  },
+  {
+   "name": "RightLowerArmTwist",
+   "parent": "RightLowerArm"
+  },
+  {
+   "name": "RightUpperLegTwist",
+   "parent": "RightUpperLeg"
+  },
+  {
+   "name": "RightLowerLegTwist",
+   "parent": "RightLowerLeg"
+  },
+  {
+   "name": "RightShoulderHelper",
+   "parent": "RightShoulder"
+  },
+  {
+   "name": "RightElbowHelper",
+   "parent": "RightUpperArm"
+  },
+  {
+   "name": "RightHipHelper",
+   "parent": "Hips"
+  },
+  {
+   "name": "RightKneeHelper",
+   "parent": "RightUpperLeg"
+  }
+ ],
+ "body_shapes": {
+  "frames": {
+   "Feminine": {
+    "bony_vertices": 4396,
+    "held_face_vertices": 1906,
+    "kept_apart": {
+     "heavy": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "heavy and muscular": {
+      "crossings_before": 2,
+      "least_factor": 0.8,
+      "left": 0,
+      "vertices_cut": 94
+     },
+     "heavy and soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slight": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slight, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slim": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     }
+    },
+    "largest_move_mm": {
+     "Feminine_Fat_Abdomen": 36.5,
+     "Feminine_Fat_Arms": 25.8,
+     "Feminine_Fat_Back": 60.3,
+     "Feminine_Fat_Calves": 15.8,
+     "Feminine_Fat_Chest": 17.1,
+     "Feminine_Fat_Down": 28.7,
+     "Feminine_Fat_Hips": 25.7,
+     "Feminine_Fat_Shoulders": 20.1,
+     "Feminine_Fat_Thighs": 36.7,
+     "Feminine_Fat_Up": 21.7,
+     "Feminine_Muscle_Abdomen": 8.2,
+     "Feminine_Muscle_Arms": 47.8,
+     "Feminine_Muscle_Back": 50.2,
+     "Feminine_Muscle_Calves": 18.9,
+     "Feminine_Muscle_Chest": 7.1,
+     "Feminine_Muscle_Down": 31.4,
+     "Feminine_Muscle_Down_Fat_Down": 66.2,
+     "Feminine_Muscle_Down_Fat_Up": 101.5,
+     "Feminine_Muscle_Hips": 4.9,
+     "Feminine_Muscle_Shoulders": 29.6,
+     "Feminine_Muscle_Thighs": 33.9,
+     "Feminine_Muscle_Up": 26.1,
+     "Feminine_Muscle_Up_Fat_Down": 25.5,
+     "Feminine_Muscle_Up_Fat_Up": 58.3
+    },
+    "neutral_crossings": 26
+   },
+   "Masculine": {
+    "bony_vertices": 4369,
+    "held_face_vertices": 1944,
+    "kept_apart": {
+     "heavy": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "heavy and muscular": {
+      "crossings_before": 129,
+      "least_factor": 0.41,
+      "left": 0,
+      "vertices_cut": 431
+     },
+     "heavy and soft": {
+      "crossings_before": 31,
+      "least_factor": 0.262,
+      "left": 0,
+      "vertices_cut": 221
+     },
+     "lean and muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "lean and muscular, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "muscular": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slight": {
+      "crossings_before": 9,
+      "least_factor": 0.8,
+      "left": 0,
+      "vertices_cut": 100
+     },
+     "slight, whole sliders only": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "slim": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     },
+     "soft": {
+      "crossings_before": 0,
+      "least_factor": 1.0,
+      "left": 0,
+      "vertices_cut": 0
+     }
+    },
+    "largest_move_mm": {
+     "Masculine_Fat_Abdomen": 51.5,
+     "Masculine_Fat_Arms": 23.4,
+     "Masculine_Fat_Back": 40.6,
+     "Masculine_Fat_Calves": 17.6,
+     "Masculine_Fat_Chest": 22.7,
+     "Masculine_Fat_Down": 18.1,
+     "Masculine_Fat_Hips": 29.5,
+     "Masculine_Fat_Shoulders": 27.1,
+     "Masculine_Fat_Thighs": 45.1,
+     "Masculine_Fat_Up": 37.6,
+     "Masculine_Muscle_Abdomen": 19.4,
+     "Masculine_Muscle_Arms": 39.1,
+     "Masculine_Muscle_Back": 36.8,
+     "Masculine_Muscle_Calves": 25.8,
+     "Masculine_Muscle_Chest": 15.9,
+     "Masculine_Muscle_Down": 71.3,
+     "Masculine_Muscle_Down_Fat_Down": 88.9,
+     "Masculine_Muscle_Down_Fat_Up": 97.8,
+     "Masculine_Muscle_Hips": 6.2,
+     "Masculine_Muscle_Shoulders": 39.2,
+     "Masculine_Muscle_Thighs": 23.9,
+     "Masculine_Muscle_Up": 44.2,
+     "Masculine_Muscle_Up_Fat_Down": 23.2,
+     "Masculine_Muscle_Up_Fat_Up": 65.9
+    },
+    "neutral_crossings": 66
+   }
+  },
+  "local": 0.6,
+  "place": {
+   "Feminine": {
+    "fat": [
+     0.0,
+     -0.75,
+     0.85
+    ],
+    "muscle": [
+     0.0,
+     -0.7,
+     0.9
+    ]
+   },
+   "Masculine": {
+    "fat": [
+     0.3,
+     -0.75,
+     0.85
+    ],
+    "muscle": [
+     0.45,
+     -0.6,
+     1.0
+    ]
+   }
+  },
+  "shapes": 48
+ },
+ "corrective_shapes": {
+  "Level": {
+   "largest_move_mm": 16.9,
+   "pose": "shoulder_abd_90",
+   "vertices": 673
+  },
+  "Raised": {
+   "largest_move_mm": 39.1,
+   "pose": "shoulder_abd_150",
+   "vertices": 701
+  },
+  "method": "delta mush",
+  "region_m": [
+   0.11,
+   0.21
+  ],
+  "smoothings": 24
+ },
+ "correctives": [
+  {
+   "angles": [
+    0.0,
+    45.0
+   ],
+   "axis": [
+    0.0,
+    -0.37768,
+    0.92594
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Level_Left"
+  },
+  {
+   "angles": [
+    0.0,
+    45.0
+   ],
+   "axis": [
+    0.0,
+    0.37698,
+    -0.92622
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Level_Right"
+  },
+  {
+   "angles": [
+    45.0,
+    105.0
+   ],
+   "axis": [
+    0.0,
+    -0.37768,
+    0.92594
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Raised_Left"
+  },
+  {
+   "angles": [
+    45.0,
+    105.0
+   ],
+   "axis": [
+    0.0,
+    0.37698,
+    -0.92622
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Raised_Right"
+  }
+ ],
+ "eyes": {
+  "feminine": {
+   "eyeball_front_in_flesh": 0,
+   "forward_of_socket": 0.13,
+   "of_socket": 0.892,
+   "radius": 0.01211,
+   "skin_in_eyeball": 0
+  },
+  "masculine": {
+   "eyeball_front_in_flesh": 0,
+   "forward_of_socket": 0.13,
+   "of_socket": 0.892,
+   "radius": 0.01227,
+   "skin_in_eyeball": 0
+  }
+ },
+ "face": {
+  "blink_shares": {
+   "Brow_Lower": [
+    0.184,
+    0.255,
+    0.88
+   ],
+   "Cheek_Raise": [
+    0.282,
+    0.304,
+    0.8
+   ],
+   "Eye_Squint": [
+    0.673,
+    0.705,
+    0.88
+   ]
+  },
+  "expressions": [
+   "Blink_Left",
+   "Blink_Right",
+   "Eye_Closed_Left",
+   "Eye_Closed_Right",
+   "Eye_Squint_Left",
+   "Eye_Squint_Right",
+   "Eye_Wide_Left",
+   "Eye_Wide_Right",
+   "Brow_Raise_Left",
+   "Brow_Raise_Right",
+   "Brow_Lower_Left",
+   "Brow_Lower_Right",
+   "Brow_Inward_Left",
+   "Brow_Inward_Right",
+   "Mouth_Smile_Left",
+   "Mouth_Smile_Right",
+   "Mouth_Frown_Left",
+   "Mouth_Frown_Right",
+   "Mouth_Open",
+   "Mouth_Wide",
+   "Mouth_Narrow",
+   "Mouth_Pucker",
+   "Mouth_Left",
+   "Mouth_Right",
+   "Upper_Lip_Raise",
+   "Lower_Lip_Lower",
+   "Upper_Lip_Raise_Left",
+   "Upper_Lip_Raise_Right",
+   "Lower_Lip_Lower_Left",
+   "Lower_Lip_Lower_Right",
+   "Lip_Corner_Pull_Left",
+   "Lip_Corner_Pull_Right",
+   "Cheek_Raise_Left",
+   "Cheek_Raise_Right",
+   "Cheek_Puff",
+   "Nose_Sneer_Left",
+   "Nose_Sneer_Right",
+   "Jaw_Open",
+   "Jaw_Forward",
+   "Jaw_Left",
+   "Jaw_Right",
+   "Tongue_Out",
+   "Tongue_Up",
+   "Tongue_Down"
+  ],
+  "face_identity": {
+   "Face_Eye_Depth_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.0042
+      ]
+     }
+    }
+   },
+   "Face_Eye_Depth_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.0042
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0045,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0045,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Size_Left": {
+    "bones": {
+     "LeftEye": {
+      "scale": 1.12
+     }
+    }
+   },
+   "Face_Eye_Size_Right": {
+    "bones": {
+     "RightEye": {
+      "scale": 1.12
+     }
+    }
+   },
+   "Face_Eye_Spacing_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0042,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Spacing_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       -0.0042,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   }
+  },
+  "identity": [
+   "Face_Eye_Height_Left",
+   "Face_Eye_Spacing_Left",
+   "Face_Eye_Depth_Left",
+   "Face_Eye_Size_Left",
+   "Face_Eye_Tilt_Left",
+   "Face_Brow_Height_Left",
+   "Face_Brow_Arch_Left",
+   "Face_Brow_Height_Up_Left",
+   "Face_Brow_Arch_Up_Left",
+   "Face_Nose_Width_Left",
+   "Face_Cheekbone_Left",
+   "Face_Cheek_Fullness_Left",
+   "Face_Jaw_Width_Left",
+   "Face_Mouth_Width_Left",
+   "Face_Ear_Size_Left",
+   "Face_Ear_Height_Left",
+   "Face_Ear_Out_Left",
+   "Face_Eye_Height_Right",
+   "Face_Eye_Spacing_Right",
+   "Face_Eye_Depth_Right",
+   "Face_Eye_Size_Right",
+   "Face_Eye_Tilt_Right",
+   "Face_Brow_Height_Right",
+   "Face_Brow_Arch_Right",
+   "Face_Brow_Height_Up_Right",
+   "Face_Brow_Arch_Up_Right",
+   "Face_Nose_Width_Right",
+   "Face_Cheekbone_Right",
+   "Face_Cheek_Fullness_Right",
+   "Face_Jaw_Width_Right",
+   "Face_Mouth_Width_Right",
+   "Face_Ear_Size_Right",
+   "Face_Ear_Height_Right",
+   "Face_Ear_Out_Right",
+   "Face_Nose_Length",
+   "Face_Nose_Tip",
+   "Face_Nose_Bridge",
+   "Face_Nose_Tilt",
+   "Face_Brow_Ridge",
+   "Face_Forehead_Height",
+   "Face_Forehead_Slope",
+   "Face_Head_Width",
+   "Face_Chin_Length",
+   "Face_Chin_Forward",
+   "Face_Chin_Width",
+   "Face_Jaw_Shift",
+   "Face_Lip_Fullness_Upper",
+   "Face_Lip_Fullness_Lower",
+   "Face_Mouth_Height"
+  ],
+  "jaw_open_deg": 25.0,
+  "largest_move_mm": {
+   "Blink_Left": 10.19,
+   "Blink_Right": 10.12,
+   "Brow_Inward_Left": 8.81,
+   "Brow_Inward_Right": 8.81,
+   "Brow_Lower_Left": 8.55,
+   "Brow_Lower_Right": 8.66,
+   "Brow_Raise_Left": 10.63,
+   "Brow_Raise_Right": 10.63,
+   "Cheek_Puff": 9.38,
+   "Cheek_Raise_Left": 8.23,
+   "Cheek_Raise_Right": 8.22,
+   "Eye_Closed_Left": 10.19,
+   "Eye_Closed_Right": 10.12,
+   "Eye_Squint_Left": 5.27,
+   "Eye_Squint_Right": 5.23,
+   "Eye_Wide_Left": 5.74,
+   "Eye_Wide_Right": 5.71,
+   "Face_Brow_Arch_Left": 6.39,
+   "Face_Brow_Arch_Right": 6.38,
+   "Face_Brow_Arch_Up_Left": 6.34,
+   "Face_Brow_Arch_Up_Right": 6.37,
+   "Face_Brow_Height_Left": 5.5,
+   "Face_Brow_Height_Right": 5.5,
+   "Face_Brow_Height_Up_Left": 5.47,
+   "Face_Brow_Height_Up_Right": 5.49,
+   "Face_Brow_Ridge": 4.6,
+   "Face_Cheek_Fullness_Left": 5.9,
+   "Face_Cheek_Fullness_Right": 5.9,
+   "Face_Cheekbone_Left": 4.75,
+   "Face_Cheekbone_Right": 4.75,
+   "Face_Chin_Forward": 5.2,
+   "Face_Chin_Length": 5.76,
+   "Face_Chin_Width": 3.99,
+   "Face_Ear_Height_Left": 4.8,
+   "Face_Ear_Height_Right": 4.8,
+   "Face_Ear_Out_Left": 7.59,
+   "Face_Ear_Out_Right": 7.59,
+   "Face_Ear_Size_Left": 6.15,
+   "Face_Ear_Size_Right": 6.19,
+   "Face_Eye_Depth_Left": 4.2,
+   "Face_Eye_Depth_Right": 4.2,
+   "Face_Eye_Height_Left": 4.5,
+   "Face_Eye_Height_Right": 4.5,
+   "Face_Eye_Size_Left": 4.87,
+   "Face_Eye_Size_Right": 4.88,
+   "Face_Eye_Spacing_Left": 4.2,
+   "Face_Eye_Spacing_Right": 4.2,
+   "Face_Eye_Tilt_Left": 5.44,
+   "Face_Eye_Tilt_Right": 5.43,
+   "Face_Forehead_Height": 8.0,
+   "Face_Forehead_Slope": 5.5,
+   "Face_Head_Width": 5.19,
+   "Face_Jaw_Shift": 5.0,
+   "Face_Jaw_Width_Left": 6.08,
+   "Face_Jaw_Width_Right": 6.08,
+   "Face_Lip_Fullness_Lower": 4.95,
+   "Face_Lip_Fullness_Upper": 5.04,
+   "Face_Mouth_Height": 4.5,
+   "Face_Mouth_Width_Left": 4.8,
+   "Face_Mouth_Width_Right": 4.8,
+   "Face_Nose_Bridge": 4.59,
+   "Face_Nose_Length": 4.41,
+   "Face_Nose_Tilt": 4.42,
+   "Face_Nose_Tip": 4.84,
+   "Face_Nose_Width_Left": 4.41,
+   "Face_Nose_Width_Right": 4.41,
+   "Jaw_Forward": 5.5,
+   "Jaw_Left": 1.69,
+   "Jaw_Open": 19.15,
+   "Jaw_Right": 1.69,
+   "Lip_Corner_Pull_Left": 5.24,
+   "Lip_Corner_Pull_Right": 5.24,
+   "Lower_Lip_Lower": 5.22,
+   "Lower_Lip_Lower_Left": 5.22,
+   "Lower_Lip_Lower_Right": 5.22,
+   "Mouth_Frown_Left": 7.24,
+   "Mouth_Frown_Right": 7.24,
+   "Mouth_Left": 6.89,
+   "Mouth_Narrow": 9.3,
+   "Mouth_Open": 5.75,
+   "Mouth_Pucker": 14.65,
+   "Mouth_Right": 6.89,
+   "Mouth_Smile_Left": 13.14,
+   "Mouth_Smile_Right": 13.14,
+   "Mouth_Wide": 6.6,
+   "Nose_Sneer_Left": 7.09,
+   "Nose_Sneer_Right": 7.09,
+   "Tongue_Down": 0.0,
+   "Tongue_Out": 0.0,
+   "Tongue_Up": 0.0,
+   "Upper_Lip_Raise": 4.67,
+   "Upper_Lip_Raise_Left": 4.67,
+   "Upper_Lip_Raise_Right": 4.67
+  },
+  "rest": {
+   "feminine_lids_moved_mm": 3.96,
+   "lid_texels_softened": 6846,
+   "lining_vertices_lifted": 304,
+   "lips_closed_by_mm": {
+    "feminine": 2.39,
+    "masculine": 1.99
+   }
+  }
+ },
+ "frame": {
+  "bones": {
+   "Chest": {
+    "offset": [
+     0.0,
+     -0.024,
+     0.0192
+    ]
+   },
+   "Head": {
+    "offset": [
+     0.0,
+     -0.05674,
+     0.00464
+    ]
+   },
+   "Hips": {
+    "offset": [
+     0.0,
+     -0.01394,
+     0.01051
+    ]
+   },
+   "Jaw": {
+    "offset": [
+     0.0,
+     -0.05744,
+     0.00388
+    ]
+   },
+   "LeftElbowHelper": {
+    "offset": [
+     -0.03057,
+     -0.02455,
+     -0.02851
+    ]
+   },
+   "LeftEye": {
+    "offset": [
+     0.00018,
+     -0.05211,
+     5e-05
+    ]
+   },
+   "LeftFoot": {
+    "offset": [
+     -0.00357,
+     0.00497,
+     0.01663
+    ]
+   },
+   "LeftHand": {
+    "offset": [
+     -0.02949,
+     -0.02554,
+     -0.03968
+    ]
+   },
+   "LeftHipHelper": {
+    "offset": [
+     -0.00294,
+     -0.01314,
+     -0.0163
+    ]
+   },
+   "LeftIndexDistal": {
+    "offset": [
+     -0.02903,
+     -0.03749,
+     -0.03803
+    ]
+   },
+   "LeftIndexIntermediate": {
+    "offset": [
+     -0.0289,
+     -0.03769,
+     -0.0388
+    ]
+   },
+   "LeftIndexProximal": {
+    "offset": [
+     -0.02745,
+     -0.03453,
+     -0.03952
+    ]
+   },
+   "LeftKneeHelper": {
+    "offset": [
+     -0.00554,
+     -0.00469,
+     0.00902
+    ]
+   },
+   "LeftLittleDistal": {
+    "offset": [
+     -0.03263,
+     -0.02941,
+     -0.03923
+    ]
+   },
+   "LeftLittleIntermediate": {
+    "offset": [
+     -0.0319,
+     -0.02988,
+     -0.04076
+    ]
+   },
+   "LeftLittleProximal": {
+    "offset": [
+     -0.02987,
+     -0.02974,
+     -0.04267
+    ]
+   },
+   "LeftLowerArm": {
+    "offset": [
+     -0.03057,
+     -0.02455,
+     -0.02851
+    ]
+   },
+   "LeftLowerArmTwist": {
+    "offset": [
+     -0.03003,
+     -0.02504,
+     -0.0341
+    ]
+   },
+   "LeftLowerLeg": {
+    "offset": [
+     -0.00554,
+     -0.00469,
+     0.00902
+    ]
+   },
+   "LeftLowerLegTwist": {
+    "offset": [
+     -0.00456,
+     0.00014,
+     0.01282
+    ]
+   },
+   "LeftMiddleDistal": {
+    "offset": [
+     -0.03092,
+     -0.0381,
+     -0.04065
+    ]
+   },
+   "LeftMiddleIntermediate": {
+    "offset": [
+     -0.03,
+     -0.03759,
+     -0.04043
+    ]
+   },
+   "LeftMiddleProximal": {
+    "offset": [
+     -0.02862,
+     -0.03456,
+     -0.03993
+    ]
+   },
+   "LeftRingDistal": {
+    "offset": [
+     -0.03121,
+     -0.03353,
+     -0.04225
+    ]
+   },
+   "LeftRingIntermediate": {
+    "offset": [
+     -0.03172,
+     -0.03446,
+     -0.04203
+    ]
+   },
+   "LeftRingProximal": {
+    "offset": [
+     -0.02986,
+     -0.03255,
+     -0.04101
+    ]
+   },
+   "LeftShoulder": {
+    "offset": [
+     -0.0007,
+     -0.04438,
+     0.00222
+    ]
+   },
+   "LeftShoulderHelper": {
+    "offset": [
+     -0.02202,
+     -0.03299,
+     -0.0006
+    ]
+   },
+   "LeftThumbDistal": {
+    "offset": [
+     -0.02975,
+     -0.02678,
+     -0.03799
+    ]
+   },
+   "LeftThumbIntermediate": {
+    "offset": [
+     -0.02789,
+     -0.02764,
+     -0.039
+    ]
+   },
+   "LeftThumbProximal": {
+    "offset": [
+     -0.02855,
+     -0.02627,
+     -0.03928
+    ]
+   },
+   "LeftToes": {
+    "offset": [
+     -0.02549,
+     -0.0007,
+     0.01715
+    ]
+   },
+   "LeftUpperArm": {
+    "offset": [
+     -0.02202,
+     -0.03299,
+     -0.0006
+    ]
+   },
+   "LeftUpperArmTwist": {
+    "offset": [
+     -0.0227,
+     -0.03231,
+     -0.00284
+    ]
+   },
+   "LeftUpperLeg": {
+    "offset": [
+     -0.00294,
+     -0.01314,
+     -0.0163
+    ]
+   },
+   "LeftUpperLegTwist": {
+    "offset": [
+     -0.00315,
+     -0.01246,
+     -0.01427
+    ]
+   },
+   "Neck": {
+    "offset": [
+     0.0,
+     -0.0455,
+     0.00366
+    ]
+   },
+   "RightElbowHelper": {
+    "offset": [
+     0.03026,
+     -0.0243,
+     -0.02814
+    ]
+   },
+   "RightEye": {
+    "offset": [
+     -0.00018,
+     -0.05211,
+     5e-05
+    ]
+   },
+   "RightFoot": {
+    "offset": [
+     0.00357,
+     0.00495,
+     0.01661
+    ]
+   },
+   "RightHand": {
+    "offset": [
+     0.02918,
+     -0.02529,
+     -0.03967
+    ]
+   },
+   "RightHipHelper": {
+    "offset": [
+     0.00294,
+     -0.01314,
+     -0.01632
+    ]
+   },
+   "RightIndexDistal": {
+    "offset": [
+     0.02805,
+     -0.03673,
+     -0.03796
+    ]
+   },
+   "RightIndexIntermediate": {
+    "offset": [
+     0.02812,
+     -0.0371,
+     -0.03884
+    ]
+   },
+   "RightIndexProximal": {
+    "offset": [
+     0.02649,
+     -0.03402,
+     -0.03943
+    ]
+   },
+   "RightKneeHelper": {
+    "offset": [
+     0.00561,
+     -0.00451,
+     0.00941
+    ]
+   },
+   "RightLittleDistal": {
+    "offset": [
+     0.0318,
+     -0.02877,
+     -0.03917
+    ]
+   },
+   "RightLittleIntermediate": {
+    "offset": [
+     0.0311,
+     -0.02926,
+     -0.04074
+    ]
+   },
+   "RightLittleProximal": {
+    "offset": [
+     0.02891,
+     -0.02904,
+     -0.04254
+    ]
+   },
+   "RightLowerArm": {
+    "offset": [
+     0.03026,
+     -0.0243,
+     -0.02814
+    ]
+   },
+   "RightLowerArmTwist": {
+    "offset": [
+     0.02972,
+     -0.0248,
+     -0.0339
+    ]
+   },
+   "RightLowerLeg": {
+    "offset": [
+     0.00561,
+     -0.00451,
+     0.00941
+    ]
+   },
+   "RightLowerLegTwist": {
+    "offset": [
+     0.00459,
+     0.00022,
+     0.01301
+    ]
+   },
+   "RightMiddleDistal": {
+    "offset": [
+     0.02997,
+     -0.03737,
+     -0.04062
+    ]
+   },
+   "RightMiddleIntermediate": {
+    "offset": [
+     0.02923,
+     -0.03692,
+     -0.04034
+    ]
+   },
+   "RightMiddleProximal": {
+    "offset": [
+     0.02753,
+     -0.03413,
+     -0.03982
+    ]
+   },
+   "RightRingDistal": {
+    "offset": [
+     0.03031,
+     -0.03285,
+     -0.04221
+    ]
+   },
+   "RightRingIntermediate": {
+    "offset": [
+     0.0309,
+     -0.0338,
+     -0.04198
+    ]
+   },
+   "RightRingProximal": {
+    "offset": [
+     0.029,
+     -0.032,
+     -0.0408
+    ]
+   },
+   "RightShoulder": {
+    "offset": [
+     0.0007,
+     -0.04438,
+     0.00222
+    ]
+   },
+   "RightShoulderHelper": {
+    "offset": [
+     0.02163,
+     -0.03282,
+     -0.00083
+    ]
+   },
+   "RightThumbDistal": {
+    "offset": [
+     0.02893,
+     -0.02623,
+     -0.03797
+    ]
+   },
+   "RightThumbIntermediate": {
+    "offset": [
+     0.02709,
+     -0.0271,
+     -0.03897
+    ]
+   },
+   "RightThumbProximal": {
+    "offset": [
+     0.02804,
+     -0.02593,
+     -0.03925
+    ]
+   },
+   "RightToes": {
+    "offset": [
+     0.02551,
+     -0.0007,
+     0.01716
+    ]
+   },
+   "RightUpperArm": {
+    "offset": [
+     0.02163,
+     -0.03282,
+     -0.00083
+    ]
+   },
+   "RightUpperArmTwist": {
+    "offset": [
+     0.02232,
+     -0.03214,
+     -0.00301
+    ]
+   },
+   "RightUpperLeg": {
+    "offset": [
+     0.00294,
+     -0.01314,
+     -0.01632
+    ]
+   },
+   "RightUpperLegTwist": {
+    "offset": [
+     0.00315,
+     -0.01245,
+     -0.01427
+    ]
+   },
+   "Spine": {
+    "offset": [
+     0.0,
+     -0.01659,
+     0.01051
+    ]
+   },
+   "UpperChest": {
+    "offset": [
+     0.0,
+     -0.03518,
+     0.01112
+    ]
+   }
+  },
+  "eye_scale": 0.9868
+ },
+ "height": {
+  "feminine": 1.694,
+  "masculine": 1.75
+ },
+ "helpers": [
+  {
+   "bone": "ShoulderHelper",
+   "parent": "Shoulder",
+   "reads": "UpperArm",
+   "share": 0.5
+  },
+  {
+   "bone": "ElbowHelper",
+   "parent": "UpperArm",
+   "reads": "LowerArm",
+   "share": 0.5
+  },
+  {
+   "bone": "HipHelper",
+   "parent": "Hips",
+   "reads": "UpperLeg",
+   "share": 0.5
+  },
+  {
+   "bone": "KneeHelper",
+   "parent": "UpperLeg",
+   "reads": "LowerLeg",
+   "share": 0.5
+  }
+ ],
+ "regions": [
+  {
+   "id": "head",
+   "label": "Head",
+   "map_index": 1,
+   "triangles": 8168
+  },
+  {
+   "id": "neck",
+   "label": "Neck",
+   "map_index": 2,
+   "triangles": 256
+  },
+  {
+   "id": "torso",
+   "label": "Torso",
+   "map_index": 3,
+   "triangles": 1408
+  },
+  {
+   "id": "waist",
+   "label": "Waist",
+   "map_index": 4,
+   "triangles": 256
+  },
+  {
+   "id": "hips",
+   "label": "Hips",
+   "map_index": 5,
+   "triangles": 336
+  },
+  {
+   "id": "upper_arms_top",
+   "label": "Upper arms (top)",
+   "map_index": 6,
+   "triangles": 488
+  },
+  {
+   "id": "upper_arms_low",
+   "label": "Upper arms (low)",
+   "map_index": 7,
+   "triangles": 676
+  },
+  {
+   "id": "forearms",
+   "label": "Forearms",
+   "map_index": 8,
+   "triangles": 1140
+  },
+  {
+   "id": "hands",
+   "label": "Hands",
+   "map_index": 9,
+   "triangles": 2748
+  },
+  {
+   "id": "thighs_top",
+   "label": "Thighs (top)",
+   "map_index": 10,
+   "triangles": 288
+  },
+  {
+   "id": "thighs_low",
+   "label": "Thighs (low)",
+   "map_index": 11,
+   "triangles": 504
+  },
+  {
+   "id": "shins_top",
+   "label": "Shins (top)",
+   "map_index": 12,
+   "triangles": 504
+  },
+  {
+   "id": "shins_low",
+   "label": "Shins (low)",
+   "map_index": 13,
+   "triangles": 1132
+  },
+  {
+   "id": "feet",
+   "label": "Feet",
+   "map_index": 14,
+   "triangles": 4280
+  }
+ ],
+ "regions_map": {
+  "cells": 16,
+  "file": "RealisticRegions.png",
+  "layer": "Regions (TEXCOORD_1)",
+  "size": 1024
+ },
+ "rest": {
+  "Left": {
+   "forearm_below_level": 42.87,
+   "leg_out": 2.0,
+   "upper_arm_below_level": 44.98
+  },
+  "Right": {
+   "forearm_below_level": 42.87,
+   "leg_out": 2.0,
+   "upper_arm_below_level": 44.98
+  }
+ },
+ "teeth": {
+  "feminine": {
+   "bag_moved_to_skin_mm": 5.0,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
+   "points_in_flesh": 0,
+   "scale": 0.85
+  },
+  "masculine": {
+   "bag_moved_to_skin_mm": null,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
+   "points_in_flesh": 0,
+   "scale": 0.85
+  },
+  "of_bundle_size": 0.85,
+  "tongue_triangles": 432,
+  "triangles": {
+   "Gums": 1498,
+   "Teeth": 7094,
+   "Tongue": 432
+  },
+  "triangles_lod1": {
+   "Gums": 1320,
+   "Teeth": 6676,
+   "Tongue": 432
+  },
+  "triangles_lod2": {
+   "Gums": 246,
+   "Teeth": 1734,
+   "Tongue": 432
+  }
+ },
+ "texture_coordinates": {
+  "coverage": 0.663,
+  "islands": 26,
+  "stretch": {
+   "density": [
+    0.94,
+    2.1
+   ],
+   "max": 15.65,
+   "p90": 1.23
+  }
+ },
+ "textures": {
+  "frames_differ_share": 0.083,
+  "size": 2048,
+  "texels_per_cm": 10.85
+ },
+ "twists": [
+  {
+   "bone": "UpperArmTwist",
+   "inside": "UpperArm",
+   "reads": "UpperArm",
+   "share": -0.5
+  },
+  {
+   "bone": "LowerArmTwist",
+   "inside": "LowerArm",
+   "reads": "Hand",
+   "share": 0.5
+  },
+  {
+   "bone": "UpperLegTwist",
+   "inside": "UpperLeg",
+   "reads": "UpperLeg",
+   "share": -0.5
+  },
+  {
+   "bone": "LowerLegTwist",
+   "inside": "LowerLeg",
+   "reads": "Foot",
+   "share": 0.5
+  }
+ ],
+ "units": "metres, glTF axes (Y up, front +Z)",
+ "version": 1
+}

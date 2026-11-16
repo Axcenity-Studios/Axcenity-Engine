@@ -1,0 +1,74 @@
+{
+ "masculine/default/shoulder_abd_150": {
+  "crossing_at_rest": 60,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "masculine/default/Cheer at 0.8 s": {
+  "crossing_at_rest": 60,
+  "new_crossings": 268,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 268
+ },
+ "masculine/heavy and muscular/shoulder_abd_150": {
+  "crossing_at_rest": 60,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "masculine/heavy and muscular/Cheer at 0.8 s": {
+  "crossing_at_rest": 60,
+  "new_crossings": 268,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 268
+ },
+ "masculine/heavy and soft/shoulder_abd_150": {
+  "crossing_at_rest": 60,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "masculine/heavy and soft/Cheer at 0.8 s": {
+  "crossing_at_rest": 60,
+  "new_crossings": 306,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 306
+ },
+ "feminine/default/shoulder_abd_150": {
+  "crossing_at_rest": 68,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "feminine/default/Cheer at 0.8 s": {
+  "crossing_at_rest": 68,
+  "new_crossings": 240,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 240
+ },
+ "feminine/heavy and muscular/shoulder_abd_150": {
+  "crossing_at_rest": 68,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "feminine/heavy and muscular/Cheer at 0.8 s": {
+  "crossing_at_rest": 68,
+  "new_crossings": 240,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 240
+ },
+ "feminine/heavy and soft/shoulder_abd_150": {
+  "crossing_at_rest": 68,
+  "new_crossings": 0,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 0
+ },
+ "feminine/heavy and soft/Cheer at 0.8 s": {
+  "crossing_at_rest": 68,
+  "new_crossings": 241,
+  "new_crossings_round_the_shoulders": 0,
+  "new_crossings_in_the_hands": 241
+ }
+}

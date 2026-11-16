@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-face-nose-length-min",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0,
+    "nose_length": -1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

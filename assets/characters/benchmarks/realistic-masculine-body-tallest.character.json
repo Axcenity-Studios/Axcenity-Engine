@@ -1,0 +1,10 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-body-tallest",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "height": 1.15,
+    "leg_length": 1.15
+  }
+}

@@ -9,6 +9,10 @@ use std::path::Path;
 
 use crate::{BaseManifest, Catalogue, ItemManifest, Problem};
 
+/// The character library's folder in a project, from the project's folder:
+/// its `catalogue.json` is at the top of it.
+pub const LIBRARY_FOLDER: &str = "assets/characters";
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Library {
     pub bases: BTreeMap<String, BaseManifest>,

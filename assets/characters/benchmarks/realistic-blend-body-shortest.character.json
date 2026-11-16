@@ -1,0 +1,10 @@
+{
+  "format_version": 2,
+  "name": "realistic-blend-body-shortest",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0.5,
+    "height": 0.85,
+    "leg_length": 0.85
+  }
+}

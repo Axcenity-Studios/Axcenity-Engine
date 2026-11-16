@@ -11,7 +11,9 @@ use std::sync::{Arc, OnceLock};
 use axcenity_assets::{
     AlphaMode, Assets, ChannelTexture, Image, Model, ModelMaterial, Posed, Primitive,
 };
-use axcenity_core::{ClassName, Instance, InstanceId, PartType, TextureChannel, Value, World};
+use axcenity_core::{
+    ClassName, Instance, InstanceId, MATERIAL_VALUE_PREFIX, PartType, TextureChannel, Value, World,
+};
 use axcenity_render::glam::{Mat4, Quat, Vec3};
 use axcenity_render::{
     AmbientLight, Camera, Channel, ChannelMap, Clouds, Cone, DecalRole, DrawItem, DrawList, Fog,
@@ -680,6 +682,15 @@ fn mesh_part_draw_items(
         .filter(|posed| posed.model_key == model.key())
         .map(|posed| meshes.skins.get(id, posed))
         .or_else(|| meshes.skins.rest(model));
+    // A character's material values (attributes named `Mat_…`).
+    let has_values = instance
+        .attributes()
+        .range::<str, _>((
+            std::ops::Bound::Included(MATERIAL_VALUE_PREFIX),
+            std::ops::Bound::Unbounded,
+        ))
+        .next()
+        .is_some_and(|(name, _)| name.starts_with(MATERIAL_VALUE_PREFIX));
     // The model's meshes and file materials are made once and shared by
     // every MeshPart showing it, frame after frame (I8).
     for (primitive, piece) in model.primitives.iter().zip(pieces) {
@@ -695,6 +706,9 @@ fn mesh_part_draw_items(
         if let Some(color) = whole_color {
             material.base_color = color;
             material.base_color_texture = None;
+        }
+        if has_values {
+            material::modulate(&mut material, instance, &primitive.material.name);
         }
         items.push(DrawItem {
             shape: piece.shape.clone(),

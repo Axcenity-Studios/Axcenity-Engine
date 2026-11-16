@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-eye-size-left-min",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "eye_size_left": -1,
+    "frame": 0
+  }
+}

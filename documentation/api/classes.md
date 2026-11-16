@@ -114,6 +114,7 @@ Instance classes: everything that can be in the tree.
 | [Tool](classes/Tool.md) | Something a character carries: a Model of parts with a Handle. |
 | [Inventory](classes/Inventory.md) | The Tools a character carries, put in the character's Model: up to Capacity Tools as its children, in hotbar order, and Equipped, the one in hand. |
 | [Humanoid](classes/Humanoid.md) | A Roblox-familiar front for a character, in its Model. |
+| [HumanoidDescription](classes/HumanoidDescription.md) | A character's look as data: its base model, body and face values, what it wears and its material values. |
 | [Ability](classes/Ability.md) | Something a character can do, in its Model or its Player: a Fireball, a dash, a heal. |
 | [Effect](classes/Effect.md) | A change to the Model it's in: to an attribute, or a Health or Humanoid property. |
 | [ForceField](classes/ForceField.md) | Keeps the Health of the Model it's in from losing any: TakeDamage, DamageZones and falls do nothing. |

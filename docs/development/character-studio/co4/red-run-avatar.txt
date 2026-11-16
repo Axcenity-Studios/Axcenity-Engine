@@ -1,0 +1,222 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.5
+   Compiling autocfg v1.5.1
+   Compiling serde_core v1.0.229
+   Compiling libm v0.2.16
+   Compiling getrandom v0.4.3
+   Compiling version_check v0.9.5
+   Compiling shlex v2.0.1
+   Compiling serde v1.0.229
+   Compiling find-msvc-tools v0.1.14
+   Compiling windows-link v0.2.1
+   Compiling simd-adler32 v0.3.10
+   Compiling typenum v1.20.1
+   Compiling adler2 v2.0.1
+   Compiling crc32fast v1.5.2
+   Compiling crossbeam-utils v0.8.23
+   Compiling memchr v2.8.3
+   Compiling zerocopy v0.8.63
+   Compiling zmij v1.0.23
+   Compiling crossbeam-epoch v0.9.21
+   Compiling thiserror v2.0.21
+   Compiling zlib-rs v0.6.8
+   Compiling paste v1.0.15
+   Compiling foldhash v0.2.0
+   Compiling log v0.4.34
+   Compiling byteorder v1.5.0
+   Compiling serde_json v1.0.154
+   Compiling crossbeam-deque v0.8.8
+   Compiling rawpointer v0.2.1
+   Compiling itoa v1.0.18
+   Compiling getrandom v0.2.17
+   Compiling windows-strings v0.5.1
+   Compiling windows-result v0.4.1
+   Compiling heapless v0.8.0
+   Compiling hashbrown v0.17.1
+   Compiling miniz_oxide v0.9.1
+   Compiling once_cell v1.21.4
+   Compiling rayon-core v1.13.0
+   Compiling hash32 v0.3.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling regex-syntax v0.8.11
+   Compiling zeroize v1.9.1
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling miniz_oxide v0.8.9
+   Compiling rand_core v0.6.4
+   Compiling equivalent v1.0.3
+   Compiling either v1.19.0
+   Compiling jobserver v0.1.35
+   Compiling pulp-wasm-simd-flag v0.1.1
+   Compiling untrusted v0.9.0
+   Compiling reborrow v0.5.5
+   Compiling parking_lot_core v0.9.12
+   Compiling aho-corasick v1.1.5
+   Compiling rustls-pki-types v1.15.1
+   Compiling cc v1.8.0
+   Compiling ena v0.14.4
+   Compiling zune-inflate v0.2.54
+   Compiling fdeflate v0.3.7
+   Compiling windows-sys v0.61.2
+   Compiling windows-threading v0.2.1
+   Compiling arrayvec v0.7.8
+   Compiling static_assertions v1.1.0
+   Compiling generic-array v0.14.7
+   Compiling pulp v0.22.3
+   Compiling slotmap v1.1.1
+   Compiling scopeguard v1.2.0
+   Compiling slab v0.4.12
+   Compiling pxfm v0.1.30
+   Compiling zune-core v0.5.3
+   Compiling subtle v2.6.1
+   Compiling inflections v1.1.1
+   Compiling bit_field v0.10.3
+   Compiling lebe v0.5.3
+   Compiling rustls v0.23.46
+   Compiling downcast-rs v2.0.2
+   Compiling lock_api v0.4.14
+   Compiling windows-targets v0.52.6
+   Compiling tracing-core v0.1.36
+   Compiling mint v0.5.9
+   Compiling pin-project-lite v0.2.17
+   Compiling byteorder-lite v0.1.0
+   Compiling windows-sys v0.52.0
+   Compiling num-traits v0.2.19
+   Compiling matrixmultiply v0.3.11
+   Compiling zune-jpeg v0.5.15
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling glam v0.34.3
+   Compiling lazy_static v1.5.1
+   Compiling base64 v0.13.1
+   Compiling urlencoding v2.1.3
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling axcenity-assets v0.2.0-alpha.1 (<worktree>\crates\assets)
+   Compiling cipher v0.4.4
+   Compiling digest v0.10.7
+   Compiling regex-automata v0.4.18
+   Compiling texture2ddecoder v0.1.2
+   Compiling rayon v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling bitflags v2.13.2
+   Compiling indexmap v2.14.2
+   Compiling uuid v1.28.0
+   Compiling raw-cpuid v11.6.0
+   Compiling png v0.18.1
+   Compiling approx v0.5.1
+   Compiling num-integer v0.1.47
+   Compiling glam v0.33.12
+   Compiling ordered-float v5.5.0
+   Compiling float-cmp v0.10.0
+   Compiling num-rational v0.4.2
+   Compiling moxcms v0.8.1
+   Compiling regex v1.13.1
+   Compiling ring v0.17.14
+   Compiling ufbx v0.11.5
+   Compiling meshopt v0.7.0
+   Compiling bytemuck_derive v1.12.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling num-derive v0.5.1
+   Compiling zerocopy-derive v0.8.63
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+   Compiling nalgebra-macros v0.3.0
+   Compiling profiling-procmacros v1.0.18
+   Compiling tracing-attributes v0.1.31
+   Compiling gltf-derive v1.4.1
+   Compiling rustls-webpki v0.103.16
+   Compiling bytemuck v1.25.2
+   Compiling num-complex v0.4.6
+   Compiling safe_arch v1.2.0
+   Compiling profiling v1.0.18
+   Compiling wide v1.7.1
+   Compiling windows-core v0.62.2
+   Compiling windows-future v0.3.2
+   Compiling windows-collections v0.3.2
+   Compiling windows-numerics v0.3.1
+   Compiling windows v0.62.2
+   Compiling smallvec v1.16.3
+   Compiling font-types v0.12.7
+   Compiling gltf-json v1.4.1
+   Compiling rstar v0.13.0
+   Compiling parking_lot v0.12.5
+   Compiling read-fonts v0.41.0
+   Compiling tracing v0.1.44
+   Compiling simba v0.10.2
+   Compiling half v2.7.1
+   Compiling exr v1.74.2
+   Compiling axcenity-workspace-hack v0.2.0-alpha.1 (<worktree>\crates\workspace-hack)
+   Compiling nalgebra v0.35.0
+   Compiling image v0.25.10
+   Compiling skrifa v0.44.0
+   Compiling gltf v1.4.1
+   Compiling glamx v0.3.1
+   Compiling parry3d v0.31.1
+   Compiling rapier3d v0.36.1 (<worktree>\vendor\rapier3d)
+   Compiling axcenity-avatar v0.2.0-alpha.1 (<worktree>\crates\avatar)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 56.38s
+────────────
+ Nextest run ID 591545f5-4181-4fef-88e1-c8fdecd55ead with nextest profile: default
+    Starting 35 tests across 2 binaries
+        PASS [   0.008s] ( 1/35) axcenity-avatar tests::formats::the_catalogue_lists_each_manifest_with_its_browsing_fields
+        PASS [   0.009s] ( 2/35) axcenity-avatar ids::tests::paths_are_relative_and_resolve_inside_the_library
+        PASS [   0.011s] ( 3/35) axcenity-avatar material::tests::every_neutral_value_is_in_range_and_names_are_unique
+        PASS [   0.014s] ( 4/35) axcenity-avatar ids::tests::ids_have_a_namespace_and_plain_lower_case_segments
+        PASS [   0.016s] ( 5/35) axcenity-avatar tests::models::every_shape_bone_and_material_an_item_names_must_exist
+        PASS [   0.019s] ( 6/35) axcenity-avatar tests::validation::the_fixture_library_is_sound
+        PASS [   0.021s] ( 7/35) axcenity-avatar material::tests::values_are_checked_against_the_shading_model
+        PASS [   0.024s] ( 8/35) axcenity-avatar tests::validation::a_description_with_mistakes_reports_each
+        PASS [   0.026s] ( 9/35) axcenity-avatar tests::formats::a_description_round_trips_with_every_field
+        PASS [   0.028s] (10/35) axcenity-avatar tests::migration::every_format_1_part_maps_to_its_own_item
+        PASS [   0.030s] (11/35) axcenity-avatar tests::migration::a_migrated_file_saves_as_format_2_and_reads_back_the_same
+        PASS [   0.033s] (12/35) axcenity-avatar tests::formats::fields_a_newer_minor_version_adds_survive_a_round_trip
+        PASS [   0.035s] (13/35) axcenity-avatar tests::migration::a_format_1_file_migrates_to_the_same_character
+        PASS [   0.038s] (14/35) axcenity-avatar tests::resolving::parameters_take_their_defaults_clamp_and_keep_to_their_limits
+        PASS [   0.040s] (15/35) axcenity-avatar tests::migration::format_1_defaults_ranges_and_unknown_parts_carry_over
+        PASS [   0.042s] (16/35) axcenity-avatar tests::formats::newer_manifests_and_catalogues_are_refused
+        PASS [   0.045s] (17/35) axcenity-avatar tests::models::every_shape_bone_and_material_the_base_names_must_exist
+        PASS [   0.047s] (18/35) axcenity-avatar tests::resolving::shapes_take_their_drivers_corners_and_hidden_regions
+        PASS [   0.049s] (19/35) axcenity-avatar tests::migration::an_empty_format_1_file_is_the_default_character
+        PASS [   0.051s] (20/35) axcenity-avatar tests::validation::a_sound_description_has_no_problems
+        PASS [   0.054s] (21/35) axcenity-avatar tests::resolving::a_span_maps_and_clamps
+        PASS [   0.057s] (22/35) axcenity-avatar tests::formats::damaged_files_are_errors_not_panics
+        PASS [   0.062s] (23/35) axcenity-avatar material::tests::colours_read_and_write_as_hex
+        PASS [   0.062s] (24/35) axcenity-avatar::shipped_library every_base_models_default_character_is_sound
+        PASS [   0.064s] (25/35) axcenity-avatar tests::validation::an_item_with_mistakes_reports_each
+        PASS [   0.067s] (26/35) axcenity-avatar tests::validation::an_item_is_checked_against_its_base
+        PASS [   0.069s] (27/35) axcenity-avatar tests::models::a_manifest_that_matches_its_model_has_no_problems
+        PASS [   0.072s] (28/35) axcenity-avatar tests::validation::a_base_manifest_with_mistakes_reports_each
+        PASS [   0.074s] (29/35) axcenity-avatar tests::migration::a_damaged_format_1_file_is_an_error
+        PASS [   0.077s] (30/35) axcenity-avatar tests::formats::manifests_round_trip
+        PASS [   0.078s] (31/35) axcenity-avatar tests::formats::a_newer_description_is_refused_with_a_message
+        PASS [   0.080s] (32/35) axcenity-avatar tests::validation::an_item_must_have_what_its_kind_needs
+        PASS [   0.078s] (33/35) axcenity-avatar::shipped_library every_format_1_character_migrates_to_a_sound_description
+        PASS [   0.083s] (34/35) axcenity-avatar::shipped_library the_shipped_library_reads_and_is_sound
+        FAIL [   1.647s] (35/35) axcenity-avatar::shipped_library every_manifest_entry_names_shapes_bones_and_materials_its_model_has
+  stdout ───
+
+    running 1 test
+    test every_manifest_entry_names_shapes_bones_and_materials_its_model_has ... FAILED
+
+    failures:
+
+    failures:
+        every_manifest_entry_names_shapes_bones_and_materials_its_model_has
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.57s
+
+  stderr ───
+
+    thread 'every_manifest_entry_names_shapes_bones_and_materials_its_model_has' (31408) panicked at crates\avatar\tests\shipped_library.rs:92:76:
+    realistic/RealisticParts.glb: The system cannot find the file specified. (os error 2)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   1.657s] 35 tests run: 34 passed, 1 failed, 0 skipped
+        FAIL [   1.647s] (35/35) axcenity-avatar::shipped_library every_manifest_entry_names_shapes_bones_and_materials_its_model_has
+error: test run failed
+exit 100

@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-eye-height-left-min",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "eye_height_left": -1,
+    "frame": 1
+  }
+}

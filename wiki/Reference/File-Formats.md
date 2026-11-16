@@ -39,6 +39,7 @@ Every file the engine reads or writes, with its owner and where the full format 
 | `CREDITS.txt` | Credits for assets fetched through the Toolbox | `toolbox::provenance` | — | `docs/research/asset-sources/` |
 | `assets/probes/*` | Reflection-probe and light-probe bakes | `assets::probe`, `light_probes` | — | `docs/rendering/sky.md` |
 | Terrain folders (`heights.png`, paint maps, `foliage.json`) | Terrain data | `terrain::files`, `project::terrain_files` | `GENERATOR_VERSION` for generators | `docs/terrain.md` |
+| `assets/characters/` (`catalogue.json`, `<package>/*.base.json`, `<package>/items/*.item.json`, the packages' glTF files) | The project's character library, which applying a description resolves against (Character Studio overhaul CO3). `project::add_character_library` writes the engine's built-in stylized package there, keeping files already present | `avatar` (`LIBRARY_FOLDER`), `project::character_library` | format_version 1 each | `docs/development/character-studio/architecture.md` §15 |
 
 ## Per-machine files (git-ignored `.axcenity/`)
 
@@ -60,8 +61,8 @@ Every file the engine reads or writes, with its owner and where the full format 
 |---|---|---|
 | `game.axgame` | Packed game: `AXCGAME\0`, version 2, entries with flags, mtime, lengths; zstd per entry when it saves ≥ 5% | `project::packed` |
 | `*.axpkg` | Asset package (zip + manifest) | `project::package` |
-| `*.character.json` | A character: base model, parameter values, worn items, material values (format 2; format 1, Character Studio CS2's `Look`, migrates on load). The workspace still writes format 1 until CO12 | `avatar::Description`; `docs/development/character-studio/architecture.md` §5 |
-| `*.base.json`, `*.item.json`, `catalogue.json` | A character library: base model manifests (parameters, regions, slots, sockets, materials, skeleton, face), item manifests (garments, accessories, grooms) and the generated index; the repository's library is `assets/characters/` (format_version 1 each) | `avatar`; `architecture.md` §6–8, §15 |
+| `*.character.json` | A character: base model, parameter values, worn items, material values (format 2; format 1, Character Studio CS2's `Look`, migrates on load). The workspace still writes format 1 until CO12. Since CO3 a description is applied at runtime and kept in the World as a `HumanoidDescription` whose `Data` is this text, so a saved `world.json` holds it, with the character's derived `MeshId`s (`file.glb#Objects#i<key>`: the base model's ID plus an identity key; the derived model itself is never on disk, `docs/project/assets.md`) and its `Mat_<material>_<value>` attributes | `avatar::Description`; `docs/development/character-studio/architecture.md` §5 |
+| `*.base.json`, `*.item.json`, `catalogue.json` | A character library: base model manifests (parameters, regions, slots, sockets, materials, skeleton, face), item manifests (garments, accessories, grooms) and the generated index; the repository's library is `assets/characters/`, and a project's is its own `assets/characters/` (format_version 1 each) | `avatar`; `architecture.md` §6–8, §15 |
 
 ## Engine repository files
 

@@ -1703,6 +1703,8 @@ declare extern type Players extends Instance with
 	[string]: any
 	--- Every Player in the game.
 	function GetPlayers(self): {Player}
+	--- A new character that looks like `description`, for an NPC or a preview: a copy of the game's StarterCharacter with the description applied. Its Parent is nil: name it, place it and put it in the Workspace. An error if the game has no StarterCharacter (StarterPlayer's StarterCharacter names no prefab) or the description can't be applied.
+	function CreateHumanoidModelFromDescription(self, description: HumanoidDescription): Model
 end
 
 --- The service for the world's lighting. It sets sun shadows, the sky colors that metal parts reflect, and post-processing (exposure, tone mapping and bloom).
@@ -5279,6 +5281,31 @@ declare extern type Humanoid extends Instance with
 	function GetState(self): EnumItem
 	--- Asks for a state: Running stands it up (off a Seat, out of PlatformStand, its Ragdolls off), Jumping jumps, Ragdoll turns its Ragdolls on, and Dead sets its Health to 0. The others follow the character and are an error.
 	function ChangeState(self, state: EnumItem): ()
+	--- Makes the character look like `description`: its body takes the description's shape, the parts it wears are put on inside its `Body` (and those it no longer wears taken off), and its body sliders and material values are set. The character keeps a copy inside the Humanoid, which is applied again wherever the world is loaded or replicated. An item that can't be worn is left out with a warning. An error, changing nothing, if the Humanoid isn't in a character's Model, the character has no skinned `Body`, or the project's character library (`assets/characters/`) hasn't the description's base model.
+	function ApplyDescription(self, description: HumanoidDescription): ()
+	--- A new copy of the description the character has applied, with no Parent, or nil if it has none. Change it and call ApplyDescription to change the character.
+	function GetAppliedDescription(self): HumanoidDescription?
+end
+
+--- A character's look as data: its base model, body and face values, what it wears and its material values. Data is the text of a character file (`*.character.json`, as Character Studio saves it) and Base its base model's ID. Humanoid:ApplyDescription makes a character look like it. The one inside a Humanoid is what that character has applied; it's applied again when the world is loaded or replicated, so every device builds the character's meshes itself.
+declare extern type HumanoidDescription extends Instance with
+	--- The ID of its base model in the project's character library, such as `axcenity/stylized`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of `axcenity/stylized` when this is empty too).
+	Base: string
+	--- The description: the text of a character file (`*.character.json`), with the base model, parameter values, items worn and material values. Empty is the base model's default character. The methods read and write it, and setting it to a saved character's text loads that character. Changing the Data of the one inside a Humanoid changes that character by the next frame.
+	Data: string
+	[string]: any
+	--- The value of the base model's parameter `id` (`height`, `build`, `nose_width`, ...): the description's, or the parameter's default when it holds none. An error for a parameter the base model hasn't.
+	function GetParameter(self, id: string): number
+	--- Sets the parameter `id` to `value`, kept within the parameter's range (5 for a parameter from -1 to 1 is 1). An error for a parameter the base model hasn't, or a number that isn't finite.
+	function SetParameter(self, id: string, value: number): ()
+	--- What it wears, in order: for each item its ID in the character library (`axcenity/tee`), the slot it's worn in (nil for an item the library hasn't) and its variant, if one was chosen.
+	function GetItems(self): { { Id: string, Slot: string?, Variant: string? } }
+	--- Puts the library's item `id` in `slot`, as its variant `variant` if given, in place of what the slot holds (a slot that holds several keeps them). An item worn already stays where it is and only its variant changes. An error if the library has no such item, it doesn't fit the base model, `slot` isn't the item's slot, or it has no such variant.
+	function SetItem(self, slot: string, id: string, variant: string?): ()
+	--- Takes off every item in `slot` (`hair` for a bald head). An error for a slot the base model hasn't.
+	function RemoveItem(self, slot: string): ()
+	--- Sets the value `name` of the base model's material `slot` (`Skin`, `Iris`, `Brow`, ...): a number such as the skin's `melanin`, or a Color3 such as its `tint`. Values change the material as it was made, they don't replace its maps, and the neutral value changes nothing. An error for a material the base model hasn't, a value its shading model hasn't, the wrong kind of value, or a number outside the value's range.
+	function SetMaterialValue(self, slot: string, name: string, value: number | Color3): ()
 end
 
 --- Something a character can do, in its Model or its Player: a Fireball, a dash, a heal. Activating it (its ActivationKey, or Activate) spends CostAmount of its holder's CostAttribute and starts its Cooldown, unless its holder has one of BlockedByTags; while active it gives GrantsTags. It only activates on the server, which checks again whatever a player's device says. The ability bar shows the player's abilities with their cooldowns.
@@ -6135,6 +6162,7 @@ declare extern type InstanceLibrary with
 		& ((className: "Tool") -> Tool)
 		& ((className: "Inventory") -> Inventory)
 		& ((className: "Humanoid") -> Humanoid)
+		& ((className: "HumanoidDescription") -> HumanoidDescription)
 		& ((className: "Ability") -> Ability)
 		& ((className: "Effect") -> Effect)
 		& ((className: "ForceField") -> ForceField)

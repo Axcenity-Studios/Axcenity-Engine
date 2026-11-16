@@ -183,6 +183,7 @@
     * [Tool](api/classes/Tool.md)
     * [Inventory](api/classes/Inventory.md)
     * [Humanoid](api/classes/Humanoid.md)
+    * [HumanoidDescription](api/classes/HumanoidDescription.md)
     * [Ability](api/classes/Ability.md)
     * [Effect](api/classes/Effect.md)
     * [ForceField](api/classes/ForceField.md)

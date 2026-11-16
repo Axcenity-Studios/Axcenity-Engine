@@ -1,0 +1,3930 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic",
+  "label": "Realistic",
+  "family": "realistic",
+  "model": {
+    "file": "RealisticParts.glb",
+    "body": "AxcenityRealistic/Body",
+    "parts": [
+      "AxcenityRealistic/Eyes",
+      "AxcenityRealistic/Teeth",
+      "AxcenityRealistic/EyeShell",
+      "AxcenityRealistic/Lashes",
+      "AxcenityRealistic/Brows",
+      "AxcenityRealistic/LipSeal"
+    ]
+  },
+  "skeleton": {
+    "convention": "humanoid",
+    "height": 1.75,
+    "pose": "a-pose-45",
+    "added_bones": [
+      {
+        "name": "LeftUpperArmTwist",
+        "parent": "LeftUpperArm"
+      },
+      {
+        "name": "LeftLowerArmTwist",
+        "parent": "LeftLowerArm"
+      },
+      {
+        "name": "LeftUpperLegTwist",
+        "parent": "LeftUpperLeg"
+      },
+      {
+        "name": "LeftLowerLegTwist",
+        "parent": "LeftLowerLeg"
+      },
+      {
+        "name": "LeftShoulderHelper",
+        "parent": "LeftShoulder"
+      },
+      {
+        "name": "LeftElbowHelper",
+        "parent": "LeftUpperArm"
+      },
+      {
+        "name": "LeftHipHelper",
+        "parent": "Hips"
+      },
+      {
+        "name": "LeftKneeHelper",
+        "parent": "LeftUpperLeg"
+      },
+      {
+        "name": "RightUpperArmTwist",
+        "parent": "RightUpperArm"
+      },
+      {
+        "name": "RightLowerArmTwist",
+        "parent": "RightLowerArm"
+      },
+      {
+        "name": "RightUpperLegTwist",
+        "parent": "RightUpperLeg"
+      },
+      {
+        "name": "RightLowerLegTwist",
+        "parent": "RightLowerLeg"
+      },
+      {
+        "name": "RightShoulderHelper",
+        "parent": "RightShoulder"
+      },
+      {
+        "name": "RightElbowHelper",
+        "parent": "RightUpperArm"
+      },
+      {
+        "name": "RightHipHelper",
+        "parent": "Hips"
+      },
+      {
+        "name": "RightKneeHelper",
+        "parent": "RightUpperLeg"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "frame",
+      "label": "Frame",
+      "category": "body"
+    },
+    {
+      "id": "build",
+      "label": "Build",
+      "category": "body"
+    },
+    {
+      "id": "build_regions",
+      "label": "Build by region",
+      "category": "body"
+    },
+    {
+      "id": "proportions",
+      "label": "Proportions",
+      "category": "body"
+    },
+    {
+      "id": "eyes",
+      "label": "Eyes",
+      "category": "face"
+    },
+    {
+      "id": "brows",
+      "label": "Brows",
+      "category": "face"
+    },
+    {
+      "id": "nose",
+      "label": "Nose",
+      "category": "face"
+    },
+    {
+      "id": "cheeks",
+      "label": "Cheeks",
+      "category": "face"
+    },
+    {
+      "id": "jaw",
+      "label": "Jaw",
+      "category": "face"
+    },
+    {
+      "id": "chin",
+      "label": "Chin",
+      "category": "face"
+    },
+    {
+      "id": "lips",
+      "label": "Lips",
+      "category": "face"
+    },
+    {
+      "id": "forehead",
+      "label": "Forehead",
+      "category": "face"
+    },
+    {
+      "id": "ears",
+      "label": "Ears",
+      "category": "face"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "frame",
+      "label": "Masculine to feminine",
+      "group": "frame",
+      "range": [
+        0,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Frame_Feminine"
+        }
+      ],
+      "bones": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.024,
+            0.0192
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            -0.05674,
+            0.00464
+          ]
+        },
+        {
+          "bone": "Hips",
+          "offset": [
+            0.0,
+            -0.01394,
+            0.01051
+          ]
+        },
+        {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            -0.05744,
+            0.00388
+          ]
+        },
+        {
+          "bone": "LeftElbowHelper",
+          "offset": [
+            -0.03057,
+            -0.02455,
+            -0.02851
+          ]
+        },
+        {
+          "bone": "LeftEye",
+          "offset": [
+            0.00018,
+            -0.05211,
+            5e-05
+          ],
+          "scale": 0.9868
+        },
+        {
+          "bone": "LeftFoot",
+          "offset": [
+            -0.00357,
+            0.00497,
+            0.01663
+          ]
+        },
+        {
+          "bone": "LeftHand",
+          "offset": [
+            -0.02949,
+            -0.02554,
+            -0.03968
+          ]
+        },
+        {
+          "bone": "LeftHipHelper",
+          "offset": [
+            -0.00294,
+            -0.01314,
+            -0.0163
+          ]
+        },
+        {
+          "bone": "LeftIndexDistal",
+          "offset": [
+            -0.02903,
+            -0.03749,
+            -0.03803
+          ]
+        },
+        {
+          "bone": "LeftIndexIntermediate",
+          "offset": [
+            -0.0289,
+            -0.03769,
+            -0.0388
+          ]
+        },
+        {
+          "bone": "LeftIndexProximal",
+          "offset": [
+            -0.02745,
+            -0.03453,
+            -0.03952
+          ]
+        },
+        {
+          "bone": "LeftKneeHelper",
+          "offset": [
+            -0.00554,
+            -0.00469,
+            0.00902
+          ]
+        },
+        {
+          "bone": "LeftLittleDistal",
+          "offset": [
+            -0.03263,
+            -0.02941,
+            -0.03923
+          ]
+        },
+        {
+          "bone": "LeftLittleIntermediate",
+          "offset": [
+            -0.0319,
+            -0.02988,
+            -0.04076
+          ]
+        },
+        {
+          "bone": "LeftLittleProximal",
+          "offset": [
+            -0.02987,
+            -0.02974,
+            -0.04267
+          ]
+        },
+        {
+          "bone": "LeftLowerArm",
+          "offset": [
+            -0.03057,
+            -0.02455,
+            -0.02851
+          ]
+        },
+        {
+          "bone": "LeftLowerArmTwist",
+          "offset": [
+            -0.03003,
+            -0.02504,
+            -0.0341
+          ]
+        },
+        {
+          "bone": "LeftLowerLeg",
+          "offset": [
+            -0.00554,
+            -0.00469,
+            0.00902
+          ]
+        },
+        {
+          "bone": "LeftLowerLegTwist",
+          "offset": [
+            -0.00456,
+            0.00014,
+            0.01282
+          ]
+        },
+        {
+          "bone": "LeftMiddleDistal",
+          "offset": [
+            -0.03092,
+            -0.0381,
+            -0.04065
+          ]
+        },
+        {
+          "bone": "LeftMiddleIntermediate",
+          "offset": [
+            -0.03,
+            -0.03759,
+            -0.04043
+          ]
+        },
+        {
+          "bone": "LeftMiddleProximal",
+          "offset": [
+            -0.02862,
+            -0.03456,
+            -0.03993
+          ]
+        },
+        {
+          "bone": "LeftRingDistal",
+          "offset": [
+            -0.03121,
+            -0.03353,
+            -0.04225
+          ]
+        },
+        {
+          "bone": "LeftRingIntermediate",
+          "offset": [
+            -0.03172,
+            -0.03446,
+            -0.04203
+          ]
+        },
+        {
+          "bone": "LeftRingProximal",
+          "offset": [
+            -0.02986,
+            -0.03255,
+            -0.04101
+          ]
+        },
+        {
+          "bone": "LeftShoulder",
+          "offset": [
+            -0.0007,
+            -0.04438,
+            0.00222
+          ]
+        },
+        {
+          "bone": "LeftShoulderHelper",
+          "offset": [
+            -0.02202,
+            -0.03299,
+            -0.0006
+          ]
+        },
+        {
+          "bone": "LeftThumbDistal",
+          "offset": [
+            -0.02975,
+            -0.02678,
+            -0.03799
+          ]
+        },
+        {
+          "bone": "LeftThumbIntermediate",
+          "offset": [
+            -0.02789,
+            -0.02764,
+            -0.039
+          ]
+        },
+        {
+          "bone": "LeftThumbProximal",
+          "offset": [
+            -0.02855,
+            -0.02627,
+            -0.03928
+          ]
+        },
+        {
+          "bone": "LeftToes",
+          "offset": [
+            -0.02549,
+            -0.0007,
+            0.01715
+          ]
+        },
+        {
+          "bone": "LeftUpperArm",
+          "offset": [
+            -0.02202,
+            -0.03299,
+            -0.0006
+          ]
+        },
+        {
+          "bone": "LeftUpperArmTwist",
+          "offset": [
+            -0.0227,
+            -0.03231,
+            -0.00284
+          ]
+        },
+        {
+          "bone": "LeftUpperLeg",
+          "offset": [
+            -0.00294,
+            -0.01314,
+            -0.0163
+          ]
+        },
+        {
+          "bone": "LeftUpperLegTwist",
+          "offset": [
+            -0.00315,
+            -0.01246,
+            -0.01427
+          ]
+        },
+        {
+          "bone": "Neck",
+          "offset": [
+            0.0,
+            -0.0455,
+            0.00366
+          ]
+        },
+        {
+          "bone": "RightElbowHelper",
+          "offset": [
+            0.03026,
+            -0.0243,
+            -0.02814
+          ]
+        },
+        {
+          "bone": "RightEye",
+          "offset": [
+            -0.00018,
+            -0.05211,
+            5e-05
+          ],
+          "scale": 0.9868
+        },
+        {
+          "bone": "RightFoot",
+          "offset": [
+            0.00357,
+            0.00495,
+            0.01661
+          ]
+        },
+        {
+          "bone": "RightHand",
+          "offset": [
+            0.02918,
+            -0.02529,
+            -0.03967
+          ]
+        },
+        {
+          "bone": "RightHipHelper",
+          "offset": [
+            0.00294,
+            -0.01314,
+            -0.01632
+          ]
+        },
+        {
+          "bone": "RightIndexDistal",
+          "offset": [
+            0.02805,
+            -0.03673,
+            -0.03796
+          ]
+        },
+        {
+          "bone": "RightIndexIntermediate",
+          "offset": [
+            0.02812,
+            -0.0371,
+            -0.03884
+          ]
+        },
+        {
+          "bone": "RightIndexProximal",
+          "offset": [
+            0.02649,
+            -0.03402,
+            -0.03943
+          ]
+        },
+        {
+          "bone": "RightKneeHelper",
+          "offset": [
+            0.00561,
+            -0.00451,
+            0.00941
+          ]
+        },
+        {
+          "bone": "RightLittleDistal",
+          "offset": [
+            0.0318,
+            -0.02877,
+            -0.03917
+          ]
+        },
+        {
+          "bone": "RightLittleIntermediate",
+          "offset": [
+            0.0311,
+            -0.02926,
+            -0.04074
+          ]
+        },
+        {
+          "bone": "RightLittleProximal",
+          "offset": [
+            0.02891,
+            -0.02904,
+            -0.04254
+          ]
+        },
+        {
+          "bone": "RightLowerArm",
+          "offset": [
+            0.03026,
+            -0.0243,
+            -0.02814
+          ]
+        },
+        {
+          "bone": "RightLowerArmTwist",
+          "offset": [
+            0.02972,
+            -0.0248,
+            -0.0339
+          ]
+        },
+        {
+          "bone": "RightLowerLeg",
+          "offset": [
+            0.00561,
+            -0.00451,
+            0.00941
+          ]
+        },
+        {
+          "bone": "RightLowerLegTwist",
+          "offset": [
+            0.00459,
+            0.00022,
+            0.01301
+          ]
+        },
+        {
+          "bone": "RightMiddleDistal",
+          "offset": [
+            0.02997,
+            -0.03737,
+            -0.04062
+          ]
+        },
+        {
+          "bone": "RightMiddleIntermediate",
+          "offset": [
+            0.02923,
+            -0.03692,
+            -0.04034
+          ]
+        },
+        {
+          "bone": "RightMiddleProximal",
+          "offset": [
+            0.02753,
+            -0.03413,
+            -0.03982
+          ]
+        },
+        {
+          "bone": "RightRingDistal",
+          "offset": [
+            0.03031,
+            -0.03285,
+            -0.04221
+          ]
+        },
+        {
+          "bone": "RightRingIntermediate",
+          "offset": [
+            0.0309,
+            -0.0338,
+            -0.04198
+          ]
+        },
+        {
+          "bone": "RightRingProximal",
+          "offset": [
+            0.029,
+            -0.032,
+            -0.0408
+          ]
+        },
+        {
+          "bone": "RightShoulder",
+          "offset": [
+            0.0007,
+            -0.04438,
+            0.00222
+          ]
+        },
+        {
+          "bone": "RightShoulderHelper",
+          "offset": [
+            0.02163,
+            -0.03282,
+            -0.00083
+          ]
+        },
+        {
+          "bone": "RightThumbDistal",
+          "offset": [
+            0.02893,
+            -0.02623,
+            -0.03797
+          ]
+        },
+        {
+          "bone": "RightThumbIntermediate",
+          "offset": [
+            0.02709,
+            -0.0271,
+            -0.03897
+          ]
+        },
+        {
+          "bone": "RightThumbProximal",
+          "offset": [
+            0.02804,
+            -0.02593,
+            -0.03925
+          ]
+        },
+        {
+          "bone": "RightToes",
+          "offset": [
+            0.02551,
+            -0.0007,
+            0.01716
+          ]
+        },
+        {
+          "bone": "RightUpperArm",
+          "offset": [
+            0.02163,
+            -0.03282,
+            -0.00083
+          ]
+        },
+        {
+          "bone": "RightUpperArmTwist",
+          "offset": [
+            0.02232,
+            -0.03214,
+            -0.00301
+          ]
+        },
+        {
+          "bone": "RightUpperLeg",
+          "offset": [
+            0.00294,
+            -0.01314,
+            -0.01632
+          ]
+        },
+        {
+          "bone": "RightUpperLegTwist",
+          "offset": [
+            0.00315,
+            -0.01245,
+            -0.01427
+          ]
+        },
+        {
+          "bone": "Spine",
+          "offset": [
+            0.0,
+            -0.01659,
+            0.01051
+          ]
+        },
+        {
+          "bone": "UpperChest",
+          "offset": [
+            0.0,
+            -0.03518,
+            0.01112
+          ]
+        }
+      ]
+    },
+    {
+      "id": "height",
+      "label": "Height",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "BodyHeight",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leg_length",
+      "label": "Leg length",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "LegLength",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "arm_length",
+      "label": "Arm length",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "ArmLength",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "shoulder_width",
+      "label": "Shoulder width",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "ShoulderWidth",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "waist_width",
+      "label": "Waist width",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "WaistWidth",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "hip_width",
+      "label": "Hip width",
+      "group": "proportions",
+      "range": [
+        1.0,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HipWidth",
+          "from": [
+            1.0,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "head_size",
+      "label": "Head size",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HeadSize",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "hand_size",
+      "label": "Hand size",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "HandSize",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "foot_size",
+      "label": "Foot size",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "attributes": [
+        {
+          "attribute": "FootSize",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle",
+      "label": "Muscle",
+      "group": "build",
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "fat",
+      "label": "Body fat",
+      "group": "build",
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "muscle_chest",
+      "label": "Chest muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_chest",
+      "label": "Chest fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_shoulders",
+      "label": "Shoulders muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_shoulders",
+      "label": "Shoulders fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_arms",
+      "label": "Arms muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_arms",
+      "label": "Arms fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_abdomen",
+      "label": "Abdomen muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_abdomen",
+      "label": "Abdomen fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_back",
+      "label": "Back muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_back",
+      "label": "Back fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_hips",
+      "label": "Hips muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_hips",
+      "label": "Hips fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_thighs",
+      "label": "Thighs muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_thighs",
+      "label": "Thighs fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "muscle_calves",
+      "label": "Calves muscle",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "fat_calves",
+      "label": "Calves fat",
+      "group": "build_regions",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true
+    },
+    {
+      "id": "eye_height_left",
+      "label": "Left eye height",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Height_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "LeftEye",
+          "offset": [
+            0.0,
+            0.0045,
+            -0.0
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_height_right",
+      "label": "Right eye height",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Height_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "RightEye",
+          "offset": [
+            0.0,
+            0.0045,
+            -0.0
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_spacing_left",
+      "label": "Left eye spacing",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_spacing_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Spacing_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "LeftEye",
+          "offset": [
+            0.0042,
+            0.0,
+            -0.0
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_spacing_right",
+      "label": "Right eye spacing",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_spacing_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Spacing_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "RightEye",
+          "offset": [
+            -0.0042,
+            0.0,
+            -0.0
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_depth_left",
+      "label": "Left eye depth",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "mirror": "eye_depth_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Depth_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "LeftEye",
+          "offset": [
+            0.0,
+            0.0,
+            -0.0042
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_depth_right",
+      "label": "Right eye depth",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "mirror": "eye_depth_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Depth_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "RightEye",
+          "offset": [
+            0.0,
+            0.0,
+            -0.0042
+          ],
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_size_left",
+      "label": "Left eye size",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_size_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Size_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "LeftEye",
+          "scale": 1.12,
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_size_right",
+      "label": "Right eye size",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_size_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Size_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ],
+      "bones": [
+        {
+          "bone": "RightEye",
+          "scale": 1.12,
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_tilt_left",
+      "label": "Left eye tilt",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_tilt_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Tilt_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_tilt_right",
+      "label": "Right eye tilt",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "eye_tilt_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Tilt_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_height_left",
+      "label": "Left brow height",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Height_Left",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Height_Up_Left",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_height_right",
+      "label": "Right brow height",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Height_Right",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Height_Up_Right",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_arch_left",
+      "label": "Left brow arch",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_arch_right",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Arch_Left",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Arch_Up_Left",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_arch_right",
+      "label": "Right brow arch",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_arch_left",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Arch_Right",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Arch_Up_Right",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_ridge",
+      "label": "Brow ridge",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Brow_Ridge",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nostril_width_left",
+      "label": "Left nostril width",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "nostril_width_right",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Width_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nostril_width_right",
+      "label": "Right nostril width",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "nostril_width_left",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Width_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_length",
+      "label": "Nose length",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Nose_Length",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_bridge",
+      "label": "Nose bridge",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Nose_Bridge",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_tip",
+      "label": "Nose tip",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Nose_Tip",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_tilt",
+      "label": "Nose to one side",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "shapes": [
+        {
+          "shape": "Face_Nose_Tilt",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheekbone_left",
+      "label": "Left cheekbone",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "cheekbone_right",
+      "shapes": [
+        {
+          "shape": "Face_Cheekbone_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheekbone_right",
+      "label": "Right cheekbone",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "cheekbone_left",
+      "shapes": [
+        {
+          "shape": "Face_Cheekbone_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheek_fullness_left",
+      "label": "Left cheek fullness",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "cheek_fullness_right",
+      "shapes": [
+        {
+          "shape": "Face_Cheek_Fullness_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheek_fullness_right",
+      "label": "Right cheek fullness",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "cheek_fullness_left",
+      "shapes": [
+        {
+          "shape": "Face_Cheek_Fullness_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jaw_width_left",
+      "label": "Left jaw width",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "jaw_width_right",
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Width_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jaw_width_right",
+      "label": "Right jaw width",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "jaw_width_left",
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Width_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jaw_shift",
+      "label": "Jaw to one side",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Shift",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chin_length",
+      "label": "Chin length",
+      "group": "chin",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Chin_Length",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chin_forward",
+      "label": "Chin forward",
+      "group": "chin",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Chin_Forward",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chin_width",
+      "label": "Chin width",
+      "group": "chin",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Chin_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mouth_width_left",
+      "label": "Left mouth width",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "mouth_width_right",
+      "shapes": [
+        {
+          "shape": "Face_Mouth_Width_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mouth_width_right",
+      "label": "Right mouth width",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "mouth_width_left",
+      "shapes": [
+        {
+          "shape": "Face_Mouth_Width_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lip_fullness",
+      "label": "Upper lip fullness",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Lip_Fullness_Upper",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lower_lip_fullness",
+      "label": "Lower lip fullness",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Lip_Fullness_Lower",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mouth_height",
+      "label": "Mouth height",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Mouth_Height",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "forehead_height",
+      "label": "Forehead height",
+      "group": "forehead",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Forehead_Height",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "forehead_slope",
+      "label": "Forehead fullness",
+      "group": "forehead",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Forehead_Slope",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "temple_width",
+      "label": "Temple width",
+      "group": "forehead",
+      "range": [
+        -1,
+        1
+      ],
+      "shapes": [
+        {
+          "shape": "Face_Head_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_size_left",
+      "label": "Left ear size",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "ear_size_right",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Size_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_size_right",
+      "label": "Right ear size",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "ear_size_left",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Size_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_height_left",
+      "label": "Left ear height",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "mirror": "ear_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Height_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_height_right",
+      "label": "Right ear height",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "advanced": true,
+      "mirror": "ear_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Height_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_out_left",
+      "label": "Left ear protrusion",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "ear_out_right",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Out_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ear_out_right",
+      "label": "Right ear protrusion",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "ear_out_left",
+      "shapes": [
+        {
+          "shape": "Face_Ear_Out_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "corners": [
+    {
+      "shape": "Masculine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "to": [
+            -0.45,
+            0.0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            0.0
+          ],
+          "to": [
+            -0.3,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Down_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -0.42857142857142855,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            -0.2857142857142857,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Muscle_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Up_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.9
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down_Fat_Up",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            1.0
+          ],
+          "to": [
+            0.0,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Down_Fat_Down",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.7
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0.0,
+            -1.0
+          ],
+          "to": [
+            0.0,
+            0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Chest",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_chest",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Shoulders",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_shoulders",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Arms",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_arms",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Abdomen",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_abdomen",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Back",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_back",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Hips",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_hips",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Thighs",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_thighs",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Muscle_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Calves",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat_calves",
+          "from": [
+            -1,
+            1
+          ],
+          "to": [
+            -0.6,
+            0.6
+          ]
+        }
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "head",
+      "label": "Head",
+      "map_index": 1
+    },
+    {
+      "id": "neck",
+      "label": "Neck",
+      "map_index": 2
+    },
+    {
+      "id": "torso",
+      "label": "Torso",
+      "map_index": 3
+    },
+    {
+      "id": "waist",
+      "label": "Waist",
+      "map_index": 4
+    },
+    {
+      "id": "hips",
+      "label": "Hips",
+      "map_index": 5
+    },
+    {
+      "id": "upper_arms_top",
+      "label": "Upper arms (top)",
+      "map_index": 6
+    },
+    {
+      "id": "upper_arms_low",
+      "label": "Upper arms (low)",
+      "map_index": 7
+    },
+    {
+      "id": "forearms",
+      "label": "Forearms",
+      "map_index": 8
+    },
+    {
+      "id": "hands",
+      "label": "Hands",
+      "map_index": 9
+    },
+    {
+      "id": "thighs_top",
+      "label": "Thighs (top)",
+      "map_index": 10
+    },
+    {
+      "id": "thighs_low",
+      "label": "Thighs (low)",
+      "map_index": 11
+    },
+    {
+      "id": "shins_top",
+      "label": "Shins (top)",
+      "map_index": 12
+    },
+    {
+      "id": "shins_low",
+      "label": "Shins (low)",
+      "map_index": 13
+    },
+    {
+      "id": "feet",
+      "label": "Feet",
+      "map_index": 14
+    }
+  ],
+  "slots": [
+    {
+      "id": "hair",
+      "label": "Hairstyle",
+      "category": "hair",
+      "empty_label": "Bald"
+    },
+    {
+      "id": "underwear_top",
+      "label": "Underwear top",
+      "category": "clothing"
+    },
+    {
+      "id": "underwear_bottom",
+      "label": "Underwear",
+      "category": "clothing"
+    },
+    {
+      "id": "top",
+      "label": "Top",
+      "category": "clothing"
+    },
+    {
+      "id": "outerwear",
+      "label": "Outerwear",
+      "category": "clothing"
+    },
+    {
+      "id": "bottom",
+      "label": "Bottoms",
+      "category": "clothing"
+    },
+    {
+      "id": "shoes",
+      "label": "Shoes",
+      "category": "clothing"
+    }
+  ],
+  "sockets": [
+    {
+      "name": "HeadSocket",
+      "bone": "Head"
+    },
+    {
+      "name": "BackSocket",
+      "bone": "UpperChest"
+    },
+    {
+      "name": "HipsSocket",
+      "bone": "Hips"
+    },
+    {
+      "name": "LeftHandSocket",
+      "bone": "LeftHand"
+    },
+    {
+      "name": "RightHandSocket",
+      "bone": "RightHand"
+    },
+    {
+      "name": "LeftFootSocket",
+      "bone": "LeftFoot"
+    },
+    {
+      "name": "RightFootSocket",
+      "bone": "RightFoot"
+    }
+  ],
+  "materials": [
+    {
+      "name": "Brows",
+      "shading": "hair"
+    },
+    {
+      "name": "Cornea",
+      "shading": "eye"
+    },
+    {
+      "name": "EyeOcclusion",
+      "shading": "standard"
+    },
+    {
+      "name": "Gums",
+      "shading": "standard"
+    },
+    {
+      "name": "Iris",
+      "shading": "eye"
+    },
+    {
+      "name": "Lashes",
+      "shading": "hair"
+    },
+    {
+      "name": "LipSeal",
+      "shading": "standard"
+    },
+    {
+      "name": "Mouth",
+      "shading": "standard"
+    },
+    {
+      "name": "Sclera",
+      "shading": "eye"
+    },
+    {
+      "name": "Skin",
+      "shading": "skin"
+    },
+    {
+      "name": "TearLine",
+      "shading": "standard"
+    },
+    {
+      "name": "Teeth",
+      "shading": "standard"
+    },
+    {
+      "name": "Tongue",
+      "shading": "standard"
+    }
+  ],
+  "face": {
+    "profile": "axcenity",
+    "eye_bones": [
+      "LeftEye",
+      "RightEye"
+    ],
+    "jaw_bone": "Jaw"
+  },
+  "defaults": {
+    "items": []
+  }
+}

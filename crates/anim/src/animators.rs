@@ -158,6 +158,9 @@ pub struct Animators {
     /// The resting head of each skinned model a face has looked at, in
     /// its file's space, by model key.
     heads: HashMap<u64, Option<Vec3>>,
+    /// Which of a leader's blend shapes each of a follower's takes its
+    /// weight from, by the two models' keys ([`same_shapes`]).
+    shape_maps: HashMap<(u64, u64), Arc<[Option<usize>]>>,
 }
 
 /// A pose to work out off the calling thread: everything it needs from
@@ -211,16 +214,19 @@ pub struct FaceStats {
 impl FaceFrame {
     /// Composes the face over the body's `pose` (of `skeleton`), turns the
     /// eye and jaw bones in it, poses `model` and sets its blend shapes.
+    /// The bones are turned in the `pose` the caller keeps, so a
+    /// character's parts with those bones (eyes and teeth of their own,
+    /// which follow that pose by bone name) look and open with the face.
     fn pose(
         &self,
         model: &Model,
         skeleton: &Rig,
-        mut pose: axcenity_assets::Pose,
+        pose: &mut axcenity_assets::Pose,
         shape: &[glam::Vec3],
     ) -> Option<Posed> {
-        let controls = self.layers.compose(&self.rig, Some(skeleton), Some(&pose));
-        self.rig.turn(&mut pose, &controls);
-        let mut posed = model.pose_shaped(&pose, shape)?;
+        let controls = self.layers.compose(&self.rig, Some(skeleton), Some(pose));
+        self.rig.turn(pose, &controls);
+        let mut posed = model.pose_shaped(pose, shape)?;
         self.set_shapes(model, &controls, &mut posed);
         Some(posed)
     }
@@ -238,6 +244,46 @@ impl FaceFrame {
         self.rig.weights(model, controls, &mut weights);
         posed.set_morph_weights(&weights);
     }
+}
+
+/// Poses `model`'s skin for a finished `pose` of its skeleton `rig` (body
+/// slider scales in `shape`, its face over it if it has one). Both ways a
+/// pose is made, on the pose threads and with IK, feet or a ragdoll, end
+/// here.
+///
+/// **The twist and helper bones' one call site (CO4, `twist.rs`):** they
+/// are turned here, after everything that poses a bone and before the skin
+/// is posed, in the `pose` the caller keeps, so a character's parts
+/// (followers, which take that pose by bone name) get them too.
+fn skinned(
+    model: &Model,
+    rig: &Rig,
+    face: Option<&FaceFrame>,
+    pose: &mut axcenity_assets::Pose,
+    shape: &mut [glam::Vec3],
+) -> Option<Posed> {
+    crate::twist::drive(rig, pose, shape);
+    let mut posed = match face {
+        Some(face) => face.pose(model, rig, pose, shape),
+        None => model.pose_shaped(pose, shape),
+    }?;
+    // The pose-driven corrective shapes' one call site (CO5,
+    // `correctives.rs`): leaned on for the finished pose, after the face's
+    // own shapes are set.
+    crate::correctives::drive(model, rig, pose, &mut posed);
+    Some(posed)
+}
+
+/// [`skinned`] for a model without a face, for `twist.rs`'s test of the
+/// call site.
+#[cfg(test)]
+pub(crate) fn skinned_for_test(
+    model: &Model,
+    rig: &Rig,
+    pose: &mut axcenity_assets::Pose,
+    shape: &mut [glam::Vec3],
+) -> Option<Posed> {
+    skinned(model, rig, None, pose, shape)
 }
 
 /// The profile a FaceControls was matched to its model with.
@@ -404,6 +450,7 @@ impl Animators {
         self.poses.clear();
         self.reported.clear();
         self.changed.clear();
+        self.shape_maps.clear();
     }
 
     /// Plays the new version of the clip, state machine or model file at
@@ -563,14 +610,20 @@ impl Animators {
                 &job.layer_weights,
                 &job.bone_layers,
             );
-            let shape = match &job.shape {
+            // A character's identity moves its bones after the clips, so
+            // every clip plays on every character.
+            job.model.settle(&mut pose);
+            let mut shape = match &job.shape {
                 Some(shape) => shape.apply(&job.rig, &mut pose),
                 None => Vec::new(),
             };
-            let posed = match &job.face {
-                Some(face) => face.pose(&job.model, &job.rig, pose.clone(), &shape),
-                None => job.model.pose_shaped(&pose, &shape),
-            };
+            let posed = skinned(
+                &job.model,
+                &job.rig,
+                job.face.as_ref(),
+                &mut pose,
+                &mut shape,
+            );
             (pose, shape, posed)
         });
         self.thread_times = times;
@@ -600,13 +653,26 @@ impl Animators {
     /// it from one Animator (default humanoid HD4). Followers lead their
     /// own skinned children in turn. A follower is kept where its parent's
     /// skeleton puts it ([`place_follower`]), so changing its `MeshId` to
-    /// another part of the same skeleton is all a swap takes.
+    /// another part of the same skeleton is all a swap takes. Each of a
+    /// follower's blend shapes takes the weight of its leader's shape of
+    /// the same name (brows and lashes blink with the face); shapes the
+    /// leader hasn't got keep the follower's own weight.
     fn follow(&mut self, world: &mut World, assets: &Assets, posed: &mut HashSet<InstanceId>) {
+        // Derived models come and go (a slider dragged in Character
+        // Studio makes one per step): don't keep their maps for ever.
+        if self.shape_maps.len() > 512 {
+            self.shape_maps.clear();
+        }
         let mut leaders: Vec<InstanceId> = self.local.keys().copied().collect();
         while let Some(leader) = leaders.pop() {
             let Some((rig, pose, shape)) = self.local.get(&leader).cloned() else {
                 continue;
             };
+            // The leader's shapes, if it has any, as it's posed now.
+            let leading = mesh_model(world, assets, leader)
+                .filter(|model| !model.morph_targets.is_empty())
+                .zip(self.poses.get(&leader).cloned())
+                .filter(|(model, posed)| posed.model_key == model.key());
             let children = world
                 .get(leader)
                 .map(|instance| instance.children().to_vec())
@@ -644,9 +710,32 @@ impl Animators {
                         })
                         .collect()
                 };
-                let Some(made) = model.pose_shaped(&follows, &follows_shape) else {
+                let Some(mut made) = model.pose_shaped(&follows, &follows_shape) else {
                     continue;
                 };
+                if let Some((leader_model, leader_posed)) = &leading
+                    && !model.morph_targets.is_empty()
+                {
+                    let same = self
+                        .shape_maps
+                        .entry((leader_model.key(), model.key()))
+                        .or_insert_with(|| same_shapes(leader_model, &model));
+                    if same.iter().any(Option::is_some) {
+                        let leads = leader_posed.morph_weights();
+                        let weights: Vec<f32> = made
+                            .morph_weights()
+                            .iter()
+                            .zip(same.iter())
+                            .map(|(own, from)| {
+                                from.and_then(|index| leads.get(index).copied())
+                                    .unwrap_or(*own)
+                            })
+                            .collect();
+                        if weights != made.morph_weights() {
+                            made.set_morph_weights(&weights);
+                        }
+                    }
+                }
                 self.poses.insert(child, Arc::new(made));
                 posed.insert(child);
                 self.local.insert(child, (own, follows, follows_shape));
@@ -908,7 +997,19 @@ impl Animators {
             // just turned off still has its feet to bring back.
             let controller = parts.animator.and_then(|_| feet::wanted(world, owner));
             let wants_feet = controller.is_some_and(|(on, _)| on);
+            // An Animator with nothing to play still leads the parts
+            // inside its MeshPart: it's posed at rest, so they're placed
+            // on it (a character standing still wears its clothes).
+            let leads = parts.animator.is_some()
+                && world.get(owner).is_some_and(|instance| {
+                    instance.children().iter().any(|child| {
+                        world
+                            .get(*child)
+                            .is_some_and(|child| child.class() == ClassName::MeshPart)
+                    })
+                });
             if running.machine.is_some()
+                || leads
                 || !bone_layers.is_empty()
                 || parts.ragdoll.is_some()
                 || !parts.ik.is_empty()
@@ -961,9 +1062,10 @@ impl Animators {
                         &layer_weights,
                         &bone_layers,
                     );
+                    model.settle(&mut pose);
                     // Body sliders first, so IK and the feet work on the
                     // body as it's shaped.
-                    let shape = match BodyShape::read(world, owner) {
+                    let mut shape = match BodyShape::read(world, owner) {
                         Some(shape) => shape.apply(rig, &mut pose),
                         None => Vec::new(),
                     };
@@ -1020,10 +1122,7 @@ impl Animators {
                             self.report(problem);
                         }
                     }
-                    let made = match &face {
-                        Some(face) => face.pose(model, rig, pose.clone(), &shape),
-                        None => model.pose_shaped(&pose, &shape),
-                    };
+                    let made = skinned(model, rig, face.as_ref(), &mut pose, &mut shape);
                     if let Some(made) = made {
                         self.poses.insert(owner, Arc::new(made));
                         self.local.insert(owner, (Arc::clone(rig), pose, shape));
@@ -1751,6 +1850,21 @@ fn pose_of(
         }
     }
     pose
+}
+
+/// For each of `follower`'s blend shapes, the place of `leader`'s shape of
+/// the same name, if it has one.
+fn same_shapes(leader: &Model, follower: &Model) -> Arc<[Option<usize>]> {
+    follower
+        .morph_targets
+        .iter()
+        .map(|target| {
+            leader
+                .morph_targets
+                .iter()
+                .position(|leads| leads.name == target.name)
+        })
+        .collect()
 }
 
 /// Sets the follower MeshPart `part` (of skeleton `own`) where the

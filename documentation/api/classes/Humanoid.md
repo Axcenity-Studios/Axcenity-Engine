@@ -250,3 +250,31 @@ Humanoid:ChangeState(state: EnumItem): ()
 
 Asks for a state: Running stands it up (off a Seat, out of PlatformStand, its Ragdolls off), Jumping jumps, Ragdoll turns its Ragdolls on, and Dead sets its Health to 0. The others follow the character and are an error.
 
+#### ApplyDescription
+
+```luau
+Humanoid:ApplyDescription(description: HumanoidDescription): ()
+```
+
+Makes the character look like `description`: its body takes the description's shape, the parts it wears are put on inside its `Body` (and those it no longer wears taken off), and its body sliders and material values are set. The character keeps a copy inside the Humanoid, which is applied again wherever the world is loaded or replicated. An item that can't be worn is left out with a warning. An error, changing nothing, if the Humanoid isn't in a character's Model, the character has no skinned `Body`, or the project's character library (`assets/characters/`) hasn't the description's base model.
+
+```lua
+local Players = game:GetService("Players")
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		local description = Instance.new("HumanoidDescription")
+		description:SetItem("hair", "axcenity/hair-bob")
+		description:SetParameter("height", 1.1)
+		character:WaitForChild("Humanoid"):ApplyDescription(description)
+	end)
+end)
+```
+
+#### GetAppliedDescription
+
+```luau
+Humanoid:GetAppliedDescription(): HumanoidDescription?
+```
+
+A new copy of the description the character has applied, with no Parent, or nil if it has none. Change it and call ApplyDescription to change the character.
+

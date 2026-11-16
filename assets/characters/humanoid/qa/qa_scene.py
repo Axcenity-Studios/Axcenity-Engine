@@ -5,6 +5,11 @@ face and expression shapes, clothing masks, the bone offsets the
 customization file lists), poses the skeleton with fixed test poses, gives
 deformed geometry for measuring, and sets up one fixed studio for renders.
 
+The scripts measure either base model package (`PACKAGES`): the stylized
+humanoid (the default) or the realistic body, whose twist and helper bones
+are turned here as `anim`'s `twist.rs` turns them in the engine
+(`Character.drive`), so what's measured is what a game shows.
+
 Blender space: metres, Z up, the character faces -Y, its left is +X.
 """
 
@@ -14,12 +19,40 @@ import os
 
 import bpy
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 from mathutils.bvhtree import BVHTree
+
+from pseudo_normals import PseudoNormals
 
 QA_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSET_DIR = os.path.dirname(QA_DIR)
 CUSTOM_PATH = os.path.join(ASSET_DIR, "Humanoid.customization.json")
+LIBRARY_DIR = os.path.dirname(ASSET_DIR)
+
+# The base model packages the scripts know: where each one's files are.
+# `default` is the single-file default character (the stylized package's
+# only), `custom` what its shapes move besides vertices.
+PACKAGES = {
+    "stylized": {
+        "dir": ASSET_DIR,
+        "parts": "HumanoidParts.glb",
+        "default": "Humanoid.glb",
+        "custom": "Humanoid.customization.json",
+    },
+    "realistic": {
+        "dir": os.path.join(LIBRARY_DIR, "realistic"),
+        "parts": "RealisticParts.glb",
+        "default": None,
+        "custom": "Realistic.build.json",
+    },
+}
+
+
+def package_paths(name):
+    """(parts file, default file or None, customization file) of a package."""
+    pack = PACKAGES[name]
+    join = lambda f: os.path.join(pack["dir"], f) if f else None  # noqa: E731
+    return join(pack["parts"]), join(pack["default"]), join(pack["custom"])
 
 FWD = Vector((0, -1, 0))
 BACK = Vector((0, 1, 0))
@@ -32,9 +65,79 @@ JAW_OPEN_DEG = 25.0  # crates/assets/src/face_profile.rs: jaw_open limit
 BUILDS = ("Build_Heavy", "Build_Slim", "Build_Muscular")
 
 
+def load_manifest(parts_path):
+    """The base model manifest beside a parts file (None if it has none)."""
+    folder = os.path.dirname(parts_path)
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".base.json"):
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def span(value, source=None, to=None):
+    """`avatar::span`: a value through its `from` span onto its `to` span."""
+    source = source or [0.0, 1.0]
+    to = to or source
+    length = source[1] - source[0]
+    if length == 0:
+        return to[0]
+    t = min(1.0, max(0.0, (value - source[0]) / length))
+    return to[0] + (to[1] - to[0]) * t
+
+
+def manifest_weights(manifest, values):
+    """{shape: weight} for slider `values` ({parameter id: value}; the
+    rest at their defaults) by the manifest's rule, as `avatar::resolve`
+    does it: each parameter's shape drivers plus each corner's product
+    of factors."""
+    value = {}
+    for p in manifest["parameters"]:
+        v = values.get(p["id"], p.get("default", 0.0))
+        value[p["id"]] = min(p["range"][1], max(p["range"][0], v))
+    out = {}
+    for p in manifest["parameters"]:
+        for d in p.get("shapes", []):
+            out[d["shape"]] = out.get(d["shape"], 0.0) + span(value[p["id"]], d.get("from"), d.get("to"))
+    for c in manifest.get("corners", []):
+        w = 1.0
+        for f in c["factors"]:
+            w *= span(value[f["parameter"]], f.get("from"), f.get("to"))
+        out[c["shape"]] = out.get(c["shape"], 0.0) + w
+    return out
+
+
+def manifest_bones(manifest, values):
+    """{bone: (offset, scale)} for slider `values` by the manifest's rule,
+    as `avatar::resolve` sums a parameter's `bones` drivers: each offset
+    (glTF axes) times the parameter's mapped weight, added up, and each
+    scale `1 + (scale - 1) * weight`, multiplied. The frame's drivers are
+    left out: `set_frame_bones` and `eye_transform` take the frame's from
+    the build data."""
+    out = {}
+    for p in manifest["parameters"]:
+        if p["id"] == "frame" or not p.get("bones"):
+            continue
+        v = min(p["range"][1], max(p["range"][0], values.get(p["id"], p.get("default", 0.0))))
+        for d in p["bones"]:
+            w = span(v, d.get("from"), d.get("to"))
+            offset, scale = out.get(d["bone"], ([0.0, 0.0, 0.0], 1.0))
+            offset = [a + b * w for a, b in zip(offset, d.get("offset", [0.0, 0.0, 0.0]))]
+            out[d["bone"]] = (offset, scale * (1.0 + (d.get("scale", 1.0) - 1.0) * w))
+    return out
+
+
 def load_custom(path=CUSTOM_PATH):
+    """A package's customization data, in the stylized file's layout. The
+    realistic package's build data (`frame`, `twists`, `helpers`) is read
+    into it: its frame's bone offsets as `Frame_Feminine`'s, no garments."""
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if "frame" in data and "body" not in data:
+        data = dict(data, body={"Frame_Feminine": data["frame"]},
+                    face=(data.get("face") or {}).get("face_identity", {}), masks=[], parts={}, hair=[],
+                    default={"outfit": [], "hair": None})
+    return data
 
 
 def gltf_to_blender(d):
@@ -75,6 +178,7 @@ class Character:
                 self.defaults[name] = {kb.name: kb.value for kb in sk.key_blocks[1:]}
                 for kb in sk.key_blocks[1:]:
                     kb.slider_min = -1.0
+        self.manifest = load_manifest(path)
 
     @staticmethod
     def _mode(obj, mode):
@@ -101,12 +205,14 @@ class Character:
                     out.append(m)
         return out
 
-    def set_look(self, frame=0.0, build=None, face=None, expr=None, masks=None, keep_defaults=False):
+    def set_look(self, frame=0.0, build=None, face=None, expr=None, masks=None, keep_defaults=False, bones=None):
         """Shape weights on every part that carries them; everything else 0
         (or the file's default weight with `keep_defaults`). `build` is
         {Build_*: w}; `face` {Face_*: w}; `expr` {expression: w};
-        `masks` a list of mask names at 1. Also moves the skeleton for the
-        frame and the eye bones for the frame and eye identity shapes."""
+        `masks` a list of mask names at 1; `bones` the parameters' own
+        bone changes ({bone: (offset, scale)}, `manifest_bones`). Also
+        moves the skeleton for the frame and the eye bones for the frame,
+        the eye identity shapes and `bones`."""
         w = {"Frame_Feminine": frame}
         w.update(build or {})
         w.update(face or {})
@@ -121,9 +227,93 @@ class Character:
                 base = self.defaults[name].get(kb.name, 0.0) if keep_defaults else 0.0
                 kb.value = w.get(kb.name, base)
         self.set_frame_bones(frame)
-        self.look = {"frame": frame, "face": dict(face or {})}
+        self.look = {"frame": frame, "face": dict(face or {}), "bones": dict(bones or {})}
         self.set_eyes()
         update()
+
+    def set_sliders(self, values):
+        """The look the manifest gives slider `values` ({parameter id:
+        value}): every shape it drives, the frame's bones and eyes, and the
+        eye bones the parameters move and scale. (The eye parameters'
+        shapes move the lids and their `bones` drivers move and scale the
+        eyeball with them; the engine bakes both. With the shapes alone
+        the lids moved off an eyeball left where it was.)"""
+        w = manifest_weights(self.manifest, values)
+        self.set_look(frame=values.get("frame", 0.0), build=w, bones=manifest_bones(self.manifest, values))
+
+    def set_body_sliders(self, values):
+        """The rest pose reshaped by `anim`'s body sliders ({attribute:
+        value}, 1 changes nothing), as `anim::BodyShape::apply` reshapes
+        a pose: bones stretched along their length (`BodyHeight`,
+        `LegLength`, `ArmLength`, `ShoulderWidth`), widened
+        (`ShoulderWidth`, `WaistWidth`, `HipWidth`) or grown with
+        everything on them (`HeadSize`, `HandSize`, `FootSize`), each
+        bone's scale its own and its children moved along with it; the
+        hips raised by what the legs gained. Twist and helper bones take
+        their limb's and their joint's scale, as `twist.rs` gives them.
+        Only for the rest pose: it places every bone itself."""
+        get = lambda name: float(values.get(name, 1.0))  # noqa: E731
+        bones = self.arm.data.bones
+        scale = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+        mult = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+
+        def stretch(name, factor, axis=1):
+            if name in scale:
+                scale[name][axis] *= factor
+                for child in bones[name].children:
+                    mult[child.name][axis] *= factor
+
+        def grow(name, factor):
+            if name not in scale or factor == 1.0:
+                return
+            scale[name] *= factor
+            for child in bones[name].children_recursive:
+                scale[child.name] *= factor
+                mult[child.name] *= factor
+
+        height, arms, shoulders = get("BodyHeight"), get("ArmLength"), get("ShoulderWidth")
+        legs = get("LegLength") * height
+        for name in ("Spine", "Chest", "UpperChest"):
+            stretch(name, height)
+        for side, _ in SIDES:
+            for name in ("UpperLeg", "LowerLeg"):
+                stretch(side + name, legs)
+            for name in ("UpperArm", "LowerArm"):
+                stretch(side + name, arms)
+            stretch(side + "Shoulder", shoulders)
+        stretch("UpperChest", math.sqrt(shoulders), axis=0)
+        stretch("Spine", get("WaistWidth"), axis=0)
+        stretch("Hips", get("HipWidth"), axis=0)
+        grow("Head", get("HeadSize"))
+        for side, _ in SIDES:
+            grow(side + "Hand", get("HandSize"))
+            grow(side + "Foot", get("FootSize"))
+        # The driven bones: a twist bone takes its limb's scale, a helper its joint's, and sits on it.
+        local = {b.name: (b.parent.matrix_local.inverted() @ b.matrix_local if b.parent else b.matrix_local.copy())
+                 for b in bones}
+        moved = {name: Vector([m.to_translation()[k] * mult[name][k] for k in range(3)]) for name, m in local.items()}
+        for t in self.custom.get("twists", []):
+            for side, _ in SIDES:
+                if side + t["bone"] in scale:
+                    scale[side + t["bone"]] = scale[side + t["inside"]].copy()
+        for h in self.custom.get("helpers", []):
+            for side, _ in SIDES:
+                name, reads = side + h["bone"], side + h["reads"]
+                if name in scale:
+                    scale[name] = scale[reads].copy()
+                    moved[name] = moved[reads] + (local[name].to_translation() - local[reads].to_translation())
+        if legs != 1.0:
+            length = lambda a, b: (bones[b].head_local - bones[a].head_local).length  # noqa: E731
+            leg = length("LeftUpperLeg", "LeftLowerLeg") + length("LeftLowerLeg", "LeftFoot")
+            up = bones["Hips"].parent.matrix_local.to_3x3().inverted() @ UP if bones["Hips"].parent else UP
+            moved["Hips"] = moved["Hips"] + up * leg * (legs - 1.0)
+        # Parents first: each bone at its moved place in its parent's unscaled frame, with its own scale.
+        frame = {}
+        for b in bones:
+            parent = frame[b.parent.name] if b.parent else Matrix()
+            frame[b.name] = parent @ Matrix.Translation(moved[b.name]) @ local[b.name].to_3x3().to_4x4()
+            self.arm.pose.bones[b.name].matrix = frame[b.name] @ Matrix.Diagonal(scale[b.name]).to_4x4()
+            update()
 
     def set_frame_bones(self, frame):
         """Moves the rest skeleton by Frame_Feminine's bone offsets (eyes
@@ -173,6 +363,10 @@ class Character:
                 off += gltf_to_blender(c["offset"]) * wt
             if "scale" in c:
                 scale *= 1.0 + (c["scale"] - 1.0) * wt
+        if name in self.look.get("bones", {}):
+            offset, s = self.look["bones"][name]
+            off += gltf_to_blender(offset)
+            scale *= s
         return off, scale
 
     def set_eyes(self):
@@ -202,8 +396,84 @@ class Character:
     def pose_reset(self):
         for pb in self.arm.pose.bones:
             pb.matrix_basis = Matrix()
+        self.set_correctives({})
         self.set_eyes()
         update()
+
+    # -- twist and helper bones ------------------------------------------------------
+
+    def _local(self, name, posed=True):
+        """A bone's transform in its parent's space, at rest or as posed."""
+        bone = self.arm.data.bones[name]
+        rest = bone.matrix_local
+        if bone.parent:
+            rest = bone.parent.matrix_local.inverted() @ rest
+        return rest @ self.arm.pose.bones[name].matrix_basis if posed else rest
+
+    def drive(self):
+        """Turns the skeleton's twist and helper bones for the pose it's
+        in, by the rule `anim`'s `twist.rs` applies after every pose (the
+        customization data lists them; a skeleton without any is left
+        alone). A twist bone takes `share` of the twist of the bone it
+        reads about the limb's axis (a negative share undoes that much of
+        its own parent's twist). A helper takes `share` of its source
+        bone's whole turn and stays on its joint."""
+        bones = self.arm.pose.bones
+        for t in self.custom.get("twists", []):
+            for side, _ in SIDES:
+                pb = bones.get(side + t["bone"])
+                if pb is None:
+                    continue
+                inside, reads = side + t["inside"], side + t["reads"]
+                if reads == inside:
+                    # The limb's own turn from rest, in its own axes.
+                    turn = bones[inside].matrix_basis.to_quaternion()
+                else:
+                    # The next bone's turn from rest, in the limb's axes.
+                    turn = (self._local(reads) @ self._local(reads, posed=False).inverted()).to_quaternion()
+                angle = twist_angle(turn, Vector((0.0, 1.0, 0.0)))
+                rest = self._local(pb.name, posed=False)
+                local = Matrix.Rotation(angle * t["share"], 4, "Y") @ rest
+                pb.matrix_basis = rest.inverted() @ local
+        for h in self.custom.get("helpers", []):
+            for side, _ in SIDES:
+                pb = bones.get(side + h["bone"])
+                if pb is None:
+                    continue
+                reads = side + h["reads"]
+                src_rest, src = self._local(reads, posed=False), self._local(reads)
+                turn = (src @ src_rest.inverted()).to_quaternion()
+                part = Quaternion().slerp(turn, h["share"])
+                rest = self._local(pb.name, posed=False)
+                at = rest.to_translation() + (src.to_translation() - src_rest.to_translation())
+                local = Matrix.Translation(at) @ (part.to_matrix() @ rest.to_3x3()).to_4x4()
+                pb.matrix_basis = rest.inverted() @ local
+
+    def set_correctives(self, weights):
+        """Sets the pose-driven shapes (the customization data's
+        `correctives`) on every part that has them; the ones not in
+        `weights` to 0."""
+        for rule in self.custom.get("correctives", []):
+            for o in self.parts.values():
+                sk = o.data.shape_keys
+                if sk and rule["shape"] in sk.key_blocks:
+                    sk.key_blocks[rule["shape"]].value = weights.get(rule["shape"], 0.0)
+
+    def drive_correctives(self):
+        """Leans on the pose-driven shapes for the pose the skeleton is
+        in, by the rule `anim`'s `correctives.rs` applies: a shape's
+        weight is how far its bone has turned from rest about the rule's
+        axis (in the bone's parent's rest space), from 0 at
+        `angles[0]` degrees to 1 at `angles[1]`."""
+        weights = {}
+        for rule in self.custom.get("correctives", []):
+            name = rule["bone"]
+            turn = (self._local(name) @ self._local(name, posed=False).inverted()).to_quaternion()
+            angle = math.degrees(twist_angle(turn, Vector(rule["axis"])))
+            start, full = rule["angles"]
+            weights[rule["shape"]] = min(1.0, max(0.0, (angle - start) / (full - start)))
+        self.set_correctives(weights)
+        return weights
 
     def bend(self, bone, axis, deg, toward=None):
         """Turns `bone` by `deg` about `axis` (armature space, through its
@@ -316,7 +586,143 @@ POSES = {
 def apply_pose(ch, name):
     ch.pose_reset()
     POSES[name][0](ch)
+    ch.drive()
+    ch.drive_correctives()
     update()
+
+
+# -- takes -----------------------------------------------------------------------------
+
+def load_takes(path):
+    """Imports an animations file (a skeleton and its clips): the armature
+    and its actions by clip name."""
+    before_objects, before_actions = set(bpy.data.objects), set(bpy.data.actions)
+    bpy.ops.import_scene.gltf(filepath=path)
+    new = [o for o in bpy.data.objects if o not in before_objects]
+    arm = next(o for o in new if o.type == "ARMATURE")
+    for o in new:
+        o.hide_render = True
+    actions = {}
+    for action in bpy.data.actions:
+        if action not in before_actions:
+            actions[action.name.split("_AxcenityHumanoid")[0].split(".")[0]] = action
+    return arm, actions
+
+
+def pose_take(ch, take_arm, action, at, retarget=True):
+    """Poses `ch` from `action` (a clip on `take_arm`'s skeleton) at `at`
+    (0 to 1 through the clip), then drives its twist and helper bones.
+
+    With `retarget`, as the engine retargets a take onto another humanoid
+    (`anim` `retarget.rs`): each bone of the same name is turned by the
+    take's turn from its own rest, in the model's space, onto this
+    skeleton's rest, and the hips travel as far as the take's, scaled by
+    the two skeletons' leg lengths. Without it, as a take bound by bone
+    name plays: every bone takes the take's own place relative to its
+    parent (the take skeleton's bone offsets with it)."""
+    if take_arm.animation_data is None:
+        take_arm.animation_data_create()
+    take_arm.animation_data.action = action
+    slot = getattr(take_arm.animation_data, "action_suitable_slots", None)
+    if slot:
+        take_arm.animation_data.action_slot = slot[0]
+    start, end = action.frame_range
+    bpy.context.scene.frame_set(int(round(start + (end - start) * at)))
+    update()
+    ch.pose_reset()
+    mine, theirs = ch.arm, take_arm
+    rest_of = lambda arm, name: arm.data.bones[name].matrix_local  # noqa: E731
+
+    def leg(arm):
+        hip, knee, foot = (rest_of(arm, "Left" + n).to_translation() for n in ("UpperLeg", "LowerLeg", "Foot"))
+        return (knee - hip).length + (foot - knee).length
+
+    scale = leg(mine) / leg(theirs)
+    # Parents first, so each bone is placed on its posed parent.
+    for bone in mine.data.bones:
+        pb = mine.pose.bones[bone.name]
+        tb = theirs.pose.bones.get(bone.name)
+        if tb is None:
+            continue
+        take_rest = rest_of(theirs, bone.name)
+        if retarget:
+            turn = tb.matrix.to_3x3() @ take_rest.to_3x3().inverted()
+            rotation = turn @ bone.matrix_local.to_3x3()
+            if bone.parent is None or bone.name == "Hips":
+                travel = (tb.matrix.to_translation() - take_rest.to_translation()) * scale
+                head = bone.matrix_local.to_translation() + travel
+            else:
+                parent = mine.pose.bones[bone.parent.name]
+                local = bone.parent.matrix_local.inverted() @ bone.matrix_local
+                head = (parent.matrix @ local).to_translation()
+            pb.matrix = Matrix.Translation(head) @ rotation.to_4x4()
+        else:
+            parent = mine.pose.bones[bone.parent.name].matrix if bone.parent else Matrix()
+            take_parent = tb.parent.matrix if tb.parent else Matrix()
+            pb.matrix = parent @ (take_parent.inverted() @ tb.matrix)
+        update()
+    ch.set_eyes()
+    ch.drive()
+    ch.drive_correctives()
+    update()
+
+
+def raking_light(target, back=False, strength=5.0):
+    """One hard light across the surface for a sheet that has to show
+    relief (steps, notches, creases), with the studio's own lights off
+    and its sky turned down. Only for sheets that say so: the comparable
+    sheets keep the studio as it is."""
+    scene = bpy.context.scene
+    for o in scene.objects:
+        if o.type == "LIGHT":
+            o.hide_render = True
+    world = scene.world.node_tree.nodes.get("Background") if scene.world and scene.world.use_nodes else None
+    if world is not None:
+        world.inputs[1].default_value = min(world.inputs[1].default_value, 0.12)
+    # A small lamp inside the studio, not a sun: the studio's back wall would shade a sun from behind.
+    data = bpy.data.lights.new("Raking", "POINT")
+    data.energy = strength * 160.0
+    data.shadow_soft_size = 0.04
+    light = bpy.data.objects.new("Raking", data)
+    scene.collection.objects.link(light)
+    t = Vector(target)
+    # From the viewer's side, above and well off to one side: relief shows, and the head's shadow falls clear.
+    light.location = t + Vector((1.3, 1.7 if back else -1.7, 1.5))
+    look_at(light, t)
+    return light
+
+
+def glb_images(path):
+    """The images embedded in a .glb file, by name, as PIL images."""
+    import io
+    import struct
+    from PIL import Image
+    with open(path, "rb") as f:
+        data = f.read()
+    length = struct.unpack("<I", data[12:16])[0]
+    gltf = json.loads(data[20:20 + length])
+    binary = data[20 + length + 8:]
+    out = {}
+    for image in gltf.get("images", []):
+        view = gltf["bufferViews"][image["bufferView"]]
+        start = view.get("byteOffset", 0)
+        out[image.get("name", str(len(out)))] = Image.open(io.BytesIO(binary[start:start + view["byteLength"]]))
+    return out
+
+
+def twist_angle(turn, axis):
+    """The angle (radians) of the part of the rotation `turn` that turns
+    about `axis` (a unit vector): its twist, with the swing taken out."""
+    along = Vector((turn.x, turn.y, turn.z)).dot(axis)
+    if abs(along) < 1e-12 and abs(turn.w) < 1e-12:
+        return 0.0
+    angle = 2.0 * math.atan2(along, turn.w)
+    # The short way round.
+    if angle > math.pi:
+        angle -= 2.0 * math.pi
+    elif angle < -math.pi:
+        angle += 2.0 * math.pi
+    return angle
 
 
 # -- deformed geometry -----------------------------------------------------------------
@@ -358,6 +764,19 @@ class Geo:
         n = np.cross(b - a, c - a)
         return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-18)
 
+    def signed_distance(self, p, max_dist=0.1):
+        """Distance from `p` to the nearest point of this surface, negative
+        inside, or None past `max_dist`. Signed by the pseudo-normal there
+        (see `PseudoNormals`), so a point nearest to an edge or a corner
+        that two faces share isn't signed by whichever face the tree
+        returned."""
+        loc, _nrm, face, _d = self.bvh.find_nearest(Vector(p), max_dist)
+        if loc is None:
+            return None
+        if getattr(self, "_pseudo", None) is None:
+            self._pseudo = PseudoNormals(self.co, self.tris)
+        return self._pseudo.signed(np.array(p, dtype=np.float64), face)
+
 
 def merged_bvh(geos):
     """One BVH over several Geo objects (for 'any garment')."""
@@ -370,7 +789,12 @@ def merged_bvh(geos):
 
 
 def signed_distance(bvh, p, max_dist=0.1):
-    """(p - nearest) . face normal at the nearest point, or None."""
+    """(p - nearest) . face normal at the nearest point, or None. Given a
+    `Geo`, signed by the pseudo-normal instead (`Geo.signed_distance`),
+    which is right at edges; a bare tree (`merged_bvh`) has no mesh to
+    take one from."""
+    if isinstance(bvh, Geo):
+        return bvh.signed_distance(p, max_dist)
     loc, nrm, _, d = bvh.find_nearest(Vector(p), max_dist)
     if loc is None:
         return None

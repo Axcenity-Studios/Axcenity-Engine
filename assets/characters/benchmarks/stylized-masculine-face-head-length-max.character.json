@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-face-head-length-max",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0,
+    "head_length": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}
