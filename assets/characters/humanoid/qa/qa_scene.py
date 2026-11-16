@@ -22,6 +22,8 @@ import numpy as np
 from mathutils import Matrix, Quaternion, Vector
 from mathutils.bvhtree import BVHTree
 
+from pseudo_normals import PseudoNormals
+
 QA_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSET_DIR = os.path.dirname(QA_DIR)
 CUSTOM_PATH = os.path.join(ASSET_DIR, "Humanoid.customization.json")
@@ -762,6 +764,19 @@ class Geo:
         n = np.cross(b - a, c - a)
         return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-18)
 
+    def signed_distance(self, p, max_dist=0.1):
+        """Distance from `p` to the nearest point of this surface, negative
+        inside, or None past `max_dist`. Signed by the pseudo-normal there
+        (see `PseudoNormals`), so a point nearest to an edge or a corner
+        that two faces share isn't signed by whichever face the tree
+        returned."""
+        loc, _nrm, face, _d = self.bvh.find_nearest(Vector(p), max_dist)
+        if loc is None:
+            return None
+        if getattr(self, "_pseudo", None) is None:
+            self._pseudo = PseudoNormals(self.co, self.tris)
+        return self._pseudo.signed(np.array(p, dtype=np.float64), np.array(loc, dtype=np.float64), face)
+
 
 def merged_bvh(geos):
     """One BVH over several Geo objects (for 'any garment')."""
@@ -774,7 +789,12 @@ def merged_bvh(geos):
 
 
 def signed_distance(bvh, p, max_dist=0.1):
-    """(p - nearest) . face normal at the nearest point, or None."""
+    """(p - nearest) . face normal at the nearest point, or None. Given a
+    `Geo`, signed by the pseudo-normal instead (`Geo.signed_distance`),
+    which is right at edges; a bare tree (`merged_bvh`) has no mesh to
+    take one from."""
+    if isinstance(bvh, Geo):
+        return bvh.signed_distance(p, max_dist)
     loc, nrm, _, d = bvh.find_nearest(Vector(p), max_dist)
     if loc is None:
         return None

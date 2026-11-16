@@ -493,13 +493,13 @@ def face_parts_report(ch, configs):
         res = {}
         for part in ("Brows", "Lashes"):
             g = Q.Geo(ch.parts[part])
-            sd = [Q.signed_distance(body.bvh, p, 0.05) for p in g.co]
+            sd = [Q.signed_distance(body, p, 0.05) for p in g.co]
             sd = np.array([s for s in sd if s is not None])
             res[part] = {"min_mm": mm(sd.min()), "median_mm": mm(np.median(sd)), "max_mm": mm(sd.max()),
                          "pct_below_skin_1mm": round(100.0 * float((sd < -0.001).mean()), 1),
                          "pct_floating_over_3mm": round(100.0 * float((sd > 0.003).mean()), 1)}
             if part == "Lashes":
-                se = [Q.signed_distance(eyes.bvh, p, 0.03) for p in g.co]
+                se = [Q.signed_distance(eyes, p, 0.03) for p in g.co]
                 se = np.array([s for s in se if s is not None])
                 res[part]["inside_eyeball_verts"] = int((se < -0.0002).sum())
                 res[part]["inside_eyeball_max_mm"] = mm(-se.min()) if (se < 0).any() else 0.0
@@ -543,7 +543,7 @@ def eye_metrics(ch, body, eyes, teeth=None, z_neck=None):
         near = np.where(np.linalg.norm(body.co - np.array(c), axis=1) < r * 1.6)[0]
         sd_lid = []
         for i in near:
-            sd = Q.signed_distance(eyes.bvh, body.co[i], 0.03)
+            sd = Q.signed_distance(eyes, body.co[i], 0.03)
             if sd is None:
                 continue
             if body.co[i][1] < c.y:  # in front of the eye's centre: the lids
@@ -564,7 +564,7 @@ def eye_metrics(ch, body, eyes, teeth=None, z_neck=None):
             if (-d.y / d.length) < math.cos(math.radians(60)):
                 continue  # only the front of the eye
             front_total += 1
-            sd = Q.signed_distance(body.bvh, p, 0.03)
+            sd = Q.signed_distance(body, p, 0.03)
             if sd is not None and sd < -0.0002:
                 eye_in_flesh += 1
                 eye_in_flesh_max = max(eye_in_flesh_max, -sd)
@@ -581,7 +581,7 @@ def eye_metrics(ch, body, eyes, teeth=None, z_neck=None):
     if teeth is not None:
         emb = []
         for p in teeth.co:
-            sd = Q.signed_distance(body.bvh, p, 0.02)
+            sd = Q.signed_distance(body, p, 0.02)
             if sd is not None and sd < -0.0005:
                 emb.append(-sd)
         res["teeth_verts_inside_lips_or_gums_flesh"] = len(emb)
