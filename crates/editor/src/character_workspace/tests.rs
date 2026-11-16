@@ -585,3 +585,44 @@ fn the_preview_draws_the_realistic_character() {
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// A Character Studio folder made by an older engine (its realistic body's
+/// manifest from before the underwear: no Male or Female choices, nothing
+/// worn by default) is brought up to date when the workspace opens, so a
+/// New Character wears its underwear.
+#[test]
+fn an_older_studio_folder_gets_the_new_body_and_its_underwear() {
+    let folder = test_folder("workspace-stale");
+    drop(CharacterWorkspace::open_preset(&folder, 0).unwrap());
+    let manifest = folder.join("assets/characters/realistic/Realistic.base.json");
+    let mut old: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&manifest).unwrap()).unwrap();
+    for parameter in old["parameters"].as_array_mut().unwrap() {
+        parameter.as_object_mut().unwrap().remove("choices");
+    }
+    old["defaults"]["items"] = serde_json::json!([]);
+    std::fs::write(&manifest, serde_json::to_string_pretty(&old).unwrap()).unwrap();
+    // The library read last time is kept until its catalogue changes: an
+    // older engine's catalogue was written earlier, and this one starts
+    // again from what's on disk.
+    std::fs::File::options()
+        .write(true)
+        .open(folder.join("assets/characters/catalogue.json"))
+        .unwrap()
+        .set_modified(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap();
+
+    let workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs")
+    );
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    assert_eq!(frame.choices.len(), 2);
+    let _ = std::fs::remove_dir_all(&folder);
+}
