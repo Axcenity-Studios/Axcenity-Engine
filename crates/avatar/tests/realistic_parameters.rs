@@ -247,6 +247,8 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // controls less the four eye looks, which are bones).
     assert_eq!(left.len(), 48, "{left:?}");
     // (One less than at the merge: the body no longer carries `Pupil_Size`,
-    // which is the eyes' own shape and no slider's.)
-    assert_eq!(model.morph_targets.len(), 142);
+    // which is the eyes' own shape and no slider's. Four more since: the
+    // brows' height and arch have a raising shape each side besides the
+    // lowering one, `faceparams.SPLIT`.)
+    assert_eq!(model.morph_targets.len(), 146);
 }

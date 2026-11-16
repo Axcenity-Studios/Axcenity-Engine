@@ -1407,6 +1407,17 @@
           "shape": "Face_Brow_Height_Left",
           "from": [
             -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Height_Up_Left",
+          "from": [
+            0,
             1
           ]
         }
@@ -1426,6 +1437,17 @@
           "shape": "Face_Brow_Height_Right",
           "from": [
             -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Height_Up_Right",
+          "from": [
+            0,
             1
           ]
         }
@@ -1445,6 +1467,17 @@
           "shape": "Face_Brow_Arch_Left",
           "from": [
             -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Arch_Up_Left",
+          "from": [
+            0,
             1
           ]
         }
@@ -1464,6 +1497,17 @@
           "shape": "Face_Brow_Arch_Right",
           "from": [
             -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Arch_Up_Right",
+          "from": [
+            0,
             1
           ]
         }

@@ -297,26 +297,38 @@ BROW_SLIDES_FROM = 8.0
 # How far a lowered brow brings the upper lid down (a share of the way to
 # closed).
 BROW_PRESSES = 0.22
-# Identity: how far forward each loop of the upper lid's skin goes for
-# every metre a brow parameter brings it down (and back as it goes up).
-# Both brow parameters at -1 bring the brow down 11 mm, nearly all the
-# height between the brow and the lash line: the fold under the brow came
-# straight down through the lid's skin, which the eyeball holds forward
-# (on the feminine frame the fold stands no further forward than the lid
-# below it). Rolled forward it comes down over the lid, as a hooded lid's
-# fold does. The roll is none at the eye's inner corner and whole from a
-# third of the way along it (`BROW_ROLL_TAPER`, of the way from the inner
-# corner to the outer), and averaged over the lid (`BROW_ROLL_SMOOTH`
-# times): with both brows raised, a roll that changed sharply from loop
-# to loop pinched the fold where it ends at the inner corner.
+# Identity: the brow parameters have a shape for each end (`faceparams`),
+# since a lowered brow's fold must go forward over the lid and a raised
+# one's must lie on the brow bone, and a shape moves its vertices along
+# one straight line both ways.
+#
+# The lowering shapes (`Face_Brow_Height_*`, `Face_Brow_Arch_*`, driven
+# from 0 to -1): how far forward each loop of the upper lid's skin goes for
+# every metre the brow comes down. Both brow parameters at -1 bring the
+# brow down 11 mm, nearly all the height between the brow and the lash
+# line: the fold under the brow came straight down through the lid's skin,
+# which the eyeball holds forward (on the feminine frame the fold stands no
+# further forward than the lid below it). Rolled forward it comes down over
+# the lid, as a hooded lid's fold does. The roll is none at the eye's inner
+# corner and whole from a third of the way along it (`BROW_ROLL_TAPER`, of
+# the way from the inner corner to the outer), and averaged over the lid
+# (`BROW_ROLL_SMOOTH` times).
 BROW_ROLLS = {5: 0.15, 6: 0.25, 7: 0.30, 8: 0.30, 9: 0.20, 10: 0.10}
 BROW_ROLL_TAPER = (-0.1, 0.35)
 BROW_ROLL_SMOOTH = 6
-# How far the brow's skin rises at brow height +1 and at the arch at brow
-# arch +1 (metres). (5.2 and 6.4 mm before: with the skin over the lid no
+# How far the lowering shapes bring the brow's skin down at -1, and the
+# arch (metres). (5.2 and 6.4 mm at first: with the skin over the lid no
 # longer put back on its resting surface the shapes' largest moves came
 # out a little smaller, and they are kept at least what they were.)
 BROW_RISES = (0.00533, 0.00648)
+# The raising shapes (`Face_Brow_Height_Up_*`, `Face_Brow_Arch_Up_*`,
+# driven from 0 to +1): how far they raise the brow's skin and the arch
+# (metres). They put the raised skin back on its resting surface, lids
+# and fold too, so the fold lies forward on the brow bone: the brows'
+# identity shapes as they were before the lowering ones were made.
+# (Rolled back with the lowering shapes' roll, a raised fold stood behind
+# the skin above it as a pale crescent.)
+BROW_RAISES = (0.0052, 0.0064)
 # How much of the cheek's lift each loop of the lower lid's skin takes.
 CHEEK_ON_LID = {3: 0.15, 4: 0.40, 5: 0.65, 6: 0.85, 7: 1.0}
 # Identity: how much the eyeball and the lids' rims grow at eye size +1,
@@ -1424,11 +1436,13 @@ class Face:
             held = rims[np.abs(excess) > 1e-9]
             tilt += self.topo.smooth(kept_off, TILT_SPREADS, keep=held, among=eye.idx)
             put(f"Face_Eye_Tilt_{side}", tilt, teeth=False)
-            # Brows. (The skin is put back on its resting surface as the
-            # brow controls put it, not on the lids and the fold over
-            # them: slid there, the fold of a lowered brow was laid onto
-            # the lid's own skin. The fold rolls forward as it comes down,
-            # `BROW_ROLLS`.)
+            # Brows: a shape for each end (`BROW_RAISES` above). Lowering,
+            # the skin is put back on its resting surface as the brow
+            # controls put it, not on the lids and the fold over them
+            # (slid there, the fold of a lowered brow was laid onto the
+            # lid's own skin), and the fold rolls forward as it comes
+            # down (`BROW_ROLLS`). Both are made as a rise; the lowering
+            # ones are driven from 0 to -1, the raising ones from 0 to 1.
             bw, along_brow = self.brow(s)
             roll = np.zeros(len(P))
             span = eye.t_out - eye.t_in
@@ -1444,6 +1458,8 @@ class Face:
             # the other way the brow bent into a hook.)
             arch = gauss(along_brow - 0.60, 0.50)
             put(f"Face_Brow_Arch_{side}", (bw * arch * BROW_RISES[1])[:, None] * lift, slide=self.brow_slide(), teeth=False)
+            put(f"Face_Brow_Height_Up_{side}", vec(bw, up * BROW_RAISES[0]), slide=skin, teeth=False)
+            put(f"Face_Brow_Arch_Up_{side}", vec(bw * arch, up * BROW_RAISES[1]), slide=skin, teeth=False)
             # The nose's wing, the cheek, the jaw's corner, the mouth's corner, the ear.
             wing = self.on_skin(self.nose_tip + np.array([s * 0.019, 0.016, -0.004]))
             nw = self.near(wing, 0.013) * skin * self.side(s, 0.004)
