@@ -6,8 +6,8 @@ implementation: implemented
 crates: [character, gameplay, avatar, assets]
 source: [crates/character/src/lib.rs, crates/character/src/seat.rs, crates/character/src/rig.rs, crates/gameplay/src/description.rs, crates/gameplay/src/description_system.rs, crates/avatar/src/resolve.rs, crates/assets/src/model/identity.rs, crates/assets/src/derived.rs, crates/core/src/material_values.rs, crates/scene/src/material.rs, crates/project/src/character_library.rs]
 docs: [docs/scripting/api-character.md, crates/character/CLAUDE.md, docs/development/character-studio/architecture.md, docs/development/character-studio/testing.md, crates/gameplay/CLAUDE.md]
-verified: 2026-11-14
-verified_commit: fe0eb86c
+verified: 2026-11-15
+verified_commit: 0c7761ac
 tags: [system/character, gameplay]
 ---
 
@@ -71,7 +71,8 @@ Built in Character Studio overhaul CO4, with its body parameters from CO5, waiti
 - **Skeleton.** The 56 bones of the humanoid convention, named as the stylized humanoid's are, plus 16: eight twist bones and eight helper bones, listed in the manifest's `skeleton.added_bones`. No clip keys them; `anim` turns them by name just before the skin is posed ([Animation](Animation.md)).
 - **Clips.** The starter animations were made on the stylized skeleton, whose bones have the same names and other lengths. `anim` plays such a take through humanoid roles, not by name, so the realistic body keeps its own proportions ([Animation](Animation.md)).
 - **Body parameters (CO5).** `frame`, `muscle` and `fat` for the whole body, `muscle_<region>` and `fat_<region>` for eight regions, and nine proportion sliders that run 0.85 to 1.15 on this body (the hips only widen), because wider ranges make it cross itself. The muscle and fat shapes were carried over from MakeHuman's CC0 targets and are manifest corners with the frame. The body has 53 shapes on each level of detail, four of them corrective shapes for the raised shoulder that `anim` drives from the pose ([Animation](Animation.md)); the rest are identity and are baked ([ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md)).
-- **Not yet usable as a character family.** The face arrives in CO6, and it has no items, face shapes or hair. The library `project` writes into a project is still the stylized package alone (`crates/project/src/character_library.rs`). What it measures against its targets, and what is still short, is in [Known limitations](../Roadmap/Known-Limitations.md#characters) and `docs/development/character-studio/testing.md`.
+- **Head and face (CO6).** The body's own head with 512 more vertices round the lids (`rims.py`), eyes as sclera, iris and cornea (`Eyes`) with an occlusion film and a tear line (`EyeShell`), lash and brow cards, separate teeth, gums and a tongue (`Teeth`, with its own two simpler copies) and `LipSeal`. 44 expression shapes on `Body` for the 48 standard controls (the four looks turn the eye bones; `Jaw_Open` is the jaw's turn plus a shape) through the built-in `axcenity` face profile, and 45 identity parameters in nine groups, the eye ones also moving the eye bones. Every shape is made procedurally in Blender (`face.py`, `lids.py`, `mouth.py`, `teeth.py`, `faceparams.py`); the mouth is mirror-symmetric by construction. `assets/characters/humanoid/qa/face_checks.py` poses every control, viseme, expression and identity end and holds the lids off the eyes and the teeth out of the lips. `measure.py --only sliders` sets every pair of parameters to their ends and moves the eye bones by their `bones` drivers, as `avatar::resolve` and the bake do. What they measure and what the engine shows are in `docs/development/character-studio/co6/README.md`.
+- **Not yet usable as a character family.** It has no items or hair. The library `project` writes into a project is still the stylized package alone (`crates/project/src/character_library.rs`). What it measures against its targets, and what is still short, is in [Known limitations](../Roadmap/Known-Limitations.md#characters) and `docs/development/character-studio/testing.md`.
 
 ## Dependencies
 

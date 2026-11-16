@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-15 | Characters, Animation, Known limitations, Roadmap, Home | Character Studio overhaul CO6 (the realistic head and face): the face's parts, expression and identity shapes, the face checks, the blink held to what a squint leaves open (`BLINK_YIELDS`), eye and jaw turns reaching a character's parts, and what the face is still short of | Claude |
 | 2026-11-14 | Characters, Animation, Known limitations, Roadmap | Character Studio overhaul CO5 (body parameters): the realistic body's muscle, fat and proportion parameters, pose-driven corrective shapes in `anim` (`correctives.rs`), the raised shoulder's open measure |
 | 2026-11-14 | Characters, Animation, Known limitations, Roadmap | Character Studio overhaul CO4 (the realistic base body): the `axcenity/realistic` base model, twist and helper bones turned by name in `anim` (`twist.rs`), takes named like a body of other proportions played through roles, the measured results and what is still short | Claude |
 | 2026-11-14 | Characters | Character Studio overhaul CO2: the in-engine character capture (`character_capture.rs`) and the benchmark characters | Claude |

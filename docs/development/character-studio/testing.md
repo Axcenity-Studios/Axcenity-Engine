@@ -73,13 +73,30 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 | Elbow 135° ring area ratio | 0.37 | ≥ 0.6 with twist bones and correctives | 0.757 / 0.758, met |
 | Shoulder abducted 150° volume ratio | 0.56 | ≥ 0.8 | 0.562 / 0.561, **not met**; at CO5 0.463 / 0.513, **not met** (below) |
 | Knee 135° ring area ratio | 0.44 | ≥ 0.6 | 0.74 / 0.75, met |
-| Eyeball front uncovered in a full blink | 20–23% | 0% | Not measured: no blink shape until CO6 |
-| Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 | 6 / 14 (the lower lip's inner side), not met (CO6) |
+| Eyeball front uncovered in a full blink | 20–23% | 0% | Not measured: no blink shape until CO6; at CO6 0 / 0 rays bare under `Blink` and `Eye_Closed`, met |
+| Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 | 6 / 14 (the lower lip's inner side), not met; at CO6 0 / 0 over every control, viseme and expression, met |
 | Face vertices above the head joint carrying `Neck` weight | 911 | 0 | 0, met |
 
 **The realistic body at CO4** (`co4/measurements.json`, checked by `measure.py --package realistic --check assets/characters/realistic/qa/thresholds.json`). Met: the elbow, the knee, the `Neck` weights, and CO4's own test of no eye or teeth interpenetration at rest (0 on both frames). **Not met: the shoulder raised 150°** keeps 0.562 / 0.561 of its local volume against 0.8. A crease between collar and arm and a flattened deltoid show in `co4/deformation_poses.png`; the corrective shapes are CO5's. The thresholds file holds it as a `target` (printed as not met; `--strict` fails on it) over a floor of 0.54, and it moves into `at_least` when it is met. Also still short: the fist self-intersects (247 / 199 triangle pairs), the teeth touch the lower lip's inner side with the jaw open, and the lips rest about 2 mm apart (CO6). No target above has changed.
 
 **The realistic body at CO5** (`co5/measurements.json`). The shoulder has corrective shapes, a delta mush of the raised pose, chosen by the pictures (`co5/shoulders_*.png`, `co5/engine/cheer_shoulders_after.png`). On the measure it reads **0.463 / 0.513 at 150°** and 0.847 / 0.88 at 90° (the stylized body: 0.853 / 0.992): the target is not met, and the 150° figure is under the package's own limit of 0.54, so `--check` is red on those two lines. A first shape that moved skin outward until the measure read 0.86 was rejected: it passed the number and showed a step and a ball in the engine (`co5/engine/cheer_shoulders_before.png`). The same pose's ring area is 0.929 / 0.82. **No target or limit was changed; what the shoulder is held to is Paul's decision** (`progress.md`). New at CO5 and met: no pair of the manifest's parameters at the ends of their ranges makes the body newly cross itself at rest (0 of 351 pairs on each frame), and no shape slider puts skin in the eyes or teeth.
+
+**The realistic face at CO6** (`co6/sliders.json`, `co6/sliders-check.txt`).
+
+The sliders check now covers the face's 45 parameters as well: 73 parameters, 2,556 pairs, 10,082 bodies a frame. No body newly crosses itself on either frame; before the identity work, 14 masculine and 8 feminine did.
+
+The harness now moves and scales the eye bones by the parameters' `bones` drivers, as `avatar::resolve` and the bake do (`qa_scene.manifest_bones`). Before, it moved the lids off eyeballs left at rest, which made 13 to 14 of each frame's 17 eye-in-flesh entries.
+
+**Red on one line:** `sliders/frames/masculine/alone_eye_or_teeth_in_flesh` is 3 (at most 0). These are three false counts:
+- `eye_metrics` signs an eyeball point by the face Blender returns as nearest.
+- These three points are nearest an edge two faces share, and that face's side says "inside".
+- By the edge's pseudo-normal and by four rays' parity, each point is 2.4 to 4.7 mm outside the lid.
+
+**No threshold or measure was changed.** Whether to sign by the nearest feature's pseudo-normal is Paul's decision.
+
+## Tests that exist (CO6)
+
+`anim` `tests/realistic_face.rs` (4: `check_face` finds nothing wrong with the head and its profile; every standard control moves a vertex or a bone; the face's parts carry the shapes they follow; every control the ARKit profile uses plays); `anim` `face_tests.rs` `a_blink_closes_only_what_a_closed_eye_leaves_open` and `a_blink_closes_only_what_a_narrowed_eye_leaves_open` (the blink rule, on the shipped body); `avatar` `tests/realistic_parameters.rs` (every face parameter at each end moves the baked body and both copies, now 45 more); `player` `the_same_description_captures_identical_pictures_and_every_view_is_drawn` (six views). Blender: `assets/characters/humanoid/qa/face_checks.py --package realistic --check` poses every control, viseme, expression and identity end on both frames and holds, among others, lids in the eyeball, eyeballs in the lid, bare rays under a full blink, teeth and tongue in flesh, lips in teeth, lining through skin, new self-crossings, the mouth's, teeth's and tongue's mirror symmetry (0.1 mm) and the lips' seal out of view once the lips are 6 mm apart; identity ends are recorded, not held. Its record and output: `co6/face_checks.json`, `co6/face-checks-run.txt`. `measure.py --package realistic --only sliders` sets every pair of the 73 parameters at their ends on both frames (`co6/sliders.json`).
 
 ## Tests that exist (CO5)
 

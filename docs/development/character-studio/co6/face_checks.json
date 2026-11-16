@@ -1632,14 +1632,14 @@
      "lining_through_skin": 0,
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
-     "lips_open_mm": 4.2,
+     "lips_open_mm": 0.5,
      "mouth_asymmetry_mm": 0.0,
      "open_mm": [
       3.28,
       3.28
      ],
      "required": true,
-     "seal_in_view": 26,
+     "seal_in_view": 9,
      "self_crossing": 17,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
@@ -8241,14 +8241,14 @@
      "lining_through_skin": 0,
      "lips_in_teeth": 0,
      "lips_in_teeth_max_mm": 0.0,
-     "lips_open_mm": 4.8,
+     "lips_open_mm": 0.9,
      "mouth_asymmetry_mm": 0.0,
      "open_mm": [
       3.32,
       3.32
      ],
      "required": true,
-     "seal_in_view": 26,
+     "seal_in_view": 13,
      "self_crossing": 16,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,

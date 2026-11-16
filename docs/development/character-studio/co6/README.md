@@ -8,13 +8,13 @@ Milestone CO6 of the [Character Studio overhaul](../../../../plans/axcenity-engi
 |---|---|
 | Head | The body's own head (no graft), vertex order the bundle's, with 512 more vertices after them round the lids (`rims.py`: each loop round an eye has twice the bundle's, so the lids' edges are curves at 4K). Repairs at rest (`face.prepare`): the feminine frame's lids are the masculine frame's carried to the feminine eye (the feminine opening sat 1.5 mm higher on the eyeball and bared the whole iris: the stare); the lids' lining is lifted off the eyeball; the lips are closed (they rested 1.9 to 2.5 mm apart) without crossing each other. The upper lids' fine detail is taken out of the skin maps (`face.soften_lids`): a closing lid stretches that skin fourfold and pores stretched into streaks. |
 | Expressions | 44 blend shapes on `Body`, named as the facial profile's controls (`face.EXPRESSIONS`); the four `Eye_Look_*` controls turn the eye bones. `Jaw_Open`, `Jaw_Left`, `Jaw_Right` are the jaw bone's turn plus a shape that puts right what the turn gets wrong. The three `Tongue_*` shapes are empty on the body and move the tongue (a part follows the body's shape of the same name). |
-| Identity | 45 shapes, one per face parameter (`faceparams.py`), in nine groups (eyes, brows, nose, cheeks, jaw, chin, lips, forehead, ears). Paired features have a parameter a side that names the other as its `mirror`; `nose_tilt` and `jaw_shift` push the middle off centre. Eye parameters also move or scale the eye bones. Each end moves the face 4 mm or more (2.2 mm or more on the coarsest copy). |
+| Identity | 45 face parameters (`faceparams.py`) in nine groups (eyes, brows, nose, cheeks, jaw, chin, lips, forehead, ears), with 49 shapes. Most parameters have one shape. Brow height and brow arch have one shape for each end (`faceparams.SPLIT`): a lowered brow's fold comes forward over the lid, while a raised one lies back on the brow bone. Paired features have a parameter a side that names the other as its `mirror`; `nose_tilt` and `jaw_shift` push the middle off centre. Eye parameters also move or scale the eye bones. Each end moves the face 4 mm or more (2.2 mm or more on the coarsest copy). |
 | `Eyes` | Per eye: `Sclera` (the white, textured), `Iris` (a dish set back inside the limbus, with the pupil), `Cornea` (a clear cap 1.2 mm proud of the white, alpha-blended). 2,256 triangles. Its own shape `Pupil_Size` widens or narrows the pupil; nothing drives it yet (below). |
 | `EyeShell` | `EyeOcclusion` (a film between the lids, dark at their edges) and `TearLine` (the wet line), on the head, following the lids by shapes and drawn back behind them as they close. 2,612 triangles. |
 | `Lashes`, `Brows` | Cards, alpha-blended. Lashes are rooted on the lid's outer edge and turn with it about the eyeball (188 triangles); a brow card lies on the skin and rides it whole (352 triangles for the two). |
 | `Teeth` | The teeth, at 0.85 of the bundle's size, meet 1.6 mm under the lips' line, 2.7 mm behind the upper lip on both frames (CO4 had them 13 mm lower and 12 mm further back). The bundle's lower shell and floor, which tore between head and jaw, are gone; a tongue (432 triangles, on the jaw) is made with `Tongue_Out`, `Tongue_Up`, `Tongue_Down`, and the lower teeth and the tongue carry their own `Jaw_Open` (review round 3, part 2). Shaded by palette images, with two simpler copies of its own (the last section). 9,022 triangles. |
 
-Materials and shading in the manifest: `Skin` skin; `Sclera`, `Iris`, `Cornea` eye; `Lashes`, `Brows` hair; `Mouth`, `Teeth`, `Gums`, `Tongue`, `EyeOcclusion`, `TearLine` standard. `RealisticParts.glb` is 31.6 MB with CO5's body shapes; `Body` and each simpler copy carry 142 shapes.
+Materials and shading in the manifest: `Skin` skin; `Sclera`, `Iris`, `Cornea` eye; `Lashes`, `Brows` hair; `Mouth`, `Teeth`, `Gums`, `Tongue`, `EyeOcclusion`, `TearLine` standard. `RealisticParts.glb` is 32.0 MB with CO5's body shapes; `Body` and each simpler copy carry 146 shapes.
 
 ## How the shapes are made
 
@@ -110,6 +110,12 @@ PY -I assets/characters/humanoid/qa/measure.py --package realistic --only slider
 cargo nextest run -p axcenity-anim -p axcenity-avatar --no-fail-fast
 ```
 
+**The build is not byte-for-byte reproducible**, so after a rebuild git shows `RealisticParts.glb` as changed even when nothing was. Two runs of the same sources differ in two ways:
+- The teeth's vertex order changes. The triangles are the same, and every check gives the same numbers.
+- 9 of the skin normal map's 4.2 million pixels differ by one level.
+
+`teeth.py`'s `remove_doubles` over a set of BMVerts is one cause; ordering it alone did not make two builds agree.
+
 A face pose in the engine (both frames; see [visual-qa.md](../visual-qa.md)):
 
 ```text
@@ -120,30 +126,43 @@ Tests: `crates/anim/tests/realistic_face.rs` (four: `check_face` finds nothing; 
 
 ## Measured (`face_checks.py`, both frames)
 
+The build this README describes; the round 1 numbers are in git history. *Held to 0* means the measures `--check` holds to 0:
+- lid vertices in the eyeball;
+- eyeball vertices in the lid;
+- teeth or tongue in the flesh;
+- lips in the teeth;
+- the mouth's lining through the skin.
+
 | Measure | Masculine | Feminine |
 |---|---|---|
 | Eye open at rest, left and right (mm) | 9.53, 9.42 | 9.4, 9.3 |
+| Lips apart at rest (mm) | 0.9 | 0.4 |
+| Head triangle pairs that cross at rest | 1 | 0 |
 | Full `Blink` and `Eye_Closed`: bare rays | 0, 0 | 0, 0 |
 | Blink at 0.25, 0.5, 0.75: lid vertices in the opaque eyeball | 0, 0, 0 | 0, 0, 0 |
-| Blink at 0.25, 0.5, 0.75: eyeball vertices in the lid | 2, 0, 0 | 1, 0, 0 |
-| Blink at 0.25, 0.5, 0.75: lid vertices in the clear cornea (reported) | 6 (to 0.51 mm), 8 (to 0.54 mm), 0 (to 0.0 mm) | 6 (to 0.5 mm), 8 (to 0.51 mm), 0 (to 0.0 mm) |
-| Head triangle pairs that cross at rest | 3 | 0 |
-| 48 controls: `teeth_in_flesh` | Mouth_Left 1 (to 0.65 mm) | Jaw_Left 2 (to 0.9 mm); Jaw_Right 4 (to 1.84 mm) |
-| 48 controls: `lips_in_teeth` | 0 | Jaw_Right 1 (to 0.24 mm) |
-| 48 controls: every other measure held to 0 | 0 | 0 |
-| 12 visemes: every other measure held to 0 | 0 | 0 |
-| 15 expressions: `teeth_in_flesh` | Disgusted 8 (to 1.2 mm); Laughing 6 (to 1.29 mm) | 0 |
-| 15 expressions: `lips_in_teeth` | Disgusted 1 (to 0.92 mm) | 0 |
-| 15 expressions: every other measure held to 0 | 0 | 0 |
-| Identity ends (90 poses, reported): `eyeball_in_lid` | eye_tilt_left+1 1 (to 0.38 mm); eye_tilt_right+1 1 (to 0.38 mm) | eye_tilt_left+1 1 (to 0.37 mm); eye_tilt_right+1 1 (to 0.37 mm) |
-| Identity ends (90 poses, reported): `teeth_in_flesh` | chin_length-1 3 (to 0.93 mm) | chin_length-1 1 (to 0.53 mm) |
-| Identity ends (90 poses, reported): `lips_in_teeth` | jaw_shift-1 1 (to 0.68 mm) | chin_length-1 1 (to 2.75 mm) |
-| Identity ends (90 poses, reported): `lining_through_skin` | chin_forward-1 9; jaw_shift+1 12; jaw_shift-1 14 | chin_forward-1 8; jaw_shift-1 8 |
-| Identity ends: a full blink left open (mm, left and right) | eye_depth_right-1 [0.0, 0.11] | none |
+| Blink at 0.25, 0.5, 0.75: eyeball vertices in the lid (reported) | 0, 0, 0 | 0, 0, 0 |
+| Blink at 0.25, 0.5, 0.75: lid vertices in the clear cornea (reported) | 3 (to 0.33 mm), 5 (to 0.45 mm), 0 | 2 (to 0.32 mm), 5 (to 0.43 mm), 0 |
+| 48 controls, 7 left-and-right pairs, 12 visemes, 15 expressions: held to 0 | 0 | 0 |
+| The same: largest left-right difference of the mouth (mm, held to 0.1) | 0.07 | 0.07 |
+| Identity ends (90 poses, reported): held-to-0 measures | 0 | `jaw_shift` +1 and -1: 1 lip vertex each in the teeth (to 0.27 mm) |
+| Identity ends: head triangle pairs that newly cross (reported) | `eye_size` -1 36 and 28; `brow_ridge` +1 15; `brow_height_left` -1 10, `brow_arch_left` -1 7, right 3 and 1; `cheekbone` +1 3 and 5; `eye_tilt` +1 5 and 4 | `lower_lip_fullness` -1 98; `nose_length` -1 8; `brow_ridge` +1 6; `eye_tilt` +1 5 and 4 |
+| Identity ends, then a full blink: bare rays | 0 | 0 |
 
-`--check` exits 1 with **7 failures** (the lines above that aren't 0 among controls, visemes and expressions). CO4's file had 42 crossing pairs at the feminine mouth at rest and 3 on the masculine head.
+`--check` exits 0 with **0 failures** ([face-checks-run.txt](face-checks-run.txt)). Nothing was loosened; round 1's run had 7 failures, and CO4's file had 42 crossing pairs at the feminine mouth at rest and 3 on the masculine head.
+
+The sliders check (`measure.py --only sliders`) is in [Identity parameters at their ends](#identity-parameters-at-their-ends):
+- no new crossings on either frame;
+- red on one line, from three false counts.
 
 ## What the engine shows
+
+**The face as it is now:** [engine/final-expressions-masculine.jpg](engine/final-expressions-masculine.jpg) and [engine/final-expressions-feminine.jpg](engine/final-expressions-feminine.jpg). These are the build this README describes, straight on (`face-front`, 3840 x 2160 captures cropped to the face). They show the neutral face, Happy at 0.5 and 1, the other fourteen recipes, `Jaw_Open` at 0.5 and 1, `Blink` and `Eye_Wide`.
+- *Good:* the open mouths are ovals with a dark red inside, a tongue and the lower teeth; the teeth are separate adult teeth; the closed smile is one curve; Laughing closes the eyes to dark arcs over a toothy open mouth; Sad, Worried and Crying bend the brows up at their inner third; a blink and a closed eye are one clean line; Sleepy keeps its lips together.
+- *Still wrong:* see [What still falls short](#what-still-falls-short).
+
+The review rounds below have the close-ups, and the identity section has the parameters' ends.
+
+The sheets that follow are review round 1's, kept as the record of what was seen then.
 
 Sheets in [engine/](engine/): a row per pose; in a row the masculine frame's studio face view, hard-light face view and three-quarter view (the head cut from the full-body picture), then the feminine frame's. 1920 x 1080 captures, tiles at a third of their size.
 
@@ -163,17 +182,37 @@ Sheets in [engine/](engine/): a row per pose; in a row the masculine frame's stu
 
 ## What still falls short
 
-1. `face_checks.py --check` is red: 7 failures, all teeth and the lips' inner side within 2 mm of each other (the table above). Single controls: the masculine `Mouth_Left` (1 point) and the feminine `Jaw_Left` and `Jaw_Right` (2 and 4 points), as before the review; the TH viseme and Angry are clear; Laughing is new (6 points to 1.3 mm) with the stronger smile. None shows in the engine sheets from outside; no picture from inside the mouth was made.
-2. A half blink dips the lid into the clear cornea by up to 0.54 mm, and 1 to 2 eyeball vertices sit in the lid at a quarter blink (straight-line shapes).
-3. Eyes: no highlight (the cornea's gloss is lost in alpha blending), flat whites, no caruncle, a red speck of lining at the closed eye's inner corner. Eye shading is CO7's.
-4. Teeth: faceted and grey in close-up (`parts.TEETH_TRIANGLES` 3,600).
-5. Lashes and brows are single blended cards: a fringe and a patch, not hairs; `brow_arch` bends its card.
-6. Identity: six parameters are hard to see in a face-view picture though they pass the 2 mm test; `jaw_shift` at -1 puts 8 to 14 pairs of the mouth's lining through the skin and `chin_length` at -1 leaves 1 to 3 points of the teeth in the lining; `eye_depth_right` at -1 leaves a blink 0.11 mm open on the masculine frame.
-7. The pupil has no slider: `Pupil_Size` moves 1.3 mm of the eye, under what a parameter must move the body by.
-8. `Blink` and `Eye_Closed` are separate shapes that add (the lead is looking at it in `anim`).
-9. In the engine a cut-out (MASK) card on a skinned, morphed part shows the backdrop through the skin behind its clear pixels; the face's cards are blended to avoid it. Worth a look in the renderer before hair (CO8).
-10. The simpler copies were looked at in Blender only (`face_lods.png`); the alpha parts in a full-body engine view were seen only as the three-quarter column of the sheets, where brows and lash lines draw and nothing stands out.
-11. `measure.py`'s `sliders` section (every pair of parameters) was not run with the face's 45 parameters added: it is some eight times the pairs it was. Run since: [Identity parameters at their ends](#identity-parameters-at-their-ends).
+Judged against reference photographs in 4K engine captures, after the three review rounds and the identity work below. Every item is a known defect, not accepted behaviour.
+
+1. **No creases anywhere.** A smile, a squint, a frown and raised brows move the skin but fold none of it: no lines at the eyes' corners, on the forehead or between the brows (there are no wrinkle maps).
+2. **Eyes.**
+   - The shade over the eye is a film between the lids (`EyeOcclusion`) that does not know where the light is, so the whites are lit alike in every light.
+   - The iris's edge is 24 segments, which shows as corners close up at 4K.
+   - There is no caruncle.
+   - Eye shading is CO7's.
+3. **Lids.**
+   - Under side light, a closed lid shows the head's own shadow edge as a lit blotch.
+   - A half-shut eye (Sleepy, the squints) shows pale wedges at its corners.
+   - The feminine `Eye_Wide` has a faint lit band above the lid's outer corner.
+   - A half blink dips the lid into the clear cornea by up to 0.45 mm (reported). The lid never enters the opaque eyeball.
+4. **Mouth** (details: [round 3's list](#still-short-of-the-photographs-2)).
+   - The closed smile is milder than a real one.
+   - An open mouth's corners are points, and the lower back teeth can be counted at three times the size.
+   - `Jaw_Open` 1 is a bell, not a broad U.
+   - U and WQ show the front teeth, TH shows no tongue, and FV's lower lip does not go under the upper teeth.
+   - A band of dark lining shows under the upper lip in every open mouth.
+5. **Expressions.** Determined and Frustrated are close to a mild Angry.
+6. **Lashes and brows** are blended cards: a fringe and a patch, not hairs.
+7. **The pupil has no slider.** `Pupil_Size` moves 1.3 mm of the eye, under what a parameter must move the body by.
+8. **Identity ends** (details: [its list](#still-short)).
+   - The sliders check is red on one line, from three false counts in `eye_metrics`. The measure is unchanged; changing it is Paul's call.
+   - Several ends still have head triangles crossing; the masculine `eye_size` -1 shows as a lit streak on the upper lid.
+   - Raised brows keep the faint marks they had before the identity work: a pale chevron on the fold with one brow parameter raised, and a grey smear with both.
+   - `jaw_shift` leaves one feminine lip vertex 0.27 mm in the teeth.
+   - Six parameters are hard to see from the front.
+   - The right-side parameters were judged from the numbers and from the left side's pictures.
+9. **Rendering.** In the engine, a cut-out (MASK) card on a skinned, morphed part shows the backdrop through the skin behind its clear pixels. The face's cards are blended to avoid it. This is worth a look in the renderer before hair (CO8).
+10. **The simpler copies** were looked at in Blender only (`face_lods.png`).
 
 ## Review round 3, part 1 (open mouth, smile, laugh)
 
@@ -664,7 +703,14 @@ The sliders check's output is [sliders.json](sliders.json) and its `--check` run
 
 ### Still short
 
-1. **The sliders check is red on one line**: `sliders/frames/masculine/alone_eye_or_teeth_in_flesh` is 3 (at most 0): `eye_size_left` -1 (which it counted before this section too, with the eyes posed), `eye_tilt_left` +1 and `eye_tilt_right` +1, one eyeball point each, "0.29 to 0.43 mm in the lid". None is in the lid: each point is in the open eye, 2.4 to 4.7 mm from the lid, and outside the body by three rays' parity; `face_checks.py`, which tests by parity, finds no eyeball in a lid at these ends. `eye_metrics` takes the side of the nearest face, and a point nearest the lid's edge is nearest a vertex that several faces share, at the same distance to a thousandth of a millimetre: which face Blender returns decides the sign. The tilt's real defect (the lower lid's edge 0.25 mm in the eyeball, inside by parity) is gone; moving the lid's edge by tenths of a millimetre to take it out of the eyeball tipped the tie at two such vertices. The measure was not changed (no measure may be retuned to pass): counting a point only where the nearest face's side is its own (its distance to the body no more than its depth) would keep the real case and drop these. That is for the lead to decide.
+1. **The sliders check is red on one line**: `sliders/frames/masculine/alone_eye_or_teeth_in_flesh` is 3 (at most 0): `eye_size_left` -1 (which it counted before this section too, with the eyes posed), `eye_tilt_left` +1 and `eye_tilt_right` +1, one eyeball point each, "0.29 to 0.43 mm in the lid". None is in the lid: each point is in the open eye, 2.4 to 4.7 mm from the lid, and outside the body by three rays' parity; `face_checks.py`, which tests by parity, finds no eyeball in a lid at these ends. `eye_metrics` takes the side of the nearest face, and a point nearest the lid's edge is nearest a vertex that several faces share, at the same distance to a thousandth of a millimetre: which face Blender returns decides the sign. The tilt's real defect (the lower lid's edge 0.25 mm in the eyeball, inside by parity) is gone; moving the lid's edge by tenths of a millimetre to take it out of the eyeball tipped the tie at two such vertices. The measure was not changed (no measure may be retuned to pass): counting a point only where the nearest face's side is its own (its distance to the body no more than its depth) would keep the real case and drop these.
+
+The lead checked the three points on the merged build:
+- Blender's nearest point for each lies on an edge that two faces share, not at a vertex.
+- By that edge's pseudo-normal (the sum of the two faces' normals, which is unambiguous there), each point is outside.
+- Four rays out of each point agree.
+
+Signing by the nearest feature's pseudo-normal would be the principled fix: unlike a depth filter, it cannot drop a point that is really inside. The measure is unchanged; whether to change it is Paul's decision.
 2. **Both brows at -1** hood the upper lid down to the lash line, the fold over the lid as a hooded eye's; the lashes are under it. Under the hard light a stippled patch of shadow shows at the inner corner (the renderer's shadow pattern, which shows at the lower lid's inner corner at rest too).
 3. **The brows at +1** are the build before's, with what that had: small white marks on the fold with one brow parameter raised and a grey smear with both (seen in the engine pictures before and after alike).
 4. `face_checks.py`'s identity entries that are not clean (Checks, above) are as they were, but for the masculine brows, where fewer head triangles cross at -1.
