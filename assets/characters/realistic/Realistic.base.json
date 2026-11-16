@@ -156,7 +156,7 @@
   "parameters": [
     {
       "id": "frame",
-      "label": "Masculine to feminine",
+      "label": "Body type",
       "group": "frame",
       "range": [
         0,
@@ -736,6 +736,23 @@
             0.0,
             -0.03518,
             0.01112
+          ]
+        }
+      ],
+      "choices": [
+        {
+          "value": 0,
+          "label": "Male",
+          "items": [
+            "axcenity/realistic-boxer-briefs"
+          ]
+        },
+        {
+          "value": 1,
+          "label": "Female",
+          "items": [
+            "axcenity/realistic-briefs",
+            "axcenity/realistic-sports-bra"
           ]
         }
       ]
@@ -1506,6 +1523,66 @@
         },
         {
           "shape": "Face_Brow_Arch_Up_Right",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_length_left",
+      "label": "Left brow length",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_length_right",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Length_Left",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Length_Long_Left",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brow_length_right",
+      "label": "Right brow length",
+      "group": "brows",
+      "range": [
+        -1,
+        1
+      ],
+      "mirror": "brow_length_left",
+      "shapes": [
+        {
+          "shape": "Face_Brow_Length_Right",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            -1,
+            0
+          ]
+        },
+        {
+          "shape": "Face_Brow_Length_Long_Right",
           "from": [
             0,
             1
@@ -3792,6 +3869,21 @@
       "id": "feet",
       "label": "Feet",
       "map_index": 14
+    },
+    {
+      "id": "under_boxer_briefs",
+      "label": "Under boxer briefs",
+      "mask_shape": "Mask_Underwear_BoxerBriefs"
+    },
+    {
+      "id": "under_briefs",
+      "label": "Under briefs",
+      "mask_shape": "Mask_Underwear_Briefs"
+    },
+    {
+      "id": "under_sports_bra",
+      "label": "Under sports bra",
+      "mask_shape": "Mask_Underwear_Bra"
     }
   ],
   "slots": [
@@ -3925,6 +4017,8 @@
     "jaw_bone": "Jaw"
   },
   "defaults": {
-    "items": []
+    "items": [
+      "axcenity/realistic-boxer-briefs"
+    ]
   }
 }

@@ -49,6 +49,7 @@ Garments fit by **surface binding**: each vertex bound to the body's surface (tr
 - Body topology needs a second UV set or region map (CO4).
 - Loose garments (skirts, coats) may need cloth on coarse proxies (CO15) or deformer maps.
 - Revisit if binding artefacts on loose garments exceed the poke-through thresholds after push-out.
+- **Interim exception (2026-11-16, before CO9):** the realistic body's underwear (`assets/characters/realistic/underwear.py`) is cut from the body's own surface, so it fits by `shapes` (each vertex a fixed mix of body vertices, exact under every shape, nothing to bind), and each item hides a region with a **mask shape** that sinks the skin under it, because region-map hiding isn't drawn yet. Paul asked for undergarments on every character before CO9. When CO9 lands they move to map regions and the mask shapes go; being body topology, they can keep `shapes`. Not a change of this decision.
 
 ## Implementation references
 

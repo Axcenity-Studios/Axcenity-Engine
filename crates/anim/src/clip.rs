@@ -396,6 +396,16 @@ impl BoundTake {
         // of the character library) also play through roles: by name, the
         // take's own bone offsets would reshape the body.
         let reshaped = named && profile.is_none() && reshapes(&takes[take], &binding, rig, &map);
+        // Such a body rests in the take's pose already, but in its own
+        // shape: its bones keep their own rest directions and take only
+        // the take's turns from rest. Matching the rest pose would bend
+        // them to the take's skeleton (the realistic body's flatter feet
+        // tipped into the floor, its collarbones turned forward).
+        let own_shape = RetargetProfile {
+            match_rest_pose: false,
+            ..RetargetProfile::default()
+        };
+        let profile = if reshaped { Some(&own_shape) } else { profile };
         let mut retarget = None;
         if (profile.is_some() || !named || reshaped) && !takes[take].tracks.is_empty() {
             match Retarget::new(&takes[take], rig, rigs, profile) {

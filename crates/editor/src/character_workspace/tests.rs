@@ -38,9 +38,74 @@ fn the_workspace_offers_the_realistic_body_and_shows_it() {
         worn[0].starts_with("assets/characters/realistic/RealisticParts.glb#"),
         "the body is the realistic one: {worn:?}"
     );
-    for part in ["Eyes", "Teeth", "Lashes", "Brows"] {
+    for part in ["Eyes", "Teeth", "Lashes", "Brows", "Underwear_BoxerBriefs"] {
         assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
     }
+    // The stylized body isn't offered for new characters any more.
+    assert!(offers_base(&library, DEFAULT_BASE));
+    assert!(!offers_base(&library, axcenity_avatar::V1_BASE));
+    assert!(presets().iter().all(|preset| preset.base == DEFAULT_BASE));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// The realistic body is Male or Female, a choice and not a slider: each
+/// wears its own underwear, the switch is one undo step, and a value in
+/// between (from an older file) is taken to the nearest.
+#[test]
+fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
+    let folder = test_folder("workspace-frame");
+    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    let labels: Vec<&str> = frame.choices.iter().map(|c| c.label.as_str()).collect();
+    assert_eq!(labels, ["Male", "Female"]);
+    assert_eq!(workspace.parameter("frame"), 0.0);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs")
+    );
+    assert_eq!(workspace.worn_in("underwear_top"), None);
+
+    workspace.choose(&frame, 1.0);
+    assert_eq!(workspace.parameter("frame"), 1.0);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-briefs")
+    );
+    assert_eq!(
+        workspace.worn_in("underwear_top").as_deref(),
+        Some("axcenity/realistic-sports-bra")
+    );
+    let worn = worn_models(&workspace);
+    assert!(worn.iter().any(|name| name == "Underwear_Bra"), "{worn:?}");
+    assert!(
+        !worn.iter().any(|name| name == "Underwear_BoxerBriefs"),
+        "{worn:?}"
+    );
+
+    workspace.undo();
+    assert_eq!(workspace.parameter("frame"), 0.0);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
+
+    // Something the person picked themselves stays on.
+    workspace.choose(&frame, 1.0);
+    workspace.wear("underwear_bottom", Some("axcenity/realistic-boxer-briefs"));
+    workspace.choose(&frame, 0.0);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs")
+    );
+
+    // A value between the two is taken to the nearest choice.
+    workspace.edit(|description| {
+        description.parameters.insert("frame".to_owned(), 0.7);
+    });
+    assert_eq!(workspace.parameter("frame"), 1.0);
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -175,8 +240,8 @@ fn a_format_1_character_file_opens_on_the_stylized_body_and_saves_as_format_2() 
 #[test]
 fn the_workspace_dresses_the_preview_undoes_and_saves() {
     let folder = test_folder("workspace");
-    let everyday = presets().iter().position(|p| p.name == "Everyday").unwrap();
-    let mut workspace = CharacterWorkspace::open_preset(&folder, everyday).unwrap();
+    let female = presets().iter().position(|p| p.name == "Female").unwrap();
+    let mut workspace = CharacterWorkspace::open_preset(&folder, female).unwrap();
     // The humanoid's files are written for the preview.
     assert!(
         folder
@@ -184,44 +249,47 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
             .is_file()
     );
     assert!(workspace.dirty(), "a new character isn't saved yet");
-    let default_hair = workspace.worn_in("hair");
-    assert_eq!(default_hair.as_deref(), Some("axcenity/hair-swept"));
-    assert!(workspace.worn_in("outerwear").is_some());
+    let default_bottom = workspace.worn_in("underwear_bottom");
+    assert_eq!(default_bottom.as_deref(), Some("axcenity/realistic-briefs"));
+    assert!(workspace.worn_in("underwear_top").is_some());
 
-    workspace.wear("hair", Some("axcenity/hair-long"));
-    workspace.wear("outerwear", None);
+    workspace.wear("underwear_bottom", Some("axcenity/realistic-boxer-briefs"));
+    workspace.wear("underwear_top", None);
     let worn = workspace.worn().join(" ");
-    assert!(worn.contains("Hair_Long"), "{worn}");
-    assert!(!worn.contains("Hair_Swept"), "{worn}");
-    assert!(!worn.contains("Jacket_Cropped"), "{worn}");
+    assert!(worn.contains("Underwear_BoxerBriefs"), "{worn}");
+    assert!(!worn.contains("Underwear_Briefs"), "{worn}");
+    assert!(!worn.contains("Underwear_Bra"), "{worn}");
     // Only items that fit this body are offered.
-    let hair = workspace.items_for("hair");
-    assert!(hair.iter().any(|(id, _)| id == "axcenity/hair-bob"));
+    let bottoms = workspace.items_for("underwear_bottom");
+    assert!(
+        bottoms
+            .iter()
+            .any(|(id, _)| id == "axcenity/realistic-briefs")
+    );
+    assert!(
+        !bottoms.iter().any(|(id, _)| id == "axcenity/briefs"),
+        "{bottoms:?}"
+    );
 
     // A slider's drag is one undo step.
-    let build = workspace
-        .base()
-        .unwrap()
-        .parameter("build")
-        .unwrap()
-        .clone();
-    workspace.set_parameter(&build, 0.2, false);
-    workspace.set_parameter(&build, 0.4, false);
-    workspace.set_parameter(&build, 0.5, true);
+    let fat = workspace.base().unwrap().parameter("fat").unwrap().clone();
+    workspace.set_parameter(&fat, 0.2, false);
+    workspace.set_parameter(&fat, 0.4, false);
+    workspace.set_parameter(&fat, 0.5, true);
     workspace.undo();
-    assert_eq!(workspace.parameter("build"), 0.0);
+    assert_eq!(workspace.parameter("fat"), 0.0);
     assert_eq!(
-        workspace.worn_in("hair").as_deref(),
-        Some("axcenity/hair-long")
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs")
     );
     workspace.undo();
-    assert!(workspace.worn_in("outerwear").is_some());
+    assert!(workspace.worn_in("underwear_top").is_some());
     workspace.undo();
     assert!(!workspace.can_undo());
     workspace.redo();
     assert_eq!(
-        workspace.worn_in("hair").as_deref(),
-        Some("axcenity/hair-long")
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs")
     );
 
     workspace.edit(|description| description.name = "Test Hero".to_owned());
@@ -240,13 +308,15 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     assert!(!reopened.dirty());
     // Reset is the body's default character, keeping the name, and undoable.
     workspace.reset();
-    assert_eq!(workspace.worn_in("hair"), default_hair);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some("axcenity/realistic-boxer-briefs"),
+        "the default character is Male"
+    );
+    assert_eq!(workspace.parameter("frame"), 0.0);
     assert_eq!(workspace.description().name, "Test Hero");
     workspace.undo();
-    assert_eq!(
-        workspace.worn_in("hair").as_deref(),
-        Some("axcenity/hair-long")
-    );
+    assert_eq!(workspace.parameter("frame"), 1.0);
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -415,8 +485,12 @@ fn the_preview_draws_the_realistic_character() {
     let (width, height) = (640, 720);
     let mut renderer = TextureRenderer::new(&device, &queue, width, height);
     let mut frames = Vec::new();
-    for (name, index) in [("realistic", 0), ("realistic-feminine", 1), ("stylized", 4)] {
+    for (name, index) in [("realistic", 0), ("realistic-feminine", 1), ("stylized", 0)] {
         let mut workspace = CharacterWorkspace::open_preset(&folder, index).unwrap();
+        if name == "stylized" {
+            // A saved stylized character still opens and is drawn.
+            workspace.set_base(axcenity_avatar::V1_BASE);
+        }
         for _ in 0..10 {
             workspace.step_by(1.0 / 30.0);
         }

@@ -48,9 +48,7 @@ impl Category {
     fn about(self) -> &'static str {
         match self {
             Category::Presets => "Start from a ready-made character, then change anything.",
-            Category::Body => {
-                "Pick a body, then shape it. Changes show on the character as you drag."
-            }
+            Category::Body => "Pick male or female, then shape the body. Changes show as you drag.",
             Category::Face => "Shape the face. Changes show on the character as you drag.",
             Category::Hair => "Pick a hairstyle.",
             Category::Clothing => "Dress the character one piece at a time.",
@@ -341,7 +339,6 @@ impl CharacterWorkspace {
                 Category::Presets => self.presets_page(ui),
                 Category::Body => {
                     self.base_picker(ui);
-                    ui.add_space(8.0);
                     self.parameters_page(ui, Category::Body);
                 }
                 Category::Face => self.parameters_page(ui, Category::Face),
@@ -389,13 +386,23 @@ impl CharacterWorkspace {
         }
     }
 
-    /// The body families of the library: one chip each.
+    /// The body families Character Studio offers: one chip each, shown
+    /// only when there's a choice (or the character is on a body no longer
+    /// offered, such as a saved stylized one, so it can move).
     fn base_picker(&mut self, ui: &mut egui::Ui) {
-        widgets::section_label(ui, "Body");
         let library = self.library();
         let current = self.description().base.clone();
+        let offered: Vec<(&String, &axcenity_avatar::BaseManifest)> = library
+            .bases
+            .iter()
+            .filter(|(id, _)| super::offers_base(&library, id))
+            .collect();
+        if offered.len() < 2 && offered.iter().any(|(id, _)| **id == current) {
+            return;
+        }
+        widgets::section_label(ui, "Body");
         ui.horizontal_wrapped(|ui| {
-            for (id, base) in &library.bases {
+            for (id, base) in offered {
                 if widgets::chip(ui, &base.label, *id == current)
                     .on_hover_text(format!(
                         "Start again on the {} body",
@@ -407,6 +414,7 @@ impl CharacterWorkspace {
                 }
             }
         });
+        ui.add_space(8.0);
     }
 
     /// The manifest's parameters of `category`, by group: a slider each,
@@ -451,7 +459,11 @@ impl CharacterWorkspace {
                 .default_open(true)
                 .show(ui, |ui| {
                     for parameter in shown {
-                        self.slider(ui, parameter);
+                        if parameter.choices.is_empty() {
+                            self.slider(ui, parameter);
+                        } else {
+                            self.choices(ui, parameter);
+                        }
                     }
                 });
         }
@@ -477,6 +489,21 @@ impl CharacterWorkspace {
         if response.changed() || response.drag_stopped() || response.double_clicked() {
             self.set_parameter(parameter, value, !response.dragged());
         }
+    }
+
+    /// A parameter with choices (Male or Female): a chip each.
+    fn choices(&mut self, ui: &mut egui::Ui, parameter: &axcenity_avatar::Parameter) {
+        let value = self.parameter(&parameter.id);
+        let picked = parameter.nearest_choice(value).map(|choice| choice.value);
+        ui.label(&parameter.label);
+        ui.horizontal_wrapped(|ui| {
+            for choice in &parameter.choices {
+                if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
+                    self.choose(parameter, choice.value);
+                }
+            }
+        });
+        ui.add_space(4.0);
     }
 
     /// The manifest's slots of `category`: a chip per item that fits this

@@ -1815,6 +1815,11 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     at = np.array([v.co[:] for v in brow.data.vertices])
     quads = [tuple(p.vertices) for p in brow.data.polygons]
     hair.add_shapes(brow, {name: hair.follow_bound(face, bound, at, quads, following[name]) for name in order})
+    # The brows' length: shapes of the card alone. The body carries them
+    # empty, so the manifest can drive them (architecture.md section 14).
+    lengths = hair.brow_lengths(face, at)
+    hair.add_shapes(brow, lengths)
+    _shape_keys(body, {name: {} for name in lengths}, len(M))
     made["Brows"] = brow
     made["LipSeal"] = lip_seal(face, F, shapes, jaw_w)
     # The teeth go where the mouth goes (and their simpler copies alike).

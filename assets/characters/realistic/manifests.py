@@ -14,8 +14,10 @@ Then rebuild the library's catalogue: python -I assets/characters/catalogue.py
 
 Slots, sockets and the proportion sliders are the stylized humanoid's
 (`../humanoid/manifests.py`), read from there, so an item or a script
-that names one fits both bodies. The package has no items yet (CO9,
-CO10): a new character on this base wears nothing.
+that names one fits both bodies. Its items so far are the underwear cut
+from the body (`underwear.py`), written as `items/<name>.item.json`: the
+`frame` parameter is a choice of Male or Female, and each choice wears its
+underwear.
 """
 
 import importlib.util
@@ -52,6 +54,22 @@ PROPORTION_RANGE = [0.85, 1.15]
 # hips 2% narrower already make the skin cross there on a heavy body.
 PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
 
+# The underwear (`underwear.py`): object -> (item ID, label, slot, tags).
+GARMENTS = {
+    "Underwear_BoxerBriefs": ("axcenity/realistic-boxer-briefs", "Boxer briefs", "underwear_bottom",
+                              ["underwear"]),
+    "Underwear_Briefs": ("axcenity/realistic-briefs", "Briefs", "underwear_bottom", ["underwear"]),
+    "Underwear_Bra": ("axcenity/realistic-sports-bra", "Sports bra", "underwear_top", ["underwear"]),
+}
+# The region each one hides: its mask shape sinks the skin under it.
+GARMENT_REGIONS = {"Underwear_BoxerBriefs": "under_boxer_briefs", "Underwear_Briefs": "under_briefs",
+                   "Underwear_Bra": "under_sports_bra"}
+GARMENT_SHADING = {"Underwear": "cloth", "Waistband": "cloth"}
+# What each frame wears to start with.
+MALE_WEARS = ["axcenity/realistic-boxer-briefs"]
+FEMALE_WEARS = ["axcenity/realistic-briefs", "axcenity/realistic-sports-bra"]
+SOURCE = {"author": "Axcenity Engine contributors", "licence": "CC0-1.0"}
+
 # Every material of the body and its parts, and how it is lit.
 SHADING = {
     "Skin": "skin", "Mouth": "standard", "Iris": "eye", "Sclera": "eye",
@@ -75,8 +93,12 @@ def base_manifest(data, parts):
     frame = data["frame"]
     bones = shared.bone_drivers(frame["bones"], frame.get("eye_scale"))
     parameters = [
-        {"id": "frame", "label": "Masculine to feminine", "group": "frame", "range": [0, 1],
-         "shapes": [{"shape": "Frame_Feminine"}], "bones": bones},
+        # A choice, not a slider: Character Studio shows Male and Female.
+        # (Scripts may still set anything between; it blends the frames.)
+        {"id": "frame", "label": "Body type", "group": "frame", "range": [0, 1],
+         "shapes": [{"shape": "Frame_Feminine"}], "bones": bones,
+         "choices": [{"value": 0, "label": "Male", "items": MALE_WEARS},
+                     {"value": 1, "label": "Female", "items": FEMALE_WEARS}]},
     ]
     for pid, label, attribute, advanced in shared.PROPORTIONS:
         span = PROPORTION_RANGES.get(pid, PROPORTION_RANGE)
@@ -109,13 +131,32 @@ def base_manifest(data, parts):
         "parameters": parameters,
         "corners": shapes.corners(),
         "regions": [{"id": r["id"], "label": r["label"], "map_index": r["map_index"]}
-                    for r in data["regions"]],
+                    for r in data["regions"]]
+        + [{"id": region, "label": f"Under {GARMENTS[name][1].lower()}", "mask_shape": "Mask_" + name}
+           for name, region in GARMENT_REGIONS.items()],
         "slots": shared.SLOTS,
         "sockets": [{"name": n, "bone": b} for n, b in shared.SOCKETS],
         "materials": [{"name": m, "shading": SHADING[m]} for m in materials],
         "face": {"profile": FACE_PROFILE, "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
-        "defaults": {"items": []},
+        "defaults": {"items": MALE_WEARS},
     }
+
+
+def item_manifests(parts):
+    """The underwear's item manifests, by object name."""
+    items = {}
+    for name, (iid, label, slot, tags) in GARMENTS.items():
+        part = parts[name]
+        items[name] = {
+            "format_version": 1, "id": iid, "label": label, "kind": "garment",
+            "slot": slot, "layer": 0, "tier": "built_in", "bases": [BASE_ID],
+            "model": {"file": "../" + PARTS_FILE, "object": part["path"]},
+            "hides": [GARMENT_REGIONS[name]],
+            "materials": [{"name": m, "shading": GARMENT_SHADING[m]} for m in part["materials"]],
+            "fit": {"method": "shapes", "follows": part["shapes"]},
+            "tags": tags, "source": SOURCE,
+        }
+    return items
 
 
 def write(folder):
@@ -124,6 +165,11 @@ def write(folder):
         data = json.load(f)
     parts = shared.objects(os.path.join(folder, PARTS_FILE))
     shared.write_json(os.path.join(folder, MANIFEST_FILE), base_manifest(data, parts))
+    item_folder = os.path.join(folder, "items")
+    os.makedirs(item_folder, exist_ok=True)
+    for item in item_manifests(parts).values():
+        file = item["id"].split("/", 1)[1] + ".item.json"
+        shared.write_json(os.path.join(item_folder, file), item)
 
 
 if __name__ == "__main__":

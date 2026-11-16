@@ -717,7 +717,12 @@ mod tests {
             .chain(&base.model.parts)
             .map(|object| format!("{DEFAULT_HUMANOID_PARTS_PATH}#{object}"))
             .collect();
-        for item in library.items.values() {
+        // (The realistic body's items are its own package's.)
+        for item in library.items.values().filter(|item| {
+            item.bases
+                .iter()
+                .any(|base| base == axcenity_avatar::V1_BASE)
+        }) {
             for model in item.models() {
                 assert_eq!(library.path_of(&item.id, &model.file).unwrap(), file);
                 let object = model.object.as_deref().unwrap();

@@ -42,7 +42,7 @@ pub use item::{ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, So
 pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{
     AddedBone, AttributeDriver, BASE_VERSION, BaseManifest, BaseModel, BoneDriver, Category,
-    Constraint, Corner, Defaults, Face, Factor, Group, MaterialDriver, Parameter, Region,
+    Choice, Constraint, Corner, Defaults, Face, Factor, Group, MaterialDriver, Parameter, Region,
     ShapeDriver, Skeleton, Slot, Socket,
 };
 pub use material::{

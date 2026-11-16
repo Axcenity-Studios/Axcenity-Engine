@@ -4,9 +4,10 @@
 //! screen's Character Studio page with no project open.
 //!
 //! It edits a character [`Description`] (format 2; a format 1 file, CS2's
-//! `Look`, migrates when it's opened) on any base model of the character
-//! library: the realistic family by default (ADR-0032), the stylized one
-//! beside it. Its controls come from the base model's manifest (the
+//! `Look`, migrates when it's opened) on a base model of the character
+//! library: the realistic family (ADR-0032). The stylized body isn't
+//! offered for new characters ([`offers_base`]); a saved character on it
+//! still opens. Its controls come from the base model's manifest (the
 //! parameters by group and category, the slots) and the catalogue (the
 //! items that fit), so a new body or item shows up without code. The
 //! preview is the Character Runtime's: the default character in a World
@@ -100,8 +101,16 @@ impl Preset {
     pub fn description(&self, name: &str, library: &Library) -> Description {
         let mut description = applier::default_description(library, self.base);
         description.name = name.to_owned();
+        let base = library.base(self.base);
         for (id, value) in self.parameters {
-            description.parameters.insert((*id).to_owned(), *value);
+            match base.and_then(|base| base.parameter(id)) {
+                Some(parameter) if self.items.is_none() => {
+                    choose(&mut description, library, parameter, *value)
+                }
+                _ => {
+                    description.parameters.insert((*id).to_owned(), *value);
+                }
+            }
         }
         if let Some(items) = self.items {
             description.items = items.iter().map(|id| WornItem::new(*id)).collect();
@@ -117,91 +126,92 @@ impl Preset {
     }
 }
 
-/// The presets: the realistic family's, then the stylized family's. The
-/// first is the default character.
+/// The presets, all on the realistic body (the stylized one is no longer
+/// offered for new characters). The first is the default character. A
+/// preset that sets a parameter with choices (Male or Female) wears what
+/// that choice wears unless it names its own items.
 pub fn presets() -> Vec<Preset> {
-    const STYLIZED: &str = axcenity_avatar::V1_BASE;
     vec![
         Preset {
-            name: "Realistic",
-            about: "The semi-realistic body, as it's built: a start for any character.",
+            name: "Male",
+            about: "The realistic male body, as it's built: a start for any character.",
             base: DEFAULT_BASE,
             parameters: &[],
             items: None,
         },
         Preset {
-            name: "Realistic, feminine",
-            about: "The semi-realistic body on its feminine frame.",
+            name: "Female",
+            about: "The realistic female body, as it's built.",
             base: DEFAULT_BASE,
             parameters: &[("frame", 1.0)],
             items: None,
         },
         Preset {
-            name: "Athletic",
-            about: "Lean and muscular, on the semi-realistic body.",
+            name: "Athletic male",
+            about: "Lean and muscular.",
             base: DEFAULT_BASE,
             parameters: &[("muscle", 0.7), ("fat", -0.4)],
             items: None,
         },
         Preset {
-            name: "Heavyset",
-            about: "A heavier build, on the semi-realistic body.",
+            name: "Athletic female",
+            about: "Lean and toned.",
+            base: DEFAULT_BASE,
+            parameters: &[("frame", 1.0), ("muscle", 0.6), ("fat", -0.4)],
+            items: None,
+        },
+        Preset {
+            name: "Heavyset male",
+            about: "A heavier build.",
             base: DEFAULT_BASE,
             parameters: &[("fat", 0.8), ("muscle", 0.2)],
             items: None,
         },
         Preset {
-            name: "Everyday",
-            about: "Stylized: jacket, tee, cargo joggers, sneakers.",
-            base: STYLIZED,
-            parameters: &[],
+            name: "Heavyset female",
+            about: "A heavier build.",
+            base: DEFAULT_BASE,
+            parameters: &[("frame", 1.0), ("fat", 0.8), ("muscle", 0.2)],
             items: None,
         },
-        Preset {
-            name: "Casual",
-            about: "Stylized: no jacket, a bob, a slimmer build.",
-            base: STYLIZED,
-            parameters: &[("build", -0.4)],
-            items: Some(&[
-                "axcenity/hair-bob",
-                "axcenity/tee",
-                "axcenity/cargo-pants",
-                "axcenity/sneakers",
-            ]),
-        },
-        Preset {
-            name: "Athlete",
-            about: "Stylized: muscular, a buzz cut, tee and joggers.",
-            base: STYLIZED,
-            parameters: &[("muscle", 0.9)],
-            items: Some(&[
-                "axcenity/hair-buzz",
-                "axcenity/tee",
-                "axcenity/cargo-pants",
-                "axcenity/sneakers",
-            ]),
-        },
-        Preset {
-            name: "Long hair",
-            about: "Stylized: long hair and a heavier build under the jacket.",
-            base: STYLIZED,
-            parameters: &[("build", 0.5)],
-            items: Some(&[
-                "axcenity/hair-long",
-                "axcenity/tee",
-                "axcenity/cropped-jacket",
-                "axcenity/cargo-pants",
-                "axcenity/sneakers",
-            ]),
-        },
-        Preset {
-            name: "Base body",
-            about: "Stylized: underwear only, a start for your own clothes.",
-            base: STYLIZED,
-            parameters: &[],
-            items: Some(&["axcenity/hair-crop", "axcenity/briefs"]),
-        },
     ]
+}
+
+/// Whether Character Studio offers base model `id` for new characters:
+/// every base but the stylized one, unless the library has nothing else.
+pub fn offers_base(library: &Library, id: &str) -> bool {
+    id != axcenity_avatar::V1_BASE || library.bases.keys().all(|base| base == id)
+}
+
+/// Sets `parameter` to `value` in `description` and, if the parameter has
+/// choices, wears what the chosen one names (in their slots), taking off
+/// what the other choices name.
+fn choose(description: &mut Description, library: &Library, parameter: &Parameter, value: f32) {
+    description.parameters.insert(parameter.id.clone(), value);
+    let Some(chosen) = parameter.nearest_choice(value) else {
+        return;
+    };
+    let others: Vec<&String> = parameter
+        .choices
+        .iter()
+        .filter(|choice| *choice != chosen)
+        .flat_map(|choice| &choice.items)
+        .filter(|id| !chosen.items.contains(id))
+        .collect();
+    description.items.retain(|worn| !others.contains(&&worn.id));
+    for id in &chosen.items {
+        let Some(item) = library.item(id) else {
+            continue;
+        };
+        if !item.bases.contains(&description.base) {
+            continue;
+        }
+        let slot = item.slot.clone();
+        description
+            .items
+            .retain(|worn| library.item(&worn.id).is_none_or(|it| it.slot != slot));
+        description.items.push(WornItem::new(id.clone()));
+    }
 }
 
 /// A parameter's label for a slider that edits it and its mirror together:
@@ -512,6 +522,14 @@ impl CharacterWorkspace {
         });
     }
 
+    /// Picks `value` of a parameter with choices (Male or Female) as one
+    /// undo step, wearing what the choice wears.
+    pub fn choose(&mut self, parameter: &Parameter, value: f32) {
+        let library = self.library();
+        let parameter = parameter.clone();
+        self.edit(|description| choose(description, &library, &parameter, value));
+    }
+
     /// Moves the character onto base model `base`: that body's default
     /// character, keeping the name.
     pub fn set_base(&mut self, base: &str) {
@@ -707,8 +725,8 @@ impl CharacterWorkspace {
     }
 }
 
-/// `description` with every parameter in its base model's range, unknown
-/// parameters dropped and a name.
+/// `description` with every parameter in its base model's range (one with
+/// choices at the nearest), unknown parameters dropped and a name.
 fn tidy(mut description: Description, library: &Library) -> Description {
     if let Some(base) = library.base(&description.base) {
         description
@@ -718,6 +736,9 @@ fn tidy(mut description: Description, library: &Library) -> Description {
             if let Some(parameter) = base.parameter(id) {
                 let [low, high] = parameter.range;
                 *value = value.clamp(low.min(high), low.max(high));
+                if let Some(choice) = parameter.nearest_choice(*value) {
+                    *value = choice.value;
+                }
             }
         }
     }

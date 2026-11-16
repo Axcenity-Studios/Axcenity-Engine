@@ -130,6 +130,32 @@ pub struct Parameter {
     pub attributes: Vec<AttributeDriver>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub material_values: Vec<MaterialDriver>,
+    /// Named values to pick from instead of a slider (Character Studio
+    /// shows a button each, and keeps the parameter at one of them): the
+    /// realistic body's `frame` is Male (0) or Female (1).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<Choice>,
+}
+
+/// One of a [`Parameter`]'s `choices`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Choice {
+    pub value: f32,
+    pub label: String,
+    /// Items picking it puts on (in their slots), taking off the items the
+    /// parameter's other choices name: the realistic body's Female wears a
+    /// bra and briefs, its Male boxer briefs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub items: Vec<String>,
+}
+
+impl Parameter {
+    /// The choice nearest `value`, if the parameter has choices.
+    pub fn nearest_choice(&self, value: f32) -> Option<&Choice> {
+        self.choices
+            .iter()
+            .min_by(|a, b| (a.value - value).abs().total_cmp(&(b.value - value).abs()))
+    }
 }
 
 fn unit_span() -> [f32; 2] {
@@ -400,6 +426,22 @@ impl BaseManifest {
                     parameter.id, parameter.default
                 ),
             ));
+        }
+        for (k, choice) in parameter.choices.iter().enumerate() {
+            let at = format!("{at}.choices[{k}]");
+            not_empty(p, &format!("{at}.label"), &choice.label);
+            for (n, id) in choice.items.iter().enumerate() {
+                check_id(p, &format!("{at}.items[{n}]"), id);
+            }
+            if !(min..=max).contains(&choice.value) {
+                p.push(Problem::new(
+                    &at,
+                    format!(
+                        "`{}`'s choice {} is outside {min} to {max}",
+                        parameter.id, choice.value
+                    ),
+                ));
+            }
         }
         if let Some(mirror) = &parameter.mirror
             && self
