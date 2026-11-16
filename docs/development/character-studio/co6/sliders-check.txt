@@ -1,7 +1,7 @@
 masculine pairs 2556 bodies 10082 with new crossings 0
 feminine pairs 2556 bodies 10082 with new crossings 0
-sliders 831.2
-wrote docs/development/character-studio/co6/sliders.json 831.2 s
+sliders 854.8
+wrote docs/development/character-studio/co6/sliders.json 854.8 s
 WORSE: deformation/masculine/elbow_135/ring_area_ratio: not measured (run every section)
 WORSE: deformation/feminine/elbow_135/ring_area_ratio: not measured (run every section)
 WORSE: deformation/masculine/knee_135/ring_area_ratio: not measured (run every section)

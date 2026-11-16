@@ -2,7 +2,11 @@
 (Character Studio overhaul CO6). Plain Python: `manifests.py` reads it.
 
 Every face identity shape (`face.Face.identity`) is one parameter from -1
-to 1, 0 being the face as built. A paired feature has a parameter a side
+to 1, 0 being the face as built, but for the brows' height and arch,
+which have a shape for each end (`SPLIT`): a shape moves its vertices
+along one straight line, and a lowered brow's fold has to come forward
+over the lid where a raised one lies back on the brow bone. A paired
+feature has a parameter a side
 (`eye_height_left`, `eye_height_right`), each naming the other as its
 `mirror`, so the studio can edit both together or one alone (asymmetry).
 The middle of the face has single parameters, and three that push it off
@@ -66,9 +70,22 @@ SINGLE = [
 ]
 
 
+# Paired features with a shape for each end: {shape stem: the raising
+# shape's stem}. The stem's own shape is the lowering one, driven from 0
+# to -1 (weights 0 to -1, as one shape for both ends would be); the
+# raising one is driven from 0 to 1.
+SPLIT = {"Face_Brow_Height": "Face_Brow_Height_Up", "Face_Brow_Arch": "Face_Brow_Arch_Up"}
+
+
 def shapes():
     """Every identity shape the parameters drive."""
-    return [f"{stem}_{side}" for stem, *_ in PAIRED for side in ("Left", "Right")] + [s for s, *_ in SINGLE]
+    out = []
+    for stem, *_ in PAIRED:
+        for side in ("Left", "Right"):
+            out.append(f"{stem}_{side}")
+            if stem in SPLIT:
+                out.append(f"{SPLIT[stem]}_{side}")
+    return out + [s for s, *_ in SINGLE]
 
 
 def groups():
@@ -81,13 +98,16 @@ def parameters(face_identity):
     (offsets in glTF axes)."""
     out = []
 
-    def parameter(pid, label, group, shape, advanced, mirror=None):
+    def parameter(pid, label, group, shape, advanced, mirror=None, raising=None):
         p = {"id": pid, "label": label, "group": group, "range": [-1, 1]}
         if advanced:
             p["advanced"] = True
         if mirror:
             p["mirror"] = mirror
-        p["shapes"] = [{"shape": shape, "from": [-1, 1]}]
+        if raising:
+            p["shapes"] = [{"shape": shape, "from": [-1, 0], "to": [-1, 0]}, {"shape": raising, "from": [0, 1]}]
+        else:
+            p["shapes"] = [{"shape": shape, "from": [-1, 1]}]
         bones = []
         for bone, change in sorted(face_identity.get(shape, {}).get("bones", {}).items()):
             bones.append(dict({"bone": bone}, **change, **{"from": [-1, 1]}))
@@ -99,8 +119,9 @@ def parameters(face_identity):
     rows = []
     for stem, pid, label, group, advanced in PAIRED:
         for side, other in (("left", "right"), ("right", "left")):
+            raising = f"{SPLIT[stem]}_{side.capitalize()}" if stem in SPLIT else None
             rows.append((order[group], parameter(f"{pid}_{side}", f"{side.capitalize()} {label}", group,
-                                                 f"{stem}_{side.capitalize()}", advanced, f"{pid}_{other}")))
+                                                 f"{stem}_{side.capitalize()}", advanced, f"{pid}_{other}", raising)))
     for shape, pid, label, group, advanced in SINGLE:
         rows.append((order[group], parameter(pid, label, group, shape, advanced)))
     rows.sort(key=lambda row: row[0])
