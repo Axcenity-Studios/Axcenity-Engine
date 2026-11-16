@@ -69,7 +69,7 @@
   "frames": {
    "Feminine": {
     "bony_vertices": 4396,
-    "held_face_vertices": 1398,
+    "held_face_vertices": 1906,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -162,7 +162,7 @@
    },
    "Masculine": {
     "bony_vertices": 4369,
-    "held_face_vertices": 1434,
+    "held_face_vertices": 1944,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -251,7 +251,7 @@
      "Masculine_Muscle_Up_Fat_Down": 23.2,
      "Masculine_Muscle_Up_Fat_Up": 65.9
     },
-    "neutral_crossings": 67
+    "neutral_crossings": 66
    }
   },
   "local": 0.6,
@@ -372,6 +372,23 @@
   }
  },
  "face": {
+  "blink_shares": {
+   "Brow_Lower": [
+    0.184,
+    0.255,
+    0.88
+   ],
+   "Cheek_Raise": [
+    0.282,
+    0.304,
+    0.8
+   ],
+   "Eye_Squint": [
+    0.673,
+    0.705,
+    0.88
+   ]
+  },
   "expressions": [
    "Blink_Left",
    "Blink_Right",
@@ -549,23 +566,23 @@
   ],
   "jaw_open_deg": 25.0,
   "largest_move_mm": {
-   "Blink_Left": 9.71,
-   "Blink_Right": 9.63,
-   "Brow_Inward_Left": 8.92,
-   "Brow_Inward_Right": 8.91,
+   "Blink_Left": 10.19,
+   "Blink_Right": 10.12,
+   "Brow_Inward_Left": 8.81,
+   "Brow_Inward_Right": 8.81,
    "Brow_Lower_Left": 8.55,
    "Brow_Lower_Right": 8.66,
-   "Brow_Raise_Left": 10.57,
-   "Brow_Raise_Right": 10.57,
+   "Brow_Raise_Left": 10.63,
+   "Brow_Raise_Right": 10.63,
    "Cheek_Puff": 9.38,
-   "Cheek_Raise_Left": 8.17,
-   "Cheek_Raise_Right": 8.16,
-   "Eye_Closed_Left": 9.71,
-   "Eye_Closed_Right": 9.63,
-   "Eye_Squint_Left": 5.43,
-   "Eye_Squint_Right": 5.13,
-   "Eye_Wide_Left": 5.58,
-   "Eye_Wide_Right": 5.55,
+   "Cheek_Raise_Left": 8.23,
+   "Cheek_Raise_Right": 8.22,
+   "Eye_Closed_Left": 10.19,
+   "Eye_Closed_Right": 10.12,
+   "Eye_Squint_Left": 5.27,
+   "Eye_Squint_Right": 5.23,
+   "Eye_Wide_Left": 5.74,
+   "Eye_Wide_Right": 5.71,
    "Face_Brow_Arch_Left": 6.34,
    "Face_Brow_Arch_Right": 6.37,
    "Face_Brow_Height_Left": 5.47,
@@ -588,8 +605,8 @@
    "Face_Eye_Depth_Right": 4.2,
    "Face_Eye_Height_Left": 4.5,
    "Face_Eye_Height_Right": 4.5,
-   "Face_Eye_Size_Left": 4.8,
-   "Face_Eye_Size_Right": 4.79,
+   "Face_Eye_Size_Left": 4.87,
+   "Face_Eye_Size_Right": 4.88,
    "Face_Eye_Spacing_Left": 4.2,
    "Face_Eye_Spacing_Right": 4.2,
    "Face_Eye_Tilt_Left": 5.44,
@@ -641,8 +658,8 @@
   },
   "rest": {
    "feminine_lids_moved_mm": 3.96,
-   "lid_texels_softened": 6709,
-   "lining_vertices_lifted": 150,
+   "lid_texels_softened": 6846,
+   "lining_vertices_lifted": 304,
    "lips_closed_by_mm": {
     "feminine": 2.39,
     "masculine": 1.99
@@ -1186,7 +1203,7 @@
    "id": "head",
    "label": "Head",
    "map_index": 1,
-   "triangles": 7144
+   "triangles": 8168
   },
   {
    "id": "neck",

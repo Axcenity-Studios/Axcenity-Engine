@@ -448,10 +448,13 @@ def fields(body, P, lm):
 
 # -- the bakes ---------------------------------------------------------------------
 
-def bake(body, source, lm, size, out_dir):
+def bake(body, source, lm, size, out_dir, cage=None):
     """Bakes the texture set for `body` (which has its final texture
     coordinates) from the frames' vendored positions `source`. Returns
-    {albedo, normal, orm}: image datablocks saved in `out_dir`."""
+    {albedo, normal, orm}: image datablocks saved in `out_dir`. `cage`
+    is the body on the bundle's own topology where `body` has more
+    vertices than it (`rims.split`): the vendored sculpts are stored
+    against that mesh subdivided, vertex by vertex."""
     hidden_sets = {*MOUTH_SETS, *FS_SOCKET.values()}
     hidden = _grow(_coverage(body, size, hidden_sets), 3)
     normals, occlusion = {}, {}
@@ -462,7 +465,17 @@ def bake(body, source, lm, size, out_dir):
             vert.co = p
         low.data.update()
         shade_smooth(low)
-        high = sculpt(low, frame)
+        if cage is None:
+            high = sculpt(low, frame)
+        else:
+            # (The bundle's vertices come first in `source`.)
+            under = duplicate(cage, f"Cage{frame}")
+            for vert, p in zip(under.data.vertices, source[frame]):
+                vert.co = p
+            under.data.update()
+            shade_smooth(under)
+            high = sculpt(under, frame)
+            bpy.data.objects.remove(under)
         img = _image(f"Normal{frame}", size, (0.5, 0.5, 1.0, 1.0))
         _target(low, img)
         _target(high, _image("Unused", 8))

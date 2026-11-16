@@ -277,6 +277,13 @@ CHEEK_LID = 0.40
 # (the loops from the lash line up to the fold under the brow).
 BROW_WHOLE = 0.0065
 BROW_ON_LID = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.08, 4: 0.20, 5: 0.42, 6: 0.50, 7: 0.80}
+# How far the skin between the brows stands forward of the skull with
+# their inner ends drawn up and together (`Brow_Inward`; metres).
+BROW_BUNCH = 0.0008
+# The skin between the eyes and the brows, by distance from the middle of
+# the face (all of it within the first, none past the second; metres): it
+# has no fold to be kept off the skull for.
+BROWS_BETWEEN = (0.007, 0.013)
 # How much of a raised cheek and of a lowered brow a blink has.
 BLINK_CHEEK = 0.22
 BLINK_BROW = 0.14
@@ -1041,6 +1048,9 @@ class Face:
         slide = self.lip_slide()
         pairs = {name: {} for name in ("Mouth_Smile", "Mouth_Frown", "Lip_Corner_Pull", "Upper_Lip_Raise",
                                        "Lower_Lip_Lower", "Nose_Sneer")}
+        # The moves of the shapes that raise a brow, before the skin is
+        # put back on the skull (below).
+        rising = {}
         for side, s in SIDES:
             out = np.array([float(s), 0.0, 0.0])
             cheek = self.cheek(s)
@@ -1071,10 +1081,19 @@ class Face:
             # down or together; it stays off its resting surface there.)
             bunch = self.glabella() * self.side(s, 0.006)
             on_skull = self.brow_slide() * (1.0 - np.clip(bunch * 2.0, 0.0, 1.0))
+            # (Brows that go up carry the skin between them, from the
+            # root of the nose up, up the forehead, which leans back: that
+            # skin slides on the skull all the way, and its bunch is added
+            # to it afterwards. It is within a dozen loops of both eyes,
+            # so it was held off the skull like the folds over the lids,
+            # and for its bunch besides.)
+            between = (1.0 - smoothstep(BROWS_BETWEEN[0], BROWS_BETWEEN[1], np.abs(P[:, 0]))) * self.skin
+            sliding = np.maximum(self.brow_slide(), between)
             # Raised (frontalis): the whole brow, its inner end a little
             # less; the fold under it is drawn up and the lid follows.
             profile = 0.75 + 0.25 * smoothstep(0.0, 0.45, along)
-            S[f"Brow_Raise_{side}"] = add(self._moved(vec(w * profile, up * 0.0105), slide=on_skull, teeth=False),
+            rising[f"Brow_Raise_{side}"] = vec(w * profile, up * 0.0105)
+            S[f"Brow_Raise_{side}"] = add(self._moved(rising[f"Brow_Raise_{side}"], slide=sliding, teeth=False),
                                           self._lids(s, -0.12, None))
             # Lowered (the depressors): the inner end down and toward the
             # other, the tail less; the fold comes down on the upper lid,
@@ -1101,9 +1120,10 @@ class Face:
             # bunches forward.
             kink = 1.0 - smoothstep(0.0, 0.42, along)
             outer = smoothstep(0.45, 1.0, along)
-            S[f"Brow_Inward_{side}"] = self._moved(
-                vec(w * kink, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0010)
-                + (bunch * 0.0015)[:, None] * N, slide=on_skull, teeth=False)
+            rising[f"Brow_Inward_{side}"] = vec(w * kink, up * 0.0082) + together(0.0034) + vec(w * outer, up * -0.0010)
+            S[f"Brow_Inward_{side}"] = add(
+                self._moved(rising[f"Brow_Inward_{side}"], slide=sliding, teeth=False),
+                {int(i): bunch[i] * BROW_BUNCH * N[i] for i in np.where(bunch > 0.01)[0]})
             # The mouth's corners, the lips and the nose: each side's
             # offsets are kept, and made into shapes below.
             X, sl = self.smile(s)
@@ -1126,6 +1146,29 @@ class Face:
             flank = self.near(self.on_skin(wing + np.array([s * 0.005, 0.0, 0.013])), 0.012) * self.skin * self.side(s)
             sneer += vec(flank, up * 0.0034) + (flank * 0.0020)[:, None] * N
             pairs["Nose_Sneer"][s] = (sneer, slide * 0.6)
+        # The four shapes that raise a brow (both sides' `Brow_Raise` and
+        # `Brow_Inward`) all carry the skin between the brows up the
+        # forehead, each along the straight line to where it alone ends
+        # on the skull. The forehead is curved, so added together the four
+        # lines ended off it: the skin between the brows' inner ends stood
+        # 3 mm proud of the skull, a lit ridge with the hair's inner ends
+        # splayed on it. All four together now end on the skull: what
+        # their sum is off by is taken out of each by its share of the
+        # move (one alone then lies under the skull by that share, half a
+        # millimetre or so, which does not show).
+        together_on_skull = np.zeros_like(P)
+        for i, d in self._moved(sum(rising.values()), slide=sliding, teeth=False).items():
+            together_on_skull[i] = d
+        apart = np.zeros_like(P)
+        for name in rising:
+            for i, d in self._moved(rising[name], slide=sliding, teeth=False).items():
+                apart[i] += d
+        length = {name: np.linalg.norm(d, axis=1) for name, d in rising.items()}
+        total = np.maximum(sum(length.values()), 1e-9)
+        off = (together_on_skull - apart) * (sliding > 0.0)[:, None]
+        for name in rising:
+            share = length[name] / total
+            S[name] = add(S[name], {int(i): off[i] * share[i] for i in np.where(np.linalg.norm(off, axis=1) * share > 2e-5)[0]})
         # A pair's two sides are made as one shape (both sides at once,
         # kept off the teeth together) and then divided between them
         # across the middle of the face, so the two together are what was
@@ -1663,12 +1706,12 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     order = ["Frame_Feminine", *shapes]
     made = {}
     shell, mix = eyelib.shell(face, out_dir)
-    lids = set(expressions)
-    hair.add_shapes(shell, {name: eyelib.follow(face, mix, following[name], name in lids) for name in order})
+    on_lids = set(expressions)
+    hair.add_shapes(shell, {name: eyelib.follow(face, mix, following[name], name in on_lids) for name in order})
     made["EyeShell"] = shell
     lash, roots = hair.lashes(face, out_dir)
     at = np.array([v.co[:] for v in lash.data.vertices])
-    hair.add_shapes(lash, {name: hair.follow_lashes(face, at, roots, following[name], name in lids) for name in order})
+    hair.add_shapes(lash, {name: hair.follow_lashes(face, at, roots, following[name], name in on_lids) for name in order})
     made["Lashes"] = lash
     brow, bound = hair.brows(face, out_dir)
     at = np.array([v.co[:] for v in brow.data.vertices])
@@ -1693,5 +1736,10 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
         "face_identity": bones,
         "largest_move_mm": largest,
         "jaw_open_deg": JAW_OPEN_DEG,
+        # How much of a blink each control that narrows an eye uses up
+        # (at the middle of the eye, the most along it and where that
+        # is): the shares the engine holds a blink back by.
+        "blink_shares": {name: list(lids.blink_shares(face.eye[1], M, expressions["Blink_Left"], expressions[f"{name}_Left"]))
+                         for name in ("Eye_Squint", "Cheek_Raise", "Brow_Lower")},
     }
     return made, data

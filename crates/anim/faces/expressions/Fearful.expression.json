@@ -9,10 +9,10 @@
     "Brow_Raise_Right": 0.7,
     "Eye_Wide_Left": 0.9,
     "Eye_Wide_Right": 0.9,
-    "Jaw_Open": 0.2,
+    "Jaw_Open": 0.3,
     "Lip_Corner_Pull_Left": 0.4,
     "Lip_Corner_Pull_Right": 0.4,
-    "Lower_Lip_Lower": 0.3,
+    "Lower_Lip_Lower": 0.1,
     "Mouth_Wide": 0.5
   }
 }
