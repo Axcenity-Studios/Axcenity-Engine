@@ -128,6 +128,8 @@ fn encode(model: &Model) -> Option<Vec<u8>> {
         warnings,
         rig,
         morph_targets,
+        // A derived model is made again from its base, never kept.
+        identity_pose: _,
     } = model;
     if !warnings.is_empty() {
         return None;
@@ -587,6 +589,7 @@ fn decode(input: &mut Input<'_>, project: &Path, relative: &str) -> Option<Model
         warnings: Vec::new(),
         rig,
         morph_targets,
+        identity_pose: Vec::new(),
     })
 }
 

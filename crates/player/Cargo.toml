@@ -37,6 +37,8 @@ profiling.workspace = true
 axcenity-workspace-hack.workspace = true
 
 [dev-dependencies]
+# Tests apply character descriptions and capture them (character_capture.rs).
+axcenity-avatar.workspace = true
 # Tests check the example's Fracture pieces match what Generate makes.
 axcenity-mesh-edit.workspace = true
 

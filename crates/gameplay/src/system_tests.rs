@@ -30,12 +30,14 @@ fn described_system_methods_are_the_installed_ones_and_exist() {
     let lua = mlua::Lua::new();
     let abilities = crate::AbilitySystem::default();
     let character = crate::CharacterSystem::default();
+    let descriptions = crate::DescriptionSystem::default();
     let tools = crate::ToolSystem::default();
     let story = crate::Story::default();
     let installed: Vec<(ClassName, &str)> = [
         &crate::Debris as &dyn GameSystem,
         &abilities,
         &character,
+        &descriptions,
         &tools,
         &story,
     ]
@@ -48,7 +50,13 @@ fn described_system_methods_are_the_installed_ones_and_exist() {
     let checks: Vec<String> = DESCRIBED_SYSTEM_METHODS
         .iter()
         .map(|(class, name)| {
-            format!("assert(type(Instance.new('{class}').{name}) == 'function', '{class}:{name}')")
+            // A service can't be made: scripts get the game's.
+            let sample = if class.is_service() {
+                format!("game:GetService('{class}')")
+            } else {
+                format!("Instance.new('{class}')")
+            };
+            format!("assert(type({sample}.{name}) == 'function', '{class}:{name}')")
         })
         .collect();
     let source = format!("{}\nprint('checked')", checks.join("\n"));
@@ -84,12 +92,14 @@ fn described_system_services_are_the_installed_ones_and_their_members_exist() {
 
     let abilities = crate::AbilitySystem::default();
     let character = crate::CharacterSystem::default();
+    let descriptions = crate::DescriptionSystem::default();
     let tools = crate::ToolSystem::default();
     let story = crate::Story::default();
     let installed: Vec<&str> = [
         &crate::Debris as &dyn GameSystem,
         &abilities,
         &character,
+        &descriptions,
         &tools,
         &story,
     ]
@@ -132,12 +142,14 @@ fn described_system_fields_are_kept_and_read() {
 
     let abilities = crate::AbilitySystem::default();
     let character = crate::CharacterSystem::default();
+    let descriptions = crate::DescriptionSystem::default();
     let tools = crate::ToolSystem::default();
     let story = crate::Story::default();
     let systems = [
         &crate::Debris as &dyn GameSystem,
         &abilities,
         &character,
+        &descriptions,
         &tools,
         &story,
     ];

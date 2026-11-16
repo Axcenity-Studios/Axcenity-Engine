@@ -21,6 +21,8 @@ pub mod ability;
 mod ability_system;
 mod character_system;
 mod debris;
+pub mod description;
+mod description_system;
 pub mod dialogue;
 pub mod health;
 pub mod humanoid;
@@ -33,6 +35,8 @@ mod tool_system;
 mod ability_tests;
 #[cfg(test)]
 mod debris_tests;
+#[cfg(test)]
+mod description_tests;
 #[cfg(test)]
 mod dialogue_tests;
 #[cfg(test)]
@@ -49,6 +53,7 @@ pub use character_system::{
     CharacterSystem, fire_landed, share_nav_mesh, step_health, step_humanoids,
 };
 pub use debris::Debris;
+pub use description_system::DescriptionSystem;
 pub use story::{Story, dialogue_active, dialogue_view, quest_tracker};
 pub use tool_system::{ToolSystem, place_tools, player_inventory, step_tools};
 
@@ -60,6 +65,7 @@ pub fn install(runtime: &mut ScriptRuntime) {
     // Effects cause fire after the Abilities' in the same round.
     runtime.add_system(AbilitySystem::default());
     runtime.add_system(CharacterSystem::default());
+    runtime.add_system(DescriptionSystem::default());
     runtime.add_system(ToolSystem::default());
     runtime.add_system(Story::default());
 }

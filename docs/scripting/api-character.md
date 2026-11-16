@@ -44,3 +44,45 @@ A kinematic walk, run, jump and crouch, up slopes and steps within limits, and c
 - **Both cameras.** The `Move` action moves: WASD, the arrow keys, or a controller's left stick, which walks slower pushed part way. The right stick turns the camera (the `Look` action), as the right mouse button does. Every key and button here comes from the input map (`input.json`; [client-server.md](client-server.md#input-phase-30)), with the player's rebinds, in the player and in the editor's Play (`MoveInput::from_actions`). During Play the editor fly camera is left where it was and returns on Stop. `workspace.CurrentCamera` reports the controller's view. A LocalScript can read it; a move it writes is not applied while a controller owns the camera.
 - **Insert.** Model tab, Effects (Third Person or First Person), or Explorer Insert ▸ Third Person or First Person. If a Model, Part, or MeshPart is selected and no controller already moves it, the controller is parented there. Otherwise (nothing selected, or a character that already has a controller, which keeps it) the editor also inserts a Model named Character in the Workspace and a Part named Body (2×5×1).
 - **Sample.** `examples/hello-character` hovers with H from a LocalScript (`hover.client.lua`, a custom `"Hover"` mode: E rises, Q sinks, W goes where the camera looks, at 12 studs a second) and clears it with H again; 6 and 7 set and clear the same mode from a block script, and 6 prints the mode it reads back. It switches with Shift from a LocalScript and with 1 and 2 from a block script, next to a falling crate. J jumps from the LocalScript and 3 from the block script. K crouches or stands from the LocalScript, and 4 and 5 crouch and stand from the block script. A green `LowCeiling` at x = 30 stops a standing character; crouched, it goes under, and stands again on the far side. Grey obstacles to the right (a 0.8-stud `LowStep`, and a 30° `Ramp` up to a `Platform`) are crossed; red ones to the left (a 2-stud `TallStep` and a 60° `SteepRamp`) stop the character.
+
+## Character descriptions
+
+Character Studio overhaul CO3. Code: `crates/gameplay/src/description_system.rs` (the script API and the game system) over `description.rs` (the applier). The formats and what parameters mean: [../development/character-studio/architecture.md](../development/character-studio/architecture.md) (sections 5, 7, 10 and 17).
+
+A **`HumanoidDescription`** is a character's look as data: its base model, its body and face parameter values, the items it wears and its material values. It has two string properties: `Data`, the text of a character file (`*.character.json`), and `Base`, the base model's ID. `Instance.new("HumanoidDescription")` is the default character of `axcenity/stylized` (its default hair and clothes, every parameter at its default) and holds nothing until it is changed; `Data` set to a saved character's text is that character. Every method reads `Data`, changes the description and writes it back, keeping `Base` the same as the `base` in it.
+
+The project needs the **character library** in `assets/characters/`: its `catalogue.json`, the base model and item manifests and their models (`project::add_character_library` writes the built-in one). Without it, every method that has to check something against the library is an error that says so.
+
+| Member | Does |
+|---|---|
+| `description:GetParameter(id)` → number | The parameter's value (`height`, `build`, `frame`, `nose_width`, ...): the description's, or the base manifest's default when it holds none. An error for a parameter the base model hasn't |
+| `description:SetParameter(id, value)` | Sets it, kept within the parameter's range. An error for an unknown parameter or a number that isn't finite |
+| `description:GetItems()` → `{ {Id, Slot, Variant} }` | What it wears, in order. `Slot` is nil for an item the library hasn't, `Variant` nil when none was chosen |
+| `description:SetItem(slot, id, variant?)` | Puts the item in its slot, in place of what the slot holds (unless the slot is `multiple`), at that item's place in the list. An item worn already stays where it is with its own material values, and only its variant changes. An error if the library hasn't the item, it doesn't fit the base model, `slot` isn't its manifest's slot, or it hasn't the variant |
+| `description:RemoveItem(slot)` | Takes off every item in the slot. An error for a slot the base model hasn't |
+| `description:SetMaterialValue(slot, name, value)` | A value of one of the **base model's** materials (`Skin`, `Iris`, `Sclera`, `Brow`, `Lash`, `Mouth`, `Gums`, `Teeth`): a number or a `Color3` (kept as the nearest `#rrggbb`), checked against the slot's shading model. An unknown material or name, the wrong kind of value, or a number outside the value's range is an error (it isn't clamped) |
+| `humanoid:ApplyDescription(description)` | Makes the Humanoid's character look like it: the `Body` MeshPart's mesh with the identity baked in, the parts it wears inside the `Body`, body slider attributes, material value attributes. An item that can't be worn is left out with a warning in Output. An error, changing nothing, if the Humanoid has no parent, the character has no skinned `Body`, or the library hasn't the base model |
+| `humanoid:GetAppliedDescription()` → HumanoidDescription or nil | A new copy of what's applied, with no parent. Changing it changes nothing until it is applied |
+| `Players:CreateHumanoidModelFromDescription(description)` → Model | A copy of the game's StarterCharacter (as `Clone` makes it, so its scripts start once it's in the Workspace) with the description applied and no parent. An error if the game has no StarterCharacter or the description can't be applied (the copy is destroyed) |
+
+Scripts and LocalScripts both have all of them. A mistake's error starts with the call, such as ``SetItem(slot, id, variant): `axcenity/hair-bob` goes in the `hair` slot, not `top` ``, and changes nothing.
+
+**What a character keeps.** `ApplyDescription` leaves a `HumanoidDescription` inside the Humanoid holding what was applied. Each frame the description system (`DescriptionSystem::step`, in the script step on both sides) applies every one kept in a character in the Workspace that isn't applied as it is now: after a world is loaded or replicated, when a script puts one in a Humanoid, and when a script changes the kept one (its `Data`, or through its methods), by the next frame and without calling `ApplyDescription`. A kept description that can't be read or applied is one error in Output, said once, and the character stays as it was.
+
+```lua
+local ServerStorage = game:GetService("ServerStorage")
+game:GetService("Players").PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid")
+		-- A saved character: a HumanoidDescription whose Data is the text of Ada.character.json.
+		humanoid:ApplyDescription(ServerStorage.Characters.Ada)
+		-- At runtime: change what's applied and apply it again.
+		local description = humanoid:GetAppliedDescription()
+		description:SetItem("hair", "axcenity/hair-long")
+		description:SetParameter("height", 1.1)
+		humanoid:ApplyDescription(description)
+	end)
+end)
+```
+
+Tests: `gameplay/src/description_tests.rs` (parameters, the wardrobe, material values and the errors, against the repository's library) and `player/src/default_humanoid_tests/description_lua.rs` (`a_script_builds_a_description_and_applies_it_to_the_character`, `players_makes_a_character_from_a_description`, `a_kept_description_changed_by_a_script_is_applied_the_next_frame`).

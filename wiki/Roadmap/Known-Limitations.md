@@ -40,6 +40,17 @@ What the engine doesn't do, or does with a known flaw, today. Each entry names w
 - **Server-moved characters** (MP6a): other players are drawn in the past on a device, so walking into a moving player costs a correction; moving platforms aren't rewound; seats, `MoveTo` and `MoveDirection` don't drive a remote player's character, and a device Script's `Jump` can be lost in a replay.
 - Editor Play can't host or join a real network game.
 
+## Characters
+
+The Character Runtime (Character Studio overhaul CO3; [Characters](../Engine-Systems/Characters.md#applying-a-description-character-runtime), `docs/development/character-studio/architecture.md`):
+
+- **Character Studio doesn't use the applier yet.** Its workspace still writes format 1 character files and poses its own preview by leaning every part toward its shapes each frame (CO12). A test holds the preview and the applier to the same result.
+- **The editor's edit mode doesn't apply kept descriptions.** `DescriptionSync` is stepped by the game systems, which run in Play, the player and the server. A saved character that had a description applied therefore shows its base meshes in the editor (its derived `MeshId`s fall back to the base model) until Play (CO13).
+- **A project made before CO3 has no character library until Insert > Character is used.** The library is written with the default character (`project::add_default_humanoid`: a new project with a character, Insert > Character, Character Studio's workspace folder). An older project gets it the next time Insert > Character is used; until then `Humanoid:ApplyDescription` fails with a message that says the project has no character library, and a packed game built from such a project has none.
+- **Most material values aren't drawn yet.** Skin, eye, cloth and hair materials draw as Standard, and of a character's material values only `tint`, `iris_tint` and `roughness_scale` change the picture; the others (`melanin`, `redness`, `sheen_tint` and the rest) are stored on the parts and wait for the renderer's shading models (CO7).
+- **Binding-fitted and socket items have no shipped content** (CO9, CO10): every item in the built-in library fits by its own copies of the body's shapes. A `binding` item would be drawn as a plain skinned part, unfitted.
+- **The identity bake's cost isn't measured** (CO18). A derived model is baked again in every run and whenever its base model is reloaded, never cooked, and each distinct description makes its own.
+
 ## Editor
 
 - Script completion and Go to Definition (F12) follow chains and declarations but doesn't type-check: a value it can't follow (a function's result, a table field, a module's return) offers nothing, luau-lsp ships in every package (a source build downloads it on request) and follows `require(game.ReplicatedStorage.X)` and `GetService` paths into modules (not `require(script.Parent.X)`, nor children's types such as `workspace.Door`); only open tabs are checked, and VS Code's set-up still checks each file alone.

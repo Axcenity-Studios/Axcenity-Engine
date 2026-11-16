@@ -352,6 +352,26 @@ pub(crate) fn placement_with(world: &World, part: InstanceId, fit: Mat4) -> Opti
     place.is_finite().then_some(place)
 }
 
+/// Keeps the MeshPart `part`'s model where it stands in the world while
+/// its model changes from one fitted by `old` ([`Rig::fit`]) to one fitted
+/// by `new`: its `Size` and `Position` become what the new model's box
+/// needs for the same file space, so the two skeletons line up. Its
+/// `Orientation` stays.
+pub fn refit(world: &mut World, part: InstanceId, old: Mat4, new: Mat4) {
+    let Some(file_space) = placement_with(world, part, old) else {
+        return;
+    };
+    let wanted = file_space * new.inverse();
+    let (scale, _, translation) = wanted.to_scale_rotation_translation();
+    if !scale.is_finite() || !translation.is_finite() {
+        return;
+    }
+    let size = Vector3::new(scale.x.abs(), scale.y.abs(), scale.z.abs());
+    for (name, value) in [("Size", size), ("Position", to_vector3(translation))] {
+        let _ = world.set_property(part, name, Value::Vector3(value));
+    }
+}
+
 pub(crate) fn to_vec3(v: Vector3) -> Vec3 {
     Vec3::new(v.x, v.y, v.z)
 }

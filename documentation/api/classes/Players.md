@@ -125,3 +125,21 @@ for _, player in Players:GetPlayers() do
 end
 ```
 
+#### CreateHumanoidModelFromDescription
+
+```luau
+Players:CreateHumanoidModelFromDescription(description: HumanoidDescription): Model
+```
+
+A new character that looks like `description`, for an NPC or a preview: a copy of the game's StarterCharacter with the description applied. Its Parent is nil: name it, place it and put it in the Workspace. An error if the game has no StarterCharacter (StarterPlayer's StarterCharacter names no prefab) or the description can't be applied.
+
+```lua
+local description = Instance.new("HumanoidDescription")
+description:SetItem("hair", "axcenity/hair-long")
+description:RemoveItem("outerwear")
+local guard = game:GetService("Players"):CreateHumanoidModelFromDescription(description)
+guard.Name = "Guard"
+guard:PivotTo(workspace.GuardPost.CFrame)
+guard.Parent = workspace
+```
+

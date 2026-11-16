@@ -35,6 +35,7 @@ mod asset_refs;
 mod backup;
 pub mod branding;
 mod build_profiles;
+mod character_library;
 mod collaborate_file;
 mod compat;
 mod default_humanoid;
@@ -68,6 +69,9 @@ mod templates;
 mod ui_graphs;
 mod user_templates;
 
+pub use character_library::{
+    CHARACTER_LIBRARY_PATH, add_character_library, built_in_character_library,
+};
 pub use collision_groups::{
     COLLISION_GROUPS_FILE, parse_collision_groups, save_collision_groups, write_collision_groups,
 };

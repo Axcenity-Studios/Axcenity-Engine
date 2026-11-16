@@ -39,7 +39,7 @@ pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem};
 pub use description::{DESCRIPTION_VERSION, Description, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, Source, Variant};
-pub use library::Library;
+pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{
     AddedBone, AttributeDriver, BASE_VERSION, BaseManifest, BaseModel, BoneDriver, Category,
     Constraint, Corner, Defaults, Face, Factor, Group, MaterialDriver, Parameter, Region,
@@ -50,7 +50,9 @@ pub use material::{
 };
 pub use migrate::{V1_BASE, V1_ITEMS};
 pub use model_check::{ModelContents, ModelRef};
-pub use resolve::{body_shape_weights, parameter_values, span};
+pub use resolve::{
+    PartFit, Resolved, ResolvedPart, body_shape_weights, parameter_values, resolve, span,
+};
 
 use std::fmt;
 

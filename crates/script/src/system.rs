@@ -178,6 +178,15 @@ pub const DESCRIBED_SYSTEM_METHODS: &[(ClassName, &str)] = &[
     (ClassName::Humanoid, "TakeDamage"),
     (ClassName::Humanoid, "GetState"),
     (ClassName::Humanoid, "ChangeState"),
+    (ClassName::HumanoidDescription, "GetParameter"),
+    (ClassName::HumanoidDescription, "SetParameter"),
+    (ClassName::HumanoidDescription, "GetItems"),
+    (ClassName::HumanoidDescription, "SetItem"),
+    (ClassName::HumanoidDescription, "RemoveItem"),
+    (ClassName::HumanoidDescription, "SetMaterialValue"),
+    (ClassName::Humanoid, "ApplyDescription"),
+    (ClassName::Humanoid, "GetAppliedDescription"),
+    (ClassName::Players, "CreateHumanoidModelFromDescription"),
     (ClassName::Inventory, "GetItems"),
     (ClassName::Inventory, "Add"),
     (ClassName::Inventory, "Remove"),
@@ -319,6 +328,12 @@ pub fn type_name(lua: &Lua, value: &mlua::Value) -> String {
 /// Adds a line to the output as an error, without a stack trace.
 pub fn report(lua: &Lua, text: impl Into<String>) {
     crate::push_output(lua, crate::OutputKind::Error, text.into());
+}
+
+/// Adds a line to the output as a warning: something that may be a
+/// mistake but stopped nothing.
+pub fn warn(lua: &Lua, text: impl Into<String>) {
+    crate::push_output(lua, crate::OutputKind::Warning, text.into());
 }
 
 /// An error's message as the output shows it, with the script's path and

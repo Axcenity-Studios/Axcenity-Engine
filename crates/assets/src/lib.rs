@@ -34,6 +34,7 @@ mod asset_id;
 mod color_grading;
 mod cooked;
 mod data_table;
+mod derived;
 mod face_expression;
 mod face_profile;
 mod fonts;
@@ -122,13 +123,14 @@ pub use material::{
 };
 pub use memory::{AssetMemory, CacheUse, model_bytes};
 pub use model::{
-    AlphaMode, Blend, Bone, BoneTransform, Channel, ChannelTexture, Image, Joint, Keys,
-    LevelReport, LodReport, LodWarning, MESH_CACHE_FOLDER, MODEL_CACHE_FOLDER, MODEL_EXTENSIONS,
-    MapSlot, Model, ModelError, ModelFormat, ModelMaterial, ModelObject, MorphTarget, Pick, Pose,
-    Posed, PosedBone, PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Take,
-    TextureRole, Track, apply_morphs, cached_meshes, cooked_models, embedded_files,
-    is_collision_piece, list_objects, load_model, load_models, load_takes, lod_level, tangents,
-    texture_pack_name, texture_roles,
+    AlphaMode, Blend, Bone, BoneChange, BoneDelta, BoneTransform, Channel, ChannelTexture,
+    Identity, IdentityLayer, Image, Joint, Keys, LevelReport, LodReport, LodWarning,
+    MESH_CACHE_FOLDER, MODEL_CACHE_FOLDER, MODEL_EXTENSIONS, MapSlot, Model, ModelError,
+    ModelFormat, ModelMaterial, ModelObject, MorphTarget, Pick, Pose, Posed, PosedBone,
+    PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Take, TextureRole, Track,
+    apply_morphs, cached_meshes, cooked_models, derived_mesh_id, embedded_files,
+    is_collision_piece, list_objects, load_model, load_models, load_takes, lod_level,
+    split_derived, tangents, texture_pack_name, texture_roles,
 };
 pub use model_presets::{
     BringIn, DEFAULT_MODEL_PRESET, ImportCollision, LAST_MODEL_PRESET_FILE, ModelSettings, UpAxis,
@@ -195,6 +197,8 @@ struct Shared {
     /// Every model asked for so far, by its `MeshId`. `None` means it
     /// couldn't be loaded, so it isn't tried again.
     models: HashMap<String, Option<Arc<Model>>>,
+    /// Models with a character's identity baked in (`derived.rs`).
+    derived: derived::Derived,
     /// Every texture file asked for so far, by its path, the same way.
     textures: HashMap<String, Option<Arc<Image>>>,
     /// Every sky image asked for so far, by its path, the same way.
@@ -323,6 +327,7 @@ impl Assets {
     /// load in this version of the engine, which takes longer. False once
     /// it's loaded, or for a MeshId that isn't a project model file.
     pub fn model_needs_import(&self, mesh_id: &str) -> bool {
+        let (mesh_id, _) = split_derived(mesh_id);
         let resolved = self.resolve(mesh_id);
         let mesh_id: &str = &resolved;
         let (folder, loaded) = {
@@ -351,6 +356,9 @@ impl Assets {
     /// the model's [warnings](Model::warnings). To load without waiting,
     /// see [`request_model`](Self::request_model).
     pub fn model_blocking(&self, mesh_id: &str) -> Option<Arc<Model>> {
+        if let Some(derived) = self.derived_blocking(mesh_id) {
+            return derived;
+        }
         let resolved = self.resolve(mesh_id);
         let mesh_id: &str = &resolved;
         if mesh_id.is_empty() {
