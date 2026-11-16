@@ -49,7 +49,7 @@ impl StartScreen {
         ui.add_space(6.0);
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(CARD_SPACING, CARD_SPACING);
-            for (index, (name, about, _)) in presets().into_iter().enumerate() {
+            for (index, preset) in presets().into_iter().enumerate() {
                 let response = egui::Frame::new()
                     .fill(palette.surface)
                     .stroke(Stroke::new(1.0_f32, palette.border))
@@ -58,13 +58,15 @@ impl StartScreen {
                     .show(ui, |ui| {
                         ui.set_width(200.0);
                         ui.label(
-                            RichText::new(theme::with_icon(icons::USER_FOCUS, name))
+                            RichText::new(theme::with_icon(icons::USER_FOCUS, preset.name))
                                 .family(theme::medium_family())
                                 .color(palette.text_strong),
                         );
                         ui.add(
-                            egui::Label::new(RichText::new(about).color(palette.text_weak).small())
-                                .wrap(),
+                            egui::Label::new(
+                                RichText::new(preset.about).color(palette.text_weak).small(),
+                            )
+                            .wrap(),
                         );
                     })
                     .response

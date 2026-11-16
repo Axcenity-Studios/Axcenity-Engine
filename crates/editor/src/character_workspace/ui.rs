@@ -1,12 +1,14 @@
 //! Drawing the workspace: a toolbar across the top (Home, the name, undo
 //! and redo, Reset, Save), the categories down the left, the viewport in
-//! the middle and the category's controls on the right.
+//! the middle and the category's controls on the right. The Body, Face,
+//! Hair and Clothing pages are drawn from the base model's manifest (its
+//! groups, parameters and slots) and the catalogue (CO12).
 
 use eframe::egui::{self, Rect, Sense, vec2};
 use eframe::egui_wgpu::RenderState;
 
 use super::stage::{self, Backdrop, Lighting, ViewPreset};
-use super::{Category, CharacterWorkspace, Slot, part_label, presets};
+use super::{Category, CharacterWorkspace, presets, symmetric_label};
 use crate::theme::{self, icons};
 use crate::widgets::{self, Role};
 
@@ -25,6 +27,7 @@ impl Category {
         match self {
             Category::Presets => "Presets",
             Category::Body => "Body",
+            Category::Face => "Face",
             Category::Hair => "Hair",
             Category::Clothing => "Clothing",
             Category::Stage => "Stage",
@@ -35,6 +38,7 @@ impl Category {
         match self {
             Category::Presets => icons::SPARKLE,
             Category::Body => icons::PERSON,
+            Category::Face => icons::SMILEY,
             Category::Hair => icons::SCISSORS,
             Category::Clothing => icons::T_SHIRT,
             Category::Stage => icons::LIGHTBULB,
@@ -44,7 +48,10 @@ impl Category {
     fn about(self) -> &'static str {
         match self {
             Category::Presets => "Start from a ready-made character, then change anything.",
-            Category::Body => "Shape the body. Changes show on the character as you drag.",
+            Category::Body => {
+                "Pick a body, then shape it. Changes show on the character as you drag."
+            }
+            Category::Face => "Shape the face. Changes show on the character as you drag.",
             Category::Hair => "Pick a hairstyle.",
             Category::Clothing => "Dress the character one piece at a time.",
             Category::Stage => {
@@ -144,7 +151,7 @@ impl CharacterWorkspace {
                     .color(palette.accent),
             );
             ui.add_space(8.0);
-            let mut name = self.look().name.clone();
+            let mut name = self.description().name.clone();
             let field = ui.add(
                 egui::TextEdit::singleline(&mut name)
                     .desired_width(180.0)
@@ -226,9 +233,25 @@ impl CharacterWorkspace {
             )
             .clicked()
             {
-                self.category = category;
+                self.pick_category(category);
             }
         }
+    }
+
+    /// Shows `category`: the Face page frames the face, the Body page the
+    /// whole character.
+    pub(super) fn pick_category(&mut self, category: Category) {
+        if category == self.category {
+            return;
+        }
+        match category {
+            Category::Face => self.orbit = ViewPreset::Face.orbit(),
+            Category::Body if self.category == Category::Face => {
+                self.orbit = ViewPreset::FullBody.orbit()
+            }
+            _ => {}
+        }
+        self.category = category;
     }
 
     fn viewport(&mut self, ui: &mut egui::Ui, rect: Rect, render_state: Option<&RenderState>) {
@@ -258,12 +281,11 @@ impl CharacterWorkspace {
         let palette = theme::palette(ui.ctx());
         match render_state {
             Some(render_state) => {
-                let poses = self.poses();
                 let mut list = axcenity_scene::build_draw_list_posed(
                     &self.world,
                     &self.assets,
                     self.orbit.camera(),
-                    &poses,
+                    self.poses(),
                     &mut axcenity_scene::TerrainCache::new(),
                 );
                 stage::backdrop(&mut list, self.backdrop);
@@ -317,27 +339,25 @@ impl CharacterWorkspace {
             .auto_shrink(false)
             .show(ui, |ui| match self.category {
                 Category::Presets => self.presets_page(ui),
-                Category::Body => self.body_page(ui),
-                Category::Hair => self.slot_picker(ui, Slot::Hair),
-                Category::Clothing => {
-                    for slot in [Slot::Top, Slot::Outerwear, Slot::Bottom, Slot::Shoes] {
-                        widgets::section_label(ui, slot.label());
-                        self.slot_picker(ui, slot);
-                        ui.add_space(10.0);
-                    }
+                Category::Body => {
+                    self.base_picker(ui);
+                    ui.add_space(8.0);
+                    self.parameters_page(ui, Category::Body);
                 }
+                Category::Face => self.parameters_page(ui, Category::Face),
+                Category::Hair | Category::Clothing => self.slots_page(ui, self.category),
                 Category::Stage => self.stage_page(ui),
             });
     }
 
     fn presets_page(&mut self, ui: &mut egui::Ui) {
         let palette = theme::palette(ui.ctx());
-        for (name, about, look) in presets() {
-            let selected = {
-                let mut mine = self.look().clone();
-                mine.name = look.name.clone();
-                mine == look
-            };
+        let library = self.library();
+        for preset in presets() {
+            if library.base(preset.base).is_none() {
+                continue;
+            }
+            let selected = self.is_preset(&preset);
             let frame = egui::Frame::new()
                 .fill(if selected {
                     palette.accent_soft
@@ -350,61 +370,154 @@ impl CharacterWorkspace {
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.label(
-                        egui::RichText::new(name)
+                        egui::RichText::new(preset.name)
                             .family(theme::medium_family())
                             .color(palette.text_strong),
                     );
-                    ui.label(egui::RichText::new(about).color(palette.text_weak).small());
+                    ui.label(
+                        egui::RichText::new(preset.about)
+                            .color(palette.text_weak)
+                            .small(),
+                    );
                 })
                 .response
                 .interact(Sense::click());
             if response.clicked() {
-                let keep = self.look().name.clone();
-                self.edit(|current| {
-                    *current = look;
-                    current.name = keep;
-                });
+                self.use_preset(&preset);
             }
             ui.add_space(6.0);
         }
     }
 
-    fn body_page(&mut self, ui: &mut egui::Ui) {
-        let mut build = self.look().build;
-        let mut muscle = self.look().muscle;
-        widgets::section_label(ui, "Build");
-        ui.horizontal(|ui| {
-            ui.label("Slim");
-            let response = ui.add(egui::Slider::new(&mut build, -1.0..=1.0).show_value(false));
-            ui.label("Heavy");
-            if response.changed() || response.drag_stopped() {
-                self.drag(|look| look.build = build, !response.dragged());
-            }
-        });
-        widgets::section_label(ui, "Muscle");
-        ui.horizontal(|ui| {
-            ui.label("Soft");
-            let response = ui.add(egui::Slider::new(&mut muscle, 0.0..=1.0).show_value(false));
-            ui.label("Strong");
-            if response.changed() || response.drag_stopped() {
-                self.drag(|look| look.muscle = muscle, !response.dragged());
+    /// The body families of the library: one chip each.
+    fn base_picker(&mut self, ui: &mut egui::Ui) {
+        widgets::section_label(ui, "Body");
+        let library = self.library();
+        let current = self.description().base.clone();
+        ui.horizontal_wrapped(|ui| {
+            for (id, base) in &library.bases {
+                if widgets::chip(ui, &base.label, *id == current)
+                    .on_hover_text(format!(
+                        "Start again on the {} body",
+                        base.label.to_lowercase()
+                    ))
+                    .clicked()
+                {
+                    self.set_base(id);
+                }
             }
         });
     }
 
-    fn slot_picker(&mut self, ui: &mut egui::Ui, slot: Slot) {
-        let current = self.look().part(slot).map(str::to_owned);
+    /// The manifest's parameters of `category`, by group: a slider each,
+    /// a mirrored pair as one slider while Symmetry is on.
+    fn parameters_page(&mut self, ui: &mut egui::Ui, category: Category) {
+        let Some(base) = self.base() else {
+            ui.label("This body isn't in the library.");
+            return;
+        };
+        let data = category.data();
         ui.horizontal_wrapped(|ui| {
-            if widgets::chip(ui, slot.none_label(), current.is_none()).clicked() {
-                self.edit(|look| look.set_part(slot, None));
-            }
-            for part in slot.options() {
-                let selected = current.as_deref() == Some(part);
-                if widgets::chip(ui, &part_label(part), selected).clicked() {
-                    self.edit(|look| look.set_part(slot, Some(part)));
-                }
-            }
+            ui.checkbox(&mut self.symmetry, "Symmetry")
+                .on_hover_text("Move a left and right pair together");
+            ui.checkbox(&mut self.advanced, "Advanced")
+                .on_hover_text("Show every slider the body has");
         });
+        ui.add_space(4.0);
+        for group in base
+            .groups
+            .iter()
+            .filter(|group| Some(group.category) == data)
+        {
+            let shown: Vec<&axcenity_avatar::Parameter> = base
+                .parameters
+                .iter()
+                .filter(|parameter| parameter.group == group.id)
+                .filter(|parameter| self.advanced || !parameter.advanced)
+                .filter(|parameter| {
+                    // With symmetry, a pair shows once: as the first of the two.
+                    let Some(mirror) = parameter.mirror.as_deref().filter(|_| self.symmetry) else {
+                        return true;
+                    };
+                    let index = |id: &str| base.parameters.iter().position(|p| p.id == id);
+                    index(&parameter.id) < index(mirror)
+                })
+                .collect();
+            if shown.is_empty() {
+                continue;
+            }
+            egui::CollapsingHeader::new(&group.label)
+                .id_salt(("character parameters", &group.id))
+                .default_open(true)
+                .show(ui, |ui| {
+                    for parameter in shown {
+                        self.slider(ui, parameter);
+                    }
+                });
+        }
+    }
+
+    fn slider(&mut self, ui: &mut egui::Ui, parameter: &axcenity_avatar::Parameter) {
+        let label = if self.symmetry && parameter.mirror.is_some() {
+            symmetric_label(&parameter.label)
+        } else {
+            parameter.label.clone()
+        };
+        let [low, high] = parameter.range;
+        let mut value = self.parameter(&parameter.id);
+        ui.label(&label);
+        let response = ui.add(
+            egui::Slider::new(&mut value, low.min(high)..=low.max(high))
+                .fixed_decimals(2)
+                .clamping(egui::SliderClamping::Always),
+        );
+        if response.double_clicked() {
+            value = parameter.default;
+        }
+        if response.changed() || response.drag_stopped() || response.double_clicked() {
+            self.set_parameter(parameter, value, !response.dragged());
+        }
+    }
+
+    /// The manifest's slots of `category`: a chip per item that fits this
+    /// body, and one for wearing nothing.
+    fn slots_page(&mut self, ui: &mut egui::Ui, category: Category) {
+        let Some(base) = self.base() else {
+            return;
+        };
+        let data = category.data();
+        let mut any = false;
+        for slot in base.slots.iter().filter(|slot| Some(slot.category) == data) {
+            let items = self.items_for(&slot.id);
+            let worn = self.worn_in(&slot.id);
+            if items.is_empty() && worn.is_none() {
+                continue;
+            }
+            any = true;
+            widgets::section_label(ui, &slot.label);
+            ui.horizontal_wrapped(|ui| {
+                let none = slot.empty_label.as_deref().unwrap_or("None");
+                if widgets::chip(ui, none, worn.is_none()).clicked() {
+                    self.wear(&slot.id, None);
+                }
+                for (id, label) in &items {
+                    if widgets::chip(ui, label, worn.as_deref() == Some(id.as_str())).clicked() {
+                        self.wear(&slot.id, Some(id));
+                    }
+                }
+            });
+            ui.add_space(10.0);
+        }
+        if !any {
+            let palette = theme::palette(ui.ctx());
+            ui.label(
+                egui::RichText::new(format!(
+                    "Nothing in the library fits the {} body here yet.",
+                    base.label.to_lowercase()
+                ))
+                .color(palette.text_weak),
+            );
+        }
     }
 
     fn stage_page(&mut self, ui: &mut egui::Ui) {

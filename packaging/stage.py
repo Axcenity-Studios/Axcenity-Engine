@@ -6,6 +6,12 @@ under `players/<os>/` beside itself. This layout matches that, on every package.
 `tools/` holds the Luau language server the editor's script tabs check with
 (`fetch_luau_lsp.py`, pinned by `luau-lsp.toml`), beside its license.
 
+`assets/characters/` is the character library Character Studio offers (its
+catalogue, the base models' and items' manifests and the files they name):
+the editor looks for it beside itself and copies it into its own data folder.
+The stylized package is also built into the editor; the realistic one's model
+is too big to be.
+
 `install.json` says how the copy was installed, so the editor knows whether it
 can update itself (`crates/release/src/install.rs`). The stage gets its OS's
 main kind; `packaging/linux/build-packages.sh` rewrites it for the AppImage and
@@ -24,6 +30,7 @@ from pathlib import Path
 import fetch_luau_lsp
 
 ROOT = Path(__file__).resolve().parents[1]
+CHARACTERS = ROOT / "assets" / "characters"
 GUIDES = Path(__file__).resolve().parent / "guides"
 BRAND = ROOT / "assets" / "branding"
 # What each OS's stage is installed as, unless --install-kind says otherwise.
@@ -43,6 +50,40 @@ def copy_file(src: Path, dst: Path, executable: bool = False) -> None:
     if executable and dst.exists():
         mode = dst.stat().st_mode
         dst.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def character_library_files(root: Path = CHARACTERS) -> list[str]:
+    """The files of the character library in `root` an editor needs, relative
+    to `root`: `catalogue.json`, every manifest it lists and every file a
+    manifest names (a base model's or item's model, a groom's cards and
+    strands, a thumbnail). Build scripts, sources and QA files stay behind."""
+    catalogue = json.loads((root / "catalogue.json").read_text(encoding="utf-8"))
+    files = {"catalogue.json"}
+
+    def named(manifest_path: str, relative: str | None) -> None:
+        if relative:
+            path = (root / manifest_path).parent / relative
+            files.add(path.resolve().relative_to(root.resolve()).as_posix())
+
+    for entry in catalogue.get("bases", []) + catalogue.get("items", []):
+        manifest_path = entry["manifest"]
+        files.add(manifest_path)
+        manifest = json.loads((root / manifest_path).read_text(encoding="utf-8"))
+        model = manifest.get("model") or {}
+        named(manifest_path, model.get("file"))
+        groom = manifest.get("groom") or {}
+        named(manifest_path, (groom.get("cards") or {}).get("file"))
+        named(manifest_path, groom.get("strands"))
+        named(manifest_path, manifest.get("thumbnail"))
+    return sorted(files)
+
+
+def stage_character_library(out: Path) -> None:
+    """Copies the character library's files into the payload's
+    `assets/characters/`."""
+    for relative in character_library_files():
+        target = out / "assets" / "characters" / relative
+        copy_file(CHARACTERS / relative, target)
 
 
 def stage(args: argparse.Namespace) -> None:
@@ -83,6 +124,7 @@ def stage(args: argparse.Namespace) -> None:
         arch = fetch_luau_lsp.host_arch() if same_os else "x86_64"
         fetch_luau_lsp.fetch(args.os, out / "tools", arch)
 
+    stage_character_library(out)
     shutil.copy2(ROOT / "LICENSE", out / "LICENSE")
     shutil.copy2(ROOT / "NOTICE", out / "NOTICE")
     guide = GUIDES / f"{args.os}.txt"
