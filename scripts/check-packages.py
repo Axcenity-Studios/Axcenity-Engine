@@ -146,6 +146,8 @@ def check_payload(folder: Path, host: str, players: dict) -> None:
     for name in ("LICENSE", "NOTICE", "INSTALL.txt", "install.json"):
         need((folder / name).is_file(), f"`{name}` is missing from `{folder}`")
     check_luau_lsp(folder, host)
+    library = folder / "assets" / "characters"
+    need((library / "catalogue.json").is_file(), f"`{library}` has no character library (Character Studio)")
     marker = folder / "install.json"
     if marker.is_file():
         kinds = ("windows-setup", "linux-tarball", "appimage", "deb", "rpm", "pacman", "macos-dmg")

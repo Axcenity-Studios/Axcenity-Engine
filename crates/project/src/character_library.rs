@@ -82,6 +82,85 @@ pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
     write("catalogue.json", catalogue.to_json().as_bytes())
 }
 
+/// Copies the character packages of the library in `from` (a folder with
+/// a `catalogue.json`, such as the engine's shipped `assets/characters/`)
+/// into `project`'s library: each base model's and item's manifest and the
+/// files it names (models, a groom, a thumbnail). A file is copied when
+/// it's missing or its size differs, so a newer engine's package replaces
+/// an older copy and an unchanged one isn't copied again. The catalogue is
+/// written again with what the project's library had and what was copied
+/// (the project's entry wins where both have an ID). Returns the IDs of the
+/// base models and items copied in; what `from` can't read is skipped.
+///
+/// Character Studio's workspace calls it for its own folder, so it offers
+/// every family the engine ships, not only the one built in (the realistic
+/// body's model is 32 MB, too big to build into the program).
+pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>, SaveError> {
+    let (shipped, _, _) = Library::read(from);
+    let root = project.join(CHARACTER_LIBRARY_PATH);
+    let (mut library, _, _) = Library::read(&root);
+    let copy = |path: &str| -> Result<(), SaveError> {
+        let source = from.join(path);
+        let target = root.join(path);
+        let size = |file: &Path| fs::metadata(file).ok().map(|meta| meta.len());
+        if size(&source).is_none() || size(&source) == size(&target) {
+            return Ok(());
+        }
+        if let Some(folder) = target.parent() {
+            fs::create_dir_all(folder).map_err(SaveError::new(folder))?;
+        }
+        fs::copy(&source, &target)
+            .map(|_| ())
+            .map_err(SaveError::new(&target))
+    };
+    let mut added = Vec::new();
+    for (id, base) in &shipped.bases {
+        if library.base(id).is_some() {
+            continue;
+        }
+        let Some(manifest) = shipped.manifest_path(id) else {
+            continue;
+        };
+        copy(manifest)?;
+        if let Some(model) = shipped.path_of(id, &base.model.file) {
+            copy(&model)?;
+        }
+        library.add_base(manifest, base.clone());
+        added.push(id.clone());
+    }
+    for (id, item) in &shipped.items {
+        if library.item(id).is_some() {
+            continue;
+        }
+        let Some(manifest) = shipped.manifest_path(id) else {
+            continue;
+        };
+        copy(manifest)?;
+        let groom = item.groom.as_ref();
+        let files = item
+            .model
+            .iter()
+            .chain(groom.and_then(|groom| groom.cards.as_ref()))
+            .map(|model| model.file.as_str())
+            .chain(groom.and_then(|groom| groom.strands.as_deref()))
+            .chain(item.thumbnail.as_deref());
+        for file in files {
+            if let Some(path) = shipped.path_of(id, file) {
+                copy(&path)?;
+            }
+        }
+        library.add_item(manifest, item.clone());
+        added.push(id.clone());
+    }
+    if !added.is_empty() {
+        let catalogue = root.join("catalogue.json");
+        fs::create_dir_all(&root).map_err(SaveError::new(&root))?;
+        fs::write(&catalogue, Catalogue::of(&library).to_json())
+            .map_err(SaveError::new(&catalogue))?;
+    }
+    Ok(added)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,6 +215,55 @@ mod tests {
         assert_eq!(
             fs::read_to_string(root.join("catalogue.json")).unwrap(),
             "mine"
+        );
+        let _ = fs::remove_dir_all(&folder);
+    }
+
+    #[test]
+    fn the_shipped_packages_are_copied_beside_the_built_in_one() {
+        let folder = std::env::temp_dir().join(format!(
+            "axcenity-character-packages-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&folder);
+        add_character_library(&folder).unwrap();
+        let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+        let added = add_character_packages(&folder, &shipped).unwrap();
+        assert!(
+            added.iter().any(|id| id == "axcenity/realistic"),
+            "{added:?}"
+        );
+        assert!(
+            !added.iter().any(|id| id == axcenity_avatar::V1_BASE),
+            "the built-in package was already there: {added:?}"
+        );
+
+        let root = folder.join(CHARACTER_LIBRARY_PATH);
+        let (library, _, problems) = Library::read(&root);
+        assert!(problems.is_empty(), "{problems:?}");
+        let realistic = library.base("axcenity/realistic").expect("copied");
+        let model = library
+            .path_of("axcenity/realistic", &realistic.model.file)
+            .unwrap();
+        assert_eq!(
+            fs::metadata(root.join(&model)).unwrap().len(),
+            fs::metadata(shipped.join(&model)).unwrap().len()
+        );
+        assert!(library.base(axcenity_avatar::V1_BASE).is_some());
+        let (repository, _, _) = Library::read(&shipped);
+        assert_eq!(library.bases.len(), repository.bases.len());
+        assert_eq!(library.items.len(), repository.items.len());
+
+        // Again: nothing new to copy, and the catalogue is left alone.
+        fs::write(
+            root.join("catalogue.json"),
+            Catalogue::of(&library).to_json(),
+        )
+        .unwrap();
+        assert!(
+            add_character_packages(&folder, &shipped)
+                .unwrap()
+                .is_empty()
         );
         let _ = fs::remove_dir_all(&folder);
     }

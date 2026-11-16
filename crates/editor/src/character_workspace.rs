@@ -1,15 +1,24 @@
-//! The Character Studio workspace (`docs/research/character-studio.md`,
-//! stage CS2, decision D9): a character editor of its own, opened from the
-//! start screen's Character Studio page with no project open.
+//! The Character Studio workspace (ADR-0031; Character Studio overhaul
+//! CO12, `docs/development/character-studio/architecture.md` sections 1,
+//! 6, 7 and 15): a character editor of its own, opened from the start
+//! screen's Character Studio page with no project open.
 //!
-//! It edits a [`Look`] (a character file: build, hair, clothes) and shows
-//! it live on the default humanoid built from its parts file, in a preview
-//! World of its own that the engine's `Animators` pose (the character
-//! idles) and the scene renderer draws. It shares `assets`, `anim`,
-//! `scene` and `render` with the Game Editor and has none of its panels.
+//! It edits a character [`Description`] (format 2; a format 1 file, CS2's
+//! `Look`, migrates when it's opened) on any base model of the character
+//! library: the realistic family by default (ADR-0032), the stylized one
+//! beside it. Its controls come from the base model's manifest (the
+//! parameters by group and category, the slots) and the catalogue (the
+//! items that fit), so a new body or item shows up without code. The
+//! preview is the Character Runtime's: the default character in a World
+//! of its own with the description applied by
+//! `gameplay::description::apply_description`, as a game applies it, posed
+//! by the engine's `Animators` (the character idles) and drawn by the
+//! scene renderer.
+//!
 //! Its files live in the editor's data folder (`Character Studio/`): the
-//! humanoid's model, parts, clips and state machine, written where missing,
-//! and the saved characters, `characters/<name>.character.json`.
+//! default humanoid's files, the character library (the built-in package
+//! and the packages the engine ships, [`find_character_library`]) and the
+//! saved characters, `characters/<name>.character.json`.
 //!
 //! `ui.rs` draws it; `stage.rs` is the viewport (camera, lighting,
 //! backdrop and drawing).
@@ -20,16 +29,16 @@ mod ui;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axcenity_anim::Animators;
 use axcenity_assets::Assets;
-use axcenity_core::{InstanceId, Value, Vector3, World};
+use axcenity_avatar::{BaseManifest, Description, Library, Parameter, WornItem};
+use axcenity_core::{InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
-use serde::{Deserialize, Serialize};
+use axcenity_gameplay::description as applier;
 
 pub use stage::{Backdrop, Lighting, Orbit};
 pub use ui::WorkspaceAction;
@@ -37,8 +46,14 @@ pub use ui::WorkspaceAction;
 /// The command-line flag that opens the editor straight into the workspace.
 pub const FLAG: &str = "--character-studio";
 
-/// The character file's format version.
-pub const LOOK_VERSION: u32 = 1;
+/// The base model a new character starts on: the semi-realistic family is
+/// the default (ADR-0032).
+pub const DEFAULT_BASE: &str = "axcenity/realistic";
+
+/// While a slider is dragged, the preview is applied again at most this
+/// often (each new identity is baked into the character's meshes); it is
+/// applied once more when the drag ends.
+const DRAG_APPLY_EVERY: Duration = Duration::from_millis(120);
 
 /// Where a workspace's files live, in the editor's data folder.
 pub fn default_folder() -> Option<PathBuf> {
@@ -48,280 +63,164 @@ pub fn default_folder() -> Option<PathBuf> {
 /// The folder of saved characters, inside the workspace's folder.
 pub const CHARACTERS_FOLDER: &str = "characters";
 
-/// The face's parts, always worn.
-const FACE_PARTS: [&str; 4] = ["Eyes", "Teeth", "Brows", "Lashes"];
-
-/// Where a part is worn: one part per slot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Slot {
-    Hair,
-    Top,
-    Outerwear,
-    Bottom,
-    Shoes,
+/// The character library the engine ships (`assets/characters/`, with its
+/// `catalogue.json`): looked for in the folder the editor was started
+/// from, then in each folder above the editor's program (an installed
+/// editor has it beside itself; a build from source under the engine's
+/// folder), then in the source tree a debug build came from.
+pub fn find_character_library() -> Option<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(folder) = std::env::current_dir() {
+        roots.push(folder);
+    }
+    if let Ok(program) = std::env::current_exe() {
+        roots.extend(program.ancestors().skip(1).map(Path::to_path_buf));
+    }
+    roots.extend(crate::rebuild::EngineSource::find().map(|source| source.workspace));
+    roots
+        .into_iter()
+        .map(|root| root.join(axcenity_avatar::LIBRARY_FOLDER))
+        .find(|folder| folder.join("catalogue.json").is_file())
 }
 
-impl Slot {
-    pub const ALL: [Slot; 5] = [
-        Slot::Hair,
-        Slot::Top,
-        Slot::Outerwear,
-        Slot::Bottom,
-        Slot::Shoes,
-    ];
+/// A starting point on the Presets page and the start screen: plain data,
+/// so the start screen can list them without a library.
+#[derive(Clone, Copy, Debug)]
+pub struct Preset {
+    pub name: &'static str,
+    pub about: &'static str,
+    pub base: &'static str,
+    pub parameters: &'static [(&'static str, f32)],
+    /// The items worn; `None` wears the base model's defaults.
+    pub items: Option<&'static [&'static str]>,
+}
 
-    /// The slot a part of the humanoid's parts file is worn in, by its
-    /// name; `None` for the body and the face's parts.
-    pub fn of(part: &str) -> Option<Slot> {
-        let prefixes: [(&str, Slot); 7] = [
-            ("Hair_", Slot::Hair),
-            ("Shirt_", Slot::Top),
-            ("Underwear_Top", Slot::Top),
-            ("Jacket_", Slot::Outerwear),
-            ("Pants_", Slot::Bottom),
-            ("Underwear_Briefs", Slot::Bottom),
-            ("Shoes_", Slot::Shoes),
-        ];
-        prefixes
-            .iter()
-            .find(|(prefix, _)| part.starts_with(prefix))
-            .map(|(_, slot)| *slot)
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Slot::Hair => "Hairstyle",
-            Slot::Top => "Top",
-            Slot::Outerwear => "Outerwear",
-            Slot::Bottom => "Bottoms",
-            Slot::Shoes => "Shoes",
+impl Preset {
+    /// The preset as a description named `name`.
+    pub fn description(&self, name: &str, library: &Library) -> Description {
+        let mut description = applier::default_description(library, self.base);
+        description.name = name.to_owned();
+        for (id, value) in self.parameters {
+            description.parameters.insert((*id).to_owned(), *value);
         }
-    }
-
-    /// What wearing nothing here is called.
-    pub fn none_label(self) -> &'static str {
-        match self {
-            Slot::Hair => "Bald",
-            _ => "None",
+        if let Some(items) = self.items {
+            description.items = items.iter().map(|id| WornItem::new(*id)).collect();
         }
+        description
     }
 
-    /// The parts of the parts file worn here.
-    pub fn options(self) -> Vec<&'static str> {
-        axcenity_project::HUMANOID_PARTS
-            .iter()
-            .copied()
-            .filter(|part| Slot::of(part) == Some(self))
-            .collect()
+    /// Whether `description` is this preset (whatever its name).
+    fn matches(&self, description: &Description, library: &Library) -> bool {
+        let mut mine = description.clone();
+        mine.name = String::new();
+        mine == self.description("", library)
     }
 }
 
-/// A part's name for people: `Jacket_Cropped` is "Cropped jacket".
-pub fn part_label(part: &str) -> String {
-    let words: Vec<&str> = part.split('_').collect();
-    match words.as_slice() {
-        ["Hair", style] => (*style).to_owned(),
-        ["Underwear", "Top"] => "Sports top".to_owned(),
-        ["Underwear", "Briefs"] => "Briefs".to_owned(),
-        ["Shirt", "Tee"] => "T-shirt".to_owned(),
-        [kind, style] => format!("{} {}", style, kind.to_lowercase()),
-        _ => part.to_owned(),
-    }
-}
-
-/// A character: what Character Studio edits and saves as a
-/// `*.character.json` file. Values a file leaves out take the default
-/// character's.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Look {
-    pub format_version: u32,
-    pub name: String,
-    /// Slim (-1) to heavy (1).
-    pub build: f32,
-    /// How muscular, 0 to 1.
-    pub muscle: f32,
-    pub hair: Option<String>,
-    pub top: Option<String>,
-    pub outerwear: Option<String>,
-    pub bottom: Option<String>,
-    pub shoes: Option<String>,
-}
-
-impl Default for Look {
-    fn default() -> Self {
-        Self {
-            format_version: LOOK_VERSION,
-            name: "New Character".to_owned(),
-            build: 0.0,
-            muscle: 0.0,
-            hair: Some("Hair_Swept".to_owned()),
-            top: Some("Shirt_Tee".to_owned()),
-            outerwear: Some("Jacket_Cropped".to_owned()),
-            bottom: Some("Pants_Cargo".to_owned()),
-            shoes: Some("Shoes_Sneakers".to_owned()),
-        }
-    }
-}
-
-impl Look {
-    pub fn part(&self, slot: Slot) -> Option<&str> {
-        match slot {
-            Slot::Hair => self.hair.as_deref(),
-            Slot::Top => self.top.as_deref(),
-            Slot::Outerwear => self.outerwear.as_deref(),
-            Slot::Bottom => self.bottom.as_deref(),
-            Slot::Shoes => self.shoes.as_deref(),
-        }
-    }
-
-    pub fn set_part(&mut self, slot: Slot, part: Option<&str>) {
-        let part = part.map(str::to_owned);
-        match slot {
-            Slot::Hair => self.hair = part,
-            Slot::Top => self.top = part,
-            Slot::Outerwear => self.outerwear = part,
-            Slot::Bottom => self.bottom = part,
-            Slot::Shoes => self.shoes = part,
-        }
-    }
-
-    /// The parts worn: the face's, then one per filled slot (only parts the
-    /// parts file has).
-    pub fn parts(&self) -> Vec<&str> {
-        let mut parts = FACE_PARTS.to_vec();
-        for slot in Slot::ALL {
-            if let Some(part) = self.part(slot)
-                && axcenity_project::HUMANOID_PARTS.contains(&part)
-            {
-                parts.push(part);
-            }
-        }
-        parts
-    }
-
-    /// The body shapes this look leans on, by shape name: its build and
-    /// the clothing masks its clothes need (`masks`: garment → masks).
-    pub fn shape_weights(&self, masks: &HashMap<String, Vec<String>>) -> BTreeMap<String, f32> {
-        let mut weights = BTreeMap::new();
-        weights.insert("Build_Heavy".to_owned(), self.build.max(0.0));
-        weights.insert("Build_Slim".to_owned(), (-self.build).max(0.0));
-        weights.insert("Build_Muscular".to_owned(), self.muscle.clamp(0.0, 1.0));
-        for list in masks.values() {
-            for mask in list {
-                weights.entry(mask.clone()).or_insert(0.0);
-            }
-        }
-        for part in self.parts() {
-            for mask in masks.get(part).into_iter().flatten() {
-                weights.insert(mask.clone(), 1.0);
-            }
-        }
-        weights
-    }
-
-    /// The safe ranges: build -1 to 1, muscle 0 to 1, a name.
-    fn clamped(mut self) -> Self {
-        self.build = self.build.clamp(-1.0, 1.0);
-        self.muscle = self.muscle.clamp(0.0, 1.0);
-        if self.name.trim().is_empty() {
-            self.name = "New Character".to_owned();
-        }
-        self
-    }
-
-    pub fn to_json(&self) -> String {
-        let mut text = serde_json::to_string_pretty(self).unwrap_or_default();
-        text.push('\n');
-        text
-    }
-
-    pub fn from_json(text: &str) -> Result<Look, String> {
-        let look: Look = serde_json::from_str(text).map_err(|err| err.to_string())?;
-        if look.format_version > LOOK_VERSION {
-            return Err(format!(
-                "It was saved by a newer Axcenity (character format {}).",
-                look.format_version
-            ));
-        }
-        Ok(look.clamped())
-    }
-}
-
-/// The starting points on the Presets page: a name, a line about it, and
-/// the look.
-pub fn presets() -> Vec<(&'static str, &'static str, Look)> {
-    let base = Look::default();
+/// The presets: the realistic family's, then the stylized family's. The
+/// first is the default character.
+pub fn presets() -> Vec<Preset> {
+    const STYLIZED: &str = axcenity_avatar::V1_BASE;
     vec![
-        (
-            "Everyday",
-            "The default outfit: jacket, tee, cargo joggers, sneakers.",
-            base.clone(),
-        ),
-        (
-            "Casual",
-            "No jacket, a bob, a slimmer build.",
-            Look {
-                build: -0.4,
-                hair: Some("Hair_Bob".to_owned()),
-                outerwear: None,
-                ..base.clone()
-            },
-        ),
-        (
-            "Athlete",
-            "Muscular, a buzz cut, tee and joggers.",
-            Look {
-                muscle: 0.9,
-                hair: Some("Hair_Buzz".to_owned()),
-                outerwear: None,
-                ..base.clone()
-            },
-        ),
-        (
-            "Long hair",
-            "Long hair and a heavier build under the jacket.",
-            Look {
-                build: 0.5,
-                hair: Some("Hair_Long".to_owned()),
-                ..base.clone()
-            },
-        ),
-        (
-            "Base body",
-            "Underwear only: a start for your own clothes.",
-            Look {
-                hair: Some("Hair_Crop".to_owned()),
-                top: None,
-                outerwear: None,
-                bottom: Some("Underwear_Briefs".to_owned()),
-                shoes: None,
-                ..base
-            },
-        ),
+        Preset {
+            name: "Realistic",
+            about: "The semi-realistic body, as it's built: a start for any character.",
+            base: DEFAULT_BASE,
+            parameters: &[],
+            items: None,
+        },
+        Preset {
+            name: "Realistic, feminine",
+            about: "The semi-realistic body on its feminine frame.",
+            base: DEFAULT_BASE,
+            parameters: &[("frame", 1.0)],
+            items: None,
+        },
+        Preset {
+            name: "Athletic",
+            about: "Lean and muscular, on the semi-realistic body.",
+            base: DEFAULT_BASE,
+            parameters: &[("muscle", 0.7), ("fat", -0.4)],
+            items: None,
+        },
+        Preset {
+            name: "Heavyset",
+            about: "A heavier build, on the semi-realistic body.",
+            base: DEFAULT_BASE,
+            parameters: &[("fat", 0.8), ("muscle", 0.2)],
+            items: None,
+        },
+        Preset {
+            name: "Everyday",
+            about: "Stylized: jacket, tee, cargo joggers, sneakers.",
+            base: STYLIZED,
+            parameters: &[],
+            items: None,
+        },
+        Preset {
+            name: "Casual",
+            about: "Stylized: no jacket, a bob, a slimmer build.",
+            base: STYLIZED,
+            parameters: &[("build", -0.4)],
+            items: Some(&[
+                "axcenity/hair-bob",
+                "axcenity/tee",
+                "axcenity/cargo-pants",
+                "axcenity/sneakers",
+            ]),
+        },
+        Preset {
+            name: "Athlete",
+            about: "Stylized: muscular, a buzz cut, tee and joggers.",
+            base: STYLIZED,
+            parameters: &[("muscle", 0.9)],
+            items: Some(&[
+                "axcenity/hair-buzz",
+                "axcenity/tee",
+                "axcenity/cargo-pants",
+                "axcenity/sneakers",
+            ]),
+        },
+        Preset {
+            name: "Long hair",
+            about: "Stylized: long hair and a heavier build under the jacket.",
+            base: STYLIZED,
+            parameters: &[("build", 0.5)],
+            items: Some(&[
+                "axcenity/hair-long",
+                "axcenity/tee",
+                "axcenity/cropped-jacket",
+                "axcenity/cargo-pants",
+                "axcenity/sneakers",
+            ]),
+        },
+        Preset {
+            name: "Base body",
+            about: "Stylized: underwear only, a start for your own clothes.",
+            base: STYLIZED,
+            parameters: &[],
+            items: Some(&["axcenity/hair-crop", "axcenity/briefs"]),
+        },
     ]
 }
 
-/// Garment → the clothing masks it needs, from the humanoid's
-/// customization data.
-pub fn garment_masks() -> HashMap<String, Vec<String>> {
-    let data: serde_json::Value =
-        serde_json::from_str(axcenity_project::DEFAULT_HUMANOID_CUSTOMIZATION).unwrap_or_default();
-    let mut out = HashMap::new();
-    if let Some(parts) = data["parts"].as_object() {
-        for (name, info) in parts {
-            let masks = info["masks"]
-                .as_array()
-                .map(|list| {
-                    list.iter()
-                        .filter_map(|mask| mask.as_str().map(str::to_owned))
-                        .collect()
-                })
+/// A parameter's label for a slider that edits it and its mirror together:
+/// "Left ear protrusion" is "Ear protrusion".
+pub fn symmetric_label(label: &str) -> String {
+    for side in ["Left ", "Right ", "left ", "right "] {
+        if let Some(rest) = label.strip_prefix(side) {
+            let mut chars = rest.chars();
+            return chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect())
                 .unwrap_or_default();
-            out.insert(name.clone(), masks);
         }
     }
-    out
+    label
+        .replace(" (left)", "")
+        .replace(" (right)", "")
+        .replace(" left", "")
+        .replace(" right", "")
 }
 
 /// The categories down the left of the workspace.
@@ -330,19 +229,33 @@ pub enum Category {
     #[default]
     Presets,
     Body,
+    Face,
     Hair,
     Clothing,
     Stage,
 }
 
 impl Category {
-    pub const ALL: [Category; 5] = [
+    pub const ALL: [Category; 6] = [
         Category::Presets,
         Category::Body,
+        Category::Face,
         Category::Hair,
         Category::Clothing,
         Category::Stage,
     ];
+
+    /// The manifest's category this one shows, if it shows one.
+    pub fn data(self) -> Option<axcenity_avatar::Category> {
+        use axcenity_avatar::Category as Data;
+        match self {
+            Category::Body => Some(Data::Body),
+            Category::Face => Some(Data::Face),
+            Category::Hair => Some(Data::Hair),
+            Category::Clothing => Some(Data::Clothing),
+            Category::Presets | Category::Stage => None,
+        }
+    }
 }
 
 /// The workspace: the character being edited, its preview and its undo.
@@ -350,16 +263,21 @@ pub struct CharacterWorkspace {
     folder: PathBuf,
     assets: Assets,
     world: World,
-    body: Option<InstanceId>,
+    character: Option<InstanceId>,
     animators: Animators,
-    masks: HashMap<String, Vec<String>>,
-    look: Look,
-    /// The look as last saved or opened (`None`: never saved).
-    saved: Option<Look>,
-    history: Vec<Look>,
-    future: Vec<Look>,
+    description: Description,
+    /// The description as last saved or opened (`None`: never saved).
+    saved: Option<Description>,
+    history: Vec<Description>,
+    future: Vec<Description>,
     /// A slider being dragged: its edit is one undo step.
     dragging: bool,
+    /// What the preview shows, and when it was applied.
+    applied: Option<(Description, Instant)>,
+    /// Sliders with a mirror move it too.
+    pub symmetry: bool,
+    /// Show the manifest's advanced parameters.
+    pub advanced: bool,
     pub category: Category,
     pub orbit: Orbit,
     pub lighting: Lighting,
@@ -373,89 +291,259 @@ pub struct CharacterWorkspace {
 }
 
 impl CharacterWorkspace {
-    /// Opens the workspace on `look`, its files in `folder` (written where
-    /// missing: the humanoid's model, parts and animations).
-    pub fn open(folder: &Path, look: Look, saved: bool) -> Result<Self, String> {
+    /// Opens the workspace on `description`, its files in `folder` (written
+    /// where missing: the humanoid's files and the character library). A
+    /// description whose base model the library hasn't is shown on the
+    /// default character, with a notice.
+    pub fn open(folder: &Path, description: Description, saved: bool) -> Result<Self, String> {
         std::fs::create_dir_all(folder.join(CHARACTERS_FOLDER))
             .map_err(|err| format!("Could not make the Character Studio folder: {err}"))?;
         axcenity_project::add_default_humanoid(folder)
             .map_err(|err| format!("Could not write the humanoid's files: {err}"))?;
-        axcenity_project::add_humanoid_parts(folder)
-            .map_err(|err| format!("Could not write the humanoid's parts: {err}"))?;
-        let look = look.clamped();
+        axcenity_project::add_character_library(folder)
+            .map_err(|err| format!("Could not write the character library: {err}"))?;
+        let mut notice = None;
+        match find_character_library() {
+            Some(shipped) => {
+                if let Err(err) = axcenity_project::add_character_packages(folder, &shipped) {
+                    notice = Some(format!("Could not copy the character library: {err}"));
+                }
+            }
+            None => {
+                notice = Some(
+                    "Only the stylized characters are here: the engine's character library \
+                     (assets/characters) wasn't found."
+                        .to_owned(),
+                )
+            }
+        }
+        let assets = Assets::new(folder);
+        let library = applier::library(&assets);
+        let mut description = description;
+        if library.base(&description.base).is_none() {
+            let base = if library.base(DEFAULT_BASE).is_some() {
+                DEFAULT_BASE
+            } else {
+                axcenity_avatar::V1_BASE
+            };
+            notice = Some(format!(
+                "\"{}\" is on a body this library hasn't ({}); showing the default character.",
+                description.name, description.base
+            ));
+            let name = description.name.clone();
+            description = applier::default_description(&library, base);
+            description.name = name;
+        }
+        let description = tidy(description, &library);
         let mut workspace = Self {
             folder: folder.to_owned(),
-            assets: Assets::new(folder),
+            assets,
             world: World::new(),
-            body: None,
+            character: None,
             animators: Animators::new(),
-            masks: garment_masks(),
-            saved: saved.then(|| look.clone()),
-            look,
+            saved: saved.then(|| description.clone()),
+            description,
             history: Vec::new(),
             future: Vec::new(),
             dragging: false,
+            applied: None,
+            symmetry: true,
+            advanced: false,
             category: Category::default(),
             orbit: Orbit::default(),
             lighting: Lighting::default(),
             backdrop: Backdrop::default(),
             canvas: Canvas::default(),
             last_frame: None,
-            notice: None,
+            notice,
             leaving: false,
         };
         workspace.build_world();
         Ok(workspace)
     }
 
-    /// Opens a saved character file.
+    /// Opens a saved character file (any format up to this version's).
     pub fn open_file(folder: &Path, file: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(file)
             .map_err(|err| format!("Could not read {}: {err}", file.display()))?;
-        let look = Look::from_json(&text)?;
-        Self::open(folder, look, true)
+        let description = Description::from_json(&text).map_err(|err| err.to_string())?;
+        Self::open(folder, description, true)
     }
 
-    pub fn look(&self) -> &Look {
-        &self.look
+    /// Opens preset `index` of [`presets`] (the default character when
+    /// there's no such preset).
+    pub fn open_preset(folder: &Path, index: usize) -> Result<Self, String> {
+        let preset = presets().into_iter().nth(index).unwrap_or(presets()[0]);
+        // The library is written into the folder by `open`; a preset's
+        // items need it, so it opens first on a bare description.
+        let mut workspace = Self::open(
+            folder,
+            Description::new("New Character", preset.base),
+            false,
+        )?;
+        let library = workspace.library();
+        if library.base(preset.base).is_some() {
+            workspace.description = tidy(preset.description("New Character", &library), &library);
+            workspace.applied = None;
+            workspace.refresh(true);
+        }
+        Ok(workspace)
+    }
+
+    pub fn description(&self) -> &Description {
+        &self.description
     }
 
     pub fn folder(&self) -> &Path {
         &self.folder
     }
 
-    /// Whether the look changed since it was saved (a new one always has).
-    pub fn dirty(&self) -> bool {
-        self.saved.as_ref() != Some(&self.look)
+    /// The character library in the workspace's folder.
+    pub fn library(&self) -> Arc<Library> {
+        applier::library(&self.assets)
     }
 
-    /// Changes the look as one undo step and shows it.
-    pub fn edit(&mut self, change: impl FnOnce(&mut Look)) {
-        let before = self.look.clone();
-        change(&mut self.look);
-        self.look = std::mem::take(&mut self.look).clamped();
-        if self.look != before {
+    /// The base model the character is on.
+    pub fn base(&self) -> Option<BaseManifest> {
+        self.library().base(&self.description.base).cloned()
+    }
+
+    /// Whether the description changed since it was saved (a new one always
+    /// has).
+    pub fn dirty(&self) -> bool {
+        self.saved.as_ref() != Some(&self.description)
+    }
+
+    /// Changes the description as one undo step and shows it.
+    pub fn edit(&mut self, change: impl FnOnce(&mut Description)) {
+        let before = self.description.clone();
+        let mut changed = before.clone();
+        change(&mut changed);
+        self.description = tidy(changed, &self.library());
+        if self.description != before {
             self.history.push(before);
             self.future.clear();
-            self.sync_parts();
+            self.refresh(true);
         }
     }
 
     /// A slider's change: the whole drag is one undo step (`done` ends it).
-    pub fn drag(&mut self, change: impl FnOnce(&mut Look), done: bool) {
+    pub fn drag(&mut self, change: impl FnOnce(&mut Description), done: bool) {
         if !self.dragging {
-            self.history.push(self.look.clone());
+            self.history.push(self.description.clone());
             self.future.clear();
             self.dragging = true;
         }
-        change(&mut self.look);
-        self.look = std::mem::take(&mut self.look).clamped();
+        let mut changed = self.description.clone();
+        change(&mut changed);
+        self.description = tidy(changed, &self.library());
         if done {
             self.dragging = false;
-            if self.history.last() == Some(&self.look) {
+            if self.history.last() == Some(&self.description) {
                 self.history.pop();
             }
         }
+        self.refresh(done);
+    }
+
+    /// The value of parameter `id` (its default when the description leaves
+    /// it out).
+    pub fn parameter(&self, id: &str) -> f32 {
+        let default = self
+            .base()
+            .and_then(|base| base.parameter(id).map(|parameter| parameter.default))
+            .unwrap_or_default();
+        self.description
+            .parameters
+            .get(id)
+            .copied()
+            .unwrap_or(default)
+    }
+
+    /// Sets parameter `parameter` (and, with symmetry on, its mirror) while
+    /// a slider is dragged; `done` ends the drag.
+    pub fn set_parameter(&mut self, parameter: &Parameter, value: f32, done: bool) {
+        let mirror = parameter.mirror.clone().filter(|_| self.symmetry);
+        let id = parameter.id.clone();
+        self.drag(
+            |description| {
+                description.parameters.insert(id, value);
+                if let Some(mirror) = mirror {
+                    description.parameters.insert(mirror, value);
+                }
+            },
+            done,
+        );
+    }
+
+    /// The items the library has for `slot` on this character's base model.
+    pub fn items_for(&self, slot: &str) -> Vec<(String, String)> {
+        let library = self.library();
+        library
+            .items
+            .values()
+            .filter(|item| item.slot == slot && item.bases.contains(&self.description.base))
+            .map(|item| (item.id.clone(), item.label.clone()))
+            .collect()
+    }
+
+    /// The item worn in `slot`, if any.
+    pub fn worn_in(&self, slot: &str) -> Option<String> {
+        let library = self.library();
+        self.description
+            .items
+            .iter()
+            .find(|worn| library.item(&worn.id).is_some_and(|item| item.slot == slot))
+            .map(|worn| worn.id.clone())
+    }
+
+    /// Wears `item` in `slot` (taking off what was there), or nothing.
+    pub fn wear(&mut self, slot: &str, item: Option<&str>) {
+        let library = self.library();
+        let slot = slot.to_owned();
+        let item = item.map(str::to_owned);
+        self.edit(|description| {
+            description
+                .items
+                .retain(|worn| library.item(&worn.id).is_none_or(|it| it.slot != slot));
+            if let Some(item) = item {
+                description.items.push(WornItem::new(item));
+            }
+        });
+    }
+
+    /// Moves the character onto base model `base`: that body's default
+    /// character, keeping the name.
+    pub fn set_base(&mut self, base: &str) {
+        if base == self.description.base {
+            return;
+        }
+        let library = self.library();
+        let name = self.description.name.clone();
+        let base = base.to_owned();
+        self.edit(|description| {
+            *description = applier::default_description(&library, &base);
+            description.name = name;
+        });
+    }
+
+    /// Starts again from `preset`, keeping the name, as an undo step.
+    pub fn use_preset(&mut self, preset: &Preset) {
+        let library = self.library();
+        if library.base(preset.base).is_none() {
+            self.notice = Some(format!(
+                "This library hasn't the body \"{}\" is on.",
+                preset.name
+            ));
+            return;
+        }
+        let name = self.description.name.clone();
+        self.edit(|description| *description = preset.description(&name, &library));
+    }
+
+    /// Whether the character is `preset` (whatever its name).
+    pub fn is_preset(&self, preset: &Preset) -> bool {
+        preset.matches(&self.description, &self.library())
     }
 
     pub fn can_undo(&self) -> bool {
@@ -468,33 +556,36 @@ impl CharacterWorkspace {
 
     pub fn undo(&mut self) {
         if let Some(before) = self.history.pop() {
-            self.future.push(std::mem::replace(&mut self.look, before));
+            self.future
+                .push(std::mem::replace(&mut self.description, before));
             self.dragging = false;
-            self.sync_parts();
+            self.refresh(true);
         }
     }
 
     pub fn redo(&mut self) {
         if let Some(after) = self.future.pop() {
-            self.history.push(std::mem::replace(&mut self.look, after));
-            self.sync_parts();
+            self.history
+                .push(std::mem::replace(&mut self.description, after));
+            self.refresh(true);
         }
     }
 
-    /// Back to the default character (keeping the name), as an undo step.
+    /// Back to the default character of the current body (keeping the
+    /// name), as an undo step.
     pub fn reset(&mut self) {
-        let name = self.look.name.clone();
-        self.edit(|look| {
-            *look = Look {
-                name,
-                ..Look::default()
-            }
+        let library = self.library();
+        let name = self.description.name.clone();
+        let base = self.description.base.clone();
+        self.edit(|description| {
+            *description = applier::default_description(&library, &base);
+            description.name = name;
         });
     }
 
-    /// The saved file's path for the look's name.
+    /// The saved file's path for the character's name.
     pub fn file_path(&self) -> Option<PathBuf> {
-        let name = crate::character_studio::file_name(&self.look.name)?;
+        let name = crate::character_studio::file_name(&self.description.name)?;
         Some(
             self.folder
                 .join(CHARACTERS_FOLDER)
@@ -502,83 +593,97 @@ impl CharacterWorkspace {
         )
     }
 
-    /// Saves the look as `characters/<name>.character.json`.
+    /// Saves the description as `characters/<name>.character.json`
+    /// (format 2).
     pub fn save(&mut self) -> Result<PathBuf, String> {
         let path = self
             .file_path()
             .ok_or_else(|| "Give the character a name to save it.".to_owned())?;
-        std::fs::write(&path, self.look.to_json())
+        std::fs::write(&path, self.description.to_json())
             .map_err(|err| format!("Could not save {}: {err}", path.display()))?;
-        self.saved = Some(self.look.clone());
+        self.saved = Some(self.description.clone());
         Ok(path)
     }
 
-    /// Builds the preview World: a floor and the character from parts.
+    /// Builds the preview World: a floor and the default character, with
+    /// the description applied.
     fn build_world(&mut self) {
         let mut world = World::new();
         let workspace = world.workspace();
-        let character =
-            axcenity_project::modular_character(&mut world, Vector3::default(), &self.look.parts());
+        let character = axcenity_project::default_character(&mut world, Vector3::default());
         let _ = world.set_parent(character, Some(workspace));
-        self.body = world.find_first_child(character, "Body");
         stage::add_floor(&mut world);
         self.world = world;
+        self.character = Some(character);
         self.animators.clear();
+        self.applied = None;
+        self.refresh(true);
     }
 
-    /// Makes the preview's worn parts match the look: parts no longer worn
-    /// go, new ones are put on (the rest keep their pose).
-    fn sync_parts(&mut self) {
-        let Some(body) = self.body else {
+    /// Applies the description to the preview if it changed: at once when
+    /// `now`, else at most every [`DRAG_APPLY_EVERY`] while a slider is
+    /// dragged.
+    fn refresh(&mut self, now: bool) {
+        let Some(character) = self.character else {
             return;
         };
-        let wanted = self.look.parts();
-        let children: Vec<InstanceId> = self
+        if let Some((applied, at)) = &self.applied {
+            if *applied == self.description {
+                return;
+            }
+            if !now && at.elapsed() < DRAG_APPLY_EVERY {
+                return;
+            }
+        }
+        match applier::apply_description(
+            &mut self.world,
+            &self.assets,
+            character,
+            &self.description,
+        ) {
+            Ok(applied) => {
+                if let Some(problem) = applied.problems.first() {
+                    self.notice = Some(problem.message.clone());
+                }
+            }
+            Err(error) => self.notice = Some(format!("Could not show the character: {error}")),
+        }
+        self.applied = Some((self.description.clone(), Instant::now()));
+    }
+
+    /// The MeshParts the preview's body wears, by name, with the body's own
+    /// `MeshId` first.
+    #[cfg(test)]
+    pub fn worn(&self) -> Vec<String> {
+        let Some(body) = self
+            .character
+            .and_then(|character| applier::body_of(&self.world, character))
+        else {
+            return Vec::new();
+        };
+        let mesh = |id: InstanceId| {
+            self.world
+                .get(id)
+                .and_then(|part| part.property("MeshId"))
+                .and_then(axcenity_core::Value::as_str)
+                .map(str::to_owned)
+        };
+        let mut names: Vec<String> = self
             .world
             .get(body)
             .map(|body| body.children().to_vec())
-            .unwrap_or_default();
-        let mut worn = Vec::new();
-        for child in children {
-            let Some(instance) = self.world.get(child) else {
-                continue;
-            };
-            if instance.property("MeshId").is_none() {
-                continue;
-            }
-            let name = instance.name().to_owned();
-            if wanted.contains(&name.as_str()) {
-                worn.push(name);
-            } else {
-                let _ = self.world.destroy(child);
-            }
-        }
-        for part in wanted {
-            if !worn.iter().any(|name| name == part) {
-                axcenity_project::humanoid_part(&mut self.world, body, part);
-            }
-        }
-    }
-
-    /// The parts worn in the preview, by name.
-    #[cfg(test)]
-    pub fn worn(&self) -> Vec<String> {
-        let Some(body) = self.body.and_then(|body| self.world.get(body)) else {
-            return Vec::new();
-        };
-        let mut names: Vec<String> = body
-            .children()
-            .iter()
-            .filter_map(|child| self.world.get(*child))
-            .filter(|child| child.property("MeshId").is_some())
-            .map(|child| child.name().to_owned())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|child| mesh(*child).is_some())
+            .filter_map(|child| self.world.get(child).map(|part| part.name().to_owned()))
             .collect();
         names.sort();
+        names.insert(0, mesh(body).unwrap_or_default());
         names
     }
 
     /// Moves the preview on by the time since the last frame: the
-    /// character idles.
+    /// character idles, and a dragged slider's change is shown.
     pub fn step(&mut self) -> f64 {
         let now = Instant::now();
         let seconds = self
@@ -586,6 +691,7 @@ impl CharacterWorkspace {
             .map_or(0.0, |last| now.duration_since(last).as_secs_f64())
             .min(0.1);
         self.last_frame = Some(now);
+        self.refresh(!self.dragging);
         self.step_by(seconds);
         seconds
     }
@@ -595,43 +701,30 @@ impl CharacterWorkspace {
             .update(&mut self.world, &self.assets, seconds);
     }
 
-    /// The preview's poses with the look's body shapes leaned on: each
-    /// posed part (the body and what it wears) gets the build and the
-    /// masks by name; its face shapes keep what its pose has.
-    pub fn poses(&self) -> axcenity_scene::Poses {
-        let weights = self.look.shape_weights(&self.masks);
-        let mut poses = axcenity_scene::Poses::new();
-        for (id, posed) in self.animators.poses() {
-            let Some(model) = self
-                .world
-                .get(*id)
-                .and_then(|part| part.property("MeshId"))
-                .and_then(Value::as_str)
-                .and_then(|mesh| self.assets.model_ready(mesh))
-            else {
-                poses.insert(*id, posed.clone());
-                continue;
-            };
-            let mut values = posed.morph_weights().to_vec();
-            let mut changed = false;
-            for (value, target) in values.iter_mut().zip(&model.morph_targets) {
-                if let Some(weight) = weights.get(&target.name)
-                    && *value != *weight
-                {
-                    *value = *weight;
-                    changed = true;
-                }
-            }
-            if changed {
-                let mut leaned = (**posed).clone();
-                leaned.set_morph_weights(&values);
-                poses.insert(*id, Arc::new(leaned));
-            } else {
-                poses.insert(*id, posed.clone());
+    /// The preview's poses.
+    pub fn poses(&self) -> &axcenity_scene::Poses {
+        self.animators.poses()
+    }
+}
+
+/// `description` with every parameter in its base model's range, unknown
+/// parameters dropped and a name.
+fn tidy(mut description: Description, library: &Library) -> Description {
+    if let Some(base) = library.base(&description.base) {
+        description
+            .parameters
+            .retain(|id, _| base.parameter(id).is_some());
+        for (id, value) in description.parameters.iter_mut() {
+            if let Some(parameter) = base.parameter(id) {
+                let [low, high] = parameter.range;
+                *value = value.clamp(low.min(high), low.max(high));
             }
         }
-        poses
     }
+    if description.name.trim().is_empty() {
+        description.name = "New Character".to_owned();
+    }
+    description
 }
 
 /// The saved characters in `folder`, newest first: (name, path).
@@ -650,8 +743,8 @@ pub fn saved_characters(folder: &Path) -> Vec<(String, PathBuf)> {
             let modified = entry.metadata().and_then(|m| m.modified()).ok()?;
             let shown = std::fs::read_to_string(&path)
                 .ok()
-                .and_then(|text| Look::from_json(&text).ok())
-                .map_or_else(|| name.to_owned(), |look| look.name);
+                .and_then(|text| Description::from_json(&text).ok())
+                .map_or_else(|| name.to_owned(), |description| description.name);
             Some((modified, shown, path))
         })
         .collect();
