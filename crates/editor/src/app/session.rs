@@ -1463,7 +1463,10 @@ impl EditorApp {
             (Some(project), _) => format!("{}{unsaved} - Axcenity Editor", project.name),
             (None, Some(workspace)) => {
                 let unsaved = if workspace.dirty() { "*" } else { "" };
-                format!("{}{unsaved} - Character Studio", workspace.look().name)
+                format!(
+                    "{}{unsaved} - Character Studio",
+                    workspace.description().name
+                )
             }
             (None, None) => "Axcenity Editor".to_string(),
         }

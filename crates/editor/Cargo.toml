@@ -24,6 +24,8 @@ axcenity-editor-toolbox.workspace = true
 axcenity-editor-tools.workspace = true
 axcenity-editor-ui-designer.workspace = true
 axcenity-gameplay.workspace = true
+# Character Data: the descriptions, manifests and catalogue Character Studio edits.
+axcenity-avatar.workspace = true
 axcenity-mcp.workspace = true
 axcenity-mesh-edit.workspace = true
 axcenity-nav.workspace = true
@@ -97,8 +99,6 @@ pollster.workspace = true
 # Builds update archives for the install tests (`app/update_install.rs`).
 flate2.workspace = true
 tar.workspace = true
-# Character Data: format 1 character files migrate to what the workspace shows.
-axcenity-avatar.workspace = true
 
 [lints]
 workspace = true

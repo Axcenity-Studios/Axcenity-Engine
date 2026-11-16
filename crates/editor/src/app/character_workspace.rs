@@ -8,7 +8,7 @@ use eframe::egui;
 use eframe::egui_wgpu::RenderState;
 
 use super::EditorApp;
-use crate::character_workspace::{CharacterWorkspace, WorkspaceAction, presets};
+use crate::character_workspace::{CharacterWorkspace, WorkspaceAction};
 use crate::dialog;
 use crate::theme::{self, icons};
 
@@ -31,14 +31,7 @@ impl EditorApp {
         };
         let opened = match file {
             Some(file) => CharacterWorkspace::open_file(&folder, file),
-            None => {
-                let look = presets()
-                    .into_iter()
-                    .nth(preset.unwrap_or(0))
-                    .map(|(_, _, look)| look)
-                    .unwrap_or_default();
-                CharacterWorkspace::open(&folder, look, false)
-            }
+            None => CharacterWorkspace::open_preset(&folder, preset.unwrap_or(0)),
         };
         match opened {
             Ok(workspace) => self.character_workspace = Some(Box::new(workspace)),
@@ -77,7 +70,7 @@ impl EditorApp {
             let (icon, tone) = dialog::unsaved_style();
             let message = format!(
                 "\"{}\" has unsaved changes. Save them before going back to the start screen?",
-                workspace.look().name
+                workspace.description().name
             );
             let outcome = dialog::ask(
                 ui.ctx(),
@@ -144,13 +137,17 @@ mod tests {
         );
         assert!(start.iter().any(|text| text == "Debug"), "{start:?}");
 
-        // The Athlete preset, from the start page.
+        // The Athletic preset, from the start page: the realistic body.
         app.open_character_workspace(Some(2), None);
         let workspace = app.character_workspace.as_ref().expect("opened");
-        assert_eq!(workspace.look().hair.as_deref(), Some("Hair_Buzz"));
+        assert_eq!(
+            workspace.description().base,
+            crate::character_workspace::DEFAULT_BASE
+        );
+        assert_eq!(workspace.description().parameters.get("muscle"), Some(&0.7));
         assert_eq!(app.title(), "New Character* - Character Studio");
         let drawn = frame(&mut app, &ctx);
-        for text in ["Customize", "Presets", "Clothing", "Athlete"] {
+        for text in ["Customize", "Presets", "Face", "Clothing", "Athletic"] {
             let found = drawn
                 .iter()
                 .any(|t| t.to_lowercase().contains(&text.to_lowercase()));
