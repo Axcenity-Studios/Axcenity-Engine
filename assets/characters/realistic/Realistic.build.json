@@ -289,6 +289,11 @@
    "pose": "shoulder_abd_90",
    "vertices": 673
   },
+  "Lowered": {
+   "largest_move_mm": 30.4,
+   "pose": "shoulder_abd_10",
+   "vertices": 665
+  },
   "Raised": {
    "largest_move_mm": 39.1,
    "pose": "shoulder_abd_150",
@@ -310,7 +315,7 @@
    "axis": [
     0.0,
     -0.37768,
-    0.92594
+    0.92593
    ],
    "bone": "LeftUpperArm",
    "shape": "Corrective_Shoulder_Level_Left"
@@ -321,7 +326,7 @@
     45.0
    ],
    "axis": [
-    0.0,
+    -0.0,
     0.37698,
     -0.92622
    ],
@@ -336,7 +341,7 @@
    "axis": [
     0.0,
     -0.37768,
-    0.92594
+    0.92593
    ],
    "bone": "LeftUpperArm",
    "shape": "Corrective_Shoulder_Raised_Left"
@@ -347,12 +352,38 @@
     105.0
    ],
    "axis": [
-    0.0,
+    -0.0,
     0.37698,
     -0.92622
    ],
    "bone": "RightUpperArm",
    "shape": "Corrective_Shoulder_Raised_Right"
+  },
+  {
+   "angles": [
+    0.0,
+    35.0
+   ],
+   "axis": [
+    -0.0,
+    0.37768,
+    -0.92593
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Lowered_Left"
+  },
+  {
+   "angles": [
+    0.0,
+    35.0
+   ],
+   "axis": [
+    0.0,
+    -0.37698,
+    0.92622
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Lowered_Right"
   }
  ],
  "eyes": {
@@ -666,7 +697,7 @@
   },
   "rest": {
    "feminine_lids_moved_mm": 3.96,
-   "lid_texels_softened": 6846,
+   "lid_texels_softened": 6849,
    "lining_vertices_lifted": 304,
    "lips_closed_by_mm": {
     "feminine": 2.39,
@@ -1358,7 +1389,7 @@
   }
  },
  "textures": {
-  "frames_differ_share": 0.083,
+  "frames_differ_share": 0.082,
   "size": 2048,
   "texels_per_cm": 10.85
  },

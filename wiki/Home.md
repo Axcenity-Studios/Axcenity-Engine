@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-16 | Characters, known limitations, Home | The realistic body's lowered-shoulder corrective shapes: no squared cap or ridge beside the neck when the arms hang |
 | 2026-11-16 | Characters, roadmap, known limitations | Character Studio overhaul Stage 3 done: the raised shoulder held by its ring area, the eye check's false counts removed, Stage 4 next |
 | 2026-11-15 | Characters, Animation, roadmap, known limitations | Character Studio overhaul CO6, the realistic head and face: eyes, teeth, expression and identity shapes, and a blink that never passes a squint |
 | 2026-11-14 | Characters, Animation, roadmap, known limitations | Character Studio overhaul CO5, body parameters: muscle and fat on the realistic body, corrective shapes driven by the pose, the raised shoulder's open measure |
-| 2026-11-14 | Characters, Animation, roadmap, known limitations | Character Studio overhaul CO4, the realistic base body: twist and helper bones, and takes named like a body of other proportions playing through roles |
 | 2026-11-14 | ADR-0038, Characters, Animation, Character Data, Gameplay systems, roadmap, known limitations | Character Studio overhaul CO3, the runtime applier: descriptions applied to characters, identity baked into derived models named by `MeshId` |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

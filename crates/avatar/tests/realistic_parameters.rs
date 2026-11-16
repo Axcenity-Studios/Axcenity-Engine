@@ -231,6 +231,8 @@ fn a_baked_body_keeps_only_its_live_shapes() {
         [
             "Corrective_Shoulder_Level_Left",
             "Corrective_Shoulder_Level_Right",
+            "Corrective_Shoulder_Lowered_Left",
+            "Corrective_Shoulder_Lowered_Right",
             "Corrective_Shoulder_Raised_Left",
             "Corrective_Shoulder_Raised_Right",
         ]
@@ -243,12 +245,13 @@ fn a_baked_body_keeps_only_its_live_shapes() {
             || *name == "Pupil_Size";
         assert!(!identity_name, "`{name}` is left on the baked body");
     }
-    // 4 corrective shapes and the 44 expression shapes (the 48 face
+    // 6 corrective shapes and the 44 expression shapes (the 48 face
     // controls less the four eye looks, which are bones).
-    assert_eq!(left.len(), 48, "{left:?}");
+    assert_eq!(left.len(), 50, "{left:?}");
     // (One less than at the merge: the body no longer carries `Pupil_Size`,
     // which is the eyes' own shape and no slider's. Four more since: the
     // brows' height and arch have a raising shape each side besides the
-    // lowering one, `faceparams.SPLIT`.)
-    assert_eq!(model.morph_targets.len(), 146);
+    // lowering one, `faceparams.SPLIT`. Two more for the lowered shoulder,
+    // `Corrective_Shoulder_Lowered_*`.)
+    assert_eq!(model.morph_targets.len(), 148);
 }
