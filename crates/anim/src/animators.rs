@@ -243,6 +243,41 @@ impl FaceFrame {
     }
 }
 
+/// Poses `model`'s skin for a finished `pose` of its skeleton `rig` (body
+/// slider scales in `shape`, its face over it if it has one). Both ways a
+/// pose is made, on the pose threads and with IK, feet or a ragdoll, end
+/// here.
+///
+/// **The twist and helper bones' one call site (CO4, `twist.rs`):** they
+/// are turned here, after everything that poses a bone and before the skin
+/// is posed, in the `pose` the caller keeps, so a character's parts
+/// (followers, which take that pose by bone name) get them too.
+fn skinned(
+    model: &Model,
+    rig: &Rig,
+    face: Option<&FaceFrame>,
+    pose: &mut axcenity_assets::Pose,
+    shape: &mut [glam::Vec3],
+) -> Option<Posed> {
+    crate::twist::drive(rig, pose, shape);
+    match face {
+        Some(face) => face.pose(model, rig, pose.clone(), shape),
+        None => model.pose_shaped(pose, shape),
+    }
+}
+
+/// [`skinned`] for a model without a face, for `twist.rs`'s test of the
+/// call site.
+#[cfg(test)]
+pub(crate) fn skinned_for_test(
+    model: &Model,
+    rig: &Rig,
+    pose: &mut axcenity_assets::Pose,
+    shape: &mut [glam::Vec3],
+) -> Option<Posed> {
+    skinned(model, rig, None, pose, shape)
+}
+
 /// The profile a FaceControls was matched to its model with.
 struct FaceRun {
     model_key: u64,
@@ -570,14 +605,17 @@ impl Animators {
             // A character's identity moves its bones after the clips, so
             // every clip plays on every character.
             job.model.settle(&mut pose);
-            let shape = match &job.shape {
+            let mut shape = match &job.shape {
                 Some(shape) => shape.apply(&job.rig, &mut pose),
                 None => Vec::new(),
             };
-            let posed = match &job.face {
-                Some(face) => face.pose(&job.model, &job.rig, pose.clone(), &shape),
-                None => job.model.pose_shaped(&pose, &shape),
-            };
+            let posed = skinned(
+                &job.model,
+                &job.rig,
+                job.face.as_ref(),
+                &mut pose,
+                &mut shape,
+            );
             (pose, shape, posed)
         });
         self.thread_times = times;
@@ -1019,7 +1057,7 @@ impl Animators {
                     model.settle(&mut pose);
                     // Body sliders first, so IK and the feet work on the
                     // body as it's shaped.
-                    let shape = match BodyShape::read(world, owner) {
+                    let mut shape = match BodyShape::read(world, owner) {
                         Some(shape) => shape.apply(rig, &mut pose),
                         None => Vec::new(),
                     };
@@ -1076,10 +1114,7 @@ impl Animators {
                             self.report(problem);
                         }
                     }
-                    let made = match &face {
-                        Some(face) => face.pose(model, rig, pose.clone(), &shape),
-                        None => model.pose_shaped(&pose, &shape),
-                    };
+                    let made = skinned(model, rig, face.as_ref(), &mut pose, &mut shape);
                     if let Some(made) = made {
                         self.poses.insert(owner, Arc::new(made));
                         self.local.insert(owner, (Arc::clone(rig), pose, shape));

@@ -955,3 +955,100 @@ fn convert_to_keys_bakes_the_retargeted_motion_onto_the_models_own_bones() {
     baked.sample(1.0, &rig, &mut b);
     assert!(a[8].rotation.abs_diff_eq(b[8].rotation, 1e-3));
 }
+
+#[test]
+fn a_take_named_like_a_body_of_other_proportions_keeps_that_bodys_bones() {
+    let mut take = walk();
+    // The same skeleton, a third longer in every bone: another base model of
+    // the character library, whose bones are named alike.
+    let mut bones = take.skeleton.to_vec();
+    for bone in &mut bones {
+        bone.rest.translation *= 1.3;
+    }
+    let rig = Rig {
+        bones,
+        joints: Vec::new(),
+        fit: Mat4::IDENTITY,
+    };
+    let mut file = ClipFile::linked("assets/anims/walk.fbx", "Walk", 0.0, 1.0);
+    file.looping = false;
+    // A take that keys no bone offsets leaves the body's own: by name.
+    let clip = Clip::bind(file.clone(), Some(Arc::new(vec![take.clone()])), Some(&rig)).unwrap();
+    assert!(!clip.retargeted());
+    // One that keys them, as glTF and FBX exports do, would bring its own.
+    let offset = take.skeleton[8].rest.translation;
+    take.tracks[0].translation = Keys {
+        times: vec![0.0, 1.0],
+        values: vec![offset, offset],
+    };
+    let clip = Clip::bind(file, Some(Arc::new(vec![take])), Some(&rig)).unwrap();
+    assert!(clip.retargeted(), "by name, the take's offsets would win");
+    let mut pose = rig.rest_pose();
+    clip.sample(1.0, &rig, &mut pose);
+    assert_ne!(pose[8].rotation, rig.bones[8].rest.rotation, "it moved");
+    for (bone, (posed, rest)) in pose.iter().zip(&rig.bones).enumerate().skip(1) {
+        assert!(
+            posed.translation.abs_diff_eq(rest.rest.translation, 1e-5),
+            "{} (bone {bone}) keeps its length",
+            rest.name
+        );
+    }
+}
+
+/// The starter animations are made on the stylized skeleton. The realistic
+/// body's bones have the same names and other lengths: by name, a clip
+/// would give it the stylized body's bone offsets (found in CO4's clip
+/// sheet: a squashed body and an open jaw).
+#[test]
+fn the_starter_animations_keep_the_realistic_bodys_proportions() {
+    use axcenity_assets::{ModelFormat, Pick, load_models, load_takes};
+    use std::path::Path;
+
+    let characters = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+    let takes = std::fs::read(characters.join("humanoid/HumanoidAnimations.glb")).unwrap();
+    let takes = Arc::new(load_takes(&takes, ModelFormat::Gltf).unwrap());
+    let body = |file: &str, object: &str| {
+        let bytes = std::fs::read(characters.join(file)).unwrap();
+        let picks = [Pick::Objects(vec![object.to_owned()])];
+        let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
+        models[0].rig.clone().unwrap()
+    };
+    let realistic = body("realistic/RealisticParts.glb", "AxcenityRealistic/Body");
+    let stylized = body("humanoid/HumanoidParts.glb", "AxcenityHumanoid/Body");
+    for take in takes.iter() {
+        let file = ClipFile::linked(
+            "HumanoidAnimations.glb",
+            &take.name,
+            0.0,
+            take.duration.into(),
+        );
+        let clip = Clip::bind(file.clone(), Some(takes.clone()), Some(&stylized)).unwrap();
+        assert!(
+            !clip.retargeted(),
+            "{}: its own skeleton, by name",
+            take.name
+        );
+
+        let clip = Clip::bind(file, Some(takes.clone()), Some(&realistic)).unwrap();
+        assert!(clip.retargeted(), "{}", take.name);
+        let hips = realistic.bone("Hips").unwrap();
+        let mut moved = false;
+        for step in 0..4 {
+            let mut pose = realistic.rest_pose();
+            clip.sample(f64::from(step) / 4.0, &realistic, &mut pose);
+            for (bone, (posed, rest)) in pose.iter().zip(&realistic.bones).enumerate() {
+                moved |= !posed.rotation.abs_diff_eq(rest.rest.rotation, 1e-3);
+                if bone == hips || rest.parent.is_none() {
+                    continue;
+                }
+                assert!(
+                    posed.translation.abs_diff_eq(rest.rest.translation, 1e-5),
+                    "{}: {} keeps its place on its parent",
+                    take.name,
+                    rest.name
+                );
+            }
+        }
+        assert!(moved, "{} moves the body", take.name);
+    }
+}

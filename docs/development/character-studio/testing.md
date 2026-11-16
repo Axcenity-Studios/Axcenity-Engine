@@ -18,7 +18,7 @@ How every milestone is tested, what runs where, and the tests that exist. Visual
 | Contract | The repository's library against its models: every shape, bone and material a manifest names exists; the catalogue is current; defaults and migrated files are sound | `crates/avatar/tests/shipped_library.rs` | Same; after any change to a manifest, a model or `catalogue.json` |
 | Engine agreement | The manifests describe what the engine ships (sockets, body sliders, parts, default outfit); format 1 files resolve to what the workspace shows | `project` `default_humanoid::tests::the_character_data_manifests_describe_the_default_humanoid`; `editor` `character_workspace::tests::a_saved_look_migrates_to_the_same_parts_and_shapes` | `cargo nextest run -p axcenity-project -p axcenity-editor` |
 | Runtime | A description applied in the player: parts, identity baked into derived models, followers taking live shapes, bone offsets, attributes, materials, kept descriptions applied again; game scripts calling the `HumanoidDescription` API | `player` `default_humanoid_tests/description.rs` and `description_lua.rs`; `gameplay` `description_tests.rs`; `assets` `model::identity`, `derived`; `avatar` `tests::resolving` | `cargo nextest run -p axcenity-player description`, `-p axcenity-gameplay`, `-p axcenity-assets identity derived` |
-| Geometry QA | Poke-through, waist gaps, layer order, joint volume, eyelid closure, teeth and lips, self-intersection at slider extremes | `assets/characters/<family>/qa/measure.py` (Blender, `bpy`) | Locally where `bpy` is installed (below) |
+| Geometry QA | Poke-through, waist gaps, layer order, joint volume, eyelid closure, teeth and lips, self-intersection at slider extremes | `assets/characters/humanoid/qa/measure.py` (Blender, `bpy`; `--package realistic` for the realistic body, held to `assets/characters/realistic/qa/thresholds.json`) | Locally where `bpy` is installed (below) |
 | Visual | Benchmark sheets, in Blender and in the engine | `render_baseline.py`; the in-engine capture (`player`'s `character_capture.rs`, the `capture_characters` tool) | [visual-qa.md](visual-qa.md) |
 | UI | Walkthroughs: open, edit, undo, redo, save, reopen; every control changes the character; drawing snapshots | `editor` `character_workspace/tests.rs`, `app/character_workspace.rs` | `AXCENITY_SNAPSHOTS=<folder> cargo nextest run -p axcenity-editor character` |
 | Performance | GPU timings per pass, the character budget, a crowd | `FramePass` timers; `docs/benchmarks.md` | On the reference PC, pinned to one CCD |
@@ -42,6 +42,7 @@ After a manifest or model change: `python -I assets/characters/humanoid/manifest
 ```text
 .bpy/bin/python -I assets/characters/humanoid/qa/measure.py --only clipping --out <file> --check assets/characters/humanoid/qa/thresholds.json
 .bpy/bin/python -I assets/characters/humanoid/qa/measure.py --out <file>      # everything, ~25 s
+.bpy/bin/python -I assets/characters/humanoid/qa/measure.py --package realistic --out <file> --check assets/characters/realistic/qa/thresholds.json
 ```
 
 ## What each milestone must test
@@ -65,16 +66,24 @@ After a manifest or model change: `python -I assets/characters/humanoid/manifest
 
 Starting points from the Stage 1 baseline (`baseline/measurements.json`); a milestone may only tighten them.
 
-| Measure | Stylized today | Realistic target (CO4–CO6) |
-|---|---|---|
-| Waist gap, every frame × build | 0 mm | 0 mm |
-| Garment poke-through (points, all combinations) | `thresholds.json` | 0 visible; counts recorded per item at CO9 |
-| Elbow 135° ring area ratio | 0.37 | ≥ 0.6 with twist bones and correctives |
-| Shoulder abducted 150° volume ratio | 0.56 | ≥ 0.8 |
-| Knee 135° ring area ratio | 0.44 | ≥ 0.6 |
-| Eyeball front uncovered in a full blink | 20–23% | 0% |
-| Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 |
-| Face vertices above the head joint carrying `Neck` weight | 911 | 0 |
+| Measure | Stylized today | Realistic target (CO4–CO6) | Realistic at CO4 (masculine / feminine) |
+|---|---|---|---|
+| Waist gap, every frame × build | 0 mm | 0 mm | Not measured: no garments until CO9 |
+| Garment poke-through (points, all combinations) | `thresholds.json` | 0 visible; counts recorded per item at CO9 | Not measured: no garments until CO9 |
+| Elbow 135° ring area ratio | 0.37 | ≥ 0.6 with twist bones and correctives | 0.757 / 0.758, met |
+| Shoulder abducted 150° volume ratio | 0.56 | ≥ 0.8 | 0.562 / 0.561, **not met** |
+| Knee 135° ring area ratio | 0.44 | ≥ 0.6 | 0.74 / 0.75, met |
+| Eyeball front uncovered in a full blink | 20–23% | 0% | Not measured: no blink shape until CO6 |
+| Teeth vertices inside lip or chin flesh, jaw open | 62–192 | 0 | 6 / 14 (the lower lip's inner side), not met (CO6) |
+| Face vertices above the head joint carrying `Neck` weight | 911 | 0 | 0, met |
+
+**The realistic body at CO4** (`co4/measurements.json`, checked by `measure.py --package realistic --check assets/characters/realistic/qa/thresholds.json`). Met: the elbow, the knee, the `Neck` weights, and CO4's own test of no eye or teeth interpenetration at rest (0 on both frames). **Not met: the shoulder raised 150°** keeps 0.562 / 0.561 of its local volume against 0.8. A crease between collar and arm and a flattened deltoid show in `co4/deformation_poses.png`; the corrective shapes are CO5's. The thresholds file holds it as a `target` (printed as not met; `--strict` fails on it) over a floor of 0.54, and it moves into `at_least` when it is met. Also still short: the fist self-intersects (247 / 199 triangle pairs), the teeth touch the lower lip's inner side with the jaw open, and the lips rest about 2 mm apart (CO6). No target above has changed.
+
+## Tests that exist (CO4)
+
+`anim` `twist::tests` (12: the twist and helper rules, a skeleton without such bones left alone, slider scale, the one call site, the shipped realistic skeleton driven as it was built); `anim` `retarget::tests::a_take_named_like_a_body_of_other_proportions_keeps_that_bodys_bones` and `the_starter_animations_keep_the_realistic_bodys_proportions` (the clip rule of architecture section 12). Blender: `assets/characters/realistic/qa/thresholds.json` (`at_least`, `at_most` and `within` limits, and the unmet shoulder `targets`). The red runs are in `co4/` (`red-run-anim.txt`, `red-run-avatar.txt`, `red-run-thresholds.txt`).
+
+**Left red on purpose:** `avatar` `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` fails for `axcenity/realistic` on the test's own floor (a base body has more than 10 shapes): the body has one shape, `Frame_Feminine`, until CO5 adds the body shapes. The manifest's check against its model passes. It is not an accepted baseline.
 
 ## Tests that exist (CO2)
 

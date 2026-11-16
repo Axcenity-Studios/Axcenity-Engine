@@ -1,0 +1,35 @@
+The realistic package's thresholds (assets/characters/realistic/qa/thresholds.json) held against the stylized body, the baseline they were written to beat:
+measure.py --package stylized --only weights,face,proportions,deformation,twist --check assets/characters/realistic/qa/thresholds.json --strict
+
+WORSE: deformation/masculine/elbow_135/ring_area_ratio: 0.374, at least 0.6
+WORSE: deformation/feminine/elbow_135/ring_area_ratio: 0.38, at least 0.6
+WORSE: deformation/masculine/knee_135/ring_area_ratio: 0.444, at least 0.6
+WORSE: deformation/feminine/knee_135/ring_area_ratio: 0.454, at least 0.6
+WORSE: twist/masculine/forearm_twist_90/ring_area_ratio_min: 0.746, at least 0.84
+WORSE: twist/feminine/forearm_twist_90/ring_area_ratio_min: 0.774, at least 0.84
+WORSE: twist/masculine/upper_arm_twist_70/ring_area_ratio_min: 0.791, at least 0.9
+WORSE: twist/feminine/upper_arm_twist_70/ring_area_ratio_min: 0.713, at least 0.9
+WORSE: twist/masculine/thigh_twist_45/ring_area_ratio_min: 0.811, at least 0.95
+WORSE: twist/feminine/thigh_twist_45/ring_area_ratio_min: 0.868, at least 0.95
+WORSE: face/masculine/neutral/skin_inside_eyeball_verts: 542, at most 0
+WORSE: face/masculine/neutral/front_eye_inside_lid_flesh_verts: 160, at most 0
+WORSE: face/masculine/neutral/teeth_verts_inside_lips_or_gums_flesh: 17, at most 0
+WORSE: face/feminine/neutral/skin_inside_eyeball_verts: 410, at most 0
+WORSE: face/feminine/neutral/front_eye_inside_lid_flesh_verts: 101, at most 0
+WORSE: face/feminine/neutral/teeth_verts_inside_lips_or_gums_flesh: 17, at most 0
+WORSE: weights/face_weights/face_verts_with_neck_weight_gt_0.1: 911, at most 0
+WORSE: weights/face_weights/neck_weighted_verts_above_eye_level: 7, at most 0
+WORSE: weights/Body_LOD1/over_4_influences: not measured (run every section)
+WORSE: weights/Body_LOD2/over_4_influences: not measured (run every section)
+WORSE: weights/cross_side_weights/verts: 174, at most 4
+WORSE: proportions/masculine/heads_tall: 5.93, within [7.3, 8.1]
+WORSE: proportions/feminine/heads_tall: 6.39, within [7.3, 8.1]
+WORSE: proportions/feminine/shoulder_width_ratio_bideltoid: 0.197, within [0.227, 0.291]
+WORSE: proportions/masculine/hand_length_ratio: 0.123, within [0.0945, 0.1215]
+WORSE: proportions/masculine/upper_arm_ratio: 0.155, within [0.163, 0.209]
+WORSE: proportions/feminine/upper_arm_ratio: 0.138, within [0.163, 0.209]
+WORSE: proportions/masculine/forearm_ratio: 0.127, within [0.128, 0.164]
+WORSE: proportions/feminine/forearm_ratio: 0.121, within [0.128, 0.164]
+TARGET NOT MET: deformation/masculine/shoulder_abd_150/local_volume_ratio: 0.559, at least 0.8
+TARGET NOT MET: deformation/feminine/shoulder_abd_150/local_volume_ratio: 0.773, at least 0.8
+check: failed (2 targets not met)

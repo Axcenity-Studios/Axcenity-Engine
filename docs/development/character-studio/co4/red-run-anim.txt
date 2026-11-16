@@ -1,0 +1,227 @@
+   Compiling rustc-hash v2.1.3
+   Compiling axcenity-core v0.2.0-alpha.1 (<worktree>\crates\core)
+   Compiling axcenity-anim v0.2.0-alpha.1 (<worktree>\crates\anim)
+warning: constant `SIDES` is never used
+  --> crates\anim\src\twist.rs:75:7
+   |
+75 | const SIDES: [&str; 2] = ["Left", "Right"];
+   |       ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `axcenity-anim` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.55s
+────────────
+ Nextest run ID a7d9b601-9c4e-452e-aab5-4390da19c8fa with nextest profile: default
+    Starting 11 tests across 1 binary (150 tests skipped)
+        FAIL [   0.006s] ( 1/11) axcenity-anim twist::tests::a_short_pose_is_filled_in_before_its_bones_are_turned
+  stdout ───
+
+    running 1 test
+    test twist::tests::a_short_pose_is_filled_in_before_its_bones_are_turned ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::a_short_pose_is_filled_in_before_its_bones_are_turned
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::a_short_pose_is_filled_in_before_its_bones_are_turned' (25368) panicked at crates\anim\src\twist.rs:358:9:
+    assertion `left == right` failed
+      left: 4
+     right: 8
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.009s] ( 2/11) axcenity-anim twist::tests::a_forearms_twist_bone_takes_half_of_the_hands_twist
+  stdout ───
+
+    running 1 test
+    test twist::tests::a_forearms_twist_bone_takes_half_of_the_hands_twist ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::a_forearms_twist_bone_takes_half_of_the_hands_twist
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::a_forearms_twist_bone_takes_half_of_the_hands_twist' (38796) panicked at crates\anim\src\twist.rs:217:9:
+    assertion failed: close(pose[LOWER_TWIST].rotation, half)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.012s] ( 3/11) axcenity-anim twist::tests::a_rest_turned_twist_bone_keeps_its_rest_under_the_twist
+  stdout ───
+
+    running 1 test
+    test twist::tests::a_rest_turned_twist_bone_keeps_its_rest_under_the_twist ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::a_rest_turned_twist_bone_keeps_its_rest_under_the_twist
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::a_rest_turned_twist_bone_keeps_its_rest_under_the_twist' (6832) panicked at crates\anim\src\twist.rs:314:9:
+    assertion failed: close(pose[LOWER_TWIST].rotation, Quat::from_axis_angle(Vec3::Y, 0.5) * rest)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.014s] ( 4/11) axcenity-anim twist::tests::the_twist_of_a_turn_is_its_part_about_the_axis
+  stdout ───
+
+    running 1 test
+    test twist::tests::the_twist_of_a_turn_is_its_part_about_the_axis ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::the_twist_of_a_turn_is_its_part_about_the_axis
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::the_twist_of_a_turn_is_its_part_about_the_axis' (21100) panicked at crates\anim\src\twist.rs:201:9:
+    assertion failed: (twist_angle(twist, Vec3::Y) - 0.7).abs() < 1e-5
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.020s] ( 5/11) axcenity-anim twist::tests::a_skeleton_without_such_bones_is_left_alone
+        FAIL [   0.022s] ( 6/11) axcenity-anim twist::tests::an_upper_arms_twist_bone_takes_half_of_the_arms_own_twist_back_out
+  stdout ───
+
+    running 1 test
+    test twist::tests::an_upper_arms_twist_bone_takes_half_of_the_arms_own_twist_back_out ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::an_upper_arms_twist_bone_takes_half_of_the_arms_own_twist_back_out
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::an_upper_arms_twist_bone_takes_half_of_the_arms_own_twist_back_out' (39340) panicked at crates\anim\src\twist.rs:257:9:
+    assertion failed: close(pose[UPPER_TWIST].rotation, Quat::from_axis_angle(Vec3::Y, -0.7))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.024s] ( 7/11) axcenity-anim twist::tests::driven_bones_take_their_limbs_slider_scale
+  stdout ───
+
+    running 1 test
+    test twist::tests::driven_bones_take_their_limbs_slider_scale ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::driven_bones_take_their_limbs_slider_scale
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::driven_bones_take_their_limbs_slider_scale' (35656) panicked at crates\anim\src\twist.rs:346:9:
+    assertion `left == right` failed
+      left: Vec3(1.0, 1.0, 1.0)
+     right: Vec3(1.0, 1.2, 1.0)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.026s] ( 8/11) axcenity-anim twist::tests::bending_a_wrist_or_raising_an_arm_turns_no_twist_bone
+  stdout ───
+
+    running 1 test
+    test twist::tests::bending_a_wrist_or_raising_an_arm_turns_no_twist_bone ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::bending_a_wrist_or_raising_an_arm_turns_no_twist_bone
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::bending_a_wrist_or_raising_an_arm_turns_no_twist_bone' (37196) panicked at crates\anim\src\twist.rs:244:9:
+    assertion failed: close(pose[LOWER_TWIST].rotation, Quat::from_axis_angle(Vec3::Y, 0.5))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.029s] ( 9/11) axcenity-anim twist::tests::what_a_clip_keyed_on_a_driven_bone_is_replaced
+  stdout ───
+
+    running 1 test
+    test twist::tests::what_a_clip_keyed_on_a_driven_bone_is_replaced ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::what_a_clip_keyed_on_a_driven_bone_is_replaced
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::what_a_clip_keyed_on_a_driven_bone_is_replaced' (31468) panicked at crates\anim\src\twist.rs:299:9:
+    assertion failed: close(pose[LOWER_TWIST].rotation, Quat::IDENTITY)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.031s] (10/11) axcenity-anim twist::tests::a_helper_turns_half_as_far_as_its_joint_and_stays_on_it
+  stdout ───
+
+    running 1 test
+    test twist::tests::a_helper_turns_half_as_far_as_its_joint_and_stays_on_it ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::a_helper_turns_half_as_far_as_its_joint_and_stays_on_it
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'twist::tests::a_helper_turns_half_as_far_as_its_joint_and_stays_on_it' (21248) panicked at crates\anim\src\twist.rs:280:9:
+    assertion failed: close(pose[ELBOW_HELPER].rotation, Quat::from_axis_angle(Vec3::X, bend / 2.0))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.604s] (11/11) axcenity-anim twist::tests::the_shipped_realistic_skeleton_is_driven_as_it_was_built
+  stdout ───
+
+    running 1 test
+    test twist::tests::the_shipped_realistic_skeleton_is_driven_as_it_was_built ... FAILED
+
+    failures:
+
+    failures:
+        twist::tests::the_shipped_realistic_skeleton_is_driven_as_it_was_built
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.59s
+
+  stderr ───
+
+    thread 'twist::tests::the_shipped_realistic_skeleton_is_driven_as_it_was_built' (35948) panicked at crates\anim\src\twist.rs:400:9:
+    assertion `left == right` failed
+      left: 0
+     right: 16
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.606s] 11 tests run: 1 passed, 10 failed, 150 skipped
+        FAIL [   0.006s] ( 1/11) axcenity-anim twist::tests::a_short_pose_is_filled_in_before_its_bones_are_turned
+        FAIL [   0.009s] ( 2/11) axcenity-anim twist::tests::a_forearms_twist_bone_takes_half_of_the_hands_twist
+        FAIL [   0.012s] ( 3/11) axcenity-anim twist::tests::a_rest_turned_twist_bone_keeps_its_rest_under_the_twist
+        FAIL [   0.014s] ( 4/11) axcenity-anim twist::tests::the_twist_of_a_turn_is_its_part_about_the_axis
+        FAIL [   0.022s] ( 6/11) axcenity-anim twist::tests::an_upper_arms_twist_bone_takes_half_of_the_arms_own_twist_back_out
+        FAIL [   0.024s] ( 7/11) axcenity-anim twist::tests::driven_bones_take_their_limbs_slider_scale
+        FAIL [   0.026s] ( 8/11) axcenity-anim twist::tests::bending_a_wrist_or_raising_an_arm_turns_no_twist_bone
+        FAIL [   0.029s] ( 9/11) axcenity-anim twist::tests::what_a_clip_keyed_on_a_driven_bone_is_replaced
+        FAIL [   0.031s] (10/11) axcenity-anim twist::tests::a_helper_turns_half_as_far_as_its_joint_and_stays_on_it
+        FAIL [   0.604s] (11/11) axcenity-anim twist::tests::the_shipped_realistic_skeleton_is_driven_as_it_was_built
+error: test run failed
+exit 100

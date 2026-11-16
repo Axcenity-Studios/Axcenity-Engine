@@ -1,0 +1,439 @@
+{
+  "anti_aliasing": "TAA",
+  "characters": [
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-blend-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-blend-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-blend-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-feminine-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-feminine-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-feminine-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-face-neutral",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-feminine-face-neutral"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-outfit-underwear",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-feminine-outfit-underwear"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-masculine-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-masculine-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-masculine-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-face-neutral",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-masculine-face-neutral"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-outfit-underwear",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "face": {
+          "Body": 0,
+          "Eyes": 1,
+          "Teeth": 1
+        },
+        "front": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "side": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Eyes": 2,
+          "Teeth": 2
+        }
+      },
+      "name": "realistic-masculine-outfit-underwear"
+    }
+  ],
+  "frames": 48,
+  "lights": [
+    "studio",
+    "hard"
+  ],
+  "quality": "High",
+  "size": [
+    1280,
+    720
+  ],
+  "stance": "rest",
+  "views": [
+    "front",
+    "three-quarter",
+    "side",
+    "back",
+    "face"
+  ]
+}
