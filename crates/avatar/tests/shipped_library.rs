@@ -219,3 +219,50 @@ fn every_format_1_character_migrates_to_a_sound_description() {
         assert!(library.item(id).is_some(), "{part} → {id}");
     }
 }
+
+/// The benchmark characters (`assets/characters/benchmarks/`, written by
+/// its `make.py`; overhaul CO2): each is a sound description of a base
+/// model in the library, named after its file, and resolves with nothing
+/// left out. Every base model has its set: bodies, faces, outfits and hair
+/// where it has them.
+#[test]
+fn every_benchmark_character_is_sound() {
+    let library = read();
+    let folder = root().join("benchmarks");
+    let mut per_base: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for entry in std::fs::read_dir(&folder).unwrap() {
+        let path = entry.unwrap().path();
+        let file = path.file_name().unwrap().to_string_lossy().into_owned();
+        let Some(name) = file.strip_suffix(".character.json") else {
+            continue;
+        };
+        let text = std::fs::read_to_string(&path).unwrap();
+        let description =
+            Description::from_json(&text).unwrap_or_else(|err| panic!("{file}: {err}"));
+        assert_eq!(description.name, name, "{file} is named after its file");
+        let problems = description.validate(&library);
+        assert!(problems.is_empty(), "{file}:\n{}", lines(&problems));
+        let resolved = axcenity_avatar::resolve(&library, &description)
+            .unwrap_or_else(|problem| panic!("{file}: {problem}"));
+        assert!(
+            resolved.problems.is_empty(),
+            "{file}:\n{}",
+            lines(&resolved.problems)
+        );
+        per_base
+            .entry(description.base.clone())
+            .or_default()
+            .push(name.to_owned());
+    }
+    for (id, base) in &library.bases {
+        let names = per_base.get(id).map(Vec::as_slice).unwrap_or_default();
+        let has = |part: &str| names.iter().any(|name| name.contains(part));
+        assert!(has("-body-default"), "{id} has no body benchmarks");
+        assert!(has("-face-neutral"), "{id} has no face benchmarks");
+        assert!(has("-outfit-underwear"), "{id} has no outfit benchmarks");
+        assert!(
+            names.iter().all(|name| name.starts_with(&base.family)),
+            "{id}: benchmarks are named <family>-<frame>-<case>"
+        );
+    }
+}

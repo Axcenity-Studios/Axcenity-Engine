@@ -7,7 +7,7 @@ crates: [avatar]
 source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, assets/characters/humanoid/manifests.py, assets/characters/catalogue.py]
 docs: [docs/development/character-studio/architecture.md, crates/avatar/CLAUDE.md]
 verified: 2026-11-14
-verified_commit: b8535483
+verified_commit: f903964e
 tags: [system/characters, formats]
 ---
 

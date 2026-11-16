@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-face-ears-out-min",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "ears_out": -1,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

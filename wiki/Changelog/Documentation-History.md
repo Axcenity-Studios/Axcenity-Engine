@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-14 | Characters | Character Studio overhaul CO2: the in-engine character capture (`character_capture.rs`) and the benchmark characters | Claude |
 | 2026-11-14 | ADR-0038 (new, Proposed), ADR index, Characters, Animation, Character Data, Gameplay systems, System inventory, System dependencies, File formats, Roadmap, Known limitations, Home | Character Studio overhaul CO3 (the runtime applier): descriptions applied to characters, identity baked into derived models named by `MeshId`, bone changes after the clips, followers' live blend shapes, material value attributes, the project's character library | Claude |
 | 2026-11-14 | Character Data (new), ADR-0032 to ADR-0037, ADR-0030 superseded, ADR index, System inventory, System dependencies, File formats, Characters, Roadmap | Character Studio overhaul Stage 2 (CO1): the `avatar` crate's contracts, the stylized humanoid's manifests, six ADRs | Claude |
 | 2026-11-14 | Roadmap | Character Studio overhaul approved; its plan moves to `plans/axcenity-engine-character-studio.md` | Claude |

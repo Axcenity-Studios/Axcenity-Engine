@@ -7,7 +7,7 @@ crates: [gameplay, script, sim]
 source: [crates/script/src/system.rs, crates/gameplay/src/lib.rs, crates/gameplay/src/ability_system.rs, crates/gameplay/src/tool_system.rs, crates/gameplay/src/character_system.rs, crates/gameplay/src/story.rs, crates/gameplay/src/debris.rs, crates/gameplay/src/description_system.rs, crates/gameplay/src/description.rs]
 docs: [docs/architecture/game-systems.md, crates/gameplay/CLAUDE.md]
 verified: 2026-11-14
-verified_commit: b8535483
+verified_commit: f903964e
 tags: [system/gameplay, scripting]
 ---
 

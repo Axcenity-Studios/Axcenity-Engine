@@ -4,7 +4,7 @@ Addition A1 of [the plan](../../../plans/axcenity-engine-character-studio.md): a
 
 ## The benchmark set
 
-Every benchmark is a **description file** (architecture §5), so the same input feeds the Blender harness, the in-engine capture *(CO2)* and later stages unchanged. They live in `assets/characters/benchmarks/` *(CO2 writes them)*, one `*.character.json` each, named `<family>-<frame>-<case>`.
+Every benchmark is a **description file** (architecture §5), so the same input feeds the in-engine capture, the Blender harness and later stages unchanged. They live in `assets/characters/benchmarks/`, one `*.character.json` each, named `<family>-<frame>-<case>` (`stylized-feminine-body-heavy`), written by `python3 -I assets/characters/benchmarks/make.py` from the library's manifests: run it again when a base model's parameters, slots or items change (it makes the set for every base model in the catalogue, so a new family gets its set by being listed). `avatar`'s `every_benchmark_character_is_sound` checks each resolves with nothing left out. The Blender harness still sets its looks itself (`qa_scene.py`); reading these files there is part of bringing the realistic package's QA in (CO4's hand-back).
 
 | Group | Characters | Why |
 |---|---|---|
@@ -30,11 +30,18 @@ Each stage's numbers go into `docs/development/character-studio/<stage>/measurem
 
 **Blender harness** (`render_baseline.py`, Stage 1's): Cycles CPU, AgX, OIDN, three area lights (key, fill, rim) and a grey cyclorama, seed 7; sheets: turnarounds (front, three-quarter, side, back) per frame, face close-ups and topology, base body clay, build range, hair styles, the test poses, expressions, details, fit. Never change `STUDIO`, the cameras or the poses, or the sets stop being comparable.
 
-**In-engine capture** *(CO2)*: the player's renderer from a description file, at 1280×720 or larger, fixed cameras (full body, three-quarter, side, back, face) and two lighting presets (the workspace's Studio, and a hard key light that shows shading and clipping), TAA settled (the same number of frames each time), the same graphics preset each time, written as PNG sheets. Same input must give identical images.
+**In-engine capture** (`crates/player/src/character_capture.rs`, CO2): the player's renderer draws a character from a description file, applied as a game applies it (`gameplay`'s applier), from five fixed cameras (`front`, `three-quarter`, `side`, `back`, `face`) under two lighting presets (`studio`: Character Studio's Studio stage on its grey backdrop; `hard`: a low key light with little fill on a dark backdrop, which shows shading, seams and clipping), at 1280 × 720, High quality, TAA, 48 frames drawn before each picture is read, each picture on a renderer of its own. The character stands in the rest pose (`AXCENITY_CAPTURE_POSE=idle` is one second into Idle). Same input gives identical pictures (`the_same_description_captures_identical_pictures_and_every_view_is_drawn`).
+
+```text
+AXCENITY_CAPTURE_DESCRIPTIONS=assets/characters/benchmarks AXCENITY_CAPTURE_DIR=<folder> \
+  cargo test -p axcenity-player --release -- --ignored capture_characters --nocapture
+```
+
+It writes `<name>/<light>-<view>.png` per picture, a contact sheet `<name>.png` (a row per light, a column per view, at half size) and `captures.json` (the settings and what was drawn). `AXCENITY_CAPTURE_DESCRIPTIONS` takes files or folders separated by `;`; `AXCENITY_CAPTURE_ONLY=<text>` keeps the names containing it; `AXCENITY_CAPTURE_SHEETS=only` writes only sheets; `AXCENITY_CAPTURE_LIBRARY=<folder>` draws from another character library (a specialist's worktree). `captures.json` also records the level of detail each part was drawn at in each view: in the full-body views small parts are drawn from simpler copies, as in a game, and a simplified garment can show skin that the full mesh doesn't (a known defect, audit §3.10), so judge clothing fit in the `face` view (full detail) and in Blender until characters switch levels together (CO18). About 2 to 4 seconds a character on the reference PC. **Never change `VIEWS`, `LIGHTS`, the stage or `Settings::default`**: add a view or a preset instead, and re-capture the baseline in the same change if one must change.
 
 ## Review
 
-1. Render and measure `main` (the "before") and the branch (the "after") with the same scripts and settings, into `baseline/` and `<stage>/`.
+1. Render, capture and measure `main` (the "before") and the branch (the "after") with the same scripts and settings, into `baseline/` (in-engine sheets in `baseline/engine/`) and `<stage>/` (`<stage>/engine/`).
 2. Compare sheet by sheet at the same size; compare `measurements.json` key by key.
 3. Look for: proportions against the anatomy references (research A.1); joints that pinch, collapse or candy-wrap; eyes through lids, teeth through lips; clothes through each other or the body; hair floating or sinking; shading seams; anything the numbers can't see.
 4. Record what improved, what regressed and what is unchanged in [progress.md](progress.md), with the numbers.
@@ -43,4 +50,4 @@ Each stage's numbers go into `docs/development/character-studio/<stage>/measurem
 
 ## Baseline
 
-The current baseline is Stage 1's, re-rendered after #401's fixes: [baseline/](baseline/) (sheets and `measurements.json`), originals in [baseline/pre-fix/](baseline/pre-fix/). CO2 adds the in-engine baseline captured on merged `main`.
+The current baseline is Stage 1's, re-rendered after #401's fixes: [baseline/](baseline/) (sheets and `measurements.json`), originals in [baseline/pre-fix/](baseline/pre-fix/). The in-engine baseline of the stylized character is [baseline/engine/](baseline/engine/): the contact sheets of a chosen set of benchmarks (both frames in the default outfit and in underwear at the default, slim, heavy and muscular builds, the blend, the shortest and tallest proportions, the heaviest layering) and its `captures.json`. The whole set is 123 characters and is captured on demand, not committed. It was captured with CO3's applier, whose result a test holds to what Character Studio's preview showed before (`a_character_file_applied_in_a_game_matches_the_workspaces_preview`), so it is the pre-overhaul character.

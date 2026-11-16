@@ -1,0 +1,13 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-item-cropped-jacket",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/cropped-jacket"
+    }
+  ]
+}

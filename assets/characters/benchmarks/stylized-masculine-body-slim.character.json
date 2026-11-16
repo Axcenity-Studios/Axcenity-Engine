@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-body-slim",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": -1,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

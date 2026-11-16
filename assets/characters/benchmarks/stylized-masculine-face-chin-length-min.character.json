@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-face-chin-length-min",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "chin_length": -1,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}
