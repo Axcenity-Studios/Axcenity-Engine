@@ -1399,7 +1399,7 @@
       6.55
      ],
      "required": true,
-     "seal_in_view": 19,
+     "seal_in_view": 13,
      "self_crossing": 0,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
@@ -1612,7 +1612,7 @@
       7.82
      ],
      "required": true,
-     "seal_in_view": 13,
+     "seal_in_view": 9,
      "self_crossing": 0,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
@@ -1693,7 +1693,7 @@
       10.04
      ],
      "required": true,
-     "seal_in_view": 15,
+     "seal_in_view": 11,
      "self_crossing": 0,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
@@ -6648,7 +6648,7 @@
      ],
      "required": true,
      "seal_in_view": 0,
-     "self_crossing": 4,
+     "self_crossing": 5,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
@@ -8008,7 +8008,7 @@
       6.64
      ],
      "required": true,
-     "seal_in_view": 15,
+     "seal_in_view": 13,
      "self_crossing": -3,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,
@@ -8302,7 +8302,7 @@
       10.17
      ],
      "required": true,
-     "seal_in_view": 15,
+     "seal_in_view": 13,
      "self_crossing": -2,
      "teeth_asymmetry_mm": 0.0,
      "teeth_in_flesh": 0,

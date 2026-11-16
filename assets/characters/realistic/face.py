@@ -353,6 +353,9 @@ UPPER_LINING_RISES = {1: 1.0, 2: 0.9, 3: 0.6, 4: 0.3}
 SMILE_LIPS_OWN = (0.45, 0.95)
 # The power of the way to the corner a lip's own share rises by.
 SMILE_LIPS_CURVE = 2.6
+# `Mouth_Narrow` parts the lips in the middle: all of its parting out to
+# the first of these of the way to a corner, none of it from the second.
+NARROW_PARTS = (0.30, 0.75)
 # The tongue with the jaw open (metres, in the jaw's own space). Turned
 # with the jaw as it rests, it is a ramp from the lower incisors up to
 # the upper molars: it fills the opening and hides the back of the mouth.
@@ -1151,7 +1154,11 @@ class Face:
         lips = gauss(self.d_line, 0.019) * (self.skin | self.lining)
         gather = lambda squeeze, forward, corners: (  # noqa: E731
             np.stack([-P[:, 0] * squeeze * lips, -(forward + corners * np.abs(self.u)) * lips, np.zeros(len(P))], axis=1))
-        narrow = gather(0.20, 0.0032, 0.0042) + vec(ul, up * 0.0012) + vec(ll, up * -0.0020)
+        # (They part in the middle only: a rounded mouth is closed toward
+        # its corners. Parted from corner to corner, the O, U and WQ
+        # visemes were a slot with both rows of teeth in it.)
+        middle = 1.0 - smoothstep(NARROW_PARTS[0], NARROW_PARTS[1], np.abs(self.u))
+        narrow = gather(0.20, 0.0032, 0.0042) + vec(ul * middle, up * 0.0012) + vec(ll * middle, up * -0.0020)
         S["Mouth_Narrow"] = self._moved(narrow, slide=None)
         pucker = gather(0.31, 0.0054, 0.0056) + (lips * self.skin * 0.0009)[:, None] * N
         S["Mouth_Pucker"] = self._moved(pucker, slide=None, sealed=True)
@@ -1477,7 +1484,7 @@ SEAL_STANDS = 0.0012
 # 1.5 mm apart and be gone soon after, and it shrinks evenly from the
 # first, so the lip controls have it gone by 3 mm of parting
 # (`Mouth_Open` parts the lips 7.8 mm at full weight: 2.6 times; and so
-# on) and the jaw, which parts them 37 mm, by 4.6 mm: sooner would take
+# on) and the jaw, which parts them 39 mm, by 5 mm: sooner would take
 # a flap further into the face at full opening than a lip is deep (a
 # laugh takes the upper one 15 mm in as it is). (The left and right
 # controls take their own side's.)

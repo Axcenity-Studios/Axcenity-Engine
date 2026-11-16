@@ -90,13 +90,15 @@ FLOOR = 0.008
 # tooth in the mouth's shade, the dark red that light off the mouth's
 # walls leaves it. The lower back teeth are this (`LOWER_IN_SHADE`: how
 # much of it each lower tooth is, from the central incisor back to the
-# second molar), lit `SHADE_LIT`. Shade alone could not do it: a vertex's shade
-# is its colour's and its occlusion's at once, and with the occlusion
-# low enough to darken a white tooth the engine drew the lower molars
-# black, a row of black blocks in each corner of an open mouth against
-# the dark red round them, whatever their colour.
+# second molar; a tooth is all of it or none: part of the way, its
+# yellow neck's colour came through as olive), lit `SHADE_LIT`. Shade
+# alone could not do it: a vertex's shade is its colour's and its
+# occlusion's at once, and with the occlusion low enough to darken a
+# white tooth the engine drew the lower molars black, a row of black
+# blocks in each corner of an open mouth against the dark red round
+# them, whatever their colour.
 IN_SHADE = 0.25
-LOWER_IN_SHADE = (0.0, 0.0, 0.0, 0.3, 0.8, 1.0, 1.0)
+LOWER_IN_SHADE = (0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
 SHADE_LIT = 0.40
 # The colour at no light, and what the colours are multiplied by toward
 # the dark end.
