@@ -34,8 +34,10 @@ pub type Rule = (&'static str, &'static str, [f32; 3], f32, f32);
 
 /// The realistic body's corrective shapes: the shoulder's cap, held as the
 /// arm is raised to level (45° up from its rest, which is 45° below
-/// level) and on to 150° from hanging.
-pub const CORRECTIVES: [Rule; 4] = [
+/// level) and on to 150° from hanging, and as it is lowered to hang (35°
+/// down from rest: about the raise axis reversed, so the rule's form is
+/// the same).
+pub const CORRECTIVES: [Rule; 6] = [
     (
         "Corrective_Shoulder_Level_Left",
         "LeftUpperArm",
@@ -63,6 +65,20 @@ pub const CORRECTIVES: [Rule; 4] = [
         [0.0, 0.37698, -0.92622],
         45.0,
         105.0,
+    ),
+    (
+        "Corrective_Shoulder_Lowered_Left",
+        "LeftUpperArm",
+        [0.0, 0.37768, -0.92594],
+        0.0,
+        35.0,
+    ),
+    (
+        "Corrective_Shoulder_Lowered_Right",
+        "RightUpperArm",
+        [0.0, -0.37698, 0.92622],
+        0.0,
+        35.0,
     ),
 ];
 
@@ -249,6 +265,53 @@ mod tests {
         }
     }
 
+    /// An arm lowered from the A-pose to hang, as the starter Idle holds
+    /// it, leans on its side's Lowered shape and on none of the raising
+    /// ones; half way down, half; and the skin moves with it.
+    #[test]
+    fn a_lowered_arm_leans_on_its_lowered_corrective_only() {
+        let model = shipped("Body");
+        let rig = model.rig.clone().unwrap();
+        let arm = rig.bone("LeftUpperArm").unwrap();
+        let rest = rig.bones[arm].rest.rotation;
+        let lowered_axis = -AXIS;
+        let weights_at = |degrees: f32| {
+            let mut pose = rig.rest_pose();
+            pose[arm].rotation = turned(rest, lowered_axis, degrees);
+            let posed =
+                crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
+            let plain = model.pose_shaped(&pose, &[]).unwrap();
+            let of = |name: &str| {
+                let index = model
+                    .morph_targets
+                    .iter()
+                    .position(|target| target.name == name)
+                    .unwrap();
+                posed.morph_weights()[index]
+            };
+            let (a, b) = (posed.primitive(&model, 0, 0), plain.primitive(&model, 0, 0));
+            let moved = a
+                .positions
+                .iter()
+                .zip(&b.positions)
+                .map(|(p, q)| Vec3::from(*p).distance(Vec3::from(*q)))
+                .fold(0.0_f32, f32::max);
+            (
+                of("Corrective_Shoulder_Lowered_Left"),
+                of("Corrective_Shoulder_Lowered_Right"),
+                of("Corrective_Shoulder_Level_Left"),
+                of("Corrective_Shoulder_Raised_Left"),
+                moved,
+            )
+        };
+        let (lowered, right, level, raised, moved) = weights_at(35.0);
+        assert!((lowered - 1.0).abs() < 1e-3, "{lowered}");
+        assert_eq!((right, level, raised), (0.0, 0.0, 0.0));
+        assert!(moved > 0.005, "the cap moves {moved} m");
+        assert!((weights_at(17.5).0 - 0.5).abs() < 0.02);
+        assert_eq!(weights_at(0.0).0, 0.0);
+    }
+
     /// The pose path leans the shipped body on its shapes: the left arm
     /// raised overhead brings both of the left shoulder's in and neither
     /// of the right's, and the skin moves with them, on the body and on
@@ -274,6 +337,7 @@ mod tests {
         assert!((weight_of("Corrective_Shoulder_Raised_Left") - 1.0).abs() < 1e-3);
         assert_eq!(weight_of("Corrective_Shoulder_Level_Right"), 0.0);
         assert_eq!(weight_of("Corrective_Shoulder_Raised_Right"), 0.0);
+        assert_eq!(weight_of("Corrective_Shoulder_Lowered_Left"), 0.0);
         // Nothing else was leaned on.
         let others: f32 = model
             .morph_targets

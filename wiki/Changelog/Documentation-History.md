@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-16 | Characters, Known limitations, Home | The realistic body's lowered-shoulder corrective shapes (`Corrective_Shoulder_Lowered_*`): what skinning loses when the arm hangs below the A-pose, as the starter clips hold it | Claude |
 | 2026-11-16 | Known limitations, Home | Character Studio overhaul CO12, first part: Character Studio's workspace edits format 2 descriptions on the realistic or stylized body through the applier, with its Body, Face, Hair and Clothing pages drawn from the manifest and catalogue; the library shipped with the editor | Claude |
 | 2026-11-16 | Characters, Known limitations, Roadmap, Home | Character Studio overhaul Stage 3 done: the owner's decisions on its two open measures (the raised shoulder held by its ring area; the eye check signed by pseudo-normals, its false counts gone), Stage 3 landed on main as one, Stage 4 starts with CO12 | Claude |
 | 2026-11-15 | Characters, Animation, Known limitations, Roadmap, Home | Character Studio overhaul CO6 (the realistic head and face): the face's parts, expression and identity shapes, the face checks, the blink held to what a squint leaves open (`BLINK_YIELDS`), eye and jaw turns reaching a character's parts, and what the face is still short of | Claude |

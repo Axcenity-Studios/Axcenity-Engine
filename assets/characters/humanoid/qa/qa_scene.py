@@ -531,9 +531,13 @@ def arm_abduction(ch, side):
 
 def _shoulder(ch, target, sides=("Left",)):
     """Upper arm abducted (in the frontal plane) to `target` degrees from
-    hanging; 90 is horizontal. The whole turn is at the shoulder joint."""
+    hanging; 90 is horizontal. The whole turn is at the shoulder joint.
+    Below the rest pose's abduction the arm is lowered: `bend` takes the
+    size of the turn and which way it goes (`toward`), so a negative
+    difference with `toward=UP` would raise it instead."""
     for side in sides:
-        ch.bend(f"{side}UpperArm", (0, 1, 0), target - arm_abduction(ch, side), toward=UP)
+        turn = target - arm_abduction(ch, side)
+        ch.bend(f"{side}UpperArm", (0, 1, 0), abs(turn), toward=UP if turn >= 0 else DOWN)
 
 
 def _wrist(ch, deg, sides=("Left",)):
@@ -574,6 +578,9 @@ POSES = {
     "rest": (lambda ch: None, None),
     "elbow_135": (lambda ch: _elbow(ch, 135), ("LeftLowerArm", "LeftUpperArm", 0.075)),
     "knee_135": (lambda ch: _knee(ch, 135), ("LeftLowerLeg", "LeftUpperLeg", 0.10)),
+    # The arm hanging as the starter Idle holds it (11 degrees from hanging;
+    # Walk swings it 6 to 22): 35 below a body skinned in a 45 degree A-pose.
+    "shoulder_abd_10": (lambda ch: _shoulder(ch, 10), ("LeftUpperArm", "LeftShoulder", 0.09)),
     "shoulder_abd_90": (lambda ch: _shoulder(ch, 90), ("LeftUpperArm", "LeftShoulder", 0.09)),
     "shoulder_abd_150": (lambda ch: _shoulder(ch, 150), ("LeftUpperArm", "LeftShoulder", 0.09)),
     "hip_flex_100": (lambda ch: _hip(ch, 100), ("LeftUpperLeg", "Hips", 0.12)),

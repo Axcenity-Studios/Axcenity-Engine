@@ -30,10 +30,15 @@ the shoulder girdle (`girdle`: from the root of the neck along the
 collarbone and down the upper arm, wide enough for the cap, the
 trapezius' slope, the armpit and the edges of the pectoral and the
 latissimus), carried to the rest pose by each vertex's own skinning
-matrix so the engine's skinning lands it where it was made. Two per
+matrix so the engine's skinning lands it where it was made. Three per
 side, each made in its pose: `Corrective_Shoulder_Level_*` (the arm
-level, 45 degrees up from rest) and `Corrective_Shoulder_Raised_*` (what
-the arm 150 degrees from hanging needs on top of it).
+level, 45 degrees up from rest), `Corrective_Shoulder_Raised_*` (what
+the arm 150 degrees from hanging needs on top of it) and
+`Corrective_Shoulder_Lowered_*` (the arm 10 degrees from hanging, 35
+below rest, as the starter Idle holds it: without it the cap squares off
+and a ridge rises beside the neck, which is how a character stands most
+of the time). Lowering is a turn about the raise axis reversed, so its
+rule has the same form: 0 at rest, full at 35 degrees down.
 """
 
 import math
@@ -56,8 +61,14 @@ SMOOTHINGS = 24
 # The girdle's region: full within NEAR metres of the line from the neck's
 # root to the shoulder joint to the middle of the upper arm, none past FAR.
 NEAR, FAR = 0.11, 0.21
-# (shape, the QA pose it is made in, degrees up from rest where it starts and is full)
-STAGES = [("Level", "shoulder_abd_90", 0.0, 45.0), ("Raised", "shoulder_abd_150", 45.0, 105.0)]
+# (shape, the QA pose it is made in, which way the arm turns from rest,
+# degrees from rest that way where it starts and is full). The stages of
+# one way add up (Raised is made on top of Level); the ways are apart.
+STAGES = [
+    ("Level", "shoulder_abd_90", "up", 0.0, 45.0),
+    ("Raised", "shoulder_abd_150", "up", 45.0, 105.0),
+    ("Lowered", "shoulder_abd_10", "down", 0.0, 35.0),
+]
 
 
 def _qa():
@@ -168,21 +179,22 @@ def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
         return bone.parent.matrix_local.to_3x3().inverted() @ axis
 
     shapes, rules, report = {}, [], {"method": "delta mush", "smoothings": SMOOTHINGS, "region_m": [NEAR, FAR]}
-    so_far = np.zeros_like(rest)
-    for name, pose, start, full in STAGES:
+    so_far = {"up": np.zeros_like(rest), "down": np.zeros_like(rest)}
+    for name, pose, way, start, full in STAGES:
         Q.apply_pose(rig, pose)
         posed = evaluated_positions(body)
         delta = (mush.target(posed) - posed) * region[:, None]
         M = skin_matrices(armature, weights)
         total = np.einsum("vij,vj->vi", np.linalg.inv(M), delta)
-        left = total - so_far
+        left = total - so_far[way]
         left[np.linalg.norm(left, axis=1) < 2e-5] = 0.0
-        so_far = so_far + left
+        so_far[way] = so_far[way] + left
         right = left[mirror] * np.array([-1.0, 1.0, 1.0])
         for s, d in (("Left", left), ("Right", right)):
             shape = f"Corrective_Shoulder_{name}_{s}"
             shapes[shape] = d
-            rules.append({"shape": shape, "bone": s + "UpperArm", "axis": [round(v, 5) for v in raise_axis(s)],
+            axis = raise_axis(s) if way == "up" else -raise_axis(s)
+            rules.append({"shape": shape, "bone": s + "UpperArm", "axis": [round(v, 5) for v in axis],
                           "angles": [start, full]})
         moved = np.linalg.norm(delta, axis=1)
         report[name] = {"pose": pose, "largest_move_mm": round(float(moved.max()) * 1000, 1),
