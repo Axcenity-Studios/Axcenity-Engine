@@ -152,6 +152,48 @@
       ]
     },
     {
+      "id": "axcenity/realistic-boxer-briefs",
+      "manifest": "realistic/items/realistic-boxer-briefs.item.json",
+      "label": "Boxer briefs",
+      "kind": "garment",
+      "slot": "underwear_bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-briefs",
+      "manifest": "realistic/items/realistic-briefs.item.json",
+      "label": "Briefs",
+      "kind": "garment",
+      "slot": "underwear_bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-sports-bra",
+      "manifest": "realistic/items/realistic-sports-bra.item.json",
+      "label": "Sports bra",
+      "kind": "garment",
+      "slot": "underwear_top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
       "id": "axcenity/sneakers",
       "manifest": "humanoid/items/sneakers.item.json",
       "label": "Sneakers",

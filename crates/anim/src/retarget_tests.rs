@@ -1052,3 +1052,53 @@ fn the_starter_animations_keep_the_realistic_bodys_proportions() {
         assert!(moved, "{} moves the body", take.name);
     }
 }
+
+/// Paul, 2026-11-16: in Character Studio the realistic body's feet went
+/// through the floor and its shoulders rolled forward. The starter clips
+/// reached it through roles with rest poses matched, which turned each of
+/// its bones to point as the stylized skeleton's rest: its flatter feet
+/// tipped toes-down and its collarbones turned forward. The two already
+/// rest alike, so such a take plays without matching: standing still in
+/// Idle, each foot points as it rests and the collarbones keep their line.
+#[test]
+fn the_starter_idle_keeps_the_realistic_bodys_own_feet_and_collarbones() {
+    use axcenity_assets::{ModelFormat, Pick, load_models, load_takes};
+    use std::path::Path;
+
+    let characters = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+    let takes = std::fs::read(characters.join("humanoid/HumanoidAnimations.glb")).unwrap();
+    let takes = Arc::new(load_takes(&takes, ModelFormat::Gltf).unwrap());
+    let bytes = std::fs::read(characters.join("realistic/RealisticParts.glb")).unwrap();
+    let picks = [Pick::Objects(vec!["AxcenityRealistic/Body".to_owned()])];
+    let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
+    let rig = models[0].rig.clone().unwrap();
+    let idle = takes.iter().find(|take| take.name == "Idle").unwrap();
+    let file = ClipFile::linked("HumanoidAnimations.glb", "Idle", 0.0, idle.duration.into());
+    let clip = Clip::bind(file, Some(takes.clone()), Some(&rig)).unwrap();
+    assert!(clip.retargeted());
+
+    let rest = rig.world(&rig.rest_pose());
+    let along = |world: &[Mat4], from: &str, to: &str| {
+        let (a, b) = (rig.bone(from).unwrap(), rig.bone(to).unwrap());
+        (world[b].w_axis.truncate() - world[a].w_axis.truncate()).normalize()
+    };
+    for step in 0..8 {
+        let mut pose = rig.rest_pose();
+        clip.sample(f64::from(step) / 8.0, &rig, &mut pose);
+        let posed = rig.world(&pose);
+        for (from, to, most) in [
+            ("LeftFoot", "LeftToes", 8.0_f32),
+            ("RightFoot", "RightToes", 8.0),
+            ("LeftShoulder", "LeftUpperArm", 6.0),
+            ("RightShoulder", "RightUpperArm", 6.0),
+        ] {
+            let turned = along(&rest, from, to)
+                .angle_between(along(&posed, from, to))
+                .to_degrees();
+            assert!(
+                turned < most,
+                "at {step}/8 {from} to {to} turned {turned:.1} degrees from rest"
+            );
+        }
+    }
+}

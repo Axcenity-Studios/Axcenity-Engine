@@ -12,9 +12,10 @@ The steps: load both frames, lay out the texture coordinates, bake the
 skin maps from the vendored sculpts (in the bundle's pose), re-pose both
 frames to the 45 degree A-pose and stand them (the masculine one 1.75 m
 tall), fit the skeleton from the face sets with its twist and helper
-bones, weight the body, add `Frame_Feminine`, the eyes and the teeth, mark
-the body regions, make the simpler copies (`Body_LOD1`, `Body_LOD2`) and
-export `RealisticParts.glb`, then the base model manifest
+bones, weight the body, add `Frame_Feminine`, the eyes and the teeth, cut
+the underwear from the body (`underwear.py`), mark the body regions,
+make the simpler copies (`Body_LOD1`, `Body_LOD2`) and export
+`RealisticParts.glb`, then the base model manifest
 (`manifests.py`; afterwards rebuild the library's catalogue with
 `../catalogue.py`). Units are metres, Blender Z up, the character faces -Y
 (glTF +Z after export).
@@ -42,6 +43,7 @@ import rims  # noqa: E402
 import shapes  # noqa: E402
 import skin  # noqa: E402
 import teeth as jawlib  # noqa: E402
+import underwear  # noqa: E402
 import uvs  # noqa: E402
 from common import array, duplicate, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
 
@@ -160,6 +162,11 @@ def build(out_dir, texture_size=2048, bakes=True):
                                        joints, joints_f, weights, teeth, out_dir, teeth_copies, mirror)
     for obj in face_parts.values():
         skin_to(obj, armature)
+    # Underwear cut from the body's surface, with its weights and shapes
+    # (`underwear.py`; the items are written by `manifests.py`).
+    garments, garment_report = underwear.make(body_obj, armature, joints, joints_f)
+    for obj in garments.values():
+        skin_to(obj, armature)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
     copies = lods.build(body_obj, armature, lm, P, joints, face_regions)
     for copy in copies:
@@ -189,9 +196,11 @@ def build(out_dir, texture_size=2048, bakes=True):
         "correctives": corrective_rules,
         "corrective_shapes": corrective_report,
         "face": dict(face_data, rest=face_rest),
+        "underwear": garment_report,
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
     objects.update(face_parts)
+    objects.update(garments)
     objects.update({c.name: c for c in (*copies, *teeth_copies)})
     report = {name: tri_count(obj) for name, obj in objects.items()}
     return armature, objects, data, report

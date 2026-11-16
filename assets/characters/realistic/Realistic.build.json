@@ -1419,6 +1419,23 @@
    "share": 0.5
   }
  ],
+ "underwear": {
+  "Underwear_BoxerBriefs": {
+   "shapes": 37,
+   "triangles": 1568,
+   "weight_moved_most": 0.07
+  },
+  "Underwear_Bra": {
+   "shapes": 53,
+   "triangles": 2476,
+   "weight_moved_most": 0.122
+  },
+  "Underwear_Briefs": {
+   "shapes": 37,
+   "triangles": 1214,
+   "weight_moved_most": 0.057
+  }
+ },
  "units": "metres, glTF axes (Y up, front +Z)",
  "version": 1
 }

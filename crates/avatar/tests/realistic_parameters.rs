@@ -3,7 +3,8 @@
 //! copies (levels of detail), at both ends of its range.
 //!
 //! A parameter that drives shapes or bones is checked on the model its
-//! identity bakes (`axcenity_assets::Model::bake`, what a character's
+//! identity bakes (the brows' length on the `Brows` part, which is all it
+//! moves) (`axcenity_assets::Model::bake`, what a character's
 //! MeshPart shows at rest). A parameter that drives an attribute (the nine
 //! proportions) is checked to change that attribute, which is one of
 //! `anim`'s body sliders; that each of those moves the skin is `anim`'s
@@ -42,12 +43,25 @@ fn library() -> Library {
 
 fn body(library: &Library) -> Model {
     let base = library.base(BASE).unwrap();
+    object(library, &base.model.body)
+}
+
+/// One object of the base model's file, such as a part (`…/Brows`).
+fn object(library: &Library, path: &str) -> Model {
+    let base = library.base(BASE).unwrap();
     let bytes = std::fs::read(root().join("realistic").join(&base.model.file)).unwrap();
-    let picks = [Pick::Objects(vec![base.model.body.clone()])];
+    let picks = [Pick::Objects(vec![path.to_owned()])];
     load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks)
         .unwrap()
         .remove(0)
 }
+
+/// Parameters that move a part the body carries an empty shape for (the
+/// brows' card), not the body: the part they move.
+const PART_PARAMETERS: [(&str, &str); 2] = [
+    ("brow_length_left", "AxcenityRealistic/Brows"),
+    ("brow_length_right", "AxcenityRealistic/Brows"),
+];
 
 /// The rest positions of `model`'s first primitive at each level of detail.
 fn rest(model: &Model) -> Vec<Vec<[f32; 3]>> {
@@ -128,6 +142,15 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
                     let now = resolved.attributes[&driver.attribute];
                     assert!((now - was).abs() > 0.05, "{at}: {was} to {now}");
                 }
+            } else if let Some((_, part)) =
+                PART_PARAMETERS.iter().find(|(id, _)| *id == parameter.id)
+            {
+                let part = object(&library, part);
+                let far = farthest(
+                    &rest(&part.bake(&resolved.identity))[0],
+                    &rest(&part.bake(&resolved_neutral.identity))[0],
+                );
+                assert!(far > SEEN, "{at}: the part moved {far} m");
             } else {
                 let moved = rest(&model.bake(&resolved.identity));
                 for (level, (a, b)) in moved.iter().zip(&at_rest).enumerate() {
@@ -139,8 +162,9 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
         }
     }
     // Frame (one end), muscle and fat, sixteen regions, nine proportions
-    // (the hips only widen: one end), and the face's 45 parameters (CO6).
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1 + 2 * 45);
+    // (the hips only widen: one end), and the face's 47 parameters (CO6's
+    // 45 and the brows' length).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1 + 2 * 47);
 }
 
 /// The two whole-body sliders are not one slider twice: each corner of
@@ -252,6 +276,8 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // which is the eyes' own shape and no slider's. Four more since: the
     // brows' height and arch have a raising shape each side besides the
     // lowering one, `faceparams.SPLIT`. Two more for the lowered shoulder,
-    // `Corrective_Shoulder_Lowered_*`.)
-    assert_eq!(model.morph_targets.len(), 148);
+    // `Corrective_Shoulder_Lowered_*`. Seven more on 2026-11-16: the
+    // brows' length, four shapes the body carries empty for the `Brows`
+    // card, and a mask shape under each of the three underwear items.)
+    assert_eq!(model.morph_targets.len(), 155);
 }

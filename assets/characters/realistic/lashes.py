@@ -314,24 +314,39 @@ def follow_lashes(face, points, roots, shape, lids=True):
     return out
 
 
-def brows(face, out_dir):
-    """The `Brows` object for `face`. Returns (the object, `bound`: for
-    each vertex the skin it lies on as ([three vertices], [their shares]))."""
-    P, topo = face.P, face.topo
+# How far along the brow's line its card runs (0 the inner end, 1 the
+# tail), and where the tail ends at each end of the brows' length
+# parameter (`Face_Brow_Length_*`): drawn in, or carried on down the
+# temple.
+BROW_START = -0.06
+BROW_END = 1.08
+BROW_END_SHORT = 0.80
+BROW_END_LONG = 1.34
+
+
+def _skin_tree(face):
+    """The head's outer skin as (BVH tree, its triangles)."""
+    from mathutils.bvhtree import BVHTree
     from facetopo import FS_HEAD
+    P, topo = face.P, face.topo
     outer = [k for k, fs in enumerate(topo.sets) if fs == FS_HEAD]
     tris = []
     for k in outer:
         p = topo.polys[k]
         tris += [(p[0], p[j], p[j + 1]) for j in range(1, len(p) - 1)]
+    return BVHTree.FromPolygons([tuple(p) for p in P], tris, all_triangles=True), tris
+
+
+def _brow_card(face, tree, tris, ends):
+    """The brows' card laid on the skin: (points, faces, uvs, bound), with
+    each side's tail at `ends[s]` of the way along its brow's line."""
     from mathutils import Vector
-    from mathutils.bvhtree import BVHTree
-    tree = BVHTree.FromPolygons([tuple(p) for p in P], tris, all_triangles=True)
+    P = face.P
     pts, faces, uvs, bound = [], [], [], []
     rows = np.linspace(-1.0, 1.0, BROW_ROWS)
     for _, s in SIDES:
         # From a little before the inner end to a little past the tail.
-        curve = face.brow_curve(s, BROW_SEGMENTS, -0.06, 1.08)
+        curve = face.brow_curve(s, BROW_SEGMENTS, BROW_START, ends.get(s, BROW_END))
         base = len(pts)
         for k, at in enumerate(curve):
             ahead = curve[min(k + 1, BROW_SEGMENTS)] - curve[max(k - 1, 0)]
@@ -363,9 +378,38 @@ def brows(face, out_dir):
                     quad, uv = quad[::-1], uv[::-1]
                 faces.append(quad)
                 uvs.append(uv)
-    pts = list(over_skin(tree, np.array(pts), faces))
-    obj = _object("Brows", pts, faces, uvs, _material("Brows", brow_texture(out_dir), cut=False, matte=True))
+    return np.array(over_skin(tree, np.array(pts), faces)), faces, uvs, bound
+
+
+def brows(face, out_dir):
+    """The `Brows` object for `face`. Returns (the object, `bound`: for
+    each vertex the skin it lies on as ([three vertices], [their shares]))."""
+    tree, tris = _skin_tree(face)
+    pts, faces, uvs, bound = _brow_card(face, tree, tris, {})
+    obj = _object("Brows", list(pts), faces, uvs, _material("Brows", brow_texture(out_dir), cut=False, matte=True))
     return obj, bound
+
+
+def brow_lengths(face, rest):
+    """The brows' length shapes ({name: offsets per card vertex}), for the
+    `brow_length_*` parameters: each side's card with its tail drawn in to
+    `BROW_END_SHORT` (`Face_Brow_Length_<side>`, made as the way back out,
+    so it is driven from 0 to -1 as the brows' lowering shapes are) and
+    carried on to `BROW_END_LONG` (`Face_Brow_Length_Long_<side>`). Only
+    the card moves: the hair's texture runs the card's whole length, so a
+    shorter brow is a whole brow, shorter, and a longer one tapers further
+    down the temple. `rest` is the card as built."""
+    tree, tris = _skin_tree(face)
+    out = {}
+    per_side = (BROW_SEGMENTS + 1) * BROW_ROWS
+    for k, (side, s) in enumerate(SIDES):
+        mine = np.zeros((len(rest), 1))
+        mine[k * per_side:(k + 1) * per_side] = 1.0
+        short = _brow_card(face, tree, tris, {s: BROW_END_SHORT})[0]
+        long = _brow_card(face, tree, tris, {s: BROW_END_LONG})[0]
+        out[f"Face_Brow_Length_{side}"] = (rest - short) * mine
+        out[f"Face_Brow_Length_Long_{side}"] = (long - rest) * mine
+    return out
 
 
 def over_skin(tree, points, faces, rounds=6):

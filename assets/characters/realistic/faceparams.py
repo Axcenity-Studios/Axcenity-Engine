@@ -2,10 +2,12 @@
 (Character Studio overhaul CO6). Plain Python: `manifests.py` reads it.
 
 Every face identity shape (`face.Face.identity`) is one parameter from -1
-to 1, 0 being the face as built, but for the brows' height and arch,
-which have a shape for each end (`SPLIT`): a shape moves its vertices
-along one straight line, and a lowered brow's fold has to come forward
-over the lid where a raised one lies back on the brow bone. A paired
+to 1, 0 being the face as built, but for the brows' height, arch and
+length, which have a shape for each end (`SPLIT`): a shape moves its
+vertices along one straight line, and a lowered brow's fold has to come
+forward over the lid where a raised one lies back on the brow bone (and a
+brow's tail follows the brow's curve, `lashes.brow_lengths`). The length
+shapes move the `Brows` card only; the body carries them empty. A paired
 feature has a parameter a side
 (`eye_height_left`, `eye_height_right`), each naming the other as its
 `mirror`, so the studio can edit both together or one alone (asymmetry).
@@ -40,6 +42,7 @@ PAIRED = [
     ("Face_Eye_Tilt", "eye_tilt", "eye tilt", "eyes", False),
     ("Face_Brow_Height", "brow_height", "brow height", "brows", False),
     ("Face_Brow_Arch", "brow_arch", "brow arch", "brows", False),
+    ("Face_Brow_Length", "brow_length", "brow length", "brows", False),
     ("Face_Nose_Width", "nostril_width", "nostril width", "nose", False),
     ("Face_Cheekbone", "cheekbone", "cheekbone", "cheeks", False),
     ("Face_Cheek_Fullness", "cheek_fullness", "cheek fullness", "cheeks", False),
@@ -74,7 +77,8 @@ SINGLE = [
 # shape's stem}. The stem's own shape is the lowering one, driven from 0
 # to -1 (weights 0 to -1, as one shape for both ends would be); the
 # raising one is driven from 0 to 1.
-SPLIT = {"Face_Brow_Height": "Face_Brow_Height_Up", "Face_Brow_Arch": "Face_Brow_Arch_Up"}
+SPLIT = {"Face_Brow_Height": "Face_Brow_Height_Up", "Face_Brow_Arch": "Face_Brow_Arch_Up",
+         "Face_Brow_Length": "Face_Brow_Length_Long"}
 
 
 def shapes():

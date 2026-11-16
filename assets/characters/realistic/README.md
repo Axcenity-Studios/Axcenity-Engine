@@ -1,10 +1,11 @@
 # Realistic base body
 
-The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body with human proportions, a masculine and a feminine frame, eyes, teeth, a baked skin texture set, twist and helper bones, body regions and two simpler copies. Since CO6 it has a face: expression shapes for the standard facial controls, face identity parameters, layered eyes, a tongue, lashes and brows (**[the face](../../../docs/development/character-studio/co6/README.md)**). No hair or clothing yet.
+The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body with human proportions, a masculine and a feminine frame, eyes, teeth, a baked skin texture set, twist and helper bones, body regions and two simpler copies. Since CO6 it has a face: expression shapes for the standard facial controls, face identity parameters, layered eyes, a tongue, lashes and brows (**[the face](../../../docs/development/character-studio/co6/README.md)**). Its first items are underwear cut from the body itself (below); no hair or other clothing yet.
 
 | File | What it is |
 | --- | --- |
-| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`, `LipSeal`. The skin maps are inside it. |
+| `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`, `LipSeal`, and the underwear `Underwear_BoxerBriefs`, `Underwear_Briefs`, `Underwear_Bra`. The skin maps are inside it. |
+| `items/*.item.json` | The underwear's item manifests (written by `manifests.py`). |
 | `Realistic.base.json` | The base model manifest (written by `manifests.py`). |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
@@ -13,14 +14,14 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 
 ## Building
 
-Needs the `bpy` module (Python 3.13 for bpy 5.x), NumPy and Pillow. About 40 seconds on a 16-core CPU.
+Needs the `bpy` module (Python 3.13 for bpy 5.x), NumPy and Pillow. About 40 seconds on a 16-core CPU, three and a half minutes on a 6-core laptop. Blender itself works too (`blender -b --factory-startup --python-exit-code 1 --python build.py -- --out DIR`); its own Python has NumPy but not Pillow, so install Pillow for Python 3.13 into a folder and start Blender with `--python-use-system-env` and `PYTHONPATH` naming it.
 
 ```bash
 python -I assets/characters/realistic/build.py --out assets/characters/realistic
 python -I assets/characters/catalogue.py
 ```
 
-`--texture-size 4096` bakes the hero texture set (2048 is committed); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `rims.py` (twice the vertices round the lids), `skin.py` (bakes), `face.py` (the face put right at rest), `eyes.py`, `parts.py` and `teeth.py` (eyes, teeth, gums, tongue), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `face.py` again (expression and identity shapes; `EyeShell`, `Lashes`, `Brows` from `eyes.py` and `lashes.py`), `regions.py`, `lods.py` and `manifests.py` (with `faceparams.py`). It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
+`--texture-size 4096` bakes the hero texture set (2048 is committed); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `rims.py` (twice the vertices round the lids), `skin.py` (bakes), `face.py` (the face put right at rest), `eyes.py`, `parts.py` and `teeth.py` (eyes, teeth, gums, tongue), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `face.py` again (expression and identity shapes; `EyeShell`, `Lashes`, `Brows` from `eyes.py` and `lashes.py`), `underwear.py`, `regions.py`, `lods.py` and `manifests.py` (with `faceparams.py`). It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
 
 After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 
@@ -157,6 +158,20 @@ They are a **delta mush** of their poses (`correctives.Mush`): the skinned pose 
 
 Made for raising the arm sideways with the collarbone still; an arm swung forward leans on them only as far as it is also raised. The starter animations don't turn the collarbones at all (their `LeftShoulder` and `RightShoulder` keys are the rest pose), so that is the case clips play today.
 
+## Brow length
+
+`brow_length_left` and `_right` (2026-11-16, Paul: "I can not adjust the brow length") move the `Brows` card alone: `Face_Brow_Length_<side>` draws the tail in to 0.80 of the way along the brow's line (the card runs to 1.08 as built), driven from 0 to -1, and `Face_Brow_Length_Long_<side>` carries it on down the temple to 1.34, driven from 0 to 1 (`lashes.brow_lengths`, the same card laid out again). The hair's texture runs the card's whole length, so a shorter brow is a whole brow, shorter. The body carries the four shapes empty, so the manifest can name them (architecture.md section 14).
+
+## Underwear
+
+`underwear.py` (2026-11-16) cuts three garments from the body's own surface: **boxer briefs** (from the hip bones' crest to a third of the way down the thigh, with a waistband), **briefs** (high cut: the leg opening runs round the thigh from the crotch up above the hip joint at the side, and across the buttocks behind) and a **sports bra** (laid out on the feminine frame: under the bust to a scooped neckline, across the shoulder blades behind, cut away under the arms, with a strap over each shoulder). Male (`frame` 0) wears the boxer briefs; Female (1) the briefs and the bra (the parameter's `choices`, written by `manifests.py`); every one fits both frames.
+
+- **Cutting.** Each garment is a few simple, nearly linear fields on the body (height, distance down the thigh and which way round it, distance from the middle, the arms' and thighs' weights) and a rule over them. The surface is split along each field's zero line in turn, then the pieces the rule keeps are the garment, so hems are curves and a strap narrower than the body's triangles is still cut exactly. A gusset strip joins the leg openings under the crotch. The waistband and the bra's band are a second material.
+- **Fitting.** A garment vertex is a fixed mix of body vertices, so it takes their weights and every shape the body has (the frame, muscle and fat with their corners, the correctives): `fit: shapes`. A point on a hem can mix two vertices' eight influences; past four, each goes to its nearest kept ancestor bone (the build data's `underwear.*.weight_moved_most` is the most any vertex moved: 0.07 to 0.12).
+- **Lying like cloth.** It stands 2.4 to 3 mm off the skin; it is drawn straight across the cleavage and the buttocks' cleft, then smoothed outward only (`taut`), so it spans hollows and keeps to convex skin; at every hem a rim folds 4 mm down into the skin.
+- **The skin under it.** Each item hides its own region, whose mask shape (`Mask_<object>`) sinks the skin it covers 5 mm and eases back over 15 mm past the hems. Without it the body's simpler copies came through the cloth at a distance, and at a strap's edge the skin beside it did. This is an interim exception to ADR-0035 (fitting by binding, hiding by the region map): CO9 builds those.
+- **Look.** Charcoal cloth with a darker, glossier elastic band (`cloth` shading).
+
 ## Proportions (CO5)
 
 The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim` takes 0.5 to 1.5; this body's manifest offers **0.85 to 1.15** (`manifests.PROPORTION_RANGE`), and the hips only widen (**1 to 1.15**): at the wide ends the skin crosses itself (shoulders at half width put the arms through the chest, 282 pairs of triangles; hips 2% narrower already cross at the crotch of a heavy masculine body). With these ranges every pair of the manifest's 28 parameters at the ends of their ranges, on both frames, leaves the body free of new crossings (`measure.py --only ...,sliders`: 351 pairs, 1,352 bodies per frame).
@@ -167,4 +182,5 @@ The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim`
 - The body's shapes are MakeHuman's anatomy at this mesh's resolution: the heavy and muscular corner is still a bodybuilder's build, and muscle definition finer than 25 mm isn't in the geometry (a normal-map layer, CO7).
 - The hips can't be made narrower, and the proportion sliders stop at 15% either way.
 - One normal and occlusion map serves both frames, so detail that sits differently on the two (the upper eyelid's fold) is softened or slightly misplaced on the feminine frame: two short dark marks above each feminine eye.
+- The underwear's shapes are copied, so a garment is as heavy as its share of the body's shapes (37 to 53 shapes each); the briefs' back hem meets the gusset in a small crumple seen from below.
 - No subsurface map and no hair. What the face still falls short of is listed in [the face's notes](../../../docs/development/character-studio/co6/README.md).
