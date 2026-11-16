@@ -24,6 +24,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 BASE_ID = "axcenity/realistic"
 PARTS_FILE = "RealisticParts.glb"
 DATA_FILE = "Realistic.build.json"
@@ -31,7 +32,7 @@ MANIFEST_FILE = "Realistic.base.json"
 FACE_PROFILE = "axcenity"
 
 # The parts always worn with the body.
-FACE_PARTS = ["Eyes", "Teeth"]
+FACE_PARTS = ["Eyes", "Teeth", "EyeShell", "Lashes", "Brows", "LipSeal"]
 
 GROUPS = [
     ("frame", "Frame", "body"),
@@ -54,7 +55,9 @@ PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
 # Every material of the body and its parts, and how it is lit.
 SHADING = {
     "Skin": "skin", "Mouth": "standard", "Iris": "eye", "Sclera": "eye",
-    "Teeth": "standard", "Gums": "standard", "Tongue": "standard",
+    "Teeth": "standard", "Gums": "standard", "Tongue": "standard", "LipSeal": "standard",
+    # The face's parts (CO6; eyes.py, lashes.py).
+    "Cornea": "eye", "EyeOcclusion": "standard", "TearLine": "standard", "Lashes": "hair", "Brows": "hair",
 }
 
 
@@ -88,6 +91,9 @@ def base_manifest(data, parts):
         sys.path.insert(0, HERE)
     import shapes
     parameters += shapes.parameters()
+    # The face's parameters (CO6; faceparams.py).
+    import faceparams
+    parameters += faceparams.parameters(data.get("face", {}).get("face_identity", {}))
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})
     return {
@@ -99,7 +105,7 @@ def base_manifest(data, parts):
                   "parts": [parts[name]["path"] for name in FACE_PARTS]},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",
                      "added_bones": data["added_bones"]},
-        "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS],
+        "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS] + faceparams.groups(),
         "parameters": parameters,
         "corners": shapes.corners(),
         "regions": [{"id": r["id"], "label": r["label"], "map_index": r["map_index"]}

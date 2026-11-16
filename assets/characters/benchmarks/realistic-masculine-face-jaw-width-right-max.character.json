@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-jaw-width-right-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "jaw_width_right": 1
+  }
+}

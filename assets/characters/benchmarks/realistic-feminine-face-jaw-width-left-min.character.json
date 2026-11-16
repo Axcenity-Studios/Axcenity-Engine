@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-jaw-width-left-min",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 1,
+    "jaw_width_left": -1
+  }
+}

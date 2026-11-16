@@ -105,6 +105,26 @@ def manifest_weights(manifest, values):
     return out
 
 
+def manifest_bones(manifest, values):
+    """{bone: (offset, scale)} for slider `values` by the manifest's rule,
+    as `avatar::resolve` sums a parameter's `bones` drivers: each offset
+    (glTF axes) times the parameter's mapped weight, added up, and each
+    scale `1 + (scale - 1) * weight`, multiplied. The frame's drivers are
+    left out: `set_frame_bones` and `eye_transform` take the frame's from
+    the build data."""
+    out = {}
+    for p in manifest["parameters"]:
+        if p["id"] == "frame" or not p.get("bones"):
+            continue
+        v = min(p["range"][1], max(p["range"][0], values.get(p["id"], p.get("default", 0.0))))
+        for d in p["bones"]:
+            w = span(v, d.get("from"), d.get("to"))
+            offset, scale = out.get(d["bone"], ([0.0, 0.0, 0.0], 1.0))
+            offset = [a + b * w for a, b in zip(offset, d.get("offset", [0.0, 0.0, 0.0]))]
+            out[d["bone"]] = (offset, scale * (1.0 + (d.get("scale", 1.0) - 1.0) * w))
+    return out
+
+
 def load_custom(path=CUSTOM_PATH):
     """A package's customization data, in the stylized file's layout. The
     realistic package's build data (`frame`, `twists`, `helpers`) is read
@@ -112,7 +132,8 @@ def load_custom(path=CUSTOM_PATH):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if "frame" in data and "body" not in data:
-        data = dict(data, body={"Frame_Feminine": data["frame"]}, face={}, masks=[], parts={}, hair=[],
+        data = dict(data, body={"Frame_Feminine": data["frame"]},
+                    face=(data.get("face") or {}).get("face_identity", {}), masks=[], parts={}, hair=[],
                     default={"outfit": [], "hair": None})
     return data
 
@@ -182,12 +203,14 @@ class Character:
                     out.append(m)
         return out
 
-    def set_look(self, frame=0.0, build=None, face=None, expr=None, masks=None, keep_defaults=False):
+    def set_look(self, frame=0.0, build=None, face=None, expr=None, masks=None, keep_defaults=False, bones=None):
         """Shape weights on every part that carries them; everything else 0
         (or the file's default weight with `keep_defaults`). `build` is
         {Build_*: w}; `face` {Face_*: w}; `expr` {expression: w};
-        `masks` a list of mask names at 1. Also moves the skeleton for the
-        frame and the eye bones for the frame and eye identity shapes."""
+        `masks` a list of mask names at 1; `bones` the parameters' own
+        bone changes ({bone: (offset, scale)}, `manifest_bones`). Also
+        moves the skeleton for the frame and the eye bones for the frame,
+        the eye identity shapes and `bones`."""
         w = {"Frame_Feminine": frame}
         w.update(build or {})
         w.update(face or {})
@@ -202,15 +225,19 @@ class Character:
                 base = self.defaults[name].get(kb.name, 0.0) if keep_defaults else 0.0
                 kb.value = w.get(kb.name, base)
         self.set_frame_bones(frame)
-        self.look = {"frame": frame, "face": dict(face or {})}
+        self.look = {"frame": frame, "face": dict(face or {}), "bones": dict(bones or {})}
         self.set_eyes()
         update()
 
     def set_sliders(self, values):
         """The look the manifest gives slider `values` ({parameter id:
-        value}): every shape it drives, and the frame's bones and eyes."""
+        value}): every shape it drives, the frame's bones and eyes, and the
+        eye bones the parameters move and scale. (The eye parameters'
+        shapes move the lids and their `bones` drivers move and scale the
+        eyeball with them; the engine bakes both. With the shapes alone
+        the lids moved off an eyeball left where it was.)"""
         w = manifest_weights(self.manifest, values)
-        self.set_look(frame=values.get("frame", 0.0), build=w)
+        self.set_look(frame=values.get("frame", 0.0), build=w, bones=manifest_bones(self.manifest, values))
 
     def set_body_sliders(self, values):
         """The rest pose reshaped by `anim`'s body sliders ({attribute:
@@ -334,6 +361,10 @@ class Character:
                 off += gltf_to_blender(c["offset"]) * wt
             if "scale" in c:
                 scale *= 1.0 + (c["scale"] - 1.0) * wt
+        if name in self.look.get("bones", {}):
+            offset, s = self.look["bones"][name]
+            off += gltf_to_blender(offset)
+            scale *= s
         return off, scale
 
     def set_eyes(self):

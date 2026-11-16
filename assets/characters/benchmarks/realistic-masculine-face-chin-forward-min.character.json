@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-chin-forward-min",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "chin_forward": -1,
+    "frame": 0
+  }
+}

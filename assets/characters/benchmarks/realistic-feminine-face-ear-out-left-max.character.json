@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-ear-out-left-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "ear_out_left": 1,
+    "frame": 1
+  }
+}

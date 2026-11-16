@@ -33,6 +33,9 @@
 //! repository's `assets/characters` otherwise), `AXCENITY_CAPTURE_SIZE`
 //! (`1920x1080`), `AXCENITY_CAPTURE_POSE` (`rest`, the A-pose, `idle`, or
 //! one of the default character's clips at a time, such as `Cheer@0.6`),
+//! `AXCENITY_CAPTURE_FACE` (what the face shows: face controls and
+//! expressions with their strengths, such as `Blink_Left:1,Jaw_Open:0.5`
+//! or `Happy:1`; blinking, gaze and idle motion are off with it),
 //! `AXCENITY_CAPTURE_ONLY` (names containing this text) and
 //! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures).
 
@@ -57,7 +60,7 @@ pub(crate) struct View {
 }
 
 /// The cameras, in the order the sheet shows them.
-pub(crate) const VIEWS: [View; 5] = [
+pub(crate) const VIEWS: [View; 6] = [
     View {
         name: "front",
         eye: [0.0, 2.6, -9.5],
@@ -85,6 +88,14 @@ pub(crate) const VIEWS: [View; 5] = [
     View {
         name: "face",
         eye: [-0.35, 4.62, -2.3],
+        target: [0.0, 4.58, 0.0],
+        fov: 30.0,
+    },
+    // Straight on, where `face` stands a little to one side: a mouth or a
+    // brow that is higher on one side shows here and nowhere else (CO6).
+    View {
+        name: "face-front",
+        eye: [0.0, 4.6, -2.3],
         target: [0.0, 4.58, 0.0],
         fov: 30.0,
     },
@@ -152,6 +163,9 @@ pub(crate) struct Settings {
     /// Frames drawn before the picture is read, the same every time, so
     /// temporal anti-aliasing has settled the same way.
     pub frames: u32,
+    /// What the face shows: face controls and expressions by name, each
+    /// with its strength. Empty leaves the face alone.
+    pub face: &'static [(&'static str, f64)],
 }
 
 impl Default for Settings {
@@ -160,6 +174,7 @@ impl Default for Settings {
             size: (1280, 720),
             stance: Stance::Rest,
             frames: 48,
+            face: &[],
         }
     }
 }
@@ -272,6 +287,7 @@ fn stage_world(
     assets: &Assets,
     description: &Description,
     stance: Stance,
+    face: &[(&str, f64)],
 ) -> Result<(World, Animators), String> {
     let mut world = World::new();
     let workspace = world.workspace();
@@ -294,6 +310,35 @@ fn stage_world(
         // No state machine: the Animator poses the skeleton at rest, with
         // the character's identity, and leads its parts.
         let _ = world.set_property(animator, "StateMachine", Value::String(String::new()));
+    }
+    if !face.is_empty() {
+        // A FaceControls of the body's own, showing only what is asked:
+        // no blinks, gaze or idle motion, so the picture is the same
+        // every time.
+        let controls = world
+            .create(ClassName::FaceControls)
+            .map_err(|err| err.to_string())?;
+        let _ = world.set_property(controls, "ProceduralEnabled", Value::Bool(false));
+        let _ = world.set_parent(controls, Some(applied.body));
+        for (order, &(name, strength)) in face.iter().enumerate() {
+            if axcenity_core::face::face_control(name).is_some() {
+                let _ = world.set_property(controls, name, Value::Number(strength));
+            } else if let Some(state) = world.face_mut(controls) {
+                // Not a control: an expression, shown whole at once.
+                state.expressions.push(axcenity_core::face::ExpressionPlay {
+                    name: name.to_owned(),
+                    intensity: strength,
+                    target_intensity: strength,
+                    presence: 1.0,
+                    target_presence: 1.0,
+                    transition: Some(0.0),
+                    weight: 1.0,
+                    priority: 0,
+                    asymmetry: 0.0,
+                    order: order as u64,
+                });
+            }
+        }
     }
     if let Stance::Clip { name, .. } = stance {
         // The clip alone, beside the Animator, started with the game.
@@ -348,7 +393,7 @@ pub(crate) fn capture(
     description: &Description,
     settings: Settings,
 ) -> Result<Vec<Shot>, String> {
-    let (mut world, animators) = stage_world(assets, description, settings.stance)?;
+    let (mut world, animators) = stage_world(assets, description, settings.stance, settings.face)?;
     let (width, height) = settings.size;
     let mut graphics = GraphicsSettings::preset(Quality::High);
     graphics.anti_aliasing = Some(AntiAliasing::Taa);
@@ -552,6 +597,21 @@ fn capture_characters() {
         }
         _ => {}
     }
+    if let Ok(face) = std::env::var("AXCENITY_CAPTURE_FACE") {
+        let shown: Vec<(&'static str, f64)> = face
+            .split(',')
+            .filter(|entry| !entry.trim().is_empty())
+            .map(|entry| {
+                let (name, strength) = entry.trim().split_once(':').unwrap_or((entry.trim(), "1"));
+                let strength = strength
+                    .parse()
+                    .expect("AXCENITY_CAPTURE_FACE is `Name:strength,...`");
+                // Kept for the run: a capture is one process.
+                (&*Box::leak(name.to_owned().into_boxed_str()), strength)
+            })
+            .collect();
+        settings.face = Box::leak(shown.into_boxed_slice());
+    }
     let only = std::env::var("AXCENITY_CAPTURE_ONLY").ok();
     let sheets_only = std::env::var("AXCENITY_CAPTURE_SHEETS").as_deref() == Ok("only");
     let (device, queue) = super::bench_tests::bench_gpu().expect("no graphics adapter");
@@ -624,6 +684,7 @@ fn capture_characters() {
     let record = serde_json::json!({
         "size": [settings.size.0, settings.size.1],
         "stance": settings.stance.label(),
+        "face": settings.face.iter().map(|(name, strength)| format!("{name}:{strength}")).collect::<Vec<_>>(),
         "frames": settings.frames,
         "quality": "High",
         "anti_aliasing": "TAA",
@@ -711,6 +772,9 @@ fn the_same_description_captures_identical_pictures_and_every_view_is_drawn() {
     );
     // The sheet holds them all, at half size.
     let (width, height, sheet) = contact_sheet(&first, settings.size);
-    assert_eq!((width, height), (160 * 5, 90 * 2));
+    assert_eq!(
+        (width, height),
+        (160 * VIEWS.len() as u32, 90 * LIGHTS.len() as u32)
+    );
     assert_eq!(sheet.len(), (width * height * 4) as usize);
 }

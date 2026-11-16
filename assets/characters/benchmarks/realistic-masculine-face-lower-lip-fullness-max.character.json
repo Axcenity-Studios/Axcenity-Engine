@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-lower-lip-fullness-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "lower_lip_fullness": 1
+  }
+}

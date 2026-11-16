@@ -27,18 +27,23 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bpy  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 import body  # noqa: E402
 import correctives  # noqa: E402
+import eyes as eyelib  # noqa: E402
+import face  # noqa: E402
 import lods  # noqa: E402
 import manifests  # noqa: E402
 import parts  # noqa: E402
 import regions  # noqa: E402
 import rig  # noqa: E402
+import rims  # noqa: E402
 import shapes  # noqa: E402
 import skin  # noqa: E402
+import teeth as jawlib  # noqa: E402
 import uvs  # noqa: E402
-from common import face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
+from common import array, duplicate, face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
 
 ARMATURE = "AxcenityRealistic"
 PARTS_FILE = "RealisticParts.glb"
@@ -77,18 +82,49 @@ def build(out_dir, texture_size=2048, bakes=True):
     M, F = frames["Masculine"], frames["Feminine"]
     sets = face_sets(body_obj)
     layout = uvs.layout(body_obj, lm)
-    maps = skin.bake(body_obj, source, lm, texture_size, out_dir) if bakes else None
 
     # Eyes and teeth, on the frames as they stand. The eyes follow the
     # feminine frame on their bones (the frame's bone offsets and eye
     # scale), the teeth by a shape; the mouth's bag is widened round them.
+    # (The eyes are fitted to the bundle's own sockets, before the lids
+    # get their new vertices.)
     set_positions(body_obj, M.P)
     eyes_m, eye_radius, eye_fit = parts.fit_eyes(body_obj, M.P, lm)
     eyes_f, eye_radius_f, eye_fit_f = parts.fit_eyes(body_obj, F.P, lm)
-    eyes = parts.eyes(eyes_m, eye_radius, out_dir)
+    # Twice the vertices round the lids (`rims.py`). The bundle's vertices
+    # keep their indices; the new ones follow in every set of positions,
+    # and whatever is kept by polygon is read again. The sculpts are baked
+    # from the bundle's own topology (`cage`).
+    cage = duplicate(body_obj, "Cage") if bakes else None
+    fine = rims.split(body_obj, sets)
+    sets = face_sets(body_obj)
+    lm = rig.stylized_rig().Landmarks(body_obj)
+    source = {name: fine.grow_points(P) for name, P in source.items()}
+    M.P, F.P = fine.grow_points(M.P), fine.grow_points(F.P)
+    set_positions(body_obj, source["Masculine"])
+    maps = skin.bake(body_obj, source, lm, texture_size, out_dir, cage) if bakes else None
+    if cage is not None:
+        bpy.data.objects.remove(cage)
+    set_positions(body_obj, M.P)
+    # The face put right at rest (the feminine lids, the lids' lining, the
+    # lips; `face.prepare`), before the teeth are placed and the body weighted.
+    topo = face.topo_of(body_obj.data, sets)
+    # (Each vertex's mirror vertex: the mouth is made even by it.)
+    mirror = fine.mirror(shapes._transfer()[0].mirror_map(
+        [array(source["Masculine"])[:fine.count], array(source["Feminine"])[:fine.count]]))
+    m_face, f_face, face_rest = face.prepare(topo, array(M.P), array(F.P), eyes_m, eyes_f, eye_radius, eye_radius_f,
+                                             mirror)
+    M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
+    if maps:
+        face_rest["lid_texels_softened"] = face.soften_lids(body_obj, topo, m_face, eyes_m, eye_radius, maps)
+    eyes = eyelib.eyes(eyes_m, eye_radius, parts.iris_texture(out_dir), out_dir)
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
-    teeth, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle)
+    teeth, teeth_copies, M.P, F.P, teeth_fit = parts.teeth(body_obj, M.P, F.P, lm, height / bundle, out_dir)
+    # (Room for the jaw is made vertex by vertex: the mouth even again.)
+    mouth_share = face.mouth_region(topo, (array(M.P), array(F.P)), mirror)
+    M.P = [Vector(p) for p in face.even(array(M.P), mirror, mouth_share)]
+    F.P = [Vector(p) for p in face.even(array(F.P), mirror, mouth_share)]
 
     # The skeleton and the weights, on the masculine frame.
     P = M.P
@@ -96,8 +132,8 @@ def build(out_dir, texture_size=2048, bakes=True):
     joints = rig.fit_joints(P, lm, eyes_m)
     joints_f = rig.fit_joints(F.P, lm, eyes_f)
     armature = rig.build_armature(joints, ARMATURE)
-    weights = rig.skin(body_obj, armature, P, lm, joints)
-    for obj in (body_obj, eyes, teeth):
+    weights = rig.skin(body_obj, armature, P, lm, joints, even=(mirror, mouth_share))
+    for obj in (body_obj, eyes, teeth, *teeth_copies):
         skin_to(obj, armature)
 
     # Materials (the face sets' are replaced), the frame shape, the body
@@ -109,7 +145,7 @@ def build(out_dir, texture_size=2048, bakes=True):
     both = lambda m, f: {"Masculine": m, "Feminine": f}  # noqa: E731
     body_shapes, shape_report, mesh = shapes.build(
         body_obj, source, both(P, F.P), lm, both(joints, joints_f), weights, both(eyes_m, eyes_f),
-        both(eye_radius, eye_radius_f))
+        both(eye_radius, eye_radius_f), mirror=mirror, grow=fine.grow)
     shapes.add_keys(body_obj, body_shapes, both(P, F.P))
     # The shapes the engine leans on as the arms are raised (CO5).
     driven = {"twists": [{"bone": n, "inside": i, "reads": r, "share": s} for n, i, r, s in rig.TWISTS],
@@ -117,6 +153,13 @@ def build(out_dir, texture_size=2048, bakes=True):
     corrective_shapes, corrective_rules, corrective_report = correctives.build(
         body_obj, armature, weights, P, driven, mesh["mirror"], mesh["lap"], mesh["tris"])
     correctives.add_keys(body_obj, corrective_shapes, P)
+    # The face: its expression and identity shapes, and the parts that
+    # follow the lids and brows (before the simpler copies, which take
+    # the body's shapes).
+    face_parts, face_data = face.build(body_obj, topo, array(P), array(F.P), eyes_m, eyes_f, eye_radius,
+                                       joints, joints_f, weights, teeth, out_dir, teeth_copies, mirror)
+    for obj in face_parts.values():
+        skin_to(obj, armature)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
     copies = lods.build(body_obj, armature, lm, P, joints, face_regions)
     for copy in copies:
@@ -145,9 +188,11 @@ def build(out_dir, texture_size=2048, bakes=True):
         "body_shapes": shape_report,
         "correctives": corrective_rules,
         "corrective_shapes": corrective_report,
+        "face": dict(face_data, rest=face_rest),
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
-    objects.update({c.name: c for c in copies})
+    objects.update(face_parts)
+    objects.update({c.name: c for c in (*copies, *teeth_copies)})
     report = {name: tri_count(obj) for name, obj in objects.items()}
     return armature, objects, data, report
 
@@ -184,9 +229,9 @@ def main(out_dir, texture_size=2048, bakes=True):
         f.write("\n")
     manifests.write(out_dir)
     skin.clean_up(out_dir)
-    iris = os.path.join(out_dir, "RealisticIris.png")
-    if os.path.exists(iris):
-        os.remove(iris)
+    for image in ("RealisticIris.png", *face.IMAGES, *jawlib.IMAGES):
+        if os.path.exists(os.path.join(out_dir, image)):
+            os.remove(os.path.join(out_dir, image))
     return report
 
 

@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-brow-arch-left-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "brow_arch_left": 1,
+    "frame": 1
+  }
+}

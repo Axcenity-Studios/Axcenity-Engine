@@ -1027,7 +1027,11 @@ def slider_pairs(ch, touching=0.004):
     move makes or unmakes a crossing. Shapes are set by the manifest's
     rule and the body sliders as `anim` applies them
     (`Character.set_sliders`, `set_body_sliders`). Also each parameter
-    alone, with the eyes and teeth checked against the skin."""
+    alone, with the eyes and teeth checked against the skin. The eye
+    bones are moved and scaled by the parameters' `bones` drivers, as the
+    engine's bake carries the eyeballs (`set_sliders`): an eye parameter's
+    shape moves the lids and its bone the eyeball, so the lids are
+    measured against the eyeball where the engine draws it."""
     manifest = ch.manifest
     ch.show_only(["Body", "Eyes", "Teeth"])
     params = [p for p in manifest["parameters"] if p["id"] != "frame"]

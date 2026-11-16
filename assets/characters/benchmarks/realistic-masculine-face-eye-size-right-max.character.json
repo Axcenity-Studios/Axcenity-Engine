@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-eye-size-right-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "eye_size_right": 1,
+    "frame": 0
+  }
+}

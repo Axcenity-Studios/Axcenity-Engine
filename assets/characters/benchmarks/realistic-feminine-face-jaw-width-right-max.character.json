@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-face-jaw-width-right-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 1,
+    "jaw_width_right": 1
+  }
+}

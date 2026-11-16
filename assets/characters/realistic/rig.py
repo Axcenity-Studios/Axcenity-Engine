@@ -283,7 +283,7 @@ def _smooth(values, nbr, iterations, keep=None):
     return vals
 
 
-def skin(body, armature, P, lm, joints):
+def skin(body, armature, P, lm, joints, even=None):
     """Weights `body` to `armature`: bone-heat weights from the contract's
     bones, then the head and neck, the jaw, the fingers and toes from the
     face sets, each limb's twist bones, and the helper bones at the big
@@ -313,6 +313,16 @@ def skin(body, armature, P, lm, joints):
 
     _head_and_neck(w, X, in_sets, J)
     _jaw(w, X, body.data, lm, in_sets, of_set, J, nbr)
+    if even is not None:
+        # The jaw's hold the same on both sides of the mouth (`even`: each
+        # vertex's mirror vertex, and how much of it is the mouth's), as
+        # the mouth's form is (`face.prepare`).
+        mirror, share = even
+        head, jaw = w.index["Head"], w.index["Jaw"]
+        held = w.W[:, head] + w.W[:, jaw]
+        amount = w.W[:, jaw] + share * (0.5 * (w.W[:, jaw] + w.W[mirror, jaw]) - w.W[:, jaw])
+        amount = np.minimum(amount, held)
+        w.W[:, head], w.W[:, jaw] = held - amount, amount
     for side, s in SIDES:
         _shoulder(w, X, body.data, lm, of_set, side, s)
         _hand(w, X, of_set, J, side, s)
@@ -383,54 +393,112 @@ def _head_and_neck(w, X, in_sets, J):
     w.W[idx] /= np.maximum(total, 1e-12)
 
 
+# The jaw's hold on the face (`_jaw`).
+# How much of the jaw's turn the corners of the mouth take.
+JAW_CORNER = 0.30
+# The lips' curve between the middle and a corner (`_jaw`): the power of
+# the way along the lip the hold changes by. High, a lip is level across
+# its middle and turns to the corner late (a broad U); it still meets
+# the corner at a slope, so its end stays by the corner (an ellipse's
+# upright end hung the lower lip's red a centimetre under it).
+JAW_UPPER_CURVE = 2.5
+JAW_LOWER_CURVE = 2.5
+# The cheeks: from none of the turn this far above the line from the hinge
+# to the mouth's corner to all of it this far under it (radians about the
+# hinge, so the band is as wide as the jaw's travel is long).
+JAW_BAND = (-0.20, 0.18)
+# Round the mouth the lips' own rule holds inside this ring and has
+# eased into the cheeks' by this one (elliptic coordinate about the
+# corners: 0 is the lips' line, 1 an ellipse 85 mm wide and 64 mm high).
+JAW_LIPS = (0.45, 1.0)
+# Inside the mouth the skin's rule holds to this far from the lips' line
+# and has given way by the second distance to the lining's own (metres):
+# the roof with the head, the floor with the jaw.
+JAW_LINING = (0.006, 0.016)
+
+
 def _jaw(w, X, mesh, lm, in_sets, of_set, J, nbr):
-    """A first pass at the jaw (the face's own weights and shapes are
-    CO6's): what lies under the line from the hinge to the mouth follows
-    `Jaw`, more the further under it, so the cheeks stretch. Round the
-    mouth the two lips part by where they are on the skin, not by height
-    alone (their edges touch): on the line they meet on, skin facing up
-    is the lower lip's and the jaw's, skin facing down the upper lip's
-    and the head's, and the corners end up shared. Inside the mouth the
-    floor is the jaw's and the roof the head's."""
+    """The jaw's hold on the head: one smooth field over the skin and the
+    mouth's lining alike, so a cheek and the lining behind it move
+    together.
+
+    - **The cheeks**, by the angle about the hinge under the line to the
+      mouth's corner (`JAW_BAND`): a wide band, so the jaw's drop is
+      spread over the whole cheek and not taken by one strip of skin.
+    - **The lips.** The upper lip's middle stays with the head and the
+      lower lip's middle goes with the jaw, though they touch; the
+      corners, where they are one skin, take `JAW_CORNER`. Between, the
+      hold follows elliptic coordinates about the two corners: on the
+      lips' line, a fraction `u` of the way from the middle to a corner,
+      the upper lip takes `JAW_CORNER * u ** JAW_UPPER_CURVE` and the
+      lower `1 - (1 - JAW_CORNER) * u ** JAW_LOWER_CURVE`, so an open
+      mouth is a shallow arch over a broad U and not a box. The same
+      coordinates carry the rule off the lips smoothly, to none of the
+      turn under the nose and all of it on the chin.
+    - **Inside the mouth** the lips' inner sides go by the same rule as
+      their outer sides, so a lip is moved whole. Deeper (`JAW_LINING`),
+      where the lining lies on the gums, the upper half goes with the
+      head and the lower with the jaw, as the teeth do, and the seam
+      between the two along the inside of the cheek is shared."""
     from common import FS_MOUTH_UPPER
     hinge, _ = J["Jaw"]
     idx = in_sets(HEAD_SETS)
-    lower_rim = np.array(lm.ring(FS_MUZZLE, FS_MOUTH_LOWER), dtype=np.int64)
-    upper_rim = np.array(lm.ring(FS_MUZZLE, FS_MOUTH_UPPER), dtype=np.int64)
-    rim = np.concatenate([lower_rim, upper_rim])
-    half = float(np.abs(X[rim][:, 0]).max())
-    corners = rim[np.abs(X[rim][:, 0]) > 0.85 * half]
-    corner = X[corners].mean(axis=0)
-    # Each vertex's angle about the hinge, under the line to the mouth's corners.
+    edge = np.array(lm.ring(FS_MOUTH_UPPER, FS_HEAD), dtype=np.int64)
+    edge = edge[np.argsort(X[edge][:, 0])]
+    ends = X[edge[[0, -1]]]
+    half = float(np.abs(ends[:, 0]).mean())
+    corner = np.array([0.0, ends[:, 1].mean(), ends[:, 2].mean()])
+    # The cheeks' rule: each vertex's angle about the hinge, under the
+    # line to the mouth's corners.
     forward = -(X[:, 1] - hinge[1])
     up = X[:, 2] - hinge[2]
     line = np.arctan2(corner[2] - hinge[2], -(corner[1] - hinge[1]))
     under = line - np.arctan2(up, forward)
-    field = _smoothstep(-0.01, 0.07, under)
+    cheeks = np.where(under < 0.0, JAW_CORNER * (1.0 - _smoothstep(0.0, -JAW_BAND[0], -under)),
+                      JAW_CORNER + (1.0 - JAW_CORNER) * _smoothstep(0.0, JAW_BAND[1], under))
+    # The lips' rule, in elliptic coordinates about the corners on the
+    # face seen from the front, the lips' line made level.
+    x = X[:, 0]
+    inside = np.clip(x, -half, half)
+    height = X[:, 2] - np.interp(inside, X[edge][:, 0], X[edge][:, 2])
+    r_left, r_right = np.hypot(x - half, height), np.hypot(x + half, height)
+    ring = np.arccosh(np.maximum((r_left + r_right) / (2.0 * half), 1.0))
+    along = np.clip((r_right - r_left) / (2.0 * half), -1.0, 1.0)
+    # Which lip: over or under the line; on it (the lips touch) by the
+    # face set, the lower lip's being the muzzle's and the floor's.
+    upper = height > 0.0
+    of = np.zeros(len(X), dtype=np.int8)
+    of[of_set[FS_HEAD]] = 1
+    of[of_set[FS_MOUTH_UPPER]] = 1
+    of[of_set[FS_MUZZLE]] = -1
+    of[of_set[FS_MOUTH_LOWER]] = -1
+    of[edge] = 1
+    close = (np.abs(x) < half) & (np.abs(height) < 0.006) & (of != 0)
+    upper[close] = of[close] > 0
+    way = np.abs(along)
+    lips = np.where(upper, JAW_CORNER * way ** JAW_UPPER_CURVE, 1.0 - (1.0 - JAW_CORNER) * way ** JAW_LOWER_CURVE)
+    # How far the lips' rule reaches round the mouth.
+    reach = 1.0 - _smoothstep(JAW_LIPS[0], JAW_LIPS[1], ring)
+    field = cheeks + (lips - cheeks) * reach
+    # Nothing at the hinge itself, nor behind it.
     field *= _smoothstep(0.015, 0.045, np.hypot(forward, up))
     field *= _smoothstep(hinge[1] + 0.004, hinge[1] - 0.02, X[:, 1])
-    # The lips (outside and in): under the line they meet on, or on it and
-    # facing up, the lower lip; over it, the upper.
-    muzzle = of_set[FS_MUZZLE]
-    slit = float(np.median(X[upper_rim][:, 2]))
-    normals = np.array([v.normal[:] for v in mesh.vertices])
-    front_y = float(X[muzzle][:, 1].min())
-    at_slit = muzzle[(np.abs(X[muzzle][:, 2] - slit) < 0.0015) & (X[muzzle][:, 1] < front_y + 0.03)]
-    wide = float(np.abs(X[at_slit][:, 0]).max())
-    zone = muzzle[(np.abs(X[muzzle][:, 0]) < wide) & (np.abs(X[muzzle][:, 2] - slit) < 0.02)]
-    height = X[zone][:, 2] - slit
-    lower = (height < -0.004) | ((np.abs(height) <= 0.004) & (normals[zone][:, 2] > 0))
-    field[zone] = np.where(lower, 1.0, 0.0)
-    field[of_set[FS_MOUTH_UPPER]] = 0.0
-    field[of_set[FS_MOUTH_LOWER]] = 1.0
-    field[upper_rim] = 0.0
-    field[lower_rim] = 1.0
+    # The mouth's lining, away from the lips.
+    upper_bag, lower_bag = of_set[FS_MOUTH_UPPER], of_set[FS_MOUTH_LOWER]
+    own = np.zeros(len(X))
+    own[lower_bag] = 1.0
+    own[np.intersect1d(upper_bag, lower_bag)] = 0.5
+    bag = np.union1d(upper_bag, lower_bag)
+    lip_line = X[edge]
+    away = np.full(len(X), np.inf)
+    for k in range(len(lip_line) - 1):
+        a, b = lip_line[k], lip_line[k + 1]
+        t = np.clip(((X[bag] - a) @ (b - a)) / max(float((b - a) @ (b - a)), 1e-18), 0.0, 1.0)
+        away[bag] = np.minimum(away[bag], np.linalg.norm(X[bag] - (a + t[:, None] * (b - a)), axis=1))
+    deep = _smoothstep(JAW_LINING[0], JAW_LINING[1], away[bag])
+    field[bag] += (own[bag] - field[bag]) * deep
     out = np.zeros(len(X))
     out[idx] = field[idx]
-    keep = np.ones(len(X), dtype=bool)
-    keep[idx] = False
-    keep[np.concatenate([of_set[FS_MOUTH_UPPER], of_set[FS_MOUTH_LOWER], rim])] = True
-    out = _smooth(out, nbr, 3, keep=keep)
     # Only what the head holds turns with the jaw.
     held = w.col("Head")
     amount = np.clip(out, 0.0, 1.0) * held

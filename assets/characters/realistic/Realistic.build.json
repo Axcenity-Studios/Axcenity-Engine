@@ -69,7 +69,7 @@
   "frames": {
    "Feminine": {
     "bony_vertices": 4396,
-    "held_face_vertices": 1397,
+    "held_face_vertices": 1906,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -108,10 +108,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 18,
-      "least_factor": 0.64,
+      "crossings_before": 0,
+      "least_factor": 1.0,
       "left": 0,
-      "vertices_cut": 137
+      "vertices_cut": 0
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -158,11 +158,11 @@
      "Feminine_Muscle_Up_Fat_Down": 25.5,
      "Feminine_Muscle_Up_Fat_Up": 58.3
     },
-    "neutral_crossings": 68
+    "neutral_crossings": 26
    },
    "Masculine": {
     "bony_vertices": 4369,
-    "held_face_vertices": 1435,
+    "held_face_vertices": 1944,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -201,10 +201,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 24,
-      "least_factor": 0.64,
+      "crossings_before": 9,
+      "least_factor": 0.8,
       "left": 0,
-      "vertices_cut": 206
+      "vertices_cut": 100
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -251,7 +251,7 @@
      "Masculine_Muscle_Up_Fat_Down": 23.2,
      "Masculine_Muscle_Up_Fat_Up": 65.9
     },
-    "neutral_crossings": 61
+    "neutral_crossings": 66
    }
   },
   "local": 0.6,
@@ -369,6 +369,309 @@
    "of_socket": 0.892,
    "radius": 0.01227,
    "skin_in_eyeball": 0
+  }
+ },
+ "face": {
+  "blink_shares": {
+   "Brow_Lower": [
+    0.184,
+    0.255,
+    0.88
+   ],
+   "Cheek_Raise": [
+    0.282,
+    0.304,
+    0.8
+   ],
+   "Eye_Squint": [
+    0.673,
+    0.705,
+    0.88
+   ]
+  },
+  "expressions": [
+   "Blink_Left",
+   "Blink_Right",
+   "Eye_Closed_Left",
+   "Eye_Closed_Right",
+   "Eye_Squint_Left",
+   "Eye_Squint_Right",
+   "Eye_Wide_Left",
+   "Eye_Wide_Right",
+   "Brow_Raise_Left",
+   "Brow_Raise_Right",
+   "Brow_Lower_Left",
+   "Brow_Lower_Right",
+   "Brow_Inward_Left",
+   "Brow_Inward_Right",
+   "Mouth_Smile_Left",
+   "Mouth_Smile_Right",
+   "Mouth_Frown_Left",
+   "Mouth_Frown_Right",
+   "Mouth_Open",
+   "Mouth_Wide",
+   "Mouth_Narrow",
+   "Mouth_Pucker",
+   "Mouth_Left",
+   "Mouth_Right",
+   "Upper_Lip_Raise",
+   "Lower_Lip_Lower",
+   "Upper_Lip_Raise_Left",
+   "Upper_Lip_Raise_Right",
+   "Lower_Lip_Lower_Left",
+   "Lower_Lip_Lower_Right",
+   "Lip_Corner_Pull_Left",
+   "Lip_Corner_Pull_Right",
+   "Cheek_Raise_Left",
+   "Cheek_Raise_Right",
+   "Cheek_Puff",
+   "Nose_Sneer_Left",
+   "Nose_Sneer_Right",
+   "Jaw_Open",
+   "Jaw_Forward",
+   "Jaw_Left",
+   "Jaw_Right",
+   "Tongue_Out",
+   "Tongue_Up",
+   "Tongue_Down"
+  ],
+  "face_identity": {
+   "Face_Eye_Depth_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.0042
+      ]
+     }
+    }
+   },
+   "Face_Eye_Depth_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0,
+       -0.0042
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0,
+       0.0045,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Height_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       0.0,
+       0.0045,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Size_Left": {
+    "bones": {
+     "LeftEye": {
+      "scale": 1.12
+     }
+    }
+   },
+   "Face_Eye_Size_Right": {
+    "bones": {
+     "RightEye": {
+      "scale": 1.12
+     }
+    }
+   },
+   "Face_Eye_Spacing_Left": {
+    "bones": {
+     "LeftEye": {
+      "offset": [
+       0.0042,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   },
+   "Face_Eye_Spacing_Right": {
+    "bones": {
+     "RightEye": {
+      "offset": [
+       -0.0042,
+       0.0,
+       -0.0
+      ]
+     }
+    }
+   }
+  },
+  "identity": [
+   "Face_Eye_Height_Left",
+   "Face_Eye_Spacing_Left",
+   "Face_Eye_Depth_Left",
+   "Face_Eye_Size_Left",
+   "Face_Eye_Tilt_Left",
+   "Face_Brow_Height_Left",
+   "Face_Brow_Arch_Left",
+   "Face_Brow_Height_Up_Left",
+   "Face_Brow_Arch_Up_Left",
+   "Face_Nose_Width_Left",
+   "Face_Cheekbone_Left",
+   "Face_Cheek_Fullness_Left",
+   "Face_Jaw_Width_Left",
+   "Face_Mouth_Width_Left",
+   "Face_Ear_Size_Left",
+   "Face_Ear_Height_Left",
+   "Face_Ear_Out_Left",
+   "Face_Eye_Height_Right",
+   "Face_Eye_Spacing_Right",
+   "Face_Eye_Depth_Right",
+   "Face_Eye_Size_Right",
+   "Face_Eye_Tilt_Right",
+   "Face_Brow_Height_Right",
+   "Face_Brow_Arch_Right",
+   "Face_Brow_Height_Up_Right",
+   "Face_Brow_Arch_Up_Right",
+   "Face_Nose_Width_Right",
+   "Face_Cheekbone_Right",
+   "Face_Cheek_Fullness_Right",
+   "Face_Jaw_Width_Right",
+   "Face_Mouth_Width_Right",
+   "Face_Ear_Size_Right",
+   "Face_Ear_Height_Right",
+   "Face_Ear_Out_Right",
+   "Face_Nose_Length",
+   "Face_Nose_Tip",
+   "Face_Nose_Bridge",
+   "Face_Nose_Tilt",
+   "Face_Brow_Ridge",
+   "Face_Forehead_Height",
+   "Face_Forehead_Slope",
+   "Face_Head_Width",
+   "Face_Chin_Length",
+   "Face_Chin_Forward",
+   "Face_Chin_Width",
+   "Face_Jaw_Shift",
+   "Face_Lip_Fullness_Upper",
+   "Face_Lip_Fullness_Lower",
+   "Face_Mouth_Height"
+  ],
+  "jaw_open_deg": 25.0,
+  "largest_move_mm": {
+   "Blink_Left": 10.19,
+   "Blink_Right": 10.12,
+   "Brow_Inward_Left": 8.81,
+   "Brow_Inward_Right": 8.81,
+   "Brow_Lower_Left": 8.55,
+   "Brow_Lower_Right": 8.66,
+   "Brow_Raise_Left": 10.63,
+   "Brow_Raise_Right": 10.63,
+   "Cheek_Puff": 9.38,
+   "Cheek_Raise_Left": 8.23,
+   "Cheek_Raise_Right": 8.22,
+   "Eye_Closed_Left": 10.19,
+   "Eye_Closed_Right": 10.12,
+   "Eye_Squint_Left": 5.27,
+   "Eye_Squint_Right": 5.23,
+   "Eye_Wide_Left": 5.74,
+   "Eye_Wide_Right": 5.71,
+   "Face_Brow_Arch_Left": 6.39,
+   "Face_Brow_Arch_Right": 6.38,
+   "Face_Brow_Arch_Up_Left": 6.34,
+   "Face_Brow_Arch_Up_Right": 6.37,
+   "Face_Brow_Height_Left": 5.5,
+   "Face_Brow_Height_Right": 5.5,
+   "Face_Brow_Height_Up_Left": 5.47,
+   "Face_Brow_Height_Up_Right": 5.49,
+   "Face_Brow_Ridge": 4.6,
+   "Face_Cheek_Fullness_Left": 5.9,
+   "Face_Cheek_Fullness_Right": 5.9,
+   "Face_Cheekbone_Left": 4.75,
+   "Face_Cheekbone_Right": 4.75,
+   "Face_Chin_Forward": 5.2,
+   "Face_Chin_Length": 5.76,
+   "Face_Chin_Width": 3.99,
+   "Face_Ear_Height_Left": 4.8,
+   "Face_Ear_Height_Right": 4.8,
+   "Face_Ear_Out_Left": 7.59,
+   "Face_Ear_Out_Right": 7.59,
+   "Face_Ear_Size_Left": 6.15,
+   "Face_Ear_Size_Right": 6.19,
+   "Face_Eye_Depth_Left": 4.2,
+   "Face_Eye_Depth_Right": 4.2,
+   "Face_Eye_Height_Left": 4.5,
+   "Face_Eye_Height_Right": 4.5,
+   "Face_Eye_Size_Left": 4.87,
+   "Face_Eye_Size_Right": 4.88,
+   "Face_Eye_Spacing_Left": 4.2,
+   "Face_Eye_Spacing_Right": 4.2,
+   "Face_Eye_Tilt_Left": 5.44,
+   "Face_Eye_Tilt_Right": 5.43,
+   "Face_Forehead_Height": 8.0,
+   "Face_Forehead_Slope": 5.5,
+   "Face_Head_Width": 5.19,
+   "Face_Jaw_Shift": 5.0,
+   "Face_Jaw_Width_Left": 6.08,
+   "Face_Jaw_Width_Right": 6.08,
+   "Face_Lip_Fullness_Lower": 4.95,
+   "Face_Lip_Fullness_Upper": 5.04,
+   "Face_Mouth_Height": 4.5,
+   "Face_Mouth_Width_Left": 4.8,
+   "Face_Mouth_Width_Right": 4.8,
+   "Face_Nose_Bridge": 4.59,
+   "Face_Nose_Length": 4.41,
+   "Face_Nose_Tilt": 4.42,
+   "Face_Nose_Tip": 4.84,
+   "Face_Nose_Width_Left": 4.41,
+   "Face_Nose_Width_Right": 4.41,
+   "Jaw_Forward": 5.5,
+   "Jaw_Left": 1.69,
+   "Jaw_Open": 19.15,
+   "Jaw_Right": 1.69,
+   "Lip_Corner_Pull_Left": 5.24,
+   "Lip_Corner_Pull_Right": 5.24,
+   "Lower_Lip_Lower": 5.22,
+   "Lower_Lip_Lower_Left": 5.22,
+   "Lower_Lip_Lower_Right": 5.22,
+   "Mouth_Frown_Left": 7.24,
+   "Mouth_Frown_Right": 7.24,
+   "Mouth_Left": 6.89,
+   "Mouth_Narrow": 9.3,
+   "Mouth_Open": 5.75,
+   "Mouth_Pucker": 14.65,
+   "Mouth_Right": 6.89,
+   "Mouth_Smile_Left": 13.14,
+   "Mouth_Smile_Right": 13.14,
+   "Mouth_Wide": 6.6,
+   "Nose_Sneer_Left": 7.09,
+   "Nose_Sneer_Right": 7.09,
+   "Tongue_Down": 0.0,
+   "Tongue_Out": 0.0,
+   "Tongue_Up": 0.0,
+   "Upper_Lip_Raise": 4.67,
+   "Upper_Lip_Raise_Left": 4.67,
+   "Upper_Lip_Raise_Right": 4.67
+  },
+  "rest": {
+   "feminine_lids_moved_mm": 3.96,
+   "lid_texels_softened": 6846,
+   "lining_vertices_lifted": 304,
+   "lips_closed_by_mm": {
+    "feminine": 2.39,
+    "masculine": 1.99
+   }
   }
  },
  "frame": {
@@ -908,7 +1211,7 @@
    "id": "head",
    "label": "Head",
    "map_index": 1,
-   "triangles": 7144
+   "triangles": 8168
   },
   {
    "id": "neck",
@@ -1009,16 +1312,37 @@
  },
  "teeth": {
   "feminine": {
-   "bag_to_skin_mm": 2.0,
-   "behind_lips_mm": 12.4,
+   "bag_moved_to_skin_mm": 5.0,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
    "points_in_flesh": 0,
-   "scale": 0.97
+   "scale": 0.85
   },
   "masculine": {
-   "bag_to_skin_mm": 2.0,
-   "behind_lips_mm": 8.3,
+   "bag_moved_to_skin_mm": null,
+   "behind_lips_mm": 2.7,
+   "bite_under_lips_mm": 1.6,
+   "faces_through_the_body": 0,
    "points_in_flesh": 0,
-   "scale": 0.94
+   "scale": 0.85
+  },
+  "of_bundle_size": 0.85,
+  "tongue_triangles": 432,
+  "triangles": {
+   "Gums": 1498,
+   "Teeth": 7094,
+   "Tongue": 432
+  },
+  "triangles_lod1": {
+   "Gums": 1320,
+   "Teeth": 6676,
+   "Tongue": 432
+  },
+  "triangles_lod2": {
+   "Gums": 246,
+   "Teeth": 1734,
+   "Tongue": 432
   }
  },
  "texture_coordinates": {

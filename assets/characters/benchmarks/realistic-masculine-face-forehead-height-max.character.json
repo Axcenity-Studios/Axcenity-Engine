@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-forehead-height-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "forehead_height": 1,
+    "frame": 0
+  }
+}

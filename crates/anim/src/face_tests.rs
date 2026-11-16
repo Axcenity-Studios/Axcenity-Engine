@@ -354,6 +354,158 @@ fn face_controls_turn_a_skinned_characters_eyes() {
     assert!(animators.poses().get(&part).is_none());
 }
 
+/// A character's eyes and teeth are parts of their own, which follow the
+/// body's bones by name (Character Studio's base models): the look and
+/// the jaw a face turns reach them, or the eyes would stare ahead and the
+/// lower teeth stay shut inside an open mouth.
+#[test]
+fn the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts() {
+    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
+    let mesh = |object: &str| format!("realistic/RealisticParts.glb#AxcenityRealistic/{object}");
+    let mut world = World::new();
+    let body = mesh_part(&mut world, &mesh("Body"));
+    let mut parts = Vec::new();
+    for (object, bone, degrees) in [("Eyes", "LeftEye", 30.0_f32), ("Teeth", "Jaw", 25.0)] {
+        let part = world.create(ClassName::MeshPart).unwrap();
+        world
+            .set_property(part, "MeshId", Value::String(mesh(object)))
+            .unwrap();
+        world.set_parent(part, Some(body)).unwrap();
+        parts.push((part, object, bone, degrees));
+    }
+    let face = face_controls(
+        &mut world,
+        body,
+        &[("Eye_Look_Left", 1.0), ("Jaw_Open", 1.0)],
+    );
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    let mut animators = Animators::new();
+    animators.update(&mut world, &assets, FRAME);
+    let errors = animators.take_errors();
+    assert!(errors.is_empty(), "{errors:?}");
+    for (part, object, bone, degrees) in parts {
+        let model = assets.model_blocking(&mesh(object)).unwrap();
+        let rig = model.rig.clone().unwrap();
+        let posed = animators
+            .poses()
+            .get(&part)
+            .unwrap_or_else(|| panic!("{object} follows the body"));
+        let turn = eye_turn(&rig, rig.bone(bone).unwrap(), posed);
+        let turned = turn.angle_between(Quat::IDENTITY).to_degrees();
+        assert!(
+            (turned - degrees).abs() < 1.0,
+            "{object}'s {bone} turned {turned} degrees, not {degrees}"
+        );
+    }
+}
+
+/// `Blink` and `Eye_Closed` both close a lid, and a head has a shape for
+/// each: a blink over an eye that is already closed (a sleepy face that
+/// blinks) closes only what is still open, or the lid would go on through
+/// the lower one.
+#[test]
+fn a_blink_closes_only_what_a_closed_eye_leaves_open() {
+    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
+    let mesh = "realistic/RealisticParts.glb#AxcenityRealistic/Body";
+    let model = assets.model_blocking(mesh).unwrap();
+    let mut world = World::new();
+    let body = mesh_part(&mut world, mesh);
+    let face = face_controls(
+        &mut world,
+        body,
+        &[
+            ("Eye_Closed_Left", 1.0),
+            ("Blink_Left", 1.0),
+            ("Eye_Closed_Right", 0.8),
+            ("Blink_Right", 0.5),
+        ],
+    );
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    let mut animators = Animators::new();
+    animators.update(&mut world, &assets, FRAME);
+    let errors = animators.take_errors();
+    assert!(errors.is_empty(), "{errors:?}");
+    let posed = animators.poses().get(&body).unwrap();
+    let weight = |name: &str| {
+        let index = model
+            .morph_targets
+            .iter()
+            .position(|target| target.name == name)
+            .unwrap_or_else(|| panic!("the body has no shape `{name}`"));
+        posed.morph_weights()[index]
+    };
+    assert!((weight("Eye_Closed_Left") - 1.0).abs() < 1e-4);
+    assert!(
+        weight("Blink_Left").abs() < 1e-4,
+        "{}",
+        weight("Blink_Left")
+    );
+    assert!((weight("Eye_Closed_Right") - 0.8).abs() < 1e-4);
+    assert!(
+        (weight("Blink_Right") - 0.2).abs() < 1e-4,
+        "{}",
+        weight("Blink_Right")
+    );
+}
+
+/// A squint, a raised cheek and a lowered brow each close part of the
+/// eye, and blend shapes add: a full blink over a laughing or a frowning
+/// face (the automatic blink, most of the time) would carry the upper lid
+/// on past the lower one. A blink closes only what they leave open.
+#[test]
+fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
+    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
+    let mesh = "realistic/RealisticParts.glb#AxcenityRealistic/Body";
+    let model = assets.model_blocking(mesh).unwrap();
+    let mut world = World::new();
+    let body = mesh_part(&mut world, mesh);
+    let face = face_controls(
+        &mut world,
+        body,
+        &[
+            ("Eye_Squint_Left", 0.5),
+            ("Cheek_Raise_Left", 1.0),
+            ("Blink_Left", 1.0),
+            ("Brow_Lower_Right", 0.5),
+            ("Eye_Closed_Right", 0.25),
+            ("Blink_Right", 1.0),
+        ],
+    );
+    world
+        .set_property(face, "ProceduralEnabled", Value::Bool(false))
+        .unwrap();
+    let mut animators = Animators::new();
+    animators.update(&mut world, &assets, FRAME);
+    let errors = animators.take_errors();
+    assert!(errors.is_empty(), "{errors:?}");
+    let posed = animators.poses().get(&body).unwrap();
+    let weight = |name: &str| {
+        let index = model
+            .morph_targets
+            .iter()
+            .position(|target| target.name == name)
+            .unwrap_or_else(|| panic!("the body has no shape `{name}`"));
+        posed.morph_weights()[index]
+    };
+    // What narrows the eye is left as it was.
+    assert!((weight("Eye_Squint_Left") - 0.5).abs() < 1e-4);
+    assert!((weight("Cheek_Raise_Left") - 1.0).abs() < 1e-4);
+    assert!(
+        (weight("Blink_Left") - (1.0 - 0.5 * 0.71 - 0.31)).abs() < 1e-4,
+        "{}",
+        weight("Blink_Left")
+    );
+    assert!(
+        (weight("Blink_Right") - (1.0 - 0.25 - 0.5 * 0.26)).abs() < 1e-4,
+        "{}",
+        weight("Blink_Right")
+    );
+}
+
 #[test]
 fn face_controls_set_a_still_models_blend_shapes() {
     let folder =
@@ -580,14 +732,17 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
     assert_eq!(at(&compose(&mut world, 0.0), "Mouth_Smile_Left"), 0.25);
 
     // The eyes blink by themselves within the longest wait between
-    // blinks, and the expression stays on.
+    // blinks, and the expression stays on. Happy's squint (0.3, through
+    // the mask) has the lids 0.21 of the way shut already, and the blink
+    // closes the rest.
     let mut motion = crate::face_play::FaceMotion::new(3);
     let mut closed = 0.0f32;
     for _ in 0..(7.0 / FRAME) as usize {
         let controls = compose_with(&mut world, &mut motion, FRAME);
+        assert!((at(&controls, "Eye_Squint_Left") - 0.3).abs() < 1e-4);
         closed = closed.max(at(&controls, "Blink_Left").min(at(&controls, "Blink_Right")));
     }
-    assert!(closed > 0.9, "{closed}");
+    assert!((closed - (1.0 - 0.71 * 0.3)).abs() < 1e-3, "{closed}");
     assert_eq!(world.face(face).unwrap().expressions.len(), 1);
 }
 
