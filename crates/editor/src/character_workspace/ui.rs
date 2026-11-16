@@ -513,8 +513,25 @@ impl CharacterWorkspace {
             return;
         };
         let data = category.data();
+        let chosen = super::chosen_slots(&self.library(), &self.description().base);
+        let palette = theme::palette(ui.ctx());
+        if base
+            .slots
+            .iter()
+            .any(|slot| Some(slot.category) == data && chosen.contains(&slot.id))
+        {
+            ui.label(
+                egui::RichText::new("Underwear comes with the body type (Male or Female).")
+                    .color(palette.text_weak),
+            );
+            ui.add_space(8.0);
+        }
         let mut any = false;
-        for slot in base.slots.iter().filter(|slot| Some(slot.category) == data) {
+        for slot in base
+            .slots
+            .iter()
+            .filter(|slot| Some(slot.category) == data && !chosen.contains(&slot.id))
+        {
             let items = self.items_for(&slot.id);
             let worn = self.worn_in(&slot.id);
             if items.is_empty() && worn.is_none() {
@@ -536,7 +553,6 @@ impl CharacterWorkspace {
             ui.add_space(10.0);
         }
         if !any {
-            let palette = theme::palette(ui.ctx());
             ui.label(
                 egui::RichText::new(format!(
                     "Nothing in the library fits the {} body here yet.",

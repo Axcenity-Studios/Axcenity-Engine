@@ -134,7 +134,8 @@ pub(crate) fn parameter(
     Ok(as_written(held.unwrap_or(parameter.default)))
 }
 
-/// Sets the parameter `id` to `value`, clamped to the manifest's range.
+/// Sets the parameter `id` to `value`, clamped to the manifest's range;
+/// one with choices (Male or Female) also wears what the nearest wears.
 pub(crate) fn set_parameter(
     library: &Library,
     description: &mut Description,
@@ -151,7 +152,34 @@ pub(crate) fn set_parameter(
     let [from, to] = parameter.range;
     let value = (value as f32).clamp(from.min(to), from.max(to));
     description.parameters.insert(id.to_owned(), value);
+    // A parameter with choices (Male or Female) wears what the choice does.
+    axcenity_avatar::wear_choice(description, library, parameter, value);
     Ok(())
+}
+
+/// An error when `slot` is one a parameter's choices fill (the realistic
+/// body's underwear, which follows Male or Female): it can't be changed.
+fn not_chosen(library: &Library, base: &BaseManifest, slot: &str) -> Result<(), String> {
+    if !axcenity_avatar::chosen_slots(library, &base.id)
+        .iter()
+        .any(|s| s == slot)
+    {
+        return Ok(());
+    }
+    let by = base
+        .parameters
+        .iter()
+        .find(|parameter| {
+            parameter
+                .choices
+                .iter()
+                .flat_map(|c| &c.items)
+                .any(|id| library.item(id).is_some_and(|item| item.slot == slot))
+        })
+        .map_or("a choice", |parameter| parameter.id.as_str());
+    Err(format!(
+        "the `{slot}` slot comes with `{by}` and can't be changed or emptied; set `{by}` instead"
+    ))
 }
 
 /// Checks that `base` has the slot `slot`.
@@ -170,7 +198,8 @@ fn known_slot<'a>(base: &'a BaseManifest, slot: &str) -> Result<&'a axcenity_ava
 /// The new item takes the place in the list of the slot's first; one worn
 /// already stays where it is with its own material values. An error,
 /// changing nothing, when the library hasn't the item, it doesn't fit the
-/// base model, `slot` isn't its slot, or it hasn't the variant.
+/// base model, `slot` isn't its slot, it hasn't the variant, or the slot
+/// comes with a parameter's choice (the realistic body's underwear).
 pub(crate) fn set_item(
     library: &Library,
     description: &mut Description,
@@ -185,6 +214,7 @@ pub(crate) fn set_item(
     if !item.bases.contains(&base.id) {
         return Err(format!("`{id}` doesn't fit the base model `{}`", base.id));
     }
+    not_chosen(library, base, slot)?;
     if item.slot != slot {
         return Err(format!(
             "`{id}` goes in the `{}` slot, not `{slot}`",
@@ -235,7 +265,9 @@ pub(crate) fn set_item(
 }
 
 /// Takes off every item in `slot`. A slot the base model hasn't is an
-/// error (a mistyped name would otherwise do nothing, silently).
+/// error (a mistyped name would otherwise do nothing, silently), and so is
+/// one that comes with a parameter's choice (the realistic body's
+/// underwear can't be taken off).
 pub(crate) fn remove_item(
     library: &Library,
     description: &mut Description,
@@ -243,6 +275,7 @@ pub(crate) fn remove_item(
 ) -> Result<(), String> {
     let base = base_of(library, description)?;
     known_slot(base, slot)?;
+    not_chosen(library, base, slot)?;
     description
         .items
         .retain(|worn| !library.item(&worn.id).is_some_and(|item| item.slot == slot));

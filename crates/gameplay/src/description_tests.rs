@@ -272,6 +272,35 @@ fn removing_a_slots_item_leaves_the_others_and_an_unknown_slot_is_an_error() {
     assert!(why.contains("hair"), "it names the slots there are: {why}");
 }
 
+/// The realistic body's underwear comes with Male or Female: a script
+/// can't take it off or swap it, and setting the frame dresses for it.
+#[test]
+fn a_script_cant_take_off_the_realistic_underwear() {
+    let library = shipped();
+    let mut character = default_description(&library, "axcenity/realistic");
+    assert_eq!(worn(&character), ["axcenity/realistic-boxer-briefs"]);
+    let why = remove_item(&library, &mut character, "underwear_bottom").unwrap_err();
+    assert!(why.contains("comes with `frame`"), "{why}");
+    let why = set_item(
+        &library,
+        &mut character,
+        "underwear_bottom",
+        "axcenity/realistic-briefs",
+        None,
+    )
+    .unwrap_err();
+    assert!(why.contains("can't be changed"), "{why}");
+    assert_eq!(worn(&character), ["axcenity/realistic-boxer-briefs"]);
+
+    set_parameter(&library, &mut character, "frame", 1.0).unwrap();
+    let mut items = worn(&character);
+    items.sort();
+    assert_eq!(
+        items,
+        ["axcenity/realistic-briefs", "axcenity/realistic-sports-bra"]
+    );
+}
+
 #[test]
 fn a_material_value_is_checked_against_its_slots_shading_model() {
     let library = shipped();

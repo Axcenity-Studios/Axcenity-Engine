@@ -36,7 +36,10 @@ use std::time::{Duration, Instant};
 
 use axcenity_anim::Animators;
 use axcenity_assets::Assets;
-use axcenity_avatar::{BaseManifest, Description, Library, Parameter, WornItem};
+pub use axcenity_avatar::chosen_slots;
+use axcenity_avatar::{
+    BaseManifest, Description, Library, Parameter, WornItem, wear_choice, wear_choices,
+};
 use axcenity_core::{InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
 use axcenity_gameplay::description as applier;
@@ -184,34 +187,10 @@ pub fn offers_base(library: &Library, id: &str) -> bool {
 }
 
 /// Sets `parameter` to `value` in `description` and, if the parameter has
-/// choices, wears what the chosen one names (in their slots), taking off
-/// what the other choices name.
+/// choices, wears what the chosen one names ([`wear_choice`]).
 fn choose(description: &mut Description, library: &Library, parameter: &Parameter, value: f32) {
     description.parameters.insert(parameter.id.clone(), value);
-    let Some(chosen) = parameter.nearest_choice(value) else {
-        return;
-    };
-    let others: Vec<&String> = parameter
-        .choices
-        .iter()
-        .filter(|choice| *choice != chosen)
-        .flat_map(|choice| &choice.items)
-        .filter(|id| !chosen.items.contains(id))
-        .collect();
-    description.items.retain(|worn| !others.contains(&&worn.id));
-    for id in &chosen.items {
-        let Some(item) = library.item(id) else {
-            continue;
-        };
-        if !item.bases.contains(&description.base) {
-            continue;
-        }
-        let slot = item.slot.clone();
-        description
-            .items
-            .retain(|worn| library.item(&worn.id).is_none_or(|it| it.slot != slot));
-        description.items.push(WornItem::new(id.clone()));
-    }
+    wear_choice(description, library, parameter, value);
 }
 
 /// A parameter's label for a slider that edits it and its mirror together:
@@ -726,7 +705,8 @@ impl CharacterWorkspace {
 }
 
 /// `description` with every parameter in its base model's range (one with
-/// choices at the nearest), unknown parameters dropped and a name.
+/// choices at the nearest, wearing what that choice wears), unknown
+/// parameters dropped and a name.
 fn tidy(mut description: Description, library: &Library) -> Description {
     if let Some(base) = library.base(&description.base) {
         description
@@ -741,6 +721,9 @@ fn tidy(mut description: Description, library: &Library) -> Description {
                 }
             }
         }
+        // What a choice wears is always on: it can't be taken off, and an
+        // older file without it gets it.
+        wear_choices(&mut description, library);
     }
     if description.name.trim().is_empty() {
         description.name = "New Character".to_owned();
