@@ -180,6 +180,81 @@ def unfold(mesh, P, sets, rounds=40):
     return P, found or 0
 
 
+# The fold under the chest: the sharpest inward bend this mesh's 25 mm
+# quads can carry without stepping, in degrees between neighbouring faces.
+FOLD = 24.0
+# And the sharpest outward bend, for the ridge of the breast's underside
+# just above the fold: sharper than this it shows as facets from below.
+RIDGE = 26.0
+
+
+def soften_folds(mesh, P, sets, mirror, rounds=60):
+    """`P` with the fold under each side of the chest softened to what
+    the mesh can hold. The bundle's feminine body has a sharp fold under
+    the breast (up to 58 degrees between faces) that runs askew over quads
+    25 mm wide, so it shows as stair-steps and a notch at its outer end.
+    The vertices of the edges that fold inward by more than `FOLD`
+    degrees there (or bend outward by more than `RIDGE`, on the ridge of
+    the breast's underside above the fold), and their neighbours, are moved toward the middle of
+    their own neighbours, a little at a time, until no edge does: the
+    breast keeps its form and meets the ribs in a curve. Both sides are
+    kept mirror images. Returns the positions, how many edges were over
+    the limit and the sharpest of them (degrees)."""
+    import bmesh
+
+    from common import FS_TORSO, edge_neighbours
+    nbr = edge_neighbours(mesh)
+    P = [p.copy() for p in P]
+    low = min(p.z for p in P)
+    height = max(p.z for p in P) - low
+    found, sharpest = None, 0.0
+    for _ in range(rounds):
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bm.verts.ensure_lookup_table()
+        for v in bm.verts:
+            v.co = P[v.index]
+        bm.normal_update()
+        over = set()
+        worst = 0.0
+        for e in bm.edges:
+            if len(e.link_faces) != 2:
+                continue
+            f, g = e.link_faces
+            if sets[f.index] != FS_TORSO or sets[g.index] != FS_TORSO:
+                continue
+            mid = (e.verts[0].co + e.verts[1].co) / 2
+            down = (height - (mid.z - low)) / height
+            # Under the chest, on the front and round to the side (the fold's
+            # outer end), off the middle line and below the armpit.
+            if not (0.265 < down < 0.355 and 0.03 < abs(mid.x) < 0.21 * height / 1.75 and mid.y < -0.005):
+                continue
+            inward = (g.calc_center_median() - f.calc_center_median()).dot(f.normal) > 0
+            angle = math.degrees(f.normal.angle(g.normal, 0.0))
+            if angle > (FOLD if inward else RIDGE):
+                over.update(v.index for v in e.verts)
+                worst = max(worst, angle)
+        bm.free()
+        if found is None:
+            found, sharpest = len(over), worst
+        if not over:
+            break
+        move = set(over)
+        move |= {n for v in over for n in nbr[v]}
+        if mirror is not None:
+            move |= {mirror[v] for v in move}
+        new = {v: P[v].lerp(sum((P[n] for n in nbr[v]), Vector()) / len(nbr[v]), 0.35) for v in move}
+        for v, at in new.items():
+            P[v] = at
+        if mirror is not None:
+            for v in move:
+                m = P[mirror[v]]
+                mean = (P[v] + Vector((-m.x, m.y, m.z))) / 2
+                P[v] = mean
+                P[mirror[v]] = Vector((-mean.x, mean.y, mean.z))
+    return P, found or 0, sharpest
+
+
 def load():
     """The masculine body object (faces, face sets and texture coordinates
     as vendored, in the bundle's pose), its landmarks, both frames re-posed
@@ -207,5 +282,13 @@ def load():
         if scale is None:
             scale = HEIGHT / (max(p.z for p in Q) - min(p.z for p in Q))
         Q, _ = unfold(masc.data, _stand(Q, scale), sets)
+        # Only the feminine frame: the masculine body's sharpest fold there is
+        # its pectoral's lower edge (36 degrees), which holds its line.
+        folds = 0
+        if name == "Feminine":
+            Q, folds, sharpest = soften_folds(masc.data, Q, sets, mirror)
+        if folds:
+            print(f"  {name}: {folds} vertices on folds under the chest sharper than {FOLD:g} degrees "
+                  f"(the sharpest {sharpest:.0f}), softened")
         frames[name] = Frame(Q, lm)
     return masc, lm, frames, source

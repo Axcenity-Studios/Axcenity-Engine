@@ -42,11 +42,16 @@ BUILDS = {
         "muscular": {"muscle": 1.0},
         "heavy-muscular": {"build": 1.0, "muscle": 1.0},
     },
-    # The realistic base's fat and muscle layers (CO5).
+    # The realistic base's muscle and fat sliders (CO5): each alone at an
+    # end, and the four corners of the two together. `fat` is the body's
+    # weight: with little muscle it is fat, with much it is bulk.
     "axcenity/realistic": {
-        "slim": {"fat": 0.0, "muscle": 0.0, "weight": -1.0},
+        "slim": {"fat": -1.0},
         "heavy": {"fat": 1.0},
         "muscular": {"muscle": 1.0},
+        "slight": {"fat": -1.0, "muscle": -1.0},
+        "heavy-soft": {"fat": 1.0, "muscle": -1.0},
+        "lean-muscular": {"fat": -1.0, "muscle": 1.0},
         "heavy-muscular": {"fat": 1.0, "muscle": 1.0},
     },
 }

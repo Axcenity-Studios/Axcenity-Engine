@@ -357,6 +357,136 @@ class Run:
         take("hip_flex_100 from behind", ((1.0, 1.3, 0.75), (0.09, 0.05, 0.80), 85), pose="hip_flex_100")
         self.save("details", tiles, 4, labels, "Details: eyes, mouth, hands, feet and the joints' other sides")
 
+    def build_grid(self, frame):
+        """The body over muscle (across) by fat (down), clay: the two
+        whole-body sliders at their ends and their middle."""
+        ch, cam = self.scene(self.a.parts, 300, 400)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        Q.turn_character(ch, 25)
+        tiles, labels = [], []
+        for fat in (1.0, 0.0, -1.0):
+            for muscle in (-1.0, 0.0, 1.0):
+                ch.set_sliders({"frame": value, "muscle": muscle, "fat": fat})
+                tiles.append(self.tile(cam, f"build_{frame}_{muscle}_{fat}", ((0.0, -4.72, 0.95), (0.0, 0.0, 0.92), 85)))
+                labels.append(f"muscle {muscle:+g}, fat {fat:+g}")
+        Q.turn_character(ch, 0)
+        self.save(f"build_grid_{frame}", tiles, 3, labels, f"Muscle by fat, {frame}, clay", grey=True)
+
+    def build_details(self, frame):
+        """The trunk close up, front and back, at the sliders' corners:
+        the sheet to judge the anatomy by."""
+        ch, cam = self.scene(self.a.parts, 360, 440)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        looks = [("neutral", {}), ("heavy and soft", {"muscle": -1.0, "fat": 1.0}),
+                 ("heavy and muscular", {"muscle": 1.0, "fat": 1.0}), ("heavy", {"fat": 1.0}),
+                 ("slim", {"fat": -1.0}), ("slight", {"muscle": -1.0, "fat": -1.0}),
+                 ("muscular", {"muscle": 1.0}), ("lean and muscular", {"muscle": 1.0, "fat": -1.0})]
+        tiles, labels = [], []
+        for turn, side in ((15, "front"), (195, "back")):
+            Q.turn_character(ch, turn)
+            for name, values in looks:
+                ch.set_sliders(dict(values, frame=value))
+                tiles.append(self.tile(cam, f"detail_{frame}_{side}_{name}", ((0.0, -2.6, 1.18), (0.0, 0.0, 1.14), 85)))
+                labels.append(f"{name}, {side}")
+        Q.turn_character(ch, 0)
+        self.save(f"build_details_{frame}", tiles, 4, labels, f"The trunk at the sliders' corners, {frame}, clay",
+                  grey=True)
+
+    def build_regions(self, frame):
+        """Each region's fat and muscle slider alone, at 1 (and the
+        whole-body sliders at 0), clay."""
+        ch, cam = self.scene(self.a.parts, 260, 400)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        regions = [p["id"][len("fat_"):] for p in ch.manifest["parameters"] if p["id"].startswith("fat_")]
+        Q.turn_character(ch, 25)
+        tiles, labels = [], []
+        for kind in ("fat", "muscle"):
+            for region in regions:
+                ch.set_sliders({"frame": value, f"{kind}_{region}": 1.0})
+                tiles.append(self.tile(cam, f"region_{frame}_{kind}_{region}", ((0.0, -3.3, 1.12), (0.0, 0.0, 1.09), 85)))
+                labels.append(f"{kind}_{region} +1")
+        Q.turn_character(ch, 0)
+        self.save(f"build_regions_{frame}", tiles, len(regions), labels, f"One region's slider at a time, {frame}, clay",
+                  grey=True)
+
+    def shoulders(self, frame):
+        """The raised shoulder close up, clay under one raking light (flat
+        studio clay hides steps and notches): the arm at 150 degrees
+        from the front, the back and above, the arm level, and the
+        starter animations' Cheer at 0.8 s (which also raises the
+        collarbones) from the front and the back."""
+        ch, cam = self.scene(self.a.parts, 520, 520)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = 0.0 if frame == "masculine" else 1.0
+        ch.set_sliders({"frame": value})
+        at = ch.head("LeftUpperArm")
+        centre = (at.x + 0.05, 0.0, at.z + 0.06)
+        tiles, labels = [], []
+        views = [("shoulder_abd_150", "front", (centre[0], -1.7, centre[2] + 0.05), False),
+                 ("shoulder_abd_150", "back", (centre[0], 1.7, centre[2] + 0.05), True),
+                 ("shoulder_abd_150", "above", (centre[0] - 0.25, -0.5, centre[2] + 1.7), False),
+                 ("shoulder_abd_90", "front", (centre[0], -1.7, centre[2] + 0.05), False),
+                 ("shoulder_abd_90", "back", (centre[0], 1.7, centre[2] + 0.05), True)]
+        light = None
+        for pose, side, pos, back in views:
+            Q.apply_pose(ch, pose)
+            if light is not None:
+                bpy.data.objects.remove(light)
+            light = Q.raking_light(centre, back=back)
+            tiles.append(self.tile(cam, f"shoulder_{frame}_{pose}_{side}", (pos, centre, 85)))
+            labels.append(f"{pose}, {side}")
+        take_arm, actions = Q.load_takes(self.a.clips)
+        start, end = actions["Cheer"].frame_range
+        share = min(1.0, 0.8 * bpy.context.scene.render.fps / max(end - start, 1e-6))
+        Q.pose_take(ch, take_arm, actions["Cheer"], share, retarget=True)
+        mid = (0.0, 0.0, at.z + 0.08)
+        for side, y, back in (("front", -2.9, False), ("back", 2.9, True)):
+            bpy.data.objects.remove(light)
+            light = Q.raking_light(mid, back=back)
+            tiles.append(self.tile(cam, f"shoulder_{frame}_cheer_{side}", ((0.0, y, mid[2] + 0.1), mid, 85)))
+            labels.append(f"Cheer at 0.8 s, {side}")
+        ch.pose_reset()
+        self.save(f"shoulders_{frame}", tiles, 4, labels,
+                  f"The raised shoulder, {frame}, clay under a raking light", grey=True)
+
+    def chest(self, frame):
+        """The chest close up at rest, clay under one lamp from the side:
+        the default body, the heavy and soft one and the slim one, from
+        the front, three-quarter and below. `frame` is `feminine` or
+        `blend` (halfway). For the fold under the breast, which the flat
+        studio doesn't show."""
+        ch, cam = self.scene(self.a.parts, 440, 440)
+        Q.clay_parts(ch.parts.values(), Q.clay_kind)
+        ch.show_only(["Body", "Eyes", "Teeth"])
+        value = {"masculine": 0.0, "feminine": 1.0, "blend": 0.5}[frame]
+        z = ch.head("LeftUpperArm").z - 0.16
+        centre = (0.0, -0.05, z)
+        builds = [("default", {}), ("heavy and soft", {"muscle": -1.0, "fat": 1.0}), ("slim", {"fat": -1.0})]
+        views = [("front", 0, (0.0, -1.5, z + 0.03)), ("three-quarter", 40, (0.0, -1.5, z + 0.03)),
+                 ("from below", 0, (0.0, -0.95, z - 0.95))]
+        tiles, labels = [], []
+        light = None
+        for name, values in builds:
+            ch.pose_reset()
+            ch.set_sliders(dict(values, frame=value))
+            for view, turn, pos in views:
+                Q.turn_character(ch, turn)
+                if light is not None:
+                    bpy.data.objects.remove(light)
+                light = Q.raking_light(centre)
+                tiles.append(self.tile(cam, f"chest_{frame}_{name}_{view}", (pos, centre, 85)))
+                labels.append(f"{name}, {view}")
+        Q.turn_character(ch, 0)
+        self.save(f"chest_{frame}", tiles, 3, labels, f"The chest at rest, {frame}, clay under a lamp from the side",
+                  grey=True)
+
     def twist_poses(self):
         """The limbs turned about their length, clay with wireframe: a
         forearm, an upper arm and a thigh (measure.py's twist poses), and
@@ -528,6 +658,16 @@ def main():
     r = Run(a)
     only = [s for s in a.only.split(",") if s] or (SHEETS if a.package == "stylized" else BARE_SHEETS)
     for s in only:
+        if s.startswith("chest_"):
+            r.chest(s.split("_", 1)[1])
+            continue
+        if s.startswith("shoulders_"):
+            r.shoulders(s.split("_", 1)[1])
+            continue
+        if s.startswith("build_"):
+            kind, frame = s.rsplit("_", 1)
+            getattr(r, kind)(frame)
+            continue
         if s.startswith("turnaround_"):
             r.turnaround(s.split("_", 1)[1])
         else:

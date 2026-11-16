@@ -1,0 +1,71 @@
+   Compiling axcenity-avatar v0.2.0-alpha.1 (<home>\Desktop\axcenity-co5-spike\crates\avatar)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.83s
+────────────
+ Nextest run ID b7837819-bf6c-43ed-869a-9313b03fff26 with nextest profile: default
+    Starting 3 tests across 1 binary (2 binaries skipped)
+        FAIL [   0.079s] (1/3) axcenity-avatar::realistic_parameters the_realistic_base_has_its_body_parameters
+  stdout ───
+
+    running 1 test
+    test the_realistic_base_has_its_body_parameters ... FAILED
+
+    failures:
+
+    failures:
+        the_realistic_base_has_its_body_parameters
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s
+
+  stderr ───
+
+    thread 'the_realistic_base_has_its_body_parameters' (36300) panicked at crates\avatar\tests\realistic_parameters.rs:79:9:
+    muscle
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   1.008s] (2/3) axcenity-avatar::realistic_parameters muscle_and_fat_make_four_different_corners
+  stdout ───
+
+    running 1 test
+    test muscle_and_fat_make_four_different_corners ... FAILED
+
+    failures:
+
+    failures:
+        muscle_and_fat_make_four_different_corners
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.00s
+
+  stderr ───
+
+    thread 'muscle_and_fat_make_four_different_corners' (35300) panicked at crates\avatar\tests\realistic_parameters.rs:174:17:
+    frame 0: corners 0 and 1 are 0 m apart
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   1.008s] (3/3) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+  stdout ───
+
+    running 1 test
+    test every_parameter_moves_the_body_and_its_simpler_copies ... FAILED
+
+    failures:
+
+    failures:
+        every_parameter_moves_the_body_and_its_simpler_copies
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.98s
+
+  stderr ───
+
+    thread 'every_parameter_moves_the_body_and_its_simpler_copies' (30424) panicked at crates\avatar\tests\realistic_parameters.rs:147:5:
+    assertion `left == right` failed
+      left: 19
+     right: 55
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   1.009s] 3 tests run: 0 passed, 3 failed, 0 skipped
+        FAIL [   0.079s] (1/3) axcenity-avatar::realistic_parameters the_realistic_base_has_its_body_parameters
+        FAIL [   1.008s] (2/3) axcenity-avatar::realistic_parameters muscle_and_fat_make_four_different_corners
+        FAIL [   1.008s] (3/3) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+error: test run failed
+exit 100

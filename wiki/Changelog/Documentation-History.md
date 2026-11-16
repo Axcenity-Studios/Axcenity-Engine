@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-14 | Characters, Animation, Known limitations, Roadmap | Character Studio overhaul CO5 (body parameters): the realistic body's muscle, fat and proportion parameters, pose-driven corrective shapes in `anim` (`correctives.rs`), the raised shoulder's open measure |
 | 2026-11-14 | Characters, Animation, Known limitations, Roadmap | Character Studio overhaul CO4 (the realistic base body): the `axcenity/realistic` base model, twist and helper bones turned by name in `anim` (`twist.rs`), takes named like a body of other proportions played through roles, the measured results and what is still short | Claude |
 | 2026-11-14 | Characters | Character Studio overhaul CO2: the in-engine character capture (`character_capture.rs`) and the benchmark characters | Claude |
 | 2026-11-14 | ADR-0038 (new, Proposed), ADR index, Characters, Animation, Character Data, Gameplay systems, System inventory, System dependencies, File formats, Roadmap, Known limitations, Home | Character Studio overhaul CO3 (the runtime applier): descriptions applied to characters, identity baked into derived models named by `MeshId`, bone changes after the clips, followers' live blend shapes, material value attributes, the project's character library | Claude |

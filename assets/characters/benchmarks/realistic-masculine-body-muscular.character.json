@@ -1,0 +1,9 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-body-muscular",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "muscle": 1
+  }
+}

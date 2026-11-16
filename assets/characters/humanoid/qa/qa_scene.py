@@ -63,6 +63,48 @@ JAW_OPEN_DEG = 25.0  # crates/assets/src/face_profile.rs: jaw_open limit
 BUILDS = ("Build_Heavy", "Build_Slim", "Build_Muscular")
 
 
+def load_manifest(parts_path):
+    """The base model manifest beside a parts file (None if it has none)."""
+    folder = os.path.dirname(parts_path)
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".base.json"):
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def span(value, source=None, to=None):
+    """`avatar::span`: a value through its `from` span onto its `to` span."""
+    source = source or [0.0, 1.0]
+    to = to or source
+    length = source[1] - source[0]
+    if length == 0:
+        return to[0]
+    t = min(1.0, max(0.0, (value - source[0]) / length))
+    return to[0] + (to[1] - to[0]) * t
+
+
+def manifest_weights(manifest, values):
+    """{shape: weight} for slider `values` ({parameter id: value}; the
+    rest at their defaults) by the manifest's rule, as `avatar::resolve`
+    does it: each parameter's shape drivers plus each corner's product
+    of factors."""
+    value = {}
+    for p in manifest["parameters"]:
+        v = values.get(p["id"], p.get("default", 0.0))
+        value[p["id"]] = min(p["range"][1], max(p["range"][0], v))
+    out = {}
+    for p in manifest["parameters"]:
+        for d in p.get("shapes", []):
+            out[d["shape"]] = out.get(d["shape"], 0.0) + span(value[p["id"]], d.get("from"), d.get("to"))
+    for c in manifest.get("corners", []):
+        w = 1.0
+        for f in c["factors"]:
+            w *= span(value[f["parameter"]], f.get("from"), f.get("to"))
+        out[c["shape"]] = out.get(c["shape"], 0.0) + w
+    return out
+
+
 def load_custom(path=CUSTOM_PATH):
     """A package's customization data, in the stylized file's layout. The
     realistic package's build data (`frame`, `twists`, `helpers`) is read
@@ -113,6 +155,7 @@ class Character:
                 self.defaults[name] = {kb.name: kb.value for kb in sk.key_blocks[1:]}
                 for kb in sk.key_blocks[1:]:
                     kb.slider_min = -1.0
+        self.manifest = load_manifest(path)
 
     @staticmethod
     def _mode(obj, mode):
@@ -162,6 +205,86 @@ class Character:
         self.look = {"frame": frame, "face": dict(face or {})}
         self.set_eyes()
         update()
+
+    def set_sliders(self, values):
+        """The look the manifest gives slider `values` ({parameter id:
+        value}): every shape it drives, and the frame's bones and eyes."""
+        w = manifest_weights(self.manifest, values)
+        self.set_look(frame=values.get("frame", 0.0), build=w)
+
+    def set_body_sliders(self, values):
+        """The rest pose reshaped by `anim`'s body sliders ({attribute:
+        value}, 1 changes nothing), as `anim::BodyShape::apply` reshapes
+        a pose: bones stretched along their length (`BodyHeight`,
+        `LegLength`, `ArmLength`, `ShoulderWidth`), widened
+        (`ShoulderWidth`, `WaistWidth`, `HipWidth`) or grown with
+        everything on them (`HeadSize`, `HandSize`, `FootSize`), each
+        bone's scale its own and its children moved along with it; the
+        hips raised by what the legs gained. Twist and helper bones take
+        their limb's and their joint's scale, as `twist.rs` gives them.
+        Only for the rest pose: it places every bone itself."""
+        get = lambda name: float(values.get(name, 1.0))  # noqa: E731
+        bones = self.arm.data.bones
+        scale = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+        mult = {b.name: Vector((1.0, 1.0, 1.0)) for b in bones}
+
+        def stretch(name, factor, axis=1):
+            if name in scale:
+                scale[name][axis] *= factor
+                for child in bones[name].children:
+                    mult[child.name][axis] *= factor
+
+        def grow(name, factor):
+            if name not in scale or factor == 1.0:
+                return
+            scale[name] *= factor
+            for child in bones[name].children_recursive:
+                scale[child.name] *= factor
+                mult[child.name] *= factor
+
+        height, arms, shoulders = get("BodyHeight"), get("ArmLength"), get("ShoulderWidth")
+        legs = get("LegLength") * height
+        for name in ("Spine", "Chest", "UpperChest"):
+            stretch(name, height)
+        for side, _ in SIDES:
+            for name in ("UpperLeg", "LowerLeg"):
+                stretch(side + name, legs)
+            for name in ("UpperArm", "LowerArm"):
+                stretch(side + name, arms)
+            stretch(side + "Shoulder", shoulders)
+        stretch("UpperChest", math.sqrt(shoulders), axis=0)
+        stretch("Spine", get("WaistWidth"), axis=0)
+        stretch("Hips", get("HipWidth"), axis=0)
+        grow("Head", get("HeadSize"))
+        for side, _ in SIDES:
+            grow(side + "Hand", get("HandSize"))
+            grow(side + "Foot", get("FootSize"))
+        # The driven bones: a twist bone takes its limb's scale, a helper its joint's, and sits on it.
+        local = {b.name: (b.parent.matrix_local.inverted() @ b.matrix_local if b.parent else b.matrix_local.copy())
+                 for b in bones}
+        moved = {name: Vector([m.to_translation()[k] * mult[name][k] for k in range(3)]) for name, m in local.items()}
+        for t in self.custom.get("twists", []):
+            for side, _ in SIDES:
+                if side + t["bone"] in scale:
+                    scale[side + t["bone"]] = scale[side + t["inside"]].copy()
+        for h in self.custom.get("helpers", []):
+            for side, _ in SIDES:
+                name, reads = side + h["bone"], side + h["reads"]
+                if name in scale:
+                    scale[name] = scale[reads].copy()
+                    moved[name] = moved[reads] + (local[name].to_translation() - local[reads].to_translation())
+        if legs != 1.0:
+            length = lambda a, b: (bones[b].head_local - bones[a].head_local).length  # noqa: E731
+            leg = length("LeftUpperLeg", "LeftLowerLeg") + length("LeftLowerLeg", "LeftFoot")
+            up = bones["Hips"].parent.matrix_local.to_3x3().inverted() @ UP if bones["Hips"].parent else UP
+            moved["Hips"] = moved["Hips"] + up * leg * (legs - 1.0)
+        # Parents first: each bone at its moved place in its parent's unscaled frame, with its own scale.
+        frame = {}
+        for b in bones:
+            parent = frame[b.parent.name] if b.parent else Matrix()
+            frame[b.name] = parent @ Matrix.Translation(moved[b.name]) @ local[b.name].to_3x3().to_4x4()
+            self.arm.pose.bones[b.name].matrix = frame[b.name] @ Matrix.Diagonal(scale[b.name]).to_4x4()
+            update()
 
     def set_frame_bones(self, frame):
         """Moves the rest skeleton by Frame_Feminine's bone offsets (eyes
@@ -240,6 +363,7 @@ class Character:
     def pose_reset(self):
         for pb in self.arm.pose.bones:
             pb.matrix_basis = Matrix()
+        self.set_correctives({})
         self.set_eyes()
         update()
 
@@ -291,6 +415,32 @@ class Character:
                 at = rest.to_translation() + (src.to_translation() - src_rest.to_translation())
                 local = Matrix.Translation(at) @ (part.to_matrix() @ rest.to_3x3()).to_4x4()
                 pb.matrix_basis = rest.inverted() @ local
+
+    def set_correctives(self, weights):
+        """Sets the pose-driven shapes (the customization data's
+        `correctives`) on every part that has them; the ones not in
+        `weights` to 0."""
+        for rule in self.custom.get("correctives", []):
+            for o in self.parts.values():
+                sk = o.data.shape_keys
+                if sk and rule["shape"] in sk.key_blocks:
+                    sk.key_blocks[rule["shape"]].value = weights.get(rule["shape"], 0.0)
+
+    def drive_correctives(self):
+        """Leans on the pose-driven shapes for the pose the skeleton is
+        in, by the rule `anim`'s `correctives.rs` applies: a shape's
+        weight is how far its bone has turned from rest about the rule's
+        axis (in the bone's parent's rest space), from 0 at
+        `angles[0]` degrees to 1 at `angles[1]`."""
+        weights = {}
+        for rule in self.custom.get("correctives", []):
+            name = rule["bone"]
+            turn = (self._local(name) @ self._local(name, posed=False).inverted()).to_quaternion()
+            angle = math.degrees(twist_angle(turn, Vector(rule["axis"])))
+            start, full = rule["angles"]
+            weights[rule["shape"]] = min(1.0, max(0.0, (angle - start) / (full - start)))
+        self.set_correctives(weights)
+        return weights
 
     def bend(self, bone, axis, deg, toward=None):
         """Turns `bone` by `deg` about `axis` (armature space, through its
@@ -404,6 +554,7 @@ def apply_pose(ch, name):
     ch.pose_reset()
     POSES[name][0](ch)
     ch.drive()
+    ch.drive_correctives()
     update()
 
 
@@ -479,7 +630,33 @@ def pose_take(ch, take_arm, action, at, retarget=True):
         update()
     ch.set_eyes()
     ch.drive()
+    ch.drive_correctives()
     update()
+
+
+def raking_light(target, back=False, strength=5.0):
+    """One hard light across the surface for a sheet that has to show
+    relief (steps, notches, creases), with the studio's own lights off
+    and its sky turned down. Only for sheets that say so: the comparable
+    sheets keep the studio as it is."""
+    scene = bpy.context.scene
+    for o in scene.objects:
+        if o.type == "LIGHT":
+            o.hide_render = True
+    world = scene.world.node_tree.nodes.get("Background") if scene.world and scene.world.use_nodes else None
+    if world is not None:
+        world.inputs[1].default_value = min(world.inputs[1].default_value, 0.12)
+    # A small lamp inside the studio, not a sun: the studio's back wall would shade a sun from behind.
+    data = bpy.data.lights.new("Raking", "POINT")
+    data.energy = strength * 160.0
+    data.shadow_soft_size = 0.04
+    light = bpy.data.objects.new("Raking", data)
+    scene.collection.objects.link(light)
+    t = Vector(target)
+    # From the viewer's side, above and well off to one side: relief shows, and the head's shadow falls clear.
+    light.location = t + Vector((1.3, 1.7 if back else -1.7, 1.5))
+    look_at(light, t)
+    return light
 
 
 def glb_images(path):

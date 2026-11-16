@@ -29,11 +29,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy  # noqa: E402
 
 import body  # noqa: E402
+import correctives  # noqa: E402
 import lods  # noqa: E402
 import manifests  # noqa: E402
 import parts  # noqa: E402
 import regions  # noqa: E402
 import rig  # noqa: E402
+import shapes  # noqa: E402
 import skin  # noqa: E402
 import uvs  # noqa: E402
 from common import face_sets, reset_scene, set_positions, shade_smooth, tri_count  # noqa: E402
@@ -103,6 +105,18 @@ def build(out_dir, texture_size=2048, bakes=True):
     skin.materials(body_obj, sets, maps)
     shade_smooth(body_obj)
     add_shape(body_obj, "Frame_Feminine", P, F.P)
+    # The body's muscle and fat shapes (CO5), on both frames.
+    both = lambda m, f: {"Masculine": m, "Feminine": f}  # noqa: E731
+    body_shapes, shape_report, mesh = shapes.build(
+        body_obj, source, both(P, F.P), lm, both(joints, joints_f), weights, both(eyes_m, eyes_f),
+        both(eye_radius, eye_radius_f))
+    shapes.add_keys(body_obj, body_shapes, both(P, F.P))
+    # The shapes the engine leans on as the arms are raised (CO5).
+    driven = {"twists": [{"bone": n, "inside": i, "reads": r, "share": s} for n, i, r, s in rig.TWISTS],
+              "helpers": [{"bone": n, "parent": p, "reads": r, "share": 0.5} for n, p, r in rig.HELPERS]}
+    corrective_shapes, corrective_rules, corrective_report = correctives.build(
+        body_obj, armature, weights, P, driven, mesh["mirror"], mesh["lap"], mesh["tris"])
+    correctives.add_keys(body_obj, corrective_shapes, P)
     region_info, face_regions = regions.mark(body_obj, sets, P, joints, weights, out_dir)
     copies = lods.build(body_obj, armature, lm, P, joints, face_regions)
     for copy in copies:
@@ -128,6 +142,9 @@ def build(out_dir, texture_size=2048, bakes=True):
         "textures": maps["report"] if maps else {"size": 0},
         "eyes": {"masculine": eye_fit, "feminine": eye_fit_f},
         "teeth": teeth_fit,
+        "body_shapes": shape_report,
+        "correctives": corrective_rules,
+        "corrective_shapes": corrective_report,
     }
     objects = {"Body": body_obj, "Eyes": eyes, "Teeth": teeth}
     objects.update({c.name: c for c in copies})

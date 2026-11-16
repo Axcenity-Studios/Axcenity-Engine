@@ -88,6 +88,7 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-14 | Characters, Animation, roadmap, known limitations | Character Studio overhaul CO5, body parameters: muscle and fat on the realistic body, corrective shapes driven by the pose, the raised shoulder's open measure |
 | 2026-11-14 | Characters, Animation, roadmap, known limitations | Character Studio overhaul CO4, the realistic base body: twist and helper bones, and takes named like a body of other proportions playing through roles |
 | 2026-11-14 | ADR-0038, Characters, Animation, Character Data, Gameplay systems, roadmap, known limitations | Character Studio overhaul CO3, the runtime applier: descriptions applied to characters, identity baked into derived models named by `MeshId` |
 | 2026-11-14 | Character Data, ADR-0032 to ADR-0037, roadmap | Character Studio overhaul Stage 2: one character description and its manifests (`avatar`), six decisions; ADR-0030 superseded |

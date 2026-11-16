@@ -35,8 +35,21 @@ FACE_PARTS = ["Eyes", "Teeth"]
 
 GROUPS = [
     ("frame", "Frame", "body"),
+    ("build", "Build", "body"),
+    ("build_regions", "Build by region", "body"),
     ("proportions", "Proportions", "body"),
 ]
+
+# How far a proportion slider goes on this body (CO5). `anim`'s body
+# sliders take 0.5 to 1.5, which the stylized body's manifest offers whole;
+# on this body the ends of that make the skin cross itself (shoulders at
+# half width put the arms through the chest: 282 pairs of triangles), so
+# each slider stops where every pair of sliders at their ends still leaves
+# the body free of new crossings (`measure.py --only sliders`).
+PROPORTION_RANGE = [0.85, 1.15]
+# Hips only get wider: the masculine frame's thighs meet at the crotch, and
+# hips 2% narrower already make the skin cross there on a heavy body.
+PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
 
 # Every material of the body and its parts, and how it is lit.
 SHADING = {
@@ -63,11 +76,18 @@ def base_manifest(data, parts):
          "shapes": [{"shape": "Frame_Feminine"}], "bones": bones},
     ]
     for pid, label, attribute, advanced in shared.PROPORTIONS:
-        parameter = {"id": pid, "label": label, "group": "proportions", "range": [0.5, 1.5],
-                     "default": 1, "attributes": [{"attribute": attribute, "from": [0.5, 1.5]}]}
+        span = PROPORTION_RANGES.get(pid, PROPORTION_RANGE)
+        parameter = {"id": pid, "label": label, "group": "proportions", "range": span,
+                     "default": 1, "attributes": [{"attribute": attribute, "from": span}]}
         if advanced:
             parameter["advanced"] = True
         parameters.append(parameter)
+    # The body's muscle and fat sliders (CO5): every one of their shapes is a
+    # corner with the frame (`shapes.py`).
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    import shapes
+    parameters += shapes.parameters()
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})
     return {
@@ -81,6 +101,7 @@ def base_manifest(data, parts):
                      "added_bones": data["added_bones"]},
         "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS],
         "parameters": parameters,
+        "corners": shapes.corners(),
         "regions": [{"id": r["id"], "label": r["label"], "map_index": r["map_index"]}
                     for r in data["regions"]],
         "slots": shared.SLOTS,

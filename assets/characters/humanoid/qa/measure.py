@@ -1011,6 +1011,93 @@ def file_report(path, custom=None):
             "total_vertices_gltf": sum(s["vertices_gltf"] for s in stats.values())}
 
 
+def crossing_pairs(geo):
+    """The pairs of the body's triangles that cross and share no vertex."""
+    tris = geo.tris
+    tree = BVHTree.FromPolygons([tuple(p) for p in geo.co], [tuple(t) for t in tris], all_triangles=True)
+    return {(i, j) for i, j in tree.overlap(tree) if i < j and not set(tris[i]) & set(tris[j])}
+
+
+def slider_pairs(ch, touching=0.004):
+    """Every pair of the manifest's parameters at every combination of
+    their ranges' ends, on both frames, in the rest pose: how many pairs
+    of the body's triangles newly cross. "Newly" leaves out the pairs
+    that cross in the frame's neutral body and the pairs that already
+    touch there (within 4 mm: closed lips, neighbouring toes), where any
+    move makes or unmakes a crossing. Shapes are set by the manifest's
+    rule and the body sliders as `anim` applies them
+    (`Character.set_sliders`, `set_body_sliders`). Also each parameter
+    alone, with the eyes and teeth checked against the skin."""
+    manifest = ch.manifest
+    ch.show_only(["Body", "Eyes", "Teeth"])
+    params = [p for p in manifest["parameters"] if p["id"] != "frame"]
+
+    def look(frame, values):
+        ch.pose_reset()
+        ch.set_sliders(dict(values, frame=frame))
+        sliders = {}
+        for p in params:
+            for d in p.get("attributes", []):
+                sliders[d["attribute"]] = Q.span(values.get(p["id"], p.get("default", 0.0)), d.get("from"), d.get("to"))
+        if any(abs(v - 1.0) > 1e-6 for v in sliders.values()):
+            ch.set_body_sliders(sliders)
+        Q.update()
+        return Q.Geo(ch.parts["Body"])
+
+    out = {"parameters": len(params) + 1, "frames": {}}
+    for label, frame in (("masculine", 0.0), ("feminine", 1.0)):
+        neutral = look(frame, {})
+        known = crossing_pairs(neutral)
+        tris, P = neutral.tris, neutral.co
+
+        def new(geo):
+            n = 0
+            for a, b in crossing_pairs(geo) - known:
+                gap = np.linalg.norm(P[tris[a]][:, None] - P[tris[b]][None], axis=2).min()
+                n += gap > touching
+            return int(n)
+
+        ends = {p["id"]: [e for e in p["range"] if abs(e - p.get("default", 0.0)) > 1e-9] for p in params}
+        alone, worst = {}, []
+        for p in params:
+            for e in ends[p["id"]]:
+                geo = look(frame, {p["id"]: e})
+                one = {"new_crossings": new(geo)}
+                if not p.get("attributes"):
+                    # A shape can push skin into the eyes or the teeth. A body
+                    # slider can't: it moves and scales bones, and the eyes and
+                    # teeth are carried whole by the head's.
+                    m = eye_metrics(ch, geo, Q.Geo(ch.parts["Eyes"]), Q.Geo(ch.parts["Teeth"]))
+                    one.update({k: m.get(k) for k in ("skin_inside_eyeball_verts", "front_eye_inside_lid_flesh_verts",
+                                                      "teeth_verts_inside_lips_or_gums_flesh")})
+                alone[f"{p['id']}={e:g}"] = one
+        pairs = bodies = crossing = 0
+        for i, a in enumerate(params):
+            for b in params[i + 1:]:
+                pairs += 1
+                for ea in ends[a["id"]]:
+                    for eb in ends[b["id"]]:
+                        bodies += 1
+                        n = new(look(frame, {a["id"]: ea, b["id"]: eb}))
+                        if n:
+                            crossing += 1
+                            worst.append((n, f"{a['id']}={ea:g}, {b['id']}={eb:g}"))
+        worst.sort(reverse=True)
+        out["frames"][label] = {
+            "neutral_crossings": len(known), "alone": alone, "pairs": pairs, "bodies": bodies,
+            "bodies_with_new_crossings": crossing, "new_crossings_largest": worst[0][0] if worst else 0,
+            "offenders": [{"sliders": s, "new_crossings": n} for n, s in worst[:40]],
+            "alone_with_new_crossings": sum(1 for v in alone.values() if v["new_crossings"]),
+            "alone_eye_or_teeth_in_flesh": sum(1 for v in alone.values() if v.get("skin_inside_eyeball_verts")
+                                               or v.get("front_eye_inside_lid_flesh_verts")
+                                               or v.get("teeth_verts_inside_lips_or_gums_flesh")),
+        }
+        print(label, "pairs", pairs, "bodies", bodies, "with new crossings", crossing, flush=True)
+    ch.pose_reset()
+    ch.set_look()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--package", default="stylized", choices=sorted(Q.PACKAGES))
@@ -1031,6 +1118,8 @@ def main():
     only = set(filter(None, a.only.split(",")))
     # `twist` is extra: run when asked for, or for a package with twist bones.
     extra = {"twist"} if not custom.get("twists") else set()
+    # `sliders` takes a quarter of an hour: only when asked for.
+    extra.add("sliders")
     run = lambda s: (s in only) if only else s not in extra  # noqa: E731
     out = {"files": {}, "notes": [
         "Blender space: metres, Z up, the character faces -Y. Distances in mm unless named _m.",
@@ -1080,6 +1169,9 @@ def main():
     if run("shapes"):
         out["shapes"] = shapes_report(ch)
         print("shapes", round(time.time() - t0, 1))
+    if run("sliders"):
+        out["sliders"] = slider_pairs(ch)
+        print("sliders", round(time.time() - t0, 1))
     if run("proportions"):
         out["proportions"] = proportions(ch, W)
         print("proportions", round(time.time() - t0, 1))

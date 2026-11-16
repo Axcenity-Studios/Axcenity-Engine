@@ -31,7 +31,8 @@
 //! detail). Optional:
 //! `AXCENITY_CAPTURE_LIBRARY` (the character library to use; the
 //! repository's `assets/characters` otherwise), `AXCENITY_CAPTURE_SIZE`
-//! (`1920x1080`), `AXCENITY_CAPTURE_POSE` (`rest`, the A-pose, or `idle`),
+//! (`1920x1080`), `AXCENITY_CAPTURE_POSE` (`rest`, the A-pose, `idle`, or
+//! one of the default character's clips at a time, such as `Cheer@0.6`),
 //! `AXCENITY_CAPTURE_ONLY` (names containing this text) and
 //! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures).
 
@@ -127,6 +128,20 @@ pub(crate) enum Stance {
     Rest,
     /// One second into the default state machine's Idle.
     Idle,
+    /// `frames` sixtieths of a second into one of the default character's
+    /// clips (`Cheer`, `Wave`, ...), played alone: joints away from rest
+    /// (a raised arm, a bent knee) as a game's animation leaves them.
+    Clip { name: &'static str, frames: u32 },
+}
+
+impl Stance {
+    fn label(self) -> String {
+        match self {
+            Stance::Rest => "rest".to_owned(),
+            Stance::Idle => "idle".to_owned(),
+            Stance::Clip { name, frames } => format!("{name}@{:.2}", f64::from(frames) / 60.0),
+        }
+    }
 }
 
 /// What a capture is drawn with.
@@ -273,12 +288,25 @@ fn stage_world(
     for problem in &applied.problems {
         eprintln!("  left out: {problem}");
     }
-    if stance == Stance::Rest
+    if stance != Stance::Idle
         && let Some(animator) = world.find_first_child(applied.body, "Animator")
     {
         // No state machine: the Animator poses the skeleton at rest, with
         // the character's identity, and leads its parts.
         let _ = world.set_property(animator, "StateMachine", Value::String(String::new()));
+    }
+    if let Stance::Clip { name, .. } = stance {
+        // The clip alone, beside the Animator, started with the game.
+        let clip = format!(
+            "{}/{name}.anim.json",
+            axcenity_project::DEFAULT_HUMANOID_CLIPS_FOLDER
+        );
+        let animation = world
+            .create(ClassName::Animation)
+            .map_err(|err| err.to_string())?;
+        let _ = world.set_property(animation, "Clip", Value::String(clip));
+        let _ = world.set_property(animation, "AutoPlay", Value::Bool(true));
+        let _ = world.set_parent(animation, Some(applied.body));
     }
     let floor = world
         .create(ClassName::Part)
@@ -298,6 +326,7 @@ fn stage_world(
     let steps = match stance {
         Stance::Rest => 2,
         Stance::Idle => 60,
+        Stance::Clip { frames, .. } => frames.max(2),
     };
     for _ in 0..steps {
         animators.update(&mut world, assets, 1.0 / 60.0);
@@ -508,8 +537,20 @@ fn capture_characters() {
     {
         settings.size = (width, height);
     }
-    if std::env::var("AXCENITY_CAPTURE_POSE").as_deref() == Ok("idle") {
-        settings.stance = Stance::Idle;
+    match std::env::var("AXCENITY_CAPTURE_POSE").as_deref() {
+        Ok("idle") => settings.stance = Stance::Idle,
+        Ok(pose) if pose != "rest" => {
+            let (name, seconds) = pose.split_once('@').unwrap_or((pose, "0.5"));
+            let seconds: f64 = seconds
+                .parse()
+                .expect("AXCENITY_CAPTURE_POSE is `rest`, `idle` or `Clip@seconds`");
+            settings.stance = Stance::Clip {
+                // Kept for the run: a capture is one process.
+                name: Box::leak(name.to_owned().into_boxed_str()),
+                frames: (seconds * 60.0).round() as u32,
+            };
+        }
+        _ => {}
     }
     let only = std::env::var("AXCENITY_CAPTURE_ONLY").ok();
     let sheets_only = std::env::var("AXCENITY_CAPTURE_SHEETS").as_deref() == Ok("only");
@@ -582,7 +623,7 @@ fn capture_characters() {
     }
     let record = serde_json::json!({
         "size": [settings.size.0, settings.size.1],
-        "stance": match settings.stance { Stance::Rest => "rest", Stance::Idle => "idle" },
+        "stance": settings.stance.label(),
         "frames": settings.frames,
         "quality": "High",
         "anti_aliasing": "TAA",
