@@ -100,7 +100,7 @@ python3 fetch_makehuman.py MH
 PY -I extract.py --bundle path/to/human_base_meshes_bundle.blend --makehuman MH --work WORK
 PY -I marks.py --work WORK                 # navel and nipples of both bodies
 PY -I register.py --work WORK              # pins them
-PY -I transfer.py --work WORK --method filtered --pack ../realistic/source/body_shapes.npz
+PY -I transfer.py --work WORK --method filtered --pack ../realistic/source/body_shapes.npz \n    --pack-extras masculine/m_thyroid,masculine/m_adrenal,masculine/neck_double,masculine/pregnant_decr,feminine/f_ovary,feminine/f_liver,feminine/upperarm_fat,feminine/neck_double
 ```
 
-Then build the package (`assets/characters/realistic/README.md`).
+Then build the package (`assets/characters/realistic/README.md`). The `--pack-extras` list (R3, 2026-11-17) is the regional targets `realistic/shapes.py`'s `SOFT` and `FLAT` name; without it the build stops for want of them. The bundle path and `MH` must hold the files `makehuman.sha256` lists (41).

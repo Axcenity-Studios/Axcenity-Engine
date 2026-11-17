@@ -1,0 +1,67 @@
+R3 body fat (RA3), red run: the new tests against the assets as they were on character-creator-stage0 (5b650d5d), before the rebuild.
+Command: cargo nextest run -p axcenity-avatar --no-fail-fast
+
+        PASS [   0.009s] ( 1/49) axcenity-avatar ids::tests::paths_are_relative_and_resolve_inside_the_library
+        PASS [   0.012s] ( 2/49) axcenity-avatar tests::migration::an_empty_format_1_file_is_the_default_character
+        PASS [   0.015s] ( 3/49) axcenity-avatar tests::models::every_shape_bone_and_material_the_base_names_must_exist
+        PASS [   0.017s] ( 4/49) axcenity-avatar material::tests::colours_read_and_write_as_hex
+        PASS [   0.021s] ( 5/49) axcenity-avatar material::tests::values_are_checked_against_the_shading_model
+        PASS [   0.025s] ( 6/49) axcenity-avatar tests::migration::a_migrated_file_saves_as_format_2_and_reads_back_the_same
+        PASS [   0.028s] ( 7/49) axcenity-avatar tests::formats::newer_manifests_and_catalogues_are_refused
+        PASS [   0.031s] ( 8/49) axcenity-avatar tests::models::a_manifest_that_matches_its_model_has_no_problems
+        PASS [   0.033s] ( 9/49) axcenity-avatar tests::formats::a_newer_description_is_refused_with_a_message
+        PASS [   0.039s] (10/49) axcenity-avatar material::tests::every_neutral_value_is_in_range_and_names_are_unique
+        PASS [   0.042s] (11/49) axcenity-avatar tests::formats::manifests_round_trip
+        PASS [   0.044s] (12/49) axcenity-avatar tests::resolving::a_description_resolves_to_its_body_parts_and_items
+        PASS [   0.051s] (13/49) axcenity-avatar tests::formats::a_description_round_trips_with_every_field
+        PASS [   0.055s] (14/49) axcenity-avatar tests::resolving::the_identity_has_a_layer_per_cause_so_each_mesh_reseats_or_is_carried
+        PASS [   0.058s] (15/49) axcenity-avatar tests::migration::every_format_1_part_maps_to_its_own_item
+        PASS [   0.061s] (16/49) axcenity-avatar tests::formats::damaged_files_are_errors_not_panics
+        PASS [   0.064s] (17/49) axcenity-avatar tests::migration::a_format_1_file_migrates_to_the_same_character
+        PASS [   0.067s] (18/49) axcenity-avatar tests::formats::the_catalogue_lists_each_manifest_with_its_browsing_fields
+        PASS [   0.070s] (19/49) axcenity-avatar tests::resolving::shapes_take_their_drivers_corners_and_hidden_regions
+        PASS [   0.072s] (20/49) axcenity-avatar tests::models::every_shape_bone_and_material_an_item_names_must_exist
+        PASS [   0.075s] (21/49) axcenity-avatar tests::migration::a_damaged_format_1_file_is_an_error
+        PASS [   0.077s] (22/49) axcenity-avatar tests::validation::a_sound_description_has_no_problems
+        PASS [   0.080s] (23/49) axcenity-avatar tests::resolving::bones_attributes_and_materials_take_the_same_spans_as_shapes
+        PASS [   0.083s] (24/49) axcenity-avatar tests::resolving::a_span_maps_and_clamps
+        PASS [   0.086s] (25/49) axcenity-avatar tests::resolving::items_that_cannot_be_worn_are_left_out_and_said
+        PASS [   0.089s] (26/49) axcenity-avatar ids::tests::ids_have_a_namespace_and_plain_lower_case_segments
+        PASS [   0.092s] (27/49) axcenity-avatar tests::formats::fields_a_newer_minor_version_adds_survive_a_round_trip
+        PASS [   0.094s] (28/49) axcenity-avatar tests::validation::a_base_manifest_with_mistakes_reports_each
+        PASS [   0.098s] (29/49) axcenity-avatar tests::migration::format_1_defaults_ranges_and_unknown_parts_carry_over
+        PASS [   0.102s] (30/49) axcenity-avatar tests::validation::a_description_with_mistakes_reports_each
+        PASS [   0.104s] (31/49) axcenity-avatar tests::resolving::parameters_take_their_defaults_clamp_and_keep_to_their_limits
+        PASS [   0.108s] (32/49) axcenity-avatar tests::resolving::a_worn_items_values_go_over_its_variants
+        PASS [   0.100s] (33/49) axcenity-avatar tests::validation::an_item_is_checked_against_its_base
+        PASS [   0.101s] (34/49) axcenity-avatar tests::validation::an_item_must_have_what_its_kind_needs
+        PASS [   0.100s] (35/49) axcenity-avatar tests::validation::an_item_with_mistakes_reports_each
+        PASS [   0.104s] (36/49) axcenity-avatar tests::validation::the_fixture_library_is_sound
+        PASS [   0.111s] (37/49) axcenity-avatar::realistic_parameters the_realistic_base_has_its_body_parameters
+        PASS [   0.113s] (38/49) axcenity-avatar::realistic_parameters the_underwear_is_always_worn_and_follows_the_frame
+        PASS [   0.110s] (39/49) axcenity-avatar::shipped_library every_base_models_default_character_is_sound
+        PASS [   0.111s] (40/49) axcenity-avatar::shipped_library every_format_1_character_migrates_to_a_sound_description
+        PASS [   0.129s] (41/49) axcenity-avatar::shipped_library the_shipped_library_reads_and_is_sound
+        PASS [   0.203s] (42/49) axcenity-avatar::shipped_library every_benchmark_character_is_sound
+        FAIL [   1.315s] (43/49) axcenity-avatar::realistic_fat the_slight_masculine_body_has_a_flat_belly
+    thread 'the_slight_masculine_body_has_a_flat_belly'  panicked at crates\avatar\tests\realistic_fat.rs:210:5:
+    the slight belly is 0.009446524 m behind the slim one
+        FAIL [   1.380s] (44/49) axcenity-avatar::realistic_fat fat_goes_where_each_frame_carries_it
+    thread 'fat_goes_where_each_frame_carries_it'  panicked at crates\avatar\tests\realistic_fat.rs:179:5:
+    belly forward: masculine 0.0075117275 m, feminine 0.015282497 m
+        FAIL [   1.389s] (45/49) axcenity-avatar::realistic_parameters a_baked_body_keeps_only_its_live_shapes
+    thread 'a_baked_body_keeps_only_its_live_shapes'  panicked at crates\avatar\tests\realistic_parameters.rs:284:5:
+    assertion `left == right` failed
+      left: 155
+     right: 158
+        FAIL [   1.470s] (46/49) axcenity-avatar::realistic_fat fat_puts_on_a_belly_and_widens_the_waist_on_both_frames
+    thread 'fat_puts_on_a_belly_and_widens_the_waist_on_both_frames'  panicked at crates\avatar\tests\realistic_fat.rs:162:9:
+    frame 0: the belly comes forward 0.0075117275 m
+        PASS [   1.535s] (47/49) axcenity-avatar::realistic_parameters muscle_and_fat_make_four_different_corners
+        PASS [   3.139s] (48/49) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+        PASS [   3.338s] (49/49) axcenity-avatar::shipped_library every_manifest_entry_names_shapes_bones_and_materials_its_model_has
+     Summary [   3.399s] 49 tests run: 45 passed, 4 failed, 0 skipped
+        FAIL [   1.315s] (43/49) axcenity-avatar::realistic_fat the_slight_masculine_body_has_a_flat_belly
+        FAIL [   1.380s] (44/49) axcenity-avatar::realistic_fat fat_goes_where_each_frame_carries_it
+        FAIL [   1.389s] (45/49) axcenity-avatar::realistic_parameters a_baked_body_keeps_only_its_live_shapes
+        FAIL [   1.470s] (46/49) axcenity-avatar::realistic_fat fat_puts_on_a_belly_and_widens_the_waist_on_both_frames

@@ -2675,6 +2675,78 @@
       ]
     },
     {
+      "shape": "Masculine_Fat_Soft",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            0.5,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Belly_Flat",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0,
+            -1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0,
+            -1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "shape": "Masculine_Muscle_Chest",
       "factors": [
         {
@@ -3362,6 +3434,40 @@
           "to": [
             0.0,
             0.75
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Soft",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            -1,
+            0
+          ],
+          "to": [
+            0.5,
+            1
           ]
         }
       ]

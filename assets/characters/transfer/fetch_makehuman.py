@@ -13,10 +13,10 @@ here), holding only the licence files, the base mesh and the targets
 (about 136 MB on disk). The files are data and are only read; none of
 MakeHuman's code is fetched or run.
 
-`makehuman.sha256` lists the 33 files the spike reads (the base mesh, 6
+`makehuman.sha256` lists the 41 files the transfer reads (the base mesh, 6
 ethnic and 18 "universal" macro targets at the young age, 6 regional
-targets, and the two licence files); `shapes/LICENCE-RECORD.md` says what makes
-them CC0.
+targets for the spike's sheets, 8 more for R3's fat, and the two licence
+files); `shapes/LICENCE-RECORD.md` says what makes them CC0.
 """
 
 import hashlib
