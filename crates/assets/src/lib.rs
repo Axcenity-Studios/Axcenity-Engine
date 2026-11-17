@@ -124,7 +124,7 @@ pub use material::{
 pub use memory::{AssetMemory, CacheUse, model_bytes};
 pub use model::{
     AlphaMode, Blend, Bone, BoneChange, BoneDelta, BoneTransform, Channel, ChannelTexture,
-    Identity, IdentityLayer, Image, Joint, Keys, LevelReport, LodReport, LodWarning,
+    Identity, IdentityLayer, Image, Joint, Keys, LevelReport, LiveIdentity, LodReport, LodWarning,
     MESH_CACHE_FOLDER, MODEL_CACHE_FOLDER, MODEL_EXTENSIONS, MapSlot, Model, ModelError,
     ModelFormat, ModelMaterial, ModelObject, MorphTarget, Pick, Pose, Posed, PosedBone,
     PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Take, TextureRole, Track,

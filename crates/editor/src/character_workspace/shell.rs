@@ -40,7 +40,7 @@ impl CharacterWorkspace {
         // that started it missed the release (a colour picker's popup).
         if self.dragging() && !ui.input(|input| input.pointer.any_down()) {
             self.history.commit(&self.description);
-            self.refresh(true);
+            self.refresh();
         }
         let mut intents = self.shortcuts(ui);
         let full = ui.available_rect_before_wrap();

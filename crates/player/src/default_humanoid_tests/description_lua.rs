@@ -137,15 +137,17 @@ print(#humanoid:GetAppliedDescription():GetItems())
             "Teeth"
         ]
     );
-    // The body slider, and the build baked into a derived body.
+    // The body slider, and the build worn live on the library's body
+    // (ADR-0041): its own mesh, the identity named by its key.
     let height = attribute(&game, body, "BodyHeight").and_then(|value| value.as_number());
     assert!((height.unwrap() - 1.2).abs() < 1e-6, "{height:?}");
     let mesh = game.world.get(body).unwrap().property("MeshId").cloned();
     let mesh = mesh.as_ref().and_then(Value::as_str).unwrap();
     assert!(
-        mesh.contains("HumanoidParts.glb#AxcenityHumanoid/Body#"),
+        mesh.ends_with("HumanoidParts.glb#AxcenityHumanoid/Body"),
         "{mesh}"
     );
+    assert!(axcenity_anim::identity_key(&game.world, body).is_some());
     // The material values, on the body.
     let melanin = attribute(&game, body, &material_value_attribute("Skin", "melanin"))
         .and_then(|value| value.as_number());

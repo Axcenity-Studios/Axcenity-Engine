@@ -6,8 +6,10 @@
 //! cargo test -p axcenity-editor --release -- --ignored drag_apply_time --nocapture
 //! ```
 //!
-//! For each parameter it takes 20 slider steps across its range and times
-//! (a) `apply_description` alone, what the 120 ms throttle guards, and
+//! For each parameter it takes 20 slider steps across its range, live
+//! (refinement R2a: the identity worn as weights) and then baked as before
+//! R2a (`gameplay::description::bake` after each apply), and times
+//! (a) `apply_description` alone (with the bake when baked), and
 //! (b) that plus the next frame's work before drawing: the animators'
 //! step (an owner whose model changed rebinds its clips) and the draw list
 //! (the worn parts' derived models are baked there, on first use). The GPU
@@ -61,37 +63,51 @@ fn drag_apply_time() {
     ] {
         let parameter = workspace.base().unwrap().parameter(id).unwrap().clone();
         let [low, high] = parameter.range;
-        let mut apply = Vec::new();
-        let mut frame = Vec::new();
-        for step in 0..20 {
-            let value = low + (high - low) * (step as f32 + 0.5) / 20.0;
-            let mut description = workspace.description.clone();
-            description.parameters.insert(id.to_owned(), value);
-            let started = Instant::now();
-            applier::apply_description(
-                &mut workspace.world,
-                &workspace.assets,
-                character,
-                &description,
-            )
-            .unwrap();
-            apply.push(started.elapsed());
-            workspace.step_by(1.0 / 60.0);
-            let _list = axcenity_scene::build_draw_list_posed(
-                &workspace.world,
-                &workspace.assets,
-                workspace.orbit.camera(),
-                workspace.poses(),
-                &mut axcenity_scene::TerrainCache::new(),
+        // Live (R2a: weights and bone changes, no bake), then baked as
+        // every apply was before R2a (`gameplay::description::bake`: the
+        // parts' derived models are baked in the step and the draw list).
+        for baked in [false, true] {
+            let mut apply = Vec::new();
+            let mut frame = Vec::new();
+            for step in 0..20 {
+                let value = low + (high - low) * (step as f32 + 0.5) / 20.0;
+                let mut description = workspace.description.clone();
+                description.parameters.insert(id.to_owned(), value);
+                let started = Instant::now();
+                applier::apply_description(
+                    &mut workspace.world,
+                    &workspace.assets,
+                    character,
+                    &description,
+                )
+                .unwrap();
+                if baked {
+                    axcenity_gameplay::description::bake(
+                        &mut workspace.world,
+                        &workspace.assets,
+                        character,
+                    )
+                    .unwrap();
+                }
+                apply.push(started.elapsed());
+                workspace.step_by(1.0 / 60.0);
+                let _list = axcenity_scene::build_draw_list_posed(
+                    &workspace.world,
+                    &workspace.assets,
+                    workspace.orbit.camera(),
+                    workspace.poses(),
+                    &mut axcenity_scene::TerrainCache::new(),
+                );
+                frame.push(started.elapsed());
+            }
+            let mode = if baked { "baked" } else { "live" };
+            println!("{id:>16}  {mode:>5} apply: {}", summary(&mut apply));
+            println!(
+                "{:>16}  {mode:>5} apply + step + draw list: {}",
+                "",
+                summary(&mut frame)
             );
-            frame.push(started.elapsed());
         }
-        println!("{id:>16}  apply: {}", summary(&mut apply));
-        println!(
-            "{:>16}  apply + step + draw list: {}",
-            "",
-            summary(&mut frame)
-        );
     }
     let _ = std::fs::remove_dir_all(&folder);
 }

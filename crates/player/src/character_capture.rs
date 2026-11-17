@@ -911,6 +911,24 @@ pub(crate) fn capture_in(
     views: &[&View],
 ) -> Result<Vec<Shot>, String> {
     let (mut world, animators) = stage_world(assets, description, settings.stance, settings.face)?;
+    draw_staged(
+        device, queue, assets, &mut world, &animators, settings, lights, views,
+    )
+}
+
+/// Draws a staged `world` ([`stage_world`]) as [`capture_in`] does: each of
+/// `views` under each of `lights`, lights outermost.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn draw_staged(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    assets: &Assets,
+    world: &mut World,
+    animators: &Animators,
+    settings: Settings,
+    lights: &[Lit],
+    views: &[&View],
+) -> Result<Vec<Shot>, String> {
     let (width, height) = settings.size;
     let mut graphics = GraphicsSettings::preset(Quality::High);
     graphics.anti_aliasing = Some(AntiAliasing::Taa);
@@ -945,7 +963,7 @@ pub(crate) fn capture_in(
             };
             for _ in 0..settings.frames.max(1) {
                 let mut list = axcenity_scene::build_draw_list_posed(
-                    &world,
+                    world,
                     assets,
                     camera,
                     animators.poses(),
@@ -1706,4 +1724,109 @@ fn the_face_suite_draws_each_face_on_one_sheet() {
     let (width, height, sheet) = contact_grid(&shots, settings.size, views.len());
     assert_eq!((width, height), (80 * 4, 45 * 5));
     assert_eq!(sheet.len(), (width * height * 4) as usize);
+}
+
+/// Refinement R2a (ADR-0041): the bake is an optional optimization that
+/// must not change the picture. A realistic character with a strong
+/// identity (the feminine frame, fat, a longer nose, wider eyes) drawn
+/// live (its base meshes, weights and bone changes on each pose) and then
+/// baked (`gameplay::description::bake`: derived models) gives the same
+/// pixels, to a small tolerance (the GPU's sums run in another order).
+/// Skipped on machines without a GPU.
+#[test]
+fn an_explicit_bake_draws_the_same_pixels_as_the_live_character() {
+    let Some((device, queue)) = super::bench_tests::bench_gpu() else {
+        return;
+    };
+    let stage = Stage::new("bake", &repository_library()).expect("the stage");
+    let library = axcenity_gameplay::description::library(&stage.assets);
+    let mut description =
+        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    for (id, value) in [
+        ("frame", 1.0),
+        ("fat", 0.7),
+        ("nose_length", 0.6),
+        ("eye_size_left", 0.6),
+    ] {
+        description.parameters.insert(id.to_owned(), value);
+    }
+    let settings = Settings {
+        size: (480, 270),
+        frames: 12,
+        ..Settings::default()
+    };
+    let lights = lights_named("studio").unwrap();
+    let views = views_named("front,side,face").unwrap();
+    let (mut world, mut animators) =
+        stage_world(&stage.assets, &description, settings.stance, settings.face).unwrap();
+    let step = |world: &mut World, animators: &mut Animators| {
+        for _ in 0..2 {
+            animators.update(world, &stage.assets, 1.0 / 60.0);
+        }
+    };
+    step(&mut world, &mut animators);
+    let live = draw_staged(
+        &device,
+        &queue,
+        &stage.assets,
+        &mut world,
+        &animators,
+        settings,
+        &lights,
+        &views,
+    )
+    .unwrap();
+    assert_eq!(stage.assets.derived_count(), 0, "live: nothing baked");
+
+    let kept = world.all_below(world.workspace(), |class| {
+        class == ClassName::HumanoidDescription
+    });
+    let humanoid = world.get(kept[0]).unwrap().parent().unwrap();
+    let character = world.get(humanoid).unwrap().parent().unwrap();
+    let baked = axcenity_gameplay::description::bake(&mut world, &stage.assets, character).unwrap();
+    assert!(baked > 4, "the body and its parts: {baked}");
+    step(&mut world, &mut animators);
+    let drawn = draw_staged(
+        &device,
+        &queue,
+        &stage.assets,
+        &mut world,
+        &animators,
+        settings,
+        &lights,
+        &views,
+    )
+    .unwrap();
+    assert!(stage.assets.derived_count() >= baked, "baked models drawn");
+
+    for (live, drawn) in live.iter().zip(&drawn) {
+        let mut off = 0;
+        let mut total = 0u64;
+        for (a, b) in live
+            .pixels
+            .chunks_exact(4)
+            .zip(drawn.pixels.chunks_exact(4))
+        {
+            let most = a.iter().zip(b).map(|(a, b)| a.abs_diff(*b)).max().unwrap();
+            total += u64::from(most);
+            if most > 8 {
+                off += 1;
+            }
+        }
+        let pixels = live.pixels.len() / 4;
+        let share = off as f64 / pixels as f64;
+        let mean = total as f64 / pixels as f64;
+        println!(
+            "{} {}: {off} pixels ({:.4}%) differ by more than 8, mean difference {mean:.4}",
+            live.light,
+            live.view,
+            share * 100.0
+        );
+        assert!(
+            share < 0.002 && mean < 0.5,
+            "{} {}: the bake drew another picture ({share}, {mean})",
+            live.light,
+            live.view
+        );
+    }
 }

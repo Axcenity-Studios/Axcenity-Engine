@@ -46,6 +46,7 @@ pub mod files;
 pub mod ik;
 mod ik_control;
 mod lip_sync;
+mod live_identity;
 mod property_clip;
 pub mod ragdoll;
 mod retarget;
@@ -92,6 +93,7 @@ pub use lip_sync::{
     CompiledVisemes, LipTiming, default_viseme_map, find_viseme_map, lip_sync_from_audio,
     lip_sync_from_phonemes, phoneme_viseme, viseme_weights,
 };
+pub use live_identity::{IDENTITY, identity_key, set_identity_key};
 pub use property_clip::{
     Applied, EvaluatedProperty, Placement, PropertyClip, apply_evaluated, blend_evaluated,
     current_numbers, model_pivot, numbers_of, resolve_target, sample_time, sample_track,

@@ -88,11 +88,6 @@ pub const FLAG: &str = "--character-studio";
 /// the default (ADR-0032).
 pub const DEFAULT_BASE: &str = "axcenity/realistic";
 
-/// While a slider is dragged, the preview is applied again at most this
-/// often (each new identity is baked into the character's meshes); it is
-/// applied once more when the drag ends.
-const DRAG_APPLY_EVERY: Duration = Duration::from_millis(120);
-
 /// Where a workspace's files live, in the editor's data folder.
 pub fn default_folder() -> Option<PathBuf> {
     eframe::storage_dir(crate::APP_ID).map(|data| data.join("Character Studio"))
@@ -446,7 +441,7 @@ impl CharacterWorkspace {
         if library.base(preset.base).is_some() {
             workspace.description = tidy(preset.description("New Character", &library), &library);
             workspace.applied = None;
-            workspace.refresh(true);
+            workspace.refresh();
         }
         Ok(workspace)
     }
@@ -488,7 +483,7 @@ impl CharacterWorkspace {
         self.asking = None;
         self.animators.clear();
         self.applied = None;
-        self.refresh(true);
+        self.refresh();
     }
 
     pub fn description(&self) -> &Description {
@@ -534,7 +529,7 @@ impl CharacterWorkspace {
             // A change of nothing makes no step and keeps redo (audit D-05).
             self.description = before;
         } else if self.history.record(before, &self.description) {
-            self.refresh(true);
+            self.refresh();
         }
     }
 
@@ -556,7 +551,7 @@ impl CharacterWorkspace {
             }
             self.history.commit(&self.description);
         }
-        self.refresh(done);
+        self.refresh();
     }
 
     /// Whether a drag is going on (its undo step is open).
@@ -568,7 +563,7 @@ impl CharacterWorkspace {
     pub fn cancel_edit(&mut self) {
         if let Some(start) = self.history.cancel() {
             self.description = start;
-            self.refresh(true);
+            self.refresh();
         }
     }
 
@@ -732,14 +727,14 @@ impl CharacterWorkspace {
     pub fn undo(&mut self) {
         if let Some(before) = self.history.undo(self.description.clone()) {
             self.description = before;
-            self.refresh(true);
+            self.refresh();
         }
     }
 
     pub fn redo(&mut self) {
         if let Some(after) = self.history.redo(self.description.clone()) {
             self.description = after;
-            self.refresh(true);
+            self.refresh();
         }
     }
 
@@ -853,7 +848,7 @@ impl CharacterWorkspace {
         self.description = adopt(description, &library).0;
         self.animators.clear();
         self.applied = None;
-        self.refresh(true);
+        self.refresh();
     }
 
     /// Builds the preview World: a floor and the default character, with
@@ -868,23 +863,21 @@ impl CharacterWorkspace {
         self.character = Some(character);
         self.animators.clear();
         self.applied = None;
-        self.refresh(true);
+        self.refresh();
     }
 
-    /// Applies the description to the preview if it changed: at once when
-    /// `now`, else at most every [`DRAG_APPLY_EVERY`] while a slider is
-    /// dragged.
-    fn refresh(&mut self, now: bool) {
+    /// Applies the description to the preview if it changed, every step of
+    /// a drag too: the identity is worn live (refinement R2a, ADR-0041), so
+    /// a change is new weights, measured at well under a millisecond
+    /// (`timing_tests.rs`), and the 120 ms throttle is gone.
+    fn refresh(&mut self) {
         let Some(character) = self.character else {
             return;
         };
-        if let Some((applied, at)) = &self.applied {
-            if *applied == self.description {
-                return;
-            }
-            if !now && at.elapsed() < DRAG_APPLY_EVERY {
-                return;
-            }
+        if let Some((applied, _)) = &self.applied
+            && *applied == self.description
+        {
+            return;
         }
         match applier::apply_description(
             &mut self.world,
@@ -1042,7 +1035,7 @@ impl CharacterWorkspace {
             .map_or(0.0, |last| now.duration_since(last).as_secs_f64())
             .min(0.1);
         self.last_frame = Some(now);
-        self.refresh(!self.dragging());
+        self.refresh();
         self.step_by(seconds);
         seconds
     }
