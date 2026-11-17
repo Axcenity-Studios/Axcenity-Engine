@@ -50,6 +50,11 @@ impl EditorApp {
         ui: &mut egui::Ui,
         render_state: Option<&RenderState>,
     ) {
+        if let Some(render_state) = render_state {
+            // A saved character's picture is drawn on it.
+            self.start
+                .set_gpu(&render_state.device, &render_state.queue);
+        }
         let Some(workspace) = self.character_workspace.as_mut() else {
             return;
         };
@@ -58,6 +63,13 @@ impl EditorApp {
             .frame(egui::Frame::NONE.fill(palette.app_bg))
             .show(ui, |ui| workspace.ui(ui, render_state))
             .inner;
+        // What it saved gets a fresh picture on the start page.
+        for file in std::mem::take(&mut workspace.saved_files) {
+            self.start.character_saved(&file);
+        }
+        let Some(workspace) = self.character_workspace.as_mut() else {
+            return;
+        };
         if action == Some(WorkspaceAction::Home) {
             if workspace.dirty() {
                 workspace.leaving = true;
@@ -90,7 +102,10 @@ impl EditorApp {
             );
             match outcome {
                 Some(dialog::Outcome::Picked(2)) => match workspace.save() {
-                    Ok(_) => self.character_workspace = None,
+                    Ok(file) => {
+                        self.start.character_saved(&file);
+                        self.character_workspace = None;
+                    }
                     Err(error) => {
                         workspace.notice = Some(error);
                         workspace.leaving = false;

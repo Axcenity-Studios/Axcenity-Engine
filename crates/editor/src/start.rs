@@ -357,6 +357,8 @@ pub struct StartScreen {
     join_asked: Option<StartAction>,
     /// Where Character Studio keeps its files.
     characters_folder: Option<PathBuf>,
+    /// The Character Studio page: its characters, packs and pictures.
+    shelf: characters::Shelf,
 }
 
 impl StartScreen {

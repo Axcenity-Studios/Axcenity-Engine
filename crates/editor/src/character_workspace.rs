@@ -19,14 +19,23 @@
 //! Its files live in the editor's data folder (`Character Studio/`): the
 //! default humanoid's files, the character library (the built-in package
 //! and the packages the engine ships, [`find_character_library`]) and the
-//! saved characters, `characters/<name>.character.json`.
+//! saved characters, `characters/<name>.character.json`; beside them the
+//! start page's Recent list (`recent.rs`), character packs (`packs.rs`)
+//! and the cached pictures of characters and presets (`thumbnails.rs`).
 //!
 //! `ui.rs` draws it; `stage.rs` is the viewport (camera, lighting,
-//! backdrop and drawing).
+//! backdrop and drawing); `shelf.rs` lists the saved characters for the
+//! start page and deletes them.
 
+pub mod packs;
+pub mod recent;
+pub mod shelf;
 mod stage;
+pub mod thumbnails;
 mod ui;
 
+#[cfg(test)]
+mod shelf_tests;
 #[cfg(test)]
 mod tests;
 
@@ -277,7 +286,14 @@ pub struct CharacterWorkspace {
     pub notice: Option<String>,
     /// Home was asked for with unsaved changes: the editor asks to save.
     pub leaving: bool,
+    /// The files saved since the editor last looked (it draws their
+    /// pictures again).
+    pub saved_files: Vec<PathBuf>,
 }
+
+/// Held while a workspace writes the library into its folder: the start
+/// page's pictures open a workspace of their own on another thread.
+static WRITING_LIBRARY: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 impl CharacterWorkspace {
     /// Opens the workspace on `description`, its files in `folder` (written
@@ -287,6 +303,9 @@ impl CharacterWorkspace {
     pub fn open(folder: &Path, description: Description, saved: bool) -> Result<Self, String> {
         std::fs::create_dir_all(folder.join(CHARACTERS_FOLDER))
             .map_err(|err| format!("Could not make the Character Studio folder: {err}"))?;
+        let writing = WRITING_LIBRARY
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         axcenity_project::add_default_humanoid(folder)
             .map_err(|err| format!("Could not write the humanoid's files: {err}"))?;
         axcenity_project::add_character_library(folder)
@@ -306,6 +325,7 @@ impl CharacterWorkspace {
                 )
             }
         }
+        drop(writing);
         let assets = Assets::new(folder);
         let library = applier::library(&assets);
         let mut description = description;
@@ -346,6 +366,7 @@ impl CharacterWorkspace {
             last_frame: None,
             notice,
             leaving: false,
+            saved_files: Vec::new(),
         };
         workspace.build_world();
         Ok(workspace)
@@ -356,7 +377,9 @@ impl CharacterWorkspace {
         let text = std::fs::read_to_string(file)
             .map_err(|err| format!("Could not read {}: {err}", file.display()))?;
         let description = Description::from_json(&text).map_err(|err| err.to_string())?;
-        Self::open(folder, description, true)
+        let workspace = Self::open(folder, description, true)?;
+        recent::remember(folder, file);
+        Ok(workspace)
     }
 
     /// Opens preset `index` of [`presets`] (the default character when
@@ -599,7 +622,32 @@ impl CharacterWorkspace {
         std::fs::write(&path, self.description.to_json())
             .map_err(|err| format!("Could not save {}: {err}", path.display()))?;
         self.saved = Some(self.description.clone());
+        recent::remember(&self.folder, &path);
+        self.saved_files.push(path.clone());
         Ok(path)
+    }
+
+    /// Shows `description` in the preview in place of the character being
+    /// edited, as the workspace would open it (for the start page's
+    /// pictures): its undo is left alone.
+    pub(crate) fn show_only(&mut self, description: Description) {
+        let library = self.library();
+        let description = if library.base(&description.base).is_some() {
+            description
+        } else {
+            let base = if library.base(DEFAULT_BASE).is_some() {
+                DEFAULT_BASE
+            } else {
+                axcenity_avatar::V1_BASE
+            };
+            let mut fallback = applier::default_description(&library, base);
+            fallback.name = description.name;
+            fallback
+        };
+        self.description = tidy(description, &library);
+        self.animators.clear();
+        self.applied = None;
+        self.refresh(true);
     }
 
     /// Builds the preview World: a floor and the default character, with
@@ -729,32 +777,4 @@ fn tidy(mut description: Description, library: &Library) -> Description {
         description.name = "New Character".to_owned();
     }
     description
-}
-
-/// The saved characters in `folder`, newest first: (name, path).
-pub fn saved_characters(folder: &Path) -> Vec<(String, PathBuf)> {
-    let Ok(entries) = std::fs::read_dir(folder.join(CHARACTERS_FOLDER)) else {
-        return Vec::new();
-    };
-    let mut found: Vec<(std::time::SystemTime, String, PathBuf)> = entries
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let name = path
-                .file_name()?
-                .to_str()?
-                .strip_suffix(".character.json")?;
-            let modified = entry.metadata().and_then(|m| m.modified()).ok()?;
-            let shown = std::fs::read_to_string(&path)
-                .ok()
-                .and_then(|text| Description::from_json(&text).ok())
-                .map_or_else(|| name.to_owned(), |description| description.name);
-            Some((modified, shown, path))
-        })
-        .collect();
-    found.sort_by_key(|entry| std::cmp::Reverse(entry.0));
-    found
-        .into_iter()
-        .map(|(_, name, path)| (name, path))
-        .collect()
 }
