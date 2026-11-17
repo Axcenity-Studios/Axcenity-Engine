@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-cast-narrow-face",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0,
+    "head_length": 0.3,
+    "head_width": -0.7,
+    "jaw_width": -0.6,
+    "nose_width": -0.4
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

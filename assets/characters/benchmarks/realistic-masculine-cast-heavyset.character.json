@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-cast-heavyset",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.8,
+    "frame": 0,
+    "muscle": 0.2
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
+}

@@ -5,5 +5,10 @@
   "parameters": {
     "frame": 0,
     "jaw_shift": -1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
 }

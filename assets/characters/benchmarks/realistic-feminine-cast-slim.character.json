@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "realistic-feminine-cast-slim",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -0.6,
+    "frame": 1,
+    "muscle": -0.2
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
+}

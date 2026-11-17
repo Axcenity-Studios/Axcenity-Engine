@@ -249,6 +249,17 @@ fn every_benchmark_character_is_sound() {
             "{file}:\n{}",
             lines(&resolved.problems)
         );
+        // The file says what is drawn: what a parameter's choices wear (the
+        // realistic body's underwear) is already what it lists, so the
+        // resolver changes nothing.
+        let mut worn = description.clone();
+        axcenity_avatar::wear_choices(&mut worn, &library);
+        let ids = |d: &Description| d.items.iter().map(|w| w.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&worn), ids(&description), "{file} wears its choices");
+        // A cast member other than the average sets something.
+        if name.contains("-cast-") && !name.ends_with("-cast-average") {
+            assert!(!description.parameters.is_empty(), "{file} sets nothing");
+        }
         per_base
             .entry(description.base.clone())
             .or_default()
@@ -258,12 +269,33 @@ fn every_benchmark_character_is_sound() {
         let names = per_base.get(id).map(Vec::as_slice).unwrap_or_default();
         let has = |part: &str| names.iter().any(|name| name.contains(part));
         assert!(has("-body-default"), "{id} has no body benchmarks");
-        assert!(has("-face-neutral"), "{id} has no face benchmarks");
+        // The neutral face is the cast's average where the two were the
+        // same character (refinement R1, plan 11.6).
+        assert!(
+            has("-face-neutral") || has("-cast-average"),
+            "{id} has no face benchmarks"
+        );
         assert!(has("-outfit-underwear"), "{id} has no outfit benchmarks");
         assert!(
             names.iter().all(|name| name.starts_with(&base.family)),
             "{id}: benchmarks are named <family>-<frame>-<case>"
         );
+        // The cast (brief §17.1): each person on each frame, and natural
+        // asymmetry where the base has sided parameters to show it with.
+        let frames: &[&str] = if base.parameters.iter().any(|p| p.id == "frame") {
+            &["masculine", "feminine"]
+        } else {
+            &["body"]
+        };
+        let sided = base.parameters.iter().any(|p| p.mirror.is_some());
+        for frame in frames {
+            for person in BENCHMARK_CAST {
+                let name = format!("{}-{frame}-cast-{person}", base.family);
+                assert!(names.contains(&name), "{id} has no {name}");
+            }
+            let asymmetry = format!("{}-{frame}-cast-asymmetry", base.family);
+            assert_eq!(names.contains(&asymmetry), sided, "{asymmetry}");
+        }
     }
 }
 
@@ -442,3 +474,17 @@ fn an_outfit_preset_leaves_the_chosen_underwear() {
     axcenity_avatar::apply_preset(&mut character, &empty, &library).unwrap();
     assert_eq!(character.items, before);
 }
+
+/// The benchmark cast every base has on each frame (brief §17.1;
+/// `benchmarks/make.py`'s `CAST`). `asymmetry` joins it on a base with
+/// sided parameters.
+const BENCHMARK_CAST: [&str; 8] = [
+    "average",
+    "slim",
+    "athletic",
+    "muscular",
+    "heavyset",
+    "broad-face",
+    "narrow-face",
+    "distinctive",
+];

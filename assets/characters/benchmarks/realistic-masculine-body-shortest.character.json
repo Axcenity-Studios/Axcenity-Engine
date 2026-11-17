@@ -6,5 +6,10 @@
     "frame": 0,
     "height": 0.85,
     "leg_length": 0.85
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
 }

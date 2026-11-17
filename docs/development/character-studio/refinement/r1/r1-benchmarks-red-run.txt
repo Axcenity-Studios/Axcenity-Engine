@@ -1,0 +1,38 @@
+RA6 r1-benchmarks: the red run (tests written first, before the implementation).
+Run 2026-11-17 in the r1-benchmarks worktree; the new functions were todo!() stubs, make.py and the Walk state unchanged.
+
+## cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/character_capture/)'
+FAIL [   0.079s] (1/7) axcenity-player::bin/axcenity-player character_capture::light_view_and_pose_names_are_read_and_unknown_ones_refused
+FAIL [   0.143s] (2/7) axcenity-player::bin/axcenity-player character_capture::the_default_run_is_every_fixed_view_under_every_fixed_light
+FAIL [   0.143s] (3/7) axcenity-player::bin/axcenity-player character_capture::the_suites_hold_the_brief_s_facial_and_body_tests
+FAIL [   2.624s] (4/7) axcenity-player::bin/axcenity-player character_capture::the_face_suite_draws_each_face_on_one_sheet
+FAIL [   2.661s] (5/7) axcenity-player::bin/axcenity-player character_capture::added_lights_views_and_poses_repeat_and_differ
+FAIL [   2.696s] (6/7) axcenity-player::bin/axcenity-player character_capture::held_poses_turn_each_joint_to_its_angle_on_the_realistic_body
+PASS [  16.541s] (7/7) axcenity-player::bin/axcenity-player character_capture::the_same_description_captures_identical_pictures_and_every_view_is_drawn
+Starting 7 tests across 1 binary (191 tests skipped)
+Summary [  16.542s] 7 tests run: 1 passed, 6 failed, 191 skipped
+not yet implemented: 73 TPose
+not yet implemented: Face
+not yet implemented: studio, warm,cool,outdoor
+not yet implemented: studio,hard
+not yet implemented: studio,warm,cool,outdoor
+
+## cargo nextest run -p axcenity-avatar --no-fail-fast every_benchmark_character_is_sound
+FAIL [   0.018s] (1/1) axcenity-avatar::shipped_library every_benchmark_character_is_sound
+Starting 1 test across 3 binaries (45 tests skipped)
+Summary [   0.019s] 1 test run: 0 passed, 1 failed, 45 skipped
+assertion `left == right` failed: realistic-blend-body-default.character.json wears its choices
+left: ["axcenity/realistic-boxer-briefs"]
+panicked at crates\avatar\tests\shipped_library.rs:258:9:
+right: []
+
+## cargo nextest run -p axcenity-project --no-fail-fast the_walk_state
+FAIL [   0.034s] (1/1) axcenity-project default_humanoid::tests::the_walk_state_plays_the_walk_take_at_the_walk_speed
+Starting 1 test across 1 binary (242 tests skipped)
+Summary [   0.036s] 1 test run: 0 passed, 1 failed, 242 skipped
+assertion `left == right` failed
+error: test run failed
+left: "Run"
+panicked at crates\project\src\default_humanoid.rs:581:9:
+right: "Walk"
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 242 filtered out; finished in 0.03s
