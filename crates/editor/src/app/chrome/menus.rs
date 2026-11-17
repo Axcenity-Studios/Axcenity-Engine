@@ -2,9 +2,9 @@ use super::*;
 
 impl EditorApp {
     /// The header, which is also the window's title bar, like VS Code's (see
-    /// `window_frame.rs`): the logo and menus, the window title in the
-    /// middle, then Play's badge, Settings and the window buttons. Its empty
-    /// space drags the window.
+    /// `window_frame.rs`): the logo and menus, the search box (like Visual
+    /// Studio's), the window title in the middle, then Play's badge,
+    /// Settings and the window buttons. Its empty space drags the window.
     pub(in crate::app) fn title_bar(&mut self, ui: &mut egui::Ui) {
         let bar = ui.max_rect();
         // First, so the menus and buttons added after it sit on top.
@@ -33,7 +33,9 @@ impl EditorApp {
             )
             .inner;
 
-        // Centred on the window, but kept clear of the menus and buttons.
+        let free = self.header_search(ui, free);
+        // Centred on the window, but kept clear of the menus, the search
+        // box and the buttons.
         let span = free.shrink2(egui::vec2(16.0, 0.0));
         if span.width() > 48.0 {
             let palette = theme::palette(ui.ctx());
@@ -53,6 +55,63 @@ impl EditorApp {
                 palette.text_secondary,
             );
         }
+    }
+
+    /// Universal search's box, at the left of `free` (the room between the
+    /// menus and the chips at the right), with a project open: as wide as
+    /// leaves the title room, or, in a narrow window, a magnifying glass
+    /// that opens search in the middle. Returns the room left for the title.
+    fn header_search(&mut self, ui: &mut egui::Ui, free: egui::Rect) -> egui::Rect {
+        // The start screen and Character Studio have searches of their own;
+        // with no project, Ctrl+K still opens search in the middle.
+        if self.project.is_none() || self.character_workspace.is_some() {
+            return free;
+        }
+        const GAP: f32 = 8.0;
+        const MIN_BOX: f32 = 170.0;
+        const MAX_BOX: f32 = 320.0;
+        // Room kept for the title before the box shrinks.
+        const TITLE_ROOM: f32 = 180.0;
+        let room = free.width() - GAP;
+        let shortcut = crate::shortcuts::Action::Search.menu_text(ui.ctx());
+        let middle = free.center().y;
+        let (width, icon_only) = if room >= MIN_BOX {
+            ((room - TITLE_ROOM).clamp(MIN_BOX, MAX_BOX), false)
+        } else if room >= 28.0 {
+            (26.0, true)
+        } else {
+            return free;
+        };
+        let height = if icon_only {
+            26.0
+        } else {
+            crate::command_palette::HEADER_BOX_HEIGHT
+        };
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(free.left() + GAP, middle - height / 2.0),
+            egui::vec2(width, height),
+        );
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            |ui| {
+                if self.loading.is_some() {
+                    ui.disable();
+                }
+                if icon_only {
+                    let tip = format!("Search ({shortcut})");
+                    if widgets::icon_button(ui, icons::MAGNIFYING_GLASS, &tip, self.palette.open)
+                        .clicked()
+                    {
+                        self.palette.toggle();
+                    }
+                } else {
+                    self.palette.header_box(ui, width, &shortcut);
+                }
+            },
+        );
+        egui::Rect::from_min_max(egui::pos2(rect.right(), free.top()), free.max)
     }
 
     /// The logo and the menus, then Play's badge and Settings at the right.

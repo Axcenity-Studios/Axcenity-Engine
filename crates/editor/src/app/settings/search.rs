@@ -94,12 +94,6 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         ),
         setting(
             Layout,
-            "Panels",
-            &["Show panel", "Hide panel", "Docking", "Windows"],
-            "Which panels show.",
-        ),
-        setting(
-            Layout,
             "Layouts",
             &[
                 "Layout presets",
@@ -108,8 +102,11 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
                 "Scripting layout",
                 "Animation layout",
                 "Modeling layout",
+                "Reset layout",
+                "Panels",
+                "Docking",
             ],
-            "Switch to a preset for a task or a layout you saved, or save this one.",
+            "Switch to a preset for a task or a layout you saved, save this one, or reset it.",
         ),
         setting(
             Layout,
@@ -296,9 +293,14 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         ),
         setting(
             Layout,
-            "Ribbon",
-            &["Custom ribbon tab", "Toolbar"],
-            "Make your own ribbon tab from any of the ribbon's groups.",
+            "Ribbon tabs",
+            &[
+                "Custom ribbon tab",
+                "Tab icon",
+                "Toolbar",
+                "Customize ribbon",
+            ],
+            "Make your own ribbon tabs from any of the ribbon's groups, with any icon, and edit or delete them.",
         ),
         setting(
             Project,

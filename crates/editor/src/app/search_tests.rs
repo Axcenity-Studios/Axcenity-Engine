@@ -476,3 +476,264 @@ fn search_cost_at_100_1000_and_10000_objects() {
         );
     }
 }
+
+/// One whole-editor frame `size` big, with the header's search box.
+fn editor_frame(
+    app: &mut EditorApp,
+    ctx: &egui::Context,
+    clock: &mut f64,
+    size: egui::Vec2,
+    events: Vec<egui::Event>,
+) {
+    *clock += 0.05;
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+        events,
+        time: Some(*clock),
+        ..Default::default()
+    };
+    let _ = crate::theme::run(ctx, input, |ui| app.frame(ui, None));
+}
+
+fn click_events(at: egui::Pos2) -> [Vec<egui::Event>; 3] {
+    use super::ui_designer_tests::press;
+    [
+        vec![egui::Event::PointerMoved(at)],
+        vec![press(at, true)],
+        vec![press(at, false)],
+    ]
+}
+
+const WIDE: egui::Vec2 = egui::vec2(1280.0, 800.0);
+
+/// The header's search box (like Visual Studio's): clicking it and typing
+/// searches, the results drop down under it, and Enter runs the pick.
+#[test]
+fn the_header_search_box_drops_its_results_under_it_and_runs_the_pick() {
+    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let ctx = theme::test_context();
+    let mut clock = 0.0;
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    let rect = app
+        .palette
+        .header_rect(&ctx)
+        .expect("the header has a search box");
+    assert!(
+        rect.bottom() <= crate::window_frame::HEIGHT,
+        "it's in the header"
+    );
+    assert!(!app.palette.open);
+    for events in click_events(rect.center()) {
+        editor_frame(&mut app, &ctx, &mut clock, WIDE, events);
+    }
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    assert!(app.palette.docked(), "it opens under the box");
+    assert_eq!(
+        ctx.memory(|memory| memory.focused()),
+        Some(crate::command_palette::header_field_id()),
+        "typing goes into the box"
+    );
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![egui::Event::Text("New Ribbon Tab".into())],
+    );
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    assert_eq!(app.palette.query, "New Ribbon Tab");
+    let results = ctx
+        .memory(|memory| memory.area_rect(egui::Id::new("command palette")))
+        .expect("the results show");
+    assert!(results.top() >= rect.bottom(), "under the box");
+    assert!(
+        (results.left() - rect.left()).abs() < 1.0,
+        "lined up with it"
+    );
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(egui::Key::Enter, egui::Modifiers::NONE)],
+    );
+    assert!(!app.palette.open);
+    assert!(app.ribbon_tabs.is_editing(), "the command ran");
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    assert_ne!(
+        ctx.memory(|memory| memory.focused()),
+        Some(crate::command_palette::header_field_id()),
+        "the box lets go of the keyboard"
+    );
+}
+
+/// Ctrl+K puts the caret in the header's box, as Ctrl+Q does in Visual
+/// Studio; picking an object selects it, and Escape closes the results.
+#[test]
+fn ctrl_k_focuses_the_header_box_and_an_object_can_be_picked() {
+    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let ctx = theme::test_context();
+    let mut clock = 0.0;
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(egui::Key::K, egui::Modifiers::COMMAND)],
+    );
+    assert!(app.palette.docked());
+    assert_eq!(
+        ctx.memory(|memory| memory.focused()),
+        Some(crate::command_palette::header_field_id())
+    );
+    for text in ["P", "ad"] {
+        editor_frame(
+            &mut app,
+            &ctx,
+            &mut clock,
+            WIDE,
+            vec![egui::Event::Text(text.into())],
+        );
+    }
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(egui::Key::Enter, egui::Modifiers::NONE)],
+    );
+    let selected = app.selected.and_then(|id| app.world.get(id));
+    assert_eq!(selected.map(|pad| pad.name()), Some("Pad"));
+    // Ctrl+Shift+P opens the box on commands; Escape closes it.
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(
+            egui::Key::P,
+            egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+        )],
+    );
+    assert!(app.palette.docked());
+    assert!(app.palette.query.starts_with('>'));
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(egui::Key::Escape, egui::Modifiers::NONE)],
+    );
+    assert!(!app.palette.open);
+    editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
+    assert_ne!(
+        ctx.memory(|memory| memory.focused()),
+        Some(crate::command_palette::header_field_id())
+    );
+}
+
+/// A narrow window has a magnifying glass instead of the box, and the
+/// start screen has none: search opens in the middle there.
+#[test]
+fn narrow_windows_and_the_start_screen_search_in_the_middle() {
+    let ctx = theme::test_context();
+    let mut clock = 0.0;
+    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let narrow = egui::vec2(620.0, 600.0);
+    editor_frame(&mut app, &ctx, &mut clock, narrow, Vec::new());
+    editor_frame(&mut app, &ctx, &mut clock, narrow, Vec::new());
+    assert_eq!(app.palette.header_rect(&ctx), None, "no room for the box");
+    editor_frame(
+        &mut app,
+        &ctx,
+        &mut clock,
+        narrow,
+        vec![key(egui::Key::K, egui::Modifiers::COMMAND)],
+    );
+    assert!(app.palette.open);
+    assert!(!app.palette.docked(), "in the middle");
+
+    let ctx = theme::test_context();
+    let mut start = EditorApp::new(None);
+    editor_frame(&mut start, &ctx, &mut clock, WIDE, Vec::new());
+    editor_frame(&mut start, &ctx, &mut clock, WIDE, Vec::new());
+    assert_eq!(
+        start.palette.header_rect(&ctx),
+        None,
+        "not on the start screen"
+    );
+    editor_frame(
+        &mut start,
+        &ctx,
+        &mut clock,
+        WIDE,
+        vec![key(egui::Key::K, egui::Modifiers::COMMAND)],
+    );
+    assert!(start.palette.open && !start.palette.docked());
+}
+
+/// With `AXCENITY_SNAPSHOTS` set: the header's search with its results
+/// open, in both themes, and a narrow window's magnifying glass.
+#[test]
+fn the_header_search_draws_in_both_themes() {
+    let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS").map(std::path::PathBuf::from) else {
+        return;
+    };
+    for (name, appearance, size, query) in [
+        (
+            "header-search-dark",
+            theme::Appearance::default(),
+            egui::vec2(1280.0, 720.0),
+            Some("pa"),
+        ),
+        (
+            "header-search-light",
+            theme::Appearance {
+                theme: theme::ThemeChoice::Light,
+                ..theme::Appearance::default()
+            },
+            egui::vec2(1280.0, 720.0),
+            Some("pa"),
+        ),
+        (
+            "header-search-closed-dark",
+            theme::Appearance::default(),
+            egui::vec2(1280.0, 300.0),
+            None,
+        ),
+        (
+            "header-search-narrow-light",
+            theme::Appearance {
+                theme: theme::ThemeChoice::Light,
+                ..theme::Appearance::default()
+            },
+            egui::vec2(620.0, 300.0),
+            None,
+        ),
+    ] {
+        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut frame = 0;
+        crate::snapshot::snapshot(
+            &folder.join(format!("{name}.png")),
+            size,
+            vec![Vec::new(); 5],
+            |ui| {
+                let ctx = &ui.ctx().clone();
+                theme::apply(ctx, &appearance);
+                if let Some(query) = query {
+                    if frame == 1 {
+                        app.palette.toggle();
+                    }
+                    if frame == 2 {
+                        app.palette.query = query.to_owned();
+                    }
+                }
+                frame += 1;
+                app.frame(ui, None);
+            },
+        );
+        assert_eq!(app.palette.docked(), query.is_some(), "{name}");
+    }
+}

@@ -1,5 +1,8 @@
 //! Universal search (Ctrl+K), the command palette (Ctrl+Shift+P) and Quick
-//! Open (Ctrl+P): one searchable window over the whole editor. Its rows come
+//! Open (Ctrl+P): one search over the whole editor. With a project open it's
+//! the search box in the header, like Visual Studio's, whose results drop
+//! down under it ([`Palette::header_box`]); otherwise (the start screen, a
+//! window too narrow for the box) it's a window at the top middle. Its rows come
 //! from search providers (`app/search.rs`): commands and tools, scene
 //! objects, assets, scripts, levels, settings and the selected object's
 //! properties, each row tagged with its [`Category`]. Ranking is a fuzzy
@@ -15,6 +18,10 @@ use crate::theme::{self, icons, type_scale};
 const RECENT_LIMIT: usize = 20;
 /// How many rows the list shows at most.
 const SHOWN_LIMIT: usize = 200;
+/// How wide the results under the header's search box are, at least.
+const DROPDOWN_WIDTH: f32 = 560.0;
+/// How tall the header's search box is.
+pub const HEADER_BOX_HEIGHT: f32 = 24.0;
 /// What a query starting with this searches: commands and tools only.
 pub const COMMAND_PREFIX: char = '>';
 
@@ -180,6 +187,12 @@ pub struct Palette {
     cache: Option<RankCache>,
     /// Bumped by [`Palette::used`], so the ranking is made again.
     recent_version: u64,
+    /// Where the header's search box was drawn, and in which pass. While
+    /// it's there, the palette opens under it instead of in the middle.
+    anchor: Option<(egui::Rect, u64)>,
+    /// Whether the palette showed under the header's box this frame (so
+    /// the box is the field typed in).
+    docked: bool,
 }
 
 impl Palette {
@@ -200,11 +213,142 @@ impl Palette {
         if self.open && self.query.starts_with(COMMAND_PREFIX) == commands {
             self.open = false;
         } else {
-            self.open = true;
-            self.query = query.to_owned();
-            self.scope = None;
-            self.selected = 0;
-            self.focus = true;
+            self.open_with(query);
+        }
+    }
+
+    fn open_with(&mut self, query: &str) {
+        self.open = true;
+        self.query = query.to_owned();
+        self.scope = None;
+        self.selected = 0;
+        self.focus = true;
+    }
+
+    /// Where the header's search box is, if it was drawn in the last pass.
+    fn anchored(&self, ctx: &egui::Context) -> Option<egui::Rect> {
+        let pass = theme::frame_number(ctx);
+        self.anchor
+            .filter(|(_, drawn)| drawn + 2 >= pass)
+            .map(|(rect, _)| rect)
+    }
+
+    /// Where the header's search box is, if it was drawn in the last pass.
+    #[cfg(test)]
+    pub fn header_rect(&self, ctx: &egui::Context) -> Option<egui::Rect> {
+        self.anchored(ctx)
+    }
+
+    /// Whether the results are showing under the header's search box.
+    pub fn docked(&self) -> bool {
+        self.open && self.docked
+    }
+
+    /// The search box in the header, `width` wide: a field reading
+    /// "Search (Ctrl+K)" until it's clicked or Ctrl+K is pressed, then the
+    /// field the query is typed in, with the results dropping down under it
+    /// ([`ui`](Self::ui) draws them). `shortcut` is how the menus write
+    /// Ctrl+K on this computer.
+    pub fn header_box(&mut self, ui: &mut egui::Ui, width: f32, shortcut: &str) -> egui::Response {
+        let ctx = ui.ctx().clone();
+        let palette = theme::palette(&ctx);
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(width, HEADER_BOX_HEIGHT), egui::Sense::click());
+        let hint = format!("Search ({shortcut})");
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::TextEdit, true, &hint));
+        self.anchor = Some((rect, theme::frame_number(&ctx)));
+        let typing = self.docked();
+        let hover = theme::ease(&ctx, response.id.with("hover"), response.hovered());
+        let (fill, stroke) = if typing {
+            (palette.surface, palette.accent)
+        } else {
+            (
+                theme::mix(palette.control, palette.control_hover, hover),
+                theme::mix(palette.border, palette.border_strong, hover),
+            )
+        };
+        ui.painter().rect(
+            rect,
+            theme::radius::CONTROL,
+            fill,
+            egui::Stroke::new(1.0_f32, stroke),
+            egui::StrokeKind::Inside,
+        );
+        ui.painter().text(
+            rect.left_center() + egui::vec2(13.0, 0.0),
+            egui::Align2::CENTER_CENTER,
+            icons::MAGNIFYING_GLASS,
+            egui::FontId::proportional(theme::size::ICON_SMALL),
+            if typing {
+                palette.accent
+            } else {
+                palette.text_weak
+            },
+        );
+        let text_rect = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + 26.0, rect.top()),
+            egui::pos2(rect.right() - 8.0, rect.bottom()),
+        );
+        if typing {
+            let mut field_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(text_rect)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            );
+            let before = self.query.clone();
+            let field = field_ui.add(
+                egui::TextEdit::singleline(&mut self.query)
+                    .id(header_field_id())
+                    .frame(egui::Frame::NONE)
+                    .margin(egui::Margin::ZERO)
+                    .hint_text(egui::RichText::new(&hint).color(palette.text_muted))
+                    .desired_width(text_rect.width()),
+            );
+            self.take_focus(&field);
+            if self.query != before {
+                self.selected = 0;
+                ctx.request_repaint();
+            }
+        } else {
+            // Closed by Ctrl+K or a menu while it was typed in.
+            ctx.memory_mut(|memory| memory.surrender_focus(header_field_id()));
+            let text = one_line(
+                ui,
+                &hint,
+                egui::FontId::proportional(type_scale::BODY),
+                palette.text_muted,
+                text_rect.width(),
+            );
+            ui.painter().galley(
+                egui::pos2(text_rect.left(), rect.center().y - text.size().y / 2.0),
+                text,
+                palette.text_muted,
+            );
+            if response.hovered() {
+                ctx.set_cursor_icon(egui::CursorIcon::Text);
+            }
+            if response.clicked() {
+                self.open_with("");
+                ctx.request_repaint();
+            }
+        }
+        response
+            .on_hover_text("Search commands, tools, objects, scripts, assets, levels and settings")
+    }
+
+    /// Focuses `field` if it was asked for, with the caret at the end
+    /// (after a `>`).
+    fn take_focus(&mut self, field: &egui::Response) {
+        if !std::mem::take(&mut self.focus) {
+            return;
+        }
+        field.request_focus();
+        if let Some(mut state) = egui::TextEdit::load_state(&field.ctx, field.id) {
+            let end = egui::text::CCursor::new(self.query.chars().count());
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::one(end)));
+            state.store(&field.ctx, field.id);
         }
     }
 
@@ -260,7 +404,9 @@ impl Palette {
 
     /// Draws the palette over `buckets` and returns the row picked (with
     /// Enter or a click). Escape or a click outside closes it. Tab and
-    /// Shift+Tab step through the chips that have matches.
+    /// Shift+Tab step through the chips that have matches. Under the
+    /// header's search box when it showed in the last pass (it's typed in
+    /// there), else a window with its own field at the top middle.
     pub fn ui(
         &mut self,
         ctx: &egui::Context,
@@ -284,8 +430,13 @@ impl Palette {
                 back_tab,
             )
         });
+        let anchor = self.anchored(ctx);
+        self.docked = anchor.is_some();
         if escape {
             self.open = false;
+            if anchor.is_some() {
+                ctx.memory_mut(|memory| memory.surrender_focus(header_field_id()));
+            }
             return None;
         }
         // Rank first for this frame's chips; Tab moves among them.
@@ -306,40 +457,55 @@ impl Palette {
 
         let mut picked = None;
         let screen = ctx.content_rect();
-        let width = (screen.width() - 40.0).clamp(240.0, 640.0);
+        let (at, width) = match anchor {
+            // Under the box, at least as wide as it, kept on the screen.
+            Some(rect) => {
+                let width = rect.width().max(DROPDOWN_WIDTH).min(screen.width() - 16.0);
+                let x = rect
+                    .left()
+                    .min(screen.right() - 8.0 - width)
+                    .max(screen.left() + 8.0);
+                (egui::pos2(x, rect.bottom() + 4.0), width)
+            }
+            None => {
+                let width = (screen.width() - 40.0).clamp(240.0, 640.0);
+                (
+                    egui::pos2(screen.center().x - width / 2.0, screen.top() + 60.0),
+                    width,
+                )
+            }
+        };
         let area = egui::Area::new(egui::Id::new("command palette"))
             .order(egui::Order::Foreground)
-            .fixed_pos(egui::pos2(
-                screen.center().x - width / 2.0,
-                screen.top() + 60.0,
-            ))
+            .fixed_pos(at)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     ui.set_width(width);
-                    let hint = if self.query.starts_with(COMMAND_PREFIX) {
-                        "Run a command or pick a tool"
-                    } else {
-                        "Search commands, objects, assets, scripts and settings"
-                    };
-                    let before = self.query.clone();
-                    let field = ui.add(
-                        egui::TextEdit::singleline(&mut self.query)
-                            .hint_text(hint)
-                            .desired_width(f32::INFINITY),
-                    );
-                    if std::mem::take(&mut self.focus) {
-                        field.request_focus();
+                    if anchor.is_none() {
+                        let hint = if self.query.starts_with(COMMAND_PREFIX) {
+                            "Run a command or pick a tool"
+                        } else {
+                            "Search commands, objects, assets, scripts and settings"
+                        };
+                        let before = self.query.clone();
+                        let field = ui.add(
+                            egui::TextEdit::singleline(&mut self.query)
+                                .hint_text(hint)
+                                .desired_width(f32::INFINITY),
+                        );
                         // Keep a `>` the caret is after.
-                        if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), field.id) {
-                            let end = egui::text::CCursor::new(self.query.chars().count());
-                            state
-                                .cursor
-                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
-                            state.store(ui.ctx(), field.id);
+                        self.take_focus(&field);
+                        if self.query != before {
+                            self.selected = 0;
                         }
-                    }
-                    if self.query != before {
-                        self.selected = 0;
+                    } else if self.query.starts_with(COMMAND_PREFIX) {
+                        ui.label(
+                            egui::RichText::new(
+                                "Commands and tools. Backspace the > to search everything.",
+                            )
+                            .size(type_scale::CAPTION)
+                            .color(palette.text_weak),
+                        );
                     }
                     self.chips_ui(ui);
                     if enter && let Some(&hit) = ranked.get(self.selected) {
@@ -374,11 +540,10 @@ impl Palette {
                     footer_ui(ui, highlighted, &palette);
                 });
             });
+        let pointer = ctx.input(|input| input.pointer.interact_pos().unwrap_or_default());
         let clicked_outside = ctx.input(|input| input.pointer.any_pressed())
-            && !area.response.rect.contains(
-                ctx.input(|input| input.pointer.interact_pos())
-                    .unwrap_or_default(),
-            );
+            && !area.response.rect.contains(pointer)
+            && !anchor.is_some_and(|rect| rect.contains(pointer));
         if clicked_outside {
             self.open = false;
         }
@@ -389,6 +554,9 @@ impl Palette {
             }
             self.used(&entry.key.clone());
             self.open = false;
+        }
+        if !self.open && anchor.is_some() {
+            ctx.memory_mut(|memory| memory.surrender_focus(header_field_id()));
         }
         picked
     }
@@ -449,6 +617,11 @@ impl Palette {
             }
         });
     }
+}
+
+/// The header search box's text field.
+pub fn header_field_id() -> egui::Id {
+    egui::Id::new("header search field")
 }
 
 /// One row: the icon and title, the detail after it, then at the right

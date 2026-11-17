@@ -1,16 +1,26 @@
 //! The tabs above the ribbon, like Roblox Studio's Home, Model and Test:
 //! each tab shows some of the ribbon's groups. Besides the built-in tabs,
 //! people can make their own ("custom tabs") from any groups, in any
-//! order. Custom tabs are saved between runs, like the theme.
+//! order, with any Phosphor icon. Custom tabs are saved between runs, like
+//! the theme.
 //!
 //! This module only knows which groups a tab has; the app draws the groups
-//! themselves (`EditorApp::ribbon_group`).
+//! themselves (`EditorApp::ribbon_group`), in the ribbon and in the tab
+//! editor's preview.
 
 use eframe::egui;
 use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, icons, type_scale};
 use crate::widgets;
+
+mod editor;
+mod icon_picker;
+
+use editor::TabEditor;
+pub use icon_picker::{DEFAULT_ICON, icon_glyph};
+#[cfg(test)]
+pub use icon_picker::{SUGGESTED_ICONS, find_icons, icon_label};
 
 /// One captioned group of ribbon buttons.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -245,11 +255,27 @@ impl BuiltInTab {
     }
 }
 
-/// A tab someone made: a name and the groups it shows, in order.
+/// A tab someone made: a name, an icon and the groups it shows, in order.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CustomTab {
     pub name: String,
     pub groups: Vec<RibbonGroup>,
+    /// The name of its Phosphor icon (`"ROCKET"`), as `icons::ICONS` lists
+    /// them: a name, not the glyph, so a font update can't change it.
+    /// Tabs saved before tabs had icons get the star.
+    #[serde(default = "default_icon")]
+    pub icon: String,
+}
+
+impl CustomTab {
+    /// The glyph in front of its name.
+    pub fn glyph(&self) -> &'static str {
+        icon_glyph(&self.icon)
+    }
+}
+
+fn default_icon() -> String {
+    DEFAULT_ICON.to_owned()
 }
 
 /// Which tab is showing.
@@ -273,13 +299,6 @@ pub struct RibbonTabs {
     active: ActiveTab,
     pub custom: Vec<CustomTab>,
     editing: Option<TabEditor>,
-}
-
-/// A custom tab being made (`index` `None`) or changed.
-struct TabEditor {
-    index: Option<usize>,
-    name: String,
-    groups: Vec<RibbonGroup>,
 }
 
 impl Default for RibbonTabs {
@@ -313,11 +332,13 @@ impl RibbonTabs {
         }
     }
 
-    /// Adds a custom tab and shows it. Groups listed twice are kept once.
-    pub fn add_custom(&mut self, name: &str, groups: &[RibbonGroup]) {
+    /// Adds a custom tab with the icon called `icon` and shows it. Groups
+    /// listed twice are kept once.
+    pub fn add_custom(&mut self, name: &str, icon: &str, groups: &[RibbonGroup]) {
         self.custom.push(CustomTab {
             name: name.trim().to_owned(),
             groups: unique(groups),
+            icon: icon.to_owned(),
         });
         self.active = ActiveTab::Custom(self.custom.len() - 1);
     }
@@ -370,7 +391,8 @@ impl RibbonTabs {
             let mut remove = None;
             for index in 0..self.custom.len() {
                 let active = ActiveTab::Custom(index);
-                let label = theme::with_icon(icons::STAR, &self.custom[index].name);
+                let tab = &self.custom[index];
+                let label = theme::with_icon(tab.glyph(), &tab.name);
                 let response = tab_button(ui, &label, self.active == active)
                     .on_hover_text("Your tab. Right-click to change or delete it.");
                 if self.active == active {
@@ -389,6 +411,16 @@ impl RibbonTabs {
                         .clicked()
                     {
                         self.edit(Some(index));
+                        ui.close();
+                    }
+                    if ui
+                        .button(theme::menu_item(ui.ctx(), icons::SMILEY, "Change Icon…"))
+                        .clicked()
+                    {
+                        self.edit(Some(index));
+                        if let Some(editor) = &mut self.editing {
+                            editor.picking_icon = true;
+                        }
                         ui.close();
                     }
                     if ui
@@ -459,127 +491,6 @@ impl RibbonTabs {
         active_rect
     }
 
-    /// Opens the window that makes a custom tab (`None`) or changes one.
-    pub fn edit(&mut self, index: Option<usize>) {
-        let (name, groups) = match index.and_then(|index| self.custom.get(index)) {
-            Some(tab) => (tab.name.clone(), tab.groups.clone()),
-            None => (format!("My Tab {}", self.custom.len() + 1), Vec::new()),
-        };
-        self.editing = Some(TabEditor {
-            index,
-            name,
-            groups,
-        });
-    }
-
-    /// Whether the custom tab window is open.
-    #[cfg(test)]
-    pub fn is_editing(&self) -> bool {
-        self.editing.is_some()
-    }
-
-    /// The custom tab window, while it's open.
-    pub fn editor_window(&mut self, ctx: &egui::Context) {
-        let Some(editor) = &mut self.editing else {
-            return;
-        };
-        let mut open = true;
-        let mut save = false;
-        let mut cancel = false;
-        let title = if editor.index.is_some() {
-            "Edit Tab"
-        } else {
-            "New Tab"
-        };
-        widgets::tool_window(icons::PENCIL_SIMPLE, title)
-            .fit(380.0)
-            .show(ctx, &mut open, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Name");
-                    ui.text_edit_singleline(&mut editor.name);
-                });
-                ui.add_space(6.0);
-                ui.strong("In this tab");
-                if editor.groups.is_empty() {
-                    ui.weak("Nothing yet. Add groups from the list below.");
-                }
-                let mut action = None;
-                let count = editor.groups.len();
-                for (index, group) in editor.groups.iter().enumerate() {
-                    ui.horizontal(|ui| {
-                        ui.label(group.label());
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.small_button(icons::X).on_hover_text("Remove").clicked() {
-                                action = Some(Reorder::Remove(index));
-                            }
-                            if ui
-                                .add_enabled(
-                                    index + 1 < count,
-                                    egui::Button::new(icons::ARROW_DOWN).small(),
-                                )
-                                .on_hover_text("Move right in the ribbon")
-                                .clicked()
-                            {
-                                action = Some(Reorder::Swap(index, index + 1));
-                            }
-                            if ui
-                                .add_enabled(index > 0, egui::Button::new(icons::ARROW_UP).small())
-                                .on_hover_text("Move left in the ribbon")
-                                .clicked()
-                            {
-                                action = Some(Reorder::Swap(index - 1, index));
-                            }
-                        });
-                    });
-                }
-                match action {
-                    Some(Reorder::Remove(index)) => {
-                        editor.groups.remove(index);
-                    }
-                    Some(Reorder::Swap(a, b)) => editor.groups.swap(a, b),
-                    None => {}
-                }
-                ui.add_space(6.0);
-                ui.strong("Add a group");
-                for group in RibbonGroup::ALL {
-                    if editor.groups.contains(&group) {
-                        continue;
-                    }
-                    if ui
-                        .button(theme::with_icon(icons::PLUS, group.label()))
-                        .on_hover_text(group.description())
-                        .clicked()
-                    {
-                        editor.groups.push(group);
-                    }
-                }
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    let ready = !editor.name.trim().is_empty() && !editor.groups.is_empty();
-                    save = ui
-                        .add_enabled(ready, egui::Button::new("Save"))
-                        .on_disabled_hover_text("Give the tab a name and at least one group.")
-                        .clicked();
-                    cancel = ui.button("Cancel").clicked();
-                });
-            });
-        if save {
-            let editor = self.editing.take().expect("checked above");
-            match editor.index.filter(|&index| index < self.custom.len()) {
-                Some(index) => {
-                    self.custom[index] = CustomTab {
-                        name: editor.name.trim().to_owned(),
-                        groups: unique(&editor.groups),
-                    };
-                    self.active = ActiveTab::Custom(index);
-                }
-                None => self.add_custom(&editor.name, &editor.groups),
-            }
-        } else if cancel || !open {
-            self.editing = None;
-        }
-    }
-
     /// The custom tabs and the tab showing, as text for eframe's storage.
     pub fn to_text(&self) -> String {
         serde_json::to_string(&Saved {
@@ -636,11 +547,6 @@ fn tab_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
         color,
     );
     response
-}
-
-enum Reorder {
-    Remove(usize),
-    Swap(usize, usize),
 }
 
 /// `groups` with any repeats left out, in order.
@@ -751,6 +657,7 @@ mod tests {
         assert_eq!(tabs.groups(), BuiltInTab::Home.groups());
         tabs.add_custom(
             " Building ",
+            DEFAULT_ICON,
             &[RibbonGroup::Parts, RibbonGroup::Tools, RibbonGroup::Parts],
         );
         assert_eq!(tabs.active, ActiveTab::Custom(0));
@@ -761,8 +668,8 @@ mod tests {
     #[test]
     fn deleting_the_showing_custom_tab_goes_back_home() {
         let mut tabs = RibbonTabs::default();
-        tabs.add_custom("One", &[RibbonGroup::Game]);
-        tabs.add_custom("Two", &[RibbonGroup::Ui]);
+        tabs.add_custom("One", DEFAULT_ICON, &[RibbonGroup::Game]);
+        tabs.add_custom("Two", DEFAULT_ICON, &[RibbonGroup::Ui]);
         tabs.remove_custom(0);
         assert_eq!(tabs.active, ActiveTab::Custom(0));
         assert_eq!(tabs.groups(), [RibbonGroup::Ui]);
@@ -773,12 +680,50 @@ mod tests {
     #[test]
     fn custom_tabs_survive_saving_and_bad_text_is_ignored() {
         let mut tabs = RibbonTabs::default();
-        tabs.add_custom("Lights", &[RibbonGroup::Effects, RibbonGroup::Game]);
+        tabs.add_custom(
+            "Lights",
+            DEFAULT_ICON,
+            &[RibbonGroup::Effects, RibbonGroup::Game],
+        );
+        tabs.add_custom("Rockets", "ROCKET", &[RibbonGroup::Parts]);
         let reloaded = RibbonTabs::from_text(&tabs.to_text());
         assert_eq!(reloaded.custom, tabs.custom);
-        assert_eq!(reloaded.active, ActiveTab::Custom(0));
+        assert_eq!(reloaded.custom[1].icon, "ROCKET");
+        assert_eq!(reloaded.custom[1].glyph(), icons::ROCKET);
+        assert_eq!(reloaded.active, ActiveTab::Custom(1));
         let broken = RibbonTabs::from_text("{");
         assert!(broken.custom.is_empty());
         assert_eq!(broken.active, ActiveTab::BuiltIn(BuiltInTab::Home));
+        // Saved before tabs had icons: the star, as then.
+        let old = RibbonTabs::from_text(
+            r#"{"active":{"Custom":0},"custom":[{"name":"Mine","groups":["Ui"]}]}"#,
+        );
+        assert_eq!(old.custom[0].icon, DEFAULT_ICON);
+        assert_eq!(old.custom[0].glyph(), icons::STAR);
+        assert_eq!(old.active, ActiveTab::Custom(0));
+        // An icon a later font doesn't have shows the star too.
+        let unknown = RibbonTabs::from_text(
+            r#"{"active":{"Custom":0},"custom":[{"name":"Mine","groups":["Ui"],"icon":"NO_SUCH_ICON"}]}"#,
+        );
+        assert_eq!(unknown.custom[0].glyph(), icons::STAR);
+    }
+
+    #[test]
+    fn icons_are_found_by_name_and_read_as_words() {
+        for name in SUGGESTED_ICONS {
+            assert!(
+                icons::ICONS.iter().any(|(icon, _)| icon == name),
+                "{name} is a Phosphor icon"
+            );
+        }
+        assert_eq!(icon_glyph("GAME_CONTROLLER"), icons::GAME_CONTROLLER);
+        assert_eq!(icon_label("GAME_CONTROLLER"), "Game controller");
+        assert_eq!(find_icons(""), SUGGESTED_ICONS);
+        let found = find_icons("game contr");
+        assert!(found.contains(&"GAME_CONTROLLER"), "{found:?}");
+        assert!(found.iter().all(|name| name.contains("GAME")));
+        assert!(find_icons("zzzz nothing").is_empty());
+        // Every icon can be found, not only the suggestions.
+        assert!(find_icons("acorn").contains(&"ACORN"));
     }
 }

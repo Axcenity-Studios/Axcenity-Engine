@@ -2000,7 +2000,7 @@ impl EditorApp {
         self.save_template_dialog(ctx);
         self.import_dropped(ctx);
         self.import_prompt(ctx, render_state);
-        self.ribbon_tabs.editor_window(ctx);
+        self.ribbon_tab_editor(ctx);
         self.start_thumbnail(ctx);
         if self.learn_open && self.project.is_some() {
             let folder = self.project.as_ref().map(|project| project.folder.clone());
@@ -2141,6 +2141,8 @@ mod plugin_tests;
 mod posing_tests;
 #[cfg(test)]
 mod prefab_tests;
+#[cfg(test)]
+mod ribbon_editor_tests;
 #[cfg(test)]
 mod scene_tools_tests;
 #[cfg(test)]
