@@ -1,11 +1,13 @@
 //! The Terrain Studio: a dockable panel for shaping and painting Terrains.
 //!
-//! At the top, the terrain being edited (or a way to make one). Then the
-//! tool palette, in three rows: sculpting brushes (Raise / Lower, Smooth,
-//! Flatten, Sculpt, Stamp, Noise), materials (Paint, Auto Materials) and
-//! whole-terrain tools (Generate, Erosion, Masks). Under it, only the
-//! settings of the tool picked, with the rarely needed ones folded away,
-//! then the terrain's layers and how the viewport shows the terrain.
+//! At the top, the terrain being edited (or a way to make one). Then three
+//! tabs (`tabs.rs`), each with its row of tools: Sculpt (Raise / Lower,
+//! Smooth, Flatten, Sculpt, Stamp, Noise, Holes), Materials (Paint,
+//! Foliage, Auto Materials, then the terrain's layers, biomes and scatter
+//! rules) and Terrain (Generate, Erosion, Masks, then its water and data).
+//! Under the tools, only the settings of the tool picked, with the rarely
+//! needed ones folded away; at the bottom, how the viewport shows the
+//! terrain, on every tab.
 //!
 //! With a brush picked, the viewport's left button sculpts or paints (see
 //! `viewport.rs`), Shift does the opposite (lowers, erases), and Ctrl+click
@@ -18,6 +20,7 @@
 //! is previewed in the viewport (without touching the world) until Apply.
 
 mod presets;
+mod tabs;
 
 pub(crate) mod biomes;
 mod layers;
@@ -53,6 +56,7 @@ pub use axcenity_editor_tools::terrain_tool::TerrainTool;
 pub use biomes::{BiomePreset, biome_of};
 pub use presets::{LayerPreset, layers_for};
 pub use scatter::{RulePreset, scatter_rules};
+pub use tabs::StudioTab;
 pub use world_presets::built_in_world_presets;
 
 /// A TerrainLayer's map properties, with what the studio calls them.
@@ -241,7 +245,16 @@ impl Default for NewTerrain {
 /// preferences: they stay when another project is opened.
 pub struct TerrainStudio {
     /// The tool picked, or `None` when the terrain isn't being edited.
+    /// Pick one with [`TerrainStudio::pick`], so its tab remembers it.
     pub tool: Option<TerrainTool>,
+    /// The tab shown while no tool is held (see [`TerrainStudio::tab`]).
+    tab: StudioTab,
+    /// Each tab's last-used tool, picked again on switching back to it.
+    last_tools: [Option<TerrainTool>; 3],
+    /// True once the tab shown last run has been read from egui's memory.
+    tab_restored: bool,
+    /// The selection the panel last saw, to notice a new one.
+    last_selected: Option<InstanceId>,
     /// The terrain being edited.
     pub target: Option<InstanceId>,
     pub brush: Brush,
@@ -306,6 +319,10 @@ impl Default for TerrainStudio {
     fn default() -> Self {
         Self {
             tool: None,
+            tab: StudioTab::Sculpt,
+            last_tools: [None; 3],
+            tab_restored: false,
+            last_selected: None,
             target: None,
             brush: Brush::default(),
             sculpt: SculptMode::Hill,
@@ -458,6 +475,7 @@ impl TerrainStudio {
     pub fn show(&mut self, ui: &mut egui::Ui, cx: &StudioContext) -> Vec<TerrainAction> {
         let mut actions = Vec::new();
         let target = self.resolve_target(cx.world, cx.selected);
+        self.settle_tab(ui.ctx(), cx);
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .show(ui, |ui| {
@@ -468,47 +486,63 @@ impl TerrainStudio {
                         return;
                     };
                     ui.add_space(6.0);
-                    self.palette(ui);
+                    self.tab_strip(ui);
+                    ui.add_space(4.0);
+                    let tab = self.tab();
+                    self.palette(ui, tab);
                     self.status(ui, &mut actions);
-                    let Some(tool) = self.tool else {
-                        hint(ui, "Pick a tool to start shaping the terrain.");
-                        self.layers_section(ui, cx, terrain, false, &mut actions);
-                        self.biomes_section(ui, cx, terrain, &mut actions);
-                        self.scatter_section(ui, cx, terrain, &mut actions);
-                        self.water_section(ui, cx.world, terrain, &mut actions);
-                        self.view_section(ui);
-                        return;
-                    };
-                    hint(ui, tool.hint());
-                    match tool {
-                        TerrainTool::Raise => self.brush_settings(ui, None),
-                        TerrainTool::Smooth => self.brush_settings(ui, None),
-                        TerrainTool::Flatten => self.flatten_settings(ui),
-                        TerrainTool::Sculpt => self.sculpt_settings(ui),
-                        TerrainTool::Stamp => self.stamp_settings(ui, &mut actions),
-                        TerrainTool::Noise => self.noise_settings(ui),
-                        TerrainTool::Holes => self.brush_settings(ui, None),
-                        TerrainTool::Paint => self.paint_settings(ui),
-                        TerrainTool::Foliage => self.foliage_settings(ui),
-                        TerrainTool::Auto => {
-                            self.auto_settings(ui, cx.world, terrain, &mut actions)
+                    match self.tool {
+                        Some(tool) => {
+                            hint(ui, tool.hint());
+                            self.tool_settings(ui, cx, terrain, tool, &mut actions);
                         }
-                        TerrainTool::Generate => {
-                            self.generate_settings(ui, cx, terrain, &mut actions)
-                        }
-                        TerrainTool::Erode => self.erosion_settings(ui, &mut actions),
-                        TerrainTool::Masks => self.mask_settings(ui),
+                        None => hint(ui, tab.pick_hint()),
                     }
-                    let painting = matches!(tool, TerrainTool::Paint | TerrainTool::Auto);
-                    self.layers_section(ui, cx, terrain, painting, &mut actions);
-                    self.biomes_section(ui, cx, terrain, &mut actions);
-                    self.scatter_section(ui, cx, terrain, &mut actions);
-                    self.water_section(ui, cx.world, terrain, &mut actions);
-                    self.view_section(ui);
-                    self.data_section(ui, cx.world, terrain, &mut actions);
+                    match tab {
+                        StudioTab::Sculpt => self.view_section(ui),
+                        StudioTab::Materials => {
+                            let painting =
+                                matches!(self.tool, Some(TerrainTool::Paint | TerrainTool::Auto));
+                            self.layers_section(ui, cx, terrain, painting, &mut actions);
+                            self.biomes_section(ui, cx, terrain, &mut actions);
+                            self.scatter_section(ui, cx, terrain, &mut actions);
+                            self.view_section(ui);
+                        }
+                        StudioTab::Terrain => {
+                            self.water_section(ui, cx.world, terrain, &mut actions);
+                            self.view_section(ui);
+                            self.data_section(ui, cx.world, terrain, &mut actions);
+                        }
+                    }
                 });
             });
         actions
+    }
+
+    /// The settings of the tool picked.
+    fn tool_settings(
+        &mut self,
+        ui: &mut egui::Ui,
+        cx: &StudioContext,
+        terrain: InstanceId,
+        tool: TerrainTool,
+        actions: &mut Vec<TerrainAction>,
+    ) {
+        match tool {
+            TerrainTool::Raise => self.brush_settings(ui, None),
+            TerrainTool::Smooth => self.brush_settings(ui, None),
+            TerrainTool::Flatten => self.flatten_settings(ui),
+            TerrainTool::Sculpt => self.sculpt_settings(ui),
+            TerrainTool::Stamp => self.stamp_settings(ui, actions),
+            TerrainTool::Noise => self.noise_settings(ui),
+            TerrainTool::Holes => self.brush_settings(ui, None),
+            TerrainTool::Paint => self.paint_settings(ui),
+            TerrainTool::Foliage => self.foliage_settings(ui),
+            TerrainTool::Auto => self.auto_settings(ui, cx.world, terrain, actions),
+            TerrainTool::Generate => self.generate_settings(ui, cx, terrain, actions),
+            TerrainTool::Erode => self.erosion_settings(ui, actions),
+            TerrainTool::Masks => self.mask_settings(ui),
+        }
     }
 
     fn header(
@@ -530,7 +564,7 @@ impl TerrainStudio {
                     && widgets::icon_button(ui, icons::X, "Put the tool down (Esc)", false)
                         .clicked()
                 {
-                    self.tool = None;
+                    self.pick(None);
                 }
             });
         });
@@ -628,7 +662,7 @@ impl TerrainStudio {
                     height: size.height,
                     samples: size.samples,
                 });
-                self.tool = Some(TerrainTool::Generate);
+                self.pick(Some(TerrainTool::Generate));
             }
         });
     }
@@ -680,63 +714,44 @@ impl TerrainStudio {
         );
     }
 
-    /// The tool palette: three rows of icon buttons, with each tool's name
-    /// beside its icon when the panel is wide enough for it.
-    fn palette(&mut self, ui: &mut egui::Ui) {
+    /// The tool palette: `tab`'s tools as icon buttons, with each tool's
+    /// name beside its icon when the panel is wide enough for it.
+    fn palette(&mut self, ui: &mut egui::Ui, tab: StudioTab) {
         let captions = ui.available_width() >= CAPTIONS_WIDTH;
-        let rows: [(&str, &[TerrainTool]); 3] = [
-            ("Sculpt", &TerrainTool::SCULPTING),
-            ("Materials", &TerrainTool::MATERIALS),
-            ("Terrain", &TerrainTool::WHOLE),
-        ];
-        for (title, tools) in rows {
-            ui.horizontal_wrapped(|ui| {
-                ui.add_sized(
-                    egui::vec2(64.0, ui.spacing().interact_size.y),
-                    egui::Label::new(
-                        egui::RichText::new(title)
-                            .size(theme::type_scale::SMALL)
-                            .color(theme::palette(ui.ctx()).text_weak),
+        ui.horizontal_wrapped(|ui| {
+            for &tool in tab.tools() {
+                let tooltip = match tool.key() {
+                    Some(key) => format!(
+                        "{} ({})
+{}",
+                        tool.label(),
+                        key.name(),
+                        tool.hint()
                     ),
-                );
-                let mut buttons = |ui: &mut egui::Ui| {
-                    for &tool in tools {
-                        let tooltip = match tool.key() {
-                            Some(key) => {
-                                format!("{} ({})\n{}", tool.label(), key.name(), tool.hint())
-                            }
-                            None => format!("{}\n{}", tool.label(), tool.hint()),
-                        };
-                        let picked = self.tool == Some(tool);
-                        let button = if captions {
-                            let palette = theme::palette(ui.ctx());
-                            ui.add(
-                                widgets::button(
-                                    Role::Ghost,
-                                    Some(tool.icon()),
-                                    tool.label(),
-                                    &palette,
-                                )
-                                .selected(picked)
-                                .frame(picked),
-                            )
-                            .on_hover_text(&tooltip)
-                        } else {
-                            widgets::icon_button(ui, tool.icon(), &tooltip, picked)
-                        };
-                        if button.clicked() {
-                            self.tool = if picked { None } else { Some(tool) };
-                        }
-                    }
+                    None => format!(
+                        "{}
+{}",
+                        tool.label(),
+                        tool.hint()
+                    ),
                 };
-                // Named buttons that wrap stay to the right of the row's title.
-                if captions {
-                    ui.horizontal_wrapped(buttons);
+                let picked = self.tool == Some(tool);
+                let button = if captions {
+                    let palette = theme::palette(ui.ctx());
+                    ui.add(
+                        widgets::button(Role::Ghost, Some(tool.icon()), tool.label(), &palette)
+                            .selected(picked)
+                            .frame(picked),
+                    )
+                    .on_hover_text(&tooltip)
                 } else {
-                    buttons(ui);
+                    widgets::icon_button(ui, tool.icon(), &tooltip, picked)
+                };
+                if button.clicked() {
+                    self.pick(if picked { None } else { Some(tool) });
                 }
-            });
-        }
+            }
+        });
         if let Some(tool) = self.tool {
             let palette = theme::palette(ui.ctx());
             ui.label(

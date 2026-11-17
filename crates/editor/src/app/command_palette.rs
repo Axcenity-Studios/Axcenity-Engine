@@ -1387,10 +1387,7 @@ impl EditorApp {
             Command::InsertControls if !playing => self.insert_controls_ui(),
             Command::TerrainStudio => self.layout.open(Pane::Terrain),
             Command::ModelStudio => self.layout.open(Pane::ModelStudio),
-            Command::TerrainTool(tool) if !playing => {
-                self.terrain.tool = Some(tool);
-                self.layout.open(Pane::Terrain);
-            }
+            Command::TerrainTool(tool) if !playing => self.pick_terrain_tool(tool),
             Command::PluginButton { plugin, button } if !playing => {
                 self.click_plugin_button(plugin, button);
             }

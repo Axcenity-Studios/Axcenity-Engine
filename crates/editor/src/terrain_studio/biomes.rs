@@ -434,7 +434,7 @@ impl TerrainStudio {
             .clicked()
             && let Some(layer) = paint_layer
         {
-            self.tool = Some(TerrainTool::Paint);
+            self.pick(Some(TerrainTool::Paint));
             self.paint_layer = layer;
         }
     }

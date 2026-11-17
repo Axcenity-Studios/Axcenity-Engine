@@ -87,24 +87,32 @@ fn the_panel_snapshots_with_its_main_tools() {
         world.set_name(layer, preset.name).unwrap();
         world.set_parent(layer, Some(terrain)).unwrap();
     }
-    for (tool, file) in [
-        (None, "terrain-none.png"),
-        (Some(TerrainTool::Smooth), "terrain-wide.png"),
-        (Some(TerrainTool::Raise), "terrain-raise.png"),
-        (Some(TerrainTool::Paint), "terrain-paint.png"),
-        (Some(TerrainTool::Generate), "terrain-generate.png"),
-        (Some(TerrainTool::Erode), "terrain-erode.png"),
+    // Each tab wide (the tools' names shown) and in a 260-point column.
+    let mut shots = vec![
+        (None, "terrain-none.png".to_owned(), 340.0),
+        (
+            Some(TerrainTool::Erode),
+            "terrain-erode.png".to_owned(),
+            340.0,
+        ),
+        // Short settings, so the Terrain tab's Water and data show.
+        (
+            Some(TerrainTool::Masks),
+            "terrain-tab-terrain-masks.png".to_owned(),
+            340.0,
+        ),
+    ];
+    for (tool, tab) in [
+        (TerrainTool::Raise, "sculpt"),
+        (TerrainTool::Paint, "materials"),
+        (TerrainTool::Generate, "terrain"),
     ] {
-        let mut studio = TerrainStudio {
-            tool,
-            ..TerrainStudio::default()
-        };
-        // The wide one shows the tools' names.
-        let width = if file == "terrain-wide.png" {
-            520.0
-        } else {
-            340.0
-        };
+        shots.push((Some(tool), format!("terrain-tab-{tab}-wide.png"), 520.0));
+        shots.push((Some(tool), format!("terrain-tab-{tab}-narrow.png"), 280.0));
+    }
+    for (tool, file, width) in shots {
+        let mut studio = TerrainStudio::default();
+        studio.pick(tool);
         crate::snapshot::snapshot(
             &std::path::PathBuf::from(&folder).join(file),
             egui::vec2(width, 900.0),
@@ -280,41 +288,59 @@ fn texts_drawn(
     studio: &mut TerrainStudio,
 ) -> Vec<String> {
     let ctx = crate::theme::test_context();
-    let mut output = None;
+    let mut texts = Vec::new();
     for _ in 0..2 {
-        let input = egui::RawInput {
-            screen_rect: Some(egui::Rect::from_min_size(
-                egui::Pos2::ZERO,
-                egui::vec2(260.0, 2400.0),
-            )),
-            ..Default::default()
-        };
-        output = Some(crate::theme::run(&ctx, input, |ui| {
-            egui::CentralPanel::default().show(ui, |ui| {
-                studio.show(
-                    ui,
-                    &StudioContext {
-                        world,
-                        selected,
-                        editing: true,
-                        time: 0.0,
-                        textures: &[],
-                        pictures: &HashMap::new(),
-                        world_presets: &[],
-                    },
-                );
-            });
-        }));
+        texts = frame(&ctx, world, selected, studio, 260.0, Vec::new());
     }
-    fn walk(shape: &egui::Shape, found: &mut Vec<String>) {
+    texts.into_iter().map(|(text, _)| text).collect()
+}
+
+/// Draws the panel `width` points wide (and very tall, so nothing scrolls)
+/// with `events`, and returns the texts drawn and where.
+fn frame(
+    ctx: &egui::Context,
+    world: &World,
+    selected: Option<InstanceId>,
+    studio: &mut TerrainStudio,
+    width: f32,
+    events: Vec<egui::Event>,
+) -> Vec<(String, egui::Rect)> {
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(width, 2400.0),
+        )),
+        events,
+        ..Default::default()
+    };
+    let output = crate::theme::run(ctx, input, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
+            studio.show(
+                ui,
+                &StudioContext {
+                    world,
+                    selected,
+                    editing: true,
+                    time: 0.0,
+                    textures: &[],
+                    pictures: &HashMap::new(),
+                    world_presets: &[],
+                },
+            );
+        });
+    });
+    fn walk(shape: &egui::Shape, found: &mut Vec<(String, egui::Rect)>) {
         match shape {
-            egui::Shape::Text(text) => found.push(text.galley.text().to_owned()),
+            egui::Shape::Text(text) => found.push((
+                text.galley.text().to_owned(),
+                text.galley.rect.translate(text.pos.to_vec2()),
+            )),
             egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, found)),
             _ => {}
         }
     }
     let mut found = Vec::new();
-    for clipped in &output.unwrap().shapes {
+    for clipped in &output.shapes {
         walk(&clipped.shape, &mut found);
     }
     found
@@ -364,4 +390,156 @@ fn a_selected_biome_shows_its_settings_and_paint_and_its_rules_say_where_they_ar
             .any(|t| t.contains("Add rule to Lowland Forest"))
     );
     assert_eq!(studio.target, Some(terrain), "a biome selects its terrain");
+}
+
+/// A terrain with the mountain range's layers, for the tab tests.
+fn layered_terrain() -> (World, InstanceId) {
+    let mut world = World::new();
+    let terrain = world.create(ClassName::Terrain).unwrap();
+    world.set_parent(terrain, Some(world.workspace())).unwrap();
+    // Not "Terrain", which the target picker would show above the tabs.
+    world.set_name(terrain, "Island").unwrap();
+    for preset in layers_for(Preset::MountainRange) {
+        let layer = world.create(ClassName::TerrainLayer).unwrap();
+        world.set_name(layer, preset.name).unwrap();
+        world.set_parent(layer, Some(terrain)).unwrap();
+    }
+    (world, terrain)
+}
+
+#[test]
+fn each_tool_is_on_exactly_one_tab() {
+    for tool in TerrainTool::all() {
+        let tabs: Vec<StudioTab> = StudioTab::ALL
+            .into_iter()
+            .filter(|tab| tab.tools().contains(&tool))
+            .collect();
+        assert_eq!(tabs, vec![StudioTab::of(tool)], "{tool:?}");
+    }
+    let on_tabs: usize = StudioTab::ALL.iter().map(|tab| tab.tools().len()).sum();
+    assert_eq!(on_tabs, TerrainTool::all().count());
+    assert_eq!(StudioTab::of(TerrainTool::Holes), StudioTab::Sculpt);
+    assert_eq!(StudioTab::of(TerrainTool::Foliage), StudioTab::Materials);
+    assert_eq!(StudioTab::of(TerrainTool::Masks), StudioTab::Terrain);
+}
+
+#[test]
+fn a_picked_tool_shows_its_tab_and_a_tab_picks_its_last_tool_again() {
+    let mut studio = TerrainStudio::default();
+    assert_eq!(studio.tab(), StudioTab::Sculpt);
+    // No tool held: switching tabs picks nothing.
+    studio.switch_tab(StudioTab::Terrain);
+    assert_eq!((studio.tab(), studio.tool), (StudioTab::Terrain, None));
+    studio.pick(Some(TerrainTool::Paint));
+    studio.pick(Some(TerrainTool::Foliage));
+    assert_eq!(studio.tab(), StudioTab::Materials);
+    studio.pick(Some(TerrainTool::Flatten));
+    assert_eq!(studio.tab(), StudioTab::Sculpt);
+    // With a tool held, a tab picks its last tool, or its first.
+    studio.switch_tab(StudioTab::Materials);
+    assert_eq!(studio.tool, Some(TerrainTool::Foliage));
+    studio.switch_tab(StudioTab::Terrain);
+    assert_eq!(studio.tool, Some(TerrainTool::Generate));
+    studio.switch_tab(StudioTab::Sculpt);
+    assert_eq!(studio.tool, Some(TerrainTool::Flatten));
+    // Putting the tool down keeps its tab.
+    studio.pick(None);
+    assert_eq!((studio.tab(), studio.tool), (StudioTab::Sculpt, None));
+    // A tool set directly shows its tab at once, and is remembered for it
+    // once the panel is drawn.
+    let (world, _) = layered_terrain();
+    studio.tool = Some(TerrainTool::Erode);
+    assert_eq!(studio.tab(), StudioTab::Terrain);
+    texts_drawn(&world, None, &mut studio);
+    studio.pick(Some(TerrainTool::Raise));
+    studio.switch_tab(StudioTab::Terrain);
+    assert_eq!(studio.tool, Some(TerrainTool::Erode));
+}
+
+#[test]
+fn clicking_a_tab_shows_it_and_picks_its_last_tool() {
+    let (world, _) = layered_terrain();
+    let ctx = crate::theme::test_context();
+    let mut studio = TerrainStudio::default();
+    studio.pick(Some(TerrainTool::Masks));
+    studio.pick(Some(TerrainTool::Smooth));
+    let mut texts = Vec::new();
+    for _ in 0..2 {
+        texts = frame(&ctx, &world, None, &mut studio, 260.0, Vec::new());
+    }
+    let (_, rect) = texts
+        .iter()
+        .find(|(text, _)| text == "Terrain")
+        .expect("the Terrain tab is drawn")
+        .clone();
+    let at = rect.center();
+    let click = |pressed| egui::Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let moved = vec![egui::Event::PointerMoved(at)];
+    frame(&ctx, &world, None, &mut studio, 260.0, moved);
+    frame(&ctx, &world, None, &mut studio, 260.0, vec![click(true)]);
+    frame(&ctx, &world, None, &mut studio, 260.0, vec![click(false)]);
+    assert_eq!(studio.tab(), StudioTab::Terrain);
+    assert_eq!(studio.tool, Some(TerrainTool::Masks));
+}
+
+#[test]
+fn each_section_is_drawn_under_its_tab_only() {
+    let (world, _) = layered_terrain();
+    // The sections' titles (and Layers' Add layer), and each tab's tools'
+    // names, which a wide panel shows.
+    let sections: [(StudioTab, &[&str]); 3] = [
+        (StudioTab::Sculpt, &["Raise / Lower", "Holes"]),
+        (
+            StudioTab::Materials,
+            &["Paint", "Foliage", "Add layer", "Biomes", "Scatter Rules"],
+        ),
+        (
+            StudioTab::Terrain,
+            &["Generate", "Masks", "Water", "Terrain data"],
+        ),
+    ];
+    for (tab, own) in sections {
+        let mut studio = TerrainStudio::default();
+        studio.switch_tab(tab);
+        let ctx = crate::theme::test_context();
+        let mut texts = Vec::new();
+        for _ in 0..2 {
+            texts = frame(&ctx, &world, None, &mut studio, 600.0, Vec::new());
+        }
+        let drawn = |name: &str| texts.iter().any(|(text, _)| text.contains(name));
+        for (other, names) in sections {
+            for name in names {
+                assert_eq!(drawn(name), other == tab, "{name} on {tab:?}");
+            }
+        }
+        assert!(own.iter().all(|name| drawn(name)));
+        // The view is on every tab.
+        assert!(drawn("Slope"), "View on {tab:?}");
+    }
+}
+
+#[test]
+fn a_tools_settings_are_under_its_tab() {
+    let (world, _) = layered_terrain();
+    for (tool, setting) in [
+        (TerrainTool::Raise, "Strength"),
+        (TerrainTool::Paint, "Strength"),
+        (TerrainTool::Auto, "Rules"),
+        (TerrainTool::Generate, "World Presets"),
+        (TerrainTool::Erode, "Erosion"),
+        (TerrainTool::Masks, "Only between heights"),
+    ] {
+        let mut studio = TerrainStudio::default();
+        studio.pick(Some(tool));
+        let texts = texts_drawn(&world, None, &mut studio);
+        assert!(
+            texts.iter().any(|t| t.ends_with(setting)),
+            "{tool:?}: {texts:?}"
+        );
+    }
 }
