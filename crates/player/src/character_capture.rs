@@ -283,7 +283,7 @@ fn copy_library(from: &Path, to: &Path) -> Result<(), String> {
 
 /// The world a capture draws: the default character at the origin with
 /// `description` applied, on Character Studio's round floor.
-fn stage_world(
+pub(crate) fn stage_world(
     assets: &Assets,
     description: &Description,
     stance: Stance,

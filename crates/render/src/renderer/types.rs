@@ -180,6 +180,10 @@ pub(super) struct FrameUniform {
     /// while off), y: how many scene pixels a traced one stands for each
     /// way, z: the traced width (lighting.wgsl's `traced_reflected`).
     pub(super) ray_reflections: [f32; 4],
+    /// x: which of 64 frames this is while TAA is on (0 otherwise), so
+    /// the shadow filters' per-pixel turn changes every frame and TAA
+    /// averages it away (lighting.wgsl's `shading_noise`).
+    pub(super) noise: [f32; 4],
 }
 
 /// The most point and spot lights drawn at once.

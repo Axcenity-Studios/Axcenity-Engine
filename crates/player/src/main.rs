@@ -1560,6 +1560,8 @@ mod bench_tests;
 mod character_capture;
 #[cfg(test)]
 mod profile_tests;
+#[cfg(test)]
+mod skin_value_tests;
 
 #[cfg(test)]
 mod gpu_particles_tests;

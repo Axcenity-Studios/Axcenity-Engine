@@ -734,6 +734,16 @@ impl ScenePipeline {
         };
         frame_uniform.view_proj = drawn_view_proj.to_cols_array_2d();
         frame_uniform.inv_view_proj = drawn_view_proj.inverse().to_cols_array_2d();
+        // With TAA the shadow filters' per-pixel turn moves on each frame,
+        // so TAA averages it into a smooth edge (`shading_noise`).
+        if self
+            .frame_targets
+            .temporal
+            .as_ref()
+            .is_some_and(|temporal| temporal.has_taa())
+        {
+            frame_uniform.noise[0] = (self.history.frame_index() % 64) as f32;
+        }
         (frame_uniform.environment, frame_uniform.sky_light) = self.environment.uniform();
         let sky_colors = [
             &mut frame_uniform.sky_top,
