@@ -71,6 +71,8 @@ impl EditorApp {
             Action::KeepPlayChanges(_) => {}
             Action::SetLocked(id, on) => self.set_locked(id, on),
             Action::ReportBug(id) => self.report_bug_about(id),
+            Action::GroupAsMesh(_) => self.solid_action(super::solid::SolidAction::GroupAsMesh),
+            Action::UngroupMesh(_) => self.solid_action(super::solid::SolidAction::UngroupMesh),
             Action::Plugin { plugin, action } => self.plugin_explorer_action(plugin, action),
         }
     }

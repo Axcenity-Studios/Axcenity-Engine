@@ -1,6 +1,7 @@
 //! The ribbon's Solid Modeling group (Phase 50): Union, Negate, Intersect
 //! and Separate, each one undo step that keeps the whole world
-//! (`History::record_world`), To Terrain (`to_terrain.rs`), and Conform to
+//! (`History::record_world`), Group as Mesh and Ungroup Mesh
+//! (`group_mesh.rs`), To Terrain (`to_terrain.rs`), and Conform to
 //! Terrain and Blend into Terrain (`terrain_objects.rs`, procedural worlds
 //! PW5).
 //!
@@ -26,17 +27,21 @@ pub enum SolidAction {
     Negate,
     Intersect,
     Separate,
+    GroupAsMesh,
+    UngroupMesh,
     ToTerrain,
     ConformToTerrain,
     BlendIntoTerrain,
 }
 
 impl SolidAction {
-    pub const ALL: [SolidAction; 7] = [
+    pub const ALL: [SolidAction; 9] = [
         SolidAction::Union,
         SolidAction::Negate,
         SolidAction::Intersect,
         SolidAction::Separate,
+        SolidAction::GroupAsMesh,
+        SolidAction::UngroupMesh,
         SolidAction::ToTerrain,
         SolidAction::ConformToTerrain,
         SolidAction::BlendIntoTerrain,
@@ -48,6 +53,8 @@ impl SolidAction {
             SolidAction::Negate => "Negate",
             SolidAction::Intersect => "Intersect",
             SolidAction::Separate => "Separate",
+            SolidAction::GroupAsMesh => "Group as Mesh",
+            SolidAction::UngroupMesh => "Ungroup Mesh",
             SolidAction::ToTerrain => "To Terrain",
             SolidAction::ConformToTerrain => "Conform to Terrain",
             SolidAction::BlendIntoTerrain => "Blend into Terrain",
@@ -60,6 +67,8 @@ impl SolidAction {
             SolidAction::Negate => icons::SUBTRACT,
             SolidAction::Intersect => icons::INTERSECT_SQUARE,
             SolidAction::Separate => icons::ARROWS_SPLIT,
+            SolidAction::GroupAsMesh => icons::ARROWS_MERGE,
+            SolidAction::UngroupMesh => icons::ARROWS_OUT_SIMPLE,
             SolidAction::ToTerrain => icons::MOUNTAINS,
             SolidAction::ConformToTerrain => icons::ARROW_LINE_DOWN,
             SolidAction::BlendIntoTerrain => icons::BULLDOZER,
@@ -83,6 +92,12 @@ impl SolidAction {
             SolidAction::Separate => {
                 "Break the selected UnionOperations back into the parts they were made of."
             }
+            SolidAction::GroupAsMesh => {
+                "Make the selected parts (MeshParts, Parts, unions, and those in selected                  Models) one MeshPart with one optimized model: faces pressed together or                  hidden inside are taken away and flat faces merged, so it draws fewer                  triangles and looks the same. The parts are kept inside it, listed dimmed in                  the Explorer, for Ungroup Mesh."
+            }
+            SolidAction::UngroupMesh => {
+                "Give back the parts the selected grouped MeshParts were made of, moved, turned                  and resized as each MeshPart has been since."
+            }
             SolidAction::ToTerrain => {
                 "Turn the selected parts into ground: the Terrain under each rises to its top \
                  and is painted with the layer most like it, and the part is removed."
@@ -105,6 +120,8 @@ impl SolidAction {
             SolidAction::Union | SolidAction::Intersect => "Select two or more parts.",
             SolidAction::Negate => "Select a Part or a negated part.",
             SolidAction::Separate => "Select a UnionOperation.",
+            SolidAction::GroupAsMesh => "Select two or more parts, or a Model with them.",
+            SolidAction::UngroupMesh => "Select a MeshPart made by Group as Mesh.",
             SolidAction::ToTerrain
             | SolidAction::ConformToTerrain
             | SolidAction::BlendIntoTerrain => "Select parts over a Terrain.",
@@ -125,6 +142,16 @@ impl SolidAction {
             SolidAction::Separate => parts
                 .iter()
                 .any(|&id| class(id) == Some(ClassName::UnionOperation)),
+            SolidAction::GroupAsMesh => {
+                parts
+                    .iter()
+                    .filter(|&&id| class(id) != Some(ClassName::NegateOperation))
+                    .count()
+                    >= 2
+            }
+            SolidAction::UngroupMesh => parts
+                .iter()
+                .any(|&id| axcenity_core::csg::grouped_parts(world, id).is_some()),
             SolidAction::ToTerrain
             | SolidAction::ConformToTerrain
             | SolidAction::BlendIntoTerrain => {
@@ -163,6 +190,8 @@ impl EditorApp {
             SolidAction::Intersect => self.combine_selected(Operation::Intersect),
             SolidAction::Negate => self.negate_selected(),
             SolidAction::Separate => self.separate_selected(),
+            SolidAction::GroupAsMesh => self.group_as_mesh(),
+            SolidAction::UngroupMesh => self.ungroup_mesh(),
             SolidAction::ToTerrain => self.convert_to_terrain(),
             SolidAction::ConformToTerrain => self.conform_to_terrain(),
             SolidAction::BlendIntoTerrain => self.blend_into_terrain(),

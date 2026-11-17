@@ -229,6 +229,12 @@ pub enum Action {
     Prefab(crate::prefab_menu::PrefabAction),
     /// Report a bug about `id` on the Team Board (teamwork T2).
     ReportBug(InstanceId),
+    /// Group the selection (with `id`) as one MeshPart (Model ▸ Solid
+    /// Modeling ▸ Group as Mesh).
+    GroupAsMesh(InstanceId),
+    /// Give back the parts the grouped MeshPart `id` (and the rest of the
+    /// selection) was made of.
+    UngroupMesh(InstanceId),
     /// A plugin's Explorer item (plugin API 3): the plugin at `plugin` in
     /// the list, its item numbered `action`. It gets the selection.
     Plugin {
@@ -663,9 +669,12 @@ impl Explorer {
                     // Clicks select; dragging moves the row onto another.
                     let icon = egui::RichText::new(row_icon(world, row))
                         .color(theme::class_color(row.class, ui.visuals()));
-                    // A branch shown only for what's below it is dimmed.
+                    // A branch shown only for what's below it is dimmed,
+                    // and so are a grouped MeshPart's kept parts.
                     let layer_hidden = self.hidden.contains(&row.id);
-                    let label_text = if row.matches && !layer_hidden {
+                    let kept = row.class == ClassName::GroupedParts
+                        || axcenity_core::csg::in_group(world, row.id);
+                    let label_text = if row.matches && !layer_hidden && !kept {
                         egui::RichText::new(name)
                     } else {
                         egui::RichText::new(name).color(palette.text_weak)
@@ -745,6 +754,11 @@ impl Explorer {
                     if layer_hidden {
                         ui.weak(icons::EYE_SLASH).on_hover_text(
                             "In a layer hidden in the Layers panel: the viewport doesn't show it.",
+                        );
+                    }
+                    if kept {
+                        ui.weak(icons::STACK).on_hover_text(
+                            "Kept inside a grouped MeshPart for Ungroup Mesh: out of the world,                              not drawn or collided with. The MeshPart's model stands for it.",
                         );
                     }
 
@@ -1106,6 +1120,10 @@ enum RowCommand {
     Prefab(crate::prefab_menu::PrefabAction),
     /// Report a bug about it on the Team Board.
     ReportBug,
+    /// Group as Mesh, on the selection.
+    GroupAsMesh,
+    /// Ungroup Mesh, on the selection.
+    UngroupMesh,
     Rename,
     Duplicate,
     Delete,
@@ -1131,6 +1149,8 @@ impl RowCommand {
             RowCommand::ExportPackage => Some(Action::ExportPackage(id)),
             RowCommand::SaveMaterial => Some(Action::SaveMaterial(id)),
             RowCommand::ReportBug => Some(Action::ReportBug(id)),
+            RowCommand::GroupAsMesh => Some(Action::GroupAsMesh(id)),
+            RowCommand::UngroupMesh => Some(Action::UngroupMesh(id)),
             RowCommand::MakeUnique => Some(Action::MakeUnique(id)),
             RowCommand::Prefab(action) => Some(Action::Prefab(action)),
             RowCommand::Duplicate => Some(Action::Duplicate(id)),
@@ -1440,6 +1460,35 @@ fn row_menu(
     }
     if let Some(action) = crate::prefab_menu::row_menu(ui, world, id) {
         chosen = Some(RowCommand::Prefab(action));
+    }
+    // Group as Mesh and Ungroup Mesh (Model ▸ Solid Modeling), on the
+    // selection the right-click joined.
+    let groupable = world.get(id).is_some_and(|instance| {
+        let class = instance.class();
+        (class.is_base_part() || matches!(class, ClassName::Model | ClassName::Folder))
+            && !axcenity_core::csg::out_of_world(world, id)
+    });
+    if groupable
+        && ui
+            .button(theme::menu_item(ui.ctx(), icons::ARROWS_MERGE, "Group as Mesh"))
+            .on_hover_text(
+                "Make the selected parts one MeshPart with one optimized model; the parts                  are kept inside it for Ungroup Mesh",
+            )
+            .clicked()
+    {
+        chosen = Some(RowCommand::GroupAsMesh);
+    }
+    if axcenity_core::csg::grouped_parts(world, id).is_some()
+        && ui
+            .button(theme::menu_item(
+                ui.ctx(),
+                icons::ARROWS_OUT_SIMPLE,
+                "Ungroup Mesh",
+            ))
+            .on_hover_text("Give back the parts it was made of, where it is now")
+            .clicked()
+    {
+        chosen = Some(RowCommand::UngroupMesh);
     }
     if id != world.root()
         && ui

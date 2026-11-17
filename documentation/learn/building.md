@@ -60,7 +60,7 @@ The **Model** tab's **Build** group works on every selected part at once:
 
 ## Solid modeling and constraints
 
-**Union** joins parts into one shape, **Negate** turns a part into a hole that cuts what it overlaps when you union them, **Intersect** keeps only the overlap and **Separate** undoes a union. The **Constraints** group welds parts together (**Weld**), adds **Attachments**, and places joints and movers (hinges, springs, ropes, motors) with the **Constraint** tool: click a surface on one part, then on another.
+**Union** joins parts into one shape, **Negate** turns a part into a hole that cuts what it overlaps when you union them, **Intersect** keeps only the overlap and **Separate** undoes a union. **Group as Mesh** makes the selected parts (MeshParts, Parts, unions, or a whole Model) one MeshPart with one model, and takes away what can't be seen: faces pressed together, faces hidden inside another part, and extra triangles in flat faces, so it draws faster and looks the same. Output says how many triangles it saved. The parts are kept inside it, dimmed in the Explorer, and **Ungroup Mesh** gives them back where the grouped part is now. A part's built-in material texture (Wood, Brick and the like) isn't carried: it's grouped in its color. The **Constraints** group welds parts together (**Weld**), adds **Attachments**, and places joints and movers (hinges, springs, ropes, motors) with the **Constraint** tool: click a surface on one part, then on another.
 
 ## Properties
 

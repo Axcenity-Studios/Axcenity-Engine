@@ -10,6 +10,8 @@
 //! - [`boolean`] is the union, difference or intersection of two closed
 //!   meshes, and [`combine_parts`] what the editor's Union and Intersect
 //!   (and scripts' `UnionAsync`, `SubtractAsync`, `IntersectAsync`) call.
+//! - [`group`] is what the editor's Group as Mesh calls: parts made into
+//!   one model with as few triangles as look the same ([`optimize`]).
 //!
 //! - [`EditMesh`] is a polygon mesh kept as half-edges, which the Model
 //!   Studio edits: [`ModelDoc`] holds a file's objects, opened from and
@@ -56,6 +58,9 @@ mod fill;
 mod fracture;
 mod generate;
 mod glb;
+mod group;
+#[cfg(test)]
+mod group_tests;
 mod half_edge;
 mod low_poly;
 mod merge;
@@ -66,6 +71,9 @@ mod modifiers_tests;
 mod ops;
 #[cfg(test)]
 mod ops_tests;
+pub mod optimize;
+#[cfg(test)]
+mod optimize_tests;
 pub mod paint;
 #[cfg(test)]
 mod paint_tests;
@@ -94,7 +102,8 @@ pub use bake::{BakeReport, BakeSettings, Overlap};
 pub use csg::{Operation, boolean};
 pub use fracture::{Pattern, fracture, seed_points, voronoi_pieces};
 pub use generate::{Settings, generate, generate_for};
-pub use glb::{GlbMaterial, write_glb};
+pub use glb::{GlbMaterial, MaterialMaps, write_glb};
+pub use group::{GroupLook, GroupSource, GroupStats, Grouped, group, group_source, save_group};
 pub use half_edge::{EditMesh, Face, HalfEdge, Polygon};
 pub use low_poly::{decimate_to, relax};
 pub use model_doc::{

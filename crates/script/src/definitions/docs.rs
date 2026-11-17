@@ -2243,6 +2243,16 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "Studs one copy of a SurfaceAppearance's textures covers. 0 leaves the shape's own coordinates unscaled.",
     ),
     (
+        ClassName::GroupedParts,
+        "Origin",
+        "Where the grouped MeshPart it's in was when Group as Mesh made it. Ungroup Mesh moves and turns the parts by how the MeshPart has moved and turned since.",
+    ),
+    (
+        ClassName::GroupedParts,
+        "OriginSize",
+        "The grouped MeshPart's Size when Group as Mesh made it. Ungroup Mesh stretches the parts by how the MeshPart has been resized since.",
+    ),
+    (
         ClassName::UnionOperation,
         "UsePartColor",
         "If true, the whole solid is drawn in Color. If false (the default), each face keeps the color and material of the part it came from.",
@@ -5933,6 +5943,9 @@ pub(super) fn class_doc(class: ClassName) -> &'static str {
         }
         ClassName::UnionOperation => {
             "Parts combined into one solid by Union or Intersect (Model ▸ Solid Modeling), or by `UnionAsync`, `SubtractAsync` or `IntersectAsync`. Drawn and collided as its model, which the editor saves as `<name>.union.glb` in `assets/models`; each face keeps the color and material of the part it came from unless UsePartColor is on. The editor keeps the parts it was made of inside it, hidden, so Separate can give them back."
+        }
+        ClassName::GroupedParts => {
+            "The parts a MeshPart made by Group as Mesh (Model ▸ Solid Modeling) was made of, kept inside it for Ungroup Mesh. Like a UnionOperation's parts, everything inside it is out of the world: not drawn, colliding or hit by raycasts. The Explorer lists them, dimmed, so they can be looked at."
         }
         ClassName::NegateOperation => {
             "A Part made negative by Negate (Model ▸ Solid Modeling): shown pink and see-through, and when it's unioned with other parts it cuts itself out of them, as a doorway out of a wall. Negate it again to turn it back into a Part. Everything a Part has."

@@ -91,6 +91,7 @@
     * [MeshPart](api/classes/MeshPart.md)
     * [UnionOperation](api/classes/UnionOperation.md)
     * [NegateOperation](api/classes/NegateOperation.md)
+    * [GroupedParts](api/classes/GroupedParts.md)
     * [Seat](api/classes/Seat.md)
     * [VehicleSeat](api/classes/VehicleSeat.md)
     * [DamageZone](api/classes/DamageZone.md)

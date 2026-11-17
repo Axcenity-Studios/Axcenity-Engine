@@ -306,6 +306,29 @@ impl Bvh {
         }
     }
 
+    /// Adds to `out` every triangle in a leaf whose box overlaps the box
+    /// from `min` to `max` (touching counts).
+    pub(crate) fn boxed(&self, min: Vec3, max: Vec3, out: &mut Vec<u32>) {
+        if self.order.is_empty() {
+            return;
+        }
+        let mut stack = vec![0usize];
+        while let Some(index) = stack.pop() {
+            let node = &self.nodes[index];
+            if node.min.cmpgt(max).any() || node.max.cmplt(min).any() {
+                continue;
+            }
+            if node.left != 0 {
+                stack.push(node.left as usize + 1);
+                stack.push(node.left as usize);
+            } else {
+                out.extend_from_slice(
+                    &self.order[node.start as usize..(node.start + node.count) as usize],
+                );
+            }
+        }
+    }
+
     /// The runs of `order` with at most `size` triangles that make up the
     /// whole, each a node's (so its triangles are near each other).
     pub(crate) fn runs(&self, size: usize) -> Vec<std::ops::Range<usize>> {

@@ -37,6 +37,73 @@ pub struct GlbMaterial {
     pub base_color_texture: Option<String>,
 }
 
+/// The texture files a material links, by role: paths with `/` between
+/// folders, relative to the `.glb` when written (Group as Mesh keeps them
+/// relative to the project until then).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct MaterialMaps {
+    pub base_color: Option<String>,
+    /// glTF's one texture of both: metalness in blue, roughness in green.
+    pub metal_rough: Option<String>,
+    pub normal: Option<String>,
+    /// Ambient occlusion, in red.
+    pub occlusion: Option<String>,
+    pub emissive: Option<String>,
+}
+
+impl MaterialMaps {
+    /// The files of a loaded model's material's textures (relative to its
+    /// model's folder). A texture with no file is left out.
+    pub fn of(material: &ModelMaterial) -> MaterialMaps {
+        let file = |image: Option<&Arc<Image>>| image.and_then(|image| image.file.clone());
+        let metal_rough = [&material.metalness_texture, &material.roughness_texture]
+            .into_iter()
+            .flatten()
+            .map(|channel| &channel.image)
+            .next();
+        MaterialMaps {
+            base_color: file(material.base_color_texture.as_ref()),
+            metal_rough: file(metal_rough),
+            normal: file(material.normal_texture.as_ref()),
+            occlusion: file(material.occlusion_texture.as_ref().map(|c| &c.image)),
+            emissive: file(material.emissive_texture.as_ref()),
+        }
+    }
+
+    /// True when it links no texture.
+    pub fn is_empty(&self) -> bool {
+        self.all().all(|map| map.is_none())
+    }
+
+    fn all(&self) -> impl Iterator<Item = &Option<String>> {
+        [
+            &self.base_color,
+            &self.metal_rough,
+            &self.normal,
+            &self.occlusion,
+            &self.emissive,
+        ]
+        .into_iter()
+    }
+
+    /// Every file it links.
+    pub fn files(&self) -> impl Iterator<Item = &str> {
+        self.all().filter_map(|map| map.as_deref())
+    }
+
+    /// Each file changed by `change`.
+    pub fn map(&self, change: impl Fn(&str) -> String) -> MaterialMaps {
+        let each = |map: &Option<String>| map.as_deref().map(&change);
+        MaterialMaps {
+            base_color: each(&self.base_color),
+            metal_rough: each(&self.metal_rough),
+            normal: each(&self.normal),
+            occlusion: each(&self.occlusion),
+            emissive: each(&self.emissive),
+        }
+    }
+}
+
 /// A .glb with one node per piece named `Piece1`, `Piece2`, … (in order),
 /// each with its own mesh: one primitive per Outer material it uses
 /// (`materials[i]`) and one for its Interior faces (`interior`). Positions
@@ -110,7 +177,7 @@ pub(crate) struct Vertices {
 
 /// The triangles of `piece` on `surface`, with only the vertices they use.
 /// Interior triangles get their plane's normal and uvs across it.
-fn surface_triangles(piece: &Mesh, surface: Surface) -> Vertices {
+pub(crate) fn surface_triangles(piece: &Mesh, surface: Surface) -> Vertices {
     let mut vertices = Vertices::default();
     // Vertices already written, by the original index (Outer) or by
     // position and normal (Interior).
@@ -230,6 +297,17 @@ impl File {
     /// with no file is left out). Metalness and roughness are written as
     /// glTF's one texture of both.
     pub(crate) fn add_model_material(&mut self, material: &ModelMaterial) -> usize {
+        self.add_material_with(material, &MaterialMaps::of(material))
+    }
+
+    /// Adds `material`'s values (its own textures aren't looked at) with
+    /// the texture files `maps` names, and returns its index. How it moves
+    /// in the wind is kept in its `extras`, as the loader reads it.
+    pub(crate) fn add_material_with(
+        &mut self,
+        material: &ModelMaterial,
+        maps: &MaterialMaps,
+    ) -> usize {
         let transform = (material.uv_scale != [1.0, 1.0]
             || material.uv_offset != [0.0, 0.0]
             || material.uv_rotation != 0.0)
@@ -240,9 +318,9 @@ impl File {
                     "scale": material.uv_scale.map(finite),
                 })
             });
-        self.transforms |= transform.is_some() && material.has_textures();
-        let info = |file: &mut Self, image: Option<&Arc<Image>>| {
-            let uri = image?.file.as_deref()?;
+        self.transforms |= transform.is_some() && !maps.is_empty();
+        let info = |file: &mut Self, uri: &Option<String>| {
+            let uri = uri.as_deref()?;
             let mut info = json!({ "index": file.texture(uri) });
             if let Some(transform) = &transform {
                 info["extensions"] = json!({ "KHR_texture_transform": transform });
@@ -254,15 +332,10 @@ impl File {
             "metallicFactor": finite(material.metalness).clamp(0.0, 1.0),
             "roughnessFactor": finite(material.roughness).clamp(0.0, 1.0),
         });
-        if let Some(texture) = info(self, material.base_color_texture.as_ref()) {
+        if let Some(texture) = info(self, &maps.base_color) {
             pbr["baseColorTexture"] = texture;
         }
-        let metal_rough = [&material.metalness_texture, &material.roughness_texture]
-            .into_iter()
-            .flatten()
-            .map(|channel| &channel.image)
-            .next();
-        if let Some(texture) = info(self, metal_rough) {
+        if let Some(texture) = info(self, &maps.metal_rough) {
             pbr["metallicRoughnessTexture"] = texture;
         }
         let mut json = json!({
@@ -279,17 +352,34 @@ impl File {
             }
             AlphaMode::Blend => json["alphaMode"] = json!("BLEND"),
         }
-        if let Some(mut texture) = info(self, material.normal_texture.as_ref()) {
+        if let Some(mut texture) = info(self, &maps.normal) {
             texture["scale"] = json!(finite(material.normal_scale));
             json["normalTexture"] = texture;
         }
-        let occlusion = material.occlusion_texture.as_ref().map(|c| &c.image);
-        if let Some(mut texture) = info(self, occlusion) {
+        if let Some(mut texture) = info(self, &maps.occlusion) {
             texture["strength"] = json!(finite(material.occlusion_strength));
             json["occlusionTexture"] = texture;
         }
-        if let Some(texture) = info(self, material.emissive_texture.as_ref()) {
+        if let Some(texture) = info(self, &maps.emissive) {
             json["emissiveTexture"] = texture;
+        }
+        // A leaf (one that flutters) is see-through to light unless told
+        // otherwise, so its translucency is written whenever it flutters.
+        if material.sway > 0.0 || material.flutter > 0.0 || material.translucency > 0.0 {
+            let mut extras = serde_json::Map::new();
+            if material.sway > 0.0 {
+                extras.insert("axcenity_sway".into(), json!(finite(material.sway)));
+            }
+            if material.flutter > 0.0 {
+                extras.insert("axcenity_flutter".into(), json!(finite(material.flutter)));
+            }
+            if material.flutter > 0.0 || material.translucency > 0.0 {
+                extras.insert(
+                    "axcenity_translucency".into(),
+                    json!(finite(material.translucency)),
+                );
+            }
+            json["extras"] = Value::Object(extras);
         }
         self.materials.push(json);
         self.materials.len() - 1

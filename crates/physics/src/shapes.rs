@@ -556,6 +556,35 @@ pub fn prepare_precise(model: &Model, size: Vector3) {
     let _ = decomposed(model, half);
 }
 
+/// The corners of each convex piece a part with `model` at `size` collides
+/// as with `PreciseConvexDecomposition`, in the part's own space (its
+/// middle at the origin). Group as Mesh keeps a precise union's pieces as
+/// the grouped model's own collision pieces. One box when it has none.
+pub fn precise_pieces(model: &Model, size: Vector3) -> Vec<Vec<[f32; 3]>> {
+    let half = to_vec3(size).abs().max(Vec3::splat(MIN_SIZE)) / 2.0;
+    let collider = decomposed(model, half).build();
+    let Some(compound) = collider.shape().as_compound() else {
+        let corners = (0..8).map(|k| {
+            let sign = |bit: usize| if k & bit == 0 { -1.0 } else { 1.0 };
+            [half.x * sign(1), half.y * sign(2), half.z * sign(4)]
+        });
+        return vec![corners.collect()];
+    };
+    compound
+        .shapes()
+        .iter()
+        .filter_map(|(pose, shape)| {
+            let poly = shape.as_convex_polyhedron()?;
+            Some(
+                poly.points()
+                    .iter()
+                    .map(|&point| (*pose * point).to_array())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
 /// The edges of each convex piece of a collider made of them
 /// ([`decomposed`], [`own_pieces`]): its box's if it isn't.
 fn compound_edges(collider: &Collider, half: Vec3) -> Vec<(Vec3, Vec3)> {

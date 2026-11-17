@@ -15,6 +15,7 @@ Click a class name to open its API Reference entry, with every property, method 
 | `Part` | The basic building block: Block, Ball, Cylinder, Wedge or Capsule (`Part.Shape`). Key properties: `Part.Position`, `Part.Size`, `Part.Color`, `Part.Material`, `Part.Anchored`, `Part.CanCollide`, `Part.Transparency`. Event: `Part.Touched`. |
 | `MeshPart` | An imported model's mesh, with its own materials or a `SurfaceAppearance`. |
 | `UnionOperation`, `NegateOperation` | Parts combined (Union) or cut away (Negate). |
+| `GroupedParts` | The parts a MeshPart made by Group as Mesh was made of, kept inside it (out of the world) for Ungroup Mesh. |
 | `Model` | A group of parts that moves as one; `Model:PivotTo()` moves it. |
 | `Folder` | A group for tidiness only. |
 | `SpawnLocation` | Where players appear. |

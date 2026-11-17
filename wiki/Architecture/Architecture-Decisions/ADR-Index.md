@@ -52,6 +52,7 @@ Decisions with long-term consequences, so later work doesn't silently reverse th
 | [ADR-0036](ADR-0036-Character-Shading-Models-With-Modulating-Material-Values.md) | Skin, Eye, Cloth and Hair shading models with a fixed parameter set each; material values modulate a material's maps, never replace them | Accepted | 2026-11-14 |
 | [ADR-0037](ADR-0037-One-Groom-Asset-With-Card-Strand-And-Mesh-Tiers.md) | Hair is one groom asset with card, strand and mesh tiers; cards first, strands optional and never the only tier | Accepted | 2026-11-14 |
 | [ADR-0038](ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) | A character's identity (its description's shape weights and bone changes) is baked into derived models, named by the base `MeshId` plus the identity's key and resolved inside `Assets`; bone changes are added to every pose after the clips | Proposed | 2026-11-14 |
+| [ADR-0039](ADR-0039-Group-As-Mesh-Keeps-Parts-In-A-GroupedParts.md) | Group as Mesh makes a plain MeshPart with one optimized `.group.glb` (each part's collision as `_COL` pieces) and keeps the parts in a `GroupedParts` inside it, out of the world like a union's, with the MeshPart's place when grouped so Ungroup Mesh follows it | Proposed | 2026-11-16 |
 
 ## Superseded and changed decisions found in the plans
 

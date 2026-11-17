@@ -90,6 +90,12 @@ pub enum ClassName {
     /// A Part that cuts itself out of the parts it's unioned with (Phase
     /// 50). Shown pink and see-through in the editor.
     NegateOperation,
+    /// The parts a MeshPart made by Group as Mesh was made of, kept inside
+    /// it for Ungroup Mesh: like a UnionOperation's parts, everything in it
+    /// is out of the world (not drawn, simulated or queried). `Origin` and
+    /// `OriginSize` are where the MeshPart was when it was grouped, so
+    /// Ungroup Mesh puts the parts where the MeshPart is now.
+    GroupedParts,
     /// A Part that characters sit on: one that touches it while it's empty
     /// and enabled sits down (`Occupant`).
     Seat,
@@ -516,6 +522,7 @@ impl ClassName {
         ClassName::MeshPart,
         ClassName::UnionOperation,
         ClassName::NegateOperation,
+        ClassName::GroupedParts,
         ClassName::Seat,
         ClassName::VehicleSeat,
         ClassName::DamageZone,
@@ -670,6 +677,7 @@ impl ClassName {
             ClassName::MeshPart => "MeshPart",
             ClassName::UnionOperation => "UnionOperation",
             ClassName::NegateOperation => "NegateOperation",
+            ClassName::GroupedParts => "GroupedParts",
             ClassName::Script => "Script",
             ClassName::LocalScript => "LocalScript",
             ClassName::ModuleScript => "ModuleScript",
@@ -2466,6 +2474,13 @@ impl ClassName {
                 properties.extend(body_properties());
                 properties
             }
+            ClassName::GroupedParts => vec![
+                // Where the MeshPart these parts were grouped into was, and
+                // its size, when it was grouped. Ungroup Mesh moves, turns
+                // and stretches the parts as the MeshPart has been since.
+                ("Origin", Value::CFrame(CFrame::IDENTITY)),
+                ("OriginSize", Value::Vector3(Vector3::new(1.0, 1.0, 1.0))),
+            ],
             ClassName::Terrain => vec![
                 // The middle of the terrain's footprint, at the bottom of its
                 // height range.
@@ -3264,6 +3279,7 @@ impl ClassName {
             | ClassName::Model
             | ClassName::Inventory
             | ClassName::HumanoidDescription
+            | ClassName::GroupedParts
             | ClassName::Effect
             | ClassName::Folder
             | ClassName::SurfaceAppearance

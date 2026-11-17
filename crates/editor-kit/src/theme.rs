@@ -1351,6 +1351,7 @@ pub fn class_icon(class: ClassName) -> &'static str {
         ClassName::Fracture => icons::HAMMER,
         ClassName::UnionOperation => icons::UNITE,
         ClassName::NegateOperation => icons::SUBTRACT,
+        ClassName::GroupedParts => icons::STACK,
         ClassName::Health => icons::HEART,
         ClassName::Ability => icons::LIGHTNING,
         ClassName::Effect => icons::FLASK,

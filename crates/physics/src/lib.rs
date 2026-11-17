@@ -84,7 +84,7 @@ pub use query::{
     cast_ray_excluding, debug_colliders, inside_solids, part_solids, parts_in_box, parts_in_part,
     parts_in_radius, raycast, raycast_rewound, shapecast, solids, surface_hits,
 };
-pub use shapes::{prepare_precise, triangle_mesh};
+pub use shapes::{precise_pieces, prepare_precise, triangle_mesh};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
