@@ -1,0 +1,14 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-eye-corner-left-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "eye_corner_left": 1,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
+}

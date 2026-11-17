@@ -64,12 +64,24 @@ const PART_PARAMETERS: [(&str, &str); 2] = [
     ("brow_length_right", "AxcenityRealistic/Brows"),
 ];
 
-/// The rest positions of `model`'s first primitive at each level of detail.
+/// The rest positions of `model`'s first primitive at each level of detail,
+/// in metres. (A model's positions are its box scaled to one on each axis;
+/// `size` is the box in the file, in metres for this one. Until R4 this
+/// compared the scaled positions, which made a move up count 1.75 times
+/// less than it is and a move forward three times more.)
 fn rest(model: &Model) -> Vec<Vec<[f32; 3]>> {
     let rig = model.rig.as_ref().unwrap();
     let posed = model.pose_shaped(&rig.rest_pose(), &[]).unwrap();
+    let size = model.size;
     (0..=model.primitives[0].lods.len())
-        .map(|level| posed.primitive(model, 0, level).positions.clone())
+        .map(|level| {
+            posed
+                .primitive(model, 0, level)
+                .positions
+                .iter()
+                .map(|p| [p[0] * size[0], p[1] * size[1], p[2] * size[2]])
+                .collect()
+        })
         .collect()
 }
 
@@ -172,9 +184,11 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
         }
     }
     // Frame (one end), muscle and fat, sixteen regions, nine proportions
-    // (both ends: the hips narrow too since R3), and the face's 47
-    // parameters (CO6's 45 and the brows' length).
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) + 2 * 47);
+    // (both ends: the hips narrow too since R3), and the face's 61
+    // parameters (CO6's 45, the brows' length, and R4's 14: nose tip
+    // projection and rotation, nose width, philtrum length, and a pair each
+    // of jaw angle, upper lid fold, lower lid, eye corner and earlobe).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) + 2 * 61);
     // Every proportion's end moves its body slider but the hips' low end,
     // which moves the body by a shape.
     assert_eq!(proportions, 2 * 9 - 1);
@@ -295,7 +309,8 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // Three more in R3: `Masculine_Fat_Soft`, `Feminine_Fat_Soft` (fat that
     // is fat) and `Masculine_Belly_Flat` (the slight body's belly); two more
     // for the wider ranges, `<Frame>_Hips_Narrow` (the hips below 1).
-    assert_eq!(model.morph_targets.len(), 160);
+    // Fourteen more in R4: the face's new controls, one shape each.
+    assert_eq!(model.morph_targets.len(), 174);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always

@@ -4,7 +4,7 @@ expression and every face identity parameter's two ends, on both frames:
 does the eyeball come through a lid, do the teeth or the tongue come
 through the lips, and does a full blink close the eye.
 
-    python -I face_checks.py --package realistic --out FILE [--check]
+    python -I face_checks.py --package realistic --out FILE [--check] [--only TEXT]
 
 (`python` has the `bpy` module, as for `measure.py`.) It poses the parts
 file as the engine does: a control's blend shape on the body and on every
@@ -61,7 +61,17 @@ ray bare; and in every pose that is the same on both sides the mouth, the
 teeth and the tongue are within `EVEN_MM` of their mirror images, on both
 frames; and no vertex of `LipSeal` is in view with the lips more than
 `SEAL_GONE_MM` apart. The tongue controls are posed with the jaw
-half open: a tongue doesn't leave a closed mouth.
+half open: a tongue doesn't leave a closed mouth. The identity parameters
+in `HELD_IDENTITY` (R4's) are held to the same at both ends: alone, in a
+full blink (no ray bare) and under every expression and viseme
+(`identity_faces`); the others' ends are reported. Those parameters'
+ends also make no pair of the head's skin triangles cross that doesn't
+cross at rest, alone or on top of any other face parameter's end
+(`identity_pairs`: the pairs that cross with both, less those that cross
+with the other alone or at rest; on top of an older parameter's end that
+crosses on its own, reported). Unlike `measure.py`'s sliders check,
+this counts the pairs that lie within 4 mm at rest: the upper lid's
+crease lies on itself there, and its fold once came down through it.
 """
 
 import argparse
@@ -109,6 +119,97 @@ LIPS_EDGE = 0.008
 # With the lips further apart than this at the middle (millimetres), no
 # part of `LipSeal` may be in view.
 SEAL_GONE_MM = 6.0
+# The face identity parameters held to the checks at their ends, alone, in
+# a full blink and with every expression and viseme on top (R4's controls,
+# by id or id stem; the older parameters' ends are reported only, as
+# before: some of them are not clean, `co6/README.md`).
+HELD_IDENTITY = ("nose_tip_projection", "nose_tip_rotation", "nose_width", "philtrum_length", "jaw_angle",
+                 "upper_lid_fold", "lower_lid", "eye_corner", "earlobe")
+
+
+def head_crossings(ch):
+    """The pairs of the head's posed skin triangles (above the neck) that
+    cross and share no vertex, as pairs of their numbers. (Of the skin:
+    the mouth's lining lies folded on itself inside the mouth, where no
+    one sees it, and its crossing the skin is `lining_through_skin`.)"""
+    body = Piece(ch.parts["Body"], ("Skin",))
+    z_neck = ch.head("Head").z - 0.02
+    keep = np.where(body.co[body.tris][:, :, 2].min(axis=1) > z_neck)[0]
+    tris = body.tris[keep]
+    tree = BVHTree.FromPolygons([tuple(p) for p in body.co], [tuple(int(i) for i in t) for t in tris], all_triangles=True)
+    return {(int(keep[i]), int(keep[j])) for i, j in tree.overlap(tree) if i < j and not set(tris[i]) & set(tris[j])}
+
+
+def identity_pairs(ch, frame, parameters, shapes, only=""):
+    """Each `HELD_IDENTITY` parameter's ends alone and on top of every
+    other face parameter's ends (of other parameters): how many pairs of
+    the head's skin triangles cross that cross neither at rest nor with the
+    other parameter alone. {"poses": n, "offenders": [{"sliders",
+    "new_crossings", "required"}]}: held (`required`) alone and on top of
+    an end that crosses nothing of its own; on top of an end that already
+    crosses (an older parameter's, reported in `identity`), reported.
+
+    Left out, as `measure.py`'s sliders check leaves them out: pairs that
+    touch at rest (within 4 mm) at the closed lips (within `LIPS_EDGE`
+    of `LipSeal`), where any move makes or unmakes a crossing (the
+    philtrum and the mouth's height moved the corners of closed lips 9.5
+    mm up together, and a few hundredths of a millimetre between them
+    did). Elsewhere, the lids' crease among them, every pair counts."""
+    def identity(*ends):
+        out = {}
+        for drivers, end in ends:
+            for shape, value in drivers(end).items():
+                if shape in shapes:
+                    out[shape] = out.get(shape, 0.0) + value
+        return out
+
+    pose(ch, frame, {})
+    rest = head_crossings(ch)
+    skin = Piece(ch.parts["Body"], ("Skin",))
+    seal = Piece(ch.parts["LipSeal"]).co if "LipSeal" in ch.parts else np.zeros((0, 3))
+
+    def at_lips(pair):
+        a, b = (skin.co[skin.tris[t]] for t in pair)
+        if np.linalg.norm(a[:, None] - b[None], axis=2).min() > 0.004 or not len(seal):
+            return False
+        return all(np.linalg.norm(seal - t.mean(axis=0), axis=1).min() < LIPS_EDGE for t in (a, b))
+
+    def counted(pairs):
+        return sum(1 for pair in pairs if not at_lips(pair))
+
+    alone = {}
+    for pid, drivers in parameters:
+        for end in (-1.0, 1.0):
+            pose(ch, frame, {}, identity((drivers, end)))
+            alone[(pid, end)] = head_crossings(ch)
+    poses, offenders = 0, []
+    for pid, drivers in parameters:
+        if not held_identity(pid):
+            continue
+        for end in (-1.0, 1.0):
+            name = f"{pid}{end:+.0f}"
+            if only and only not in name:
+                continue
+            new = counted(alone[(pid, end)] - rest)
+            poses += 1
+            if new:
+                offenders.append({"sliders": name, "new_crossings": new, "required": True})
+            for other, other_drivers in parameters:
+                if other == pid:
+                    continue
+                for other_end in (-1.0, 1.0):
+                    pose(ch, frame, {}, identity((drivers, end), (other_drivers, other_end)))
+                    new = counted(head_crossings(ch) - alone[(other, other_end)] - rest)
+                    poses += 1
+                    if new:
+                        clean = not counted(alone[(other, other_end)] - rest)
+                        offenders.append({"sliders": f"{name}, {other}{other_end:+.0f}", "new_crossings": new,
+                                          "required": clean})
+    return {"poses": poses, "offenders": offenders}
+
+
+def held_identity(pid):
+    return any(pid == stem or pid in (f"{stem}_left", f"{stem}_right") for stem in HELD_IDENTITY)
 
 
 def mm(x):
@@ -438,17 +539,24 @@ def poses(shapes, parameters):
     for name, w in expressions().items():
         out.append(("expressions", name, w, {}, True))
     # Identity: each face parameter's two ends, at rest and in a blink
-    # (reported; a blink on a reshaped eye is not held to zero).
+    # (reported; a blink on a reshaped eye is not held to zero), but for
+    # the `HELD_IDENTITY` ones: held, and also with every expression and
+    # viseme on top (`identity_faces`).
     blink = {"Blink_Left": 1.0, "Blink_Right": 1.0}
+    faces = list(expressions().items()) + [(f"viseme {name}", w) for name, w in visemes().items()]
     for pid, drivers in parameters:
+        held = held_identity(pid)
         for end in (-1.0, 1.0):
             identity = {}
             for shape, value in drivers(end).items():
                 if shape in shapes:
                     identity[shape] = value
             if identity:
-                out.append(("identity", f"{pid}{end:+.0f}", {}, identity, False))
-                out.append(("identity_blink", f"{pid}{end:+.0f}", blink, identity, False))
+                out.append(("identity", f"{pid}{end:+.0f}", {}, identity, held))
+                out.append(("identity_blink", f"{pid}{end:+.0f}", blink, identity, held))
+                if held:
+                    for name, w in faces:
+                        out.append(("identity_faces", f"{pid}{end:+.0f} {name}", w, identity, True))
     return out
 
 
@@ -505,12 +613,16 @@ def failures(report):
                 if m.get("lips_open_mm", 0.0) > SEAL_GONE_MM and m.get("seal_in_view"):
                     bad.append(f"{frame}/{group}/{name}: {m['seal_in_view']} vertices of LipSeal in view with the lips "
                                f"{m['lips_open_mm']} mm apart")
-                if group == "closed" and m["bare_rays"]:
+                if group in ("closed", "identity_blink") and m["bare_rays"]:
                     bad.append(f"{frame}/{group}/{name}: the eye isn't closed: {m['bare_rays']} rays bare, "
                                f"open {m['open_mm']} mm")
         for name in ("Blink", "Eye_Closed"):
             if name not in groups.get("closed", {}):
                 bad.append(f"{frame}: no {name} pose was measured")
+    for frame, pairs in report.get("identity_pairs", {}).items():
+        for o in (o for o in pairs["offenders"] if o["required"]):
+            bad.append(f"{frame}/identity_pairs/{o['sliders']}: {o['new_crossings']} new pairs of the head's skin "
+                       "triangles cross")
     return bad
 
 
@@ -521,6 +633,9 @@ def main():
     ap.add_argument("--custom", default="")
     ap.add_argument("--out", default="face_checks.json")
     ap.add_argument("--check", action="store_true")
+    # Only the poses whose name has this text (and rest, which the others
+    # are measured against): for a quick look at one control.
+    ap.add_argument("--only", default="")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     parts_path, _, custom_path = Q.package_paths(a.package)
     a.parts = a.parts or parts_path
@@ -534,7 +649,10 @@ def main():
     keys = ch.parts["Body"].data.shape_keys
     shapes = {kb.name for kb in keys.key_blocks} if keys else set()
     manifest = os.path.join(os.path.dirname(a.parts), "Realistic.base.json" if a.package == "realistic" else "Humanoid.base.json")
-    listed = poses(shapes, face_parameters(manifest))
+    parameters = face_parameters(manifest)
+    listed = poses(shapes, parameters)
+    if a.only:
+        listed = [p for p in listed if p[0] == "rest" or a.only in p[1]]
     pose(ch, 0.0, {})
     report = {"file": os.path.basename(a.parts), "limits_deg": LIMITS, "tongue_posed_with_jaw_open": TONGUE_JAW,
               "body_open_edges": Piece(ch.parts["Body"]).open_edges(),
@@ -558,6 +676,9 @@ def main():
             m["required"] = required
             groups.setdefault(group, {})[name] = m
         report["frames"][frame_name] = groups
+        report.setdefault("identity_pairs", {})[frame_name] = identity_pairs(ch, frame, parameters, shapes, a.only)
+        print(f"{frame_name}: identity_pairs {report['identity_pairs'][frame_name]['poses']} poses, "
+              f"{len(report['identity_pairs'][frame_name]['offenders'])} with new crossings", flush=True)
     bad = failures(report)
     report["failures"] = bad
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:

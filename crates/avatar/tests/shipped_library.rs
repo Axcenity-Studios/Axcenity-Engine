@@ -373,7 +373,8 @@ fn the_realistic_parameters_say_what_they_are() {
     use axcenity_avatar::Level;
     let library = read();
     let base = library.base("axcenity/realistic").unwrap();
-    assert_eq!(base.parameters.len(), 75);
+    // (75 at R1; R4 added the face's 14.)
+    assert_eq!(base.parameters.len(), 89);
     for parameter in &base.parameters {
         let id = &parameter.id;
         let about = parameter.about.as_deref().unwrap_or_default();

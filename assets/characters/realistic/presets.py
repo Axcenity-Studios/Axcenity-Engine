@@ -88,6 +88,17 @@ FACE_TABLE = [
     ("mouth_width*", [0, 0, 0.1, -0.1, 0, 0.3, -0.2, 0, 0]),
     ("upper_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.3, -0.2]),
     ("lower_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.3, -0.2]),
+    # R4's controls, where they serve a preset (face README §3: "with the
+    # proposed parameters, add jaw_angle, + for square and angular, - for
+    # round, heart and soft"; the rest by the presets' sentences).
+    ("jaw_angle*", [-0.4, 0, 0.6, -0.3, 0, 0.2, 0, -0.5, 0.6]),
+    ("nose_width", [0.2, 0, 0, 0, -0.1, 0.4, -0.4, 0, 0]),
+    ("nose_tip_projection", [0, 0, 0, 0, 0.3, 0, 0, -0.2, 0.3]),
+    ("nose_tip_rotation", [0, 0, 0, 0, 0, 0, 0, 0.2, -0.1]),
+    ("philtrum_length", [-0.3, 0, 0, 0, 0.4, -0.2, 0, 0, 0]),
+    ("lower_lid*", [0.3, 0, 0, 0, 0, 0, 0, 0.4, -0.2]),
+    ("upper_lid_fold*", [0, 0, 0, 0, 0, 0, 0, 0.2, -0.3]),
+    ("eye_corner*", [0, 0, 0, 0.2, 0, 0, 0, 0, 0.3]),
 ]
 
 # The six characters the editor had in code (`presets()`), in its order:

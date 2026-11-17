@@ -136,7 +136,16 @@ fn the_faces_parts_carry_the_shapes_they_follow() {
         "Brow_Inward_Left",
         "Brow_Inward_Right",
     ];
-    let mouth = ["Jaw_Forward", "Tongue_Out", "Tongue_Up", "Tongue_Down"];
+    // (The teeth go with the mouth when an identity moves it: its height,
+    // and since R4 the philtrum's length.)
+    let mouth = [
+        "Jaw_Forward",
+        "Tongue_Out",
+        "Tongue_Up",
+        "Tongue_Down",
+        "Face_Mouth_Height",
+        "Face_Philtrum_Length",
+    ];
     let wanted: [(&str, &[&str]); 4] = [
         ("Lashes", &lids),
         ("EyeShell", &lids),
