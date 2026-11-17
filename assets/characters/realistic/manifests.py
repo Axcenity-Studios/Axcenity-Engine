@@ -51,16 +51,31 @@ GROUPS = [
 ]
 BODY_GROUPS = {gid for gid, _, _ in GROUPS}
 
-# How far a proportion slider goes on this body (CO5). `anim`'s body
-# sliders take 0.5 to 1.5, which the stylized body's manifest offers whole;
-# on this body the ends of that make the skin cross itself (shoulders at
-# half width put the arms through the chest: 282 pairs of triangles), so
-# each slider stops where every pair of sliders at their ends still leaves
-# the body free of new crossings (`measure.py --only sliders`).
-PROPORTION_RANGE = [0.85, 1.15]
-# Hips only get wider: the masculine frame's thighs meet at the crotch, and
-# hips 2% narrower already make the skin cross there on a heavy body.
-PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
+# How far each proportion slider goes on this body (R3, plan section 0
+# decision 8; CO5 had cut them all to 0.85 to 1.15 and the hips to 1 to
+# 1.15). Each end is where the ranges sweep (`../humanoid/qa/ranges.py`)
+# found the last step that still deforms cleanly on both frames and at the
+# corners of muscle and fat, or the population's 0.5th or 99.5th
+# percentile (ANSUR II), whichever is nearer to 1. What set each end, with
+# the numbers: docs/development/character-studio/refinement/r3/ranges.md,
+# whose table a test holds this one to (`avatar`'s `realistic_ranges`).
+PROPORTION_RANGE = [0.85, 1.15]  # (a proportion the table below doesn't name)
+PROPORTION_RANGES = {
+    "height": [0.82, 1.13],
+    "leg_length": [0.85, 1.125],
+    "arm_length": [0.95, 1.08],
+    "shoulder_width": [0.88, 1.12],
+    "waist_width": [0.775, 1.225],
+    "hip_width": [0.7, 1.2],
+    "head_size": [0.88, 1.12],
+    "hand_size": [0.82, 1.07],
+    "foot_size": [0.96, 1.21],
+}
+# Sliders whose attribute (`anim`'s body slider) starts at 1: below 1 they
+# move no bone and a shape does the work. The hips: `HipWidth` below 1
+# pulls the legs in and the thighs cross; `<Frame>_Hips_Narrow`
+# (`shapes.py`) narrows the surface instead.
+ATTRIBUTE_FROM_ONE = {"hip_width"}
 
 # The underwear (`underwear.py`): object -> (item ID, label, slot, tags).
 GARMENTS = {
@@ -211,8 +226,9 @@ def base_manifest(data, parts, folder=HERE):
     ]
     for pid, label, attribute, advanced in shared.PROPORTIONS:
         span = PROPORTION_RANGES.get(pid, PROPORTION_RANGE)
+        drives = [max(span[0], 1), span[1]] if pid in ATTRIBUTE_FROM_ONE else span
         parameter = {"id": pid, "label": label, "group": "proportions", "range": span,
-                     "default": 1, "attributes": [{"attribute": attribute, "from": span}]}
+                     "default": 1, "attributes": [{"attribute": attribute, "from": drives}]}
         if advanced:
             parameter["advanced"] = True
         parameters.append(parameter)

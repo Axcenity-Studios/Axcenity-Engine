@@ -765,8 +765,8 @@
       "label": "Height",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.82,
+        1.13
       ],
       "about": "How tall the whole body is.",
       "feature": "body",
@@ -776,8 +776,8 @@
         {
           "attribute": "BodyHeight",
           "from": [
-            0.85,
-            1.15
+            0.82,
+            1.13
           ]
         }
       ]
@@ -788,7 +788,7 @@
       "group": "proportions",
       "range": [
         0.85,
-        1.15
+        1.125
       ],
       "about": "How long the legs are against the body.",
       "feature": "thighs",
@@ -799,7 +799,7 @@
           "attribute": "LegLength",
           "from": [
             0.85,
-            1.15
+            1.125
           ]
         }
       ]
@@ -809,8 +809,8 @@
       "label": "Arm length",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.95,
+        1.08
       ],
       "about": "How long the arms are against the body.",
       "feature": "arms",
@@ -820,8 +820,8 @@
         {
           "attribute": "ArmLength",
           "from": [
-            0.85,
-            1.15
+            0.95,
+            1.08
           ]
         }
       ]
@@ -831,8 +831,8 @@
       "label": "Shoulder width",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.88,
+        1.12
       ],
       "about": "How wide the shoulders are.",
       "feature": "shoulders",
@@ -842,8 +842,8 @@
         {
           "attribute": "ShoulderWidth",
           "from": [
-            0.85,
-            1.15
+            0.88,
+            1.12
           ]
         }
       ]
@@ -853,8 +853,8 @@
       "label": "Waist width",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.775,
+        1.225
       ],
       "about": "How wide the waist is.",
       "feature": "waist",
@@ -864,8 +864,8 @@
         {
           "attribute": "WaistWidth",
           "from": [
-            0.85,
-            1.15
+            0.775,
+            1.225
           ]
         }
       ]
@@ -875,8 +875,8 @@
       "label": "Hip width",
       "group": "proportions",
       "range": [
-        1.0,
-        1.15
+        0.7,
+        1.2
       ],
       "about": "How wide the hips are.",
       "feature": "hips",
@@ -886,8 +886,8 @@
         {
           "attribute": "HipWidth",
           "from": [
-            1.0,
-            1.15
+            1,
+            1.2
           ]
         }
       ]
@@ -897,8 +897,8 @@
       "label": "Head size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.88,
+        1.12
       ],
       "about": "How large the head is against the body.",
       "feature": "head",
@@ -908,8 +908,8 @@
         {
           "attribute": "HeadSize",
           "from": [
-            0.85,
-            1.15
+            0.88,
+            1.12
           ]
         }
       ]
@@ -919,8 +919,8 @@
       "label": "Hand size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.82,
+        1.07
       ],
       "about": "How large the hands are.",
       "feature": "hands",
@@ -930,8 +930,8 @@
         {
           "attribute": "HandSize",
           "from": [
-            0.85,
-            1.15
+            0.82,
+            1.07
           ]
         }
       ],
@@ -942,8 +942,8 @@
       "label": "Foot size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.96,
+        1.21
       ],
       "about": "How large the feet are.",
       "feature": "feet",
@@ -953,8 +953,8 @@
         {
           "attribute": "FootSize",
           "from": [
-            0.85,
-            1.15
+            0.96,
+            1.21
           ]
         }
       ],
@@ -2912,6 +2912,33 @@
       ]
     },
     {
+      "shape": "Masculine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "shape": "Masculine_Belly_Flat",
       "factors": [
         {
@@ -3670,6 +3697,33 @@
           ],
           "to": [
             0.5,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
             1
           ]
         }
