@@ -53,11 +53,11 @@ fn recent_puts_the_newest_first_and_drops_missing_files() {
 #[test]
 fn opening_and_saving_put_a_character_first_in_recent() {
     let folder = test_folder("recent-workspace");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.edit(|description| description.name = "First".into());
     let first = workspace.save().unwrap();
     // A second character (a rename would move First's file: audit D-03).
-    workspace.new_character(0);
+    workspace.new_character(&Start::default());
     workspace.edit(|description| description.name = "Second".into());
     let second = workspace.save().unwrap();
     assert_eq!(recent::recent(&folder), vec![second.clone(), first.clone()]);
@@ -70,14 +70,17 @@ fn opening_and_saving_put_a_character_first_in_recent() {
 #[test]
 fn the_overview_names_the_body_type_hair_and_what_it_wears() {
     let folder = test_folder("overview");
-    let workspace = CharacterWorkspace::open_preset(&folder, 1).unwrap();
+    let workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
     let library = workspace.library();
     let female = shelf::overview(workspace.description(), &library);
     assert_eq!(female.body, "Female · Realistic", "{female:?}");
     assert!(female.look.starts_with("Bald · "), "{female:?}");
     assert!(female.look.contains("Sports bra"), "{female:?}");
 
-    let athletic = presets()[2].description("Athletic", &library);
+    let athletic = library
+        .preset("axcenity/realistic-athletic-male")
+        .unwrap()
+        .clone();
     let athletic = shelf::overview(&athletic, &library);
     assert_eq!(athletic.body, "Male · Realistic · 2 values set");
     assert!(athletic.look.contains("Boxer briefs"), "{athletic:?}");
@@ -253,15 +256,33 @@ fn a_pictures_key_follows_the_file_and_presets_have_their_own() {
         one,
         thumbnails::character_picture(&folder, &file, "two").unwrap()
     );
-    let presets: Vec<PathBuf> = (0..presets().len())
-        .map(|index| thumbnails::preset_picture(&folder, index).unwrap())
-        .collect();
-    assert!(
-        presets
-            .iter()
-            .all(|path| !path.starts_with(one.parent().unwrap()))
+    // Presets are addressed by ID, and keyed by the character drawn and
+    // its framing.
+    let shown = Description::new("Round", DEFAULT_BASE);
+    let whole = thumbnails::preset_picture(
+        &folder,
+        "axcenity/realistic-face-round",
+        &Subject::Character(shown.clone()),
     );
-    assert!(thumbnails::preset_picture(&folder, 99).is_none());
+    let face = thumbnails::preset_picture(
+        &folder,
+        "axcenity/realistic-face-round",
+        &Subject::Face(shown.clone()),
+    );
+    assert!(!whole.starts_with(one.parent().unwrap()));
+    assert_ne!(whole, face, "the framing is in the key");
+    let name = whole.file_name().unwrap().to_string_lossy().into_owned();
+    assert!(name.starts_with("axcenity-realistic-face-round."), "{name}");
+    let mut other = shown;
+    other.parameters.insert("fat".into(), 0.5);
+    assert_ne!(
+        whole,
+        thumbnails::preset_picture(
+            &folder,
+            "axcenity/realistic-face-round",
+            &Subject::Character(other)
+        )
+    );
 }
 
 /// A GPU device for drawing pictures, or `None` on a machine without one.
@@ -326,7 +347,11 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
     }
 
     // A preset, and a different body, look different.
-    let preset = painter.paint(&Subject::Preset(0));
+    let library = shelf::library_for(&folder);
+    let male = library.preset("axcenity/realistic-male").unwrap();
+    let mut shown = applier::default_description(&library, DEFAULT_BASE);
+    axcenity_avatar::apply_preset(&mut shown, male, &library).unwrap();
+    let preset = painter.paint(&Subject::Character(shown));
     assert!(covered(&preset) > 0.6);
     let differ = preset
         .chunks(4)
@@ -357,8 +382,14 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
     pictures.set_folder(Some(folder.clone()));
     pictures.set_gpu(&device, &queue);
     pictures.poll(&ctx);
-    let preset_out = thumbnails::preset_picture(&folder, 3).unwrap();
-    pictures.request(Subject::Preset(3), preset_out.clone());
+    let athletic = library
+        .preset("axcenity/realistic-athletic-female")
+        .unwrap()
+        .clone();
+    let athletic = Subject::Character(athletic);
+    let preset_out =
+        thumbnails::preset_picture(&folder, "axcenity/realistic-athletic-female", &athletic);
+    pictures.request(athletic.clone(), preset_out.clone());
     assert!(pictures.pending(&preset_out));
     let started = Instant::now();
     while pictures.pending(&preset_out) {
@@ -374,7 +405,7 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
         assert!(pictures.texture(&ctx, &preset_out).is_some());
     });
     // Asking again for a picture that's there draws nothing.
-    pictures.request(Subject::Preset(3), preset_out.clone());
+    pictures.request(athletic, preset_out.clone());
     assert!(!pictures.pending(&preset_out));
     let _ = std::fs::remove_dir_all(&folder);
 }

@@ -4,19 +4,21 @@
 //! the workspace. So a walkthrough test drives the studio exactly as the
 //! panels do, and no panel calls another.
 //!
-//! Capture and comparison (brief §12) come with R1's second part, as new
-//! variants here.
+//! Comparison (brief §12), Randomize, presets by ID and the recovery
+//! offer came with R1's second part. Comparison, locks and favourites are
+//! editor state: their intents never change the description or undo.
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
 use std::path::PathBuf;
 
-use axcenity_avatar::MaterialValue;
+use axcenity_avatar::{MaterialValue, PresetKind};
 
-use super::Category;
 use super::edit::Scope;
+use super::random::RandomScope;
 use super::selection::Level;
 use super::stage::{Backdrop, Lighting, ViewPreset};
+use super::{Category, Start};
 
 /// Where a change is in its gesture.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,10 +67,18 @@ pub enum Intent {
     SetBase(String),
     /// Renames the character (one undo step).
     Rename(String),
-    /// Starts again from preset `index` of `presets()`, keeping the name.
-    ApplyPreset(usize),
-    /// A new character from preset `index`, not saved yet.
-    New(usize),
+    /// Applies the preset with this ID (what its kind owns; the name is
+    /// kept), as one undo step.
+    ApplyPreset(String),
+    /// Saves the character as a person's own preset of a kind.
+    SaveAsPreset {
+        kind: PresetKind,
+        name: String,
+    },
+    /// Marks a preset a favourite, or not (editor state).
+    ToggleFavourite(String),
+    /// A new character, not saved yet: a family's default or a preset.
+    New(Start),
     /// Opens a saved character file in place of this one.
     Open(PathBuf),
     Save,
@@ -89,6 +99,47 @@ pub enum Intent {
     /// Shows a built-in expression on the preview's face (`None`: none).
     /// Preview only: never in the description.
     PreviewExpression(Option<String>),
+    /// Draws the scope again, keeping what's locked (one undo step).
+    Randomize(RandomScope),
+    /// Locks or unlocks parameters for Randomize (editor state).
+    SetLock {
+        ids: Vec<String>,
+        locked: bool,
+    },
+    /// Holds the current character as the next of A, B and C.
+    Capture,
+    /// Shows a held version (`None`: the current character).
+    ShowHeld(Option<usize>),
+    /// A held version beside the current one, or not.
+    SideBySide(bool),
+    /// Makes a held version the character (one undo step).
+    KeepHeld(usize),
+    /// Drops a held version.
+    DiscardHeld(usize),
+    /// The answer to "Recover the unsaved character?".
+    Recover(bool),
     /// Back to the start screen (the editor asks to save first).
     Home,
+}
+
+impl Intent {
+    /// Whether it changes the character (so a held version shown in its
+    /// place gives way to it first: an edit is always seen).
+    pub fn edits(&self) -> bool {
+        matches!(
+            self,
+            Intent::SetParameter { .. }
+                | Intent::SetMirrored { .. }
+                | Intent::Choose { .. }
+                | Intent::Wear { .. }
+                | Intent::SetMaterial { .. }
+                | Intent::SetBase(_)
+                | Intent::Rename(_)
+                | Intent::ApplyPreset(_)
+                | Intent::Undo
+                | Intent::Redo
+                | Intent::Reset(_)
+                | Intent::Randomize(_)
+        )
+    }
 }

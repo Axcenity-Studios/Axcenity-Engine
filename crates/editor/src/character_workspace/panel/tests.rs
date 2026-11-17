@@ -8,7 +8,7 @@ use axcenity_avatar::{BaseManifest, Description, Library};
 use super::super::edit::Scope;
 use super::super::selection::{Level, Selection};
 use super::super::{
-    Category, CharacterWorkspace, DEFAULT_BASE, find_character_library, nav, toolbar,
+    Category, CharacterWorkspace, DEFAULT_BASE, Start, find_character_library, nav, toolbar,
 };
 use super::materials::{DRAWN_TODAY, value_label};
 use super::parameters::{hidden_changes, rows};
@@ -184,7 +184,7 @@ fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
 #[test]
 fn reset_offers_everything_the_category_and_the_picked_feature() {
     let folder = test_folder("panel-reset");
-    let workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
     let mut selection = Selection {
         category: Category::Face,
