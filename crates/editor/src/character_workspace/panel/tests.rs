@@ -225,6 +225,9 @@ fn the_skin_page_offers_the_skin_models_values_and_says_which_are_drawn() {
         "{names:?}"
     );
     assert!(DRAWN_TODAY.contains(&"tint"));
-    assert!(!DRAWN_TODAY.contains(&"melanin"));
+    // Since R5 the Skin model draws all of its values; the Eye model's
+    // aren't drawn yet.
+    assert!(DRAWN_TODAY.contains(&"melanin") && DRAWN_TODAY.contains(&"softness"));
+    assert!(!DRAWN_TODAY.contains(&"pupil_size"));
     assert_eq!(value_label("roughness_scale"), "Roughness scale");
 }

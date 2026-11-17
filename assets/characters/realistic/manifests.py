@@ -102,6 +102,16 @@ SHADING = {
 }
 
 
+# How much of the skin's defined normal map shows (R5, OPEN-07): muscle
+# brings the definition, fat covers it, and the renderer shows
+# `definition * (1 - softness)` of it, so abdominal lines show only on
+# lean, muscular bodies (`skin.py`).
+SKIN_DRIVERS = {
+    "muscle": {"material": "Skin", "value": "definition", "from": [-0.5, 0.8], "to": [0, 1]},
+    "fat": {"material": "Skin", "value": "softness", "from": [-0.5, 0.5], "to": [0, 1]},
+}
+
+
 # What each body parameter does, in a sentence (its tooltip, R1), and the
 # feature it belongs to. A regional slider's sentence is made from its
 # region's words (`REGION_WORDS`).
@@ -238,6 +248,9 @@ def base_manifest(data, parts, folder=HERE):
         sys.path.insert(0, HERE)
     import shapes
     parameters += shapes.parameters()
+    for parameter in parameters:
+        if parameter["id"] in SKIN_DRIVERS:
+            parameter["material_values"] = [SKIN_DRIVERS[parameter["id"]]]
     # The face's parameters (CO6; faceparams.py).
     import faceparams
     parameters += faceparams.parameters(data.get("face", {}).get("face_identity", {}))

@@ -29,6 +29,7 @@ pub(super) const SCENE_SHADER: &str = concat!(
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
+    include_str!("../skin.wgsl"),
     include_str!("../surface.wgsl")
 );
 /// Water's shader: the scene's, then water.wgsl, with nothing traced (see
@@ -40,6 +41,7 @@ pub(super) const WATER_SHADER: &str = concat!(
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
+    include_str!("../skin.wgsl"),
     include_str!("../surface.wgsl"),
     include_str!("../water.wgsl"),
     include_str!("../water_no_rays.wgsl")
@@ -54,6 +56,7 @@ pub(super) const TRACED_WATER_SHADER: &str = concat!(
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
+    include_str!("../skin.wgsl"),
     include_str!("../surface.wgsl"),
     include_str!("../water.wgsl"),
     include_str!("../water_rays.wgsl")
@@ -66,7 +69,8 @@ pub(super) const SCENE_TEMPLATE: &str = concat!(
     include_str!("../clouds.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
-    include_str!("../shader.wgsl")
+    include_str!("../shader.wgsl"),
+    include_str!("../skin.wgsl")
 );
 /// The shader for terrain chunks: the sky's colors, the fog and the
 /// shared lighting, then `terrain.wgsl`.

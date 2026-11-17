@@ -27,9 +27,10 @@ struct Maps {
     uv_matrix: vec4<f32>,
     // xy: added to the texture coordinates after `uv_matrix`.
     uv_offset: vec4<f32>,
-    // How it's lit. x: the model (SHADING_STANDARD, _UNLIT or _TOON); for
-    // toon, y: its bands (0: read its ramp, bound in the specular map's
-    // place), z: softness, w: highlight size.
+    // How it's lit. x: the model (SHADING_STANDARD, _UNLIT, _TOON or
+    // _SKIN); for toon, y: its bands (0: read its ramp, bound in the
+    // specular map's place), z: softness, w: highlight size; for skin, see
+    // skin.wgsl; for standard, y: a leaf's translucency.
     shading: vec4<f32>,
     // x: toon's rim light.
     toon: vec4<f32>,
@@ -371,6 +372,27 @@ fn map_value(texel: vec4<f32>, mask: vec4<f32>, invert: f32) -> f32 {
 // from the mesh's normal `n` (unit length) and `tangent`.
 fn surface_normal(n: vec3<f32>, tangent: vec4<f32>, uv: vec2<f32>) -> vec3<f32> {
     let texel = textureSample(normal_texture, material_sampler, uv).xyz;
+    // Skin's defined normal map, when it has a share (skin.wgsl).
+    let defined = skin_defined_texel(uv);
+    return mapped_normal(n, tangent, texel, defined);
+}
+
+// A normal map's texel as a direction in its tangent space; `bc5` if it
+// holds only red and green.
+fn unpacked_normal(texel: vec3<f32>, bc5: bool) -> vec3<f32> {
+    var tipped = texel * 2.0 - 1.0;
+    if bc5 {
+        // A unit normal's Z from its X and Y.
+        tipped.z = sqrt(saturate(1.0 - dot(tipped.xy, tipped.xy)));
+    }
+    return tipped;
+}
+
+// `surface_normal` from the normal map's `texel` (and, on skin with a
+// share of it, the defined normal map's `defined`, blended in tangent
+// space by `Maps::shading`'s y).
+fn mapped_normal(n: vec3<f32>, tangent: vec4<f32>, texel: vec3<f32>, defined: vec3<f32>)
+    -> vec3<f32> {
     // The tangent, made perpendicular to the normal.
     let along = tangent.xyz - n * dot(n, tangent.xyz);
     if maps.settings.x == 0.0 || dot(along, along) < 1e-12 {
@@ -378,10 +400,11 @@ fn surface_normal(n: vec3<f32>, tangent: vec4<f32>, uv: vec2<f32>) -> vec3<f32> 
     }
     let t = normalize(along);
     let b = cross(n, t) * tangent.w;
-    var tipped = texel * 2.0 - 1.0;
-    if maps.specular.y != 0.0 {
-        // A unit normal's Z from its X and Y.
-        tipped.z = sqrt(saturate(1.0 - dot(tipped.xy, tipped.xy)));
+    var tipped = unpacked_normal(texel, maps.specular.y != 0.0);
+    if maps.shading.x == SHADING_SKIN && maps.shading.y > 0.0 {
+        // Written so a share of 1 gives the defined map's value exactly.
+        let share = maps.shading.y;
+        tipped = tipped * (1.0 - share) + unpacked_normal(defined, maps.shading.w != 0.0) * share;
     }
     tipped = vec3<f32>(tipped.x, tipped.y * maps.settings.y, tipped.z);
     tipped = vec3<f32>(tipped.xy * maps.settings.x, max(tipped.z, 0.0));
@@ -485,12 +508,13 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     let shaded = pixel_surface(in, facing);
     let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
     let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
+    let footprint = skin_footprint(in, shaded.normal, facing);
 
     // Cut-out materials (leaves, fences) leave holes where the texture is clear.
     if shaded.opacity < in.surface.z || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
-    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel);
+    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, footprint);
 }
 
 // A cut-out surface, in the scene pass. Its depth was drawn just before
@@ -504,7 +528,8 @@ fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(
     let shaded = pixel_surface(in, facing);
     let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
     let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
-    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel);
+    let footprint = skin_footprint(in, shaded.normal, facing);
+    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, footprint);
 }
 
 // A cut-out surface's opacity at this pixel, as `standard_surface` and
@@ -543,13 +568,14 @@ fn fs_depth_coverage(in: VertexOut) -> @location(0) vec4<f32> {
 }
 
 // The lit color of a pixel of a surface: `shaded`, its two remaining maps'
-// texels already read.
+// texels already read, and (for skin) its `footprint`.
 fn lit_pixel(
     in: VertexOut,
     facing: f32,
     shaded: Surface,
     occlusion_texel: vec4<f32>,
     specular_texel: vec4<f32>,
+    footprint: SkinFootprint,
 ) -> vec4<f32> {
     let metalness = clamp(shaded.metalness, 0.0, 1.0);
     // Perfectly smooth surfaces make the highlight infinitely small, so keep a minimum.
@@ -569,6 +595,8 @@ fn lit_pixel(
     } else if maps.shading.x == SHADING_TOON {
         color = toon_surface(in.world_position, geometric, shaded.normal, in.clip_position.xy,
             shaded.base_color, occlusion, solid);
+    } else if maps.shading.x == SHADING_SKIN {
+        color = skin_surface(in, facing, geometric, shaded, roughness, occlusion, solid, footprint);
     } else if maps.shading.y > 0.0 {
         color = lit_leaf(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
             solid, maps.shading.y);
@@ -701,6 +729,7 @@ fn through_leaf(
 const SHADING_STANDARD: f32 = 0.0;
 const SHADING_UNLIT: f32 = 1.0;
 const SHADING_TOON: f32 = 2.0;
+const SHADING_SKIN: f32 = 3.0;
 
 // How far round from the camera a toon surface's rim light starts (in
 // 1 - cos of the angle), and how large a highlight of size 1 is (its

@@ -18,10 +18,23 @@ use crate::color_palette;
 use crate::theme;
 use crate::widgets;
 
-/// The values `scene::material::modulate` draws today for every shading
-/// model (until CO7): the others are kept in the description and drawn
-/// once the skin shading model reads them.
-pub(in super::super) const DRAWN_TODAY: &[&str] = &["tint", "iris_tint", "roughness_scale"];
+/// The values the renderer draws today: `scene`'s material values (CO7's
+/// first slice) and the Skin shading model's (R5). The others (the Eye
+/// model's, cloth's and hair's own) are kept in the description and drawn
+/// once their shading model reads them.
+pub(in super::super) const DRAWN_TODAY: &[&str] = &[
+    "tint",
+    "iris_tint",
+    "sclera_tint",
+    "roughness_scale",
+    "detail_strength",
+    "melanin",
+    "undertone",
+    "redness",
+    "scatter_scale",
+    "definition",
+    "softness",
+];
 
 /// A value's name for people: `roughness_scale` is "Roughness scale".
 pub(in super::super) fn value_label(name: &str) -> String {
@@ -70,8 +83,8 @@ pub(super) fn skin(
                     spec.meaning.to_owned()
                 } else {
                     format!(
-                        "{} Saved with the character; the renderer draws it once skin \
-                             shading lands (CO7).",
+                        "{} Saved with the character; the renderer draws it once its \
+                             shading model does.",
                         spec.meaning
                     )
                 };

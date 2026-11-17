@@ -531,6 +531,7 @@ pub(super) struct MapsUniform {
 pub(super) const SHADING_STANDARD: f32 = 0.0;
 pub(super) const SHADING_UNLIT: f32 = 1.0;
 pub(super) const SHADING_TOON: f32 = 2.0;
+pub(super) const SHADING_SKIN: f32 = 3.0;
 
 /// A texture uploaded to the GPU, with a view for each way it's read.
 pub(super) struct GpuTexture {

@@ -27,6 +27,162 @@ fn a_fluttering_material_is_a_leaf_unless_it_says_otherwise() {
 }
 
 #[test]
+fn a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map() {
+    let of = |text: &str| {
+        let raw = serde_json::value::RawValue::from_string(text.to_owned()).unwrap();
+        super::shading_of(&Some(raw))
+    };
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin", "axcenity_defined_normal": {"index": 3}}"#),
+        (ModelShading::Skin, Some(3))
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin"}"#),
+        (ModelShading::Skin, None)
+    );
+    // A defined map only means something on skin; an unknown model (a
+    // newer file's "eye", say) draws as standard.
+    assert_eq!(
+        of(r#"{"axcenity_defined_normal": {"index": 3}}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": "eye"}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": 7, "axcenity_sway": 0.2}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(super::shading_of(&None), (ModelShading::Standard, None));
+}
+
+/// The realistic body's skin, as the build writes it: marked skin, with
+/// its smooth normal map as glTF's own and the defined one beside it.
+#[test]
+fn the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    assert_eq!(skin.shading, ModelShading::Skin);
+    let smooth = skin.normal_texture.as_ref().expect("a smooth normal map");
+    let defined = skin
+        .defined_normal_texture
+        .as_ref()
+        .expect("a defined normal map");
+    assert_eq!(
+        (smooth.width, smooth.height),
+        (defined.width, defined.height)
+    );
+    assert_ne!(smooth.rgba(), defined.rgba(), "the two maps differ");
+    // Every other material draws as standard (the mouth shares the maps).
+    for primitive in &model.primitives {
+        if primitive.material.name != "Skin" {
+            assert_eq!(
+                primitive.material.shading,
+                ModelShading::Standard,
+                "{}",
+                primitive.material.name
+            );
+        }
+    }
+    // The manifest's `materials[].shading` and the file agree on what is
+    // skin (architecture.md §10): every material the manifest calls skin
+    // is marked skin in the file, and only those. (The file marks only
+    // skin so far: an "eye" or "hair" material draws as standard.)
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.base.json")).unwrap())
+            .unwrap();
+    let said_skin: Vec<&str> = manifest["materials"]
+        .as_array()
+        .expect("the manifest's materials")
+        .iter()
+        .filter(|material| material["shading"] == "skin")
+        .map(|material| material["name"].as_str().unwrap())
+        .collect();
+    let mut marked_skin: Vec<&str> = model
+        .primitives
+        .iter()
+        .filter(|primitive| primitive.material.shading == ModelShading::Skin)
+        .map(|primitive| primitive.material.name.as_str())
+        .collect();
+    marked_skin.sort_unstable();
+    marked_skin.dedup();
+    assert_eq!(said_skin, marked_skin, "the manifest's skin and the file's");
+}
+
+/// The navel stays on every body: the smooth normal map (what fat makes
+/// of the defined one) keeps it where the build found it
+/// (`Realistic.build.json`'s `textures.navel_uv`), so the two maps agree
+/// round it.
+#[test]
+fn the_realistic_skins_smooth_normal_map_keeps_the_navel() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let navel = &build["textures"]["navel_uv"];
+    let (u, v) = (
+        navel[0].as_f64().expect("the navel's u"),
+        navel[1].as_f64().expect("the navel's v"),
+    );
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    let smooth = skin.normal_texture.as_ref().unwrap();
+    let defined = skin.defined_normal_texture.as_ref().unwrap();
+    let (width, height) = (smooth.width as i64, smooth.height as i64);
+    let (x, y) = ((u * width as f64) as i64, (v * height as f64) as i64);
+    // Within 12 texels (about a centimetre: the navel and its rim), the
+    // mean difference of every channel, in steps of 255.
+    let reach = 12;
+    let (mut sum, mut count, mut most) = (0.0, 0.0, 0u8);
+    // How far the defined map leans off flat (128 in red and green) there:
+    // the navel's walls, so the place the build chose isn't a flat spot
+    // (78 at the navel; 19 to 35 on the belly 40 to 120 texels beside it).
+    let mut leaning = 0u8;
+    for dy in -reach..=reach {
+        for dx in -reach..=reach {
+            if dx * dx + dy * dy > reach * reach {
+                continue;
+            }
+            let at = (((y + dy).clamp(0, height - 1) * width + (x + dx).clamp(0, width - 1)) * 4)
+                as usize;
+            for c in 0..3 {
+                let apart = smooth.rgba()[at + c].abs_diff(defined.rgba()[at + c]);
+                sum += f64::from(apart);
+                most = most.max(apart);
+                count += 1.0;
+            }
+            for c in 0..2 {
+                leaning = leaning.max(defined.rgba()[at + c].abs_diff(128));
+            }
+        }
+    }
+    let mean = sum / count;
+    eprintln!("at the navel ({x}, {y}) the defined map leans up to {leaning} steps off flat");
+    assert!(
+        leaning >= 50,
+        "the navel's place ({x}, {y}) is a dimple in the defined map: it leans {leaning} steps at most"
+    );
+    assert!(
+        mean < 1.5 && most < 12,
+        "the smooth map flattens the navel at ({x}, {y}): the maps differ by {mean:.2} on average, {most} at most"
+    );
+}
+
+#[test]
 fn the_example_pyramid_loads_fitted_into_the_unit_cube() {
     let model = load_model(&example_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
     assert_eq!(model.size, [4.0, 3.0, 4.0]);

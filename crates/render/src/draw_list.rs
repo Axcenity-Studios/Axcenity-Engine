@@ -2114,6 +2114,47 @@ pub enum Shading {
     Unlit,
     /// Cel shading: see [`Toon`].
     Toon(Toon),
+    /// Skin: light spreads under the surface and comes back out softened
+    /// and redder, with two specular lobes. See [`SkinShading`].
+    Skin(SkinShading),
+}
+
+/// Skin shading (characters' `skin` model, ADR-0036;
+/// `docs/rendering/skin.md`). Its diffuse light is lit by a blurred copy of
+/// the normal map (a pore is smaller than the distance light travels under
+/// skin) and spread across the line where light ends by a table
+/// pre-integrated from human skin's diffusion profile, further in red than
+/// in green and blue; its shadows' edges are redder too. Its specular
+/// light is two GGX lobes (a sharp and a broad one) on the full normal
+/// map, widened where the normal changes faster than a pixel can show, so
+/// pores don't glitter. Metalness and the specular map are left out: skin
+/// reflects 2.8% head-on, in white.
+#[derive(Clone, Debug)]
+pub struct SkinShading {
+    /// How far light spreads under the surface, as a multiple of human
+    /// skin's at the engine's scale (a stud is 0.35 m): 0 spreads none
+    /// (diffuse light is Lambert's, on the full normal map), 2 twice as
+    /// far.
+    pub scatter: f32,
+    /// A second normal map placed like the material's own, blended with it
+    /// by `normal_blend` before anything is lit: the realistic body's
+    /// defined one (lean and muscular), the material's own being the
+    /// smooth one. It takes the specular map's place, and is read at the
+    /// own map's scale and green convention.
+    pub defined_normal: Option<Arc<dyn TextureSource>>,
+    /// 0 draws the material's own normal map, 1 `defined_normal`, and
+    /// between them a blend. Without a `defined_normal` it changes nothing.
+    pub normal_blend: f32,
+}
+
+impl Default for SkinShading {
+    fn default() -> Self {
+        Self {
+            scatter: 1.0,
+            defined_normal: None,
+            normal_blend: 0.0,
+        }
+    }
 }
 
 /// Toon shading: each light's share (how squarely it falls, times its

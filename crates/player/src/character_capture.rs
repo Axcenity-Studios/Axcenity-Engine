@@ -60,6 +60,9 @@
 //!   controls) and mouth open (`Jaw_Open`); the body suite rest, the four
 //!   held poses and a walk frame (`Walk@0.3`). Lights default to `studio`;
 //!   `AXCENITY_CAPTURE_LIGHTS` and `_VIEWS` change them.
+//! - `AXCENITY_CAPTURE_AA=msaa` (or `fxaa`, `off`) draws with that
+//!   anti-aliasing instead of TAA (R5: the High and Ultra presets' default
+//!   is MSAA 4x, which shows what TAA hides); unset, it is TAA.
 
 use std::path::{Path, PathBuf};
 
@@ -899,6 +902,17 @@ pub(crate) fn capture(
     )
 }
 
+/// The anti-aliasing captures draw with: TAA, unless
+/// `AXCENITY_CAPTURE_AA` names another (`msaa` is MSAA 4x).
+fn anti_aliasing() -> AntiAliasing {
+    match std::env::var("AXCENITY_CAPTURE_AA").as_deref() {
+        Ok("msaa") => AntiAliasing::Msaa4,
+        Ok("fxaa") => AntiAliasing::Fxaa,
+        Ok("off") => AntiAliasing::Off,
+        _ => AntiAliasing::Taa,
+    }
+}
+
 /// Draws `description` from each of `views` under each of `lights`
 /// (lights outermost), as [`capture`] draws every view under every light.
 pub(crate) fn capture_in(
@@ -931,7 +945,7 @@ pub(crate) fn draw_staged(
 ) -> Result<Vec<Shot>, String> {
     let (width, height) = settings.size;
     let mut graphics = GraphicsSettings::preset(Quality::High);
-    graphics.anti_aliasing = Some(AntiAliasing::Taa);
+    graphics.anti_aliasing = Some(anti_aliasing());
     let mut shots = Vec::with_capacity(lights.len() * views.len());
     for lit in lights {
         let light = lit.light;
@@ -1324,7 +1338,12 @@ fn capture_characters() {
         "face": settings.face.iter().map(|(name, strength)| format!("{name}:{strength}")).collect::<Vec<_>>(),
         "frames": settings.frames,
         "quality": "High",
-        "anti_aliasing": "TAA",
+        "anti_aliasing": match anti_aliasing() {
+            AntiAliasing::Taa => "TAA",
+            AntiAliasing::Msaa4 => "MSAA 4x",
+            AntiAliasing::Fxaa => "FXAA",
+            _ => "off",
+        },
         "lights": lights.iter().map(|lit| lit.light.name).collect::<Vec<_>>(),
         "views": views.iter().map(|view| view.name).collect::<Vec<_>>(),
         "characters": listed,
