@@ -72,3 +72,43 @@ Base: refinement-r1-wave1 (6267cb98). Debug, RX 9070 XT. Skin stubbed as Standar
     thread 'skin_value_tests::definition_and_softness_show_and_hide_the_defined_normal_map' (32092) panicked at crates\player\src\skin_value_tests.rs:374:9:
      Summary [  13.837s] 3 tests run: 1 passed, 2 failed, 201 skipped
 error: test run failed
+
+
+== Review fixes (red, before the fixes) ==
+
+-- render: cargo nextest run -p axcenity-render -E "test(/skin::/)" --no-capture
+0.49149108 of the sun through the clouds; red over green lit: open 0.9997653, under clouds 1.099631; where the light ends: open 1.2331918, under clouds 1.3748304
+FAIL [   8.253s] (3/8) axcenity-render renderer::tests::skin::a_crease_sharper_than_skins_smallest_radius_is_no_redder_than_it
+FAIL [  16.193s] (2/8) axcenity-render renderer::tests::skin::a_cloud_shadow_dims_skin_without_reddening_it
+Summary [  75.114s] 8 tests run: 6 passed, 2 failed, 376 skipped
+grain lit: smooth 5.3123937, standard 14.286927, skin 6.9575553; where the light ends: smooth 13.258064, standard 21.154839, skin 13.609677
+lit: open 0.9997653, under clouds 1.099631
+red over green where the light ends: 1 mm 1.7021189, 4 mm 1.3387038
+test renderer::tests::skin::a_cloud_shadow_dims_skin_without_reddening_it ... FAILED
+test renderer::tests::skin::a_crease_sharper_than_skins_smallest_radius_is_no_redder_than_it ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 383 filtered out; finished in 16.04s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 383 filtered out; finished in 8.16s
+
+-- assets: the navel test, first without textures.navel_uv in Realistic.build.json
+the navel's u
+Summary [   1.294s] 2 tests run: 1 passed, 1 failed, 210 skipped
+
+-- assets: then with the navel's place (0.3713, 0.3257) written into it by hand, against the committed maps
+the smooth map flattens the navel at (760, 667): the maps differ by 16.41 on average, 65 at most
+Summary [   1.290s] 1 test run: 0 passed, 1 failed, 211 skipped
+
+-- scene: a SurfaceAppearance on skin
+Summary [   0.011s] 1 test run: 0 passed, 1 failed, 201 skipped
+no defined map
+
+-- render: a groove (concave), added after the first re-captures showed the red patches stayed
+red over green where the light ends in a groove: standard 1, skin 1.0647502
+skin in a groove isn't reddened: 1.0647502
+Summary [   8.483s] 1 test run: 0 passed, 1 failed, 384 skipped
+
+-- render: a normal map's fold (red's blurrier normal unheld), added after the second re-captures still showed red in the ear's fold, the nostril and under the eye
+-- cargo nextest run -p axcenity-render -E "test(red_light_doesnt_fill)" --no-capture
+flat red over green 1; the folded square's reddest 82, 28 pixels darker than half the flat's
+thread 'renderer::tests::skin::red_light_doesnt_fill_a_normal_maps_fold_that_green_leaves_dark' panicked at crates\render\src\renderer\tests\skin.rs:643:5:
+red over green in the fold: 82 (flat 1)
+     Summary [  12.550s] 1 test run: 0 passed, 1 failed, 385 skipped

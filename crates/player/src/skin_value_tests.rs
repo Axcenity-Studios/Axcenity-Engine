@@ -264,9 +264,10 @@ fn skin_surface_and_eye_values_change_the_picture_the_way_they_mean() {
     let flattened = change(before, smooth);
     // (Since R5 the skin's diffuse light doesn't see its pores and the
     // grain is half as steep, so the detail moves fewer pixels: 1.3% of
-    // this picture, 2% or more before.)
+    // this picture, 2% or more before; 1% still catches detail that
+    // does nothing.)
     assert!(
-        flattened.share > 0.005,
+        flattened.share > 0.01,
         "detail 0 changed {}",
         flattened.share
     );

@@ -92,6 +92,82 @@ fn the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map() {
             );
         }
     }
+    // The manifest's `materials[].shading` and the file agree on what is
+    // skin (architecture.md §10): every material the manifest calls skin
+    // is marked skin in the file, and only those. (The file marks only
+    // skin so far: an "eye" or "hair" material draws as standard.)
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.base.json")).unwrap())
+            .unwrap();
+    let said_skin: Vec<&str> = manifest["materials"]
+        .as_array()
+        .expect("the manifest's materials")
+        .iter()
+        .filter(|material| material["shading"] == "skin")
+        .map(|material| material["name"].as_str().unwrap())
+        .collect();
+    let mut marked_skin: Vec<&str> = model
+        .primitives
+        .iter()
+        .filter(|primitive| primitive.material.shading == ModelShading::Skin)
+        .map(|primitive| primitive.material.name.as_str())
+        .collect();
+    marked_skin.sort_unstable();
+    marked_skin.dedup();
+    assert_eq!(said_skin, marked_skin, "the manifest's skin and the file's");
+}
+
+/// The navel stays on every body: the smooth normal map (what fat makes
+/// of the defined one) keeps it where the build found it
+/// (`Realistic.build.json`'s `textures.navel_uv`), so the two maps agree
+/// round it.
+#[test]
+fn the_realistic_skins_smooth_normal_map_keeps_the_navel() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let navel = &build["textures"]["navel_uv"];
+    let (u, v) = (
+        navel[0].as_f64().expect("the navel's u"),
+        navel[1].as_f64().expect("the navel's v"),
+    );
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    let smooth = skin.normal_texture.as_ref().unwrap();
+    let defined = skin.defined_normal_texture.as_ref().unwrap();
+    let (width, height) = (smooth.width as i64, smooth.height as i64);
+    let (x, y) = ((u * width as f64) as i64, (v * height as f64) as i64);
+    // Within 12 texels (about a centimetre: the navel and its rim), the
+    // mean difference of every channel, in steps of 255.
+    let reach = 12;
+    let (mut sum, mut count, mut most) = (0.0, 0.0, 0u8);
+    for dy in -reach..=reach {
+        for dx in -reach..=reach {
+            if dx * dx + dy * dy > reach * reach {
+                continue;
+            }
+            let at = (((y + dy).clamp(0, height - 1) * width + (x + dx).clamp(0, width - 1)) * 4)
+                as usize;
+            for c in 0..3 {
+                let apart = smooth.rgba()[at + c].abs_diff(defined.rgba()[at + c]);
+                sum += f64::from(apart);
+                most = most.max(apart);
+                count += 1.0;
+            }
+        }
+    }
+    let mean = sum / count;
+    assert!(
+        mean < 1.5 && most < 12,
+        "the smooth map flattens the navel at ({x}, {y}): the maps differ by {mean:.2} on average, {most} at most"
+    );
 }
 
 #[test]

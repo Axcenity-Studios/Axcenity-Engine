@@ -190,12 +190,23 @@ fn a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_spec
 /// The red and green of the pixels across the middle of a 12 mm ball (a
 /// nose's tip) lit from straight right, from its lit side to its dark one.
 fn across_a_small_ball(shading: Shading) -> Vec<[u8; 4]> {
+    across_a_ball(0.006, shading, |_| {})
+}
+
+/// [`across_a_small_ball`] for a ball of `radius_m` metres, filling the
+/// frame as much as the 6 mm one does, its list changed by `change` first.
+fn across_a_ball(radius_m: f32, shading: Shading, change: impl Fn(&mut DrawList)) -> Vec<[u8; 4]> {
     let Some((device, queue)) = test_device() else {
         return Vec::new();
     };
-    // 6 mm in studs (a stud is 0.35 m).
-    let radius = 0.006 / 0.35;
-    let list = scene(vec![ball(radius, 0.0, shading)], 0.3, 8.0);
+    // In studs (a stud is 0.35 m).
+    let radius = radius_m / 0.35;
+    let mut list = scene(
+        vec![ball(radius, 0.0, shading)],
+        0.3,
+        8.0 * radius_m / 0.006,
+    );
+    change(&mut list);
     let mut renderer = renderer(&device, &queue);
     let pixels = draw(&mut renderer, &list);
     let (start, end) = (
@@ -253,6 +264,221 @@ fn light_spreads_past_where_it_ends_on_skin_further_in_red() {
     }));
     let unspread = red_where_light_ends(&none);
     assert!(unspread < 1.04, "no scatter, no red: {unspread}");
+}
+
+/// The mean red over green of the lit pixels (green above half the
+/// brightest's).
+fn red_where_lit(row: &[[u8; 4]]) -> f32 {
+    let top = row.iter().map(|p| p[1]).max().unwrap_or(0) as f32;
+    let lit: Vec<f32> = row
+        .iter()
+        .filter(|p| p[1] as f32 > top * 0.5)
+        .map(|p| p[0] as f32 / p[1].max(1) as f32)
+        .collect();
+    assert!(lit.len() >= 3, "nothing lit: {row:?}");
+    lit.iter().sum::<f32>() / lit.len() as f32
+}
+
+/// The mean of red, green and blue over the lit pixels of `row`.
+fn lit_brightness(row: &[[u8; 4]]) -> f32 {
+    let lit: Vec<f32> = row
+        .iter()
+        .filter(|p| p[1] > 8)
+        .map(|&p| brightness(p) as f32)
+        .collect();
+    lit.iter().sum::<f32>() / lit.len().max(1) as f32
+}
+
+/// The sun a third of the way up from straight right (so clouds can
+/// shade it), at `intensity`, under an overcast sky of thin cloud: about
+/// half the sun's light gets through, the same everywhere on a small ball.
+fn under_clouds(clouded: bool, intensity: f32) -> impl Fn(&mut DrawList) {
+    move |list: &mut DrawList| {
+        list.sun.direction = Vec3::new(1.0, 0.35, 0.0).normalize();
+        list.sun.intensity = intensity;
+        if clouded {
+            list.clouds = crate::Clouds {
+                cover: 1.0,
+                density: CLOUD_DENSITY,
+                ..crate::Clouds::default()
+            };
+        }
+    }
+}
+
+/// Thin enough that about half the sun gets through (`CLOUD_LIGHT`).
+const CLOUD_DENSITY: f32 = 0.0165;
+/// How much of the sun's light gets through [`CLOUD_DENSITY`] at full
+/// cover (clouds.wgsl's `cloud_shadow`: an optical depth of 0.05 a stud at
+/// density 1, through the 400-stud layer, over the sun's height 0.33).
+fn cloud_light() -> f32 {
+    let up = Vec3::new(1.0, 0.35, 0.0).normalize().y.max(0.25);
+    let depth = 0.05 * CLOUD_DENSITY * 400.0 / up;
+    0.7 * (-depth).exp() + 0.3 * (-0.25 * depth).exp()
+}
+
+#[test]
+fn a_cloud_shadow_dims_skin_without_reddening_it() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    let through = cloud_light();
+    // The clouds really take about half the sun away (a grey ball).
+    let open = across_a_ball(0.006, Shading::Standard, under_clouds(false, 2.0));
+    let shaded = across_a_ball(0.006, Shading::Standard, under_clouds(true, 2.0));
+    let (open_light, shaded_light) = (lit_brightness(&open), lit_brightness(&shaded));
+    assert!(
+        shaded_light < 0.8 * open_light,
+        "the clouds shade the ball: open {open_light}, under clouds {shaded_light}"
+    );
+    // Skin in the open, and under the clouds with the sun made brighter
+    // by as much as they take: the same light arrives, so the same
+    // picture. Clouds are grey, not a shadow's edge: they mustn't redden
+    // the skin (it would turn redder all over when a cloud passes).
+    let skin = || skin(None, 0.0);
+    let open = across_a_ball(0.006, skin(), under_clouds(false, 2.0));
+    let shaded = across_a_ball(0.006, skin(), under_clouds(true, 2.0 / through));
+    let (lit_open, lit_shaded) = (red_where_lit(&open), red_where_lit(&shaded));
+    let (edge_open, edge_shaded) = (red_where_light_ends(&open), red_where_light_ends(&shaded));
+    eprintln!(
+        "{through} of the sun through the clouds; red over green lit: open {lit_open}, under clouds {lit_shaded}; where the light ends: open {edge_open}, under clouds {edge_shaded}"
+    );
+    assert!(
+        (lit_shaded - lit_open).abs() < 0.03,
+        "lit: open {lit_open}, under clouds {lit_shaded}"
+    );
+    assert!(
+        (edge_shaded - edge_open).abs() < 0.03,
+        "where the light ends: open {edge_open}, under clouds {edge_shaded}"
+    );
+}
+
+#[test]
+fn a_crease_sharper_than_skins_smallest_radius_is_no_redder_than_it() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    // A 1 mm ball (a nostril's rim, a crease) is drawn as skin's smallest
+    // radius, 4 mm: past it the table reddens a crease's shading
+    // as no real skin does at that size.
+    let tiny = red_where_light_ends(&across_a_ball(0.001, skin(None, 0.0), |_| {}));
+    let smallest = red_where_light_ends(&across_a_ball(0.004, skin(None, 0.0), |_| {}));
+    eprintln!("red over green where the light ends: 1 mm {tiny}, 4 mm {smallest}");
+    assert!(tiny < smallest + 0.03, "1 mm {tiny}, 4 mm {smallest}");
+}
+
+/// The inside of half a cylinder standing upright, open toward +Z: a
+/// groove (a crease, an ear's fold), in the unit cube. Its normals face in,
+/// toward its axis.
+struct Groove {
+    positions: Vec<[f32; 3]>,
+    normals: Vec<[f32; 3]>,
+    uvs: Vec<[f32; 2]>,
+    indices: Vec<u32>,
+}
+
+impl Groove {
+    fn new() -> Self {
+        let (around, up) = (48u32, 8u32);
+        let mut groove = Groove {
+            positions: Vec::new(),
+            normals: Vec::new(),
+            uvs: Vec::new(),
+            indices: Vec::new(),
+        };
+        for j in 0..=up {
+            for i in 0..=around {
+                // From the left edge (x -0.5) round the back to the right.
+                let angle = (i as f32 / around as f32 - 0.5) * std::f32::consts::PI;
+                let (sin, cos) = angle.sin_cos();
+                let y = j as f32 / up as f32 - 0.5;
+                groove.positions.push([0.5 * sin, y, -0.5 * cos]);
+                groove.normals.push([-sin, 0.0, cos]);
+                groove
+                    .uvs
+                    .push([i as f32 / around as f32, j as f32 / up as f32]);
+            }
+        }
+        let row = around + 1;
+        for j in 0..up {
+            for i in 0..around {
+                let at = j * row + i;
+                // Counter-clockwise seen from +Z.
+                groove
+                    .indices
+                    .extend([at, at + 1, at + row + 1, at, at + row + 1, at + row]);
+            }
+        }
+        groove
+    }
+}
+
+impl MeshSource for Groove {
+    fn key(&self) -> u64 {
+        0x5e_9700
+    }
+    fn positions(&self) -> &[[f32; 3]] {
+        &self.positions
+    }
+    fn normals(&self) -> &[[f32; 3]] {
+        &self.normals
+    }
+    fn uvs(&self) -> &[[f32; 2]] {
+        &self.uvs
+    }
+    fn indices(&self) -> &[u32] {
+        &self.indices
+    }
+}
+
+/// The pixels across a groove 12 mm wide lit from straight right, from
+/// its lit (left) side to its dark one.
+fn across_a_groove(shading: Shading) -> Vec<[u8; 4]> {
+    let Some((device, queue)) = test_device() else {
+        return Vec::new();
+    };
+    let radius = 0.006 / 0.35;
+    let mut groove = ball(radius, 0.0, shading);
+    groove.shape = Shape::Mesh(Arc::new(Groove::new()));
+    let list = scene(vec![groove], 0.3, 8.0);
+    let mut renderer = renderer(&device, &queue);
+    let pixels = draw(&mut renderer, &list);
+    let back = -radius * (1.0f32 - 0.81).sqrt();
+    let (start, end) = (
+        on_screen(&list, Vec3::new(-radius * 0.9, 0.0, back)),
+        on_screen(&list, Vec3::new(radius * 0.9, 0.0, back)),
+    );
+    let steps = (end - start).abs().max_element().ceil() as u32;
+    (0..=steps)
+        .map(|step| pixel(&pixels, start.lerp(end, step as f32 / steps as f32)))
+        .collect()
+}
+
+#[test]
+fn light_ending_in_a_groove_isnt_reddened_as_on_a_ball() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    // The table is pre-integrated round a ball's curve: light reaches past
+    // where it ends because the surface curves away from it. A crease
+    // curves the other way (an ear's fold, a nostril, where the nose meets
+    // the lip), and drawn as a ball it took a band of saturated red.
+    let standard = across_a_groove(Shading::Standard);
+    let skinned = across_a_groove(skin(None, 0.0));
+    assert!(
+        standard.iter().any(|p| p[1] > 40),
+        "the groove is drawn: {standard:?}"
+    );
+    let (plain, red) = (
+        red_where_light_ends(&standard),
+        red_where_light_ends(&skinned),
+    );
+    eprintln!("red over green where the light ends in a groove: standard {plain}, skin {red}");
+    assert!(plain < 1.04, "a grey standard groove stays grey: {plain}");
+    assert!(red < 1.04, "skin in a groove isn't reddened: {red}");
 }
 
 /// How much each pixel's brightness differs from its right neighbour's,
@@ -365,6 +591,72 @@ fn the_normal_blend_draws_the_own_map_at_0_and_the_defined_one_at_1() {
         half[middle],
         own[middle],
         defined[middle]
+    );
+}
+
+/// A normal map 64 texels square, flat but for a fold: a band 12 texels
+/// wide (columns 26 to 37) whose texels lean 50 degrees toward -X, away from
+/// a light on the right (an ear's fold, a nostril's rim, the lid's crease
+/// as the sculpt's map carries them).
+fn folded(key: u64) -> Arc<dyn TextureSource> {
+    let (sin, cos) = (-50.0f32).to_radians().sin_cos();
+    let byte = |v: f32| ((v * 0.5 + 0.5) * 255.0).round() as u8;
+    Map::shared(key, 64, move |x, _| {
+        if (26..38).contains(&x) {
+            [byte(sin), byte(0.0), byte(cos), 255]
+        } else {
+            [128, 128, 255, 255]
+        }
+    })
+}
+
+#[test]
+fn red_light_doesnt_fill_a_normal_maps_fold_that_green_leaves_dark() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    // Red reads the normal map blurrier than green (it spreads further
+    // under the skin), but only a little further: in a fold the sculpt's
+    // map turns away from the light, a blurrier red normal faces it again,
+    // and drawn so the fold filled with saturated red (an ear's helix, a
+    // nostril's corner, the crease under the eye).
+    let pixels = square(folded(0x5e_f0), skin(None, 0.0));
+    let flat = square(leaning(0x5e_f1, 0.0), skin(None, 0.0));
+    let row = SIZE as usize / 2;
+    let at = |pixels: &[u8], x: usize| -> [u8; 4] {
+        pixels[(row * SIZE as usize + x) * 4..][..4]
+            .try_into()
+            .unwrap()
+    };
+    let ratio = |p: [u8; 4]| p[0] as f32 / p[1].max(1) as f32;
+    let middle = at(&flat, SIZE as usize / 2);
+    // The most red over green across the row, where there is any red.
+    let reddest = (0..SIZE as usize)
+        .map(|x| at(&pixels, x))
+        .filter(|p| p[0] >= 8)
+        .map(ratio)
+        .fold(0.0f32, f32::max);
+    let dark = (0..SIZE as usize)
+        .map(|x| at(&pixels, x))
+        .filter(|p| p[1] < middle[1] / 2)
+        .count();
+    eprintln!(
+        "flat red over green {}; the folded square's reddest {reddest}, {dark} pixels darker than half the flat's",
+        ratio(middle)
+    );
+    assert!(dark >= 4, "the fold is drawn dark: {dark} pixels");
+    assert!(
+        ratio(middle) < 1.04,
+        "flat skin under a sun is grey: {middle:?}"
+    );
+    // Measured 82 before red was held, 1.375 after: red at most half as
+    // bright again as green's normal gives it (`SKIN_RED_FILL`), which near
+    // black stays about 1.5 in 8-bit sRGB too.
+    assert!(
+        reddest < 1.5,
+        "red over green in the fold: {reddest} (flat {})",
+        ratio(middle)
     );
 }
 

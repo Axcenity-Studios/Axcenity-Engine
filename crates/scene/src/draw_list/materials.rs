@@ -208,6 +208,11 @@ pub(super) fn surface_material(
         scale: number("NormalStrength", 1.0),
         flip_green: flag("NormalMapDirectX"),
     });
+    // The file's defined normal map goes with the file's own normal map,
+    // which the appearance has just replaced (with its own, or none).
+    if let Shading::Skin(skin) = &mut material.shading {
+        skin.defined_normal = None;
+    }
     maps.metalness = channel_map("MetalnessMap", "MetalnessChannel", false);
     if maps.metalness.is_some() {
         material.metalness = 1.0;

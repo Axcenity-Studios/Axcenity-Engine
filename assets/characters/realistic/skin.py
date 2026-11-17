@@ -13,8 +13,9 @@ a packed occlusion-roughness map, at 2K by default (4K for the hero set).
   muscular: abdominal lines, muscle separation). A **smooth** copy
   (what fat makes of it) flattens the sculpt's forms over the soft parts
   of the body (`soft_tissue`: the trunk, shoulders, arms and legs, but
-  not the head, hands, feet, knees, elbows, navel or nipples, nor any
-  deep crease) and is the material's own normal map; the defined one
+  not the head, hands, feet, knees, elbows, nipples or navel (`navel`:
+  the navel found and kept by name, as the occlusion doesn't keep its rim), nor
+  any deep crease) and is the material's own normal map; the defined one
   rides beside it in the glTF material's `extras`
   (`axcenity_defined_normal`, `mark`), and the renderer's Skin model
   blends the two by the material values `definition` and `softness`,
@@ -471,17 +472,43 @@ def fields(body, P, lm):
             "oily": clip(oily), "dry": clip(dry)}
 
 
+def _joint_heads(P, lm):
+    """The fitted skeleton's joints (their heads) on positions `P`."""
+    eyes = {s: np.array(fit_sphere(P[i] for i in lm.verts(FS_SOCKET[s]))[0]) for s in (1, -1)}
+    joints = rig.fit_joints(P, lm, {s: Vector(c) for s, c in eyes.items()})
+    return {name: np.array(h) for name, (h, _, _) in joints.items()}
+
+
+def navel(P, lm):
+    """The navel's vertex: of the belly's midline vertices between the hips
+    and the chest, the one lying furthest in behind the line through its
+    midline neighbours above and below (the low mesh's own dent; the
+    sculpt's is deeper). Front is -Y, up +Z."""
+    X = array(P)
+    J = _joint_heads(P, lm)
+    mid = np.flatnonzero((np.abs(X[:, 0]) < 0.004) & (X[:, 1] < J["Spine"][1])
+                         & (X[:, 2] > J["Hips"][2]) & (X[:, 2] < J["Chest"][2]))
+    mid = mid[np.argsort(X[mid][:, 2])]
+    z, y = X[mid][:, 2], X[mid][:, 1]
+    behind = y[1:-1] - (y[:-2] + (y[2:] - y[:-2]) * (z[1:-1] - z[:-2]) / (z[2:] - z[:-2]))
+    return int(mid[1 + int(np.argmax(behind))])
+
+
+# How far round the navel (metres) the smooth map keeps the sculpt's forms
+# whole (the navel and its rim), and where the flattening is full again.
+NAVEL_KEPT = (0.02, 0.035)
+
+
 def soft_tissue(P, lm):
     """Per vertex, 0 to 1: how much of the sculpt's forms there are soft
     tissue that fat covers (abdominal lines, the separation between
     muscles), for the smooth normal map. None on the head (down to the
     neck's middle), the hands and the feet, and less over the knees,
-    elbows and nipples, whose forms stay on a heavy body."""
+    elbows and nipples, whose forms stay on a heavy body (the navel is
+    kept in the texels, by `bake`)."""
     X = array(P)
     of_set = {fs: np.array(sorted(idx), dtype=np.int64) for fs, idx in lm.of_set.items()}
-    eyes = {s: np.array(fit_sphere(P[i] for i in lm.verts(FS_SOCKET[s]))[0]) for s in (1, -1)}
-    joints = rig.fit_joints(P, lm, {s: Vector(c) for s, c in eyes.items()})
-    J = {name: np.array(h) for name, (h, _, _) in joints.items()}
+    J = _joint_heads(P, lm)
 
     def blob(centre, radius):
         return np.exp(-((X - centre) ** 2).sum(axis=1) / (radius * radius))
@@ -504,6 +531,17 @@ def soft_tissue(P, lm):
         if len(on_side):
             soft *= 1.0 - blob(X[on_side[np.argmin(X[on_side][:, 1])]], 0.025)
     return np.clip(soft, 0.0, 1.0)
+
+
+def _uv_of(obj, vertex):
+    """`vertex`'s texture coordinates on `obj`, as glTF has them (v down),
+    rounded to a texel of a 4K map."""
+    layer = obj.data.uv_layers[0].data
+    for loop in obj.data.loops:
+        if loop.vertex_index == vertex:
+            u, v = layer[loop.index].uv
+            return [round(float(u), 4), round(1.0 - float(v), 4)]
+    raise ValueError(f"vertex {vertex} has no face")
 
 
 def _soft_texels(low, P, lm, size):
@@ -667,9 +705,16 @@ def bake(body, source, lm, size, out_dir, cage=None):
     g = _pixels(grain) * 2.0 - 1.0
     g[hidden] = (0.0, 0.0, 1.0)
     # The smooth map: the sculpt's forms flattened over soft tissue, but
-    # not in deep creases (the navel, the fold under a breast, the
-    # buttocks'), which fat deepens rather than hides.
+    # not in deep creases (the fold under a breast, the buttocks'), which
+    # fat deepens rather than hides.
     soft = _soft_texels(low, P, lm, size) * _step(0.80, 0.92, ao)
+    # Nor round the navel, a crease the occlusion doesn't keep (only its
+    # middle is deep, not its rim): measured in the texels, as the low
+    # mesh's vertices round it are 2 to 4 cm apart.
+    navel_uv = _uv_of(low, navel(P, lm))
+    rows, cols = np.mgrid[0:size, 0:size]
+    from_navel = np.hypot(cols + 0.5 - navel_uv[0] * size, rows + 0.5 - navel_uv[1] * size) * texel
+    soft *= _step(*NAVEL_KEPT, from_navel)
     flat_share = (SMOOTHED * soft)[:, :, None]
     smooth = shared * (1.0 - flat_share) + flat * flat_share
     smooth /= np.maximum(np.linalg.norm(smooth, axis=2, keepdims=True), 1e-9)
@@ -805,6 +850,9 @@ def bake(body, source, lm, size, out_dir, cage=None):
         "size": size, "texels_per_cm": round(1.0 / texel / 100.0, 2),
         "frames_differ_share": round(float((lean[:, :, 0] > 0.5).mean()), 3),
         "smoothed_share": round(float((soft > 0.5).mean()), 3),
+        # Where the navel is (glTF texture coordinates), which the smooth
+        # map keeps: the assets crate's test checks the two maps agree there.
+        "navel_uv": navel_uv,
         "grain": {"cell_texels": GRAIN_CELL, "fine_texels": GRAIN_FINE, "height_texels": GRAIN_HEIGHT},
     }
     return images

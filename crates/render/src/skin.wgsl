@@ -11,8 +11,8 @@
 //   pre-integrated from human skin's diffusion profile over a ring of the
 //   surface's curvature (Penner and Borshukov, "Pre-Integrated Skin
 //   Shading", GPU Pro 2, 2011; the profile is d'Eon and Luebke's six
-//   Gaussians, GPU Gems 3, chapter 14). Shadow edges are widened in red
-//   the same way.
+//   Gaussians, GPU Gems 3, chapter 14). A shadow map's soft edge is
+//   widened in red the same way; clouds and contact shadows stay grey.
 // - Specular: two GGX lobes, a sharp and a broad one, on the full normal
 //   map, reflecting 2.8% head-on in white (index of refraction 1.4). Their
 //   roughness is widened by how fast the normal turns within a pixel
@@ -41,6 +41,10 @@ const SKIN_MM_PER_UNIT: f32 = 350.0;
 // so a far face isn't grained by its pixel-sized pores either.
 const SKIN_DIFFUSE_LEVEL: f32 = 2.5;
 const SKIN_RED_LEVELS: f32 = 1.5;
+// The most red's blurrier normal brings it over what green's normal gives
+// red (in a fold the sculpt's map turns from the light, the blurrier
+// normal faces it again; unheld, the fold filled with saturated red).
+const SKIN_RED_FILL: f32 = 1.5;
 // How much of the full normal map's detail green and blue diffuse light
 // keep (red none): blue light scatters least, so it shows the most.
 const SKIN_DETAIL: vec3<f32> = vec3<f32>(0.0, 0.1, 0.2);
@@ -48,6 +52,13 @@ const SKIN_DETAIL: vec3<f32> = vec3<f32>(0.0, 0.1, 0.2);
 // widens it, so the edge of a shadow on skin is redder (light scatters
 // in under it).
 const SKIN_PENUMBRA: vec3<f32> = vec3<f32>(0.55, 0.85, 0.95);
+// The most red a shadow's edge has over its green: red at most half as
+// bright again, and a little, so deep inside a shadow skin doesn't glow.
+const SKIN_PENUMBRA_RED: vec2<f32> = vec2<f32>(1.5, 0.02);
+// The table's smallest row: a 4 mm radius. The curvature is the
+// triangles' (screen-space derivatives), which jumps at a nostril's rim
+// or a crease's edge; sharper rows only redden those.
+const SKIN_SMALLEST_ROW: f32 = 1.0;
 // Specular antialiasing: the variance of a pixel's filter, and the most
 // roughness it adds (alpha squared), as Filament has them.
 const SKIN_FILTER_VARIANCE: f32 = 0.15915494;
@@ -56,7 +67,8 @@ const SKIN_MOST_WIDENING: f32 = 0.18;
 // What a skin pixel's neighbourhood says, worked out before anything
 // branches (derivatives need it): how many texels of the normal map a
 // pixel spans (a mip level), how curved the surface is (1 / its radius,
-// in world units), and how fast the shading normal turns across a pixel.
+// in world units; 0 where it is flat or hollow), and how fast the shading
+// normal turns across a pixel.
 struct SkinFootprint {
     level: f32,
     curvature: f32,
@@ -73,10 +85,17 @@ fn skin_footprint(in: VertexOut, n: vec3<f32>, facing: f32) -> SkinFootprint {
     let across = dpdx(in.uv) * size;
     let down = dpdy(in.uv) * size;
     out.level = 0.5 * log2(max(max(dot(across, across), dot(down, down)), 1e-8));
+    // Signed: how far the normal turns along each step across the
+    // surface (1 / radius on a ball). A crease (an ear's fold, a nostril,
+    // where the nose meets the lip) turns the other way and counts as flat:
+    // the table is pre-integrated round a ball, whose light reaches past
+    // where it ends; drawn so, a crease took a band of saturated red.
     let geometric = normalize(in.normal) * facing;
-    let bend = length(dpdx(geometric)) + length(dpdy(geometric));
-    let step = length(dpdx(in.world_position)) + length(dpdy(in.world_position));
-    out.curvature = bend / max(step, 1e-7);
+    let right = dpdx(in.world_position);
+    let below = dpdy(in.world_position);
+    let bend = dot(dpdx(geometric), right) + dot(dpdy(geometric), below);
+    let step = dot(right, right) + dot(below, below);
+    out.curvature = max(bend, 0.0) / max(step, 1e-14);
     let turn_x = dpdx(n);
     let turn_y = dpdy(n);
     out.variance = dot(turn_x, turn_x) + dot(turn_y, turn_y);
@@ -125,23 +144,37 @@ fn skin_table(n_dot_l: f32, row: f32) -> vec3<f32> {
     return mix(near, far, between);
 }
 
+// How much of a light a shadow's edge lets through on skin, by channel:
+// `shadow` the shadow map's (or rays') visibility, widened in red only
+// across its soft edge (4v(1 - v) is 1 half way across it and 0 in full
+// light and full shadow), and red held to `SKIN_PENUMBRA_RED` of green.
+fn skin_penumbra(shadow: f32, scatter: f32) -> vec3<f32> {
+    let v = saturate(shadow);
+    let widened = pow(vec3<f32>(v), pow(SKIN_PENUMBRA, vec3<f32>(scatter)));
+    var tint = mix(vec3<f32>(v), widened, 4.0 * v * (1.0 - v));
+    tint.r = min(tint.r, tint.g * SKIN_PENUMBRA_RED.x + SKIN_PENUMBRA_RED.y);
+    return tint;
+}
+
 // The diffuse and specular light one light leaves on skin, before its
 // colour and strength (`Arrival::radiance`): `n` the full normal,
 // `diffuse_n` and `red_n` the blurred ones, `row` the table's row (or
 // below 0 for no spreading at all), `sharp` and `broad` the lobes'
-// roughness.
+// roughness. Only `parts.shadow` reddens; `parts.veil` (clouds, contact
+// shadows) dims every channel alike.
 fn skin_light(
     n: vec3<f32>,
     diffuse_n: vec3<f32>,
     red_n: vec3<f32>,
     geometric: vec3<f32>,
     v: vec3<f32>,
-    arrival: Arrival,
+    parts: ArrivalParts,
     base_color: vec3<f32>,
     row: f32,
     sharp: f32,
     broad: f32,
 ) -> vec3<f32> {
+    let arrival = parts.arrival;
     let l = arrival.l;
     let h = normalize(v + l);
     let n_dot_l = max(dot(n, l), 0.0);
@@ -155,13 +188,15 @@ fn skin_light(
         // Green and blue keep a little of the surface's detail (blue,
         // which scatters least, the most); red spreads at least as far as
         // they do, so a blurrier red normal facing away (in a nostril, an
-        // ear's fold) never leaves a cyan fringe.
+        // ear's fold) never leaves a cyan fringe, and its blurrier normal
+        // adds at most `SKIN_RED_FILL` of what green's normal gives red: a
+        // few millimetres of spreading, not a fold the sculpt's normal
+        // map turns away from the light filled with saturated red.
         let green = skin_table(dot(normalize(mix(diffuse_n, n, SKIN_DETAIL.g)), l), row);
         let blue = skin_table(dot(normalize(mix(diffuse_n, n, SKIN_DETAIL.b)), l), row);
-        let red = max(skin_table(dot(red_n, l), row).r, green.r);
+        let red = clamp(skin_table(dot(red_n, l), row).r, green.r, green.r * SKIN_RED_FILL);
         spread = vec3<f32>(red, green.g, blue.b);
-        shadow = pow(vec3<f32>(saturate(arrival.visible)),
-            pow(SKIN_PENUMBRA, vec3<f32>(maps.shading.z)));
+        shadow = skin_penumbra(parts.shadow, maps.shading.z) * parts.veil;
     }
     let diffuse = (1.0 - fresnel) * base_color / PI * spread * shadow;
 
@@ -206,23 +241,23 @@ fn skin_surface(
             red_n = skin_normal_at(in, facing, level + SKIN_RED_LEVELS);
         }
         let radius_mm = 1.0 / max(footprint.curvature / SKIN_MM_PER_UNIT * scatter, 1e-6);
-        row = clamp(log2(radius_mm / 2.0), 0.0, f32(SKIN_ROWS - 1u));
+        row = clamp(log2(radius_mm / 2.0), SKIN_SMALLEST_ROW, f32(SKIN_ROWS - 1u));
     }
 
     let sharp = skin_widened(clamp(weather.roughness * SKIN_SHARP, 0.04, 1.0), footprint.variance);
     let broad = skin_widened(clamp(weather.roughness * SKIN_BROAD, 0.04, 1.0), footprint.variance);
 
-    let sun = sun_arrival(world_position, geometric, pixel, solid);
+    let sun = sun_arrival_parts(world_position, geometric, pixel, solid);
     var lit = skin_light(n, diffuse_n, red_n, geometric, v, sun, base_color, row, sharp, broad)
-        * sun.radiance;
+        * sun.arrival.radiance;
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {
-        let lamp = lamp_arrival(lamps, i, slot, world_position, geometric, pixel, solid);
+        let lamp = lamp_arrival_parts(lamps, i, slot, world_position, geometric, pixel, solid);
         slot += lamp_slots(lamps, i);
-        if lamp.visible > 0.0 {
+        if lamp.arrival.visible > 0.0 {
             lit += skin_light(n, diffuse_n, red_n, geometric, v, lamp, base_color, row, sharp,
-                broad) * lamp.radiance;
+                broad) * lamp.arrival.radiance;
         }
     }
 
