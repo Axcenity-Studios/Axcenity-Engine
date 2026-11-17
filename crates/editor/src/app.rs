@@ -1845,7 +1845,7 @@ impl EditorApp {
         } else if self.character_workspace.is_some() {
             self.character_workspace_ui(ui, render_state);
         } else {
-            self.start_screen(ui);
+            self.start_screen(ui, render_state);
         }
         if let Some(clicked) = output.clicked {
             if self.tool == Tool::Paint
