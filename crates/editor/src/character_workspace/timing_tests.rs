@@ -34,7 +34,7 @@ fn summary(times: &mut [Duration]) -> String {
 #[ignore = "a measurement: run in release with --ignored"]
 fn drag_apply_time() {
     let folder = test_folder("drag-timing");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let character = workspace.character.unwrap();
     // Warm up: the first frame loads the models.
     for _ in 0..3 {

@@ -1,0 +1,77 @@
+Red run, r1-studio-2 (RA1, R1 step 2 part 2). Tests written before they could pass.
+
+1. Audit D2, against the old add_character_packages (it skipped a package the folder had):
+   cargo nextest run -p axcenity-project --no-fail-fast shipped
+
+────────────
+ Nextest run ID 91b94eb2-e29f-49b9-ac0e-dc53eedb9b8e with nextest profile: default
+    Starting 2 tests across 1 binary (241 tests skipped)
+        FAIL [   0.273s] (1/2) axcenity-project character_library::tests::an_older_copy_of_a_shipped_package_is_brought_up_to_date
+  stdout ───
+    running 1 test
+    test character_library::tests::an_older_copy_of_a_shipped_package_is_brought_up_to_date ... FAILED
+    failures:
+    failures:
+        character_library::tests::an_older_copy_of_a_shipped_package_is_brought_up_to_date
+  stderr ───
+    thread 'character_library::tests::an_older_copy_of_a_shipped_package_is_brought_up_to_date' (22392) panicked at crates\project\src\character_library.rs:360:9:
+    []
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [   0.284s] (2/2) axcenity-project character_library::tests::the_shipped_packages_are_copied_beside_the_built_in_one
+────────────
+     Summary [   0.286s] 2 tests run: 1 passed, 1 failed, 241 skipped
+        FAIL [   0.273s] (1/2) axcenity-project character_library::tests::an_older_copy_of_a_shipped_package_is_brought_up_to_date
+error: test run failed
+
+2. The editor features. The new tests were written with the new Intents and API, so against
+   the base branch they don't compile (no Start, no Intent::Capture, Randomize, SetLock,
+   ApplyPreset(String), SaveAsPreset, ToggleFavourite, Recover; no autosave_step). For a run
+   that fails at runtime, each feature's entry point was switched off with an early return
+   (use_preset, save_as_preset, toggle_favourite, randomize, set_lock, capture, keep_held,
+   refresh_other, autosave_step, recover) and offers_base put back to the old rule (stylized
+   not offered); then switched on again. Only slider_rows_and_the_body_type_draw_a_lock
+   passed: it checks the lock icons are drawn, which no entry point switches off.
+
+   cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(feature_tests) | test(the_whole_r1_walkthrough) | test(every_new_character_choice) | test(the_workspace_offers_the_realistic)'
+
+        FAIL [   2.369s] ( 1/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::randomize_draws_its_scope_again_as_one_step_and_keeps_locks
+    thread 'character_workspace::feature_tests::randomize_draws_its_scope_again_as_one_step_and_keeps_locks' (37668) panicked at crates\editor\src\character_workspace\feature_tests.rs:335:5:
+      left: Description { format_version: 2, name: "New Character", base: "axcenity/realistic", parameters: {}, items: [WornItem { id: "axcenity/realistic-boxer-briefs", variant: None, materials: {}, 
+        FAIL [   2.384s] ( 2/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::autosave_writes_at_most_every_few_seconds_and_save_removes_it
+    thread 'character_workspace::feature_tests::autosave_writes_at_most_every_few_seconds_and_save_removes_it' (21956) panicked at crates\editor\src\character_workspace\feature_tests.rs:535:5:
+        FAIL [   2.385s] ( 3/12) axcenity-editor::bin/axcenity-editor character_workspace::tests::every_new_character_choice_is_sound_on_both_families
+    thread 'character_workspace::tests::every_new_character_choice_is_sound_on_both_families' (6180) panicked at crates\editor\src\character_workspace\tests.rs:385:5:
+      left: ["Realistic"]
+        FAIL [   2.406s] ( 4/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::a_crash_leaves_a_recovery_that_the_next_open_offers
+    thread 'character_workspace::feature_tests::a_crash_leaves_a_recovery_that_the_next_open_offers' (8804) panicked at crates\editor\src\character_workspace\feature_tests.rs:593:5:
+        FAIL [   2.432s] ( 5/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::save_as_preset_writes_a_preset_of_its_kind_into_the_workspace
+    thread 'character_workspace::feature_tests::save_as_preset_writes_a_preset_of_its_kind_into_the_workspace' (10756) panicked at crates\editor\src\character_workspace\feature_tests.rs:251:5:
+        FAIL [   2.448s] ( 6/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::favourites_are_kept_beside_recent_and_never_in_the_character
+    thread 'character_workspace::feature_tests::favourites_are_kept_beside_recent_and_never_in_the_character' (35424) panicked at crates\editor\src\character_workspace\feature_tests.rs:300:5:
+        FAIL [   2.463s] ( 7/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise
+    thread 'character_workspace::feature_tests::body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise' (12124) panicked at crates\editor\src\character_workspace\feature_tests.rs:160:
+      left: 0.0
+        FAIL [   2.558s] ( 8/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::held_versions_never_enter_undo_or_the_saved_file
+    thread 'character_workspace::feature_tests::held_versions_never_enter_undo_or_the_saved_file' (14652) panicked at crates\editor\src\character_workspace\feature_tests.rs:452:5:
+      left: []
+        FAIL [   2.559s] ( 9/12) axcenity-editor::bin/axcenity-editor character_workspace::tests::the_workspace_offers_the_realistic_body_and_shows_it
+    thread 'character_workspace::tests::the_workspace_offers_the_realistic_body_and_shows_it' (21008) panicked at crates\editor\src\character_workspace\tests.rs:47:5:
+        PASS [   2.779s] (10/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::slider_rows_and_the_body_type_draw_a_lock
+        FAIL [   3.629s] (11/12) axcenity-editor::bin/axcenity-editor character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery
+    thread 'character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery' (42476) panicked at crates\editor\src\character_workspace\walkthrough_tests
+      left: 0.0
+        FAIL [   4.146s] (12/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::a_stylized_character_opens_edits_saves_and_reopens
+    thread 'character_workspace::feature_tests::a_stylized_character_opens_edits_saves_and_reopens' (24008) panicked at crates\editor\src\character_workspace\feature_tests.rs:115:5:
+      left: 0.0
+     Summary [   4.148s] 12 tests run: 1 passed, 11 failed, 1349 skipped
+        FAIL [   2.369s] ( 1/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::randomize_draws_its_scope_again_as_one_step_and_keeps_locks
+        FAIL [   2.384s] ( 2/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::autosave_writes_at_most_every_few_seconds_and_save_removes_it
+        FAIL [   2.385s] ( 3/12) axcenity-editor::bin/axcenity-editor character_workspace::tests::every_new_character_choice_is_sound_on_both_families
+        FAIL [   2.406s] ( 4/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::a_crash_leaves_a_recovery_that_the_next_open_offers
+        FAIL [   2.432s] ( 5/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::save_as_preset_writes_a_preset_of_its_kind_into_the_workspace
+        FAIL [   2.448s] ( 6/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::favourites_are_kept_beside_recent_and_never_in_the_character
+        FAIL [   2.463s] ( 7/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise
+        FAIL [   2.558s] ( 8/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::held_versions_never_enter_undo_or_the_saved_file
+        FAIL [   2.559s] ( 9/12) axcenity-editor::bin/axcenity-editor character_workspace::tests::the_workspace_offers_the_realistic_body_and_shows_it
+        FAIL [   3.629s] (11/12) axcenity-editor::bin/axcenity-editor character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery
+        FAIL [   4.146s] (12/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::a_stylized_character_opens_edits_saves_and_reopens

@@ -47,7 +47,7 @@ The editor window shows the Character Studio workspace in place of the start scr
 
 ## Implementation references
 
-- `crates/editor/src/character_workspace.rs`, `character_workspace/shell.rs` (and the areas it applies `Intent`s from: `nav.rs`, `panel.rs`, `toolbar.rs`, `bottom_bar.rs`; refinement R1), `stage.rs`
+- `crates/editor/src/character_workspace.rs`, `character_workspace/shell.rs` (and the areas it applies `Intent`s from: `nav.rs`, `panel.rs`, `toolbar.rs`, `bottom_bar.rs`, `compare.rs`; refinement R1), `presets.rs`, `random.rs`, `autosave.rs`, `stage.rs`
 - `crates/editor/src/app/character_workspace.rs`, `start/characters.rs`, the `--character-studio` flag in `main.rs`
-- Tests: `character_workspace::tests`, `app::character_workspace::tests`
+- Tests: `character_workspace::tests`, `character_workspace::feature_tests`, `character_workspace::walkthrough_tests`, `app::character_workspace::tests`
 - Plan: `docs/research/character-studio.md` D9, stage CS2

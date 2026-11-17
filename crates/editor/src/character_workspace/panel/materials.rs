@@ -91,7 +91,7 @@ pub(super) fn skin(
                             _ => neutral,
                         };
                         let id = format!("{}.{}", slot.name, spec.name);
-                        if let Some((value, gesture)) = row::slider(
+                        if let Some(row::Asked::Set(value, gesture)) = row::slider(
                             ui,
                             &Row {
                                 id: &id,
@@ -102,6 +102,8 @@ pub(super) fn skin(
                                 range: [min, max],
                                 default: neutral,
                                 typed: level == Level::Advanced,
+                                // Material values aren't randomized.
+                                locked: None,
                             },
                         ) {
                             let to = ((value - neutral).abs() > 1.0e-4)

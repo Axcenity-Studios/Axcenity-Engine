@@ -5,9 +5,9 @@
 //!
 //! It edits a character [`Description`] (format 2; a format 1 file, CS2's
 //! `Look`, migrates when it's opened) on a base model of the character
-//! library: the realistic family (ADR-0032). The stylized body isn't
-//! offered for new characters ([`offers_base`]); a saved character on it
-//! still opens. Its controls come from the base model's manifest (the
+//! library: the realistic family (ADR-0032), the default, or the stylized
+//! one (plan section 0, decision 7: both are offered, [`offers_base`]).
+//! Its controls come from the base model's manifest (the
 //! parameters by group and category, the slots) and the catalogue (the
 //! items that fit), so a new body or item shows up without code. The
 //! preview is the Character Runtime's: the default character in a World
@@ -20,8 +20,10 @@
 //! default humanoid's files, the character library (the built-in package
 //! and the packages the engine ships, [`find_character_library`]) and the
 //! saved characters, `characters/<name>.character.json`; beside them the
-//! start page's Recent list (`recent.rs`), character packs (`packs.rs`)
-//! and the cached pictures of characters and presets (`thumbnails.rs`).
+//! start page's Recent list (`recent.rs`), character packs (`packs.rs`),
+//! the cached pictures of characters and presets (`thumbnails.rs`), a
+//! person's own presets (`presets/`) and favourites (`presets.rs`) and the
+//! autosave's recovery file (`autosave.rs`).
 //!
 //! The studio is split by area (audit-studio-ui.md section 3), each
 //! drawing from `&CharacterWorkspace` and returning [`Intent`]s that only
@@ -30,16 +32,22 @@
 //! `panel.rs` (the contextual panel on the right), `toolbar.rs` and
 //! `bottom_bar.rs` (camera, lighting and backdrop under the viewport).
 //! `intent.rs`, `selection.rs` and `edit.rs` are the contracts they share
-//! (what a panel can ask, what is shown, undo and reset). `stage.rs` is the
-//! camera, lighting, backdrop and floor; `shelf.rs` lists the saved
-//! characters for the start page and deletes them.
+//! (what a panel can ask, what is shown, undo and reset). `random.rs` is
+//! Randomize and its locks, `compare.rs` the held versions (before and
+//! after, side by side). `stage.rs` is the camera, lighting, backdrop and
+//! floor; `shelf.rs` lists the saved characters for the start page and
+//! deletes them.
 
+pub mod autosave;
 mod bottom_bar;
+pub mod compare;
 pub mod edit;
 pub mod intent;
 mod nav;
 pub mod packs;
 mod panel;
+pub mod presets;
+pub mod random;
 pub mod recent;
 pub mod selection;
 pub mod shelf;
@@ -48,6 +56,8 @@ mod stage;
 pub mod thumbnails;
 mod toolbar;
 
+#[cfg(test)]
+mod feature_tests;
 #[cfg(test)]
 mod shelf_tests;
 #[cfg(test)]
@@ -59,6 +69,7 @@ mod timing_tests;
 #[cfg(test)]
 mod walkthrough_tests;
 
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -67,14 +78,16 @@ use axcenity_anim::Animators;
 use axcenity_assets::Assets;
 pub use axcenity_avatar::chosen_slots;
 use axcenity_avatar::{
-    BaseManifest, Description, Library, MaterialValue, Parameter, WornItem, wear_choice,
-    wear_choices,
+    BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, WornItem,
+    wear_choice, wear_choices,
 };
 use axcenity_core::{ClassName, InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
 use axcenity_gameplay::description as applier;
 use axcenity_render::glam::Vec3;
 
+use autosave::{Autosave, Recovery};
+use compare::Comparison;
 use edit::{History, Scope};
 pub use intent::{Gesture, Intent};
 use selection::Selection;
@@ -121,103 +134,36 @@ pub fn find_character_library() -> Option<PathBuf> {
         .find(|folder| folder.join("catalogue.json").is_file())
 }
 
-/// A starting point on the Presets page and the start screen: plain data,
-/// so the start screen can list them without a library.
-#[derive(Clone, Copy, Debug)]
-pub struct Preset {
-    pub name: &'static str,
-    pub about: &'static str,
-    pub base: &'static str,
-    pub parameters: &'static [(&'static str, f32)],
-    /// The items worn; `None` wears the base model's defaults.
-    pub items: Option<&'static [&'static str]>,
+/// What a new character starts from: a base model's default character (a
+/// family), or a preset by its ID (the library's or a person's own).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Start {
+    Family(String),
+    Preset(String),
 }
 
-impl Preset {
-    /// The preset as a description named `name`.
-    pub fn description(&self, name: &str, library: &Library) -> Description {
-        let mut description = applier::default_description(library, self.base);
-        description.name = name.to_owned();
-        let base = library.base(self.base);
-        for (id, value) in self.parameters {
-            match base.and_then(|base| base.parameter(id)) {
-                Some(parameter) if self.items.is_none() => {
-                    choose(&mut description, library, parameter, *value)
-                }
-                _ => {
-                    description.parameters.insert((*id).to_owned(), *value);
-                }
-            }
-        }
-        if let Some(items) = self.items {
-            description.items = items.iter().map(|id| WornItem::new(*id)).collect();
-        }
-        description
-    }
-
-    /// Whether `description` is this preset (whatever its name).
-    fn matches(&self, description: &Description, library: &Library) -> bool {
-        let mut mine = description.clone();
-        mine.name = String::new();
-        mine == self.description("", library)
+impl Start {
+    /// A shipped realistic preset by its short name (`female`,
+    /// `athletic-male`…), for tests.
+    #[cfg(test)]
+    pub fn shipped(name: &str) -> Self {
+        Start::Preset(format!("axcenity/realistic-{name}"))
     }
 }
 
-/// The presets, all on the realistic body (the stylized one is no longer
-/// offered for new characters). The first is the default character. A
-/// preset that sets a parameter with choices (Male or Female) wears what
-/// that choice wears unless it names its own items.
-pub fn presets() -> Vec<Preset> {
-    vec![
-        Preset {
-            name: "Male",
-            about: "The realistic male body, as it's built: a start for any character.",
-            base: DEFAULT_BASE,
-            parameters: &[],
-            items: None,
-        },
-        Preset {
-            name: "Female",
-            about: "The realistic female body, as it's built.",
-            base: DEFAULT_BASE,
-            parameters: &[("frame", 1.0)],
-            items: None,
-        },
-        Preset {
-            name: "Athletic male",
-            about: "Lean and muscular.",
-            base: DEFAULT_BASE,
-            parameters: &[("muscle", 0.7), ("fat", -0.4)],
-            items: None,
-        },
-        Preset {
-            name: "Athletic female",
-            about: "Lean and toned.",
-            base: DEFAULT_BASE,
-            parameters: &[("frame", 1.0), ("muscle", 0.6), ("fat", -0.4)],
-            items: None,
-        },
-        Preset {
-            name: "Heavyset male",
-            about: "A heavier build.",
-            base: DEFAULT_BASE,
-            parameters: &[("fat", 0.8), ("muscle", 0.2)],
-            items: None,
-        },
-        Preset {
-            name: "Heavyset female",
-            about: "A heavier build.",
-            base: DEFAULT_BASE,
-            parameters: &[("frame", 1.0), ("fat", 0.8), ("muscle", 0.2)],
-            items: None,
-        },
-    ]
+impl Default for Start {
+    /// The realistic family's default character.
+    fn default() -> Self {
+        Start::Family(DEFAULT_BASE.to_owned())
+    }
 }
 
 /// Whether Character Studio offers base model `id` for new characters:
-/// every base but the stylized one, unless the library has nothing else.
+/// every family the library has (plan section 0, decision 7: both the
+/// realistic and the stylized family are selectable; realistic is the
+/// default and listed first, [`presets::families`]).
 pub fn offers_base(library: &Library, id: &str) -> bool {
-    id != axcenity_avatar::V1_BASE || library.bases.keys().all(|base| base == id)
+    library.base(id).is_some()
 }
 
 /// Sets `parameter` to `value` in `description` and, if the parameter has
@@ -346,6 +292,28 @@ pub struct CharacterWorkspace {
     /// The files saved since the editor last looked (it draws their
     /// pictures again).
     pub saved_files: Vec<PathBuf>,
+    /// A person's own presets (`presets/`), by ID.
+    own_presets: BTreeMap<String, Description>,
+    /// The favourite presets' IDs (editor state, `favourites.json`).
+    pub favourites: BTreeSet<String>,
+    /// Parameters Randomize leaves alone (editor state).
+    pub locks: BTreeSet<String>,
+    /// How many times Randomize was pressed: part of its seed.
+    rolls: u64,
+    /// The held versions and what is shown (editor state, never undone or
+    /// saved).
+    pub comparison: Comparison,
+    /// The second character, side by side, and what it shows.
+    other: Option<InstanceId>,
+    other_applied: Option<Description>,
+    other_canvas: Canvas,
+    autosave: Autosave,
+    /// A character a crash left, offered when the studio opened.
+    pub recovery: Option<Recovery>,
+    /// The presets' pictures (the Presets page's tiles).
+    pictures: thumbnails::Thumbnails,
+    /// Each preset's picture file and its texture once loaded, by ID.
+    preset_pictures: HashMap<String, (PathBuf, Option<eframe::egui::TextureHandle>)>,
 }
 
 /// Held while a workspace writes the library into its folder: the start
@@ -392,6 +360,8 @@ impl CharacterWorkspace {
         let assets = Assets::new(folder);
         let library = applier::library(&assets);
         let (description, fell_back) = adopt(description, &library);
+        let mut pictures = thumbnails::Thumbnails::default();
+        pictures.set_folder(Some(folder.to_owned()));
         let mut workspace = Self {
             folder: folder.to_owned(),
             assets,
@@ -417,6 +387,21 @@ impl CharacterWorkspace {
             leaving: false,
             asking: None,
             saved_files: Vec::new(),
+            own_presets: presets::read_own(folder),
+            favourites: presets::read_favourites(folder),
+            locks: random::default_locks(),
+            rolls: 0,
+            comparison: Comparison::default(),
+            other: None,
+            other_applied: None,
+            other_canvas: Canvas::default(),
+            autosave: Autosave {
+                on: true,
+                ..Autosave::default()
+            },
+            recovery: autosave::read_recovery(folder),
+            pictures,
+            preset_pictures: HashMap::new(),
         };
         workspace.build_world();
         Ok(workspace)
@@ -431,37 +416,60 @@ impl CharacterWorkspace {
         Ok(workspace)
     }
 
-    /// Opens preset `index` of [`presets`] (the default character when
-    /// there's no such preset).
-    pub fn open_preset(folder: &Path, index: usize) -> Result<Self, String> {
-        let preset = presets().into_iter().nth(index).unwrap_or(presets()[0]);
+    /// Opens the workspace on a new character from `start` (the default
+    /// character when the library hasn't what it names).
+    pub fn open_new(folder: &Path, start: &Start) -> Result<Self, String> {
         // The library is written into the folder by `open`; a preset's
         // items need it, so it opens first on a bare description.
         let mut workspace = Self::open(
             folder,
-            Description::new("New Character", preset.base),
+            Description::new("New Character", DEFAULT_BASE),
             false,
         )?;
-        let library = workspace.library();
-        if library.base(preset.base).is_some() {
-            workspace.description = tidy(preset.description("New Character", &library), &library);
-            workspace.applied = None;
-            workspace.refresh(true);
-        }
+        let description = workspace.starting(start);
+        workspace.description = description.clone();
+        workspace.autosave.untouched = Some(description);
+        workspace.applied = None;
+        workspace.refresh(true);
         Ok(workspace)
     }
 
-    /// Starts a new character from preset `index` in place of this one:
-    /// not saved, with an undo of its own.
-    pub fn new_character(&mut self, index: usize) {
+    /// The new character `start` makes, tidied; the default character
+    /// when the library hasn't what it names.
+    fn starting(&self, start: &Start) -> Description {
         let library = self.library();
-        let preset = presets().into_iter().nth(index).unwrap_or(presets()[0]);
-        let description = if library.base(preset.base).is_some() {
-            preset.description("New Character", &library)
-        } else {
-            applier::default_description(&library, &self.description.base)
+        let made = match start {
+            Start::Family(base) => library
+                .base(base)
+                .map(|_| applier::default_description(&library, base)),
+            Start::Preset(id) => {
+                presets::find(&library, &self.own_presets, id).and_then(|preset| {
+                    library.base(&preset.base)?;
+                    let mut made = applier::default_description(&library, &preset.base);
+                    axcenity_avatar::apply_preset(&mut made, preset, &library).ok()?;
+                    Some(made)
+                })
+            }
         };
-        self.start_over(tidy(description, &library), None);
+        let made = made.unwrap_or_else(|| {
+            let base = if library.base(DEFAULT_BASE).is_some() {
+                DEFAULT_BASE
+            } else {
+                axcenity_avatar::V1_BASE
+            };
+            applier::default_description(&library, base)
+        });
+        let mut made = tidy(made, &library);
+        made.name = "New Character".to_owned();
+        made
+    }
+
+    /// Starts a new character from `start` in place of this one: not
+    /// saved, with an undo of its own.
+    pub fn new_character(&mut self, start: &Start) {
+        let description = self.starting(start);
+        self.start_over(description.clone(), None);
+        self.autosave.untouched = Some(description);
     }
 
     /// Opens the character saved in `file` in place of this one.
@@ -486,9 +494,11 @@ impl CharacterWorkspace {
         self.expression = None;
         self.leaving = false;
         self.asking = None;
+        self.autosave.untouched = None;
         self.animators.clear();
         self.applied = None;
-        self.refresh(true);
+        // Held versions belong to the character they were held of.
+        self.clear_comparison();
     }
 
     pub fn description(&self) -> &Description {
@@ -707,18 +717,71 @@ impl CharacterWorkspace {
         });
     }
 
-    /// Starts again from `preset`, keeping the name, as an undo step.
-    pub fn use_preset(&mut self, preset: &Preset) {
+    /// Applies preset `id` (`avatar::apply_preset`: what its kind owns,
+    /// the name kept), as one undo step.
+    pub fn use_preset(&mut self, id: &str) {
         let library = self.library();
-        if library.base(preset.base).is_none() {
+        let Some(preset) = presets::find(&library, &self.own_presets, id).cloned() else {
+            self.notice = Some(format!("There's no preset \"{id}\" in this library."));
+            return;
+        };
+        let mut applied = self.description.clone();
+        if let Err(problem) = axcenity_avatar::apply_preset(&mut applied, &preset, &library) {
             self.notice = Some(format!(
-                "This library hasn't the body \"{}\" is on.",
-                preset.name
+                "\"{}\" can't be applied: {}",
+                preset.name, problem.message
             ));
             return;
         }
-        let name = self.description.name.clone();
-        self.edit(|description| *description = preset.description(&name, &library));
+        self.edit(|description| *description = applied);
+    }
+
+    /// The presets of `kind` for the character's base model, the
+    /// library's (`library`, the caller's for the frame) and a person's
+    /// own.
+    pub fn presets_of<'a>(
+        &'a self,
+        library: &'a Library,
+        kind: PresetKind,
+    ) -> Vec<presets::Listed<'a>> {
+        presets::of_kind(library, &self.own_presets, &self.description.base, kind)
+    }
+
+    /// A person's own presets, by ID.
+    pub fn own_presets(&self) -> &BTreeMap<String, Description> {
+        &self.own_presets
+    }
+
+    /// Saves the character as a person's own preset of `kind` named
+    /// `name` (in `presets/`); the status line says how it went.
+    pub fn save_as_preset(&mut self, kind: PresetKind, name: &str) {
+        let library = self.library();
+        match presets::save_own(
+            &self.folder,
+            &self.description,
+            kind,
+            name,
+            &library,
+            &self.own_presets,
+        ) {
+            Ok((id, preset)) => {
+                self.notice = Some(format!(
+                    "Saved \"{}\" as a {} preset.",
+                    preset.name,
+                    kind.name()
+                ));
+                self.own_presets.insert(id, preset);
+            }
+            Err(error) => self.notice = Some(error),
+        }
+    }
+
+    /// Marks preset `id` a favourite, or not.
+    pub fn toggle_favourite(&mut self, id: &str) {
+        if !self.favourites.remove(id) {
+            self.favourites.insert(id.to_owned());
+        }
+        presets::write_favourites(&self.folder, &self.favourites);
     }
 
     pub fn can_undo(&self) -> bool {
@@ -819,6 +882,9 @@ impl CharacterWorkspace {
         }
         self.file = Some(path.clone());
         self.saved = Some(self.description.clone());
+        // Saved: nothing left to recover.
+        self.autosave.written = None;
+        autosave::remove_recovery(&self.folder);
         recent::remember(&self.folder, &path);
         self.saved_files.push(path.clone());
         Ok(match renamed_from {
@@ -866,9 +932,11 @@ impl CharacterWorkspace {
         stage::add_floor(&mut world);
         self.world = world;
         self.character = Some(character);
+        self.other = None;
+        self.other_applied = None;
         self.animators.clear();
         self.applied = None;
-        self.refresh(true);
+        self.refresh_previews();
     }
 
     /// Applies the description to the preview if it changed: at once when
@@ -878,20 +946,18 @@ impl CharacterWorkspace {
         let Some(character) = self.character else {
             return;
         };
+        // A held version shown in the character's place (comparison).
+        let shown = self.shown();
         if let Some((applied, at)) = &self.applied {
-            if *applied == self.description {
+            if applied == shown {
                 return;
             }
             if !now && at.elapsed() < DRAG_APPLY_EVERY {
                 return;
             }
         }
-        match applier::apply_description(
-            &mut self.world,
-            &self.assets,
-            character,
-            &self.description,
-        ) {
+        let shown = shown.clone();
+        match applier::apply_description(&mut self.world, &self.assets, character, &shown) {
             Ok(applied) => {
                 if let Some(problem) = applied.problems.first() {
                     let more = applied.problems.len() - 1;
@@ -904,7 +970,7 @@ impl CharacterWorkspace {
             }
             Err(error) => self.notice = Some(format!("Could not show the character: {error}")),
         }
-        self.applied = Some((self.description.clone(), Instant::now()));
+        self.applied = Some((shown, Instant::now()));
     }
 
     /// Frames `view`. The Face view aims at the character's head bone as
@@ -1059,7 +1125,7 @@ impl CharacterWorkspace {
 }
 
 /// Reads a character file (any format up to this version's).
-fn read_character(file: &Path) -> Result<Description, String> {
+pub(crate) fn read_character(file: &Path) -> Result<Description, String> {
     let text = std::fs::read_to_string(file)
         .map_err(|err| format!("Could not read {}: {err}", file.display()))?;
     Description::from_json(&text).map_err(|err| err.to_string())

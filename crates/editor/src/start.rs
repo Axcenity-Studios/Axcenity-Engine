@@ -179,9 +179,9 @@ pub enum StartAction {
     SetUpCollaborate,
     /// Settings, at Collaborate.
     CollaborateSettings,
-    /// Character Studio on a new character from the preset at this index
-    /// (`character_workspace::presets`; 0 is the default character).
-    NewCharacter(usize),
+    /// Character Studio on a new character: a family's default or a preset
+    /// by its ID (`character_workspace::Start`).
+    NewCharacter(crate::character_workspace::Start),
     /// Character Studio on a saved character file.
     OpenCharacter(PathBuf),
 }

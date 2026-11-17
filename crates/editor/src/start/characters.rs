@@ -14,7 +14,7 @@ use super::*;
 use crate::character_workspace::packs::{self, Pack};
 use crate::character_workspace::shelf::{self, Overview, SavedCharacter};
 use crate::character_workspace::thumbnails::{self, Subject, Thumbnails};
-use crate::character_workspace::{Preset, presets, recent};
+use crate::character_workspace::{Start, presets, recent};
 
 mod cards;
 mod dialogs;
@@ -43,10 +43,12 @@ struct Card {
     picture: Option<PathBuf>,
 }
 
-/// A preset's card.
+/// A starting point's card: a whole-character preset, or a family's
+/// default character where the family has no presets.
 struct PresetCard {
-    index: usize,
-    preset: Preset,
+    start: Start,
+    name: String,
+    about: String,
     overview: Overview,
     picture: Option<PathBuf>,
 }
@@ -74,7 +76,7 @@ pub(super) struct Shelf {
 enum Pick {
     Edit(PathBuf),
     Delete(PathBuf),
-    Preset(usize),
+    Preset(Start),
     NewPack,
     ImportPack,
     Pack(usize, PackButton),
@@ -113,23 +115,51 @@ impl Shelf {
             .collect();
         self.recent = recent::recent(folder);
         self.packs = packs::packs(folder);
-        self.presets = presets()
+        // Both families (plan section 0, decision 7), realistic first: each
+        // family's whole-character presets, or its default character.
+        let own = presets::read_own(folder);
+        let mut cards = Vec::new();
+        for base in presets::families(&library) {
+            let made = presets::of_kind(
+                &library,
+                &own,
+                &base.id,
+                axcenity_avatar::PresetKind::Character,
+            );
+            if made.is_empty() {
+                let mut shown =
+                    axcenity_gameplay::description::default_description(&library, &base.id);
+                shown.name = format!("{} character", base.label);
+                cards.push((
+                    Start::Family(base.id.clone()),
+                    format!("The {} body as it's built.", base.label.to_lowercase()),
+                    shown,
+                ));
+            }
+            for listed in made {
+                cards.push((
+                    Start::Preset(listed.id.to_owned()),
+                    listed.info.about.clone(),
+                    listed.pictured(&library),
+                ));
+            }
+        }
+        self.presets = cards
             .into_iter()
-            .enumerate()
-            .filter(|(_, preset)| library.bases.is_empty() || library.base(preset.base).is_some())
-            .map(|(index, preset)| {
-                let overview =
-                    shelf::overview(&preset.description(preset.name, &library), &library);
-                let picture = thumbnails::preset_picture(folder, index);
-                if let Some(picture) = &picture {
-                    self.thumbnails
-                        .request(Subject::Preset(index), picture.clone());
-                }
+            .map(|(start, about, shown)| {
+                let overview = shelf::overview(&shown, &library);
+                let id = match &start {
+                    Start::Preset(id) | Start::Family(id) => id.clone(),
+                };
+                let subject = Subject::Character(shown.clone());
+                let picture = thumbnails::preset_picture(folder, &id, &subject);
+                self.thumbnails.request(subject, picture.clone());
                 PresetCard {
-                    index,
-                    preset,
+                    start,
+                    name: shown.name,
+                    about,
                     overview,
-                    picture,
+                    picture: Some(picture),
                 }
             })
             .collect();
@@ -256,7 +286,7 @@ impl StartScreen {
             .inner
         };
         if clicked {
-            action = Some(StartAction::NewCharacter(0));
+            action = Some(StartAction::NewCharacter(Start::default()));
         }
         if let Some((notice, failed)) = &self.shelf.notice {
             ui.add_space(8.0);
@@ -409,14 +439,15 @@ impl StartScreen {
         let (columns, width) = columns(ui.available_width(), MIN_CHARACTER_CARD_WIDTH);
         let mut pick = None;
         ui.spacing_mut().item_spacing.y = CARD_SPACING;
-        let presets: Vec<(usize, Preset, Overview, Option<PathBuf>)> = self
+        let presets: Vec<(Start, String, String, Overview, Option<PathBuf>)> = self
             .shelf
             .presets
             .iter()
             .map(|card| {
                 (
-                    card.index,
-                    card.preset,
+                    card.start.clone(),
+                    card.name.clone(),
+                    card.about.clone(),
                     card.overview.clone(),
                     card.picture.clone(),
                 )
@@ -425,18 +456,18 @@ impl StartScreen {
         for row in presets.chunks(columns) {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = CARD_SPACING;
-                for (index, preset, overview, picture) in row {
+                for (start, name, about, overview, picture) in row {
                     let texture = self.shelf.texture(&ctx, picture.as_deref());
                     let view = CardView {
-                        id: egui::Id::new(("preset card", index)),
-                        name: preset.name,
+                        id: egui::Id::new(("preset card", format!("{start:?}"))),
+                        name,
                         overview,
                         picture: texture.as_ref(),
                         pending: self.shelf.pending(picture.as_deref()),
-                        hover: preset.about.to_owned(),
+                        hover: about.clone(),
                     };
                     if character_card(ui, &view, width, true).is_some() {
-                        pick = Some(Pick::Preset(*index));
+                        pick = Some(Pick::Preset(start.clone()));
                     }
                 }
             });
@@ -520,7 +551,7 @@ impl StartScreen {
         let folder = self.characters_folder.clone()?;
         match pick {
             Pick::Edit(path) => return Some(StartAction::OpenCharacter(path)),
-            Pick::Preset(index) => return Some(StartAction::NewCharacter(index)),
+            Pick::Preset(start) => return Some(StartAction::NewCharacter(start)),
             Pick::Delete(path) => {
                 let name = self
                     .shelf
