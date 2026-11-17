@@ -48,3 +48,39 @@ Temporary paths are shown as <temp>. The red_d* tests were then ported into walk
         FAIL [   2.931s] (6/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d16_ctrl_shift_z_redoes
         FAIL [   3.506s] (7/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d01_save_never_overwrites_another_character_with_the_same_name
 error: test run failed
+
+
+# Review fix: D-04 red run
+# shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left, run with the
+# name field temporarily bound straight to the description name as stage0 ui.rs did
+# (each keystroke renames; tidy turns an empty name back into "New Character").
+# toolbar.rs was restored afterwards and the test passes on the fix.
+# Command: cargo nextest run -p axcenity-editor --no-fail-fast the_name_field
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.42s
+────────────
+ Nextest run ID <id> with nextest profile: default
+    Starting 1 test across 2 binaries (1349 tests skipped)
+        FAIL [   2.341s] (1/1) axcenity-editor::bin/axcenity-editor character_workspace::shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left
+  stdout ───
+
+    running 1 test
+    test character_workspace::shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left ... FAILED
+
+    failures:
+
+    failures:
+        character_workspace::shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1344 filtered out; finished in 2.27s
+
+  stderr ───
+
+    thread 'character_workspace::shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left' panicked at crates\editor\src\character_workspace\shell_tests.rs:123:5:
+    the field doesn't fill itself back in: ["\u{e2c2}", "\u{e6fc}  Character Studio", "New Character", "Not saved", "\u{e248}  Save", "\u{e038}  Reset  \u{e136}", "\u{e256}  Open  \u{e136}", "\u{e236}  New  \u{e136}", "\u{e036}", "\u{e038}", "CUSTOMIZE", "\u{e3a8}", "Body", "Frame", "Build", "Proportions", "\u{e436}", "Face", "\u{eae0}", "Hair", "\u{e670}", "Clothing", "\u{e210}", "Skin and Makeup", "\u{e7ba}", "Accessories", "\u{e9f4}", "Expressions", "\u{e6a2}", "Presets", "\u{e10e}", "Full body", "Face", "Front", "Three-quarter", "Side", "Back", "Sky", "Dark", "Light", "Grey", "\u{e2ca}", "Night", "Sunset", "Daylight", "Studio", "\u{e472}", "Body", "Pick the body type, then shape the body
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   2.343s] 1 test run: 0 passed, 1 failed, 1349 skipped
+        FAIL [   2.341s] (1/1) axcenity-editor::bin/axcenity-editor character_workspace::shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left
+error: test run failed

@@ -4,14 +4,14 @@ Branched from `character-creator-stage0` (5b650d5d). Plan: [section 11](../../..
 
 ## What changed
 
-**Defects fixed, each with a test seen failing first** ([red run](r1-studio-shell-red-run.txt): 7 tests, 7 failed on the old code):
+**Defects fixed, each with a test seen failing first** ([red run](r1-studio-shell-red-run.txt): 7 tests, 7 failed on the old code; D-04's test was added after review and seen failing against stage0's field binding, appended to the same file):
 
 | Defect | Fix | Test |
 |---|---|---|
 | D-01 Save overwrote another character with the same name | Save never writes over a file that isn't this character's own: it saves under the first free "<name> 2" (the character takes that name) and the status line says so | `walkthrough_tests::save_never_overwrites_another_character_with_the_same_name` |
 | D-02 closing the window with unsaved studio changes didn't ask | The workspace is in the editor's unsaved-documents list (`DocKind::Character`, `app/documents.rs`); "Save changes?" names the character, and its Save saves it (`save_character_workspace`, `app/session.rs` `answer`) | `app::character_workspace::tests::closing_the_window_with_unsaved_studio_changes_asks_and_saves_the_character` |
 | D-03 a rename saved a second file | The workspace keeps the file it opened or last saved; a save after a rename moves it (Recent entry, pictures and pack places follow: `packs::rename_character`); a case-only rename keeps one file | `walkthrough_tests::a_rename_moves_the_saved_file_instead_of_copying_it` |
-| D-04 the name field couldn't be emptied | The field keeps a draft while typed in and renames once, when left | `walkthrough_tests::a_change_of_nothing_keeps_redo` (the model side); the field itself is UI only |
+| D-04 the name field couldn't be emptied | The field keeps a draft while typed in and renames once, when left | `shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left` (drives the real field through egui; red against stage0's binding, see Review fixes) |
 | D-05 a click that changed nothing lost redo | `edit.rs` transactions record a step only when the character changed (`same_character`: a parameter at its default equals one left out) | `edit::tests::a_transaction_is_one_step_and_a_click_that_changes_nothing_keeps_redo`, `walkthrough_tests::a_change_of_nothing_keeps_redo` |
 | D-06 the Face view aimed at a fixed height | It aims at the head bone as posed; on the default character that is where the fixed view was (4.52 of 5 studs) | `shell_tests::the_face_view_aims_at_the_head_of_a_tall_or_short_character` |
 | D-07 the panel cloned the manifest per slider per frame | Panels get one `&Library` per frame and read values with `value_of` (no clone); presets compare against it | not measured (no test) |
@@ -47,7 +47,7 @@ Pages: Body (preset chips, body family when there's a choice, groups), Face (nin
 
 Written and run (`cargo nextest run -p axcenity-editor --no-fail-fast character`): **62 tests run: 62 passed, 1287 skipped**. New: `walkthrough_tests.rs` (7: the walkthrough through Intents, New/Open asking, D-01, D-03, D-05, reset by scope, a skin value without a rebake), `shell_tests.rs` (6), `panel/tests.rs` (5), `edit.rs` (3), `selection.rs` (3), `timing_tests.rs` (1, ignored), and the D-02 test in `app/character_workspace.rs`. Updated for the moved code, no assertion weakened: `tests.rs` (levels for the Advanced bool, `selection.category`, a three-quarter check added), `shelf_tests.rs` (`opening_and_saving_put_a_character_first_in_recent` saved two characters by renaming one, which is D-03; it now makes a second with `new_character`, same assertions). Also run: `-E 'test(every_page_is_drawn) | test(/documents|unsaved|save_changes|close/)'`: 42 passed. `cargo clippy -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all`: clean. `python scripts/check-wiki.py`: 0 errors (58 warnings, all pre-existing staleness).
 
-The whole editor suite and the workspace were not run (only this crate's character filter and the related app tests).
+The whole editor suite was not run before review; it was run with the review fixes (below).
 
 ## DIS-18
 
@@ -84,3 +84,22 @@ None added.
 2. `intent.rs`, `selection.rs` and `edit.rs` are the plan's lead-owned files: review them as the contract (Locks and `features.rs` are not here).
 3. Conflicts are likely in `crates/editor/src/app/session.rs` (`answer`, the prompt's name) and `app/documents.rs` if another branch touched them.
 4. `docs/editor/character-studio.md`, `crates/editor/CLAUDE.md`, the wiki's ADR-0031 file list and `Editor/Specialized-Editors.md` were updated; add the contracts to `architecture.md`.
+
+## Review fixes
+
+The review found one blocking item: D-04 was marked fixed, but its cited evidence (`Intent::Rename("")` then the name is "New Character") passed on stage0 as well, because `tidy` already turned an empty name into "New Character". Nothing tested the field itself.
+
+- **New test** `shell_tests::the_name_field_can_be_emptied_and_renames_once_when_left`. It drives the real toolbar field through egui frames (`theme::run`, as the other shell tests do). It opens preset 0, focuses the field (`egui::Id::new("character studio name").with("field")`), and sends Ctrl+A then Backspace. While the field is focused it checks that the field is no longer drawn with "New Character", that the draft in egui temp data is `Some("")`, that the description's name hasn't changed, and that there is no undo step. After typing "Ada" the name is still unchanged. After Enter the name is "Ada", the draft is gone, and one undo gets back to "New Character" with nothing left to undo.
+- **Red**: `name_field` in `toolbar.rs` was temporarily bound straight to the description name, as stage0's `ui.rs` did (each change renames). The test failed at "the field doesn't fill itself back in": the emptied field was drawn again as "New Character". The run is appended to [r1-studio-shell-red-run.txt](r1-studio-shell-red-run.txt). `toolbar.rs` was then restored with `git checkout` (no code change in this fix), and the test passes.
+- The D-04 row above now cites the new test.
+- **Summary correction**: the Skin and Makeup page shows the tint and six sliders. Five of them (melanin, redness, undertone, detail_strength, scatter_scale) are marked "not drawn yet". `tint` and `roughness_scale` are drawn by `scene::material::modulate`. The earlier summary's "six the renderer ignores" was wrong; this file already said five.
+- Run with the fix: `cargo nextest run -p axcenity-editor --no-fail-fast` gave **1341 tests run: 1341 passed, 9 skipped**, and the `character` filter gave 63 passed (62 plus the new test). The first full run had one failure outside the studio, `app::tests::the_view_mode_changes_the_viewport_at_once_and_lit_comes_back`, which this branch doesn't touch. It passed 3 of 3 times alone and in the second full run, so it looks like a flake under load. `python scripts/check-wiki.py` gave 0 errors and 58 warnings, all pre-existing. `cargo clippy -p axcenity-editor --all-targets -- -D warnings` was clean, and so was `cargo fmt --all -- --check`.
+
+Still open from the review's non-blocking notes (not changed here):
+
+- Symmetry shows on Face > Nose, which has no pairs, because the pair check covers the whole category.
+- Double-clicking a slider probably makes two undo steps. Not tested.
+- D-07 has no timing or allocation guard.
+- Saving on window close can quietly save as "X 2" (D-01), and the notice is lost when the window closes.
+- `Intent::New(usize)` and `Intent::ApplyPreset(usize)` will need a preset id once presets are data files.
+- Older audit docs still cite `character_workspace/ui.rs`. They are historical records; `ui.rs` was split in R1.

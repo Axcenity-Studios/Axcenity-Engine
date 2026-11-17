@@ -88,6 +88,65 @@ fn ctrl_shift_z_redoes_and_ctrl_z_undoes() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// Audit D-04: the name field can be emptied while it's typed in. What's
+/// typed stays a draft (nothing renamed, no undo step) and becomes one
+/// rename when the field is left with Enter.
+#[test]
+fn the_name_field_can_be_emptied_and_renames_once_when_left() {
+    let folder = test_folder("shell-name");
+    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let before = workspace.description().name.clone();
+    assert!(!workspace.can_undo());
+    let draft_id = egui::Id::new("character studio name");
+    let ctx = theme::test_context();
+    let frame = |workspace: &mut CharacterWorkspace, events| -> Vec<String> {
+        let output = theme::run(&ctx, input(events), |ui| {
+            workspace.ui(ui, None);
+        });
+        drawn_texts(&output)
+    };
+    // The field exists after a first frame; then it's given the focus.
+    frame(&mut workspace, Vec::new());
+    assert!(frame(&mut workspace, Vec::new()).contains(&before));
+    ctx.memory_mut(|memory| memory.request_focus(draft_id.with("field")));
+    frame(&mut workspace, Vec::new());
+
+    // Select all and delete: the field is empty and stays empty.
+    let mut events = key(egui::Key::A, egui::Modifiers::COMMAND);
+    events.extend(key(egui::Key::Backspace, egui::Modifiers::NONE));
+    frame(&mut workspace, events);
+    let drawn = frame(&mut workspace, Vec::new());
+    assert!(
+        ctx.memory(|memory| memory.has_focus(draft_id.with("field"))),
+        "the field keeps the focus while it's typed in"
+    );
+    assert!(
+        !drawn.contains(&before),
+        "the field doesn't fill itself back in: {drawn:?}"
+    );
+    assert_eq!(
+        ctx.data(|data| data.get_temp::<String>(draft_id))
+            .as_deref(),
+        Some(""),
+        "the draft is empty"
+    );
+    assert_eq!(workspace.description().name, before, "nothing renamed yet");
+    assert!(!workspace.can_undo(), "a draft is no undo step");
+
+    // Type a name and press Enter: one rename, one undo step.
+    frame(&mut workspace, vec![egui::Event::Text("Ada".into())]);
+    assert_eq!(workspace.description().name, before, "still a draft");
+    frame(&mut workspace, key(egui::Key::Enter, egui::Modifiers::NONE));
+    frame(&mut workspace, Vec::new());
+    assert_eq!(workspace.description().name, "Ada");
+    assert_eq!(ctx.data(|data| data.get_temp::<String>(draft_id)), None);
+    assert!(workspace.can_undo());
+    workspace.apply(Intent::Undo);
+    assert_eq!(workspace.description().name, before, "one undo step");
+    assert!(!workspace.can_undo(), "exactly one undo step");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
 /// Audit D-06: the Face view aims at the head as it's posed, so a tall
 /// character's face is framed higher than a short one's; on the default
 /// character it's where the fixed view was.
