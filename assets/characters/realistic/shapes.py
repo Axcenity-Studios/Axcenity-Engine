@@ -67,6 +67,26 @@ REGIONS = ("chest", "shoulders", "arms", "abdomen", "back", "hips", "thighs", "c
 LOCAL = 0.6       # a region's slider at 1, as a share of the step to the sliders' heavy corner
 HOLD = 0.85       # how much of a fat shape the bony places hold back
 STEP = 2e-5       # the packed file's step, metres
+# The fat MakeHuman's weight axis leaves out (R3). Its heavy corners carry
+# fat only with little muscle: at average muscle its heaviest body is 7 mm
+# deeper at the belly than its average one, at least muscle 108 mm. So
+# `fat` up to 1 also adds `<Frame>_Fat_Soft`: MakeHuman's own body-shape
+# and regional targets (`body_shapes.npz`'s extras), by frame as people
+# carry fat (references/body B12): the masculine body round the belly and
+# flanks (`m_thyroid`, the whole body; `m_adrenal`, the belly), the
+# feminine on the hips, thighs and buttocks (`f_ovary`) with some belly
+# (`f_liver`) and upper arm; both some fat under the chin (`neck_double`).
+SOFT = {
+    "Masculine": {"m_thyroid": 0.4, "m_adrenal": 0.3, "neck_double": 0.6},
+    "Feminine": {"f_ovary": 0.5, "f_liver": 0.35, "upperarm_fat": 0.7, "neck_double": 0.5},
+}
+# The share of `SOFT` left at muscle -1, whose own heavy corner already
+# carries a belly (MakeHuman's least muscle is soft).
+SOFT_AT_LEAST_MUSCLE = 0.5
+# The slight body (`muscle` and `fat` both down) keeps MakeHuman's least
+# muscled body's slack lower belly on the masculine frame;
+# `<Frame>_Belly_Flat` takes it in by MakeHuman's own flatter belly.
+FLAT = {"Masculine": {"pregnant_decr": 1.0}, "Feminine": {}}
 
 
 def _transfer():
@@ -120,6 +140,25 @@ def span(value, source, to):
     return to[0] + (to[1] - to[0]) * t
 
 
+def mix_extras(extras, weights):
+    """The sum of MakeHuman's regional targets `weights` ({name: weight})
+    names, from `extras` ({name: offsets}); None when it names none."""
+    out = None
+    for name, weight in weights.items():
+        out = extras[name] * weight if out is None else out + extras[name] * weight
+    return out
+
+
+def extra_shapes(extras, frame):
+    """{shape name: offsets}: `<Frame>_Fat_Soft` and, where the frame has
+    one, `<Frame>_Belly_Flat` (`SOFT`, `FLAT`)."""
+    out = {f"{frame}_Fat_Soft": mix_extras(extras, SOFT[frame])}
+    flat = mix_extras(extras, FLAT[frame])
+    if flat is not None:
+        out[f"{frame}_Belly_Flat"] = flat
+    return out
+
+
 def engine_shapes(grid, frame):
     """{shape name: offsets} for one frame: the four single-slider shapes
     and the four products (module docstring)."""
@@ -156,6 +195,15 @@ def corners():
                 out.append({"shape": f"{frame}_Muscle_{way[km]}_Fat_{way[kf]}",
                             "factors": [frame_factor(frame), {"parameter": "muscle", "from": sm, "to": tm},
                                         {"parameter": "fat", "from": sf, "to": tf}]})
+        # Fat that is fat: all of it at `fat` 1, less where little muscle
+        # already makes the corner soft (`SOFT`).
+        out.append({"shape": f"{frame}_Fat_Soft",
+                    "factors": [frame_factor(frame), {"parameter": "fat", "from": [0, 1]},
+                                {"parameter": "muscle", "from": [-1, 0], "to": [SOFT_AT_LEAST_MUSCLE, 1]}]})
+        if FLAT[frame]:
+            out.append({"shape": f"{frame}_Belly_Flat",
+                        "factors": [frame_factor(frame), {"parameter": "muscle", "from": [0, -1], "to": [0, 1]},
+                                    {"parameter": "fat", "from": [0, -1], "to": [0, 1]}]})
         for region in REGIONS:
             for title in ("Muscle", "Fat"):
                 out.append({"shape": f"{frame}_{title}_{region.capitalize()}",
@@ -289,7 +337,9 @@ def face_hold(P, lm, eyes, eye_radius, lap):
 # -- the build's step -------------------------------------------------------------------
 
 def unpack(path=PACK):
-    """{frame: {corner: offsets}} from the vendored file, in the bundle's pose."""
+    """{frame: {name: offsets}} from the vendored file, in the bundle's
+    pose: MakeHuman's corners (`<muscle>_<weight>`) and the regional
+    targets `SOFT` and `FLAT` name."""
     data = np.load(path)
     step = float(data["step"])
     count = int(data["count"]) if "count" in data.files else 10582
@@ -298,8 +348,6 @@ def unpack(path=PACK):
         if key.endswith("_index"):
             name = key[:-len("_index")]
             frame, corner = name.split("_", 1)
-            if "muscle" not in corner:
-                continue
             d = np.zeros((count, 3))
             d[data[key]] = data[name + "_offset"].astype(np.float64) * step
             out[frame.capitalize()][corner] = d
@@ -359,6 +407,7 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, 
         normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
         corner = {name: transfer.reframe(d, P0, P, edges) for name, d in packed[frame].items()}
         shapes = engine_shapes(Grid(corner), frame)
+        shapes.update(extra_shapes(corner, frame))
         # Per region: a share of the step to the sliders' heavy corners. Fat
         # in one place is the heavy and soft body's there (MakeHuman's fat is
         # in its low-muscle bodies: weight alone, at average muscle, is
@@ -367,7 +416,7 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, 
         m0, m_lo, m_hi = PLACE[frame]["muscle"]
         w0, _, w_hi = PLACE[frame]["fat"]
         here = Grid(corner).at(m0, w0)
-        fat_up = Grid(corner).at(m_lo, w_hi) - here
+        fat_up = Grid(corner).at(m_lo, w_hi) - here + SOFT_AT_LEAST_MUSCLE * shapes[f"{frame}_Fat_Soft"]
         muscle_up = Grid(corner).at(m_hi, w_hi) - here
         regions = region_weights(weights, normals, lap)
         for region, share in regions.items():

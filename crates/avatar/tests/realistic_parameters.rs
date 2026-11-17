@@ -279,7 +279,9 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // `Corrective_Shoulder_Lowered_*`. Seven more on 2026-11-16: the
     // brows' length, four shapes the body carries empty for the `Brows`
     // card, and a mask shape under each of the three underwear items.)
-    assert_eq!(model.morph_targets.len(), 155);
+    // Three more in R3: `Masculine_Fat_Soft`, `Feminine_Fat_Soft` (fat that
+    // is fat) and `Masculine_Belly_Flat` (the slight body's belly).
+    assert_eq!(model.morph_targets.len(), 158);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always

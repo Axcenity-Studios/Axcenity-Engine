@@ -1,4 +1,4 @@
-# SHA-256 of the MakeHuman files the transfer spike reads, at commit
+# SHA-256 of the MakeHuman files the transfer reads (the spike's 33; R3 added 8), at commit
 # a8bc2d54ff0ac92e78ff71431b1023eda42bf482 of github.com/makehumancommunity/makehuman
 # (checked by fetch_makehuman.py; paths are relative to the checkout).
 5c0de89e743bcf3d364af133befa3c3673476ca9c95b5e5d991222a8c0d04ee2  LICENSE.md
@@ -34,3 +34,11 @@ f15ca7176840bfbb715dd3e50fc268f0688a93aaa9b028809bb34f5b159c9cb4  makehuman/data
 9fe21886f388b50dc666bbd78b86fb62c5d487d1fdaa18a59b4eae6a6985154a  makehuman/data/targets/torso/torso-muscle-pectoral-incr.target
 c491bcf80e5733e7b4ec731a414d6154cc7adc27a85e6a5a8ab416af11e3b531  makehuman/data/targets/breast/female-young-averagemuscle-averageweight-maxcup-averagefirmness.target
 823f3542a0e4d3d326fd85d8ff1209325f6235510928de1a330a162bf212a0f8  makehuman/data/targets/breast/female-young-averagemuscle-averageweight-mincup-averagefirmness.target
+68d67754b5c38e4922531e3fc8e146faf8853c949c84d1f18824724f9d16ec40  makehuman/data/targets/stomach/stomach-pregnant-decr.target
+fc60100fe3fe0d4582fb725bdd2f22e5ac5f880631ba9936e0120637219a9583  makehuman/data/targets/bodyshapes/bodyshapes-elvs-man-thyroid.target
+55d72dce46b7cced6b06a05097abe66703ffb6545fbb520b0dbc98392e16eb5b  makehuman/data/targets/bodyshapes/bodyshapes-elvs-man-adrenal.target
+19a71f83c8eba348d81aeb987ae575ec3de8b50d1ad5cc544d3013e62cd071ab  makehuman/data/targets/bodyshapes/bodyshapes-elvs-fem-ovary.target
+987a295615dd8762798766d482f1b0f55d6035bc383311b12d8585efcbdb6cd1  makehuman/data/targets/bodyshapes/bodyshapes-elvs-fem-liver.target
+faf7229632f2b531d0d5f96990545aa120bed26bb3949625e7c8eda79e99eda9  makehuman/data/targets/neck/neck-double-incr.target
+0502128d4661484bac746466b2135e035fd69ecddf737573ef62b0a95ebbf036  makehuman/data/targets/armslegs/l-upperarm-fat-incr.target
+c5d1588a8ccfc4b2de56588d1108ff815ebf571c2a4467e15691fdb4bfbe7be2  makehuman/data/targets/armslegs/r-upperarm-fat-incr.target
