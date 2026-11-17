@@ -428,15 +428,16 @@ impl CharacterWorkspace {
             }
         }
         // Say what is shown, so a held version is never taken for the
-        // character being edited.
+        // character being edited. Each label sits on a small card of its
+        // own: the backdrop is any colour the person picks.
         let label = |rect: Rect, text: String| {
-            ui.painter_at(rect).text(
-                egui::pos2(rect.left() + 14.0, rect.bottom() - 12.0),
-                egui::Align2::LEFT_BOTTOM,
-                text,
-                egui::FontId::proportional(14.0),
-                palette.text_strong,
-            );
+            let painter = ui.painter_at(rect);
+            let galley =
+                painter.layout_no_wrap(text, egui::FontId::proportional(14.0), palette.text_strong);
+            let at = egui::pos2(rect.left() + 22.0, rect.bottom() - 16.0 - galley.size().y);
+            let card = Rect::from_min_size(at, galley.size()).expand2(vec2(8.0, 4.0));
+            painter.rect_filled(card, theme::radius::CARD, compare::backing(&palette));
+            painter.galley(at, galley, palette.text_strong);
         };
         if let (Some(index), Some(left)) = (beside, left) {
             label(

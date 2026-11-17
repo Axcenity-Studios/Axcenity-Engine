@@ -303,8 +303,10 @@ pub struct CharacterWorkspace {
     /// The held versions and what is shown (editor state, never undone or
     /// saved).
     pub comparison: Comparison,
-    /// The second character, side by side, and what it shows.
+    /// The second character, side by side, its own floor, and what it
+    /// shows.
     other: Option<InstanceId>,
+    other_floor: Option<InstanceId>,
     other_applied: Option<Description>,
     other_canvas: Canvas,
     autosave: Autosave,
@@ -393,6 +395,7 @@ impl CharacterWorkspace {
             rolls: 0,
             comparison: Comparison::default(),
             other: None,
+            other_floor: None,
             other_applied: None,
             other_canvas: Canvas::default(),
             autosave: Autosave {
@@ -933,6 +936,7 @@ impl CharacterWorkspace {
         self.world = world;
         self.character = Some(character);
         self.other = None;
+        self.other_floor = None;
         self.other_applied = None;
         self.animators.clear();
         self.applied = None;

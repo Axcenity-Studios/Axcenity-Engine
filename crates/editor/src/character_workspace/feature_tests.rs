@@ -544,6 +544,140 @@ fn held_versions_never_enter_undo_or_the_saved_file() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// A piece of text drawn: what it says, where, its colour, and every
+/// filled rectangle painted before it (later ones are on top).
+struct DrawnText {
+    text: String,
+    rect: eframe::egui::Rect,
+    color: eframe::egui::Color32,
+    under: Vec<eframe::egui::epaint::RectShape>,
+}
+
+fn texts_and_backings(output: &eframe::egui::FullOutput) -> Vec<DrawnText> {
+    use eframe::egui::{Color32, Shape, epaint::RectShape};
+    fn walk(shape: &Shape, fills: &mut Vec<RectShape>, found: &mut Vec<DrawnText>) {
+        match shape {
+            Shape::Rect(rect) if rect.fill.a() > 0 => fills.push(rect.clone()),
+            Shape::Text(text) => {
+                let format = text.galley.job.sections.first().map(|s| s.format.color);
+                let color = match (text.override_text_color, format) {
+                    (Some(color), _) => color,
+                    (None, Some(color)) if color != Color32::PLACEHOLDER => color,
+                    _ => text.fallback_color,
+                };
+                found.push(DrawnText {
+                    text: text.galley.text().to_owned(),
+                    rect: eframe::egui::Rect::from_min_size(text.pos, text.galley.size()),
+                    color,
+                    under: fills.clone(),
+                });
+            }
+            Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, fills, found)),
+            _ => {}
+        }
+    }
+    let (mut fills, mut found) = (Vec::new(), Vec::new());
+    for clipped in &output.shapes {
+        walk(&clipped.shape, &mut fills, &mut found);
+    }
+    found
+}
+
+/// Review fix: the comparison strip's chips, its Discard icon and the
+/// viewport's "held" and "Current" labels sit on a backing of their own,
+/// not straight on the backdrop (whose colour the person picks: on the
+/// Light one the quiet chip text could hardly be read). The backing is a
+/// small, nearly opaque card behind the text, and the text reads on it at
+/// AA (4.5:1) or better.
+#[test]
+fn the_comparison_controls_and_labels_read_on_any_backdrop() {
+    use eframe::egui::Color32;
+    let folder = test_folder("feature-compare-legible");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.apply(Intent::SetBackdrop(stage::Backdrop::Light));
+    workspace.apply(Intent::Capture);
+    workspace.apply(set("fat", 0.9));
+    let ctx = theme::test_context();
+    let frame = |workspace: &mut CharacterWorkspace| {
+        let mut texts = Vec::new();
+        for _ in 0..2 {
+            let output = theme::run(&ctx, input(Vec::new()), |ui| {
+                workspace.ui(ui, None);
+            });
+            texts = texts_and_backings(&output);
+        }
+        texts
+    };
+    let check = |drawn: &[DrawnText], wanted: &str| {
+        let text = drawn
+            .iter()
+            .find(|drawn| drawn.text.starts_with(wanted))
+            .unwrap_or_else(|| panic!("{wanted:?} is not drawn"));
+        // The nearest fill under the text that is a small card (not the
+        // viewport's picture, or its stand-in without a GPU).
+        let backing = text
+            .under
+            .iter()
+            .rev()
+            .find(|fill| {
+                fill.rect.contains_rect(text.rect.shrink(1.0)) && fill.rect.height() <= 60.0
+            })
+            .unwrap_or_else(|| panic!("{wanted:?} has no backing of its own"));
+        let [r, g, b, a] = backing.fill.to_srgba_unmultiplied();
+        assert!(a >= 215, "{wanted:?}'s backing is too see-through ({a})");
+        let ratio = theme::contrast(text.color, Color32::from_rgb(r, g, b));
+        assert!(
+            ratio >= 4.5,
+            "{wanted:?} reads at {ratio:.2}:1 on its backing"
+        );
+    };
+
+    // Before and after: A shown in the character's place.
+    workspace.apply(Intent::ShowHeld(Some(0)));
+    let drawn = frame(&mut workspace);
+    for wanted in [
+        "Current",
+        "Side by side",
+        theme::icons::TRASH,
+        "Showing A (held)",
+    ] {
+        check(&drawn, wanted);
+    }
+    // Side by side: the two halves' labels and the strip.
+    workspace.apply(Intent::ShowHeld(None));
+    workspace.apply(Intent::SideBySide(true));
+    let drawn = frame(&mut workspace);
+    for wanted in ["A (held)", "Current", "Side by side"] {
+        check(&drawn, wanted);
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Review fix: turning side by side on and off leaves one floor for the
+/// character, and one more only while the second character stands.
+#[test]
+fn side_by_side_on_and_off_leaves_no_floor_behind() {
+    let folder = test_folder("feature-compare-floors");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let floors = |workspace: &CharacterWorkspace| {
+        let world = &workspace.world;
+        world
+            .descendants(world.workspace())
+            .into_iter()
+            .filter(|id| world.get(*id).is_some_and(|i| i.name() == "Floor"))
+            .count()
+    };
+    assert_eq!(floors(&workspace), 1);
+    workspace.apply(Intent::Capture);
+    for _ in 0..3 {
+        workspace.apply(Intent::SideBySide(true));
+        assert_eq!(floors(&workspace), 2, "the second character's own floor");
+        workspace.apply(Intent::SideBySide(false));
+        assert_eq!(floors(&workspace), 1, "its floor goes with it");
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
 // ---- Autosave (CO20) ----
 
 /// The recovery copy is written when the work changes, at most every few

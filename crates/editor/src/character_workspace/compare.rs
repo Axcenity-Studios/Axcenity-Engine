@@ -22,9 +22,18 @@ use crate::widgets;
 /// How many states can be held.
 pub const MAX_HELD: usize = 3;
 
-/// Where the second character stands for side by side: far enough to the
-/// side that neither camera sees the other character.
+/// Where the second character stands for side by side, 30 studs along -X.
+/// It shares the preview World, so a camera looking along the X axis (the
+/// Side view) has it 30 studs behind the main character: mostly hidden by
+/// it, but its floor can show near the horizon when zoomed out.
 pub const OTHER_AT: Vec3 = Vec3::new(-30.0, 0.0, 0.0);
+
+/// The card the comparison's controls and labels sit on over the viewport:
+/// the panel colour, nearly opaque, so the panel's text colours read on it
+/// whatever the backdrop (Grey, Light, Dark or Sky).
+pub(super) fn backing(palette: &theme::Palette) -> egui::Color32 {
+    palette.panel.gamma_multiply(0.92)
+}
 
 /// The held states and what is shown (editor state only).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -143,8 +152,12 @@ impl CharacterWorkspace {
     /// making it the first time; removes it when side by side is off.
     pub(super) fn refresh_other(&mut self) {
         let Some(index) = self.comparison.beside() else {
-            if let Some(other) = self.other.take() {
-                let _ = self.world.destroy(other);
+            // The second character goes with its own floor.
+            for id in [self.other.take(), self.other_floor.take()]
+                .into_iter()
+                .flatten()
+            {
+                let _ = self.world.destroy(id);
             }
             self.other_applied = None;
             return;
@@ -157,7 +170,7 @@ impl CharacterWorkspace {
                 let other = axcenity_project::default_character(&mut self.world, at);
                 let workspace = self.world.workspace();
                 let _ = self.world.set_parent(other, Some(workspace));
-                stage::add_floor_at(&mut self.world, OTHER_AT.x);
+                self.other_floor = stage::add_floor_at(&mut self.world, OTHER_AT.x);
                 self.other = Some(other);
                 self.other_applied = None;
                 other
@@ -185,11 +198,32 @@ impl CharacterWorkspace {
 
 /// The comparison strip over the top of the viewport: hold the current
 /// version, flip between held ones and the current one, side by side, and
-/// keep or discard the one shown.
+/// keep or discard the one shown. The row sits on a card of the panel's
+/// colour ([`backing`]): its chips and icon are the panel's, and drawn
+/// straight on a light backdrop their quiet text could hardly be read.
 pub(super) fn strip(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     let comparison = &workspace.comparison;
+    // A horizontal row whose one child is the card, so the card is only as
+    // wide as what is on it.
+    ui.horizontal(|ui| {
+        egui::Frame::new()
+            .fill(backing(&palette))
+            .corner_radius(theme::radius::CARD)
+            .inner_margin(4)
+            .show(ui, |ui| strip_row(ui, comparison, &palette, &mut intents));
+    });
+    intents
+}
+
+/// The strip's controls, in a row.
+fn strip_row(
+    ui: &mut egui::Ui,
+    comparison: &Comparison,
+    palette: &theme::Palette,
+    intents: &mut Vec<Intent>,
+) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
         let next = Comparison::letter(comparison.held.len());
@@ -201,7 +235,7 @@ pub(super) fn strip(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<In
                     widgets::Role::Secondary,
                     Some(icons::CAMERA),
                     &format!("Hold as {next}"),
-                    &palette,
+                    palette,
                 ),
             )
             .on_hover_text(
@@ -256,7 +290,7 @@ pub(super) fn strip(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<In
                     widgets::Role::Primary,
                     Some(icons::CHECK),
                     &format!("Keep {letter}"),
-                    &palette,
+                    palette,
                 ))
                 .on_hover_text(format!(
                     "Make {letter} the character (one undo step; the name stays)"
@@ -271,5 +305,4 @@ pub(super) fn strip(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<In
             }
         }
     });
-    intents
 }

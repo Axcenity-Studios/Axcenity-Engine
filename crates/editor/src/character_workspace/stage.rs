@@ -1,7 +1,7 @@
 //! The workspace's viewport: an orbit camera with view presets, lighting
 //! and backdrop presets, a floor, and drawing the preview World.
 
-use axcenity_core::{ClassName, Color3, PartType, Value, Vector3, World};
+use axcenity_core::{ClassName, Color3, InstanceId, PartType, Value, Vector3, World};
 use axcenity_render::Camera;
 use axcenity_render::glam::Vec3;
 
@@ -212,16 +212,14 @@ impl Backdrop {
 
 /// A round floor under the character, for its shadow.
 pub(super) fn add_floor(world: &mut World) {
-    add_floor_at(world, 0.0);
+    let _ = add_floor_at(world, 0.0);
 }
 
 /// A round floor at `x` along the X axis (side by side, the second
-/// character stands on one of its own).
-pub(super) fn add_floor_at(world: &mut World, x: f32) {
+/// character stands on one of its own); `None` if it could not be made.
+pub(super) fn add_floor_at(world: &mut World, x: f32) -> Option<InstanceId> {
     let workspace = world.workspace();
-    let Ok(floor) = world.create(ClassName::Part) else {
-        return;
-    };
+    let floor = world.create(ClassName::Part).ok()?;
     let _ = world.set_name(floor, "Floor");
     for (name, value) in [
         ("Shape", Value::PartType(PartType::Cylinder)),
@@ -233,6 +231,7 @@ pub(super) fn add_floor_at(world: &mut World, x: f32) {
         let _ = world.set_property(floor, name, value);
     }
     let _ = world.set_parent(floor, Some(workspace));
+    Some(floor)
 }
 
 /// Sets the preview's time of day and floor colour for the presets.

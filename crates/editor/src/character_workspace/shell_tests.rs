@@ -457,7 +457,16 @@ fn every_page_is_drawn_with_its_controls() {
         workspace.apply(Intent::SideBySide(false));
         workspace.apply(Intent::ShowHeld(Some(0)));
         snap(&mut workspace, &snapshots, "compare-showing-a", 3);
+        // The same on the Light backdrop: the strip and labels must still
+        // read (they sit on cards of their own).
+        let backdrop = workspace.backdrop;
+        workspace.apply(Intent::SetBackdrop(stage::Backdrop::Light));
+        snap(&mut workspace, &snapshots, "compare-showing-a-light", 3);
         workspace.apply(Intent::ShowHeld(None));
+        workspace.apply(Intent::SideBySide(true));
+        snap(&mut workspace, &snapshots, "compare-side-by-side-light", 3);
+        workspace.apply(Intent::SideBySide(false));
+        workspace.apply(Intent::SetBackdrop(backdrop));
         // The stylized family's Body and Face pages.
         workspace.apply(Intent::New(Start::Family(axcenity_avatar::V1_BASE.into())));
         workspace.answer(Some(false));

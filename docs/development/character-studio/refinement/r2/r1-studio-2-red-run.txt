@@ -75,3 +75,15 @@ error: test run failed
         FAIL [   2.559s] ( 9/12) axcenity-editor::bin/axcenity-editor character_workspace::tests::the_workspace_offers_the_realistic_body_and_shows_it
         FAIL [   3.629s] (11/12) axcenity-editor::bin/axcenity-editor character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery
         FAIL [   4.146s] (12/12) axcenity-editor::bin/axcenity-editor character_workspace::feature_tests::a_stylized_character_opens_edits_saves_and_reopens
+
+## Review fixes (red, before the fix)
+
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(the_comparison_controls_and_labels_read_on_any_backdrop) | test(side_by_side_on_and_off_leaves_no_floor_behind)'
+
+    FAIL character_workspace::feature_tests::side_by_side_on_and_off_leaves_no_floor_behind
+      assertion `left == right` failed: its floor goes with it
+        left: 2
+       right: 1
+    FAIL character_workspace::feature_tests::the_comparison_controls_and_labels_read_on_any_backdrop
+      "Current" has no backing of its own
+    Summary 2 tests run: 0 passed, 2 failed, 1361 skipped

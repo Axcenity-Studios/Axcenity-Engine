@@ -138,3 +138,43 @@ None added.
 2. Conflicts are likely in `character_workspace.rs`, `panel.rs`, `toolbar.rs`, `shell.rs` and `start/characters.rs` if another RA1 branch touched them, and in `docs/editor/character-studio.md`.
 3. `add_character_packages` now compares bytes: on each studio open, it reads both copies of the 32 MB realistic model once when their sizes are equal. That cost isn't measured; if it shows, compare a hash stamp instead.
 4. Progress entry: R1's comparison, autosave, presets by ID, Randomize UI and both families are done; D2 is fixed.
+
+## Review fixes
+
+The review found one blocking item. I fixed it, and two cheap non-blocking items with it.
+
+### Blocking: the comparison strip couldn't be read on the viewport (fixed)
+
+The strip's chips (A, B, C, Current, Side by side) and its Discard icon are the panel's widgets: an unselected chip is `text_weak` on nothing, and they were drawn straight on the backdrop. On Grey "Current", "Side by side" and the trash could hardly be seen, and on Light it was worse. Yet the viewport tells the person to "go back to Current", the only way out of "Showing A".
+
+- `compare::strip` now puts the row on a card: an `egui::Frame` filled with `compare::backing` (the panel colour at 0.92 alpha), `theme::radius::CARD` corners and a 4-point margin. The card is only as wide as the row. Its chips and icon get the same colours as on the panel.
+- `shell.rs`'s viewport labels ("A (held)", "Current", "Showing A (held): ...") are drawn on a small card of the same colour behind the text.
+- Test first: `feature_tests::the_comparison_controls_and_labels_read_on_any_backdrop`. It sets the Light backdrop and draws Showing A and Side by side. It then checks that "Current", "Side by side", the trash icon and each viewport label have a small filled card under them (not the viewport's own picture), at least 215/255 opaque, and that the text reads on it at 4.5:1 or better. Red before the fix: `"Current" has no backing of its own`. It now passes.
+- Snapshots: the page test also draws `compare-showing-a-light` and `compare-side-by-side-light`. What I saw, at full size and cropped at 2x:
+  - Light, Showing A: the strip is a dark card reading Hold as B, A (lit), Current, Side by side, Keep A and the trash icon. All are clear, and "Current" and "Side by side" are grey-on-dark like the panel's chips. The label at the bottom is white on a dark card and reads easily on the light floor.
+  - Light, Side by side: "A (held)" and "Current" are on dark cards in their halves. The strip reads Hold as B, A, Side by side (lit), Keep A and the trash.
+  - Grey, Showing A and Side by side: the same cards, and nothing else changed.
+
+### Non-blocking, fixed
+
+- **A floor leaked each time side by side was turned on.** `stage::add_floor_at` now returns the floor's ID, which is kept as `other_floor` and destroyed with the second character. Test first: `side_by_side_on_and_off_leaves_no_floor_behind`. Red: `its floor goes with it, left: 2, right: 1`. It now passes.
+- **The `OTHER_AT` comment was wrong.** It now says what is true: in the Side view the second character stands 30 studs behind the main one, mostly hidden, though its floor can show near the horizon when zoomed out. I didn't add culling: it would mean a filtered draw list for the main camera, and the reviewer's own fix offered the comment as an option.
+
+### Non-blocking, left as noted
+
+- The byte comparison in `add_character_packages` (unmeasured; a size and mtime or hash stamp is the fix if it shows), the per-frame `texture()` retry for tiles without a picture, the stylized presets, the body tiles' full-body framing, "Custom" as a clickable chip, and the explicit recovery removal in `app/documents.rs` (not my file) are unchanged. They are listed above and in the review.
+- `architecture.md` §15c is still the lead's to update at merge (see "For the lead at merge").
+
+### Review-fix tests
+
+The red run of the two new tests is appended to [r1-studio-2-red-run.txt](r1-studio-2-red-run.txt) under "Review fixes": `2 tests run: 0 passed, 2 failed`, each at its own fix.
+
+- `cargo nextest run -p axcenity-editor -p axcenity-project --no-fail-fast` (full, with the fixes): `1596 tests run: 1594 passed, 2 failed, 10 skipped`. Both new tests passed.
+  - The failures were `app::tests::the_view_mode_changes_the_viewport_at_once_and_lit_comes_back` ("lit comes back") and `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved` (an `Auto` checkpoint where `Closing` was expected, after 60 s). This branch touches neither. Run again on their own, both passed (`2 tests run: 2 passed`), so they look like timing flakes under the full run's load, like the MCP test in the first run.
+- `cargo clippy -p axcenity-editor -p axcenity-project --all-targets -- -D warnings`: clean. `cargo fmt --all --check`: clean.
+- `AXCENITY_SNAPSHOTS=<folder outside the repo> cargo nextest run -p axcenity-editor -E 'test(every_page_is_drawn_with_its_controls)'`: passed, drawing `compare-showing-a`, `compare-showing-a-light`, `compare-side-by-side` and `compare-side-by-side-light`. Looked at again after the fixes:
+  - The strip is one dark card at the viewport's top left in all four, as wide as its row. "Hold as B", the lit "A", "Current", "Side by side", "Keep A" (blue) and the trash all read on Light as on Grey. The trash is the smallest and dimmest of them, but it is clearly visible.
+  - The labels "Showing A (held): editing is off until you go back to Current", "A (held)" and "Current" sit on small dark cards near the bottom left of their viewport or half, and read easily on the light floor.
+  - Side by side: the held A (body fat 0) and the current one (0.9, a rounder belly and waist) stand under the same light and framing, each on its own floor. Nothing else shows behind them in the Full body view.
+  - Showing A: the panel is greyed out, as it should be.
+  - Small, not fixed: while A is shown, the status line still says "Held as A. Change the character, then compare it with A.", the hint left from holding. It is harmless, but "Showing A" would be clearer there. The lit chip ("A", or "Side by side") is a mid-grey fill, quieter than the blue Keep button; that is the panel's chip style, kept on purpose.
