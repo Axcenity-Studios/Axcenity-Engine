@@ -134,9 +134,11 @@ fn between(value: f32, a: f32, b: f32) -> f32 {
     value.max(a.min(b)).min(a.max(b))
 }
 
-/// The base's constraints on what was drawn: a `max_sum` over its limit
-/// scales the drawn parameters down (the others stay), and a `follow`
-/// moves a target that wasn't drawn or locked with its drawn source.
+/// The base's constraints on what was drawn. Every `follow` runs first: a
+/// target that wasn't drawn or locked moves with its drawn source. Then
+/// every `max_sum` over its limit scales down what changed (the drawn
+/// parameters and the targets a follow moved), while the others stay; so
+/// the limit holds whatever order the manifest lists them in.
 fn keep_constraints(
     base: &BaseManifest,
     out: &mut Description,
@@ -151,50 +153,55 @@ fn keep_constraints(
             .or_else(|| base.parameter(id).map(|p| p.default))
             .unwrap_or(0.0)
     };
+    let mut changed: Vec<String> = drawn.iter().map(|id| (*id).to_owned()).collect();
     for constraint in &base.constraints {
-        match constraint {
-            Constraint::MaxSum { parameters, limit } => {
-                let (mut free, mut fixed) = (0.0, 0.0);
-                for id in parameters {
-                    let v = value(out, id).max(0.0);
-                    if drawn.contains(&id.as_str()) {
-                        free += v;
-                    } else {
-                        fixed += v;
-                    }
-                }
-                if free + fixed <= *limit || free <= 0.0 {
-                    continue;
-                }
-                // Rounded down, so the rounded values keep to the limit.
-                let scale = ((limit - fixed).max(0.0) / free).min(1.0);
-                for id in parameters.iter().filter(|id| drawn.contains(&id.as_str())) {
-                    let scaled = (value(out, id) * scale * 1000.0).floor() / 1000.0;
-                    let range = base.parameter(id).map_or([scaled, scaled], |p| p.range);
-                    out.parameters
-                        .insert(id.clone(), between(scaled, range[0], range[1]));
-                }
+        let Constraint::Follow {
+            source,
+            target,
+            factor,
+        } = constraint
+        else {
+            continue;
+        };
+        if !drawn.contains(&source.as_str())
+            || drawn.contains(&target.as_str())
+            || locks.contains(target)
+        {
+            continue;
+        }
+        let Some(parameter) = base.parameter(target) else {
+            continue;
+        };
+        let moved = value(out, source) - before.get(source).copied().unwrap_or(0.0);
+        let [min, max] = parameter.range;
+        let next = between(value(out, target) + factor * moved, min, max);
+        out.parameters
+            .insert(target.clone(), (next * 1000.0).round() / 1000.0);
+        changed.push(target.clone());
+    }
+    for constraint in &base.constraints {
+        let Constraint::MaxSum { parameters, limit } = constraint else {
+            continue;
+        };
+        let (mut free, mut fixed) = (0.0, 0.0);
+        for id in parameters {
+            let v = value(out, id).max(0.0);
+            if changed.contains(id) {
+                free += v;
+            } else {
+                fixed += v;
             }
-            Constraint::Follow {
-                source,
-                target,
-                factor,
-            } => {
-                if !drawn.contains(&source.as_str())
-                    || drawn.contains(&target.as_str())
-                    || locks.contains(target)
-                {
-                    continue;
-                }
-                let Some(parameter) = base.parameter(target) else {
-                    continue;
-                };
-                let moved = value(out, source) - before.get(source).copied().unwrap_or(0.0);
-                let [min, max] = parameter.range;
-                let next = between(value(out, target) + factor * moved, min, max);
-                out.parameters
-                    .insert(target.clone(), (next * 1000.0).round() / 1000.0);
-            }
+        }
+        if free + fixed <= *limit || free <= 0.0 {
+            continue;
+        }
+        // Rounded down, so the rounded values keep to the limit.
+        let scale = ((limit - fixed).max(0.0) / free).min(1.0);
+        for id in parameters.iter().filter(|id| changed.contains(id)) {
+            let scaled = (value(out, id) * scale * 1000.0).floor() / 1000.0;
+            let range = base.parameter(id).map_or([scaled, scaled], |p| p.range);
+            out.parameters
+                .insert(id.clone(), between(scaled, range[0], range[1]));
         }
     }
 }

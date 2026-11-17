@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use super::texts;
 use crate::fixtures;
-use crate::{Category, Description, Library, Scope, WornItem, randomize, resolve};
+use crate::{Category, Constraint, Description, Library, Scope, WornItem, randomize, resolve};
 
 fn start() -> Description {
     let mut description = Description::new("Ada", "test/body");
@@ -87,9 +87,6 @@ fn values_stay_inside_the_random_share() {
         // A parameter with choices takes one of them.
         let frame = d.parameters.get("frame").copied().unwrap_or(0.0);
         assert!(frame == 0.0 || frame == 1.0, "frame {frame}");
-        // `fat + muscle` keep to their `max_sum`.
-        let muscle = d.parameters.get("muscle").copied().unwrap_or(0.0);
-        assert!(fat + muscle <= 1.5 + 1e-4);
         // An item's own parameters are drawn too.
         if let Some(bob) = d.items.iter().find(|item| item.id == "test/bob") {
             let length = bob.parameters["length"];
@@ -219,4 +216,95 @@ fn a_description_on_a_base_the_library_lacks_comes_back_unchanged() {
         &fixtures::rich_library(),
     );
     assert_eq!(d, lost);
+}
+
+/// The rich library with `fat` and `muscle` drawn from [0.8, 1], so every
+/// draw of both breaks their `max_sum` of 1.5, and `follows` added after it.
+fn constrained_library(follows: &[(&str, &str, f32)]) -> Library {
+    let mut library = fixtures::rich_library();
+    let base = library.bases.get_mut("test/body").unwrap();
+    for parameter in &mut base.parameters {
+        if parameter.id == "fat" || parameter.id == "muscle" {
+            parameter.random = Some([0.8, 1.0]);
+        }
+    }
+    for (source, target, factor) in follows {
+        base.constraints.push(Constraint::Follow {
+            source: (*source).to_owned(),
+            target: (*target).to_owned(),
+            factor: *factor,
+        });
+    }
+    library
+}
+
+#[test]
+fn randomize_keeps_max_sum_and_moves_follow_targets() {
+    let none = BTreeSet::new();
+    let get = |d: &Description, id: &str| d.parameters.get(id).copied().unwrap_or(0.0);
+
+    // max_sum: both drawn, so both are scaled down to the limit.
+    let library = constrained_library(&[]);
+    let mut closest = f32::MAX;
+    for seed in 0..300 {
+        let d = randomize(&start(), &Scope::All, &none, seed, &library);
+        let sum = get(&d, "fat") + get(&d, "muscle");
+        assert!(sum <= 1.5 + 1e-3, "fat + muscle {sum} at seed {seed}");
+        closest = closest.min((1.5 - sum).abs());
+        sound(&d, &library, seed);
+    }
+    assert!(closest < 0.01, "the scaling ran: closest {closest}");
+
+    // A locked `fat` stays; only the drawn `muscle` gives way.
+    let mut heavy = start();
+    heavy.parameters.insert("fat".to_owned(), 0.9);
+    let mut near = false;
+    for seed in 0..300 {
+        let d = randomize(&heavy, &Scope::All, &locks(&["fat"]), seed, &library);
+        assert_eq!(get(&d, "fat"), 0.9, "seed {seed}");
+        let muscle = get(&d, "muscle");
+        assert!(muscle <= 0.6 + 1e-3, "muscle {muscle} at seed {seed}");
+        near |= muscle > 0.59;
+    }
+    assert!(near, "muscle is scaled to what the locked fat leaves");
+
+    // follow: a drawn `height` moves `fat`, held in range and rounded.
+    // A factor of 2 sometimes pushes `fat` below 0, so the clamp runs.
+    let library = constrained_library(&[("height", "fat", 2.0)]);
+    let only_height = Scope::Parameters(vec!["height".to_owned()]);
+    let (mut moved, mut clamped) = (false, false);
+    for seed in 0..300 {
+        let d = randomize(&start(), &only_height, &none, seed, &library);
+        let raw = 0.3 + 2.0 * (get(&d, "height") - 1.1);
+        let expected = (raw.clamp(0.0, 1.0) * 1000.0).round() / 1000.0;
+        let fat = get(&d, "fat");
+        assert!((fat - expected).abs() < 1e-5, "fat {fat}, want {expected}");
+        moved |= (fat - 0.3).abs() > 0.01;
+        clamped |= raw < 0.0;
+        sound(&d, &library, seed);
+    }
+    assert!(moved && clamped, "moved {moved}, clamped {clamped}");
+
+    // A locked target stays, and a target drawn too is not moved: it
+    // equals the draw of the same seed on a base without the follow.
+    let plain = constrained_library(&[]);
+    let both = Scope::Parameters(vec!["height".to_owned(), "fat".to_owned()]);
+    for seed in 0..100 {
+        let d = randomize(&start(), &only_height, &locks(&["fat"]), seed, &library);
+        assert_eq!(get(&d, "fat"), 0.3, "seed {seed}");
+        let followed = randomize(&start(), &both, &none, seed, &library);
+        let drawn = randomize(&start(), &both, &none, seed, &plain);
+        assert_eq!(followed, drawn, "seed {seed}");
+    }
+
+    // A follow target pushed over a max_sum listed before the follow: the
+    // drawn `muscle` gives way to it, whatever order the constraints are in.
+    let library = constrained_library(&[("height", "fat", 4.0)]);
+    let height_and_muscle = Scope::Parameters(vec!["height".to_owned(), "muscle".to_owned()]);
+    for seed in 0..300 {
+        let d = randomize(&start(), &height_and_muscle, &none, seed, &library);
+        let sum = get(&d, "fat") + get(&d, "muscle");
+        assert!(sum <= 1.5 + 1e-3, "fat + muscle {sum} at seed {seed}");
+        sound(&d, &library, seed);
+    }
 }

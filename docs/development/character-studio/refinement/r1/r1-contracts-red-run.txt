@@ -68,3 +68,25 @@ RED run 2, project: cargo nextest run -p axcenity-project --no-fail-fast charact
     FAIL character_library::tests::the_shipped_packages_are_copied_beside_the_built_in_one
     assertion `left == right` failed: left {} (the project's presets), right the 29 shipped presets
     Summary: 3 tests run: 2 passed, 1 failed
+
+== Review fixes: red runs for randomize_keeps_max_sum_and_moves_follow_targets ==
+
+1. Against the committed randomize.rs (dbd02ea9): a follow target pushed over a
+   max_sum listed before the follow is not scaled back (constraint order bug).
+   cargo nextest run -p axcenity-avatar --no-fail-fast randomiz
+   thread 'tests::randomizing::randomize_keeps_max_sum_and_moves_follow_targets' panicked at crates\avatar\src\tests\randomizing.rs:307:9:
+   fat + muscle 1.5699999 at seed 4
+   Summary [   0.085s] 7 tests run: 6 passed, 1 failed, 75 skipped
+
+2. Mutation: the keep_constraints call in randomize() replaced with a no-op
+   (the reviewer's mutation; the old suite passed 81/81 with it).
+   cargo nextest run -p axcenity-avatar --no-fail-fast
+   thread 'tests::randomizing::randomize_keeps_max_sum_and_moves_follow_targets' panicked at crates\avatar\src\tests\randomizing.rs:252:9:
+   fat + muscle 1.691 at seed 0
+   Summary [   4.458s] 82 tests run: 81 passed, 1 failed, 0 skipped
+
+3. Mutation: only the follow branch of keep_constraints disabled.
+   cargo nextest run -p axcenity-avatar --no-fail-fast randomiz
+   thread 'tests::randomizing::randomize_keeps_max_sum_and_moves_follow_targets' panicked at crates\avatar\src\tests\randomizing.rs:281:9:
+   fat 0.3, want 0.484
+   Summary [   0.102s] 7 tests run: 6 passed, 1 failed, 75 skipped
