@@ -6,8 +6,8 @@ implementation: implemented
 crates: [terrain, core, scene, physics, project, procedural]
 source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs]
 docs: [docs/terrain.md, crates/terrain/CLAUDE.md]
-verified: 2026-11-11
-verified_commit: 19c7179d
+verified: 2026-11-16
+verified_commit: 78776924
 tags: [system/terrain]
 ---
 
@@ -22,12 +22,14 @@ tags: [system/terrain]
 flowchart LR
   TD[(core::TerrainData)] --> TB[terrain: brush, generate,<br/>erosion, materials]
   TB --> TD
-  TD --> MESH[terrain::mesh chunks<br/>split cells like parry]
-  MESH --> SC[scene TerrainCache:<br/>chunks on a worker, weights, foliage draw]
+  TD --> MESH[terrain::mesh chunks<br/>split cells like parry,<br/>stitched where levels meet]
+  MESH --> SC[scene TerrainCache:<br/>levels, then meshes; weights;<br/>foliage draw]
   SC --> WA[terrain water: one water item<br/>per chunk below WaterLevel]
   TD --> PH[physics heightfield + colliding foliage]
   TD <--> PR[project terrain_files: PNG + JSON]
 ```
+
+Chunk meshes (`terrain/src/mesh.rs`, `scene/src/terrain.rs`): each frame the scene picks every chunk's level of detail (by distance, full detail for a chunk with holes), then builds each chunk so its sides meet its neighbours': a side next to a finer chunk takes that chunk's samples and fans its cells out to them, so the surface is watertight across every seam with no T-junctions, and a full-detail chunk is never changed (it stays exactly the collider). There are no skirts: until 2026-11-16 every chunk hung one from each side to hide cracks between levels, and the owner saw them as messy, stepped walls at the terrain's border and slivers at seams. Meshes are quick, so they're built in the frame that needs them, streaming or not; while streaming only the weights are made on the worker. The renderer uploads terrain chunk meshes right away even with background uploads on (the editor's viewport always has them): left to the upload thread, a chunk switching level was missing for a few frames, a sky-coloured square in the ground while the camera moved.
 
 Since LE4 (the 2026-11-13 lighting audit) a Terrain can flood its hollows: `scene/src/terrain_water.rs` draws the renderer's water over every chunk whose lowest ground is below `WaterLevel`. It is drawn only; physics doesn't see it.
 
@@ -63,7 +65,8 @@ flowchart LR
 ## Development guidance
 
 - Generators are deterministic for a seed and `GENERATOR_VERSION`; bump the version when output changes.
-- Render triangles must split cells like parry's heightfield (`mesh.rs`) so collision matches what's drawn.
+- Render triangles must split cells like parry's heightfield (`mesh.rs`) so collision matches what's drawn; stitching changes only the coarser side of a seam.
+- A chunk's mesh depends on its neighbours' levels: its key includes its sides' levels (`side_lods`), and the scene picks every level before building any mesh.
 - `terrain` depends only on `core`: no UI, GPU or file access.
 
 ## Related documentation

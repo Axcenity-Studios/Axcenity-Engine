@@ -863,8 +863,9 @@ fn bench_project() {
 /// `AXCENITY_BENCH_PROJECT` names the project, `AXCENITY_SHOT_DIR` the folder
 /// for the pictures, `AXCENITY_SHOT_VIEWS` the cameras
 /// (`name:eyeX,eyeY,eyeZ:targetX,targetY,targetZ[:fovY]`, separated by `;`),
-/// and `AXCENITY_SHOT_SIZE` (`1280x720`), `AXCENITY_SHOT_QUALITY` (`High`) and
-/// `AXCENITY_SHOT_SHADOW_DISTANCE` (the preset's) are optional.
+/// and `AXCENITY_SHOT_SIZE` (`1280x720`), `AXCENITY_SHOT_QUALITY` (`High`),
+/// `AXCENITY_SHOT_SHADOW_DISTANCE` (the preset's) and the switches below are
+/// optional.
 ///
 /// `cargo test -p axcenity-player --release -- --ignored shoot_project --nocapture --test-threads 1`
 #[test]
@@ -938,6 +939,23 @@ fn shoot_project() {
         settings.shadow_distance = Some(distance);
     }
     renderer.set_graphics(&settings);
+    // `AXCENITY_SHOT_BACKGROUND_UPLOADS`: meshes and textures go up on the
+    // renderer's upload thread, as the editor always has them.
+    if std::env::var_os("AXCENITY_SHOT_BACKGROUND_UPLOADS").is_some() {
+        renderer.set_background_uploads(true);
+    }
+    // `AXCENITY_SHOT_EVERY_FRAME`: with `AXCENITY_SHOT_MOVE`, every moving
+    // frame is saved too (`<name>_00.png` on), to catch what lasts a frame.
+    let every_frame = std::env::var_os("AXCENITY_SHOT_EVERY_FRAME").is_some();
+    let save = |pixels: Vec<u8>, name: String| {
+        let file = std::io::BufWriter::new(std::fs::File::create(out.join(name)).unwrap());
+        let mut encoder = png::Encoder::new(file, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&pixels).unwrap();
+        writer.finish().unwrap();
+    };
     let mut cache = TerrainCache::new();
     for view in views.split(';').filter(|view| !view.trim().is_empty()) {
         let parts: Vec<&str> = view.trim().split(':').collect();
@@ -1006,6 +1024,9 @@ fn shoot_project() {
             drawn.push(start.elapsed());
             device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
             gpu.extend(renderer.stats().gpu_time);
+            if every_frame && moving.is_some() {
+                save(renderer.read_pixels(), format!("{}_{i:02}.png", parts[0]));
+            }
         }
         let median = |times: &mut Vec<Duration>| {
             times.sort();
@@ -1050,15 +1071,6 @@ fn shoot_project() {
             renderer.render(&list).unwrap();
             device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
         }
-        let save = |pixels: Vec<u8>, name: String| {
-            let file = std::io::BufWriter::new(std::fs::File::create(out.join(name)).unwrap());
-            let mut encoder = png::Encoder::new(file, width, height);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&pixels).unwrap();
-            writer.finish().unwrap();
-        };
         save(renderer.read_pixels(), format!("{}.png", parts[0]));
         if moving.is_some() {
             for _ in 0..60 {

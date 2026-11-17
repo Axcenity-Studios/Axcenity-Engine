@@ -2679,6 +2679,22 @@ impl ScenePipeline {
     pub(super) fn upload_new(&mut self, list: &DrawList, draws: &[Draw], uses: &FrameUses) {
         let frame = self.frame;
         let arrived = self.finish_background_uploads();
+        // Terrain chunks are small, and switch level (a new mesh) as the
+        // camera moves: each goes up right away, like their weights. Left
+        // to the upload thread, a chunk switching level would be missing
+        // for a few frames, a hole in the ground showing the sky.
+        let terrain_meshes: rustc_hash::FxHashSet<u64> = match self.uploader {
+            Some(_) => list
+                .items
+                .iter()
+                .filter(|item| item.material.terrain.is_some())
+                .filter_map(|item| match &item.shape {
+                    Shape::Mesh(source) => Some(source.key()),
+                    _ => None,
+                })
+                .collect(),
+            None => Default::default(),
+        };
         // Thousands of draws share a few meshes and textures: each is
         // looked up once rather than once per draw.
         for &source in &uses.meshes {
@@ -2700,7 +2716,9 @@ impl ScenePipeline {
                     }
                 }
                 Entry::Vacant(slot) => {
-                    if let Some(uploader) = &mut self.uploader {
+                    if let Some(uploader) = &mut self.uploader
+                        && !terrain_meshes.contains(&source.key())
+                    {
                         // Not drawn until its thread is done with it.
                         uploader.mesh(source);
                         continue;

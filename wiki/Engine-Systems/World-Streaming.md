@@ -14,7 +14,7 @@ tags: [system/streaming, large-worlds]
 # World streaming
 
 > [!summary]
-> Phase 80: on a world too big to keep whole, each device has only what's near it. **Off by default** (`Workspace.StreamingEnabled`); with it off nothing here runs and projects play exactly as before. `core::streaming::Partition` splits the Workspace into **units** that load together (a loose part, a Model without nested Models, an `Atomic` Model); the server sends each joined player their share; a host's own screen leaves out of range content, frees its GPU copies, builds terrain chunks on a thread and lets far physics sleep. **Partial**: built and tested, one plan criterion still open, not on by default.
+> Phase 80: on a world too big to keep whole, each device has only what's near it. **Off by default** (`Workspace.StreamingEnabled`); with it off nothing here runs and projects play exactly as before. `core::streaming::Partition` splits the Workspace into **units** that load together (a loose part, a Model without nested Models, an `Atomic` Model); the server sends each joined player their share; a host's own screen leaves out of range content, frees its GPU copies, makes terrain chunks' weights on a thread and lets far physics sleep. **Partial**: built and tested, one plan criterion still open, not on by default.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ flowchart LR
   P --> SS["scene::Streaming (host's screen)<br/>in range of the camera"]
   SS --> DL[build_draw_list leaves the rest out]
   SS --> GPU["GPU frees after KEEP_UNDRAWN_FRAMES;<br/>background uploads when back in range"]
-  SS --> TC[terrain chunks built on a worker]
+  SS --> TC[terrain chunk weights made on a worker]
   SS --> PH[Physics::set_far_sleep]
   P --> OV["editor Streaming overlay (R16)<br/>unit boxes by Reach, legend from<br/>Partition::summary"]
 ```

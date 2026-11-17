@@ -8,9 +8,15 @@
 //! rules change. A changed chunk mesh keeps its key and gets a new
 //! version, so the renderer rewrites its GPU copy in place.
 //!
+//! Each chunk's level is picked first, then its mesh is built to meet its
+//! neighbours' levels (`terrain::mesh::side_lods`), so the surface has no
+//! cracks wherever two levels meet. A mesh takes well under a millisecond,
+//! so it's always built in the frame that draws it: a chunk is never left
+//! out, or drawn at a level its neighbours don't expect, while it waits.
+//!
 //! With world streaming on (Phase 80), chunks out of range are dropped
-//! and chunks that come back in range are built on a background thread,
-//! and drawn once they're ready.
+//! and chunks that come back in range have their weights (the slow part)
+//! made on a background thread, and are drawn once those are ready.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -61,10 +67,10 @@ pub struct TerrainCache {
     /// What's in range of the camera (Phase 80). The host calls its
     /// `step` each frame; drawing leaves out what's hidden.
     pub streaming: Streaming,
-    /// Builds chunks in the background while streaming, started the first
-    /// time one is needed.
+    /// Makes chunks' weights in the background while streaming, started
+    /// the first time one is needed.
     chunk_worker: Option<ChunkWorker>,
-    /// Chunks being built, by terrain, chunk and level of detail.
+    /// Chunks whose weights are being made, by terrain and chunk.
     pending: HashSet<ChunkId>,
     /// MeshParts' meshes, materials and skins, kept between frames (I8).
     pub(crate) meshes: crate::mesh_cache::MeshCache,
@@ -91,17 +97,15 @@ impl Default for TerrainCache {
     }
 }
 
-/// Which chunk mesh is being built.
-type ChunkId = (InstanceId, usize, usize, u32);
+/// Which chunk's weights are being made.
+type ChunkId = (InstanceId, usize, usize);
 
-/// A chunk's mesh and weights to build away from the frame.
+/// A chunk's weights to make away from the frame.
 struct ChunkJob {
     id: InstanceId,
     uid: u64,
     cx: usize,
     cz: usize,
-    lod: u32,
-    version: u64,
     weights_key: WeightsKey,
     data: Arc<TerrainData>,
     placement: Placement,
@@ -114,9 +118,6 @@ struct ChunkDone {
     uid: u64,
     cx: usize,
     cz: usize,
-    lod: u32,
-    version: u64,
-    mesh: Arc<ChunkSource>,
     weights_key: WeightsKey,
     weights: [Arc<dyn TextureSource>; 2],
 }
@@ -133,11 +134,6 @@ impl ChunkWorker {
         let (outbox, done) = mpsc::channel();
         std::thread::spawn(move || {
             while let Ok(job) = inbox.recv() {
-                let mesh = Arc::new(ChunkSource {
-                    key: chunk_key(job.id, job.cx, job.cz, job.lod),
-                    version: job.version,
-                    mesh: mesh::chunk_mesh(&job.data, &job.placement, job.cx, job.cz, job.lod),
-                });
                 let weights = weight_textures(
                     &job.data,
                     &job.placement,
@@ -151,9 +147,6 @@ impl ChunkWorker {
                     uid: job.uid,
                     cx: job.cx,
                     cz: job.cz,
-                    lod: job.lod,
-                    version: job.version,
-                    mesh,
                     weights_key: job.weights_key,
                     weights,
                 };
@@ -181,11 +174,16 @@ struct Entry {
 
 #[derive(Default)]
 struct Chunk {
-    /// Each level of detail's mesh, with the heights' version it was built from.
-    meshes: [Option<(u64, Arc<ChunkSource>)>; LOD_LEVELS as usize],
+    /// Each level of detail's mesh, with the heights' version and the
+    /// sides' levels it was built for.
+    meshes: [Option<BuiltMesh>; LOD_LEVELS as usize],
     /// The weight textures, with the versions and rules they were made from.
     weights: Option<(WeightsKey, [Arc<dyn TextureSource>; 2])>,
 }
+
+/// A chunk mesh with the heights' version and the sides' levels it was
+/// built for.
+type BuiltMesh = (u64, [u32; 4], Arc<ChunkSource>);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct WeightsKey {
@@ -258,7 +256,7 @@ impl TerrainCache {
         self.pending.clear();
     }
 
-    /// How many chunks are still being built in the background.
+    /// How many chunks' weights are still being made in the background.
     pub fn pending_chunks(&self) -> usize {
         self.pending.len()
     }
@@ -269,7 +267,7 @@ impl TerrainCache {
             return;
         };
         while let Ok(done) = worker.done.try_recv() {
-            self.pending.remove(&(done.id, done.cx, done.cz, done.lod));
+            self.pending.remove(&(done.id, done.cx, done.cz));
             let Some(entry) = self.terrains.get_mut(&done.id) else {
                 continue;
             };
@@ -277,7 +275,6 @@ impl TerrainCache {
                 continue;
             }
             let chunk = entry.chunks.entry((done.cx, done.cz)).or_default();
-            chunk.meshes[done.lod as usize] = Some((done.version, done.mesh));
             chunk.weights = Some((done.weights_key, done.weights));
         }
     }
@@ -392,6 +389,9 @@ impl TerrainCache {
         let transform = Mat4::from_translation(placement.position);
         let cell = placement.cell_size(&data);
         let (chunks_x, chunks_z) = data.chunk_counts();
+        // First each chunk's level (`None` for one out of range), so each
+        // chunk's mesh can meet its neighbours' with no cracks.
+        let mut lods: Vec<Option<u32>> = vec![None; chunks_x * chunks_z];
         for cz in 0..chunks_z {
             for cx in 0..chunks_x {
                 let rect = data.chunk_rect(cx, cz);
@@ -419,6 +419,23 @@ impl TerrainCache {
                 let offset = (camera.position - center).abs() - half;
                 let distance = offset.max(Vec3::ZERO).length();
                 let lod = mesh::lod_for_distance(distance, self.detail_distance);
+                lods[cz * chunks_x + cx] = Some(mesh::drawn_lod(&data, cx, cz, lod));
+            }
+        }
+        let lod_at = |cx: isize, cz: isize| {
+            if cx < 0 || cz < 0 || cx as usize >= chunks_x || cz as usize >= chunks_z {
+                return None;
+            }
+            lods[cz as usize * chunks_x + cx as usize]
+        };
+        for cz in 0..chunks_z {
+            for cx in 0..chunks_x {
+                let Some(lod) = lods[cz * chunks_x + cx] else {
+                    continue;
+                };
+                let neighbours =
+                    mesh::SIDES.map(|(dx, dz)| lod_at(cx as isize + dx, cz as isize + dz));
+                let sides = mesh::side_lods(lod, neighbours);
                 let chunk = entry.chunks.entry((cx, cz)).or_default();
                 let version = data.chunk_height_version(cx, cz);
                 let key = WeightsKey {
@@ -426,18 +443,15 @@ impl TerrainCache {
                     paint: data.chunk_paint_version(cx, cz),
                     rules: rules_key,
                 };
-                // Streaming builds what's missing on a thread of its own,
-                // and until then draws what's there of this chunk (or
-                // nothing yet).
-                if background {
-                    let up_to_date = chunk.meshes[lod as usize]
+                let weights = if background {
+                    // Streaming makes missing weights on a thread of its
+                    // own, and until then draws the chunk with the weights
+                    // it had (or not at all yet).
+                    let up_to_date = chunk
+                        .weights
                         .as_ref()
-                        .is_some_and(|(built, _)| *built == version)
-                        && chunk
-                            .weights
-                            .as_ref()
-                            .is_some_and(|(built, _)| *built == key);
-                    let job = (id, cx, cz, lod);
+                        .is_some_and(|(built, _)| *built == key);
+                    let job = (id, cx, cz);
                     if !up_to_date && !self.pending.contains(&job) {
                         let worker = self.chunk_worker.get_or_insert_with(ChunkWorker::start);
                         let sent = worker.jobs.send(ChunkJob {
@@ -445,8 +459,6 @@ impl TerrainCache {
                             uid: data.uid(),
                             cx,
                             cz,
-                            lod,
-                            version,
                             weights_key: key,
                             data: data.clone(),
                             placement,
@@ -456,36 +468,38 @@ impl TerrainCache {
                             self.pending.insert(job);
                         }
                     }
-                    let best = chunk.meshes[lod as usize]
-                        .iter()
-                        .chain(chunk.meshes.iter().flatten())
-                        .find(|(built, _)| *built == version)
-                        .map(|(_, mesh)| mesh.clone());
-                    let (Some(mesh), Some((_, weights))) = (best, chunk.weights.as_ref()) else {
+                    let Some((_, weights)) = chunk.weights.as_ref() else {
                         continue;
                     };
-                    let weights = weights.clone();
-                    items.push(chunk_item(mesh, weights, &layers, transform, casts_shadow));
-                    continue;
-                }
-                let mesh = match &chunk.meshes[lod as usize] {
-                    Some((built, mesh)) if *built == version => mesh.clone(),
-                    _ => {
-                        let mesh = Arc::new(ChunkSource {
-                            key: chunk_key(id, cx, cz, lod),
-                            version,
-                            mesh: mesh::chunk_mesh(&data, &placement, cx, cz, lod),
-                        });
-                        chunk.meshes[lod as usize] = Some((version, mesh.clone()));
-                        mesh
+                    weights.clone()
+                } else {
+                    match &chunk.weights {
+                        Some((built, weights)) if *built == key => weights.clone(),
+                        _ => {
+                            let weights =
+                                weight_textures(&data, &placement, &rules, (cx, cz), id, key);
+                            chunk.weights = Some((key, weights.clone()));
+                            weights
+                        }
                     }
                 };
-                let weights = match &chunk.weights {
-                    Some((built, weights)) if *built == key => weights.clone(),
+                // The mesh is quick to build, so it's always the one this
+                // frame's levels call for: never one its neighbours don't
+                // meet.
+                let mesh = match &chunk.meshes[lod as usize] {
+                    Some((built, built_sides, mesh))
+                        if *built == version && *built_sides == sides =>
+                    {
+                        mesh.clone()
+                    }
                     _ => {
-                        let weights = weight_textures(&data, &placement, &rules, (cx, cz), id, key);
-                        chunk.weights = Some((key, weights.clone()));
-                        weights
+                        let mesh = Arc::new(ChunkSource {
+                            key: chunk_key(id, cx, cz, lod, sides),
+                            version,
+                            mesh: mesh::chunk_mesh(&data, &placement, cx, cz, lod, sides),
+                        });
+                        chunk.meshes[lod as usize] = Some((version, sides, mesh.clone()));
+                        mesh
                     }
                 };
                 items.push(chunk_item(mesh, weights, &layers, transform, casts_shadow));
@@ -526,12 +540,13 @@ fn chunk_item(
     }
 }
 
-/// A chunk mesh's key: the same for the same chunk and level of detail of
-/// the same terrain, so the renderer updates it in place. Bit 62 is set
-/// and 63 clear, so it never matches a model's or a posed model's key.
-fn chunk_key(id: InstanceId, cx: usize, cz: usize, lod: u32) -> u64 {
+/// A chunk mesh's key: the same for the same chunk, level of detail and
+/// sides' levels of the same terrain, so the renderer updates it in place
+/// when its heights change. Bit 62 is set and 63 clear, so it never
+/// matches a model's or a posed model's key.
+fn chunk_key(id: InstanceId, cx: usize, cz: usize, lod: u32, sides: [u32; 4]) -> u64 {
     let mut hasher = DefaultHasher::new();
-    ("terrain chunk", id, cx, cz, lod).hash(&mut hasher);
+    ("terrain chunk", id, cx, cz, lod, sides).hash(&mut hasher);
     (hasher.finish() & !(1 << 63)) | 1 << 62
 }
 
@@ -900,6 +915,68 @@ mod tests {
         let near = corners(&items[0]);
         let far = corners(&items[63]);
         assert!(near > far * 4, "{near} {far}");
+    }
+
+    #[test]
+    fn moving_the_camera_draws_every_chunk_every_frame_with_closed_seams() {
+        let (mut world, terrain) = world_with_terrain();
+        let data = world.terrain_mut(terrain).unwrap();
+        let (size_x, _) = data.size();
+        let all = data.bounds();
+        for (i, h) in data.heights_mut_in(all).iter_mut().enumerate() {
+            let (x, z) = ((i % size_x) as f32, (i / size_x) as f32);
+            *h = 0.4 + 0.2 * (x * 0.05).sin() * (z * 0.07).cos();
+        }
+        let mut cache = TerrainCache::new();
+        cache.detail_distance = 40.0;
+        let assets = Assets::default();
+        let mut levels_seen = HashSet::new();
+        // Low over the 512-stud terrain from one corner to the other: the
+        // chunks change level as the camera passes.
+        for step in 0..=40 {
+            let along = -300.0 + step as f32 * 15.0;
+            let mut items = Vec::new();
+            cache.draw_all(
+                &world,
+                &assets,
+                &camera_at(Vec3::new(along, 20.0, along * 0.7)),
+                &mut items,
+                &mut Vec::new(),
+            );
+            let chunks: Vec<&Arc<dyn MeshSource>> = items
+                .iter()
+                .filter(|item| item.material.terrain.is_some())
+                .filter_map(|item| match &item.shape {
+                    Shape::Mesh(mesh) => Some(mesh),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(chunks.len(), 64, "every chunk is drawn at step {step}");
+            levels_seen.extend(chunks.iter().map(|mesh| mesh.positions().len()));
+            // Every edge inside the terrain has a triangle on each side,
+            // wherever two levels meet: nothing to see through.
+            let mut uses: HashMap<[[u32; 3]; 2], usize> = HashMap::new();
+            for mesh in &chunks {
+                let corner = |k: u32| mesh.positions()[k as usize].map(f32::to_bits);
+                for triangle in mesh.indices().chunks(3) {
+                    for k in 0..3 {
+                        let (a, b) = (corner(triangle[k]), corner(triangle[(k + 1) % 3]));
+                        *uses.entry(if a < b { [a, b] } else { [b, a] }).or_default() += 1;
+                    }
+                }
+            }
+            for (edge, count) in uses {
+                let [a, b] = edge.map(|p| p.map(f32::from_bits));
+                let border =
+                    (a[0] == b[0] && a[0].abs() == 256.0) || (a[2] == b[2] && a[2].abs() == 256.0);
+                assert_eq!(
+                    count,
+                    if border { 1 } else { 2 },
+                    "step {step}: {a:?} to {b:?}"
+                );
+            }
+        }
+        assert!(levels_seen.len() > 3, "the chunks changed level");
     }
 
     #[test]
