@@ -7,7 +7,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::manifest::{check_id, check_path, check_version, not_empty, unique};
+use crate::manifest::{
+    Choice, Level, MaterialDriver, ShapeDriver, check_about, check_choice, check_id,
+    check_material_driver, check_path, check_random, check_span, check_value_range, check_version,
+    not_empty, unique,
+};
 use crate::material::{MaterialSlot, MaterialValues, check_values};
 use crate::model_check::ModelRef;
 use crate::{FormatError, Problem, pretty, read_versioned};
@@ -54,6 +58,93 @@ pub struct ItemManifest {
     pub thumbnail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<Source>,
+    /// A sentence for the browser.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    /// The item's own sliders (a hairstyle's length): they drive the
+    /// item's shapes and material values, and a worn item holds their
+    /// values.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<ItemParameter>,
+    /// Other slots it occupies (a dress fills `bottom` too).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also_fills: Vec<String>,
+    /// Items that must be worn with it, by ID.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+    /// Items it can't be worn with, by ID (either naming the other is
+    /// enough).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub excludes: Vec<String>,
+    /// Known limits, as notes for the browser; with a parameter and a
+    /// range the editor can warn outside the range.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub limitations: Vec<Limitation>,
+    /// Socket items only: how far a person may move, turn and scale it.
+    /// None means it stays as made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adjust: Option<Adjust>,
+}
+
+/// An item's own slider: shaped like a base model's parameter, without a
+/// group, a mirror, a feature, bones or attributes (an item moves only
+/// its own shapes and material values).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ItemParameter {
+    pub id: String,
+    pub label: String,
+    pub range: [f32; 2],
+    #[serde(default)]
+    pub default: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<Level>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub random: Option<[f32; 2]>,
+    /// Shapes of the item's own model.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shapes: Vec<ShapeDriver>,
+    /// Number values of the item's own material slots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub material_values: Vec<MaterialDriver>,
+    /// Named values instead of a slider (they wear nothing).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<Choice>,
+}
+
+impl ItemParameter {
+    /// Its level: `detailed` unless it says otherwise.
+    pub fn level(&self) -> Level {
+        match self.level {
+            Some(Level::Other) | None => Level::Detailed,
+            Some(level) => level,
+        }
+    }
+}
+
+/// A known limit of an item.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Limitation {
+    pub note: String,
+    /// A parameter of the item or of the base model it is worn on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameter: Option<String>,
+    /// Where on `parameter` the item works well.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<[f32; 2]>,
+}
+
+/// How far a socket item may be moved (metres per model axis), turned
+/// (degrees about each axis) and scaled. A part left out can't change.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Adjust {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<[[f32; 2]; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn: Option<[[f32; 2]; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<[f32; 2]>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -109,6 +200,12 @@ pub struct Variant {
     pub label: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub materials: BTreeMap<String, MaterialValues>,
+    /// A picture of it, relative to the manifest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail: Option<String>,
+    /// Values for the item's own parameters.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, f32>,
 }
 
 /// A groom's tiers. Cards or a mesh are required; strands are optional and
@@ -149,6 +246,155 @@ impl ItemManifest {
 
     pub fn variant(&self, id: &str) -> Option<&Variant> {
         self.variants.iter().find(|v| v.id == id)
+    }
+
+    pub fn parameter(&self, id: &str) -> Option<&ItemParameter> {
+        self.parameters.iter().find(|p| p.id == id)
+    }
+
+    /// The slots it occupies: its own, then `also_fills`.
+    pub fn slots(&self) -> impl Iterator<Item = &String> {
+        std::iter::once(&self.slot).chain(&self.also_fills)
+    }
+
+    /// Whether this item and `other` can't be worn together (either
+    /// excludes the other).
+    pub fn conflicts_with(&self, other: &ItemManifest) -> bool {
+        self.excludes.contains(&other.id) || other.excludes.contains(&self.id)
+    }
+
+    /// Checks a value of the item parameter `id`: it exists, is finite and
+    /// in range.
+    pub(crate) fn check_parameter_value(
+        &self,
+        p: &mut Vec<Problem>,
+        at: &str,
+        id: &str,
+        value: f32,
+    ) {
+        let Some(parameter) = self.parameter(id) else {
+            p.push(Problem::new(
+                at,
+                format!("`{}` has no parameter `{id}`", self.id),
+            ));
+            return;
+        };
+        let [min, max] = parameter.range;
+        if !value.is_finite() {
+            p.push(Problem::new(at, "isn't a number"));
+        } else if value < min || value > max {
+            p.push(Problem::new(
+                at,
+                format!("{value} is outside its range, {min} to {max}"),
+            ));
+        }
+    }
+
+    fn check_capabilities(&self, p: &mut Vec<Problem>) {
+        if let Some(about) = &self.about {
+            not_empty(p, "about", about);
+        }
+        unique(p, "parameters", self.parameters.iter().map(|par| &par.id));
+        for (index, parameter) in self.parameters.iter().enumerate() {
+            let at = format!("parameters[{index}]");
+            not_empty(p, &format!("{at}.label"), &parameter.label);
+            check_value_range(p, &at, &parameter.id, parameter.range, parameter.default);
+            check_random(p, &at, &parameter.id, parameter.range, parameter.random);
+            check_about(p, &at, &parameter.about);
+            for (k, choice) in parameter.choices.iter().enumerate() {
+                let at = format!("{at}.choices[{k}]");
+                check_choice(p, &at, &parameter.id, parameter.range, choice);
+                if !choice.items.is_empty() {
+                    p.push(Problem::new(at, "an item's choice can't wear items"));
+                }
+            }
+            for (k, driver) in parameter.shapes.iter().enumerate() {
+                let at = format!("{at}.shapes[{k}]");
+                not_empty(p, &at, &driver.shape);
+                check_span(p, &at, driver.from, driver.to);
+            }
+            for (k, driver) in parameter.material_values.iter().enumerate() {
+                let at = format!("{at}.material_values[{k}]");
+                check_material_driver(p, &at, driver, self.material(&driver.material));
+            }
+        }
+        for (index, slot) in self.materials.iter().enumerate() {
+            crate::material::check_slot(p, &format!("materials[{index}]"), slot);
+        }
+        for (index, variant) in self.variants.iter().enumerate() {
+            let at = format!("variants[{index}]");
+            if let Some(thumbnail) = &variant.thumbnail {
+                check_path(p, &format!("{at}.thumbnail"), thumbnail);
+            }
+            for (id, value) in &variant.parameters {
+                self.check_parameter_value(p, &format!("{at}.parameters.{id}"), id, *value);
+            }
+        }
+        unique(p, "also_fills", self.also_fills.iter());
+        for (index, slot) in self.also_fills.iter().enumerate() {
+            if *slot == self.slot {
+                p.push(Problem::new(
+                    format!("also_fills[{index}]"),
+                    format!("`{slot}` is its own slot"),
+                ));
+            }
+        }
+        for (list, ids) in [("requires", &self.requires), ("excludes", &self.excludes)] {
+            unique(p, list, ids.iter());
+            for (index, id) in ids.iter().enumerate() {
+                let at = format!("{list}[{index}]");
+                check_id(p, &at, id);
+                if *id == self.id {
+                    p.push(Problem::new(at, "names the item itself"));
+                }
+            }
+        }
+        for (index, limitation) in self.limitations.iter().enumerate() {
+            let at = format!("limitations[{index}]");
+            not_empty(p, &format!("{at}.note"), &limitation.note);
+            if let Some([low, high]) = limitation.range {
+                if limitation.parameter.is_none() {
+                    p.push(Problem::new(&at, "a range needs a parameter"));
+                }
+                if !(low.is_finite() && high.is_finite() && low <= high) {
+                    p.push(Problem::new(
+                        &at,
+                        format!("the range {low} to {high} goes nowhere"),
+                    ));
+                }
+            }
+        }
+        if let Some(adjust) = &self.adjust {
+            if !matches!(self.fit, Fit::Socket { .. }) {
+                p.push(Problem::new(
+                    "adjust",
+                    "only an item on a socket can be moved, turned or scaled",
+                ));
+            }
+            // Every limit holds the item as it was made (0 offset, 0 turn,
+            // scale 1).
+            let mut limits = |at: &str, span: [f32; 2], made: f32| {
+                let [low, high] = span;
+                if !(low.is_finite() && high.is_finite() && low <= made && made <= high) {
+                    p.push(Problem::new(
+                        at,
+                        format!("{low} to {high} must be finite and hold {made}"),
+                    ));
+                }
+            };
+            for (k, span) in adjust.offset.iter().flatten().enumerate() {
+                limits(&format!("adjust.offset[{k}]"), *span, 0.0);
+            }
+            for (k, span) in adjust.turn.iter().flatten().enumerate() {
+                limits(&format!("adjust.turn[{k}]"), *span, 0.0);
+            }
+            if let Some(scale) = adjust.scale {
+                limits("adjust.scale", scale, 1.0);
+                if scale[0] <= 0.0 {
+                    p.push(Problem::new("adjust.scale", "a scale must stay above 0"));
+                }
+            }
+        }
     }
 
     /// The models it draws with: its model, or its groom's tiers.
@@ -277,6 +523,7 @@ impl ItemManifest {
             not_empty(p, "source.author", &source.author);
             not_empty(p, "source.licence", &source.licence);
         }
+        self.check_capabilities(p);
         problems
     }
 
@@ -305,6 +552,25 @@ impl ItemManifest {
                 "fit",
                 format!("`{}` has no socket `{socket}`", base.id),
             ));
+        }
+        for (index, slot) in self.also_fills.iter().enumerate() {
+            if base.slot(slot).is_none() {
+                problems.push(Problem::new(
+                    format!("also_fills[{index}]"),
+                    format!("`{}` has no slot `{slot}`", base.id),
+                ));
+            }
+        }
+        for (index, limitation) in self.limitations.iter().enumerate() {
+            if let Some(id) = &limitation.parameter
+                && self.parameter(id).is_none()
+                && base.parameter(id).is_none()
+            {
+                problems.push(Problem::new(
+                    format!("limitations[{index}]"),
+                    format!("neither the item nor `{}` has a parameter `{id}`", base.id),
+                ));
+            }
         }
         problems
     }

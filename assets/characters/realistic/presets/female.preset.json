@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Female",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/realistic-female",
+    "kind": "character",
+    "about": "The realistic female body, as it's built.",
+    "order": 20
+  }
+}

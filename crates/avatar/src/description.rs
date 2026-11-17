@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::manifest::{check_version, not_empty};
 use crate::material::{MaterialValues, check_values};
-use crate::{FormatError, Library, Problem, format_version, pretty};
+use crate::{FormatError, ItemManifest, Library, Problem, format_version, pretty};
 
 /// The character description's format version. Format 1 was Character
 /// Studio CS2's `Look`; it migrates on load ([`Description::from_json`]).
@@ -39,8 +39,9 @@ pub struct Description {
     pub extra: BTreeMap<String, serde_json::Value>,
 }
 
-/// An item worn: its ID, the variant chosen and values for its materials
-/// (over the variant's).
+/// An item worn: its ID, the variant chosen, values for its materials
+/// (over the variant's) and its own parameters, and for a socket item how
+/// it is moved.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WornItem {
     pub id: String,
@@ -48,6 +49,50 @@ pub struct WornItem {
     pub variant: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub materials: BTreeMap<String, MaterialValues>,
+    /// Values for the item's own parameters, over its variant's.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, f32>,
+    /// A socket item moved, turned or scaled inside its `adjust`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<Transform>,
+    /// Fields this version doesn't know, kept as they were (as the
+    /// description's own `extra`).
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// How a socket item sits relative to how it was made: an offset (metres,
+/// model axes), a turn (degrees about X, Y and Z, in that order) and a
+/// uniform scale. A part left out of the file changes nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Transform {
+    #[serde(default)]
+    pub offset: [f32; 3],
+    #[serde(default)]
+    pub turn: [f32; 3],
+    #[serde(default = "one")]
+    pub scale: f32,
+}
+
+fn one() -> f32 {
+    1.0
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            offset: [0.0; 3],
+            turn: [0.0; 3],
+            scale: 1.0,
+        }
+    }
+}
+
+impl Transform {
+    /// Whether it leaves the item as made.
+    pub fn is_identity(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 impl WornItem {
@@ -56,6 +101,9 @@ impl WornItem {
             id: id.into(),
             variant: None,
             materials: BTreeMap::new(),
+            parameters: BTreeMap::new(),
+            transform: None,
+            extra: BTreeMap::new(),
         }
     }
 }
@@ -105,9 +153,12 @@ impl Description {
 
     /// Checks the description against `library`: its base model exists;
     /// every parameter is the base's, finite and in range; every item
-    /// exists, fits the base, sits in one of its slots (one per slot unless
-    /// the slot takes several) and names a variant and materials it has;
-    /// every material value suits its slot's shading model.
+    /// exists, fits the base, sits in one of its slots and its `also_fills`
+    /// slots (one per slot unless the slot takes several), is worn with what
+    /// it `requires` and with nothing it `excludes`, names a variant,
+    /// materials and parameters it has (in range), and keeps its
+    /// `transform` inside its `adjust`; every material value suits its
+    /// slot's shading model.
     pub fn validate(&self, library: &Library) -> Vec<Problem> {
         let mut problems = Vec::new();
         let p = &mut problems;
@@ -156,23 +207,51 @@ impl Description {
                 ));
                 continue;
             }
-            match base.slot(&item.slot) {
-                None => p.push(Problem::new(
-                    &at,
-                    format!("`{}` has no slot `{}`", base.id, item.slot),
-                )),
-                Some(slot) if !slot.multiple => {
-                    if let Some(first) = filled.insert(slot.id.as_str(), item.id.as_str()) {
-                        p.push(Problem::new(
-                            &at,
-                            format!(
-                                "the {} slot holds one item and `{first}` is already in it",
-                                slot.id
-                            ),
-                        ));
+            for (k, slot_id) in item.slots().enumerate() {
+                match base.slot(slot_id) {
+                    // A missing `also_fills` slot is the library's problem.
+                    None if k > 0 => {}
+                    None => p.push(Problem::new(
+                        &at,
+                        format!("`{}` has no slot `{}`", base.id, item.slot),
+                    )),
+                    Some(slot) if !slot.multiple => {
+                        if let Some(first) = filled.insert(slot.id.as_str(), item.id.as_str()) {
+                            p.push(Problem::new(
+                                &at,
+                                format!(
+                                    "the {} slot holds one item and `{first}` is already in it",
+                                    slot.id
+                                ),
+                            ));
+                        }
                     }
+                    Some(_) => {}
                 }
-                Some(_) => {}
+            }
+            for earlier in &self.items[..index] {
+                if let Some(other) = library.item(&earlier.id)
+                    && item.conflicts_with(other)
+                {
+                    p.push(Problem::new(
+                        &at,
+                        format!("`{}` can't be worn with `{}`", other.id, item.id),
+                    ));
+                }
+            }
+            for needed in &item.requires {
+                if !self.items.iter().any(|other| other.id == *needed) {
+                    p.push(Problem::new(
+                        &at,
+                        format!("`{}` needs `{needed}` worn with it", item.id),
+                    ));
+                }
+            }
+            for (id, value) in &worn.parameters {
+                item.check_parameter_value(p, &format!("{at}.parameters.{id}"), id, *value);
+            }
+            if let Some(transform) = &worn.transform {
+                check_transform(p, &format!("{at}.transform"), item, transform);
             }
             if let Some(variant) = &worn.variant
                 && item.variant(variant).is_none()
@@ -205,4 +284,53 @@ impl Description {
         }
         problems
     }
+
+    /// The `preset` block of a preset file (`*.preset.json`), or `None`
+    /// when it has none or it doesn't read.
+    pub fn preset(&self) -> Option<crate::PresetInfo> {
+        serde_json::from_value(self.extra.get(crate::preset::PRESET_FIELD)?.clone()).ok()
+    }
+}
+
+/// A worn item's transform stays inside the item's `adjust`: a part the
+/// item doesn't let change must be as made.
+fn check_transform(p: &mut Vec<Problem>, at: &str, item: &ItemManifest, transform: &Transform) {
+    if transform.is_identity() {
+        return;
+    }
+    let Some(adjust) = &item.adjust else {
+        p.push(Problem::new(
+            at,
+            format!(
+                "`{}` can't be moved, turned or scaled: it has no `adjust`",
+                item.id
+            ),
+        ));
+        return;
+    };
+    let mut inside = |what: &str, value: f32, span: Option<[f32; 2]>, made: f32| {
+        let [low, high] = span.unwrap_or([made, made]);
+        if !(value.is_finite() && low <= value && value <= high) {
+            p.push(Problem::new(
+                at,
+                format!("the {what} {value} is outside {low} to {high}"),
+            ));
+        }
+    };
+    for k in 0..3 {
+        let axis = ["x", "y", "z"][k];
+        inside(
+            &format!("offset on {axis}"),
+            transform.offset[k],
+            adjust.offset.map(|o| o[k]),
+            0.0,
+        );
+        inside(
+            &format!("turn about {axis}"),
+            transform.turn[k],
+            adjust.turn.map(|t| t[k]),
+            0.0,
+        );
+    }
+    inside("scale", transform.scale, adjust.scale, 1.0);
 }

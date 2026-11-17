@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "name": "Heart-shaped",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "cheek_fullness_left": -0.2,
+    "cheek_fullness_right": -0.2,
+    "cheekbone_left": 0.5,
+    "cheekbone_right": 0.5,
+    "chin_length": 0.2,
+    "chin_width": -0.6,
+    "forehead_height": 0.2,
+    "forehead_slope": 0.1,
+    "jaw_width_left": -0.6,
+    "jaw_width_right": -0.6,
+    "mouth_width_left": -0.1,
+    "mouth_width_right": -0.1,
+    "temple_width": 0.5
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-heart",
+    "kind": "face",
+    "about": "A wide forehead and cheekbones, a narrow jaw and a small chin.",
+    "tags": [
+      "shape"
+    ],
+    "order": 40
+  }
+}

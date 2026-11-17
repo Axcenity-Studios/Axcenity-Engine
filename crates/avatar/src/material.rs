@@ -36,6 +36,76 @@ pub enum ShadingModel {
 pub struct MaterialSlot {
     pub name: String,
     pub shading: ShadingModel,
+    /// Its name for people ("Colour", "Highlights"); the material's name
+    /// when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The values of its shading model it offers a person (recolouring
+    /// takes these); every value when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
+    /// Which colour of the item it is, for outfit colour pickers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<MaterialRole>,
+}
+
+impl MaterialSlot {
+    pub fn new(name: impl Into<String>, shading: ShadingModel) -> Self {
+        Self {
+            name: name.into(),
+            shading,
+            label: None,
+            values: Vec::new(),
+            role: None,
+        }
+    }
+
+    /// The values it offers: its `values`, or every value of its shading
+    /// model.
+    pub fn offered(&self) -> Vec<&'static ValueSpec> {
+        self.shading
+            .values()
+            .iter()
+            .filter(|spec| self.values.is_empty() || self.values.iter().any(|v| v == spec.name))
+            .collect()
+    }
+}
+
+/// A material slot's part in an item's colours. A value a newer version
+/// adds reads as `Other` rather than making the file unreadable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MaterialRole {
+    Primary,
+    Secondary,
+    Accent,
+    #[serde(other)]
+    Other,
+}
+
+/// Checks a material slot's own fields: a label that says something, and
+/// offered values its shading model has, each once.
+pub(crate) fn check_slot(p: &mut Vec<Problem>, at: &str, slot: &MaterialSlot) {
+    if slot.label.as_deref().is_some_and(|l| l.trim().is_empty()) {
+        p.push(Problem::new(format!("{at}.label"), "is empty"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for value in &slot.values {
+        if slot.shading.value(value).is_none() {
+            p.push(Problem::new(
+                at,
+                format!(
+                    "`{}` offers `{value}`, which isn't a value of the {:?} shading model",
+                    slot.name, slot.shading
+                ),
+            ));
+        } else if !seen.insert(value.as_str()) {
+            p.push(Problem::new(
+                at,
+                format!("`{}` offers `{value}` twice", slot.name),
+            ));
+        }
+    }
 }
 
 /// An sRGB colour, written `"#rrggbb"`.

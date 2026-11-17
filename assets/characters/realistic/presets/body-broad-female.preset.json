@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Broad",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.3,
+    "hip_width": 1.08,
+    "muscle": 0.2,
+    "shoulder_width": 1.08,
+    "waist_width": 1.04
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-broad-female",
+    "kind": "body",
+    "about": "A wide, solid frame: wider shoulders, waist and hips.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 70
+  }
+}

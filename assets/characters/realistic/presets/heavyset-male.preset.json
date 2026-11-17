@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Heavyset male",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.8,
+    "muscle": 0.2
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/realistic-heavyset-male",
+    "kind": "character",
+    "about": "A heavier build.",
+    "order": 50
+  }
+}

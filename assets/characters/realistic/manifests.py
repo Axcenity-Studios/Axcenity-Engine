@@ -12,6 +12,11 @@ and it can be run alone:
 
 Then rebuild the library's catalogue: python -I assets/characters/catalogue.py
 
+Every parameter carries its `about` (tooltip), `feature` and `level`
+(R1; the face's come from `faceparams.py`), and the manifest lists the
+body's and the face's `features`, with anchors measured on the model by
+`anchors.py` (numpy). The presets are `presets.py`'s.
+
 Slots, sockets and the proportion sliders are the stylized humanoid's
 (`../humanoid/manifests.py`), read from there, so an item or a script
 that names one fits both bodies. Its items so far are the underwear cut
@@ -42,6 +47,7 @@ GROUPS = [
     ("build_regions", "Build by region", "body"),
     ("proportions", "Proportions", "body"),
 ]
+BODY_GROUPS = {gid for gid, _, _ in GROUPS}
 
 # How far a proportion slider goes on this body (CO5). `anim`'s body
 # sliders take 0.5 to 1.5, which the stylized body's manifest offers whole;
@@ -79,6 +85,102 @@ SHADING = {
 }
 
 
+# What each body parameter does, in a sentence (its tooltip, R1), and the
+# feature it belongs to. A regional slider's sentence is made from its
+# region's words (`REGION_WORDS`).
+BODY_ABOUT = {
+    "frame": "The body type the character is built on: male or female.",
+    "height": "How tall the whole body is.",
+    "leg_length": "How long the legs are against the body.",
+    "arm_length": "How long the arms are against the body.",
+    "shoulder_width": "How wide the shoulders are.",
+    "waist_width": "How wide the waist is.",
+    "hip_width": "How wide the hips are.",
+    "head_size": "How large the head is against the body.",
+    "hand_size": "How large the hands are.",
+    "foot_size": "How large the feet are.",
+    "muscle": "How much muscle the whole body carries, from slight to strong.",
+    "fat": "How much fat the whole body carries, from lean to heavy.",
+}
+BODY_FEATURE = {
+    "frame": "body", "height": "body", "muscle": "body", "fat": "body",
+    "leg_length": "thighs", "arm_length": "arms", "shoulder_width": "shoulders",
+    "waist_width": "waist", "hip_width": "hips", "head_size": "head", "hand_size": "hands",
+    "foot_size": "feet",
+}
+REGION_WORDS = {"chest": "the chest", "shoulders": "the shoulders", "arms": "the arms",
+                "abdomen": "the belly", "back": "the back", "hips": "the hips and buttocks",
+                "thighs": "the thighs", "calves": "the calves"}
+# The quick level (brief §3.3): the body's overall shape. The rest is
+# detailed, or advanced where the slider is flagged advanced.
+BODY_QUICK = {"frame", "height", "muscle", "fat"}
+
+# The body's features (R1): the whole body, then its regions, found by the
+# shapes that move them or by the region map (`anchors.py`). Their anchors
+# are at the region's centre (inside the body); `paired` gives a left and
+# a right one.
+BODY_FEATURES = [
+    {"id": "body", "label": "Whole body", "about": "Body type, height, muscle and fat.",
+     "shapes": ["Masculine_Fat_Up", "Masculine_Muscle_Up"]},
+    {"id": "head", "label": "Head", "about": "The head's size against the body.", "region": "head",
+     "regions": ["head"]},
+    {"id": "neck", "label": "Neck", "about": "The neck.", "region": "neck", "regions": ["neck"]},
+    {"id": "shoulders", "label": "Shoulders", "about": "Their width, muscle and fat.",
+     "shapes": ["Masculine_Fat_Shoulders", "Masculine_Muscle_Shoulders"], "paired": True,
+     "regions": ["upper_arms_top"]},
+    {"id": "chest", "label": "Chest", "about": "Its muscle and fat.",
+     "shapes": ["Masculine_Fat_Chest", "Masculine_Muscle_Chest"]},
+    {"id": "arms", "label": "Arms", "about": "Their length, muscle and fat.",
+     "shapes": ["Masculine_Fat_Arms", "Masculine_Muscle_Arms"], "paired": True,
+     "regions": ["upper_arms_low", "forearms"]},
+    {"id": "hands", "label": "Hands", "about": "Their size.", "region": "hands", "paired": True,
+     "regions": ["hands"]},
+    {"id": "abdomen", "label": "Abdomen", "about": "The belly's muscle and fat.",
+     "shapes": ["Masculine_Fat_Abdomen", "Masculine_Muscle_Abdomen"]},
+    {"id": "waist", "label": "Waist", "about": "Its width.", "region": "waist", "regions": ["waist"]},
+    {"id": "back", "label": "Back", "about": "Its muscle and fat.",
+     "shapes": ["Masculine_Fat_Back", "Masculine_Muscle_Back"]},
+    {"id": "hips", "label": "Hips", "about": "Their width, and the muscle and fat of the hips and buttocks.",
+     "shapes": ["Masculine_Fat_Hips", "Masculine_Muscle_Hips"], "regions": ["hips"]},
+    {"id": "thighs", "label": "Thighs", "about": "The legs' length, and the thighs' muscle and fat.",
+     "shapes": ["Masculine_Fat_Thighs", "Masculine_Muscle_Thighs"], "paired": True,
+     "regions": ["thighs_top", "thighs_low"]},
+    {"id": "calves", "label": "Calves", "about": "Their muscle and fat.",
+     "shapes": ["Masculine_Fat_Calves", "Masculine_Muscle_Calves"], "paired": True,
+     "regions": ["shins_top", "shins_low"]},
+    {"id": "feet", "label": "Feet", "about": "Their size.", "region": "feet", "paired": True,
+     "regions": ["feet"]},
+]
+
+
+def describe(parameter):
+    """A body parameter with its `about`, `feature` and `level` (R1);
+    `advanced` stays as it was, so the two agree."""
+    pid = parameter["id"]
+    if pid in BODY_ABOUT:
+        about, feature = BODY_ABOUT[pid], BODY_FEATURE[pid]
+    else:
+        kind, region = pid.split("_", 1)
+        what = "muscle" if kind == "muscle" else "fat"
+        about, feature = f"How much {what} is on {REGION_WORDS[region]}, beyond the whole body's.", region
+    level = "advanced" if parameter.get("advanced") else "quick" if pid in BODY_QUICK else "detailed"
+    out = {}
+    for key, value in parameter.items():
+        out[key] = value
+        if key == "range":
+            out.update({"about": about, "feature": feature, "level": level})
+    return out
+
+
+def features(data, folder):
+    """The base manifest's `features`: the body's, then the face's, with
+    anchors measured on the model (`anchors.py`)."""
+    import anchors
+    import faceparams
+    body = [dict(d, category="body", icon=d["id"]) for d in BODY_FEATURES]
+    return anchors.measure(os.path.join(folder, PARTS_FILE), body + faceparams.features(), data["regions"])
+
+
 def stylized():
     """The stylized humanoid's manifest generator (for what the two share)."""
     path = os.path.join(os.path.dirname(HERE), "humanoid", "manifests.py")
@@ -88,7 +190,7 @@ def stylized():
     return module
 
 
-def base_manifest(data, parts):
+def base_manifest(data, parts, folder=HERE):
     shared = stylized()
     frame = data["frame"]
     bones = shared.bone_drivers(frame["bones"], frame.get("eye_scale"))
@@ -116,6 +218,7 @@ def base_manifest(data, parts):
     # The face's parameters (CO6; faceparams.py).
     import faceparams
     parameters += faceparams.parameters(data.get("face", {}).get("face_identity", {}))
+    parameters = [describe(p) if p["group"] in BODY_GROUPS else p for p in parameters]
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})
     return {
@@ -139,6 +242,7 @@ def base_manifest(data, parts):
         "materials": [{"name": m, "shading": SHADING[m]} for m in materials],
         "face": {"profile": FACE_PROFILE, "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
         "defaults": {"items": MALE_WEARS},
+        "features": features(data, folder),
     }
 
 
@@ -164,7 +268,7 @@ def write(folder):
     with open(os.path.join(folder, DATA_FILE)) as f:
         data = json.load(f)
     parts = shared.objects(os.path.join(folder, PARTS_FILE))
-    shared.write_json(os.path.join(folder, MANIFEST_FILE), base_manifest(data, parts))
+    shared.write_json(os.path.join(folder, MANIFEST_FILE), base_manifest(data, parts, folder))
     item_folder = os.path.join(folder, "items")
     os.makedirs(item_folder, exist_ok=True)
     for item in item_manifests(parts).values():

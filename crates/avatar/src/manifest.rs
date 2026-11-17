@@ -4,6 +4,8 @@
 //! and material values. It also names the body's regions (what clothes
 //! hide), its slots, sockets, material slots, skeleton and face.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::material::MaterialSlot;
@@ -46,6 +48,93 @@ pub struct BaseManifest {
     pub face: Option<Face>,
     #[serde(default)]
     pub defaults: Defaults,
+    /// What a person can point at on the character (R1): the nose, the
+    /// shoulders. Selection, the camera's focus and the handles use them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub features: Vec<Feature>,
+    /// Handles on the character that move parameters by dragging (R2).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub handles: Vec<Handle>,
+}
+
+/// Brief §3.3's three levels of customization. A value a newer version
+/// adds reads as `Other`, which [`Parameter::level`] treats as no level.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Level {
+    Quick,
+    Detailed,
+    Advanced,
+    #[serde(other)]
+    Other,
+}
+
+/// A selectable thing on the character: one anchor for a middle feature,
+/// two for a pair (left first). A click picks the feature whose anchor is
+/// nearest within `radius`; the camera frames its anchors.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Feature {
+    pub id: String,
+    pub label: String,
+    pub category: Category,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    pub anchors: Vec<Anchor>,
+    /// Metres around an anchor that count as the feature.
+    pub radius: f32,
+    /// Body regions (by ID) that pick it too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<String>,
+}
+
+/// A point that follows a bone: the bone, and an offset from its head in
+/// model space at rest (metres, glTF axes: Y up, +Z front).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Anchor {
+    pub bone: String,
+    pub offset: [f32; 3],
+}
+
+/// A handle on the character. It holds no geometry of its own: dragging
+/// it changes the parameters it `drives`, as their sliders would, and it
+/// sits at its anchor plus `travel × t` along each drive's axis.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Handle {
+    pub id: String,
+    /// Shown when this feature is selected.
+    pub feature: String,
+    /// The driven parameter's label when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The handle on the other side; each names the other.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mirror: Option<String>,
+    /// Where it sits with its parameters at their defaults.
+    pub anchor: Anchor,
+    pub drives: Vec<Drive>,
+    /// Only shown in these framings (`front`, `side`, `three_quarter`,
+    /// `back`); in all when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub views: Vec<String>,
+}
+
+/// What a handle's drag changes: a parameter, moved as the surface at the
+/// anchor moves `travel` metres along `axis` over the parameter's range.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Drive {
+    pub parameter: String,
+    /// Model-space direction the surface moves for a rising value.
+    pub axis: [f32; 3],
+    pub travel: f32,
+    /// A screen direction (x right, y up) per view, for a parameter that
+    /// isn't a straight move (a tilt, a size).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub screen: BTreeMap<String, [f32; 2]>,
+    /// A multiplier on the one-to-one feel (1 when unset).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensitivity: Option<f32>,
 }
 
 /// Where the base model's meshes are.
@@ -89,6 +178,12 @@ pub struct Group {
     pub id: String,
     pub label: String,
     pub category: Category,
+    /// A sentence for a tooltip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    /// A name from the editor's icon set (an unknown one draws none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// The Character Studio categories data can fill.
@@ -135,6 +230,22 @@ pub struct Parameter {
     /// realistic body's `frame` is Male (0) or Female (1).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice>,
+    /// One sentence: the friendly description and the tooltip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    /// The [`Feature`] it belongs to; its group's ID when unset and a
+    /// feature has that ID ([`BaseManifest::feature_of`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature: Option<String>,
+    /// Which of the three levels shows it ([`Parameter::level`]).
+    /// Generators write `advanced` in step, so an older editor hides the
+    /// same sliders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<Level>,
+    /// The part of the range Randomize draws from; the middle half of the
+    /// range when unset ([`crate::random_span`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub random: Option<[f32; 2]>,
 }
 
 /// One of a [`Parameter`]'s `choices`.
@@ -155,6 +266,17 @@ impl Parameter {
         self.choices
             .iter()
             .min_by(|a, b| (a.value - value).abs().total_cmp(&(b.value - value).abs()))
+    }
+
+    /// The level that shows it: its `level`, or with none (or one this
+    /// version doesn't know) `advanced` when `advanced` is set, else
+    /// `detailed`.
+    pub fn level(&self) -> Level {
+        match self.level {
+            Some(Level::Other) | None if self.advanced => Level::Advanced,
+            Some(Level::Other) | None => Level::Detailed,
+            Some(level) => level,
+        }
     }
 }
 
@@ -279,6 +401,12 @@ pub struct Slot {
     /// What wearing nothing here is called ("Bald"); "None" when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub empty_label: Option<String>,
+    /// A sentence for a tooltip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<String>,
+    /// A name from the editor's icon set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// An attachment point that follows a bone (`anim`'s sockets): rigid
@@ -337,6 +465,32 @@ impl BaseManifest {
         self.materials.iter().find(|m| m.name == name)
     }
 
+    pub fn group(&self, id: &str) -> Option<&Group> {
+        self.groups.iter().find(|g| g.id == id)
+    }
+
+    pub fn feature(&self, id: &str) -> Option<&Feature> {
+        self.features.iter().find(|f| f.id == id)
+    }
+
+    pub fn handle(&self, id: &str) -> Option<&Handle> {
+        self.handles.iter().find(|h| h.id == id)
+    }
+
+    /// The category of `parameter`'s group, if it has one.
+    pub fn category_of(&self, parameter: &Parameter) -> Option<Category> {
+        self.group(&parameter.group).map(|group| group.category)
+    }
+
+    /// The feature `parameter` belongs to: its own `feature`, or the
+    /// feature with its group's ID.
+    pub fn feature_of(&self, parameter: &Parameter) -> Option<&Feature> {
+        match &parameter.feature {
+            Some(id) => self.feature(id),
+            None => self.feature(&parameter.group),
+        }
+    }
+
     /// Checks the manifest on its own: well-formed IDs and paths, unique
     /// names, ranges with their defaults inside, groups, mirrors, corners,
     /// constraints and material drivers that name what exists here.
@@ -360,6 +514,9 @@ impl BaseManifest {
             self.skeleton.added_bones.iter().map(|bone| &bone.name),
         );
         unique(p, "groups", self.groups.iter().map(|group| &group.id));
+        for (index, group) in self.groups.iter().enumerate() {
+            check_about(p, &format!("groups[{index}]"), &group.about);
+        }
         unique(p, "parameters", self.parameters.iter().map(|par| &par.id));
         for (index, parameter) in self.parameters.iter().enumerate() {
             self.check_parameter(p, &format!("parameters[{index}]"), parameter);
@@ -393,8 +550,22 @@ impl BaseManifest {
             }
         }
         unique(p, "slots", self.slots.iter().map(|slot| &slot.id));
+        for (index, slot) in self.slots.iter().enumerate() {
+            check_about(p, &format!("slots[{index}]"), &slot.about);
+        }
         unique(p, "sockets", self.sockets.iter().map(|socket| &socket.name));
         unique(p, "materials", self.materials.iter().map(|m| &m.name));
+        for (index, slot) in self.materials.iter().enumerate() {
+            crate::material::check_slot(p, &format!("materials[{index}]"), slot);
+        }
+        unique(p, "features", self.features.iter().map(|f| &f.id));
+        for (index, feature) in self.features.iter().enumerate() {
+            self.check_feature(p, &format!("features[{index}]"), feature);
+        }
+        unique(p, "handles", self.handles.iter().map(|h| &h.id));
+        for (index, handle) in self.handles.iter().enumerate() {
+            self.check_handle(p, &format!("handles[{index}]"), handle);
+        }
         if let Some(face) = &self.face {
             not_empty(p, "face.profile", &face.profile);
         }
@@ -412,36 +583,45 @@ impl BaseManifest {
                 format!("`{}` is in no group `{}`", parameter.id, parameter.group),
             ));
         }
-        let [min, max] = parameter.range;
-        if !(min.is_finite() && max.is_finite() && min < max) {
+        check_value_range(p, at, &parameter.id, parameter.range, parameter.default);
+        check_random(p, at, &parameter.id, parameter.range, parameter.random);
+        check_about(p, at, &parameter.about);
+        for (k, choice) in parameter.choices.iter().enumerate() {
+            check_choice(
+                p,
+                &format!("{at}.choices[{k}]"),
+                &parameter.id,
+                parameter.range,
+                choice,
+            );
+            for (n, id) in choice.items.iter().enumerate() {
+                check_id(p, &format!("{at}.choices[{k}].items[{n}]"), id);
+            }
+        }
+        if let Some(feature) = &parameter.feature
+            && self.feature(feature).is_none()
+        {
             p.push(Problem::new(
                 at,
-                format!("`{}` has the range {min} to {max}", parameter.id),
-            ));
-        } else if !(min..=max).contains(&parameter.default) {
-            p.push(Problem::new(
-                at,
-                format!(
-                    "`{}`'s default {} is outside {min} to {max}",
-                    parameter.id, parameter.default
-                ),
+                format!("`{}` names no feature `{feature}`", parameter.id),
             ));
         }
-        for (k, choice) in parameter.choices.iter().enumerate() {
-            let at = format!("{at}.choices[{k}]");
-            not_empty(p, &format!("{at}.label"), &choice.label);
-            for (n, id) in choice.items.iter().enumerate() {
-                check_id(p, &format!("{at}.items[{n}]"), id);
-            }
-            if !(min..=max).contains(&choice.value) {
-                p.push(Problem::new(
-                    &at,
-                    format!(
-                        "`{}`'s choice {} is outside {min} to {max}",
-                        parameter.id, choice.value
-                    ),
-                ));
-            }
+        match (parameter.level, parameter.advanced) {
+            (Some(Level::Advanced), false) => p.push(Problem::new(
+                at,
+                format!(
+                    "`{}`'s level is advanced but `advanced` isn't set: write both",
+                    parameter.id
+                ),
+            )),
+            (Some(Level::Quick | Level::Detailed), true) => p.push(Problem::new(
+                at,
+                format!(
+                    "`{}`'s level isn't advanced but `advanced` is set: write both",
+                    parameter.id
+                ),
+            )),
+            _ => {}
         }
         if let Some(mirror) = &parameter.mirror
             && self
@@ -492,29 +672,100 @@ impl BaseManifest {
         }
         for (k, driver) in parameter.material_values.iter().enumerate() {
             let at = format!("{at}.material_values[{k}]");
-            check_span(p, &at, driver.from, driver.to);
-            let Some(slot) = self.material(&driver.material) else {
+            check_material_driver(p, &at, driver, self.material(&driver.material));
+        }
+    }
+
+    fn check_feature(&self, p: &mut Vec<Problem>, at: &str, feature: &Feature) {
+        not_empty(p, &format!("{at}.label"), &feature.label);
+        check_about(p, at, &feature.about);
+        if feature.anchors.is_empty() {
+            p.push(Problem::new(
+                at,
+                format!("`{}` has no anchor to point at", feature.id),
+            ));
+        }
+        for (k, anchor) in feature.anchors.iter().enumerate() {
+            check_anchor(p, &format!("{at}.anchors[{k}]"), anchor);
+        }
+        if !(feature.radius.is_finite() && feature.radius > 0.0) {
+            p.push(Problem::new(
+                at,
+                format!("`{}`'s radius must be above 0", feature.id),
+            ));
+        }
+        for region in &feature.regions {
+            if self.region(region).is_none() {
                 p.push(Problem::new(
                     at,
-                    format!("names no material `{}`", driver.material),
+                    format!("`{}` names no region `{region}`", feature.id),
                 ));
-                continue;
-            };
-            match slot.shading.value(&driver.value).map(|spec| spec.kind) {
-                Some(crate::ValueKind::Number { .. }) => {}
-                Some(crate::ValueKind::Colour { .. }) => p.push(Problem::new(
-                    at,
-                    format!("`{}` is a colour; parameters drive numbers", driver.value),
-                )),
-                None => p.push(Problem::new(
-                    at,
-                    format!(
-                        "`{}` isn't a value of the {:?} shading model",
-                        driver.value, slot.shading
-                    ),
-                )),
             }
         }
+    }
+
+    fn check_handle(&self, p: &mut Vec<Problem>, at: &str, handle: &Handle) {
+        if self.feature(&handle.feature).is_none() {
+            p.push(Problem::new(
+                at,
+                format!("`{}` names no feature `{}`", handle.id, handle.feature),
+            ));
+        }
+        if let Some(label) = &handle.label {
+            not_empty(p, &format!("{at}.label"), label);
+        }
+        check_anchor(p, &format!("{at}.anchor"), &handle.anchor);
+        if handle.drives.is_empty() {
+            p.push(Problem::new(
+                at,
+                format!("`{}` has no drives: it would move nothing", handle.id),
+            ));
+        }
+        for (k, drive) in handle.drives.iter().enumerate() {
+            let at = format!("{at}.drives[{k}]");
+            if self.parameter(&drive.parameter).is_none() {
+                p.push(Problem::new(
+                    &at,
+                    format!("names no parameter `{}`", drive.parameter),
+                ));
+            }
+            let finite = drive.axis.iter().all(|v| v.is_finite());
+            if !finite || drive.axis.iter().all(|v| *v == 0.0) {
+                p.push(Problem::new(
+                    &at,
+                    "the axis must be a finite, non-zero vector",
+                ));
+            }
+            if !(drive.travel.is_finite() && drive.travel > 0.0) {
+                p.push(Problem::new(&at, "the travel must be above 0 metres"));
+            }
+            if drive
+                .sensitivity
+                .is_some_and(|s| !(s.is_finite() && s > 0.0))
+            {
+                p.push(Problem::new(&at, "a sensitivity must be above 0"));
+            }
+            for (view, direction) in &drive.screen {
+                if direction.iter().any(|v| !v.is_finite()) || *direction == [0.0, 0.0] {
+                    p.push(Problem::new(
+                        &at,
+                        format!("the screen direction for `{view}` must be finite and non-zero"),
+                    ));
+                }
+            }
+        }
+        if let Some(mirror) = &handle.mirror
+            && self
+                .handle(mirror)
+                .and_then(|other| other.mirror.as_deref())
+                != Some(handle.id.as_str())
+        {
+            p.push(Problem::new(
+                at,
+                format!("`{}`'s mirror `{mirror}` doesn't name it back", handle.id),
+            ));
+        }
+        unique(p, &format!("{at}.views"), handle.views.iter());
     }
 
     fn check_constraint(&self, p: &mut Vec<Problem>, at: &str, constraint: &Constraint) {
@@ -580,6 +831,112 @@ pub(crate) fn check_path(p: &mut Vec<Problem>, at: &str, path: &str) {
 pub(crate) fn not_empty(p: &mut Vec<Problem>, at: &str, text: &str) {
     if text.trim().is_empty() {
         p.push(Problem::new(at, "is empty"));
+    }
+}
+
+/// An `about` that is there says something.
+pub(crate) fn check_about(p: &mut Vec<Problem>, at: &str, about: &Option<String>) {
+    if let Some(about) = about {
+        not_empty(p, &format!("{at}.about"), about);
+    }
+}
+
+/// A parameter's range goes upwards and holds its default.
+pub(crate) fn check_value_range(
+    p: &mut Vec<Problem>,
+    at: &str,
+    id: &str,
+    range: [f32; 2],
+    default: f32,
+) {
+    let [min, max] = range;
+    if !(min.is_finite() && max.is_finite() && min < max) {
+        p.push(Problem::new(
+            at,
+            format!("`{id}` has the range {min} to {max}"),
+        ));
+    } else if !(min..=max).contains(&default) {
+        p.push(Problem::new(
+            at,
+            format!("`{id}`'s default {default} is outside {min} to {max}"),
+        ));
+    }
+}
+
+/// A `random` share is finite, goes upwards (or is one value) and lies in
+/// the range.
+pub(crate) fn check_random(
+    p: &mut Vec<Problem>,
+    at: &str,
+    id: &str,
+    range: [f32; 2],
+    random: Option<[f32; 2]>,
+) {
+    let Some([low, high]) = random else {
+        return;
+    };
+    let [min, max] = range;
+    if !(low.is_finite() && high.is_finite() && low <= high && min <= low && high <= max) {
+        p.push(Problem::new(
+            at,
+            format!("`{id}`'s random {low} to {high} isn't inside its range, {min} to {max}"),
+        ));
+    }
+}
+
+/// A choice has a label and a value in its parameter's range.
+pub(crate) fn check_choice(
+    p: &mut Vec<Problem>,
+    at: &str,
+    id: &str,
+    range: [f32; 2],
+    choice: &Choice,
+) {
+    not_empty(p, &format!("{at}.label"), &choice.label);
+    let [min, max] = range;
+    if !(min..=max).contains(&choice.value) {
+        p.push(Problem::new(
+            at,
+            format!("`{id}`'s choice {} is outside {min} to {max}", choice.value),
+        ));
+    }
+}
+
+/// A material driver drives a number value of a material slot that exists.
+pub(crate) fn check_material_driver(
+    p: &mut Vec<Problem>,
+    at: &str,
+    driver: &MaterialDriver,
+    slot: Option<&MaterialSlot>,
+) {
+    check_span(p, at, driver.from, driver.to);
+    let Some(slot) = slot else {
+        p.push(Problem::new(
+            at,
+            format!("names no material `{}`", driver.material),
+        ));
+        return;
+    };
+    match slot.shading.value(&driver.value).map(|spec| spec.kind) {
+        Some(crate::ValueKind::Number { .. }) => {}
+        Some(crate::ValueKind::Colour { .. }) => p.push(Problem::new(
+            at,
+            format!("`{}` is a colour; parameters drive numbers", driver.value),
+        )),
+        None => p.push(Problem::new(
+            at,
+            format!(
+                "`{}` isn't a value of the {:?} shading model",
+                driver.value, slot.shading
+            ),
+        )),
+    }
+}
+
+fn check_anchor(p: &mut Vec<Problem>, at: &str, anchor: &Anchor) {
+    not_empty(p, &format!("{at}.bone"), &anchor.bone);
+    if anchor.offset.iter().any(|v| !v.is_finite()) {
+        p.push(Problem::new(at, "the offset isn't a finite vector"));
     }
 }
 

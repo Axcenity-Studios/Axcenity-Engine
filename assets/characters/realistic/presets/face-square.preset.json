@@ -1,0 +1,27 @@
+{
+  "format_version": 2,
+  "name": "Square",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "brow_ridge": 0.2,
+    "cheek_fullness_left": -0.2,
+    "cheek_fullness_right": -0.2,
+    "chin_forward": 0.1,
+    "chin_length": -0.1,
+    "chin_width": 0.5,
+    "jaw_width_left": 0.7,
+    "jaw_width_right": 0.7,
+    "mouth_width_left": 0.1,
+    "mouth_width_right": 0.1,
+    "temple_width": 0.3
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-square",
+    "kind": "face",
+    "about": "A jaw as wide as the forehead, a wide flat chin and straight sides.",
+    "tags": [
+      "shape"
+    ],
+    "order": 30
+  }
+}

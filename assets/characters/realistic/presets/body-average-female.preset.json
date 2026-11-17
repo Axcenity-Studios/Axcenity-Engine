@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Average",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.4,
+    "height": 0.95,
+    "muscle": -0.4
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-average-female",
+    "kind": "body",
+    "about": "An ordinary adult who doesn't train.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 20
+  }
+}

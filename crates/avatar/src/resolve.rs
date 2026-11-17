@@ -154,8 +154,17 @@ pub struct ResolvedPart {
     /// (`humanoid/HumanoidParts.glb#AxcenityHumanoid/Shirt_Tee`).
     pub model: String,
     pub fit: PartFit,
-    /// Its material values by slot: the worn item's over its variant's.
+    /// Its material values by slot: the worn item's over its variant's,
+    /// over what the item's own parameters drive.
     pub materials: BTreeMap<String, MaterialValues>,
+    /// An item's own shape weights, from its own parameters (the worn
+    /// item's values over its variant's, over the defaults): every shape
+    /// they name, by name. Empty for the body, its parts and items without
+    /// parameters. They are identity, baked into the item's model only.
+    pub shapes: BTreeMap<String, f32>,
+    /// How a socket item sits relative to how it was made (the worn
+    /// item's `transform`; as made when it has none).
+    pub transform: crate::Transform,
 }
 
 /// How a part follows the body.
@@ -204,6 +213,8 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             model: mesh_id(&base.id, &model)?,
             fit: PartFit::Skinned,
             materials: BTreeMap::new(),
+            shapes: BTreeMap::new(),
+            transform: crate::Transform::default(),
         })
     };
     let body = own_part(&base.model.body).ok_or_else(|| {
@@ -219,8 +230,9 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         .filter_map(|part| own_part(part))
         .collect();
 
-    // The worn items, one per slot unless the slot holds several (the
-    // later one is worn), each with why another was left out.
+    // The worn items, one per slot unless the slot holds several, and
+    // none with an item it excludes (the later one is worn), each with why
+    // another was left out.
     let mut problems: Vec<(usize, Problem)> = Vec::new();
     let mut worn: Vec<(usize, &crate::WornItem, &crate::ItemManifest)> = Vec::new();
     for (index, item) in description.items.iter().enumerate() {
@@ -235,26 +247,57 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             skip(format!("`{}` doesn't fit `{}`", manifest.id, base.id));
             continue;
         }
-        let Some(slot) = base.slot(&manifest.slot) else {
+        if base.slot(&manifest.slot).is_none() {
             skip(format!("`{}` has no slot `{}`", base.id, manifest.slot));
             continue;
-        };
-        if !slot.multiple
-            && let Some(at) = worn.iter().position(|(_, _, other)| other.slot == slot.id)
-        {
-            let (earlier, _, other) = worn.remove(at);
-            problems.push((
-                earlier,
-                Problem::new(
-                    format!("items[{earlier}]"),
-                    format!(
-                        "the {} slot holds one item: `{}` is worn in place of `{}`",
-                        slot.id, manifest.id, other.id
-                    ),
-                ),
-            ));
         }
+        let single: Vec<&String> = manifest
+            .slots()
+            .filter(|slot| base.slot(slot).is_some_and(|slot| !slot.multiple))
+            .collect();
+        let mut kept = Vec::with_capacity(worn.len());
+        for (earlier, earlier_item, other) in worn.drain(..) {
+            let shared = other.slots().find(|slot| single.contains(slot));
+            let why = match shared {
+                Some(slot) => format!(
+                    "the {slot} slot holds one item: `{}` is worn in place of `{}`",
+                    manifest.id, other.id
+                ),
+                None if manifest.conflicts_with(other) => format!(
+                    "`{}` can't be worn with `{}`: `{}` is worn in place of it",
+                    other.id, manifest.id, manifest.id
+                ),
+                None => {
+                    kept.push((earlier, earlier_item, other));
+                    continue;
+                }
+            };
+            problems.push((earlier, Problem::new(format!("items[{earlier}]"), why)));
+        }
+        worn = kept;
         worn.push((index, item, manifest));
+    }
+    // An item whose requirements aren't worn is left out (again, as long
+    // as leaving one out leaves another without what it needs).
+    loop {
+        let missing = worn.iter().position(|(_, _, manifest)| {
+            manifest
+                .requires
+                .iter()
+                .any(|id| !worn.iter().any(|(_, _, other)| other.id == *id))
+        });
+        let Some(at) = missing else {
+            break;
+        };
+        let (index, _, manifest) = worn.remove(at);
+        let needs = manifest.requires.join("`, `");
+        problems.push((
+            index,
+            Problem::new(
+                format!("items[{index}]"),
+                format!("`{}` needs `{needs}` worn with it", manifest.id),
+            ),
+        ));
     }
     let mut hidden: Vec<&str> = Vec::new();
     for (index, item, manifest) in &worn {
@@ -275,12 +318,45 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             ));
             continue;
         };
-        let mut materials = item
+        let variant = item
             .variant
             .as_deref()
-            .and_then(|variant| manifest.variant(variant))
-            .map(|variant| variant.materials.clone())
-            .unwrap_or_default();
+            .and_then(|variant| manifest.variant(variant));
+        // The item's own parameters: worn value, else the variant's, else
+        // the default, clamped to the range.
+        let mut shapes: BTreeMap<String, f32> = BTreeMap::new();
+        let mut materials: BTreeMap<String, MaterialValues> = BTreeMap::new();
+        for parameter in &manifest.parameters {
+            let [min, max] = parameter.range;
+            let own = item
+                .parameters
+                .get(&parameter.id)
+                .or_else(|| variant.and_then(|v| v.parameters.get(&parameter.id)))
+                .copied()
+                .filter(|value| value.is_finite())
+                .unwrap_or(parameter.default)
+                .max(min.min(max))
+                .min(max.max(min));
+            for driver in &parameter.shapes {
+                *shapes.entry(driver.shape.clone()).or_default() +=
+                    span(own, driver.from, driver.to);
+            }
+            for driver in &parameter.material_values {
+                materials
+                    .entry(driver.material.clone())
+                    .or_default()
+                    .insert(
+                        driver.value.clone(),
+                        crate::MaterialValue::Number(span(own, driver.from, driver.to)),
+                    );
+            }
+        }
+        for (slot, values) in variant.iter().flat_map(|v| &v.materials) {
+            materials
+                .entry(slot.clone())
+                .or_default()
+                .extend(values.clone());
+        }
         for (slot, values) in &item.materials {
             materials
                 .entry(slot.clone())
@@ -300,6 +376,8 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
                 crate::Fit::Shapes { .. } | crate::Fit::Binding { .. } => PartFit::Skinned,
             },
             materials,
+            shapes,
+            transform: item.transform.unwrap_or_default(),
         });
         hidden.extend(manifest.hides.iter().map(String::as_str));
     }

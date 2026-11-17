@@ -1,0 +1,32 @@
+{
+  "format_version": 2,
+  "name": "Round",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "brow_ridge": -0.2,
+    "cheek_fullness_left": 0.6,
+    "cheek_fullness_right": 0.6,
+    "cheekbone_left": -0.2,
+    "cheekbone_right": -0.2,
+    "chin_forward": -0.1,
+    "chin_length": -0.4,
+    "chin_width": 0.4,
+    "forehead_height": -0.2,
+    "forehead_slope": 0.2,
+    "jaw_width_left": 0.3,
+    "jaw_width_right": 0.3,
+    "lower_lip_fullness": 0.1,
+    "nose_length": -0.1,
+    "temple_width": 0.3,
+    "upper_lip_fullness": 0.1
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-round",
+    "kind": "face",
+    "about": "Width and length close to equal, full cheeks, a short wide chin, no corners.",
+    "tags": [
+      "shape"
+    ],
+    "order": 10
+  }
+}

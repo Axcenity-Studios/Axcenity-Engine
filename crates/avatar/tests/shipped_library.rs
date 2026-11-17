@@ -266,3 +266,179 @@ fn every_benchmark_character_is_sound() {
         );
     }
 }
+
+/// Every preset file (`*.preset.json`) under the library, relative to
+/// its root.
+fn preset_files(folder: &Path, out: &mut Vec<String>) {
+    for entry in std::fs::read_dir(folder).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            preset_files(&path, out);
+        } else if path.to_string_lossy().ends_with(".preset.json") {
+            let relative = path.strip_prefix(root()).unwrap();
+            out.push(relative.to_string_lossy().replace('\\', "/"));
+        }
+    }
+}
+
+/// The shipped presets (plan section 11.3; brief §4.1, §5.1): each is in
+/// the catalogue, sound for its kind, resolves with nothing left out, and
+/// applied to its base model's default character gives a sound character
+/// that matches it.
+#[test]
+fn every_shipped_preset_is_sound_listed_and_resolves() {
+    use axcenity_avatar::{PresetKind, apply_preset, check_preset, matches_preset};
+    let library = read();
+    let mut files = Vec::new();
+    preset_files(&root(), &mut files);
+    files.sort();
+    let mut listed: Vec<String> = library
+        .presets
+        .keys()
+        .map(|id| library.preset_path(id).unwrap().to_owned())
+        .collect();
+    listed.sort();
+    assert_eq!(files, listed, "every preset is in the catalogue");
+    let mut kinds: BTreeMap<(String, PresetKind), usize> = BTreeMap::new();
+    for (id, preset) in &library.presets {
+        let problems = check_preset(preset, &library);
+        assert!(problems.is_empty(), "{id}:\n{}", lines(&problems));
+        let resolved = axcenity_avatar::resolve(&library, preset).unwrap();
+        assert!(
+            resolved.problems.is_empty(),
+            "{id}: {:?}",
+            resolved.problems
+        );
+        let base = library.base(&preset.base).unwrap();
+        let mut character = Description::new("New Character", &base.id);
+        character.items = base.defaults.items.iter().map(WornItem::new).collect();
+        apply_preset(&mut character, preset, &library).unwrap();
+        assert_eq!(lines(&character.validate(&library)), "", "{id}");
+        assert!(matches_preset(&character, preset, &library), "{id}");
+        assert!(character.preset().is_none(), "{id}: the block stays behind");
+        let kind = preset.preset().unwrap().kind;
+        *kinds.entry((preset.base.clone(), kind)).or_default() += 1;
+    }
+    let count = |kind| kinds.get(&("axcenity/realistic".to_owned(), kind)).copied();
+    // Seven builds for each frame (Custom is "none matches"), nine faces,
+    // the six characters the editor had in code.
+    assert_eq!(count(PresetKind::Body), Some(14));
+    assert_eq!(count(PresetKind::Face), Some(9));
+    assert_eq!(count(PresetKind::Character), Some(6));
+}
+
+/// The realistic base model's parameters say what they are (R1): a
+/// sentence, a level in step with `advanced`, and a feature it has.
+#[test]
+fn the_realistic_parameters_say_what_they_are() {
+    use axcenity_avatar::Level;
+    let library = read();
+    let base = library.base("axcenity/realistic").unwrap();
+    assert_eq!(base.parameters.len(), 75);
+    for parameter in &base.parameters {
+        let id = &parameter.id;
+        let about = parameter.about.as_deref().unwrap_or_default();
+        assert!(about.len() > 10 && about.ends_with('.'), "{id}: `{about}`");
+        let level = parameter
+            .level
+            .unwrap_or_else(|| panic!("{id} has no level"));
+        assert_eq!(level == Level::Advanced, parameter.advanced, "{id}");
+        let feature = parameter
+            .feature
+            .as_deref()
+            .unwrap_or_else(|| panic!("{id}"));
+        assert!(base.feature(feature).is_some(), "{id}: {feature}");
+    }
+    for id in ["frame", "muscle", "fat", "height"] {
+        assert_eq!(base.parameter(id).unwrap().level(), Level::Quick, "{id}");
+    }
+    let features: Vec<&str> = base.features.iter().map(|f| f.id.as_str()).collect();
+    for id in [
+        "head",
+        "neck",
+        "shoulders",
+        "chest",
+        "arms",
+        "hands",
+        "abdomen",
+        "waist",
+        "back",
+        "hips",
+        "thighs",
+        "calves",
+        "feet",
+        "eyes",
+        "brows",
+        "nose",
+        "cheeks",
+        "jaw",
+        "chin",
+        "lips",
+        "forehead",
+        "ears",
+    ] {
+        assert!(features.contains(&id), "no feature `{id}`: {features:?}");
+    }
+    for feature in &base.features {
+        assert!(
+            !feature.anchors.is_empty() && feature.radius > 0.0,
+            "{}",
+            feature.id
+        );
+    }
+    assert!(base.handles.is_empty(), "handles are R2's");
+}
+
+/// Randomize on the shipped base models (R1; R10's 1,000 seeds): every
+/// character validates and resolves, and a locked parameter holds.
+#[test]
+fn a_thousand_random_characters_on_each_shipped_base_are_sound() {
+    use axcenity_avatar::{Scope, randomize};
+    let library = read();
+    let locks: std::collections::BTreeSet<String> = ["nose_length".to_owned()].into();
+    for base in library.bases.values() {
+        let mut start = Description::new("Npc", &base.id);
+        start.items = base.defaults.items.iter().map(WornItem::new).collect();
+        start.parameters.insert("nose_length".to_owned(), 0.25);
+        let locks = if base.parameter("nose_length").is_some() {
+            locks.clone()
+        } else {
+            start.parameters.clear();
+            Default::default()
+        };
+        for seed in 0..1000 {
+            let character = randomize(&start, &Scope::All, &locks, seed, &library);
+            let problems = character.validate(&library);
+            assert!(
+                problems.is_empty(),
+                "{} seed {seed}:\n{}",
+                base.id,
+                lines(&problems)
+            );
+            let resolved = axcenity_avatar::resolve(&library, &character).unwrap();
+            assert!(resolved.problems.is_empty(), "{} seed {seed}", base.id);
+            if !locks.is_empty() {
+                assert_eq!(character.parameters["nose_length"], 0.25);
+            }
+        }
+    }
+}
+
+/// An outfit preset never takes off what a parameter's choices wear (the
+/// realistic body's underwear), even one that wears nothing.
+#[test]
+fn an_outfit_preset_leaves_the_chosen_underwear() {
+    let library = read();
+    let empty = Description::from_json(
+        r#"{ "format_version": 2, "name": "Nothing", "base": "axcenity/realistic",
+             "preset": { "id": "test/nothing", "kind": "outfit", "about": "Nothing on." } }"#,
+    )
+    .unwrap();
+    let mut character = Description::new("Ada", "axcenity/realistic");
+    character.parameters.insert("frame".to_owned(), 1.0);
+    axcenity_avatar::wear_choices(&mut character, &library);
+    let before = character.items.clone();
+    assert_eq!(before.len(), 2, "briefs and a sports bra");
+    axcenity_avatar::apply_preset(&mut character, &empty, &library).unwrap();
+    assert_eq!(character.items, before);
+}

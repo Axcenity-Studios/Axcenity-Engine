@@ -1,5 +1,5 @@
-//! A library read into memory: base models and items by ID, each with the
-//! path of its manifest in the library (paths inside a manifest are
+//! A library read into memory: base models, items and presets by ID, each
+//! with the path of its file in the library (paths inside a manifest are
 //! relative to it). The content library on disk is a folder with a
 //! `catalogue.json` at its root (`docs/development/character-studio/
 //! architecture.md`, Content library).
@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::{BaseManifest, Catalogue, ItemManifest, Problem};
+use crate::{BaseManifest, Catalogue, Description, ItemManifest, Problem};
 
 /// The character library's folder in a project, from the project's folder:
 /// its `catalogue.json` is at the top of it.
@@ -17,8 +17,12 @@ pub const LIBRARY_FOLDER: &str = "assets/characters";
 pub struct Library {
     pub bases: BTreeMap<String, BaseManifest>,
     pub items: BTreeMap<String, ItemManifest>,
+    /// Presets (`*.preset.json`) by their `preset` block's ID.
+    pub presets: BTreeMap<String, Description>,
     /// Each manifest's path in the library, by ID.
     manifest_paths: BTreeMap<String, String>,
+    /// Each preset file's path in the library, by ID.
+    preset_paths: BTreeMap<String, String>,
 }
 
 impl Library {
@@ -38,6 +42,22 @@ impl Library {
         self.items.insert(item.id.clone(), item);
     }
 
+    /// Adds a preset whose file is at `path` in the library, by its
+    /// `preset` block's ID; a description without one isn't a preset.
+    pub fn add_preset(
+        &mut self,
+        path: impl Into<String>,
+        preset: Description,
+    ) -> Result<(), Problem> {
+        let path = path.into();
+        let Some(block) = preset.preset() else {
+            return Err(Problem::new(path, "has no `preset` block"));
+        };
+        self.preset_paths.insert(block.id.clone(), path);
+        self.presets.insert(block.id, preset);
+        Ok(())
+    }
+
     pub fn base(&self, id: &str) -> Option<&BaseManifest> {
         self.bases.get(id)
     }
@@ -46,9 +66,18 @@ impl Library {
         self.items.get(id)
     }
 
+    pub fn preset(&self, id: &str) -> Option<&Description> {
+        self.presets.get(id)
+    }
+
     /// Where the manifest of the base model or item `id` is in the library.
     pub fn manifest_path(&self, id: &str) -> Option<&str> {
         self.manifest_paths.get(id).map(String::as_str)
+    }
+
+    /// Where the preset `id`'s file is in the library.
+    pub fn preset_path(&self, id: &str) -> Option<&str> {
+        self.preset_paths.get(id).map(String::as_str)
     }
 
     /// The library path of `relative`, written in the manifest of `id`;
@@ -59,8 +88,9 @@ impl Library {
     }
 
     /// Reads the library in the folder `root`: its `catalogue.json` and
-    /// every manifest it lists. Files that can't be read, IDs that don't
-    /// match their entries and duplicates are problems; what reads is kept.
+    /// every manifest and preset it lists. Files that can't be read, IDs
+    /// that don't match their entries and duplicates are problems; what
+    /// reads is kept.
     pub fn read(root: &Path) -> (Library, Option<Catalogue>, Vec<Problem>) {
         let mut library = Library::new();
         let mut problems = Vec::new();
@@ -101,12 +131,39 @@ impl Library {
                 Ok(item) => library.add_item(entry.manifest.clone(), item),
             }
         }
+        for entry in &catalogue.presets {
+            let read = read_manifest(root, &entry.file, Description::from_json);
+            let preset = match read {
+                Err(problem) => {
+                    problems.push(problem);
+                    continue;
+                }
+                Ok(preset) => preset,
+            };
+            match preset.preset().map(|block| block.id) {
+                Some(id) if id == entry.id && library.preset(&id).is_none() => {
+                    let _ = library.add_preset(entry.file.clone(), preset);
+                }
+                Some(id) if id == entry.id => {
+                    problems.push(Problem::new(&entry.file, format!("`{id}` is listed twice")))
+                }
+                found => problems.push(Problem::new(
+                    &entry.file,
+                    format!(
+                        "is `{}`; the catalogue says `{}`",
+                        found.unwrap_or_else(|| "no preset".to_owned()),
+                        entry.id
+                    ),
+                )),
+            }
+        }
         (library, Some(catalogue), problems)
     }
 
     /// Checks every manifest on its own, every item against each base
-    /// model it fits (which must be in the library), and that every path a
-    /// manifest names stays inside the library.
+    /// model it fits (which must be in the library) and the items it
+    /// requires or excludes, every preset ([`crate::check_preset`]), and
+    /// that every path a manifest names stays inside the library.
     pub fn validate(&self) -> Vec<Problem> {
         let mut problems = Vec::new();
         for (id, base) in &self.bases {
@@ -127,6 +184,16 @@ impl Library {
                     )),
                 }
             }
+            for (list, ids) in [("requires", &item.requires), ("excludes", &item.excludes)] {
+                for other in ids {
+                    if self.item(other).is_none() {
+                        problems.push(Problem::new(
+                            format!("{id}: {list}"),
+                            format!("the library has no item `{other}`"),
+                        ));
+                    }
+                }
+            }
             for model in item.models() {
                 self.check_inside(&mut problems, id, "model", &model.file);
             }
@@ -135,6 +202,27 @@ impl Library {
             }
             if let Some(thumbnail) = &item.thumbnail {
                 self.check_inside(&mut problems, id, "thumbnail", thumbnail);
+            }
+            for variant in &item.variants {
+                if let Some(thumbnail) = &variant.thumbnail {
+                    let at = format!("variants.{}.thumbnail", variant.id);
+                    self.check_inside(&mut problems, id, &at, thumbnail);
+                }
+            }
+        }
+        for (id, preset) in &self.presets {
+            problems.extend(prefixed(id, crate::check_preset(preset, self)));
+            let thumbnail = preset.preset().and_then(|block| block.thumbnail);
+            if let Some(thumbnail) = thumbnail
+                && self
+                    .preset_path(id)
+                    .and_then(|path| crate::resolve_path(path, &thumbnail))
+                    .is_none()
+            {
+                problems.push(Problem::new(
+                    format!("{id}: preset.thumbnail"),
+                    format!("`{thumbnail}` leads out of the library"),
+                ));
             }
         }
         problems

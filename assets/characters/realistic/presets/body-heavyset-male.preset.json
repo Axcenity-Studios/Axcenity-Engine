@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Heavyset",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.9,
+    "fat_abdomen": 0.4,
+    "muscle": -0.7,
+    "waist_width": 1.05
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-heavyset-male",
+    "kind": "body",
+    "about": "Soft and heavy.",
+    "tags": [
+      "build",
+      "male"
+    ],
+    "order": 50
+  }
+}
