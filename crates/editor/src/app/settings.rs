@@ -1,5 +1,6 @@
 //! The Settings window (File > Settings…, the start screen's sidebar, or
-//! Ctrl+, / Cmd+,): appearance, typography and density, the editor layout,
+//! Ctrl+, / Cmd+,): appearance, typography and density, the layout and the
+//! ribbon's tabs,
 //! this computer's graphics, the keyboard shortcuts, accessibility, and (in
 //! a debug editor run from the source tree) rebuilding the engine.
 //! Changes apply at once and are saved between runs with the other settings.
@@ -98,7 +99,7 @@ impl SettingsPage {
         match self {
             SettingsPage::Appearance => "Appearance",
             SettingsPage::Typography => "Text & density",
-            SettingsPage::Layout => "Editor layout",
+            SettingsPage::Layout => "Layout & ribbon",
             SettingsPage::Saving => "Saving",
             SettingsPage::Tools => "External tools",
             SettingsPage::Viewport => "Viewport",
@@ -249,33 +250,16 @@ impl EditorApp {
         }
     }
 
+    /// Layout & ribbon: the layout presets and saved layouts, the custom
+    /// ribbon tabs, and the start screen's navigation. Which panels show is
+    /// the ribbon's Panels ▾ menu and View › Panels, not a list here.
     fn layout_page(&mut self, ui: &mut egui::Ui) {
-        page_title(ui, "Editor layout", "Which panels show, and where they go.");
-        section(ui, "Panels");
-        for pane in Pane::CLOSABLE {
-            let mut open = self.layout.is_open(pane);
-            if ui
-                .checkbox(&mut open, theme::with_icon(pane.icon(), pane.label()))
-                .changed()
-            {
-                self.layout.toggle(pane);
-            }
-        }
-        ui.add_space(6.0);
+        page_title(
+            ui,
+            SettingsPage::Layout.label(),
+            "Where the panels go, and the ribbon's tabs.",
+        );
         let palette = theme::palette(ui.ctx());
-        if ui
-            .add(widgets::button(
-                widgets::Role::Secondary,
-                Some(icons::ARROW_COUNTER_CLOCKWISE),
-                "Reset Layout",
-                &palette,
-            ))
-            .on_hover_text("Put every panel back where it starts.")
-            .clicked()
-        {
-            self.layout.reset();
-        }
-        ui.add_space(space::L);
         // The presets and saved layouts of View › Layout (design system V17).
         section(ui, "Layouts");
         ui.horizontal_wrapped(|ui| {
@@ -313,18 +297,43 @@ impl EditorApp {
         if let Some(name) = delete {
             self.saved_layouts.delete(&name);
         }
-        if ui
-            .add(widgets::button(
-                widgets::Role::Secondary,
-                Some(icons::FLOPPY_DISK),
-                "Save Current Layout…",
-                &palette,
-            ))
-            .on_hover_text("Keep where the panels are now, by name, to switch back to later.")
-            .clicked()
-        {
-            self.layout_name = Some(Default::default());
-        }
+        ui.add_space(space::XS);
+        ui.horizontal(|ui| {
+            if ui
+                .add(widgets::button(
+                    widgets::Role::Secondary,
+                    Some(icons::FLOPPY_DISK),
+                    "Save Current Layout…",
+                    &palette,
+                ))
+                .on_hover_text("Keep where the panels are now, by name, to switch back to later.")
+                .clicked()
+            {
+                self.layout_name = Some(Default::default());
+            }
+            if ui
+                .add(widgets::button(
+                    widgets::Role::Secondary,
+                    Some(icons::ARROW_COUNTER_CLOCKWISE),
+                    "Reset Layout",
+                    &palette,
+                ))
+                .on_hover_text("Put every panel back where it starts.")
+                .clicked()
+            {
+                self.layout.reset();
+            }
+        });
+        ui.add_space(space::XS);
+        ui.label(
+            egui::RichText::new(
+                "Show or hide a panel from the Home tab's Panels menu, or View › Panels.",
+            )
+            .size(type_scale::CAPTION)
+            .color(palette.text_weak),
+        );
+        ui.add_space(space::L);
+        self.ribbon_tabs_section(ui, &palette);
         ui.add_space(space::L);
         // The start screen's navigation (`start/nav.rs`), saved per user.
         section(ui, "Start screen navigation");
@@ -361,22 +370,89 @@ impl EditorApp {
         if nav != self.start.nav() {
             self.start.set_nav(nav);
         }
-        ui.add_space(space::L);
-        section(ui, "Ribbon");
+    }
+
+    /// The custom ribbon tabs, each with its icon, name and groups, to edit
+    /// or delete, and New Ribbon Tab….
+    fn ribbon_tabs_section(&mut self, ui: &mut egui::Ui, palette: &Palette) {
+        section(ui, "Ribbon tabs");
         ui.label(
             egui::RichText::new(
-                "Make your own ribbon tab from any of the ribbon's groups. Right-click a tab \
-                 you made to change or delete it.",
+                "Your own tabs, after the built-in ones: any of the ribbon's groups, in any \
+                 order, with any icon.",
             )
             .color(palette.text_secondary),
         );
+        ui.add_space(space::XS);
+        let mut edit = None;
+        let mut delete = None;
+        if self.ribbon_tabs.custom.is_empty() {
+            ui.label(
+                egui::RichText::new("No tabs of your own yet.")
+                    .size(type_scale::CAPTION)
+                    .color(palette.text_weak),
+            );
+        }
+        for (index, tab) in self.ribbon_tabs.custom.iter().enumerate() {
+            egui::Frame::new()
+                .fill(palette.surface)
+                .stroke(egui::Stroke::new(1.0_f32, palette.border))
+                .corner_radius(theme::radius::CONTROL)
+                .inner_margin(space::margin(space::S, space::XS))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(tab.glyph())
+                                .size(theme::size::ICON_LARGE)
+                                .color(palette.accent),
+                        );
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 0.0;
+                            ui.label(egui::RichText::new(&tab.name).color(palette.text_strong));
+                            let groups: Vec<&str> =
+                                tab.groups.iter().map(|group| group.label()).collect();
+                            ui.label(
+                                egui::RichText::new(groups.join(" · "))
+                                    .size(type_scale::CAPTION)
+                                    .color(palette.text_weak),
+                            );
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if widgets::icon_button(ui, icons::TRASH, "Delete this tab", false)
+                                .clicked()
+                            {
+                                delete = Some(index);
+                            }
+                            if widgets::icon_button(
+                                ui,
+                                icons::PENCIL_SIMPLE,
+                                "Edit its name, icon and groups",
+                                false,
+                            )
+                            .clicked()
+                            {
+                                edit = Some(index);
+                            }
+                        });
+                    });
+                });
+            ui.add_space(space::XS);
+        }
+        if let Some(index) = edit {
+            self.ribbon_tabs.edit(Some(index));
+        }
+        if let Some(index) = delete {
+            self.ribbon_tabs.remove_custom(index);
+        }
         if ui
             .add(widgets::button(
                 widgets::Role::Secondary,
                 Some(icons::PLUS),
                 "New Ribbon Tab…",
-                &palette,
+                palette,
             ))
+            .on_hover_text("Make your own ribbon tab from any of the ribbon's groups.")
             .clicked()
         {
             self.ribbon_tabs.edit(None);

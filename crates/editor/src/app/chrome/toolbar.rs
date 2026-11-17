@@ -32,69 +32,11 @@ impl EditorApp {
                 ui.set_min_width(ui.available_width());
                 // Every tab keeps the tallest tab's height (Home's snapping
                 // grid), so the panels below don't jump when tabs change.
-                let tallest_id =
-                    egui::Id::new(("ribbon tallest", format!("{:?}", theme::density(ui.ctx()))));
+                let tallest_id = ribbon::tallest_id(ui.ctx());
                 let tallest: f32 = ui.data(|d| d.get_temp(tallest_id)).unwrap_or(0.0);
                 ui.set_min_height(tallest);
                 let top = ui.min_rect().top();
-                let scene = self.scene_shown(ui.ctx());
-                // Centred, the groups start half the room they leave from the
-                // left: their width is known from the last frame this tab
-                // was drawn (the first frame of a tab is drawn again).
-                let centered = self.appearance.ribbon == theme::RibbonAlign::Centered;
-                let room = ui.available_width();
-                let width_id = egui::Id::new(("ribbon width", format!("{groups:?}"), scene));
-                egui::ScrollArea::horizontal().show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 6.0;
-                        if centered {
-                            match ui.data(|d| d.get_temp::<f32>(width_id)) {
-                                Some(width) => {
-                                    ui.add_space(((room - width) / 2.0).max(0.0).floor())
-                                }
-                                None => ui.ctx().request_discard("ribbon width"),
-                            }
-                        }
-                        let start = ui.cursor().left();
-                        // Show Scene goes before the first greyed-out group,
-                        // where it's seen however narrow the window is.
-                        let mut offered = scene;
-                        for (index, &group) in groups.iter().enumerate() {
-                            if index > 0 {
-                                ui.add(egui::Separator::default().vertical().spacing(10.0));
-                            }
-                            if !offered && group.needs_scene() {
-                                offered = true;
-                                let show = ui
-                                    .add(RibbonButton::new(icons::CUBE_FOCUS, "Show Scene"))
-                                    .on_hover_text("Show the Scene View, to use its tools");
-                                if show.clicked() {
-                                    self.layout.open(Pane::Scene);
-                                }
-                                ui.add(egui::Separator::default().vertical().spacing(10.0));
-                            }
-                            if scene || !group.needs_scene() {
-                                self.ribbon_group(ui, group, &mut clicks);
-                            } else {
-                                // Acting on a scene that isn't shown would
-                                // change the world out of sight.
-                                ui.add_enabled_ui(false, |ui| {
-                                    self.ribbon_group(ui, group, &mut clicks);
-                                })
-                                .response
-                                .on_disabled_hover_text(SCENE_HIDDEN);
-                            }
-                        }
-                        let width = ui.min_rect().right() - start;
-                        let known = ui.data(|d| d.get_temp::<f32>(width_id));
-                        if known.is_none_or(|known| (known - width).abs() > 0.5) {
-                            ui.data_mut(|d| d.insert_temp(width_id, width));
-                            if known.is_some() {
-                                ui.ctx().request_repaint();
-                            }
-                        }
-                    });
-                });
+                self.ribbon_row(ui, &groups, &mut clicks, "ribbon");
                 let height = ui.min_rect().bottom() - top;
                 if height > tallest {
                     ui.data_mut(|d| d.insert_temp(tallest_id, height));
@@ -163,6 +105,95 @@ impl EditorApp {
         if clicks.stop {
             self.stop();
         }
+    }
+
+    /// The ribbon's groups in a row: centred unless Settings > Appearance >
+    /// Ribbon is Left, scrolling sideways when they don't fit, with Show
+    /// Scene before the scene tools while no Scene View shows. The tab
+    /// editor's preview draws a tab with this too; `salt` keeps the widths
+    /// it remembers apart from the real ribbon's.
+    pub(in crate::app) fn ribbon_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        groups: &[RibbonGroup],
+        clicks: &mut RibbonClicks,
+        salt: &str,
+    ) {
+        let scene = self.scene_shown(ui.ctx());
+        // Centred, the groups start half the room they leave from the
+        // left: their width is known from the last frame this tab
+        // was drawn (the first frame of a tab is drawn again).
+        let centered = self.appearance.ribbon == theme::RibbonAlign::Centered;
+        let room = ui.available_width();
+        let width_id = egui::Id::new(("ribbon width", salt, format!("{groups:?}"), scene));
+        egui::ScrollArea::horizontal()
+            .id_salt(("ribbon row", salt))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    if centered {
+                        match ui.data(|d| d.get_temp::<f32>(width_id)) {
+                            Some(width) => ui.add_space(((room - width) / 2.0).max(0.0).floor()),
+                            None => ui.ctx().request_discard("ribbon width"),
+                        }
+                    }
+                    let start = ui.cursor().left();
+                    // Show Scene goes before the first greyed-out group,
+                    // where it's seen however narrow the window is.
+                    let mut offered = scene;
+                    for (index, &group) in groups.iter().enumerate() {
+                        if index > 0 {
+                            ui.add(egui::Separator::default().vertical().spacing(10.0));
+                        }
+                        if !offered && group.needs_scene() {
+                            offered = true;
+                            let show = ui
+                                .add(RibbonButton::new(icons::CUBE_FOCUS, "Show Scene"))
+                                .on_hover_text("Show the Scene View, to use its tools");
+                            if show.clicked() {
+                                self.layout.open(Pane::Scene);
+                            }
+                            ui.add(egui::Separator::default().vertical().spacing(10.0));
+                        }
+                        if scene || !group.needs_scene() {
+                            self.ribbon_group(ui, group, clicks);
+                        } else {
+                            // Acting on a scene that isn't shown would
+                            // change the world out of sight.
+                            ui.add_enabled_ui(false, |ui| {
+                                self.ribbon_group(ui, group, clicks);
+                            })
+                            .response
+                            .on_disabled_hover_text(SCENE_HIDDEN);
+                        }
+                    }
+                    let width = ui.min_rect().right() - start;
+                    let known = ui.data(|d| d.get_temp::<f32>(width_id));
+                    if known.is_none_or(|known| (known - width).abs() > 0.5) {
+                        ui.data_mut(|d| d.insert_temp(width_id, width));
+                        if known.is_some() {
+                            ui.ctx().request_repaint();
+                        }
+                    }
+                });
+            });
+    }
+
+    /// The custom tab editor (`ribbon_tabs.rs`), with its preview drawn by
+    /// [`ribbon_row`](Self::ribbon_row), the ribbon's own code. The
+    /// preview's buttons are covered, and anything they'd do waits in a
+    /// `RibbonClicks` that's dropped.
+    pub(in crate::app) fn ribbon_tab_editor(&mut self, ctx: &egui::Context) {
+        if !self.ribbon_tabs.is_editing() {
+            return;
+        }
+        // Taken out while it's drawn, so the preview can borrow the app.
+        let mut tabs = std::mem::take(&mut self.ribbon_tabs);
+        tabs.editor_window(ctx, &mut |ui, groups| {
+            let mut ignored = RibbonClicks::default();
+            self.ribbon_row(ui, groups, &mut ignored, "tab preview");
+        });
+        self.ribbon_tabs = tabs;
     }
 
     /// The ribbon buttons for `tools`. Clicking one picks it.
