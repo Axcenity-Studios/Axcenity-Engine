@@ -96,10 +96,10 @@ At most four weights per vertex on every mesh. A clip made for the stylized huma
 
 One set of texture coordinates for the skin (`TEXCOORD_0`), 26 islands: the head is one island cut up the back, the torso is cut down the sides, arms and legs along their inner sides; hands, feet, ears, eye sockets and the mouth's interior keep the bundle's islands. Texel density is weighted (face 2.2, hands 1.15, hidden linings 0.4) and is about 10.9 texels per centimetre at 2048.
 
-Materials: `Skin` (the manifest marks it `skin`), `Mouth` (the mouth's interior, on the skin's maps), `Sclera` and `Iris` (`eye`), `Teeth`, `Gums`, `Tongue` (below). The skin's maps, embedded in the file:
+Materials: `Skin` (the manifest marks it `skin`, and so does the file: its glTF `extras` say `"axcenity_shading": "skin"`, which the engine draws with its Skin shading model, `docs/rendering/skin.md`), `Mouth` (the mouth's interior, on the skin's maps), `Sclera` and `Iris` (`eye`), `Teeth`, `Gums`, `Tongue` (below). The skin's maps, embedded in the file:
 
 - **Albedo** (JPEG): one tone with flush on the cheeks, nose, ears, chin, knuckles, elbows and knees, both lips, paler palms and soles, nails.
-- **Normal** (PNG): the sculpt's forms above the base mesh plus pore grain. One map serves both frames: where the two frames' bakes agree it is their mean, where they differ it leans to the flatter.
+- **Normal**, two of them (PNG): the sculpt's forms above the base mesh plus grain. One map serves both frames: where the two frames' bakes agree it is their mean, where they differ it leans to the flatter. `RealisticSkin_NormalDefined` is that map (lean and muscular: abdominal lines, muscle separation); `RealisticSkin_Normal`, the material's own, is a smooth copy with the sculpt's forms flattened (90%) over soft tissue (`skin.soft_tissue`: the trunk, shoulders, arms and legs, but not the head, hands, feet, knees, elbows or nipples, nor deep creases such as under a breast; and not within 2 cm of the navel, fading to 3.5 cm, which `skin.navel` finds as the belly's midline vertex lying furthest in, because the occlusion keeps only its deep middle and the smooth map once flattened it away). `Realistic.build.json` records where it is (`textures.navel_uv`), and an `assets` test checks the two maps agree there. `skin.mark` adds the defined map to the file after export (`extras.axcenity_defined_normal`); the engine blends the two by `definition × (1 − softness)`, which the manifest drives from `muscle` and `fat` (`manifests.SKIN_DRIVERS`), so soft and heavy bodies show no abdominal lines (R5, OPEN-07). The grain's cells are 5 texels across and its bump 0.09 texels high (`skin.GRAIN_*`; 2.6 texels before R5, half as steep now), so it reads as skin at a metre and as smooth at three.
 - **Occlusion, roughness, metalness** (JPEG, red, green, blue): cavity occlusion baked on the sculpt; roughness lower on the forehead, nose and lips, higher on elbows, knees and heels.
 
 ## The inside of the mouth
@@ -126,7 +126,7 @@ The engine reads `_LOD1` and `_LOD2` objects in a file as a model's levels of de
 
 ## Body shapes (CO5)
 
-`Body` and both of its copies carry, besides the face's shapes, `Frame_Feminine`, 51 for muscle and fat (`shapes.py`: 48 from CO5 and 3 from R3) and 6 pose-driven correctives (`correctives.py`). All but the correctives are **identity** shapes: a character's description sets them once and the engine bakes them into its model (ADR-0038). `RealisticParts.glb` is 37.0 MB (36.4 MB before R3's three shapes).
+`Body` and both of its copies carry, besides the face's shapes, `Frame_Feminine`, 51 for muscle and fat (`shapes.py`: 48 from CO5 and 3 from R3), the hips' narrowing per frame (`<Frame>_Hips_Narrow`, R3's wider ranges; "Proportions" below) and 6 pose-driven correctives (`correctives.py`). All but the correctives are **identity** shapes: a character's description sets them as live weights on the shared mesh, and a bake is optional (ADR-0041). `RealisticParts.glb` is 42.4 MB (37.4 MB before R4's face shapes and R5's defined normal map; 36.4 MB before R3's three fat shapes and two narrowing shapes).
 
 **Source.** MakeHuman's CC0 targets (base mesh, 24 macro targets and, since R3, 8 regional and body-shape targets at the pinned commit in `../transfer/makehuman.sha256`; licence record in `../transfer/shapes/LICENCE-RECORD.md`), carried onto this topology by `../transfer/` and vendored as `source/body_shapes.npz` (0.55 MB: 16 sculpted bodies as offsets, 8 per frame, and 8 regional targets, in the bundle's pose). The build needs neither MakeHuman's files nor the network. To regenerate the file, see `docs/development/character-studio/co5/README.md` (its "Regenerating the vendored shapes" block, which carries R3's `--pack-extras` list).
 
@@ -179,9 +179,17 @@ Made for raising the arm sideways with the collarbone still; an arm swung forwar
 - **The skin under it.** Each item hides its own region, whose mask shape (`Mask_<object>`) sinks the skin it covers 5 mm and eases back over 15 mm past the hems. Without it the body's simpler copies came through the cloth at a distance, and at a strap's edge the skin beside it did. This is an interim exception to ADR-0035 (fitting by binding, hiding by the region map): CO9 builds those.
 - **Look.** Charcoal cloth with a darker, glossier elastic band (`cloth` shading).
 
-## Proportions (CO5)
+## Proportions (CO5, R3)
 
-The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim` takes 0.5 to 1.5; this body's manifest offers **0.85 to 1.15** (`manifests.PROPORTION_RANGE`), and the hips only widen (**1 to 1.15**): at the wide ends the skin crosses itself (shoulders at half width put the arms through the chest, 282 pairs of triangles; hips 2% narrower already cross at the crotch of a heavy masculine body). With these ranges every pair of the manifest's 28 parameters at the ends of their ranges, on both frames, leaves the body free of new crossings (`measure.py --only ...,sliders`: 351 pairs, 1,352 bodies per frame).
+The nine proportion sliders set `anim`'s body sliders, which scale bones. `anim` takes 0.5 to 1.5. CO5 cut this body's to 0.85 to 1.15 and the hips to 1 to 1.15; since R3 (plan section 0, decision 8) each slider has its own range (`manifests.PROPORTION_RANGES`), each end the last step that still deforms cleanly on both frames and at the corners of muscle and fat, or the population's 0.5th or 99.5th percentile, whichever is nearer to 1, found by `../humanoid/qa/ranges.py`:
+
+| `height` | `leg_length` | `arm_length` | `shoulder_width` | `waist_width` | `hip_width` | `head_size` | `hand_size` | `foot_size` |
+|---|---|---|---|---|---|---|---|---|
+| 0.82 to 1.13 | 0.85 to 1.125 | 0.95 to 1.08 | 0.88 to 1.12 | 0.775 to 1.225 | 0.7 to 1.2 | 0.88 to 1.12 | 0.82 to 1.07 | 0.96 to 1.21 |
+
+What set each end, with the numbers, is in `docs/development/character-studio/refinement/r3/ranges.md`; `avatar`'s `tests/realistic_ranges.rs` holds the manifest to that table. Some ends are nearer 1 than CO5's: 15% of an arm or a head is several SD, and the base's feet are already short.
+
+**The hips narrow.** `HipWidth` below 1 pulls the legs' roots in and the inner thighs cross at the crotch (at 0.95 already), so `hip_width` drives the attribute only from 1 up (`manifests.ATTRIBUTE_FROM_ONE`) and below 1 a shape narrows the surface: `<Frame>_Hips_Narrow` (`shapes.hips_narrow`), a corner of the frame and `hip_width` from 1 to 0.6 (`shapes.NARROW_AT`). It moves the skin of the pelvis and the thighs' tops toward the middle, side to side only, by up to 20% of each vertex's distance from it, holding the inner thighs and fading out above the hip crest and down the thigh, so the hips' breadth falls about as fast below 1 as the bone widens it above (0.864 of the default at 0.7, 1.099 at 1.2). The underwear and both simpler copies carry it like the other body shapes.
 
 ## Known limits
 

@@ -8,7 +8,7 @@ use eframe::egui;
 use eframe::egui_wgpu::RenderState;
 
 use super::EditorApp;
-use crate::character_workspace::{CharacterWorkspace, WorkspaceAction};
+use crate::character_workspace::{CharacterWorkspace, Start, WorkspaceAction};
 use crate::dialog;
 use crate::theme::{self, icons};
 
@@ -20,9 +20,9 @@ impl EditorApp {
         self.characters_folder = folder;
     }
 
-    /// Opens the workspace on the preset at `preset` or on a saved `file`.
-    /// A problem is told on the start screen.
-    pub(super) fn open_character_workspace(&mut self, preset: Option<usize>, file: Option<&Path>) {
+    /// Opens the workspace on a new character from `start` or on a saved
+    /// `file`. A problem is told on the start screen.
+    pub(super) fn open_character_workspace(&mut self, start: Option<Start>, file: Option<&Path>) {
         let Some(folder) = self.characters_folder.clone() else {
             self.start.set_notice(
                 "Character Studio has nowhere to keep its files on this computer.".into(),
@@ -31,7 +31,7 @@ impl EditorApp {
         };
         let opened = match file {
             Some(file) => CharacterWorkspace::open_file(&folder, file),
-            None => CharacterWorkspace::open_preset(&folder, preset.unwrap_or(0)),
+            None => CharacterWorkspace::open_new(&folder, &start.unwrap_or_default()),
         };
         match opened {
             Ok(workspace) => self.character_workspace = Some(Box::new(workspace)),
@@ -41,7 +41,7 @@ impl EditorApp {
 
     /// Opens the workspace on the default character (`--character-studio`).
     pub fn open_character_studio(&mut self) {
-        self.open_character_workspace(Some(0), None);
+        self.open_character_workspace(Some(Start::default()), None);
     }
 
     /// Saves the workspace's character if it has unsaved changes (for
@@ -175,7 +175,7 @@ mod tests {
         assert!(start.iter().any(|text| text == "Debug"), "{start:?}");
 
         // The Athletic preset, from the start page: the realistic body.
-        app.open_character_workspace(Some(2), None);
+        app.open_character_workspace(Some(Start::shipped("athletic-male")), None);
         let workspace = app.character_workspace.as_ref().expect("opened");
         assert_eq!(
             workspace.description().base,
@@ -223,7 +223,7 @@ mod tests {
         let mut app = EditorApp::new(None);
         let folder = crate::character_studio::test_folder("workspace-close");
         app.set_characters_folder(Some(folder.clone()));
-        app.open_character_workspace(Some(0), None);
+        app.open_character_workspace(Some(Start::default()), None);
         assert!(app.unsaved(), "a new character isn't saved");
         let modified = app.modified_documents();
         assert!(

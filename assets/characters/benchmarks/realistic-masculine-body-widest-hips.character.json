@@ -1,0 +1,14 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-body-widest-hips",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "frame": 0,
+    "hip_width": 1.2
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
+}

@@ -153,15 +153,18 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 /// - `tint`, `iris_tint` and `sclera_tint` multiply the base colour, after
 ///   toning;
 /// - `roughness_scale` multiplies the roughness;
-/// - `detail_strength` multiplies the normal map's strength (0 to 2).
+/// - `detail_strength` multiplies the normal map's strength (0 to 2);
+/// - on a material its model file marks skin ([`Shading::Skin`], R5):
+///   `scatter_scale` multiplies how far light spreads under it (0 to 2),
+///   and `definition` times one minus `softness` (each 0 to 1) is how much
+///   of its defined normal map shows over its own smooth one.
 ///
 /// Every value at its neutral setting changes nothing, and a part with no
-/// values is drawn as authored. The rest (`scatter_scale`, `pupil_size`,
-/// `limbal_ring`, `iris_depth`, cloth sheen and hair dye) wait for the
-/// renderer's Skin, Eye, Cloth and Hair shading models (CO7): until then
-/// each material draws as Standard. `scene` doesn't know a material's
-/// shading model, so a value is drawn by its name whatever the slot: Hair's
-/// `melanin` and `redness` take the skin's curve for now.
+/// values is drawn as authored. The rest (`pupil_size`, `limbal_ring`,
+/// `iris_depth`, cloth sheen and hair dye) wait for the renderer's Eye,
+/// Cloth and Hair shading models: until then those materials draw as
+/// Standard. The colour values are drawn by their name whatever the slot:
+/// Hair's `melanin` and `redness` take the skin's curve for now.
 pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str) {
     let value = |value: &str| instance.attribute(&material_value_attribute(name, value));
     let number = |name: &str| {
@@ -196,6 +199,14 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
         && let Some(normal) = &mut material.maps.normal
     {
         normal.scale *= strength.clamp(0.0, 2.0);
+    }
+    if let Shading::Skin(skin) = &mut material.shading {
+        if let Some(scale) = number("scatter_scale") {
+            skin.scatter *= scale.clamp(0.0, 2.0);
+        }
+        let definition = number("definition").map_or(0.0, |v| v.clamp(0.0, 1.0));
+        let softness = number("softness").map_or(0.0, |v| v.clamp(0.0, 1.0));
+        skin.normal_blend = definition * (1.0 - softness);
     }
 }
 

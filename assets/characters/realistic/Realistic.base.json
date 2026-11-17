@@ -765,8 +765,8 @@
       "label": "Height",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.82,
+        1.13
       ],
       "about": "How tall the whole body is.",
       "feature": "body",
@@ -776,8 +776,8 @@
         {
           "attribute": "BodyHeight",
           "from": [
-            0.85,
-            1.15
+            0.82,
+            1.13
           ]
         }
       ]
@@ -788,7 +788,7 @@
       "group": "proportions",
       "range": [
         0.85,
-        1.15
+        1.125
       ],
       "about": "How long the legs are against the body.",
       "feature": "thighs",
@@ -799,7 +799,7 @@
           "attribute": "LegLength",
           "from": [
             0.85,
-            1.15
+            1.125
           ]
         }
       ]
@@ -809,8 +809,8 @@
       "label": "Arm length",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.95,
+        1.08
       ],
       "about": "How long the arms are against the body.",
       "feature": "arms",
@@ -820,8 +820,8 @@
         {
           "attribute": "ArmLength",
           "from": [
-            0.85,
-            1.15
+            0.95,
+            1.08
           ]
         }
       ]
@@ -831,8 +831,8 @@
       "label": "Shoulder width",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.88,
+        1.12
       ],
       "about": "How wide the shoulders are.",
       "feature": "shoulders",
@@ -842,8 +842,8 @@
         {
           "attribute": "ShoulderWidth",
           "from": [
-            0.85,
-            1.15
+            0.88,
+            1.12
           ]
         }
       ]
@@ -853,8 +853,8 @@
       "label": "Waist width",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.775,
+        1.225
       ],
       "about": "How wide the waist is.",
       "feature": "waist",
@@ -864,8 +864,8 @@
         {
           "attribute": "WaistWidth",
           "from": [
-            0.85,
-            1.15
+            0.775,
+            1.225
           ]
         }
       ]
@@ -875,8 +875,8 @@
       "label": "Hip width",
       "group": "proportions",
       "range": [
-        1.0,
-        1.15
+        0.7,
+        1.2
       ],
       "about": "How wide the hips are.",
       "feature": "hips",
@@ -886,8 +886,8 @@
         {
           "attribute": "HipWidth",
           "from": [
-            1.0,
-            1.15
+            1,
+            1.2
           ]
         }
       ]
@@ -897,8 +897,8 @@
       "label": "Head size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.88,
+        1.12
       ],
       "about": "How large the head is against the body.",
       "feature": "head",
@@ -908,8 +908,8 @@
         {
           "attribute": "HeadSize",
           "from": [
-            0.85,
-            1.15
+            0.88,
+            1.12
           ]
         }
       ]
@@ -919,8 +919,8 @@
       "label": "Hand size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.82,
+        1.07
       ],
       "about": "How large the hands are.",
       "feature": "hands",
@@ -930,8 +930,8 @@
         {
           "attribute": "HandSize",
           "from": [
-            0.85,
-            1.15
+            0.82,
+            1.07
           ]
         }
       ],
@@ -942,8 +942,8 @@
       "label": "Foot size",
       "group": "proportions",
       "range": [
-        0.85,
-        1.15
+        0.96,
+        1.21
       ],
       "about": "How large the feet are.",
       "feature": "feet",
@@ -953,8 +953,8 @@
         {
           "attribute": "FootSize",
           "from": [
-            0.85,
-            1.15
+            0.96,
+            1.21
           ]
         }
       ],
@@ -970,7 +970,21 @@
       ],
       "about": "How much muscle the whole body carries, from slight to strong.",
       "feature": "body",
-      "level": "quick"
+      "level": "quick",
+      "material_values": [
+        {
+          "material": "Skin",
+          "value": "definition",
+          "from": [
+            -0.5,
+            0.8
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
     },
     {
       "id": "fat",
@@ -982,7 +996,21 @@
       ],
       "about": "How much fat the whole body carries, from lean to heavy.",
       "feature": "body",
-      "level": "quick"
+      "level": "quick",
+      "material_values": [
+        {
+          "material": "Skin",
+          "value": "softness",
+          "from": [
+            -0.5,
+            0.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
     },
     {
       "id": "muscle_chest",
@@ -1466,7 +1494,7 @@
         -1,
         1
       ],
-      "about": "How far the outer corner of the left eye is raised or lowered.",
+      "about": "How far the left eye turns about its middle: the outer corner up and the inner corner down.",
       "feature": "eyes",
       "level": "detailed",
       "mirror": "eye_tilt_right",
@@ -1488,13 +1516,145 @@
         -1,
         1
       ],
-      "about": "How far the outer corner of the right eye is raised or lowered.",
+      "about": "How far the right eye turns about its middle: the outer corner up and the inner corner down.",
       "feature": "eyes",
       "level": "detailed",
       "mirror": "eye_tilt_left",
       "shapes": [
         {
           "shape": "Face_Eye_Tilt_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_corner_left",
+      "label": "Left eye corner",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the outer corner of the left eye is raised or lowered, with the inner corner held.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "eye_corner_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Corner_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_corner_right",
+      "label": "Right eye corner",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the outer corner of the right eye is raised or lowered, with the inner corner held.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "eye_corner_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Corner_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lid_fold_left",
+      "label": "Left upper lid fold",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the fold over the left upper lid hangs down over it (hooded) or sits up and back.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "upper_lid_fold_right",
+      "shapes": [
+        {
+          "shape": "Face_Lid_Fold_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lid_fold_right",
+      "label": "Right upper lid fold",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the fold over the right upper lid hangs down over it (hooded) or sits up and back.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "upper_lid_fold_left",
+      "shapes": [
+        {
+          "shape": "Face_Lid_Fold_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lower_lid_left",
+      "label": "Left lower lid",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full and high the left lower lid sits, from a flat, long lid to a full, short one.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "lower_lid_right",
+      "shapes": [
+        {
+          "shape": "Face_Lower_Lid_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lower_lid_right",
+      "label": "Right lower lid",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full and high the right lower lid sits, from a flat, long lid to a full, short one.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "lower_lid_left",
+      "shapes": [
+        {
+          "shape": "Face_Lower_Lid_Right",
           "from": [
             -1,
             1
@@ -1829,6 +1989,69 @@
       ]
     },
     {
+      "id": "nose_tip_projection",
+      "label": "Nose tip projection",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the tip of the nose stands out from the face.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Tip_Projection",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_tip_rotation",
+      "label": "Nose tip rotation",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the tip of the nose turns up, or droops.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Tip_Rotation",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_width",
+      "label": "Nose width",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How wide the whole nose is, from the bridge to the nostrils.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "nose_tilt",
       "label": "Nose to one side",
       "group": "nose",
@@ -1983,6 +2206,50 @@
       ]
     },
     {
+      "id": "jaw_angle_left",
+      "label": "Left jaw angle",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How square the corner of the jaw is on the left side, from sloped to square.",
+      "feature": "jaw",
+      "level": "detailed",
+      "mirror": "jaw_angle_right",
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Angle_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jaw_angle_right",
+      "label": "Right jaw angle",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How square the corner of the jaw is on the right side, from sloped to square.",
+      "feature": "jaw",
+      "level": "detailed",
+      "mirror": "jaw_angle_left",
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Angle_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "jaw_shift",
       "label": "Jaw to one side",
       "group": "jaw",
@@ -2006,7 +2273,7 @@
     },
     {
       "id": "chin_length",
-      "label": "Chin length",
+      "label": "Chin height",
       "group": "chin",
       "range": [
         -1,
@@ -2167,6 +2434,27 @@
       "shapes": [
         {
           "shape": "Face_Mouth_Height",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "philtrum_length",
+      "label": "Philtrum length",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How long the upper lip is from the nose down to the lip's edge.",
+      "feature": "lips",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Philtrum_Length",
           "from": [
             -1,
             1
@@ -2364,6 +2652,50 @@
       "shapes": [
         {
           "shape": "Face_Ear_Out_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "earlobe_left",
+      "label": "Left earlobe",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How long the lobe of the left ear hangs.",
+      "feature": "ears",
+      "level": "detailed",
+      "mirror": "earlobe_right",
+      "shapes": [
+        {
+          "shape": "Face_Earlobe_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "earlobe_right",
+      "label": "Right earlobe",
+      "group": "ears",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How long the lobe of the right ear hangs.",
+      "feature": "ears",
+      "level": "detailed",
+      "mirror": "earlobe_left",
+      "shapes": [
+        {
+          "shape": "Face_Earlobe_Right",
           "from": [
             -1,
             1
@@ -2906,6 +3238,33 @@
           ],
           "to": [
             0.5,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
             1
           ]
         }
@@ -3670,6 +4029,33 @@
           ],
           "to": [
             0.5,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
             1
           ]
         }
@@ -4668,7 +5054,7 @@
       "id": "eyes",
       "label": "Eyes",
       "category": "face",
-      "about": "Their height, spacing, depth, size and tilt.",
+      "about": "Their height, spacing, depth, size, tilt and corners, and the lids' shape.",
       "icon": "eyes",
       "anchors": [
         {
@@ -4720,7 +5106,7 @@
       "id": "nose",
       "label": "Nose",
       "category": "face",
-      "about": "Its length, bridge, tip and nostrils.",
+      "about": "Its length, width, bridge, tip and nostrils.",
       "icon": "nose",
       "anchors": [
         {
@@ -4764,7 +5150,7 @@
       "id": "jaw",
       "label": "Jaw",
       "category": "face",
-      "about": "How wide the jaw is, and where it sits.",
+      "about": "How wide and how square the jaw is, and where it sits.",
       "icon": "jaw",
       "anchors": [
         {
@@ -4808,7 +5194,7 @@
       "id": "lips",
       "label": "Lips",
       "category": "face",
-      "about": "The mouth's width and height and the lips' fullness.",
+      "about": "The mouth's width and height, the upper lip's length and the lips' fullness.",
       "icon": "lips",
       "anchors": [
         {
@@ -4844,7 +5230,7 @@
       "id": "ears",
       "label": "Ears",
       "category": "face",
-      "about": "Their size, height and how far they stand out.",
+      "about": "Their size, height, lobes and how far they stand out.",
       "icon": "ears",
       "anchors": [
         {

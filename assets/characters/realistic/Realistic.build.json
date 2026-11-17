@@ -68,8 +68,8 @@
  "body_shapes": {
   "frames": {
    "Feminine": {
-    "bony_vertices": 4396,
-    "held_face_vertices": 1906,
+    "bony_vertices": 4406,
+    "held_face_vertices": 1909,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -144,6 +144,7 @@
      "Feminine_Fat_Soft": 42.4,
      "Feminine_Fat_Thighs": 47.9,
      "Feminine_Fat_Up": 21.7,
+     "Feminine_Hips_Narrow": 36.1,
      "Feminine_Muscle_Abdomen": 8.2,
      "Feminine_Muscle_Arms": 39.2,
      "Feminine_Muscle_Back": 50.1,
@@ -239,6 +240,7 @@
      "Masculine_Fat_Soft": 69.0,
      "Masculine_Fat_Thighs": 52.7,
      "Masculine_Fat_Up": 37.6,
+     "Masculine_Hips_Narrow": 35.9,
      "Masculine_Muscle_Abdomen": 19.4,
      "Masculine_Muscle_Arms": 39.6,
      "Masculine_Muscle_Back": 36.2,
@@ -284,7 +286,7 @@
     ]
    }
   },
-  "shapes": 51
+  "shapes": 53
  },
  "corrective_shapes": {
   "Level": {
@@ -557,6 +559,9 @@
    "Face_Eye_Depth_Left",
    "Face_Eye_Size_Left",
    "Face_Eye_Tilt_Left",
+   "Face_Eye_Corner_Left",
+   "Face_Lid_Fold_Left",
+   "Face_Lower_Lid_Left",
    "Face_Brow_Height_Left",
    "Face_Brow_Arch_Left",
    "Face_Brow_Height_Up_Left",
@@ -565,15 +570,20 @@
    "Face_Cheekbone_Left",
    "Face_Cheek_Fullness_Left",
    "Face_Jaw_Width_Left",
+   "Face_Jaw_Angle_Left",
    "Face_Mouth_Width_Left",
    "Face_Ear_Size_Left",
    "Face_Ear_Height_Left",
    "Face_Ear_Out_Left",
+   "Face_Earlobe_Left",
    "Face_Eye_Height_Right",
    "Face_Eye_Spacing_Right",
    "Face_Eye_Depth_Right",
    "Face_Eye_Size_Right",
    "Face_Eye_Tilt_Right",
+   "Face_Eye_Corner_Right",
+   "Face_Lid_Fold_Right",
+   "Face_Lower_Lid_Right",
    "Face_Brow_Height_Right",
    "Face_Brow_Arch_Right",
    "Face_Brow_Height_Up_Right",
@@ -582,14 +592,19 @@
    "Face_Cheekbone_Right",
    "Face_Cheek_Fullness_Right",
    "Face_Jaw_Width_Right",
+   "Face_Jaw_Angle_Right",
    "Face_Mouth_Width_Right",
    "Face_Ear_Size_Right",
    "Face_Ear_Height_Right",
    "Face_Ear_Out_Right",
+   "Face_Earlobe_Right",
    "Face_Nose_Length",
    "Face_Nose_Tip",
    "Face_Nose_Bridge",
    "Face_Nose_Tilt",
+   "Face_Nose_Tip_Projection",
+   "Face_Nose_Tip_Rotation",
+   "Face_Nose_Width",
    "Face_Brow_Ridge",
    "Face_Forehead_Height",
    "Face_Forehead_Slope",
@@ -600,7 +615,8 @@
    "Face_Jaw_Shift",
    "Face_Lip_Fullness_Upper",
    "Face_Lip_Fullness_Lower",
-   "Face_Mouth_Height"
+   "Face_Mouth_Height",
+   "Face_Philtrum_Length"
   ],
   "jaw_open_deg": 25.0,
   "largest_move_mm": {
@@ -643,6 +659,10 @@
    "Face_Ear_Out_Right": 7.59,
    "Face_Ear_Size_Left": 6.15,
    "Face_Ear_Size_Right": 6.19,
+   "Face_Earlobe_Left": 8.54,
+   "Face_Earlobe_Right": 8.54,
+   "Face_Eye_Corner_Left": 3.0,
+   "Face_Eye_Corner_Right": 3.0,
    "Face_Eye_Depth_Left": 4.2,
    "Face_Eye_Depth_Right": 4.2,
    "Face_Eye_Height_Left": 4.5,
@@ -656,11 +676,17 @@
    "Face_Forehead_Height": 8.0,
    "Face_Forehead_Slope": 5.5,
    "Face_Head_Width": 5.19,
+   "Face_Jaw_Angle_Left": 6.8,
+   "Face_Jaw_Angle_Right": 6.78,
    "Face_Jaw_Shift": 5.0,
    "Face_Jaw_Width_Left": 6.08,
    "Face_Jaw_Width_Right": 6.08,
+   "Face_Lid_Fold_Left": 2.54,
+   "Face_Lid_Fold_Right": 2.54,
    "Face_Lip_Fullness_Lower": 4.95,
    "Face_Lip_Fullness_Upper": 5.04,
+   "Face_Lower_Lid_Left": 3.47,
+   "Face_Lower_Lid_Right": 3.47,
    "Face_Mouth_Height": 4.5,
    "Face_Mouth_Width_Left": 4.8,
    "Face_Mouth_Width_Right": 4.8,
@@ -668,12 +694,16 @@
    "Face_Nose_Length": 4.41,
    "Face_Nose_Tilt": 4.42,
    "Face_Nose_Tip": 4.84,
+   "Face_Nose_Tip_Projection": 6.5,
+   "Face_Nose_Tip_Rotation": 6.26,
+   "Face_Nose_Width": 5.17,
    "Face_Nose_Width_Left": 4.41,
    "Face_Nose_Width_Right": 4.41,
+   "Face_Philtrum_Length": 5.0,
    "Jaw_Forward": 5.5,
-   "Jaw_Left": 1.69,
+   "Jaw_Left": 1.7,
    "Jaw_Open": 19.15,
-   "Jaw_Right": 1.69,
+   "Jaw_Right": 1.7,
    "Lip_Corner_Pull_Left": 5.24,
    "Lip_Corner_Pull_Right": 5.24,
    "Lower_Lip_Lower": 5.22,
@@ -686,8 +716,8 @@
    "Mouth_Open": 5.75,
    "Mouth_Pucker": 14.65,
    "Mouth_Right": 6.89,
-   "Mouth_Smile_Left": 13.14,
-   "Mouth_Smile_Right": 13.14,
+   "Mouth_Smile_Left": 13.1,
+   "Mouth_Smile_Right": 13.1,
    "Mouth_Wide": 6.6,
    "Nose_Sneer_Left": 7.09,
    "Nose_Sneer_Right": 7.09,
@@ -699,11 +729,12 @@
    "Upper_Lip_Raise_Right": 4.67
   },
   "rest": {
+   "feminine_face_moved_mm": 6.65,
    "feminine_lids_moved_mm": 3.96,
    "lid_texels_softened": 6846,
    "lining_vertices_lifted": 304,
    "lips_closed_by_mm": {
-    "feminine": 2.39,
+    "feminine": 2.35,
     "masculine": 1.99
    }
   }
@@ -1346,7 +1377,7 @@
  },
  "teeth": {
   "feminine": {
-   "bag_moved_to_skin_mm": 5.0,
+   "bag_moved_to_skin_mm": 4.8,
    "behind_lips_mm": 2.7,
    "bite_under_lips_mm": 1.6,
    "faces_through_the_body": 0,
@@ -1393,7 +1424,17 @@
  },
  "textures": {
   "frames_differ_share": 0.083,
+  "grain": {
+   "cell_texels": 5.0,
+   "fine_texels": 12.0,
+   "height_texels": 0.09
+  },
+  "navel_uv": [
+   0.3713,
+   0.3257
+  ],
   "size": 2048,
+  "smoothed_share": 0.475,
   "texels_per_cm": 10.85
  },
  "twists": [
@@ -1424,17 +1465,17 @@
  ],
  "underwear": {
   "Underwear_BoxerBriefs": {
-   "shapes": 40,
+   "shapes": 42,
    "triangles": 1568,
    "weight_moved_most": 0.07
   },
   "Underwear_Bra": {
-   "shapes": 56,
+   "shapes": 58,
    "triangles": 2476,
    "weight_moved_most": 0.122
   },
   "Underwear_Briefs": {
-   "shapes": 40,
+   "shapes": 42,
    "triangles": 1214,
    "weight_moved_most": 0.057
   }

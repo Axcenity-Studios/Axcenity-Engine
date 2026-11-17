@@ -23,8 +23,8 @@ fn mirrored(id: &str, value: f32, gesture: Gesture) -> Intent {
     }
 }
 
-fn preset(name: &str) -> usize {
-    presets().iter().position(|p| p.name == name).unwrap()
+fn preset(name: &str) -> Start {
+    Start::shipped(name)
 }
 
 /// The brief's task list (R1's part): a new character from a preset, a
@@ -33,12 +33,12 @@ fn preset(name: &str) -> usize {
 #[test]
 fn a_walkthrough_through_intents_saves_and_reopens_the_same_character() {
     let folder = test_folder("walkthrough");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     assert_eq!(workspace.apply(Intent::Save), None);
     assert!(!workspace.dirty());
 
     // New, from the Athletic female preset: a fresh, unsaved character.
-    workspace.apply(Intent::New(preset("Athletic female")));
+    workspace.apply(Intent::New(preset("athletic-female")));
     assert!(workspace.dirty());
     assert_eq!(workspace.file(), None);
     assert!(!workspace.can_undo(), "a new character starts a fresh undo");
@@ -117,19 +117,19 @@ fn a_walkthrough_through_intents_saves_and_reopens_the_same_character() {
 #[test]
 fn new_and_open_ask_to_save_unsaved_changes_first() {
     let folder = test_folder("walkthrough-ask");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::Rename("Kept".to_owned()));
     let kept = workspace.save().unwrap();
     workspace.apply(set("fat", 0.5, Gesture::Commit));
 
-    workspace.apply(Intent::New(preset("Female")));
-    assert_eq!(workspace.asking, Some(Intent::New(preset("Female"))));
+    workspace.apply(Intent::New(preset("female")));
+    assert_eq!(workspace.asking, Some(Intent::New(preset("female"))));
     assert_eq!(workspace.parameter("fat"), 0.5, "nothing happened yet");
     workspace.answer(None);
     assert_eq!(workspace.asking, None);
     assert_eq!(workspace.parameter("fat"), 0.5);
 
-    workspace.apply(Intent::New(preset("Female")));
+    workspace.apply(Intent::New(preset("female")));
     workspace.answer(Some(false));
     assert_eq!(workspace.parameter("frame"), 1.0);
     assert_eq!(workspace.description().name, "New Character");
@@ -161,10 +161,10 @@ fn new_and_open_ask_to_save_unsaved_changes_first() {
 #[test]
 fn save_never_overwrites_another_character_with_the_same_name() {
     let folder = test_folder("walkthrough-d01");
-    let mut first = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut first = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     first.apply(set("fat", 0.5, Gesture::Commit));
     let first_path = first.save().unwrap();
-    let mut second = CharacterWorkspace::open_preset(&folder, 1).unwrap();
+    let mut second = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
     second.apply(Intent::Save);
     let second_path = second.file().unwrap().to_owned();
     assert_ne!(first_path, second_path, "the second got a file of its own");
@@ -192,7 +192,7 @@ fn save_never_overwrites_another_character_with_the_same_name() {
 #[test]
 fn a_rename_moves_the_saved_file_instead_of_copying_it() {
     let folder = test_folder("walkthrough-d03");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::Rename("Ada".to_owned()));
     let old = workspace.save().unwrap();
     packs::save_pack(&folder, None, "Cast", vec!["Ada.character.json".into()]).unwrap();
@@ -220,7 +220,7 @@ fn a_rename_moves_the_saved_file_instead_of_copying_it() {
 #[test]
 fn a_change_of_nothing_keeps_redo() {
     let folder = test_folder("walkthrough-d05");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(set("fat", 0.5, Gesture::Commit));
     workspace.apply(Intent::Undo);
     assert!(workspace.can_redo());
@@ -253,8 +253,7 @@ fn a_change_of_nothing_keeps_redo() {
 #[test]
 fn reset_puts_back_a_feature_a_category_or_everything() {
     let folder = test_folder("walkthrough-reset");
-    let mut workspace =
-        CharacterWorkspace::open_preset(&folder, preset("Athletic female")).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &preset("athletic-female")).unwrap();
     workspace.apply(Intent::Rename("Scoped".to_owned()));
     workspace.apply(set("nose_length", 0.5, Gesture::Commit));
     workspace.apply(set("chin_width", -0.5, Gesture::Commit));
@@ -310,7 +309,7 @@ fn reset_puts_back_a_feature_a_category_or_everything() {
 #[test]
 fn a_skin_value_is_undoable_and_reaches_the_preview_without_a_rebake() {
     let folder = test_folder("walkthrough-skin");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let body_model = workspace.worn()[0].clone();
     workspace.apply(Intent::SetMaterial {
         slot: "Skin".to_owned(),
@@ -340,5 +339,122 @@ fn a_skin_value_is_undoable_and_reaches_the_preview_without_a_rebake() {
     );
     workspace.apply(Intent::Undo);
     assert_eq!(workspace.material_value("Skin", "roughness_scale"), None);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// The brief's task list, R1 complete (RA1, part 2): a new realistic and a
+/// new stylized character; a body preset and a face preset; the face
+/// randomized with the nose locked; A held, a change, compared, B kept;
+/// saved and reopened the same; and the work recovered after a crash.
+#[test]
+fn the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery() {
+    use super::random::RandomScope;
+    let folder = test_folder("walkthrough-r1");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+
+    // A new stylized character, then a new realistic one (realistic is
+    // the default; both families are offered).
+    workspace.apply(Intent::New(Start::Family(axcenity_avatar::V1_BASE.into())));
+    workspace.answer(Some(false));
+    assert_eq!(workspace.description().base, axcenity_avatar::V1_BASE);
+    workspace.apply(set("nose_width", 0.5, Gesture::Commit));
+    workspace.apply(Intent::Rename("Toon".into()));
+    workspace.apply(Intent::Save);
+    let toon = workspace.file().unwrap().to_owned();
+    workspace.apply(Intent::New(preset("female")));
+    assert_eq!(workspace.description().base, DEFAULT_BASE);
+    assert_eq!(workspace.parameter("frame"), 1.0);
+
+    // A body preset, then a face preset: one undo step each.
+    workspace.apply(Intent::ApplyPreset(
+        "axcenity/realistic-body-athletic-female".into(),
+    ));
+    let library = workspace.library();
+    let athletic = library
+        .preset("axcenity/realistic-body-athletic-female")
+        .unwrap();
+    assert_eq!(workspace.parameter("muscle"), athletic.parameters["muscle"]);
+    workspace.apply(Intent::ApplyPreset("axcenity/realistic-face-heart".into()));
+    let heart = library.preset("axcenity/realistic-face-heart").unwrap();
+    assert!(axcenity_avatar::matches_preset(
+        workspace.description(),
+        heart,
+        &library
+    ));
+    workspace.apply(Intent::Undo);
+    assert!(!axcenity_avatar::matches_preset(
+        workspace.description(),
+        heart,
+        &library
+    ));
+    workspace.apply(Intent::Redo);
+
+    // The face randomized with the nose locked: the nose and the body stay.
+    workspace.apply(Intent::PickCategory(Category::Face));
+    let nose: Vec<String> = library
+        .base(DEFAULT_BASE)
+        .unwrap()
+        .parameters
+        .iter()
+        .filter(|p| p.feature.as_deref() == Some("nose"))
+        .map(|p| p.id.clone())
+        .collect();
+    workspace.apply(Intent::SetLock {
+        ids: nose.clone(),
+        locked: true,
+    });
+    let before = workspace.description().clone();
+    workspace.apply(Intent::Randomize(RandomScope::Category));
+    assert_ne!(workspace.description(), &before);
+    for id in &nose {
+        assert_eq!(
+            workspace.description().parameters.get(id),
+            before.parameters.get(id),
+            "{id}"
+        );
+    }
+    assert_eq!(workspace.parameter("muscle"), athletic.parameters["muscle"]);
+    assert_eq!(workspace.parameter("frame"), 1.0);
+
+    // Hold A, change, compare, hold B, keep B.
+    workspace.apply(Intent::Capture);
+    let a = workspace.description().clone();
+    workspace.apply(set("fat", 0.6, Gesture::Commit));
+    workspace.apply(Intent::Capture);
+    let b = workspace.description().clone();
+    workspace.apply(set("fat", -0.3, Gesture::Commit));
+    workspace.apply(Intent::ShowHeld(Some(0)));
+    assert_eq!(workspace.shown(), &a);
+    workspace.apply(Intent::SideBySide(true));
+    workspace.apply(Intent::ShowHeld(Some(1)));
+    workspace.apply(Intent::SideBySide(false));
+    workspace.apply(Intent::KeepHeld(1));
+    assert_eq!(workspace.description(), &b);
+
+    // Save, reopen: the same character; the held versions aren't in it.
+    workspace.apply(Intent::Rename("Heart".into()));
+    workspace.apply(Intent::Save);
+    assert!(!workspace.dirty(), "{:?}", workspace.notice);
+    let path = workspace.file().unwrap().to_owned();
+    let reopened = CharacterWorkspace::open_file(&folder, &path).unwrap();
+    assert_eq!(reopened.description(), workspace.description());
+    assert!(reopened.comparison.held.is_empty());
+    drop(reopened);
+    let toon_again = CharacterWorkspace::open_file(&folder, &toon).unwrap();
+    assert_eq!(toon_again.description().base, axcenity_avatar::V1_BASE);
+    assert_eq!(toon_again.parameter("nose_width"), 0.5);
+    drop(toon_again);
+
+    // Unsaved work, then a crash: the next open offers it back.
+    workspace.apply(set("height", 1.05, Gesture::Commit));
+    workspace.autosave_step(std::time::Instant::now());
+    let lost = workspace.description().clone();
+    std::mem::forget(workspace);
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    assert!(workspace.recovery.is_some());
+    workspace.apply(Intent::Recover(true));
+    assert_eq!(workspace.description(), &lost);
+    assert_eq!(workspace.file(), Some(path.as_path()));
+    assert!(workspace.dirty());
     let _ = std::fs::remove_dir_all(&folder);
 }

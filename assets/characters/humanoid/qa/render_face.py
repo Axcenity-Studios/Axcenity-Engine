@@ -10,7 +10,9 @@ on every part that has them, the jaw and eye bones turned by the facial
 profile's limits. Sheets: `face_rest`, `face_blink`, `face_controls_eyes`,
 `face_controls_mouth`, `face_visemes`, `face_expressions`,
 `face_identity`, `face_clay` (controls without materials, where the forms
-read) and `face_sidelit` (lids and lips under one low side light).
+read), `face_sidelit` (lids and lips under one low side light) and
+`face_identity_sidelit_<id>` (one parameter's ends under that light;
+`--params a,b` names which).
 """
 
 import argparse
@@ -234,8 +236,74 @@ class Run:
         self.save("face_identity", tiles, 12, labels, "Face identity parameters at -1 and +1")
 
 
+    # Where each group's ends are seen from, side-lit (R4): (a point of the
+    # head to look at, as offsets from between the eyes in metres, x to the
+    # character's left; the character's turn, negative showing its left;
+    # the lens). The eye groups use the `eye` view.
+    SIDELIT_VIEWS = {
+        "nose": (((0.0, -0.03, -0.035), 0, 110), ((0.0, -0.03, -0.035), -80, 110)),
+        "lips": (((0.0, -0.03, -0.065), 0, 110), ((0.0, -0.03, -0.065), -80, 110)),
+        "chin": (((0.0, -0.02, -0.085), 0, 100), ((0.0, -0.02, -0.085), -80, 100)),
+        "jaw": (((0.0, 0.0, -0.06), 0, 75), ((0.045, 0.03, -0.075), -60, 100)),
+        "ears": (((0.075, 0.09, -0.02), -60, 120), ((0.075, 0.09, -0.02), -90, 120)),
+    }
+
+    def close_shot(self, cam, ch, name, at, deg, lens):
+        """A close camera 0.45 m in front of `at` (offsets from between the
+        eyes), with the character turned `deg` about its feet."""
+        import math
+        c = 0.5 * (ch.eye_centre("Left") + ch.eye_centre("Right"))
+        p = Vector((c.x + at[0], c.y + at[1], c.z + at[2]))
+        a = math.radians(deg)
+        q = Vector((p.x * math.cos(a) - p.y * math.sin(a), p.x * math.sin(a) + p.y * math.cos(a), p.z))
+        Q.turn_character(ch, deg)
+        path = Q.shot(cam, os.path.join(self.tmp, name + ".png"), (q.x, q.y - 0.45, q.z), (q.x, q.y, q.z), lens)
+        Q.turn_character(ch, 0)
+        return path
+
+    def face_identity_sidelit(self):
+        """Each parameter's -1, 0 and +1 under one low side light, close
+        up in two views chosen by its group, both frames (R4: one sheet a
+        parameter, `--params` choosing which)."""
+        import json
+        with open(self.manifest, encoding="utf-8") as f:
+            groups = {p["id"]: p["group"] for p in json.load(f)["parameters"]}
+        wanted = [p for p in filter(None, self.a.params.split(","))]
+        ch, cam = self.scene(400, 400)
+        shapes = {kb.name for kb in ch.parts["Body"].data.shape_keys.key_blocks}
+        for o in bpy.data.objects:
+            if o.type == "LIGHT":
+                o.data.energy *= 0.12
+        key = bpy.data.lights.new("SideKey", "AREA")
+        key.energy, key.size = 60.0, 0.25
+        lamp = bpy.data.objects.new("SideKey", key)
+        bpy.context.scene.collection.objects.link(lamp)
+        for pid, drivers in FC.face_parameters(self.manifest):
+            if wanted and pid not in wanted:
+                continue
+            group = groups.get(pid)
+            tiles, labels = [], []
+            for fname, frame in FRAMES:
+                for k in range(2):
+                    for end in (-1.0, 0.0, 1.0):
+                        identity = {n: w for n, w in drivers(end).items() if n in shapes} if end else {}
+                        FC.pose(ch, frame, {}, identity)
+                        z = self.eye_z(ch)
+                        lamp.location = (0.9, -0.55, z + 0.12)
+                        lamp.rotation_euler = (Vector((0.0, -0.1, z - 0.03)) - lamp.location).to_track_quat("-Z", "Y").to_euler()
+                        name = f"sl_{pid}_{fname}_{k}_{end}"
+                        if group == "eyes" or group not in self.SIDELIT_VIEWS:
+                            deg = (0, -40)[k]
+                            tiles.append(self.shot(cam, ch, name, "eye", deg))
+                        else:
+                            at, deg, lens = self.SIDELIT_VIEWS[group][k]
+                            tiles.append(self.close_shot(cam, ch, name, at, deg, lens))
+                        labels.append(f"{fname[:4]} {end:+.0f} {deg}")
+            self.save(f"face_identity_sidelit_{pid}", tiles, 6, labels, f"{pid} at -1, 0, +1 under one low side light")
+
+
 SHEETS = ["face_rest", "face_blink", "face_sidelit", "face_lods", "face_under_chin", "face_controls_eyes", "face_controls_mouth", "face_clay", "face_visemes",
-          "face_expressions", "face_identity"]
+          "face_expressions", "face_identity", "face_identity_sidelit"]
 
 
 def main():
@@ -246,6 +314,9 @@ def main():
     ap.add_argument("--out", default=".")
     ap.add_argument("--only", default="")
     ap.add_argument("--samples", type=int, default=None)
+    # `face_identity_sidelit`: which parameters (ids, `,`-separated; all
+    # when empty).
+    ap.add_argument("--params", default="")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     os.makedirs(a.out, exist_ok=True)
     run = Run(a)

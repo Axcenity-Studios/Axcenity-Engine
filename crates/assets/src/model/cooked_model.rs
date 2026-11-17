@@ -23,7 +23,7 @@ use glam::{Mat4, Quat, Vec3};
 use super::stamped::Cache;
 use super::{
     AlphaMode, Bone, BoneTransform, Channel, ChannelTexture, Image, ImageOrigin, Joint, Model,
-    ModelMaterial, MorphTarget, Primitive, PrimitiveMorph, Rig, new_key,
+    ModelMaterial, ModelShading, MorphTarget, Primitive, PrimitiveMorph, Rig, new_key,
 };
 use crate::cooked::{self, SourceStamp, content_hash};
 
@@ -265,6 +265,8 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         sway,
         flutter,
         translucency,
+        shading,
+        defined_normal_texture,
     } = material;
     out.text(name);
     out.floats(base_color);
@@ -295,6 +297,11 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
     out.floats(uv_offset);
     out.u8(u8::from(*double_sided));
     out.floats(&[*sway, *flutter, *translucency]);
+    out.u8(match shading {
+        ModelShading::Standard => 0,
+        ModelShading::Skin => 1,
+    });
+    images.write(out, defined_normal_texture.as_ref());
     Some(())
 }
 
@@ -723,6 +730,12 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     let uv_offset = input.floats()?;
     let double_sided = input.bool()?;
     let [sway, flutter, translucency] = input.floats()?;
+    let shading = match input.u8()? {
+        0 => ModelShading::Standard,
+        1 => ModelShading::Skin,
+        _ => return None,
+    };
+    let defined_normal_texture = image(input)?;
     Some(ModelMaterial {
         name,
         base_color,
@@ -748,6 +761,8 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         sway,
         flutter,
         translucency,
+        shading,
+        defined_normal_texture,
     })
 }
 
@@ -864,7 +879,7 @@ mod tests {
         fn describe_primitive(out: &mut String, primitive: &Primitive) {
             let material = &primitive.material;
             out.push_str(&format!(
-                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {} {} {}\n",
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {} {} {}\n",
                 primitive.positions,
                 primitive.normals,
                 primitive.uvs,
@@ -889,7 +904,8 @@ mod tests {
                 image(&material.specular_texture),
                 (material.double_sided, material.sway),
                 material.flutter,
-                material.translucency,
+                (material.translucency, material.shading),
+                image(&material.defined_normal_texture),
                 primitive.lods.len(),
                 "",
             ));

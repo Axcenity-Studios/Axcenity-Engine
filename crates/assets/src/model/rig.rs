@@ -378,6 +378,23 @@ impl Posed {
         self.version = NEXT_VERSION.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Multiplies each joint's matrix by `binds` (one per joint; missing
+    /// ones change nothing), after the pose: how a live identity re-seats
+    /// a model's binds and carries its surface (`LiveIdentity::dress`).
+    /// Primitives already asked for are skinned again when next asked.
+    pub fn rebind(&mut self, binds: &[Mat4]) {
+        for (joint, bind) in self.joints.iter_mut().zip(binds) {
+            *joint *= *bind;
+        }
+        for (normal, joint) in self.normal_matrices.iter_mut().zip(&self.joints) {
+            *normal = Mat3::from_mat4(*joint).inverse().transpose();
+        }
+        for slot in &mut self.posed {
+            *slot = OnceLock::new();
+        }
+        self.version = NEXT_VERSION.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Whether any blend shape is leaned toward at all.
     pub fn is_morphed(&self) -> bool {
         self.morph_weights.iter().any(|weight| *weight != 0.0)

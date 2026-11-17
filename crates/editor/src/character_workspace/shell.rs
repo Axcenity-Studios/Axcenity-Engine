@@ -10,11 +10,10 @@ use std::time::Instant;
 use eframe::egui::{self, Rect, Sense, vec2};
 use eframe::egui_wgpu::RenderState;
 
+use super::compare::{self, OTHER_AT};
 use super::intent::{Gesture, Intent};
 use super::stage::{self, ViewPreset};
-use super::{
-    Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, presets, toolbar,
-};
+use super::{Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, toolbar};
 use crate::dialog;
 use crate::theme::{self, icons};
 
@@ -40,7 +39,7 @@ impl CharacterWorkspace {
         // that started it missed the release (a colour picker's popup).
         if self.dragging() && !ui.input(|input| input.pointer.any_down()) {
             self.history.commit(&self.description);
-            self.refresh(true);
+            self.refresh();
         }
         let mut intents = self.shortcuts(ui);
         let full = ui.available_rect_before_wrap();
@@ -69,6 +68,18 @@ impl CharacterWorkspace {
 
         // One library for the frame: each call stats the catalogue.
         let library = self.library();
+        self.autosave_step(Instant::now());
+        if let Some(render_state) = render_state {
+            self.pictures
+                .set_gpu(&render_state.device, &render_state.queue);
+        }
+        self.pictures.poll(ui.ctx());
+        if self.selection.category == Category::Presets {
+            self.load_preset_pictures(ui.ctx(), &library);
+        }
+        // While a held version is shown in the character's place, editing
+        // is off: what's edited is always what's seen.
+        let looking = self.comparison.instead().is_some();
         let child =
             |ui: &mut egui::Ui, rect: Rect| ui.new_child(egui::UiBuilder::new().max_rect(rect));
         intents.extend(toolbar::show(
@@ -80,17 +91,26 @@ impl CharacterWorkspace {
         ui.painter().rect_filled(right, 0.0, palette.panel);
         intents.extend(nav::show(&mut child(ui, left.shrink(10.0)), self, &library));
         self.viewport(ui, view.shrink2(vec2(6.0, 4.0)), render_state);
+        intents.extend(compare::strip(
+            &mut child(
+                ui,
+                Rect::from_min_size(view.min + vec2(14.0, 10.0), vec2(view.width() - 28.0, 30.0)),
+            ),
+            self,
+        ));
         intents.extend(bottom_bar::show(
             &mut child(ui, bar.shrink2(vec2(10.0, 4.0))),
             self,
         ));
-        intents.extend(panel::show(
-            &mut child(ui, right.shrink(12.0)),
-            self,
-            &library,
-        ));
+        let mut panel_ui = child(ui, right.shrink(12.0));
+        if looking {
+            panel_ui.disable();
+        }
+        intents.extend(panel::show(&mut panel_ui, self, &library));
         self.status(&mut child(ui, status.shrink2(vec2(12.0, 4.0))));
-        if self.asking.is_some() {
+        if self.recovery.is_some() {
+            self.offer_recovery(ui.ctx());
+        } else if self.asking.is_some() {
             self.ask_to_save(ui.ctx());
         }
         ui.advance_cursor_after_rect(full);
@@ -107,6 +127,10 @@ impl CharacterWorkspace {
     /// Does what a panel asked. The one place the workspace is changed from
     /// the interface.
     pub fn apply(&mut self, intent: Intent) -> Option<WorkspaceAction> {
+        if intent.edits() && self.comparison.instead().is_some() {
+            // Back to the character being edited before it changes.
+            self.show_held(None);
+        }
         match intent {
             Intent::SetParameter { id, value, gesture } => {
                 self.set_value(&id, value, false, gesture)
@@ -130,13 +154,11 @@ impl CharacterWorkspace {
             } => self.set_material(&slot, &value, to, gesture),
             Intent::SetBase(base) => self.set_base(&base),
             Intent::Rename(name) => self.rename(&name),
-            Intent::ApplyPreset(index) => {
-                if let Some(preset) = presets().get(index) {
-                    self.use_preset(preset);
-                }
-            }
+            Intent::ApplyPreset(id) => self.use_preset(&id),
+            Intent::SaveAsPreset { kind, name } => self.save_as_preset(kind, &name),
+            Intent::ToggleFavourite(id) => self.toggle_favourite(&id),
             Intent::New(_) | Intent::Open(_) if self.dirty() => self.asking = Some(intent),
-            Intent::New(index) => self.new_character(index),
+            Intent::New(start) => self.new_character(&start),
             Intent::Open(file) => {
                 if let Err(error) = self.open_character(&file) {
                     self.notice = Some(error);
@@ -155,6 +177,14 @@ impl CharacterWorkspace {
             Intent::SetLighting(lighting) => self.lighting = lighting,
             Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
             Intent::PreviewExpression(name) => self.preview_expression(name),
+            Intent::Randomize(scope) => self.randomize(scope),
+            Intent::SetLock { ids, locked } => self.set_lock(&ids, locked),
+            Intent::Capture => self.capture(),
+            Intent::ShowHeld(index) => self.show_held(index),
+            Intent::SideBySide(on) => self.set_side_by_side(on),
+            Intent::KeepHeld(index) => self.keep_held(index),
+            Intent::DiscardHeld(index) => self.discard_held(index),
+            Intent::Recover(take) => self.recover(take),
             Intent::Home => return Some(WorkspaceAction::Home),
         }
         None
@@ -212,6 +242,50 @@ impl CharacterWorkspace {
             Some(dialog::Outcome::Picked(2)) => self.answer(Some(true)),
             Some(dialog::Outcome::Picked(1)) => self.answer(Some(false)),
             Some(_) => self.answer(None),
+            None => {}
+        }
+    }
+
+    /// "Recover the unsaved character?": a crash left one (autosave).
+    fn offer_recovery(&mut self, ctx: &egui::Context) {
+        let Some(recovery) = &self.recovery else {
+            return;
+        };
+        let message = format!(
+            "Character Studio closed with unsaved changes to \"{}\". Recover them? Discard \
+             throws them away.",
+            recovery.description.name
+        );
+        let (icon, tone) = dialog::unsaved_style();
+        let outcome = dialog::ask(
+            ctx,
+            &dialog::Question {
+                id: "character studio recover",
+                icon,
+                tone,
+                title: "Recover the unsaved character?",
+                message: &message,
+                items: Vec::new(),
+            },
+            &[
+                dialog::Button::new(icons::TRASH, "Discard", dialog::Kind::Plain),
+                dialog::Button::new(
+                    icons::ARROW_COUNTER_CLOCKWISE,
+                    "Recover",
+                    dialog::Kind::Main,
+                ),
+            ],
+        );
+        match outcome {
+            Some(dialog::Outcome::Picked(1)) => {
+                self.apply(Intent::Recover(true));
+            }
+            Some(dialog::Outcome::Picked(0)) => {
+                self.apply(Intent::Recover(false));
+            }
+            // Closed without an answer: the file stays, offered next time
+            // (unless new work is written over it).
+            Some(_) => self.recovery = None,
             None => {}
         }
     }
@@ -316,24 +390,83 @@ impl CharacterWorkspace {
         self.step();
         stage::apply(&mut self.world, self.lighting, self.backdrop);
         let palette = theme::palette(ui.ctx());
+        // Side by side: the held version on the left, the current one on
+        // the right, one camera moved over to each, the same light.
+        let beside = self.comparison.beside();
+        let (left, right) = match beside {
+            Some(_) => {
+                let middle = rect.center().x;
+                (
+                    Some(Rect::from_min_max(
+                        rect.min,
+                        egui::pos2(middle - 2.0, rect.max.y),
+                    )),
+                    Rect::from_min_max(egui::pos2(middle + 2.0, rect.min.y), rect.max),
+                )
+            }
+            None => (None, rect),
+        };
         match render_state {
             Some(render_state) => {
-                let mut list = axcenity_scene::build_draw_list_posed(
-                    &self.world,
-                    &self.assets,
-                    self.orbit.camera(),
-                    self.poses(),
-                    &mut axcenity_scene::TerrainCache::new(),
-                );
-                stage::backdrop(&mut list, self.backdrop);
-                self.canvas.paint(ui, rect, render_state, &list);
+                let camera = self.orbit.camera();
+                let list = self.draw_list(camera);
+                self.canvas.paint(ui, right, render_state, &list);
+                if let Some(left) = left {
+                    let mut moved = camera;
+                    moved.position += OTHER_AT;
+                    moved.look_at += OTHER_AT;
+                    let list = self.draw_list(moved);
+                    self.other_canvas.paint(ui, left, render_state, &list);
+                }
                 ui.ctx().request_repaint();
             }
             None => {
-                ui.painter_at(rect)
-                    .rect_filled(rect, theme::radius::CARD, palette.inset);
+                for rect in left.into_iter().chain([right]) {
+                    ui.painter_at(rect)
+                        .rect_filled(rect, theme::radius::CARD, palette.inset);
+                }
             }
         }
+        // Say what is shown, so a held version is never taken for the
+        // character being edited. Each label sits on a small card of its
+        // own: the backdrop is any colour the person picks.
+        let label = |rect: Rect, text: String| {
+            let painter = ui.painter_at(rect);
+            let galley =
+                painter.layout_no_wrap(text, egui::FontId::proportional(14.0), palette.text_strong);
+            let at = egui::pos2(rect.left() + 22.0, rect.bottom() - 16.0 - galley.size().y);
+            let card = Rect::from_min_size(at, galley.size()).expand2(vec2(8.0, 4.0));
+            painter.rect_filled(card, theme::radius::CARD, compare::backing(&palette));
+            painter.galley(at, galley, palette.text_strong);
+        };
+        if let (Some(index), Some(left)) = (beside, left) {
+            label(
+                left,
+                format!("{} (held)", compare::Comparison::letter(index)),
+            );
+            label(right, "Current".to_owned());
+        } else if let Some(index) = self.comparison.instead() {
+            label(
+                right,
+                format!(
+                    "Showing {} (held): editing is off until you go back to Current",
+                    compare::Comparison::letter(index)
+                ),
+            );
+        }
+    }
+
+    /// The preview World's draw list from `camera`, on the stage.
+    fn draw_list(&self, camera: axcenity_render::Camera) -> axcenity_render::DrawList {
+        let mut list = axcenity_scene::build_draw_list_posed(
+            &self.world,
+            &self.assets,
+            camera,
+            self.poses(),
+            &mut axcenity_scene::TerrainCache::new(),
+        );
+        stage::backdrop(&mut list, self.backdrop);
+        list
     }
 
     /// Clears a notice that has been shown long enough (audit D-13).

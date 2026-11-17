@@ -1536,8 +1536,8 @@ impl EditorApp {
                 self.settings.page = super::settings::SettingsPage::TeamCreate;
                 self.settings.open = true;
             }
-            Some(StartAction::NewCharacter(preset)) => {
-                self.open_character_workspace(Some(preset), None)
+            Some(StartAction::NewCharacter(start)) => {
+                self.open_character_workspace(Some(start), None)
             }
             Some(StartAction::OpenCharacter(file)) => {
                 self.open_character_workspace(None, Some(&file))

@@ -8,7 +8,7 @@ use axcenity_avatar::{BaseManifest, Description, Library};
 use super::super::edit::Scope;
 use super::super::selection::{Level, Selection};
 use super::super::{
-    Category, CharacterWorkspace, DEFAULT_BASE, find_character_library, nav, toolbar,
+    Category, CharacterWorkspace, DEFAULT_BASE, Start, find_character_library, nav, toolbar,
 };
 use super::materials::{DRAWN_TODAY, value_label};
 use super::parameters::{hidden_changes, rows};
@@ -42,12 +42,16 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
             "eye_height_left",
             "eye_spacing_left",
             "eye_size_left",
-            "eye_tilt_left"
+            "eye_tilt_left",
+            // R4's eye controls.
+            "eye_corner_left",
+            "upper_lid_fold_left",
+            "lower_lid_left"
         ]
     );
     // Advanced adds the depth; Symmetry off shows both sides.
     assert!(ids(&eyes(&description, Level::Advanced, true)).contains(&"eye_depth_left".into()));
-    assert_eq!(eyes(&description, Level::Detailed, false).len(), 8);
+    assert_eq!(eyes(&description, Level::Detailed, false).len(), 14);
     // Audit D-11: a pair whose sides differ shows both, even with Symmetry.
     description.parameters.insert("eye_size_left".into(), 0.3);
     let shown = eyes(&description, Level::Detailed, true);
@@ -184,7 +188,7 @@ fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
 #[test]
 fn reset_offers_everything_the_category_and_the_picked_feature() {
     let folder = test_folder("panel-reset");
-    let workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
     let mut selection = Selection {
         category: Category::Face,
@@ -225,6 +229,9 @@ fn the_skin_page_offers_the_skin_models_values_and_says_which_are_drawn() {
         "{names:?}"
     );
     assert!(DRAWN_TODAY.contains(&"tint"));
-    assert!(!DRAWN_TODAY.contains(&"melanin"));
+    // Since R5 the Skin model draws all of its values; the Eye model's
+    // aren't drawn yet.
+    assert!(DRAWN_TODAY.contains(&"melanin") && DRAWN_TODAY.contains(&"softness"));
+    assert!(!DRAWN_TODAY.contains(&"pupil_size"));
     assert_eq!(value_label("roughness_scale"), "Roughness scale");
 }

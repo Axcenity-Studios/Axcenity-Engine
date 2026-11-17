@@ -8,7 +8,8 @@
 //! MeshPart shows at rest). A parameter that drives an attribute (the nine
 //! proportions) is checked to change that attribute, which is one of
 //! `anim`'s body sliders; that each of those moves the skin is `anim`'s
-//! `tests/realistic_proportions.rs`.
+//! `tests/realistic_proportions.rs`. The hips below 1 move no bone (R3): a
+//! shape narrows them, checked on the baked body like the shape sliders.
 
 use std::path::{Path, PathBuf};
 
@@ -63,12 +64,24 @@ const PART_PARAMETERS: [(&str, &str); 2] = [
     ("brow_length_right", "AxcenityRealistic/Brows"),
 ];
 
-/// The rest positions of `model`'s first primitive at each level of detail.
+/// The rest positions of `model`'s first primitive at each level of detail,
+/// in metres. (A model's positions are its box scaled to one on each axis;
+/// `size` is the box in the file, in metres for this one. Until R4 this
+/// compared the scaled positions, which made a move up count 1.75 times
+/// less than it is and a move forward three times more.)
 fn rest(model: &Model) -> Vec<Vec<[f32; 3]>> {
     let rig = model.rig.as_ref().unwrap();
     let posed = model.pose_shaped(&rig.rest_pose(), &[]).unwrap();
+    let size = model.size;
     (0..=model.primitives[0].lods.len())
-        .map(|level| posed.primitive(model, 0, level).positions.clone())
+        .map(|level| {
+            posed
+                .primitive(model, 0, level)
+                .positions
+                .iter()
+                .map(|p| [p[0] * size[0], p[1] * size[1], p[2] * size[2]])
+                .collect()
+        })
         .collect()
 }
 
@@ -123,6 +136,7 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
     let resolved_neutral = resolve(&library, &neutral).unwrap();
     let at_rest = rest(&model.bake(&resolved_neutral.identity));
     let mut checked = 0;
+    let mut proportions = 0;
     for parameter in &base.parameters {
         for end in parameter.range {
             if (end - parameter.default).abs() < 1e-6 {
@@ -133,17 +147,23 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
             let resolved = resolve(&library, &description).unwrap();
             assert!(resolved.problems.is_empty(), "{:?}", resolved.problems);
             let at = format!("{} at {end}", parameter.id);
-            if !parameter.attributes.is_empty() {
-                for driver in &parameter.attributes {
-                    assert!(
-                        BODY_SLIDERS.contains(&driver.attribute.as_str()),
-                        "{at}: {}",
-                        driver.attribute
-                    );
-                    let was = resolved_neutral.attributes[&driver.attribute];
-                    let now = resolved.attributes[&driver.attribute];
-                    assert!((now - was).abs() > 0.05, "{at}: {was} to {now}");
-                }
+            // A proportion changes its body slider, except where a shape
+            // does its work instead (the hips below 1, R3): then it has to
+            // move the baked body, which a body slider alone doesn't.
+            // (The nearest end is the feet's, 0.96: a 4% smaller foot.)
+            let slider_moves = parameter.attributes.iter().any(|driver| {
+                let was = resolved_neutral.attributes[&driver.attribute];
+                (resolved.attributes[&driver.attribute] - was).abs() > 0.03
+            });
+            for driver in &parameter.attributes {
+                assert!(
+                    BODY_SLIDERS.contains(&driver.attribute.as_str()),
+                    "{at}: {}",
+                    driver.attribute
+                );
+            }
+            if slider_moves {
+                proportions += 1;
             } else if let Some((_, part)) =
                 PART_PARAMETERS.iter().find(|(id, _)| *id == parameter.id)
             {
@@ -164,9 +184,14 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
         }
     }
     // Frame (one end), muscle and fat, sixteen regions, nine proportions
-    // (the hips only widen: one end), and the face's 47 parameters (CO6's
-    // 45 and the brows' length).
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) - 1 + 2 * 47);
+    // (both ends: the hips narrow too since R3), and the face's 61
+    // parameters (CO6's 45, the brows' length, and R4's 14: nose tip
+    // projection and rotation, nose width, philtrum length, and a pair each
+    // of jaw angle, upper lid fold, lower lid, eye corner and earlobe).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) + 2 * 61);
+    // Every proportion's end moves its body slider but the hips' low end,
+    // which moves the body by a shape.
+    assert_eq!(proportions, 2 * 9 - 1);
 }
 
 /// The two whole-body sliders are not one slider twice: each corner of
@@ -282,8 +307,10 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // brows' length, four shapes the body carries empty for the `Brows`
     // card, and a mask shape under each of the three underwear items.)
     // Three more in R3: `Masculine_Fat_Soft`, `Feminine_Fat_Soft` (fat that
-    // is fat) and `Masculine_Belly_Flat` (the slight body's belly).
-    assert_eq!(model.morph_targets.len(), 158);
+    // is fat) and `Masculine_Belly_Flat` (the slight body's belly); two more
+    // for the wider ranges, `<Frame>_Hips_Narrow` (the hips below 1).
+    // Fourteen more in R4: the face's new controls, one shape each.
+    assert_eq!(model.morph_targets.len(), 174);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always
@@ -334,4 +361,41 @@ fn the_underwear_is_always_worn_and_follows_the_frame() {
     let again = dressed.clone();
     axcenity_avatar::wear_choices(&mut dressed, &library);
     assert_eq!(dressed, again);
+}
+
+/// The skin's normal map shows its defined (lean, muscular) layer only on
+/// lean, muscular bodies: `muscle` drives the Skin's `definition` and
+/// `fat` its `softness`, and the renderer shows `definition × (1 −
+/// softness)` of it (R5, OPEN-07). Heavy bellies get none.
+#[test]
+fn muscle_and_fat_drive_how_much_of_the_skins_definition_shows() {
+    use axcenity_avatar::MaterialValue;
+    let library = library();
+    let shown = |muscle: f32, fat: f32| {
+        let mut description = Description::new("Build", BASE);
+        description.parameters.insert("muscle".into(), muscle);
+        description.parameters.insert("fat".into(), fat);
+        let resolved = resolve(&library, &description).unwrap();
+        assert!(resolved.problems.is_empty(), "{:?}", resolved.problems);
+        let skin = &resolved.materials["Skin"];
+        let value = |name: &str| match skin.get(name) {
+            Some(MaterialValue::Number(n)) => *n,
+            other => panic!("Skin {name}: {other:?}"),
+        };
+        value("definition") * (1.0 - value("softness"))
+    };
+    // The benchmark cast's bodies (muscle, fat).
+    let athletic = shown(0.7, -0.4);
+    let heavyset = shown(0.2, 0.8);
+    let average = shown(0.0, 0.0);
+    let slim = shown(-0.2, -0.6);
+    let heavy_muscular = shown(1.0, 1.0);
+    assert!(athletic > 0.7, "athletic: {athletic}");
+    assert!(heavyset < 0.05, "heavyset: {heavyset}");
+    assert!(
+        heavy_muscular < 0.05,
+        "heavy and muscular: {heavy_muscular}"
+    );
+    assert!(average < 0.3, "average: {average}");
+    assert!(slim < 0.3, "slim, not muscular: {slim}");
 }

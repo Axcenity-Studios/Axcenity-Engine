@@ -6,6 +6,8 @@
 //! whose sides differ shows both, so nothing is flattened unseen (audit
 //! D-11).
 
+use std::collections::BTreeSet;
+
 use axcenity_avatar::{BaseManifest, Description, Parameter};
 use eframe::egui;
 
@@ -14,7 +16,7 @@ use super::super::selection::{
     Level, Selection, parameter_about, parameter_feature, parameter_level,
 };
 use super::super::{Category, symmetric_label, value_of};
-use super::row::{self, Row};
+use super::row::{self, Asked, Row};
 use crate::theme::{self, icons};
 use crate::widgets;
 
@@ -96,6 +98,7 @@ pub(super) fn show(
     selection: &Selection,
     category: Category,
     symmetry: bool,
+    locks: &BTreeSet<String>,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
@@ -125,7 +128,14 @@ pub(super) fn show(
         any = true;
         let draw = |ui: &mut egui::Ui, intents: &mut Vec<Intent>| {
             for row in &shown {
-                intents.extend(parameter(ui, base, description, row, selection.level));
+                intents.extend(parameter(
+                    ui,
+                    base,
+                    description,
+                    row,
+                    selection.level,
+                    locks,
+                ));
             }
         };
         if selection.feature.is_some() {
@@ -180,22 +190,49 @@ pub(super) fn show(
     intents
 }
 
-/// One parameter's row: a slider, or chips for a choice.
+/// The IDs a row's lock covers: the parameter and, on a mirrored row,
+/// its mirror.
+fn lock_ids(shown: &Shown) -> Vec<String> {
+    let parameter = shown.parameter;
+    let mut ids = vec![parameter.id.clone()];
+    if shown.mirrored
+        && let Some(mirror) = &parameter.mirror
+    {
+        ids.push(mirror.clone());
+    }
+    ids
+}
+
+/// One parameter's row: a slider, or chips for a choice; each with a lock
+/// for Randomize.
 fn parameter(
     ui: &mut egui::Ui,
     base: &BaseManifest,
     description: &Description,
     shown: &Shown,
     level: Level,
+    locks: &BTreeSet<String>,
 ) -> Option<Intent> {
     let parameter = shown.parameter;
     let value = value_of(description, Some(base), &parameter.id);
+    let ids = lock_ids(shown);
+    let locked = ids.iter().all(|id| locks.contains(id));
     if !parameter.choices.is_empty() {
         let picked = parameter.nearest_choice(value).map(|choice| choice.value);
         let palette = theme::palette(ui.ctx());
-        ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
-            .on_hover_text(parameter_about(parameter));
         let mut out = None;
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
+                .on_hover_text(parameter_about(parameter));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(locked) = row::lock_toggle(ui, locked) {
+                    out = Some(Intent::SetLock {
+                        ids: ids.clone(),
+                        locked,
+                    });
+                }
+            });
+        });
         ui.horizontal_wrapped(|ui| {
             for choice in &parameter.choices {
                 if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
@@ -215,7 +252,7 @@ fn parameter(
         parameter.label.clone()
     };
     let about = parameter_about(parameter);
-    let (value, gesture) = row::slider(
+    let asked = row::slider(
         ui,
         &Row {
             id: &parameter.id,
@@ -226,8 +263,13 @@ fn parameter(
             range: parameter.range,
             default: parameter.default,
             typed: level == Level::Advanced,
+            locked: Some(locked),
         },
     )?;
+    let (value, gesture) = match asked {
+        Asked::Set(value, gesture) => (value, gesture),
+        Asked::Lock(locked) => return Some(Intent::SetLock { ids, locked }),
+    };
     let id = parameter.id.clone();
     Some(if shown.mirrored {
         Intent::SetMirrored { id, value, gesture }

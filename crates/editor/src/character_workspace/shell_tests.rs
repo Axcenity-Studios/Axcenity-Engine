@@ -14,7 +14,7 @@ use crate::character_studio::test_folder;
 use crate::theme;
 
 /// Every piece of text drawn in `output`.
-fn drawn_texts(output: &egui::FullOutput) -> Vec<String> {
+pub(super) fn drawn_texts(output: &egui::FullOutput) -> Vec<String> {
     fn walk(shape: &egui::Shape, found: &mut Vec<String>) {
         match shape {
             egui::Shape::Text(text) => found.push(text.galley.text().to_owned()),
@@ -29,7 +29,7 @@ fn drawn_texts(output: &egui::FullOutput) -> Vec<String> {
     found
 }
 
-fn input(events: Vec<egui::Event>) -> egui::RawInput {
+pub(super) fn input(events: Vec<egui::Event>) -> egui::RawInput {
     egui::RawInput {
         screen_rect: Some(egui::Rect::from_min_size(
             egui::Pos2::ZERO,
@@ -58,7 +58,7 @@ fn key(key: egui::Key, modifiers: egui::Modifiers) -> Vec<egui::Event> {
 #[test]
 fn ctrl_shift_z_redoes_and_ctrl_z_undoes() {
     let folder = test_folder("shell-keys");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     for value in [0.5, 0.7] {
         workspace.apply(Intent::SetParameter {
             id: "fat".into(),
@@ -94,7 +94,7 @@ fn ctrl_shift_z_redoes_and_ctrl_z_undoes() {
 #[test]
 fn the_name_field_can_be_emptied_and_renames_once_when_left() {
     let folder = test_folder("shell-name");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let before = workspace.description().name.clone();
     assert!(!workspace.can_undo());
     let draft_id = egui::Id::new("character studio name");
@@ -153,7 +153,7 @@ fn the_name_field_can_be_emptied_and_renames_once_when_left() {
 #[test]
 fn the_face_view_aims_at_the_head_of_a_tall_or_short_character() {
     let folder = test_folder("shell-face-view");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.step_by(1.0 / 30.0);
     workspace.focus(ViewPreset::Face);
     let default = workspace.orbit.target.y;
@@ -185,7 +185,7 @@ fn the_face_view_aims_at_the_head_of_a_tall_or_short_character() {
 #[test]
 fn pages_frame_the_face_or_the_whole_character() {
     let folder = test_folder("shell-framing");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     assert_eq!(workspace.view, Some(ViewPreset::FullBody));
     workspace.apply(Intent::PickCategory(Category::Face));
     assert_eq!(workspace.view, Some(ViewPreset::Face));
@@ -211,7 +211,7 @@ fn pages_frame_the_face_or_the_whole_character() {
 #[test]
 fn a_notice_clears_itself() {
     let folder = test_folder("shell-notice");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let start = Instant::now();
     workspace.notice = Some("Saved".to_owned());
     workspace.expire_notice(start);
@@ -231,7 +231,7 @@ fn a_notice_clears_itself() {
 #[test]
 fn an_expression_is_previewed_on_the_face_and_never_saved() {
     let folder = test_folder("shell-expression");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
     let weights = |workspace: &CharacterWorkspace| -> f32 {
         workspace.poses()[&body]
@@ -292,7 +292,7 @@ fn an_expression_is_previewed_on_the_face_and_never_saved() {
 #[test]
 fn every_page_is_drawn_with_its_controls() {
     let folder = test_folder("shell-pages");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let ctx = theme::test_context();
     let draw = |workspace: &mut CharacterWorkspace| -> Vec<String> {
         let mut texts = Vec::new();
@@ -309,7 +309,7 @@ fn every_page_is_drawn_with_its_controls() {
         (
             Category::Body,
             Level::Quick,
-            &["Body type", "Male", "Athletic female", "Quick"],
+            &["Body type", "Male", "Athletic", "Custom", "Family", "Quick"],
         ),
         (
             Category::Body,
@@ -417,6 +417,8 @@ fn every_page_is_drawn_with_its_controls() {
     if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
         workspace.apply(Intent::Reset(super::edit::Scope::All));
         workspace.apply(Intent::PickFeature(None));
+        // The Presets page's pictures, drawn as its thread draws them.
+        paint_preset_pictures(&folder, &workspace);
         for (category, level, name) in [
             (Category::Body, Level::Quick, "body-quick"),
             (Category::Body, Level::Detailed, "body"),
@@ -437,18 +439,96 @@ fn every_page_is_drawn_with_its_controls() {
             if category == Category::Face {
                 workspace.apply(Intent::PickFeature(Some("nose".into())));
             }
-            // Each snapshot makes its own GPU device; the editor has one.
-            workspace.canvas = Canvas::default();
-            crate::snapshot::snapshot_rendered(
-                &snapshots.join(format!("character-studio-page-{name}.png")),
-                egui::vec2(1440.0, 900.0),
-                vec![Vec::new(); 3],
-                |ui, render_state| {
-                    workspace.ui(ui, Some(render_state));
-                },
-            );
+            // A few pictures are read from disk each frame.
+            let frames = if category == Category::Presets { 10 } else { 3 };
+            snap(&mut workspace, &snapshots, name, frames);
             workspace.apply(Intent::PickFeature(None));
         }
+        // Comparison: A held, a heavier body, side by side and in place.
+        workspace.apply(Intent::PickCategory(Category::Body));
+        workspace.apply(Intent::Capture);
+        workspace.apply(Intent::SetParameter {
+            id: "fat".into(),
+            value: 0.9,
+            gesture: Gesture::Commit,
+        });
+        workspace.apply(Intent::SideBySide(true));
+        snap(&mut workspace, &snapshots, "compare-side-by-side", 3);
+        workspace.apply(Intent::SideBySide(false));
+        workspace.apply(Intent::ShowHeld(Some(0)));
+        snap(&mut workspace, &snapshots, "compare-showing-a", 3);
+        // The same on the Light backdrop: the strip and labels must still
+        // read (they sit on cards of their own).
+        let backdrop = workspace.backdrop;
+        workspace.apply(Intent::SetBackdrop(stage::Backdrop::Light));
+        snap(&mut workspace, &snapshots, "compare-showing-a-light", 3);
+        workspace.apply(Intent::ShowHeld(None));
+        workspace.apply(Intent::SideBySide(true));
+        snap(&mut workspace, &snapshots, "compare-side-by-side-light", 3);
+        workspace.apply(Intent::SideBySide(false));
+        workspace.apply(Intent::SetBackdrop(backdrop));
+        // The stylized family's Body and Face pages.
+        workspace.apply(Intent::New(Start::Family(axcenity_avatar::V1_BASE.into())));
+        workspace.answer(Some(false));
+        snap(&mut workspace, &snapshots, "body-stylized", 3);
+        workspace.apply(Intent::PickCategory(Category::Face));
+        snap(&mut workspace, &snapshots, "face-stylized", 3);
+        // Unsaved work left by a crash is offered on the next open.
+        workspace.apply(Intent::SetParameter {
+            id: "nose_width".into(),
+            value: 0.5,
+            gesture: Gesture::Commit,
+        });
+        workspace.autosave_step(Instant::now());
+        std::mem::forget(workspace);
+        let mut reopened = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+        snap(&mut reopened, &snapshots, "recover", 4);
+        reopened.apply(Intent::Recover(false));
     }
     let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Saves the workspace drawn for real at 1440 by 900 after `frames` frames.
+fn snap(
+    workspace: &mut CharacterWorkspace,
+    snapshots: &std::path::Path,
+    name: &str,
+    frames: usize,
+) {
+    // Each snapshot makes its own GPU device; the editor has one.
+    workspace.canvas = Canvas::default();
+    workspace.other_canvas = Canvas::default();
+    crate::snapshot::snapshot_rendered(
+        &snapshots.join(format!("character-studio-page-{name}.png")),
+        egui::vec2(1440.0, 900.0),
+        vec![Vec::new(); frames],
+        |ui, render_state| {
+            workspace.ui(ui, Some(render_state));
+        },
+    );
+}
+
+/// Draws the pictures of every preset of the workspace's base model into
+/// its cache, as the Presets page's thread would (none without a GPU).
+fn paint_preset_pictures(folder: &std::path::Path, workspace: &CharacterWorkspace) {
+    let instance = axcenity_render::adapters::instance();
+    let Some((device, queue)) =
+        pollster::block_on(axcenity_render::adapters::adapter(&instance, None))
+            .ok()
+            .and_then(|adapter| {
+                pollster::block_on(adapter.request_device(&Default::default())).ok()
+            })
+    else {
+        return;
+    };
+    let mut painter = thumbnails::Painter::new(folder, &device, &queue).unwrap();
+    let library = workspace.library();
+    for listed in presets::all(&library, workspace.own_presets()) {
+        if listed.preset.base != workspace.description().base {
+            continue;
+        }
+        let subject = thumbnails::preset_subject(&listed, &library);
+        let out = thumbnails::preset_picture(folder, listed.id, &subject);
+        painter.paint_to(&thumbnails::Job { subject, out }).unwrap();
+    }
 }

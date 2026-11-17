@@ -25,7 +25,7 @@ mod test_rig;
 
 pub use collision::is_piece as is_collision_piece;
 pub use identity::{
-    BoneChange, BoneDelta, Identity, IdentityLayer, derived_mesh_id, split_derived,
+    BoneChange, BoneDelta, Identity, IdentityLayer, LiveIdentity, derived_mesh_id, split_derived,
 };
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
@@ -292,6 +292,7 @@ impl Primitive {
             &material.normal_texture,
             &material.emissive_texture,
             &material.specular_texture,
+            &material.defined_normal_texture,
         ]
         .into_iter()
         .flatten();
@@ -390,6 +391,34 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
     }
 }
 
+/// How a glTF material's `extras` say it's lit (`axcenity_shading`), and
+/// the texture index of a skin's defined normal map
+/// (`axcenity_defined_normal: {"index": n}`), if it names one.
+fn shading_of(extras: &gltf::json::Extras) -> (ModelShading, Option<usize>) {
+    #[derive(serde::Deserialize)]
+    struct TextureRef {
+        index: usize,
+    }
+    #[derive(serde::Deserialize)]
+    struct Shading {
+        axcenity_shading: Option<serde_json::Value>,
+        axcenity_defined_normal: Option<TextureRef>,
+    }
+    let Some(shading) = extras
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<Shading>(raw.get()).ok())
+    else {
+        return (ModelShading::Standard, None);
+    };
+    match shading.axcenity_shading.as_ref().and_then(|v| v.as_str()) {
+        Some("skin") => (
+            ModelShading::Skin,
+            shading.axcenity_defined_normal.map(|texture| texture.index),
+        ),
+        _ => (ModelShading::Standard, None),
+    }
+}
+
 /// A glTF metallic-roughness material. Colors are linear, as in the file.
 /// The textures all use the primitive's one set of texture coordinates.
 #[derive(Clone, Debug)]
@@ -447,6 +476,26 @@ pub struct ModelMaterial {
     /// How much light passes through it from behind, 0 for none: leaves.
     /// From glTF `extras`: `axcenity_translucency`, or a leaf's default.
     pub translucency: f32,
+    /// How it's lit. From glTF `extras`: `axcenity_shading` (`"skin"`);
+    /// anything else, or nothing, is [`ModelShading::Standard`].
+    pub shading: ModelShading,
+    /// A [`ModelShading::Skin`] material's second, "defined" normal map
+    /// (lean and muscular; `normal_texture` is the smooth one), which the
+    /// renderer blends with the first by a material value. From glTF
+    /// `extras`: `axcenity_defined_normal: {"index": <texture>}`, placed
+    /// like the normal map.
+    pub defined_normal_texture: Option<Arc<Image>>,
+}
+
+/// How a [`ModelMaterial`] is lit, as its glTF `extras` say
+/// (`axcenity_shading`): characters' shading models (ADR-0036) that the
+/// model file itself carries, so it draws the same wherever it is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ModelShading {
+    #[default]
+    Standard,
+    /// Skin: light spreads under the surface (`render::SkinShading`).
+    Skin,
 }
 
 impl Default for ModelMaterial {
@@ -477,6 +526,8 @@ impl Default for ModelMaterial {
             sway: 0.0,
             flutter: 0.0,
             translucency: 0.0,
+            shading: ModelShading::Standard,
+            defined_normal_texture: None,
         }
     }
 }
@@ -492,6 +543,7 @@ impl ModelMaterial {
             || self.emissive_texture.is_some()
             || self.opacity_texture.is_some()
             || self.specular_texture.is_some()
+            || self.defined_normal_texture.is_some()
     }
 
     /// Takes every texture off, for a mesh with no texture coordinates.
@@ -504,6 +556,7 @@ impl ModelMaterial {
         self.emissive_texture = None;
         self.opacity_texture = None;
         self.specular_texture = None;
+        self.defined_normal_texture = None;
     }
 }
 
@@ -1135,6 +1188,10 @@ fn read(
         joints: Vec::new(),
         skins: HashMap::new(),
         morph_names: morph::MorphNames::default(),
+        texture_images: document
+            .textures()
+            .map(|texture| texture.source())
+            .collect(),
     };
     let mut models = Vec::new();
     for pick in picks {
@@ -1455,6 +1512,9 @@ struct Reader<'a> {
     skins: HashMap<usize, u16>,
     /// The blend shapes' names so far (see [`morph`]).
     morph_names: morph::MorphNames,
+    /// Each texture's image, by texture index, for textures a material's
+    /// `extras` name (a skin's defined normal map).
+    texture_images: Vec<gltf::Image<'a>>,
 }
 
 impl Reader<'_> {
@@ -1805,6 +1865,13 @@ impl Reader<'_> {
         let occlusion_texture = image(occlusion.map(|i| (i.texture(), i.tex_coord())))?
             .map(|image| ChannelTexture::new(image, Channel::Red));
         let emissive_texture = image(emissive.map(|i| (i.texture(), i.tex_coord())))?;
+        // A skin's defined normal map is placed like its normal map, so it
+        // is read only where the normal map is.
+        let (shading, defined) = shading_of(material.extras());
+        let defined_normal_texture = match defined.and_then(|i| self.texture_images.get(i)) {
+            Some(source) if normal_texture.is_some() => Some(self.image(&source.clone())?),
+            _ => None,
+        };
         let material = ModelMaterial {
             name: material.name().unwrap_or_default().to_owned(),
             base_color: pbr.base_color_factor(),
@@ -1844,6 +1911,8 @@ impl Reader<'_> {
             uv_rotation: transform.as_ref().map_or(0.0, |t| t.rotation()),
             uv_offset: transform.as_ref().map_or([0.0, 0.0], |t| t.offset()),
             double_sided: material.double_sided(),
+            shading,
+            defined_normal_texture,
             ..wind_of(material.extras())
         };
         Ok((material, uv_set))

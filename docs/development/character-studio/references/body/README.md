@@ -66,7 +66,7 @@ Region-specific entries are in the three sub-folders. IDs (B01 …) are used in 
 
 ## 3. Brief §4.1 controls against the existing parameters
 
-Population numbers are ANSUR II (B01), men / women, mean ± SD with the 1st to 99th percentile in brackets, in millimetres unless said. NHANES (B04) is added where the civilian population differs. "Reach" is what the slider does to the built body, computed from the joint heights in section 1.
+(R3, 2026-11-17: the ranges below are CO5's; each slider's range is now set by the sweep in [../../refinement/r3/ranges.md](../../refinement/r3/ranges.md), and the hips narrow.) Population numbers are ANSUR II (B01), men / women, mean ± SD with the 1st to 99th percentile in brackets, in millimetres unless said. NHANES (B04) is added where the civilian population differs. "Reach" is what the slider does to the built body, computed from the joint heights in section 1.
 
 | Control (brief §4.1) | Existing parameter | Measurement it changes | Population | Reach today | Recommended range |
 |---|---|---|---|---|---|

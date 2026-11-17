@@ -13,7 +13,34 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
 | Refinement R0 (Paul's brief of 2026-11-16) | **Done** (2026-11-16) | Audits, reference index, baseline of `main`, plan section 11 (stages R1 to R11); see the log |
-| Refinement R1 to R11 | Not started | R1 (the studio shell and the contracts) next; CO7 and CO9 in parallel |
+| Refinement R1 to R11 | **Started** (2026-11-17) | R1 built (wave 1 and studio part 2); R2a in part (live identity; CO8's compute posing not yet); R3's ranges, R4's face controls and R5's skin model built, each stage's other parts open; next CO8, R2, the waist shape, R5's makeup, R6 and R7 to the asset-quality standard |
+
+## 2026-11-17: the refinement, wave 2 merged (branch `refinement-wave2`)
+
+- **Agents:** five specialists in their own Desktop worktrees, branched from wave 1, each followed by an adversarial reviewer and a fix agent; the session ended mid-wave and a second workflow finished three of them, each reviewed again. Hand-backs in [refinement/r2/](refinement/r2/).
+  - `r2a-live-identity` (lead's track, [ADR-0041](../../../wiki/Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md), Paul's decision 9): the applier, followers and `DescriptionSync` wear identity as live weights on the shared base meshes; `gameplay::description::bake` is the explicit, optional bake and draws the same pixels as the live character. A studio change went from 6 to 8 ms (a bake) to 0.1 to 0.25 ms, so the 120 ms drag throttle is gone.
+  - `r3-ranges` (RA3, decision 8): each proportion's ends found by a sweep (`ranges.py`: the last step that still deforms cleanly, or ANSUR II's 0.5th or 99.5th percentile); height 0.82 to 1.13, hips 0.7 to 1.2 (narrowing by a `<Frame>_Hips_Narrow` shape, no bone), shoulders 0.88 to 1.12, waist 0.775 to 1.225 ([r3/ranges.md](refinement/r3/ranges.md)).
+  - `r1-studio-2` (RA1, decision 7): both families offered, realistic first, with Family chips on the Body page; presets from the library's `*.preset.json` (Start from chips, a Presets page of picture tiles, Save as preset, favourites); Randomize by scope with locks; held versions A, B and C, shown in place or side by side; autosave with recovery.
+  - `r5-skin-shading` (RA5): the Skin shading model (`docs/rendering/skin.md`): a curvature-driven diffusion table, red light spreading further than green, penumbra reddening on the shadow term only, the normal map's grain halved, body normal layers so soft bodies lose the athletic abdominal lines, the navel kept on the smooth map. Reviews sent it back twice: red patches on the face (fixed: signed curvature, a smallest radius, red's blurrier normal held to 1.5 times green's) and a navel glowing in shadow under the hard light (fixed: skin's diffuse light is capped by the triangle's own facing, as Standard's is).
+  - `r4-face-controls` (RA2): 14 parameters for the brief's missing face controls (nose tip projection and rotation, whole-nose width, philtrum length; jaw angle, upper lid fold, lower lid, eye corner and earlobe a side), each with `about`, `feature` and `level`; the feminine frame's face made its own (4.50 mm RMS from the masculine, was 3.12); face presets updated. Reviews sent back the lid fold (new crossings with other ends; now none, held by `face_checks.py`'s new `identity_pairs`), a lower lid with no visible effect on the masculine face (now 3.6% of the eye crop, feminine 8.0%) and a pointed earlobe (now stretched from a pivot, ends rounded, about 1.9 SD).
+- **The lead at merge:**
+  - Studio part 2 was written against the drag throttle: kept its New choices, held versions and autosave on the live `refresh()` (no throttle, no argument), and its tests check the live identity key instead of a derived model.
+  - The Skin page's `DRAWN_TODAY` now names every value the renderer draws (CO7's and R5's); only the Eye model's, cloth's and hair's own say "not drawn yet".
+  - Rebuilt `RealisticParts.glb` on the merged sources (R3's narrowing shapes, R4's face shapes, R5's normal layers): 42.4 MB, 174 shapes; the manifest, presets, catalogue and 445 benchmarks came out unchanged.
+- **Gates on the merged package:** `face_checks.py --package realistic --check`: 0 failures on both frames (a full blink leaves 0.0 mm open and no bare ray; `co6/face_checks.json` unchanged by the merge). `measure.py --package realistic --check` with the sliders section: passed, 0 new crossings in 3,828 pairs (15,312 bodies) a frame; the 2 targets not met are the shoulder at 90 degrees, as before R4.
+- **Seen in the captures (lead; every realistic benchmark under studio, hard and outdoor light, front, three-quarter and face):**
+  - Bodies read well under all five lights; heavy bellies have no abdominal lines; the navel is a dimple; the hips narrow and widen without breaking the underwear.
+  - The feminine face is more its own, but only a little; the brows are heavy dark cards on both frames and make every face read harsh. Next face pass: brows and a stronger feminine face.
+  - The Presets page's body tiles look alike at their size (full-body framing); the comparison strip reads on every backdrop.
+  - The grain's Voronoi crackle still shows in close views (RA5, high priority).
+- **Tests:** after the R2a and R3 merge, `cargo clippy --workspace --all-targets -- -D warnings` clean and the full suite 5101 run, 5094 passed, 7 failed or timed out under load (collab, repo, server, sculpt timing), all 17 passing alone. On the whole merge: `cargo fmt --all --check` and clippy clean; the full suite 5140 run, 5138 passed, 2 failed: the sculpt timing test under load (passes alone) and a studio test that listed the Eyes group's rows before R4's three eye controls (updated). `check-wiki.py`: 0 errors.
+- **Still open from wave 2** (in the hand-backs):
+  - ray-traced shadows, reflections and GI see the base body without identity shapes (the RT copy is skinned, not morphed): CO8;
+  - the waist slider changes the waist by about a sixth of its value (needs a waist shape); one range for both frames; the tallest capture crops the head;
+  - eye_corner on top of four older masculine ends that already cross at the lid crease adds a few pairs (CO6 work); the masculine lower lid is the quieter one;
+  - several face ends are short of 2.5 SD with reasons (philtrum, jaw angle, nose tip rotation);
+  - skin: a few face pixels at the ear rim and lip edges a little redder under the hard light; no test of `softness` on its own; the probe guard holds one GPU's numbers;
+  - the studio's status line while a held version is shown; stylized presets; the Face Rig tab shows the base face.
 
 ## 2026-11-17: the refinement, R1 wave 1 merged (branch `refinement-r1-wave1`)
 
