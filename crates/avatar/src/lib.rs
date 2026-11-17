@@ -13,8 +13,11 @@
 //! - An [`ItemManifest`] (`*.item.json`) is one garment, accessory or
 //!   groom: its slot, layer, the regions it hides, its materials and
 //!   variants, how it fits and where its model is.
-//! - A [`Catalogue`] (`catalogue.json`) lists a library's base models and
-//!   items, and a [`Library`] holds them read.
+//! - A [`Catalogue`] (`catalogue.json`) lists a library's base models,
+//!   items and presets, and a [`Library`] holds them read.
+//! - A preset (`*.preset.json`) is a description with a `preset` block;
+//!   [`apply_preset`] copies what its kind owns. [`randomize`] draws a
+//!   character from a seed.
 //!
 //! Nothing here draws, holds Instances or knows the editor: no camera,
 //! lighting, layout or undo is ever written into these files.
@@ -29,6 +32,8 @@ mod manifest;
 mod material;
 mod migrate;
 mod model_check;
+mod preset;
+mod randomize;
 mod resolve;
 
 #[cfg(test)]
@@ -36,22 +41,30 @@ mod fixtures;
 #[cfg(test)]
 mod tests;
 
-pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem};
+pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem, CataloguePreset};
 pub use choices::{chosen_slots, wear_choice, wear_choices};
-pub use description::{DESCRIPTION_VERSION, Description, WornItem};
+pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
-pub use item::{ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, Source, Variant};
+pub use item::{
+    Adjust, ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, ItemParameter,
+    Limitation, Source, Variant,
+};
 pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{
-    AddedBone, AttributeDriver, BASE_VERSION, BaseManifest, BaseModel, BoneDriver, Category,
-    Choice, Constraint, Corner, Defaults, Face, Factor, Group, MaterialDriver, Parameter, Region,
-    ShapeDriver, Skeleton, Slot, Socket,
+    AddedBone, Anchor, AttributeDriver, BASE_VERSION, BaseManifest, BaseModel, BoneDriver,
+    Category, Choice, Constraint, Corner, Defaults, Drive, Face, Factor, Feature, Group, Handle,
+    Level, MaterialDriver, Parameter, Region, ShapeDriver, Skeleton, Slot, Socket,
 };
 pub use material::{
-    Colour, MaterialSlot, MaterialValue, MaterialValues, ShadingModel, ValueKind, ValueSpec,
+    Colour, MaterialRole, MaterialSlot, MaterialValue, MaterialValues, ShadingModel, ValueKind,
+    ValueSpec,
 };
 pub use migrate::{V1_BASE, V1_ITEMS};
 pub use model_check::{ModelContents, ModelRef};
+pub use preset::{
+    PRESET_SUFFIX, PresetInfo, PresetKind, apply_preset, check_preset, matches_preset,
+};
+pub use randomize::{Scope, random_span, randomize};
 pub use resolve::{
     PartFit, Resolved, ResolvedPart, body_shape_weights, parameter_values, resolve, span,
 };

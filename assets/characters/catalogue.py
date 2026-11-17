@@ -1,6 +1,7 @@
 """Writes `catalogue.json`, the index of this character library: every base
-model manifest (`*.base.json`) and item manifest (`*.item.json`) under this
-folder, with what a browser shows without opening each manifest. The same
+model manifest (`*.base.json`), item manifest (`*.item.json`) and preset
+(`*.preset.json`) under this folder, with what a browser shows without
+opening each file. The same
 index as `avatar::Catalogue::of`; `crates/avatar/tests/shipped_library.rs`
 fails when this file is stale. Plain Python:
 
@@ -49,11 +50,24 @@ def main():
         if item.get("thumbnail"):
             entry["thumbnail"] = resolve(path, item["thumbnail"])
         items.append(entry)
+    presets = []
+    for path in manifests(".preset.json"):
+        preset = read(path)
+        block = preset["preset"]
+        entry = {"id": block["id"], "file": path, "label": preset["name"], "kind": block["kind"],
+                 "base": preset["base"]}
+        if block.get("tags"):
+            entry["tags"] = block["tags"]
+        if block.get("thumbnail"):
+            entry["thumbnail"] = resolve(path, block["thumbnail"])
+        presets.append(entry)
     catalogue = {
         "format_version": 1,
         "bases": sorted(bases, key=lambda entry: entry["id"]),
         "items": sorted(items, key=lambda entry: entry["id"]),
     }
+    if presets:
+        catalogue["presets"] = sorted(presets, key=lambda entry: entry["id"])
     with open(os.path.join(ROOT, "catalogue.json"), "w", newline="\n") as f:
         json.dump(catalogue, f, indent=2)
         f.write("\n")

@@ -162,6 +162,9 @@
         0,
         1
       ],
+      "about": "The body type the character is built on: male or female.",
+      "feature": "body",
+      "level": "quick",
       "shapes": [
         {
           "shape": "Frame_Feminine"
@@ -765,6 +768,9 @@
         0.85,
         1.15
       ],
+      "about": "How tall the whole body is.",
+      "feature": "body",
+      "level": "quick",
       "default": 1,
       "attributes": [
         {
@@ -784,6 +790,9 @@
         0.85,
         1.15
       ],
+      "about": "How long the legs are against the body.",
+      "feature": "thighs",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -804,6 +813,9 @@
         0.85,
         1.15
       ],
+      "about": "How long the arms are against the body.",
+      "feature": "arms",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -824,6 +836,9 @@
         0.85,
         1.15
       ],
+      "about": "How wide the shoulders are.",
+      "feature": "shoulders",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -844,6 +859,9 @@
         0.85,
         1.15
       ],
+      "about": "How wide the waist is.",
+      "feature": "waist",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -864,6 +882,9 @@
         1.0,
         1.15
       ],
+      "about": "How wide the hips are.",
+      "feature": "hips",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -884,6 +905,9 @@
         0.85,
         1.15
       ],
+      "about": "How large the head is against the body.",
+      "feature": "head",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -904,6 +928,9 @@
         0.85,
         1.15
       ],
+      "about": "How large the hands are.",
+      "feature": "hands",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -924,6 +951,9 @@
         0.85,
         1.15
       ],
+      "about": "How large the feet are.",
+      "feature": "feet",
+      "level": "advanced",
       "default": 1,
       "attributes": [
         {
@@ -943,7 +973,10 @@
       "range": [
         -1,
         1
-      ]
+      ],
+      "about": "How much muscle the whole body carries, from slight to strong.",
+      "feature": "body",
+      "level": "quick"
     },
     {
       "id": "fat",
@@ -952,7 +985,10 @@
       "range": [
         -1,
         1
-      ]
+      ],
+      "about": "How much fat the whole body carries, from lean to heavy.",
+      "feature": "body",
+      "level": "quick"
     },
     {
       "id": "muscle_chest",
@@ -962,6 +998,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the chest, beyond the whole body's.",
+      "feature": "chest",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -972,6 +1011,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the chest, beyond the whole body's.",
+      "feature": "chest",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -982,6 +1024,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the shoulders, beyond the whole body's.",
+      "feature": "shoulders",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -992,6 +1037,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the shoulders, beyond the whole body's.",
+      "feature": "shoulders",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1002,6 +1050,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the arms, beyond the whole body's.",
+      "feature": "arms",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1012,6 +1063,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the arms, beyond the whole body's.",
+      "feature": "arms",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1022,6 +1076,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the belly, beyond the whole body's.",
+      "feature": "abdomen",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1032,6 +1089,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the belly, beyond the whole body's.",
+      "feature": "abdomen",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1042,6 +1102,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the back, beyond the whole body's.",
+      "feature": "back",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1052,6 +1115,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the back, beyond the whole body's.",
+      "feature": "back",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1062,6 +1128,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the hips and buttocks, beyond the whole body's.",
+      "feature": "hips",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1072,6 +1141,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the hips and buttocks, beyond the whole body's.",
+      "feature": "hips",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1082,6 +1154,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the thighs, beyond the whole body's.",
+      "feature": "thighs",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1092,6 +1167,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the thighs, beyond the whole body's.",
+      "feature": "thighs",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1102,6 +1180,9 @@
         -1,
         1
       ],
+      "about": "How much muscle is on the calves, beyond the whole body's.",
+      "feature": "calves",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1112,6 +1193,9 @@
         -1,
         1
       ],
+      "about": "How much fat is on the calves, beyond the whole body's.",
+      "feature": "calves",
+      "level": "advanced",
       "advanced": true
     },
     {
@@ -1122,6 +1206,9 @@
         -1,
         1
       ],
+      "about": "How high the left eye sits on the face.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_height_right",
       "shapes": [
         {
@@ -1155,6 +1242,9 @@
         -1,
         1
       ],
+      "about": "How high the right eye sits on the face.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_height_left",
       "shapes": [
         {
@@ -1188,6 +1278,9 @@
         -1,
         1
       ],
+      "about": "How far the left eye sits from the middle of the face.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_spacing_right",
       "shapes": [
         {
@@ -1221,6 +1314,9 @@
         -1,
         1
       ],
+      "about": "How far the right eye sits from the middle of the face.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_spacing_left",
       "shapes": [
         {
@@ -1254,6 +1350,9 @@
         -1,
         1
       ],
+      "about": "How deep the left eye sits in its socket.",
+      "feature": "eyes",
+      "level": "advanced",
       "advanced": true,
       "mirror": "eye_depth_right",
       "shapes": [
@@ -1288,6 +1387,9 @@
         -1,
         1
       ],
+      "about": "How deep the right eye sits in its socket.",
+      "feature": "eyes",
+      "level": "advanced",
       "advanced": true,
       "mirror": "eye_depth_left",
       "shapes": [
@@ -1322,6 +1424,9 @@
         -1,
         1
       ],
+      "about": "How large the left eye opening is.",
+      "feature": "eyes",
+      "level": "quick",
       "mirror": "eye_size_right",
       "shapes": [
         {
@@ -1351,6 +1456,9 @@
         -1,
         1
       ],
+      "about": "How large the right eye opening is.",
+      "feature": "eyes",
+      "level": "quick",
       "mirror": "eye_size_left",
       "shapes": [
         {
@@ -1380,6 +1488,9 @@
         -1,
         1
       ],
+      "about": "How far the outer corner of the left eye is raised or lowered.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_tilt_right",
       "shapes": [
         {
@@ -1399,6 +1510,9 @@
         -1,
         1
       ],
+      "about": "How far the outer corner of the right eye is raised or lowered.",
+      "feature": "eyes",
+      "level": "detailed",
       "mirror": "eye_tilt_left",
       "shapes": [
         {
@@ -1418,6 +1532,9 @@
         -1,
         1
       ],
+      "about": "How high the left brow sits above the eye.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_height_right",
       "shapes": [
         {
@@ -1448,6 +1565,9 @@
         -1,
         1
       ],
+      "about": "How high the right brow sits above the eye.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_height_left",
       "shapes": [
         {
@@ -1478,6 +1598,9 @@
         -1,
         1
       ],
+      "about": "How high the left brow arches over its ends.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_arch_right",
       "shapes": [
         {
@@ -1508,6 +1631,9 @@
         -1,
         1
       ],
+      "about": "How high the right brow arches over its ends.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_arch_left",
       "shapes": [
         {
@@ -1538,6 +1664,9 @@
         -1,
         1
       ],
+      "about": "How far the tail of the left brow reaches.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_length_right",
       "shapes": [
         {
@@ -1568,6 +1697,9 @@
         -1,
         1
       ],
+      "about": "How far the tail of the right brow reaches.",
+      "feature": "brows",
+      "level": "detailed",
       "mirror": "brow_length_left",
       "shapes": [
         {
@@ -1598,6 +1730,9 @@
         -1,
         1
       ],
+      "about": "How far the bony ridge over the eyes stands forward.",
+      "feature": "brows",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Brow_Ridge",
@@ -1616,6 +1751,9 @@
         -1,
         1
       ],
+      "about": "How far the left nostril flares.",
+      "feature": "nose",
+      "level": "detailed",
       "mirror": "nostril_width_right",
       "shapes": [
         {
@@ -1635,6 +1773,9 @@
         -1,
         1
       ],
+      "about": "How far the right nostril flares.",
+      "feature": "nose",
+      "level": "detailed",
       "mirror": "nostril_width_left",
       "shapes": [
         {
@@ -1654,6 +1795,9 @@
         -1,
         1
       ],
+      "about": "How long the nose is, from the bridge to the tip.",
+      "feature": "nose",
+      "level": "quick",
       "shapes": [
         {
           "shape": "Face_Nose_Length",
@@ -1672,6 +1816,9 @@
         -1,
         1
       ],
+      "about": "How high the bridge of the nose stands.",
+      "feature": "nose",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Nose_Bridge",
@@ -1690,6 +1837,9 @@
         -1,
         1
       ],
+      "about": "How far the tip of the nose projects and turns up.",
+      "feature": "nose",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Nose_Tip",
@@ -1708,6 +1858,9 @@
         -1,
         1
       ],
+      "about": "How far the nose leans to one side.",
+      "feature": "nose",
+      "level": "advanced",
       "advanced": true,
       "shapes": [
         {
@@ -1727,6 +1880,9 @@
         -1,
         1
       ],
+      "about": "How prominent the left cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
       "mirror": "cheekbone_right",
       "shapes": [
         {
@@ -1746,6 +1902,9 @@
         -1,
         1
       ],
+      "about": "How prominent the right cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
       "mirror": "cheekbone_left",
       "shapes": [
         {
@@ -1765,6 +1924,9 @@
         -1,
         1
       ],
+      "about": "How full the soft left cheek under the cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
       "mirror": "cheek_fullness_right",
       "shapes": [
         {
@@ -1784,6 +1946,9 @@
         -1,
         1
       ],
+      "about": "How full the soft right cheek under the cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
       "mirror": "cheek_fullness_left",
       "shapes": [
         {
@@ -1803,6 +1968,9 @@
         -1,
         1
       ],
+      "about": "How wide the jaw is on the left side.",
+      "feature": "jaw",
+      "level": "quick",
       "mirror": "jaw_width_right",
       "shapes": [
         {
@@ -1822,6 +1990,9 @@
         -1,
         1
       ],
+      "about": "How wide the jaw is on the right side.",
+      "feature": "jaw",
+      "level": "quick",
       "mirror": "jaw_width_left",
       "shapes": [
         {
@@ -1841,6 +2012,9 @@
         -1,
         1
       ],
+      "about": "How far the jaw sits to one side.",
+      "feature": "jaw",
+      "level": "advanced",
       "advanced": true,
       "shapes": [
         {
@@ -1860,6 +2034,9 @@
         -1,
         1
       ],
+      "about": "How tall the chin is below the lower lip.",
+      "feature": "chin",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Chin_Length",
@@ -1878,6 +2055,9 @@
         -1,
         1
       ],
+      "about": "How far the chin projects forward.",
+      "feature": "chin",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Chin_Forward",
@@ -1896,6 +2076,9 @@
         -1,
         1
       ],
+      "about": "How wide the chin is.",
+      "feature": "chin",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Chin_Width",
@@ -1914,6 +2097,9 @@
         -1,
         1
       ],
+      "about": "How far the left corner of the mouth reaches.",
+      "feature": "lips",
+      "level": "quick",
       "mirror": "mouth_width_right",
       "shapes": [
         {
@@ -1933,6 +2119,9 @@
         -1,
         1
       ],
+      "about": "How far the right corner of the mouth reaches.",
+      "feature": "lips",
+      "level": "quick",
       "mirror": "mouth_width_left",
       "shapes": [
         {
@@ -1952,6 +2141,9 @@
         -1,
         1
       ],
+      "about": "How full the upper lip is.",
+      "feature": "lips",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Lip_Fullness_Upper",
@@ -1970,6 +2162,9 @@
         -1,
         1
       ],
+      "about": "How full the lower lip is.",
+      "feature": "lips",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Lip_Fullness_Lower",
@@ -1988,6 +2183,9 @@
         -1,
         1
       ],
+      "about": "How high the mouth sits between the nose and the chin.",
+      "feature": "lips",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Mouth_Height",
@@ -2006,6 +2204,9 @@
         -1,
         1
       ],
+      "about": "How tall the forehead is, from the brows to the hairline.",
+      "feature": "forehead",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Forehead_Height",
@@ -2024,6 +2225,9 @@
         -1,
         1
       ],
+      "about": "How full and upright the forehead is.",
+      "feature": "forehead",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Forehead_Slope",
@@ -2042,6 +2246,9 @@
         -1,
         1
       ],
+      "about": "How wide the head is at the temples.",
+      "feature": "forehead",
+      "level": "detailed",
       "shapes": [
         {
           "shape": "Face_Head_Width",
@@ -2060,6 +2267,9 @@
         -1,
         1
       ],
+      "about": "How large the left ear is.",
+      "feature": "ears",
+      "level": "detailed",
       "mirror": "ear_size_right",
       "shapes": [
         {
@@ -2079,6 +2289,9 @@
         -1,
         1
       ],
+      "about": "How large the right ear is.",
+      "feature": "ears",
+      "level": "detailed",
       "mirror": "ear_size_left",
       "shapes": [
         {
@@ -2098,6 +2311,9 @@
         -1,
         1
       ],
+      "about": "How high the left ear sits on the head.",
+      "feature": "ears",
+      "level": "advanced",
       "advanced": true,
       "mirror": "ear_height_right",
       "shapes": [
@@ -2118,6 +2334,9 @@
         -1,
         1
       ],
+      "about": "How high the right ear sits on the head.",
+      "feature": "ears",
+      "level": "advanced",
       "advanced": true,
       "mirror": "ear_height_left",
       "shapes": [
@@ -2138,6 +2357,9 @@
         -1,
         1
       ],
+      "about": "How far the left ear stands out from the head.",
+      "feature": "ears",
+      "level": "detailed",
       "mirror": "ear_out_right",
       "shapes": [
         {
@@ -2157,6 +2379,9 @@
         -1,
         1
       ],
+      "about": "How far the right ear stands out from the head.",
+      "feature": "ears",
+      "level": "detailed",
       "mirror": "ear_out_left",
       "shapes": [
         {
@@ -4020,5 +4245,542 @@
     "items": [
       "axcenity/realistic-boxer-briefs"
     ]
-  }
+  },
+  "features": [
+    {
+      "id": "body",
+      "label": "Whole body",
+      "category": "body",
+      "about": "Body type, height, muscle and fat.",
+      "icon": "body",
+      "anchors": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.0268,
+            -0.0093
+          ]
+        }
+      ],
+      "radius": 0.4341
+    },
+    {
+      "id": "head",
+      "label": "Head",
+      "category": "body",
+      "about": "The head's size against the body.",
+      "icon": "head",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            -0.0,
+            0.0252,
+            0.0683
+          ]
+        }
+      ],
+      "radius": 0.0839,
+      "regions": [
+        "head"
+      ]
+    },
+    {
+      "id": "neck",
+      "label": "Neck",
+      "category": "body",
+      "about": "The neck.",
+      "icon": "neck",
+      "anchors": [
+        {
+          "bone": "Neck",
+          "offset": [
+            -0.0,
+            0.0078,
+            0.0133
+          ]
+        }
+      ],
+      "radius": 0.0707,
+      "regions": [
+        "neck"
+      ]
+    },
+    {
+      "id": "shoulders",
+      "label": "Shoulders",
+      "category": "body",
+      "about": "Their width, muscle and fat.",
+      "icon": "shoulders",
+      "anchors": [
+        {
+          "bone": "LeftShoulderHelper",
+          "offset": [
+            -0.037,
+            0.0156,
+            0.022
+          ]
+        },
+        {
+          "bone": "RightShoulderHelper",
+          "offset": [
+            0.035,
+            0.0163,
+            0.0206
+          ]
+        }
+      ],
+      "radius": 0.1081,
+      "regions": [
+        "upper_arms_top"
+      ]
+    },
+    {
+      "id": "chest",
+      "label": "Chest",
+      "category": "body",
+      "about": "Its muscle and fat.",
+      "icon": "chest",
+      "anchors": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0001,
+            0.1289,
+            0.1035
+          ]
+        }
+      ],
+      "radius": 0.143
+    },
+    {
+      "id": "arms",
+      "label": "Arms",
+      "category": "body",
+      "about": "Their length, muscle and fat.",
+      "icon": "arms",
+      "anchors": [
+        {
+          "bone": "LeftUpperArm",
+          "offset": [
+            0.196,
+            -0.1999,
+            0.0086
+          ]
+        },
+        {
+          "bone": "RightUpperArm",
+          "offset": [
+            -0.1962,
+            -0.2,
+            0.0085
+          ]
+        }
+      ],
+      "radius": 0.1441,
+      "regions": [
+        "upper_arms_low",
+        "forearms"
+      ]
+    },
+    {
+      "id": "hands",
+      "label": "Hands",
+      "category": "body",
+      "about": "Their size.",
+      "icon": "hands",
+      "anchors": [
+        {
+          "bone": "LeftHand",
+          "offset": [
+            0.0662,
+            -0.0731,
+            0.0466
+          ]
+        },
+        {
+          "bone": "RightHand",
+          "offset": [
+            -0.0661,
+            -0.0732,
+            0.0466
+          ]
+        }
+      ],
+      "radius": 0.0668,
+      "regions": [
+        "hands"
+      ]
+    },
+    {
+      "id": "abdomen",
+      "label": "Abdomen",
+      "category": "body",
+      "about": "The belly's muscle and fat.",
+      "icon": "abdomen",
+      "anchors": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0001,
+            0.0498,
+            0.1035
+          ]
+        }
+      ],
+      "radius": 0.1541
+    },
+    {
+      "id": "waist",
+      "label": "Waist",
+      "category": "body",
+      "about": "Its width.",
+      "icon": "waist",
+      "anchors": [
+        {
+          "bone": "Spine",
+          "offset": [
+            0.0,
+            0.0581,
+            0.026
+          ]
+        }
+      ],
+      "radius": 0.1418,
+      "regions": [
+        "waist"
+      ]
+    },
+    {
+      "id": "back",
+      "label": "Back",
+      "category": "body",
+      "about": "Its muscle and fat.",
+      "icon": "back",
+      "anchors": [
+        {
+          "bone": "Chest",
+          "offset": [
+            0.0001,
+            0.0936,
+            -0.0673
+          ]
+        }
+      ],
+      "radius": 0.1815
+    },
+    {
+      "id": "hips",
+      "label": "Hips",
+      "category": "body",
+      "about": "Their width, and the muscle and fat of the hips and buttocks.",
+      "icon": "hips",
+      "anchors": [
+        {
+          "bone": "Spine",
+          "offset": [
+            0.0,
+            -0.0125,
+            -0.0008
+          ]
+        }
+      ],
+      "radius": 0.1481,
+      "regions": [
+        "hips"
+      ]
+    },
+    {
+      "id": "thighs",
+      "label": "Thighs",
+      "category": "body",
+      "about": "The legs' length, and the thighs' muscle and fat.",
+      "icon": "thighs",
+      "anchors": [
+        {
+          "bone": "LeftUpperLegTwist",
+          "offset": [
+            0.0197,
+            -0.0697,
+            0.0098
+          ]
+        },
+        {
+          "bone": "RightUpperLegTwist",
+          "offset": [
+            -0.0205,
+            -0.0701,
+            0.011
+          ]
+        }
+      ],
+      "radius": 0.1804,
+      "regions": [
+        "thighs_top",
+        "thighs_low"
+      ]
+    },
+    {
+      "id": "calves",
+      "label": "Calves",
+      "category": "body",
+      "about": "Their muscle and fat.",
+      "icon": "calves",
+      "anchors": [
+        {
+          "bone": "LeftLowerLegTwist",
+          "offset": [
+            0.0059,
+            -0.0009,
+            -0.0134
+          ]
+        },
+        {
+          "bone": "RightLowerLegTwist",
+          "offset": [
+            -0.0058,
+            -0.0008,
+            -0.0133
+          ]
+        }
+      ],
+      "radius": 0.133,
+      "regions": [
+        "shins_top",
+        "shins_low"
+      ]
+    },
+    {
+      "id": "feet",
+      "label": "Feet",
+      "category": "body",
+      "about": "Their size.",
+      "icon": "feet",
+      "anchors": [
+        {
+          "bone": "LeftToes",
+          "offset": [
+            -0.0044,
+            0.0008,
+            -0.0109
+          ]
+        },
+        {
+          "bone": "RightToes",
+          "offset": [
+            0.0044,
+            0.0008,
+            -0.0109
+          ]
+        }
+      ],
+      "radius": 0.0804,
+      "regions": [
+        "feet"
+      ]
+    },
+    {
+      "id": "eyes",
+      "label": "Eyes",
+      "category": "face",
+      "about": "Their height, spacing, depth, size and tilt.",
+      "icon": "eyes",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0431,
+            0.0443,
+            0.0975
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            -0.044,
+            0.0448,
+            0.0963
+          ]
+        }
+      ],
+      "radius": 0.0208
+    },
+    {
+      "id": "brows",
+      "label": "Brows",
+      "category": "face",
+      "about": "Their height, arch and length, and the ridge under them.",
+      "icon": "brows",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0344,
+            0.068,
+            0.1096
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            -0.0344,
+            0.068,
+            0.1096
+          ]
+        }
+      ],
+      "radius": 0.0223
+    },
+    {
+      "id": "nose",
+      "label": "Nose",
+      "category": "face",
+      "about": "Its length, bridge, tip and nostrils.",
+      "icon": "nose",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0043,
+            0.0088,
+            0.1244
+          ]
+        }
+      ],
+      "radius": 0.0184
+    },
+    {
+      "id": "cheeks",
+      "label": "Cheeks",
+      "category": "face",
+      "about": "The cheekbones and the soft cheeks under them.",
+      "icon": "cheeks",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0513,
+            0.0114,
+            0.0951
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            -0.0513,
+            0.0114,
+            0.0951
+          ]
+        }
+      ],
+      "radius": 0.0306
+    },
+    {
+      "id": "jaw",
+      "label": "Jaw",
+      "category": "face",
+      "about": "How wide the jaw is, and where it sits.",
+      "icon": "jaw",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0635,
+            -0.0355,
+            0.0085
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            -0.0635,
+            -0.0355,
+            0.0085
+          ]
+        }
+      ],
+      "radius": 0.0303
+    },
+    {
+      "id": "chin",
+      "label": "Chin",
+      "category": "face",
+      "about": "Its height, width and projection.",
+      "icon": "chin",
+      "anchors": [
+        {
+          "bone": "Jaw",
+          "offset": [
+            -0.0,
+            -0.0672,
+            0.0826
+          ]
+        }
+      ],
+      "radius": 0.0257
+    },
+    {
+      "id": "lips",
+      "label": "Lips",
+      "category": "face",
+      "about": "The mouth's width and height and the lips' fullness.",
+      "icon": "lips",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            -0.0274,
+            0.1153
+          ]
+        }
+      ],
+      "radius": 0.0387
+    },
+    {
+      "id": "forehead",
+      "label": "Forehead",
+      "category": "face",
+      "about": "Its height and slope, and the width at the temples.",
+      "icon": "forehead",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.1428,
+            0.0781
+          ]
+        }
+      ],
+      "radius": 0.0707
+    },
+    {
+      "id": "ears",
+      "label": "Ears",
+      "category": "face",
+      "about": "Their size, height and how far they stand out.",
+      "icon": "ears",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0747,
+            0.0301,
+            0.0056
+          ]
+        },
+        {
+          "bone": "Head",
+          "offset": [
+            -0.0746,
+            0.0301,
+            0.0055
+          ]
+        }
+      ],
+      "radius": 0.0195
+    }
+  ]
 }

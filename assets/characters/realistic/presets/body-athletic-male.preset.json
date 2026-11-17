@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "Athletic",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -0.1,
+    "muscle": 0.4
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-athletic-male",
+    "kind": "body",
+    "about": "Trained but not bulky.",
+    "tags": [
+      "build",
+      "male"
+    ],
+    "order": 30
+  }
+}

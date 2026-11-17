@@ -14,6 +14,11 @@ feature has a parameter a side
 The middle of the face has single parameters, and three that push it off
 centre (`nose_tilt`, `jaw_shift`, in the advanced view).
 
+Each parameter has an `about` sentence (`ABOUT`), its group as its
+`feature` and a `level` (R1: `quick` for the main sizes, `QUICK`;
+`advanced` where it is flagged so; else `detailed`). `features()` names
+the shapes that find each face feature for `anchors.py`.
+
 The pupil has no parameter: `Pupil_Size` is a shape of the `Eyes` part
 that moves 1.3 mm of the eye, which is not a slider's worth (a parameter
 has to be seen on the body); the eye shading's `pupil_size` (CO7) or a
@@ -81,6 +86,76 @@ SPLIT = {"Face_Brow_Height": "Face_Brow_Height_Up", "Face_Brow_Arch": "Face_Brow
          "Face_Brow_Length": "Face_Brow_Length_Long"}
 
 
+# What each parameter does, in a sentence (its tooltip, R1). A pair's
+# sentence has `{side}` where the side goes ("the left eye").
+ABOUT = {
+    "eye_height": "How high the {side} eye sits on the face.",
+    "eye_spacing": "How far the {side} eye sits from the middle of the face.",
+    "eye_depth": "How deep the {side} eye sits in its socket.",
+    "eye_size": "How large the {side} eye opening is.",
+    "eye_tilt": "How far the outer corner of the {side} eye is raised or lowered.",
+    "brow_height": "How high the {side} brow sits above the eye.",
+    "brow_arch": "How high the {side} brow arches over its ends.",
+    "brow_length": "How far the tail of the {side} brow reaches.",
+    "nostril_width": "How far the {side} nostril flares.",
+    "cheekbone": "How prominent the {side} cheekbone is.",
+    "cheek_fullness": "How full the soft {side} cheek under the cheekbone is.",
+    "jaw_width": "How wide the jaw is on the {side} side.",
+    "mouth_width": "How far the {side} corner of the mouth reaches.",
+    "ear_size": "How large the {side} ear is.",
+    "ear_height": "How high the {side} ear sits on the head.",
+    "ear_out": "How far the {side} ear stands out from the head.",
+    "brow_ridge": "How far the bony ridge over the eyes stands forward.",
+    "nose_length": "How long the nose is, from the bridge to the tip.",
+    "nose_bridge": "How high the bridge of the nose stands.",
+    "nose_tip": "How far the tip of the nose projects and turns up.",
+    "nose_tilt": "How far the nose leans to one side.",
+    "jaw_shift": "How far the jaw sits to one side.",
+    "chin_length": "How tall the chin is below the lower lip.",
+    "chin_forward": "How far the chin projects forward.",
+    "chin_width": "How wide the chin is.",
+    "upper_lip_fullness": "How full the upper lip is.",
+    "lower_lip_fullness": "How full the lower lip is.",
+    "mouth_height": "How high the mouth sits between the nose and the chin.",
+    "forehead_height": "How tall the forehead is, from the brows to the hairline.",
+    "forehead_slope": "How full and upright the forehead is.",
+    "temple_width": "How wide the head is at the temples.",
+}
+
+# The quick level (brief §3.3, broad facial adjustments): the face's main
+# sizes. Everything else is detailed, or advanced where it is flagged so.
+QUICK = {"eye_size", "nose_length", "mouth_width", "jaw_width"}
+
+# The face's features (R1), one per group, found by the shapes that move
+# them (`anchors.py`); `{side}` makes a pair. The anchors sit on the skin.
+FEATURES = [
+    ("eyes", "Eyes", "Their height, spacing, depth, size and tilt.",
+     ["Face_Eye_Height_{side}", "Face_Eye_Spacing_{side}", "Face_Eye_Size_{side}", "Face_Eye_Tilt_{side}"]),
+    ("brows", "Brows", "Their height, arch and length, and the ridge under them.",
+     ["Face_Brow_Height_{side}", "Face_Brow_Arch_{side}"]),
+    ("nose", "Nose", "Its length, bridge, tip and nostrils.",
+     ["Face_Nose_Length", "Face_Nose_Bridge", "Face_Nose_Tip", "Face_Nose_Width_Left", "Face_Nose_Width_Right"]),
+    ("cheeks", "Cheeks", "The cheekbones and the soft cheeks under them.",
+     ["Face_Cheekbone_{side}", "Face_Cheek_Fullness_{side}"]),
+    ("jaw", "Jaw", "How wide the jaw is, and where it sits.", ["Face_Jaw_Width_{side}"]),
+    ("chin", "Chin", "Its height, width and projection.",
+     ["Face_Chin_Length", "Face_Chin_Forward", "Face_Chin_Width"]),
+    ("lips", "Lips", "The mouth's width and height and the lips' fullness.",
+     ["Face_Lip_Fullness_Upper", "Face_Lip_Fullness_Lower", "Face_Mouth_Height"]),
+    ("forehead", "Forehead", "Its height and slope, and the width at the temples.",
+     ["Face_Forehead_Height", "Face_Forehead_Slope"]),
+    ("ears", "Ears", "Their size, height and how far they stand out.",
+     ["Face_Ear_Size_{side}", "Face_Ear_Height_{side}", "Face_Ear_Out_{side}"]),
+]
+
+
+def features():
+    """The face's feature definitions for `anchors.measure`."""
+    return [{"id": fid, "label": label, "category": "face", "about": about, "icon": fid,
+             "shapes": shapes, "paired": any("{side}" in s for s in shapes), "on_skin": True}
+            for fid, label, about, shapes in FEATURES]
+
+
 def shapes():
     """Every identity shape the parameters drive."""
     out = []
@@ -102,8 +177,11 @@ def parameters(face_identity):
     (offsets in glTF axes)."""
     out = []
 
-    def parameter(pid, label, group, shape, advanced, mirror=None, raising=None):
-        p = {"id": pid, "label": label, "group": group, "range": [-1, 1]}
+    def parameter(pid, label, group, shape, advanced, mirror=None, raising=None, stem=None, side=None):
+        stem = stem or pid
+        level = "advanced" if advanced else "quick" if stem in QUICK else "detailed"
+        p = {"id": pid, "label": label, "group": group, "range": [-1, 1],
+             "about": ABOUT[stem].format(side=side), "feature": group, "level": level}
         if advanced:
             p["advanced"] = True
         if mirror:
@@ -125,7 +203,8 @@ def parameters(face_identity):
         for side, other in (("left", "right"), ("right", "left")):
             raising = f"{SPLIT[stem]}_{side.capitalize()}" if stem in SPLIT else None
             rows.append((order[group], parameter(f"{pid}_{side}", f"{side.capitalize()} {label}", group,
-                                                 f"{stem}_{side.capitalize()}", advanced, f"{pid}_{other}", raising)))
+                                                 f"{stem}_{side.capitalize()}", advanced, f"{pid}_{other}", raising,
+                                                 stem=pid, side=side)))
     for shape, pid, label, group, advanced in SINGLE:
         rows.append((order[group], parameter(pid, label, group, shape, advanced)))
     rows.sort(key=lambda row: row[0])

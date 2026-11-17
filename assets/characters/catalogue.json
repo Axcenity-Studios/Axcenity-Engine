@@ -239,5 +239,293 @@
         "short-sleeve"
       ]
     }
+  ],
+  "presets": [
+    {
+      "id": "axcenity/realistic-athletic-female",
+      "file": "realistic/presets/athletic-female.preset.json",
+      "label": "Athletic female",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-athletic-male",
+      "file": "realistic/presets/athletic-male.preset.json",
+      "label": "Athletic male",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-body-athletic-female",
+      "file": "realistic/presets/body-athletic-female.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-athletic-male",
+      "file": "realistic/presets/body-athletic-male.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-average-female",
+      "file": "realistic/presets/body-average-female.preset.json",
+      "label": "Average",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-average-male",
+      "file": "realistic/presets/body-average-male.preset.json",
+      "label": "Average",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-broad-female",
+      "file": "realistic/presets/body-broad-female.preset.json",
+      "label": "Broad",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-broad-male",
+      "file": "realistic/presets/body-broad-male.preset.json",
+      "label": "Broad",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-heavyset-female",
+      "file": "realistic/presets/body-heavyset-female.preset.json",
+      "label": "Heavyset",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-heavyset-male",
+      "file": "realistic/presets/body-heavyset-male.preset.json",
+      "label": "Heavyset",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-lean-female",
+      "file": "realistic/presets/body-lean-female.preset.json",
+      "label": "Lean",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-lean-male",
+      "file": "realistic/presets/body-lean-male.preset.json",
+      "label": "Lean",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-muscular-female",
+      "file": "realistic/presets/body-muscular-female.preset.json",
+      "label": "Muscular",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-muscular-male",
+      "file": "realistic/presets/body-muscular-male.preset.json",
+      "label": "Muscular",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-slim-female",
+      "file": "realistic/presets/body-slim-female.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "female"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-body-slim-male",
+      "file": "realistic/presets/body-slim-male.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/realistic",
+      "tags": [
+        "build",
+        "male"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-angular",
+      "file": "realistic/presets/face-angular.preset.json",
+      "label": "Angular features",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-broad",
+      "file": "realistic/presets/face-broad.preset.json",
+      "label": "Broad",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-heart",
+      "file": "realistic/presets/face-heart.preset.json",
+      "label": "Heart-shaped",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-long",
+      "file": "realistic/presets/face-long.preset.json",
+      "label": "Long",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-narrow",
+      "file": "realistic/presets/face-narrow.preset.json",
+      "label": "Narrow",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-oval",
+      "file": "realistic/presets/face-oval.preset.json",
+      "label": "Oval",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-round",
+      "file": "realistic/presets/face-round.preset.json",
+      "label": "Round",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-soft",
+      "file": "realistic/presets/face-soft.preset.json",
+      "label": "Soft features",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-square",
+      "file": "realistic/presets/face-square.preset.json",
+      "label": "Square",
+      "kind": "face",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-female",
+      "file": "realistic/presets/female.preset.json",
+      "label": "Female",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-heavyset-female",
+      "file": "realistic/presets/heavyset-female.preset.json",
+      "label": "Heavyset female",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-heavyset-male",
+      "file": "realistic/presets/heavyset-male.preset.json",
+      "label": "Heavyset male",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-male",
+      "file": "realistic/presets/male.preset.json",
+      "label": "Male",
+      "kind": "character",
+      "base": "axcenity/realistic"
+    }
   ]
 }

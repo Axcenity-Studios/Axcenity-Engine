@@ -1,0 +1,70 @@
+RED run, branch r1-contracts, 2026-11-17: cargo nextest run -p axcenity-avatar --no-fail-fast
+The tests were written before the code: every new contract is missing, so the test targets don't compile.
+
+Error counts by message:
+     11 error[E0609]: no field `handles` on type `BaseManifest`
+      9 error[E0609]: no field `shapes` on type `ResolvedPart`
+      9 error[E0609]: no field `parameters` on type `WornItem`
+      9 error[E0609]: no field `parameters` on type `ItemManifest`
+      9 error[E0609]: no field `features` on type `BaseManifest`
+      7 error[E0599]: no method named `preset` found for struct `Description` in the current scope
+      7 error[E0599]: no method named `level` found for reference `&Parameter` in the current scope
+      5 error[E0609]: no field `transform` on type `WornItem`
+      5 error[E0599]: no method named `add_preset` found for struct `Library` in the current scope
+      4 error[E0609]: no field `limitations` on type `ItemManifest`
+      4 error[E0609]: no field `adjust` on type `ItemManifest`
+      3 error[E0609]: no field `values` on type `MaterialSlot`
+      3 error[E0609]: no field `thumbnail` on type `item::Variant`
+      3 error[E0609]: no field `requires` on type `ItemManifest`
+      3 error[E0609]: no field `parameters` on type `item::Variant`
+      3 error[E0609]: no field `level` on type `&Parameter`
+      3 error[E0609]: no field `feature` on type `&Parameter`
+      3 error[E0609]: no field `excludes` on type `ItemManifest`
+      3 error[E0609]: no field `also_fills` on type `ItemManifest`
+      3 error[E0609]: no field `about` on type `&Parameter`
+      3 error[E0599]: no method named `preset` found for struct `Library` in the current scope
+      2 error[E0609]: no field `values` on type `&MaterialSlot`
+      2 error[E0609]: no field `transform` on type `ResolvedPart`
+      2 error[E0609]: no field `role` on type `&MaterialSlot`
+      2 error[E0609]: no field `random` on type `Parameter`
+      2 error[E0609]: no field `random` on type `&Parameter`
+      2 error[E0609]: no field `presets` on type `Library`
+      2 error[E0609]: no field `presets` on type `Catalogue`
+      2 error[E0609]: no field `parameters` on type `&WornItem`
+      2 error[E0609]: no field `level` on type `Parameter`
+      2 error[E0609]: no field `label` on type `&MaterialSlot`
+      2 error[E0609]: no field `features` on type `&BaseManifest`
+      2 error[E0609]: no field `extra` on type `&WornItem`
+      2 error[E0609]: no field `about` on type `ItemManifest`
+      2 error[E0599]: no method named `preset_path` found for struct `Library` in the current scope
+      2 error[E0422]: cannot find struct, variant or union type `Limitation` in the crate root
+      1 error[E0609]: no field `transform` on type `&WornItem`
+      1 error[E0609]: no field `icon` on type `Group`
+      1 error[E0609]: no field `handles` on type `&BaseManifest`
+      1 error[E0609]: no field `feature` on type `Parameter`
+      1 error[E0609]: no field `extra` on type `WornItem`
+      1 error[E0609]: no field `about` on type `manifest::Slot`
+      1 error[E0609]: no field `about` on type `Group`
+      1 error[E0599]: no method named `preset` found for reference `&Description` in the current scope
+      1 error[E0599]: no method named `parameter` found for struct `ItemManifest` in the current scope
+      1 error[E0599]: no method named `handle` found for struct `BaseManifest` in the current scope
+      1 error[E0599]: no method named `feature` found for struct `BaseManifest` in the current scope
+      1 error[E0599]: no method named `feature` found for reference `&BaseManifest` in the current scope
+      1 error[E0599]: no method named `feature_of` found for struct `BaseManifest` in the current scope
+      1 error[E0432]: unresolved imports `crate::Scope`, `crate::randomize`
+      1 error[E0432]: unresolved imports `crate::CataloguePreset`, `crate::PresetKind`, `crate::apply_preset`, `crate::check_preset`, `crate::matches_preset`
+      1 error[E0432]: unresolved imports `crate::Adjust`, `crate::Level`, `crate::MaterialRole`, `crate::Transform`
+      1 error[E0432]: unresolved imports `axcenity_avatar::Scope`, `axcenity_avatar::randomize`
+      1 error[E0432]: unresolved imports `axcenity_avatar::PresetKind`, `axcenity_avatar::apply_preset`, `axcenity_avatar::check_preset`, `axcenity_avatar::matches_preset`
+      1 error[E0432]: unresolved import `axcenity_avatar::Level`
+      1 error: could not compile `axcenity-avatar` (test "shipped_library") due to 16 previous errors
+      1 error: could not compile `axcenity-avatar` (lib test) due to 142 previous errors
+      1 error: command `'<toolchain> Janota\.rustup\toolchains\1.97.0-x86_64-pc-windows-msvc\bin\cargo.exe' '--color=auto' test --no-run --message-format json-render-diagnostics --package axcenity-avatar` exited with code 101
+
+Exit code: 101
+
+RED run 2, project: cargo nextest run -p axcenity-project --no-fail-fast character_library
+(the test that the shipped presets are copied into a project, with the copying loop taken out)
+    FAIL character_library::tests::the_shipped_packages_are_copied_beside_the_built_in_one
+    assertion `left == right` failed: left {} (the project's presets), right the 29 shipped presets
+    Summary: 3 tests run: 2 passed, 1 failed

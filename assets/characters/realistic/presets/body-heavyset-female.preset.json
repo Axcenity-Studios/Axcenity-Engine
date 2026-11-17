@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Heavyset",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 1.0,
+    "fat_hips": 0.3,
+    "height": 0.95,
+    "hip_width": 1.05,
+    "muscle": -0.6
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-heavyset-female",
+    "kind": "body",
+    "about": "Soft and heavy.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 50
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "format_version": 2,
+  "name": "Angular features",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "brow_ridge": 0.4,
+    "cheek_fullness_left": -0.6,
+    "cheek_fullness_right": -0.6,
+    "cheekbone_left": 0.6,
+    "cheekbone_right": 0.6,
+    "chin_forward": 0.3,
+    "chin_length": 0.1,
+    "chin_width": -0.2,
+    "forehead_slope": -0.2,
+    "jaw_width_left": 0.3,
+    "jaw_width_right": 0.3,
+    "lower_lip_fullness": -0.2,
+    "nose_bridge": 0.4,
+    "nose_length": 0.1,
+    "upper_lip_fullness": -0.2
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-angular",
+    "kind": "face",
+    "about": "Strong planes: high cheekbones over hollow cheeks, a defined ridge and chin.",
+    "tags": [
+      "shape"
+    ],
+    "order": 90
+  }
+}

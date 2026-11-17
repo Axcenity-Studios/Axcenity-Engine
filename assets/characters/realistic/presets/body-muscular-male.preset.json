@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Muscular",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.5,
+    "muscle": 0.9,
+    "muscle_shoulders": 0.3
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-muscular-male",
+    "kind": "body",
+    "about": "Visible mass in the arms, chest and thighs.",
+    "tags": [
+      "build",
+      "male"
+    ],
+    "order": 40
+  }
+}

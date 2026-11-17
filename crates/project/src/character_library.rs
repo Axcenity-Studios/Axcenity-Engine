@@ -85,12 +85,15 @@ pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
 /// Copies the character packages of the library in `from` (a folder with
 /// a `catalogue.json`, such as the engine's shipped `assets/characters/`)
 /// into `project`'s library: each base model's and item's manifest and the
-/// files it names (models, a groom, a thumbnail). A file is copied when
+/// files it names (models, a groom's cards, strands and mesh, thumbnails,
+/// variants' pictures), and each preset file (`*.preset.json`) and its
+/// picture. A file is copied when
 /// it's missing or its size differs, so a newer engine's package replaces
 /// an older copy and an unchanged one isn't copied again. The catalogue is
 /// written again with what the project's library had and what was copied
 /// (the project's entry wins where both have an ID). Returns the IDs of the
-/// base models and items copied in; what `from` can't read is skipped.
+/// base models, items and presets copied in; what `from` can't read is
+/// skipped.
 ///
 /// Character Studio's workspace calls it for its own folder, so it offers
 /// every family the engine ships, not only the one built in (the realistic
@@ -141,9 +144,11 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .model
             .iter()
             .chain(groom.and_then(|groom| groom.cards.as_ref()))
+            .chain(groom.and_then(|groom| groom.mesh.as_ref()))
             .map(|model| model.file.as_str())
             .chain(groom.and_then(|groom| groom.strands.as_deref()))
-            .chain(item.thumbnail.as_deref());
+            .chain(item.thumbnail.as_deref())
+            .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()));
         for file in files {
             if let Some(path) = shipped.path_of(id, file) {
                 copy(&path)?;
@@ -151,6 +156,22 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
         }
         library.add_item(manifest, item.clone());
         added.push(id.clone());
+    }
+    for (id, preset) in &shipped.presets {
+        if library.preset(id).is_some() {
+            continue;
+        }
+        let Some(file) = shipped.preset_path(id) else {
+            continue;
+        };
+        copy(file)?;
+        let picture = preset.preset().and_then(|block| block.thumbnail);
+        if let Some(path) = picture.and_then(|p| axcenity_avatar::resolve_path(file, &p)) {
+            copy(&path)?;
+        }
+        if library.add_preset(file, preset.clone()).is_ok() {
+            added.push(id.clone());
+        }
     }
     if !added.is_empty() {
         let catalogue = root.join("catalogue.json");
@@ -253,6 +274,18 @@ mod tests {
         let (repository, _, _) = Library::read(&shipped);
         assert_eq!(library.bases.len(), repository.bases.len());
         assert_eq!(library.items.len(), repository.items.len());
+        // The presets come too, file for file, and the library is sound.
+        assert!(!repository.presets.is_empty());
+        assert_eq!(library.presets, repository.presets);
+        for id in repository.presets.keys() {
+            let file = repository.preset_path(id).unwrap();
+            assert_eq!(library.preset_path(id), Some(file));
+            assert_eq!(
+                fs::read(root.join(file)).unwrap(),
+                fs::read(shipped.join(file)).unwrap()
+            );
+        }
+        assert!(library.validate().is_empty(), "{:?}", library.validate());
 
         // Again: nothing new to copy, and the catalogue is left alone.
         fs::write(

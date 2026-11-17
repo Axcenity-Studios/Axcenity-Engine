@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "Average",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.5,
+    "muscle": -0.5
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-average-male",
+    "kind": "body",
+    "about": "An ordinary adult who doesn't train.",
+    "tags": [
+      "build",
+      "male"
+    ],
+    "order": 20
+  }
+}
