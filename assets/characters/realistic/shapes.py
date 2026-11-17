@@ -87,6 +87,28 @@ SOFT_AT_LEAST_MUSCLE = 0.5
 # muscled body's slack lower belly on the masculine frame;
 # `<Frame>_Belly_Flat` takes it in by MakeHuman's own flatter belly.
 FLAT = {"Masculine": {"pregnant_decr": 1.0}, "Feminine": {}}
+# Narrower hips (R3, plan section 0 decision 8). `anim`'s `HipWidth` below
+# 1 pulls the legs' roots in with the pelvis, and the inner thighs cross at
+# the crotch (CO5: 26 pairs at 0.93), so below 1 no bone moves (the
+# manifest's attribute driver starts at 1) and `<Frame>_Hips_Narrow` takes
+# the surface in. It is the hip bone's own width change, built from the
+# skin: every vertex of the pelvis and the thighs' tops brought toward the
+# middle by `1 - NARROW_SCALE` of its distance from it, the inner thighs
+# held (they are near the middle, and are let go only past `NARROW_HELD`),
+# fading out above the hip crest and down the thigh. At `hip_width`
+# `NARROW_AT` the shape is whole: `NARROW_SCALE` is chosen so that the hips'
+# breadth falls as fast below 1 as `HipWidth` widens them above it (half a
+# per cent of breadth per per cent of slider), so the slider has no kink.
+NARROW_AT = 0.6
+NARROW_SCALE = 0.8
+NARROW_HELD = (0.012, 0.07)   # metres from the middle: held, then wholly narrowed
+# Where it is whole and where it fades, in metres from the hip joints'
+# height (up: the hip crest, then the waist; down: the crotch, then mid-thigh).
+NARROW_UP = (0.08, 0.24)
+NARROW_DOWN = (0.1, 0.25)
+# The bones whose skin narrows (a hand hanging by the hip doesn't).
+NARROW_BONES = ("Hips", "Spine", "Chest")
+NARROW_SIDE_BONES = ("UpperLeg", "UpperLegTwist", "HipHelper", "LowerLeg", "LowerLegTwist", "KneeHelper")
 
 
 def _transfer():
@@ -200,6 +222,8 @@ def corners():
         out.append({"shape": f"{frame}_Fat_Soft",
                     "factors": [frame_factor(frame), {"parameter": "fat", "from": [0, 1]},
                                 {"parameter": "muscle", "from": [-1, 0], "to": [SOFT_AT_LEAST_MUSCLE, 1]}]})
+        out.append({"shape": f"{frame}_Hips_Narrow",
+                    "factors": [frame_factor(frame), {"parameter": "hip_width", "from": [1, NARROW_AT], "to": [0, 1]}]})
         if FLAT[frame]:
             out.append({"shape": f"{frame}_Belly_Flat",
                         "factors": [frame_factor(frame), {"parameter": "muscle", "from": [0, -1], "to": [0, 1]},
@@ -233,7 +257,8 @@ def weights_of(values, frame_value):
     for corner in corners():
         w = 1.0
         for factor in corner["factors"]:
-            value = frame_value if factor["parameter"] == "frame" else values.get(factor["parameter"], 0.0)
+            default = 1.0 if factor["parameter"] == "hip_width" else 0.0
+            value = frame_value if factor["parameter"] == "frame" else values.get(factor["parameter"], default)
             w *= span(value, factor.get("from", [0, 1]), factor.get("to", factor.get("from", [0, 1])))
         out[corner["shape"]] = out.get(corner["shape"], 0.0) + w
     return out
@@ -332,6 +357,34 @@ def face_hold(P, lm, eyes, eye_radius, lap):
         v = np.minimum(v, (v + lap.mean(v)) / 2)
     v[inside] = 0.0
     return v[:, 0]
+
+
+def smoothstep(x, a, b):
+    t = np.clip((x - a) / (b - a), 0.0, 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def hips_narrow(P, joints, weights, lap):
+    """`<Frame>_Hips_Narrow`'s offsets for a frame's rest positions `P`
+    (`NARROW_SCALE`): side to side only, toward the middle (x = 0), so
+    the two sides can't cross, by a share of each vertex's distance from
+    it that is smooth over the skin and never shrinks a step of the skin
+    by more than it narrows the whole (the map x -> x + dx keeps its order)."""
+    X = array(P)
+    k = (X[:, 2].max() - X[:, 2].min()) / 1.75
+    hip = float(np.array(joints["LeftUpperLeg"][0])[2])
+    z = X[:, 2] - hip
+    up = 1.0 - smoothstep(z, NARROW_UP[0] * k, NARROW_UP[1] * k)
+    down = smoothstep(z, -NARROW_DOWN[1] * k, -NARROW_DOWN[0] * k)
+    across = smoothstep(np.abs(X[:, 0]), NARROW_HELD[0] * k, NARROW_HELD[1] * k)
+    own = sum(weights.col(n) for n in NARROW_BONES)
+    own = own + sum(weights.col(side + n) for n in NARROW_SIDE_BONES for side in ("Left", "Right"))
+    mask = (up * down * np.clip(own, 0.0, 1.0))[:, None]
+    for _ in range(4):
+        mask = (mask + lap.mean(mask)) / 2
+    d = np.zeros_like(X)
+    d[:, 0] = (NARROW_SCALE - 1.0) * X[:, 0] * across * mask[:, 0]
+    return d
 
 
 # -- the build's step -------------------------------------------------------------------
@@ -444,6 +497,10 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, 
                 f"(to {f.min():.2f} at most)")
         for name in shapes:
             shapes[name] = shapes[name] * factor[:, None]
+        # (After keeping apart: the narrowing is checked by the ranges sweep,
+        # `../humanoid/qa/ranges.py`, and takes nothing off the other shapes.)
+        shapes[f"{frame}_Hips_Narrow"] = transfer.symmetric(hips_narrow(P, joints[frame], weights, lap), mirror)
+        for name in shapes:
             out[name] = (frame, shapes[name])
         report["frames"][frame] = {
             "neutral_crossings": len(known), "kept_apart": cut,

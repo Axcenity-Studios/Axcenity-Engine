@@ -1,0 +1,33 @@
+R3 wider ranges (branch r3-ranges): the red run, before the build, the sweep and the manifest changes.
+Command: cargo nextest run -p axcenity-avatar --no-fail-fast --test realistic_ranges --test realistic_parameters
+(tests written against the committed RealisticParts.glb and Realistic.base.json; ranges.md does not exist yet)
+
+ FAIL + LEAK [   0.345s] (3/8) axcenity-avatar::realistic_ranges hips_narrow_below_one_by_a_shape_not_a_bone
+ FAIL + LEAK [   0.335s] (4/8) axcenity-avatar::realistic_ranges the_ranges_stay_inside_anims_clamp
+ FAIL + LEAK [   0.349s] (5/8) axcenity-avatar::realistic_ranges the_shipped_proportion_ranges_are_the_sweeps
+        PASS [   2.352s] (6/8) axcenity-avatar::realistic_parameters a_baked_body_keeps_only_its_live_shapes
+        PASS [   2.826s] (7/8) axcenity-avatar::realistic_parameters muscle_and_fat_make_four_different_corners
+        FAIL [   4.801s] (8/8) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+    thread 'every_parameter_moves_the_body_and_its_simpler_copies' (14708) panicked at crates\avatar\tests\realistic_parameters.rs:176:5:
+    assertion `left == right` failed
+      left: 148
+     right: 149
+     Summary [   4.836s] 8 tests run: 4 passed (2 leaky), 4 failed, 0 skipped
+ FAIL + LEAK [   0.345s] (3/8) axcenity-avatar::realistic_ranges hips_narrow_below_one_by_a_shape_not_a_bone
+ FAIL + LEAK [   0.335s] (4/8) axcenity-avatar::realistic_ranges the_ranges_stay_inside_anims_clamp
+ FAIL + LEAK [   0.349s] (5/8) axcenity-avatar::realistic_ranges the_shipped_proportion_ranges_are_the_sweeps
+        FAIL [   4.801s] (8/8) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+
+The realistic_ranges panics:
+     Summary [   0.018s] 3 tests run: 0 passed, 3 failed, 0 skipped
+    docs/development/character-studio/refinement/r3/ranges.md: The system cannot find the file specified. (os error 2)
+    the hips go below 1: [1.0, 1.15]
+    thread 'hips_narrow_below_one_by_a_shape_not_a_bone' (30500) panicked at crates\avatar\tests\realistic_ranges.rs:160:5:
+    thread 'the_ranges_stay_inside_anims_clamp' (7044) panicked at crates\avatar\tests\realistic_ranges.rs:51:33:
+    thread 'the_shipped_proportion_ranges_are_the_sweeps' (17224) panicked at crates\avatar\tests\realistic_ranges.rs:51:33:
+
+Added after: the hip benchmarks (before make.py ran).
+Command: cargo nextest run -p axcenity-avatar --test shipped_library every_benchmark_character_is_sound
+        FAIL [   0.655s] (1/1) axcenity-avatar::shipped_library every_benchmark_character_is_sound
+     Summary [   0.656s] 1 test run: 0 passed, 1 failed, 8 skipped
+    axcenity/realistic has no hip benchmarks

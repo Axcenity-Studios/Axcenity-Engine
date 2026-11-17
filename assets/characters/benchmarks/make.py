@@ -11,8 +11,9 @@ items change; it rewrites every `<family>-<frame>-<case>.character.json`
 here and removes the ones no longer made. The set, per base model:
 
 - bodies: each frame (masculine, feminine, the 50/50 blend) at the default
-  build, slim, heavy, muscular, heavy and muscular, and the shortest and
-  tallest proportions, in underwear and bald so the body shows;
+  build, slim, heavy, muscular, heavy and muscular, the shortest and
+  tallest proportions, and the narrowest and widest hips (R3: the hips
+  narrow as well as widen), in underwear and bald so the body shows;
 - faces: each frame neutral, and every face parameter at each end of its
   range;
 - outfits: underwear only, the default outfit, every item alone, and the
@@ -300,6 +301,10 @@ def benchmarks(base, items):
             tall = {pid: parameters[pid]["range"][1] for pid in stature}
             out.append(make(frame, value, "body-shortest", short, underwear))
             out.append(make(frame, value, "body-tallest", tall, underwear))
+        if "hip_width" in parameters:
+            low, high = parameters["hip_width"]["range"]
+            out.append(make(frame, value, "body-narrowest-hips", {"hip_width": low}, underwear))
+            out.append(make(frame, value, "body-widest-hips", {"hip_width": high}, underwear))
     face = [p for p in base["parameters"] if groups.get(p["group"]) == "face"]
     for frame, value in frames[:2]:
         if base["id"] not in NEUTRAL_FACE_IN_CAST:

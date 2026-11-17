@@ -276,6 +276,13 @@ fn every_benchmark_character_is_sound() {
             "{id} has no face benchmarks"
         );
         assert!(has("-outfit-underwear"), "{id} has no outfit benchmarks");
+        // The hips' two ends (R3: they narrow as well as widen).
+        if base.parameters.iter().any(|p| p.id == "hip_width") {
+            assert!(
+                has("-body-narrowest-hips") && has("-body-widest-hips"),
+                "{id} has no hip benchmarks"
+            );
+        }
         assert!(
             names.iter().all(|name| name.starts_with(&base.family)),
             "{id}: benchmarks are named <family>-<frame>-<case>"

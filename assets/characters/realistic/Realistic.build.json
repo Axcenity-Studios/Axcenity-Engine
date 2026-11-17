@@ -144,6 +144,7 @@
      "Feminine_Fat_Soft": 42.4,
      "Feminine_Fat_Thighs": 47.9,
      "Feminine_Fat_Up": 21.7,
+     "Feminine_Hips_Narrow": 36.1,
      "Feminine_Muscle_Abdomen": 8.2,
      "Feminine_Muscle_Arms": 39.2,
      "Feminine_Muscle_Back": 50.1,
@@ -239,6 +240,7 @@
      "Masculine_Fat_Soft": 69.0,
      "Masculine_Fat_Thighs": 52.7,
      "Masculine_Fat_Up": 37.6,
+     "Masculine_Hips_Narrow": 35.9,
      "Masculine_Muscle_Abdomen": 19.4,
      "Masculine_Muscle_Arms": 39.6,
      "Masculine_Muscle_Back": 36.2,
@@ -284,7 +286,7 @@
     ]
    }
   },
-  "shapes": 51
+  "shapes": 53
  },
  "corrective_shapes": {
   "Level": {
@@ -1424,17 +1426,17 @@
  ],
  "underwear": {
   "Underwear_BoxerBriefs": {
-   "shapes": 40,
+   "shapes": 42,
    "triangles": 1568,
    "weight_moved_most": 0.07
   },
   "Underwear_Bra": {
-   "shapes": 56,
+   "shapes": 58,
    "triangles": 2476,
    "weight_moved_most": 0.122
   },
   "Underwear_Briefs": {
-   "shapes": 40,
+   "shapes": 42,
    "triangles": 1214,
    "weight_moved_most": 0.057
   }
