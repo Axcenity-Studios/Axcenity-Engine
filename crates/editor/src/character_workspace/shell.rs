@@ -1,0 +1,387 @@
+//! The studio's frame (brief §3.1): the toolbar across the top, the
+//! categories down the left, the viewport with its bottom bar in the
+//! middle, the contextual panel on the right and a status line. Each area
+//! draws from `&CharacterWorkspace` and returns [`Intent`]s; the shell
+//! applies them ([`CharacterWorkspace::apply`]), so only it changes the
+//! workspace. It also owns the keyboard shortcuts and the notices.
+
+use std::time::Instant;
+
+use eframe::egui::{self, Rect, Sense, vec2};
+use eframe::egui_wgpu::RenderState;
+
+use super::intent::{Gesture, Intent};
+use super::stage::{self, ViewPreset};
+use super::{
+    Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, presets, toolbar,
+};
+use crate::dialog;
+use crate::theme::{self, icons};
+
+/// What the workspace asks of the editor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WorkspaceAction {
+    /// Back to the start screen (after any Save it asked for).
+    Home,
+}
+
+const TOOLBAR: f32 = 48.0;
+const STATUS: f32 = 26.0;
+const BOTTOM_BAR: f32 = 40.0;
+
+impl CharacterWorkspace {
+    /// Draws the workspace in `ui`'s whole space.
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        render_state: Option<&RenderState>,
+    ) -> Option<WorkspaceAction> {
+        // A drag always ends with the pointer let go, even when the widget
+        // that started it missed the release (a colour picker's popup).
+        if self.dragging() && !ui.input(|input| input.pointer.any_down()) {
+            self.history.commit(&self.description);
+            self.refresh(true);
+        }
+        let mut intents = self.shortcuts(ui);
+        let full = ui.available_rect_before_wrap();
+        let palette = theme::palette(ui.ctx());
+        ui.painter().rect_filled(full, 0.0, palette.app_bg);
+        let toolbar_rect = Rect::from_min_size(full.min, vec2(full.width(), TOOLBAR));
+        let status = Rect::from_min_max(egui::pos2(full.left(), full.bottom() - STATUS), full.max);
+        let body = Rect::from_min_max(
+            egui::pos2(full.left(), toolbar_rect.bottom()),
+            egui::pos2(full.right(), status.top()),
+        );
+        // Narrow windows keep the viewport: the side panels get narrower.
+        let left_w = (body.width() * 0.15).clamp(150.0, 200.0);
+        let right_w = (body.width() * 0.25).clamp(270.0, 340.0);
+        let left = Rect::from_min_size(body.min, vec2(left_w, body.height()));
+        let right = Rect::from_min_max(egui::pos2(body.right() - right_w, body.top()), body.max);
+        let centre = Rect::from_min_max(
+            egui::pos2(left.right(), body.top()),
+            egui::pos2(right.left(), body.bottom()),
+        );
+        let bar = Rect::from_min_max(
+            egui::pos2(centre.left(), centre.bottom() - BOTTOM_BAR),
+            centre.max,
+        );
+        let view = Rect::from_min_max(centre.min, egui::pos2(centre.right(), bar.top()));
+
+        // One library for the frame: each call stats the catalogue.
+        let library = self.library();
+        let child =
+            |ui: &mut egui::Ui, rect: Rect| ui.new_child(egui::UiBuilder::new().max_rect(rect));
+        intents.extend(toolbar::show(
+            &mut child(ui, toolbar_rect.shrink2(vec2(10.0, 6.0))),
+            self,
+            &library,
+        ));
+        ui.painter().rect_filled(left, 0.0, palette.panel);
+        ui.painter().rect_filled(right, 0.0, palette.panel);
+        intents.extend(nav::show(&mut child(ui, left.shrink(10.0)), self, &library));
+        self.viewport(ui, view.shrink2(vec2(6.0, 4.0)), render_state);
+        intents.extend(bottom_bar::show(
+            &mut child(ui, bar.shrink2(vec2(10.0, 4.0))),
+            self,
+        ));
+        intents.extend(panel::show(
+            &mut child(ui, right.shrink(12.0)),
+            self,
+            &library,
+        ));
+        self.status(&mut child(ui, status.shrink2(vec2(12.0, 4.0))));
+        if self.asking.is_some() {
+            self.ask_to_save(ui.ctx());
+        }
+        ui.advance_cursor_after_rect(full);
+
+        let mut action = None;
+        for intent in intents {
+            if let Some(asked) = self.apply(intent) {
+                action = Some(asked);
+            }
+        }
+        action
+    }
+
+    /// Does what a panel asked. The one place the workspace is changed from
+    /// the interface.
+    pub fn apply(&mut self, intent: Intent) -> Option<WorkspaceAction> {
+        match intent {
+            Intent::SetParameter { id, value, gesture } => {
+                self.set_value(&id, value, false, gesture)
+            }
+            Intent::SetMirrored { id, value, gesture } => self.set_value(&id, value, true, gesture),
+            Intent::Choose { id, value } => {
+                let parameter = self
+                    .library()
+                    .base(&self.description.base)
+                    .and_then(|base| base.parameter(&id).cloned());
+                if let Some(parameter) = parameter {
+                    self.choose(&parameter, value);
+                }
+            }
+            Intent::Wear { slot, item } => self.wear(&slot, item.as_deref()),
+            Intent::SetMaterial {
+                slot,
+                value,
+                to,
+                gesture,
+            } => self.set_material(&slot, &value, to, gesture),
+            Intent::SetBase(base) => self.set_base(&base),
+            Intent::Rename(name) => self.rename(&name),
+            Intent::ApplyPreset(index) => {
+                if let Some(preset) = presets().get(index) {
+                    self.use_preset(preset);
+                }
+            }
+            Intent::New(_) | Intent::Open(_) if self.dirty() => self.asking = Some(intent),
+            Intent::New(index) => self.new_character(index),
+            Intent::Open(file) => {
+                if let Err(error) = self.open_character(&file) {
+                    self.notice = Some(error);
+                }
+            }
+            Intent::Save => self.save_now(),
+            Intent::Undo => self.undo(),
+            Intent::Redo => self.redo(),
+            Intent::CancelEdit => self.cancel_edit(),
+            Intent::Reset(scope) => self.reset_scope(&scope),
+            Intent::PickCategory(category) => self.pick_category(category),
+            Intent::PickFeature(feature) => self.selection.feature = feature,
+            Intent::PickLevel(level) => self.selection.level = level,
+            Intent::SetSymmetry(on) => self.symmetry = on,
+            Intent::FocusView(view) => self.focus(view),
+            Intent::SetLighting(lighting) => self.lighting = lighting,
+            Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
+            Intent::PreviewExpression(name) => self.preview_expression(name),
+            Intent::Home => return Some(WorkspaceAction::Home),
+        }
+        None
+    }
+
+    /// The answer to "Save changes?" before New or Open: `Some(true)`
+    /// saves first, `Some(false)` lets the changes go, `None` cancels.
+    pub fn answer(&mut self, save: Option<bool>) {
+        let Some(intent) = self.asking.take() else {
+            return;
+        };
+        match save {
+            None => {}
+            Some(true) => {
+                self.save_now();
+                if !self.dirty() {
+                    self.apply(intent);
+                }
+            }
+            Some(false) => {
+                // Marked saved so the intent goes ahead without asking again.
+                self.saved = Some(self.description.clone());
+                self.apply(intent);
+            }
+        }
+    }
+
+    fn ask_to_save(&mut self, ctx: &egui::Context) {
+        let doing = match &self.asking {
+            Some(Intent::Open(_)) => "opening another character",
+            _ => "starting a new one",
+        };
+        let message = format!(
+            "\"{}\" has unsaved changes. Save them before {doing}?",
+            self.description.name
+        );
+        let (icon, tone) = dialog::unsaved_style();
+        let outcome = dialog::ask(
+            ctx,
+            &dialog::Question {
+                id: "character studio save first",
+                icon,
+                tone,
+                title: "Save changes?",
+                message: &message,
+                items: Vec::new(),
+            },
+            &[
+                dialog::Button::new(icons::X, "Cancel", dialog::Kind::Plain),
+                dialog::Button::new(icons::TRASH, "Don't Save", dialog::Kind::Plain),
+                dialog::Button::new(icons::FLOPPY_DISK, "Save", dialog::Kind::Main),
+            ],
+        );
+        match outcome {
+            Some(dialog::Outcome::Picked(2)) => self.answer(Some(true)),
+            Some(dialog::Outcome::Picked(1)) => self.answer(Some(false)),
+            Some(_) => self.answer(None),
+            None => {}
+        }
+    }
+
+    /// Keyboard shortcuts. Redo is checked before undo: egui ignores an
+    /// extra Shift when matching, so Ctrl+Z would take Ctrl+Shift+Z
+    /// (audit D-16).
+    fn shortcuts(&self, ui: &mut egui::Ui) -> Vec<Intent> {
+        // A text field being typed in keeps its own keys.
+        if ui.ctx().egui_wants_keyboard_input() {
+            return Vec::new();
+        }
+        let dragging = self.dragging();
+        ui.input_mut(|input| {
+            let mut intents = Vec::new();
+            if input.consume_key(
+                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                egui::Key::Z,
+            ) || input.consume_key(egui::Modifiers::COMMAND, egui::Key::Y)
+            {
+                intents.push(Intent::Redo);
+            }
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::Z) {
+                intents.push(Intent::Undo);
+            }
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::S) {
+                intents.push(Intent::Save);
+            }
+            if dragging && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+                intents.push(Intent::CancelEdit);
+            }
+            intents
+        })
+    }
+
+    pub(super) fn save_now(&mut self) {
+        self.notice = Some(match self.save_reporting() {
+            Ok(Saved::Written(path)) => format!("Saved {}", path.display()),
+            Ok(Saved::Renamed { path, from }) => format!(
+                "Another character is called \"{from}\", so this one was saved as \"{}\" ({})",
+                self.description.name,
+                path.display()
+            ),
+            Err(error) => error,
+        });
+    }
+
+    /// Shows `category`. The Face and Expressions pages frame the face;
+    /// leaving them for another page frames the whole character again
+    /// (audit D-10). A camera the person moved is left where it is.
+    pub(super) fn pick_category(&mut self, category: Category) {
+        if category == self.selection.category {
+            return;
+        }
+        let was = self.selection.category;
+        if category.frames_the_face() && self.view != Some(ViewPreset::Face) {
+            self.focus(ViewPreset::Face);
+        } else if was.frames_the_face()
+            && !category.frames_the_face()
+            && self.view == Some(ViewPreset::Face)
+        {
+            self.focus(ViewPreset::FullBody);
+        }
+        if was == Category::Expressions && category != Category::Expressions {
+            // An expression is a preview of the Expressions page only.
+            self.preview_expression(None);
+        }
+        self.selection.pick_category(category);
+    }
+
+    /// The preview: camera input (turn, pan, zoom; a double click goes
+    /// back to the whole character) and the rendered character.
+    fn viewport(&mut self, ui: &mut egui::Ui, rect: Rect, render_state: Option<&RenderState>) {
+        let response = ui.allocate_rect(rect, Sense::click_and_drag());
+        let mut moved = false;
+        if response.dragged_by(egui::PointerButton::Primary) {
+            let delta = response.drag_delta();
+            self.orbit.turn(delta.x, delta.y);
+            moved |= delta != egui::Vec2::ZERO;
+        }
+        if response.dragged_by(egui::PointerButton::Secondary)
+            || response.dragged_by(egui::PointerButton::Middle)
+        {
+            let delta = response.drag_delta();
+            self.orbit.pan(delta.x, delta.y);
+            moved |= delta != egui::Vec2::ZERO;
+        }
+        if response.hovered() {
+            let scroll = ui.input(|input| input.smooth_scroll_delta.y);
+            if scroll != 0.0 {
+                self.orbit.zoom(scroll);
+                moved = true;
+            }
+        }
+        if moved {
+            // The view chips no longer say where the camera is.
+            self.view = None;
+        }
+        if response.double_clicked() {
+            self.focus(ViewPreset::FullBody);
+        }
+        self.step();
+        stage::apply(&mut self.world, self.lighting, self.backdrop);
+        let palette = theme::palette(ui.ctx());
+        match render_state {
+            Some(render_state) => {
+                let mut list = axcenity_scene::build_draw_list_posed(
+                    &self.world,
+                    &self.assets,
+                    self.orbit.camera(),
+                    self.poses(),
+                    &mut axcenity_scene::TerrainCache::new(),
+                );
+                stage::backdrop(&mut list, self.backdrop);
+                self.canvas.paint(ui, rect, render_state, &list);
+                ui.ctx().request_repaint();
+            }
+            None => {
+                ui.painter_at(rect)
+                    .rect_filled(rect, theme::radius::CARD, palette.inset);
+            }
+        }
+    }
+
+    /// Clears a notice that has been shown long enough (audit D-13).
+    pub(super) fn expire_notice(&mut self, now: Instant) {
+        let Some(text) = &self.notice else {
+            self.notice_shown = None;
+            return;
+        };
+        match &self.notice_shown {
+            Some((shown, since)) if shown == text => {
+                if now.duration_since(*since) >= NOTICE_FOR {
+                    self.notice = None;
+                    self.notice_shown = None;
+                }
+            }
+            _ => self.notice_shown = Some((text.clone(), now)),
+        }
+    }
+
+    fn status(&mut self, ui: &mut egui::Ui) {
+        self.expire_notice(Instant::now());
+        let palette = theme::palette(ui.ctx());
+        ui.horizontal_centered(|ui| {
+            let text = self.notice.clone().unwrap_or_else(|| {
+                "Drag to turn · right-drag to pan · scroll to zoom · double-click for the whole \
+                 character"
+                    .to_owned()
+            });
+            ui.label(egui::RichText::new(text).small().color(palette.text_weak));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Saved in {}",
+                        self.folder().join(super::CHARACTERS_FOLDER).display()
+                    ))
+                    .small()
+                    .color(palette.text_muted),
+                );
+            });
+        });
+    }
+}
+
+/// A slider's gesture from its response: a drag going on, or done.
+pub(super) fn gesture(response: &egui::Response) -> Gesture {
+    if response.dragged() {
+        Gesture::Drag
+    } else {
+        Gesture::Commit
+    }
+}

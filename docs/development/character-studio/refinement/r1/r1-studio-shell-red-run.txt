@@ -1,0 +1,50 @@
+R1 RA1 (r1-studio-shell) red run, before the shell: the audit's defects as tests against character-creator-stage0 (5b650d5d).
+Command: cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/red_d|closing_the_window_with_unsaved_studio/)'
+Temporary paths are shown as <temp>. The red_d* tests were then ported into walkthrough_tests.rs and shell_tests.rs.
+
+        FAIL [   2.419s] (1/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d10_leaving_the_face_for_clothing_frames_the_whole_character
+  stdout ───
+    thread 'character_workspace::red_tests::red_d10_leaving_the_face_for_clothing_frames_the_whole_character' panicked at crates/editor/src/character_workspace/red_tests.rs:123:5:
+    assertion `left == right` failed
+      left: Orbit { yaw: 12.0, pitch: 2.0, distance: 3.2, target: Vec3(0.0, 4.5249996, -0.05) }
+     right: Orbit { yaw: 25.0, pitch: 6.0, distance: 13.5, target: Vec3(0.0, 2.5, 0.0) }
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   2.433s] (2/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d03_a_rename_does_not_leave_a_second_file
+  stdout ───
+    thread 'character_workspace::red_tests::red_d03_a_rename_does_not_leave_a_second_file' panicked at crates/editor/src/character_workspace/red_tests.rs:38:5:
+    the old file is gone
+        FAIL [   2.449s] (3/7) axcenity-editor::bin/axcenity-editor app::character_workspace::tests::closing_the_window_with_unsaved_studio_changes_asks_and_saves_the_character
+  stdout ───
+    thread 'app::character_workspace::tests::closing_the_window_with_unsaved_studio_changes_asks_and_saves_the_character' panicked at crates/editor/src/app/character_workspace.rs:205:9:
+    a new character isn't saved
+        FAIL [   2.479s] (4/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d05_a_click_that_changes_nothing_keeps_redo
+  stdout ───
+    thread 'character_workspace::red_tests::red_d05_a_click_that_changes_nothing_keeps_redo' panicked at crates/editor/src/character_workspace/red_tests.rs:54:5:
+    redo survives a change of nothing
+        FAIL [   2.852s] (5/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d06_the_face_view_follows_the_characters_height
+  stdout ───
+    thread 'character_workspace::red_tests::red_d06_the_face_view_follows_the_characters_height' panicked at crates/editor/src/character_workspace/red_tests.rs:108:5:
+    the tall character's face is higher: [4.5249996, 4.5249996]
+        FAIL [   2.931s] (6/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d16_ctrl_shift_z_redoes
+  stdout ───
+    thread 'character_workspace::red_tests::red_d16_ctrl_shift_z_redoes' panicked at crates/editor/src/character_workspace/red_tests.rs:89:5:
+    assertion `left == right` failed: Ctrl+Shift+Z redid
+      left: 0.0
+     right: 0.7
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   3.506s] (7/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d01_save_never_overwrites_another_character_with_the_same_name
+  stdout ───
+    thread 'character_workspace::red_tests::red_d01_save_never_overwrites_another_character_with_the_same_name' panicked at crates/editor/src/character_workspace/red_tests.rs:22:5:
+    assertion `left != right` failed: the second got a file of its own
+      left: "<temp>/axcenity-studio-red-d01-36392//characters//New Character.character.json"
+     right: "<temp>/axcenity-studio-red-d01-36392//characters//New Character.character.json"
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+     Summary [   3.509s] 7 tests run: 0 passed, 7 failed, 1323 skipped
+        FAIL [   2.419s] (1/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d10_leaving_the_face_for_clothing_frames_the_whole_character
+        FAIL [   2.433s] (2/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d03_a_rename_does_not_leave_a_second_file
+        FAIL [   2.449s] (3/7) axcenity-editor::bin/axcenity-editor app::character_workspace::tests::closing_the_window_with_unsaved_studio_changes_asks_and_saves_the_character
+        FAIL [   2.479s] (4/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d05_a_click_that_changes_nothing_keeps_redo
+        FAIL [   2.852s] (5/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d06_the_face_view_follows_the_characters_height
+        FAIL [   2.931s] (6/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d16_ctrl_shift_z_redoes
+        FAIL [   3.506s] (7/7) axcenity-editor::bin/axcenity-editor character_workspace::red_tests::red_d01_save_never_overwrites_another_character_with_the_same_name
+error: test run failed

@@ -405,10 +405,10 @@ fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
     let ctx = theme::test_context();
     for base in [DEFAULT_BASE, axcenity_avatar::V1_BASE] {
         workspace.set_base(base);
-        for advanced in [false, true] {
-            workspace.advanced = advanced;
+        for level in selection::Level::ALL {
+            workspace.selection.level = level;
             for category in Category::ALL {
-                workspace.category = category;
+                workspace.selection.category = category;
                 for _ in 0..2 {
                     let _ = theme::run(&ctx, Default::default(), |ui| {
                         assert_eq!(workspace.ui(ui, None), None);
@@ -418,10 +418,11 @@ fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
         }
     }
     // With `AXCENITY_SNAPSHOTS`, the whole workspace on the realistic body,
-    // drawn for real, on the Body and Face pages.
+    // drawn for real, on the Body and Face pages (every page:
+    // `shell_tests::every_page_is_drawn_with_its_controls`).
     if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
         workspace.set_base(DEFAULT_BASE);
-        workspace.advanced = false;
+        workspace.selection.level = selection::Level::Detailed;
         for category in [Category::Body, Category::Face] {
             workspace.pick_category(category);
             // Each snapshot makes its own GPU device; the editor has one.
@@ -452,6 +453,12 @@ fn the_views_look_at_the_character_from_where_they_say() {
     assert!(camera(ViewPreset::Front).position.z < -5.0);
     assert!(camera(ViewPreset::Back).position.z > 5.0);
     assert!(camera(ViewPreset::Side).position.x > 5.0);
+    // Three-quarter: between the front and the side.
+    let three_quarter = camera(ViewPreset::ThreeQuarter).position;
+    assert!(
+        three_quarter.x > 3.0 && three_quarter.z < -3.0,
+        "{three_quarter}"
+    );
     // The face view is close, at head height.
     let face = camera(ViewPreset::Face);
     assert!((face.position - face.look_at).length() < 4.0);

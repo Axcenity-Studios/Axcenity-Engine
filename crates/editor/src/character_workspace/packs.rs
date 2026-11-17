@@ -160,6 +160,28 @@ pub fn remove_character(folder: &Path, file_name: &str) {
     }
 }
 
+/// The character saved as `old` is now saved as `new` (a rename): every
+/// pack that had it keeps it, in its place.
+pub fn rename_character(folder: &Path, old: &str, new: &str) {
+    for mut pack in packs(folder) {
+        if !pack.characters.iter().any(|name| name == old) {
+            continue;
+        }
+        for name in &mut pack.characters {
+            if name == old {
+                *name = new.to_owned();
+            }
+        }
+        // A pack that had both keeps one.
+        let mut seen = std::collections::HashSet::new();
+        pack.characters.retain(|name| seen.insert(name.clone()));
+        let text = serde_json::to_string_pretty(&pack).expect("plain data");
+        if let Err(err) = std::fs::write(&pack.path, text) {
+            log::warn!("could not update {}: {err}", pack.path.display());
+        }
+    }
+}
+
 /// The pack's characters that can be read, in its order.
 fn descriptions(folder: &Path, pack: &Pack) -> Vec<Description> {
     pack.members(folder)
@@ -194,7 +216,7 @@ pub fn export_pack(folder: &Path, pack: &Pack, to: &Path) -> Result<(), String> 
 }
 
 /// The first of `name`, "`name` 2", "`name` 3"… for which `taken` is false.
-fn free_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
+pub(crate) fn free_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
     if !taken(name) {
         return name.to_owned();
     }
