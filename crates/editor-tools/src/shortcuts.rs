@@ -923,7 +923,7 @@ fn terrain_keys(tool: TerrainTool) -> &'static [KeyboardShortcut] {
         TerrainTool::Auto => keys![NONE Num8],
         TerrainTool::Generate => keys![NONE Num9],
         TerrainTool::Erode => keys![NONE Num0],
-        TerrainTool::Holes | TerrainTool::Masks => &[],
+        TerrainTool::Holes | TerrainTool::Water | TerrainTool::Masks => &[],
     }
 }
 

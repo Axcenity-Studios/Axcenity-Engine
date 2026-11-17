@@ -4587,6 +4587,8 @@ declare extern type Terrain extends Instance with
 	WaveSpeed: number
 	--- Which way the waves roll, in degrees: 0 toward +X, 90 toward +Z.
 	WaveDirection: number
+	--- How much the waves differ from place to place, 0 to 1: 0 makes every crest alike and straight; more gathers them into drifting patches of higher and calmer water with bent crests.
+	WaveVariation: number
 	[string]: any
 end
 

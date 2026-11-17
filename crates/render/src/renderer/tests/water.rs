@@ -493,3 +493,105 @@ fn ray_traced_water_reflects_what_is_off_the_screen() {
     assert!(renderer.scene.water.traced().is_none());
     assert!(medium[0] + 40 < traced[0], "{medium:?} vs {traced:?}");
 }
+
+/// An open sea, as terrain water draws it: 64-stud squares of the water
+/// grid side by side, looked at from above its waves toward the horizon.
+fn open_sea(variation: f32) -> DrawList {
+    let mut items = Vec::new();
+    for z in -4..4 {
+        for x in -4..4 {
+            items.push(DrawItem {
+                shape: Shape::Mesh(water_surface()),
+                transform: Mat4::from_scale_rotation_translation(
+                    Vec3::new(64.0, 1.0, 64.0),
+                    glam::Quat::IDENTITY,
+                    Vec3::new(x as f32 * 64.0 + 32.0, -0.5, z as f32 * 64.0 + 32.0),
+                ),
+                material: Material {
+                    base_color: [1.0; 3],
+                    water: Some(Water {
+                        wave_height: 0.8,
+                        wave_length: 14.0,
+                        wave_variation: variation,
+                        foam: 0.0,
+                        ..Water::default()
+                    }),
+                    ..Material::default()
+                },
+                casts_shadow: false,
+                ..item(Shape::Block, Vec3::ZERO, 1.0)
+            });
+        }
+    }
+    let mut list = list_of(items);
+    list.camera = Camera {
+        position: Vec3::new(0.0, 14.0, 60.0),
+        look_at: Vec3::new(0.0, 0.0, -20.0),
+        fov_y_degrees: 60.0,
+    };
+    list.time = 3.0;
+    list.sun.direction = Vec3::new(0.2, 0.5, -0.8).normalize();
+    list.sun.intensity = 3.0;
+    list.ambient.intensity = 0.4;
+    list.shadows.enabled = false;
+    list
+}
+
+/// How much the roughness (the spread of brightness inside each
+/// `block`-pixel square) differs from square to square, as a share of the
+/// average, over the nearer water of a `size`-square frame: patches of
+/// rougher and calmer water raise it.
+fn patchiness(pixels: &[u8], size: usize, block: usize) -> f32 {
+    let spread = |values: &[f32]| {
+        let mean = values.iter().sum::<f32>() / values.len() as f32;
+        let deviation =
+            (values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32).sqrt();
+        (mean, deviation)
+    };
+    let mut roughness = Vec::new();
+    for by in (size / 2 + 16..size - block + 1).step_by(block) {
+        for bx in (0..size - block + 1).step_by(block) {
+            let mut values = Vec::with_capacity(block * block);
+            for y in by..by + block {
+                for x in bx..bx + block {
+                    let p = &pixels[(y * size + x) * 4..][..3];
+                    values.push(p.iter().map(|&c| f32::from(c)).sum::<f32>());
+                }
+            }
+            roughness.push(spread(&values).1);
+        }
+    }
+    let (mean, deviation) = spread(&roughness);
+    deviation / mean.max(1e-3)
+}
+
+#[test]
+fn varied_waves_gather_into_rougher_and_calmer_patches() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    const SEA: u32 = 256;
+    let mut renderer = TextureRenderer::new(&device, &queue, SEA, SEA);
+    renderer.set_graphics(&graphics(Quality::Medium));
+    let mut shot = |variation: f32| {
+        renderer.render(&open_sea(variation)).unwrap();
+        let pixels = renderer.read_pixels();
+        // AXCENITY_WATER_SHOTS=<folder> keeps the frames (raw RGBA) to look at.
+        if let Some(folder) = std::env::var_os("AXCENITY_WATER_SHOTS") {
+            let path = std::path::Path::new(&folder).join(format!("sea-{variation}.rgba"));
+            std::fs::write(path, &pixels).unwrap();
+        }
+        pixels
+    };
+    let even = shot(0.0);
+    let varied = shot(1.0);
+    let (even, varied) = (
+        patchiness(&even, SEA as usize, 32),
+        patchiness(&varied, SEA as usize, 32),
+    );
+    assert!(
+        varied > even * 1.15,
+        "varied waves differ more from place to place: {even} even, {varied} varied"
+    );
+}

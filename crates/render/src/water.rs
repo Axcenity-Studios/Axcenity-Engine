@@ -27,6 +27,10 @@ pub struct Water {
     pub wave_speed: f32,
     /// Which way the waves roll, in degrees: 0 toward +X, 90 toward +Z.
     pub wave_direction: f32,
+    /// How much the waves differ from place to place, 0 to 1: at 0 every
+    /// crest is alike and straight; above it the waves gather into
+    /// drifting patches of higher and calmer water and their crests bend.
+    pub wave_variation: f32,
     /// How far from where the water meets something the foam reaches, in
     /// studs of depth. 0 is none.
     pub foam: f32,
@@ -43,11 +47,15 @@ impl Default for Water {
             wave_length: 12.0,
             wave_speed: 1.0,
             wave_direction: 0.0,
+            wave_variation: DEFAULT_WAVE_VARIATION,
             foam: 0.5,
             refraction: 0.3,
         }
     }
 }
+
+/// The waves' variation when nothing sets it ([`Water::wave_variation`]).
+pub const DEFAULT_WAVE_VARIATION: f32 = 0.6;
 
 /// How many cells across the water grid is, each way.
 pub const WATER_GRID: u32 = 64;

@@ -16,6 +16,7 @@ pub enum TerrainTool {
     Noise,
     Holes,
     Paint,
+    Water,
     Auto,
     Generate,
     Erode,
@@ -32,7 +33,8 @@ impl TerrainTool {
         TerrainTool::Noise,
         TerrainTool::Holes,
     ];
-    pub const MATERIALS: [TerrainTool; 2] = [TerrainTool::Paint, TerrainTool::Auto];
+    pub const MATERIALS: [TerrainTool; 3] =
+        [TerrainTool::Paint, TerrainTool::Water, TerrainTool::Auto];
     pub const WHOLE: [TerrainTool; 3] = [
         TerrainTool::Generate,
         TerrainTool::Erode,
@@ -49,6 +51,7 @@ impl TerrainTool {
             TerrainTool::Noise => "Noise",
             TerrainTool::Holes => "Holes",
             TerrainTool::Paint => "Paint",
+            TerrainTool::Water => "Water",
             TerrainTool::Auto => "Auto Materials",
             TerrainTool::Generate => "Generate",
             TerrainTool::Erode => "Erosion",
@@ -66,6 +69,7 @@ impl TerrainTool {
             TerrainTool::Noise => icons::DOTS_NINE,
             TerrainTool::Holes => icons::CIRCLE_DASHED,
             TerrainTool::Paint => icons::PAINT_BRUSH,
+            TerrainTool::Water => icons::DROP,
             TerrainTool::Auto => icons::MAGIC_WAND,
             TerrainTool::Generate => icons::PLANET,
             TerrainTool::Erode => icons::CLOUD_RAIN,
@@ -91,7 +95,7 @@ impl TerrainTool {
 
     /// True for the tools used by brushing the terrain in the viewport.
     pub fn is_brush(self) -> bool {
-        Self::SCULPTING.contains(&self) || self == TerrainTool::Paint
+        Self::SCULPTING.contains(&self) || matches!(self, TerrainTool::Paint | TerrainTool::Water)
     }
 
     /// One line on how to use it.
@@ -110,6 +114,9 @@ impl TerrainTool {
             }
             TerrainTool::Paint => {
                 "Drag to paint the chosen layer. Shift erases back to the automatic materials. Ctrl+click picks a layer."
+            }
+            TerrainTool::Water => {
+                "Drag to paint water: ponds, lakes and rivers at a level of their own. Shift removes it. Ctrl+click the ground to pick the level."
             }
             TerrainTool::Auto => "Lay layers down by height and slope. Painting still wins.",
             TerrainTool::Generate => "Make a landscape from a preset and a seed.",

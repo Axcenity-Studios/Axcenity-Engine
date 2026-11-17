@@ -1153,6 +1153,7 @@ impl EditorApp {
         for tool in [
             TerrainTool::Raise,
             TerrainTool::Paint,
+            TerrainTool::Water,
             TerrainTool::Generate,
         ] {
             add(

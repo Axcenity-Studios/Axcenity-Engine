@@ -24,7 +24,7 @@ fn the_target_follows_the_selection_and_falls_back_to_the_first_terrain() {
 #[test]
 fn only_sculpting_and_painting_tools_brush_the_viewport() {
     let brushes: Vec<TerrainTool> = TerrainTool::all().filter(|t| t.is_brush()).collect();
-    assert_eq!(brushes.len(), 8);
+    assert_eq!(brushes.len(), 9);
     assert!(!TerrainTool::Generate.is_brush());
     let keys: Vec<_> = TerrainTool::all().filter_map(TerrainTool::key).collect();
     let mut unique = keys.clone();
@@ -506,7 +506,8 @@ fn each_section_is_drawn_under_its_tab_only() {
         ),
         (
             StudioTab::Terrain,
-            &["Generate", "Masks", "Water", "Terrain data"],
+            // "Water" alone is the Materials tab's Water brush too.
+            &["Generate", "Masks", "Fill the hollows", "Terrain data"],
         ),
     ];
     for (tab, own) in sections {
@@ -535,6 +536,7 @@ fn a_tools_settings_are_under_its_tab() {
     for (tool, setting) in [
         (TerrainTool::Raise, "Strength"),
         (TerrainTool::Paint, "Strength"),
+        (TerrainTool::Water, "Above where the stroke starts"),
         (TerrainTool::Auto, "Rules"),
         (TerrainTool::Generate, "World Presets"),
         (TerrainTool::Erode, "Erosion"),

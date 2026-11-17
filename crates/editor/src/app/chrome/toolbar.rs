@@ -802,6 +802,7 @@ impl EditorApp {
                     for tool in [
                         TerrainTool::Raise,
                         TerrainTool::Paint,
+                        TerrainTool::Water,
                         TerrainTool::Generate,
                     ] {
                         let item = egui::Button::selectable(

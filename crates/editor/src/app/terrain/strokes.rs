@@ -177,6 +177,27 @@ impl EditorApp {
                 Operation::Holes { fill: false },
                 "Cut Terrain Holes".to_owned(),
             ),
+            TerrainTool::Water if shift => (
+                Operation::Water {
+                    level: 0.0,
+                    erase: true,
+                },
+                "Remove Terrain Water".to_owned(),
+            ),
+            TerrainTool::Water => {
+                let level = if studio.water_from_stroke {
+                    point.y + studio.water_depth
+                } else {
+                    studio.water_level
+                };
+                (
+                    Operation::Water {
+                        level,
+                        erase: false,
+                    },
+                    "Paint Terrain Water".to_owned(),
+                )
+            }
             TerrainTool::Paint if shift => (
                 Operation::Erase {
                     locked: studio.locked,
@@ -248,12 +269,17 @@ impl EditorApp {
         true
     }
 
-    /// Ctrl+click: Flatten takes the height there, Paint the layer showing.
+    /// Ctrl+click: Flatten and Water take the height there, Paint the
+    /// layer showing.
     pub(super) fn sample_terrain(&mut self, terrain: InstanceId, tool: TerrainTool, point: Vec3) {
         match tool {
             TerrainTool::Flatten => {
                 self.terrain.flatten_height = point.y;
                 self.terrain.flatten_from_stroke = false;
+            }
+            TerrainTool::Water => {
+                self.terrain.water_level = point.y;
+                self.terrain.water_from_stroke = false;
             }
             TerrainTool::Paint => {
                 let Some(placement) = self.world.get(terrain).and_then(Placement::of) else {

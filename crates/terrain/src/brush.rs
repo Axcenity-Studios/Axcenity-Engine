@@ -413,6 +413,12 @@ pub enum Operation {
     Holes {
         fill: bool,
     },
+    /// Fills the cells under the brush with water whose surface rests at
+    /// `level` (world Y), or takes it away when `erase` is set.
+    Water {
+        level: f32,
+        erase: bool,
+    },
 }
 
 impl Operation {
@@ -424,6 +430,7 @@ impl Operation {
                 | Operation::Erase { .. }
                 | Operation::Scatter(_)
                 | Operation::Holes { .. }
+                | Operation::Water { .. }
         )
     }
 }
@@ -546,6 +553,26 @@ fn apply_one(
             for x in rect.x0..rect.x1 {
                 if weights[index] > 0.0 {
                     holes[z * size_x + x] = !fill;
+                }
+                index += 1;
+            }
+        }
+        return rect;
+    }
+
+    if let Operation::Water { level, erase } = operation {
+        // Every cell whose corner the brush reaches, whatever its strength.
+        let level = if *erase {
+            axcenity_core::NO_WATER
+        } else {
+            placement.height_of(*level).clamp(0.0, 1.0)
+        };
+        let water = data.water_mut_in(rect);
+        let mut index = 0;
+        for z in rect.z0..rect.z1 {
+            for x in rect.x0..rect.x1 {
+                if weights[index] > 0.0 {
+                    water[z * size_x + x] = level;
                 }
                 index += 1;
             }
@@ -693,7 +720,8 @@ fn apply_one(
                 Operation::Paint { .. }
                 | Operation::Erase { .. }
                 | Operation::Scatter(_)
-                | Operation::Holes { .. } => height,
+                | Operation::Holes { .. }
+                | Operation::Water { .. } => height,
             };
             let new = match limits {
                 // Raising stops at the top limit and lowering at the bottom;

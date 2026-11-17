@@ -168,8 +168,8 @@ struct Entry {
     layers: Option<Arc<TerrainLayers>>,
     /// Its painted plants and models, built once.
     foliage: Option<crate::foliage::PaintedFoliage>,
-    /// Each chunk's lowest ground, for its water (`terrain_water.rs`).
-    lowest: crate::terrain_water::Lowest,
+    /// Each chunk's lowest ground and painted water (`terrain_water.rs`).
+    water: crate::terrain_water::WaterCache,
 }
 
 #[derive(Default)]
@@ -363,7 +363,7 @@ impl TerrainCache {
             chunks: HashMap::new(),
             layers: None,
             foliage: None,
-            lowest: Default::default(),
+            water: Default::default(),
         });
         // Another landscape or another size: nothing kept fits it.
         if entry.uid != data.uid() || entry.samples != data.size() || entry.size != placement.size {
@@ -374,7 +374,7 @@ impl TerrainCache {
                 chunks: HashMap::new(),
                 layers: None,
                 foliage: None,
-                lowest: Default::default(),
+                water: Default::default(),
             };
         }
         let layers = match &entry.layers {
@@ -505,9 +505,8 @@ impl TerrainCache {
                 items.push(chunk_item(mesh, weights, &layers, transform, casts_shadow));
             }
         }
-        if let Some(water) = crate::terrain_water::TerrainWater::of(instance) {
-            crate::terrain_water::draw(&water, &data, &placement, &mut entry.lowest, items);
-        }
+        let water = crate::terrain_water::TerrainWater::of(instance);
+        crate::terrain_water::draw(id, &water, &data, &placement, &mut entry.water, items);
         crate::foliage::draw_terrain(&mut entry.foliage, id, &placement, &data, assets, chunks);
     }
 }
@@ -1087,5 +1086,72 @@ mod tests {
         let mut items = Vec::new();
         cache.draw_all(&world, &assets, &camera, &mut items, &mut Vec::new());
         assert!(water_items(&items).is_empty());
+    }
+
+    #[test]
+    fn painted_water_draws_only_its_cells_that_show() {
+        let (mut world, terrain) = world_with_terrain();
+        let ground = {
+            let data = world.terrain(terrain).unwrap();
+            -32.0 + data.height(48, 48) * 128.0
+        };
+        // Four cells in chunk (1, 1), 3 studs over the ground, and one in
+        // chunk (0, 0) far under it.
+        let level = (ground + 3.0 + 32.0) / 128.0;
+        let data = world.terrain_mut(terrain).unwrap();
+        let all = data.bounds();
+        let water = data.water_mut_in(all);
+        for (x, z) in [(48, 48), (49, 48), (48, 49), (49, 49)] {
+            water[z * 257 + x] = level;
+        }
+        water[5 * 257 + 5] = 0.0;
+        world
+            .set_property(terrain, "WaveHeight", Value::Number(0.75))
+            .unwrap();
+        let mut cache = TerrainCache::new();
+        let assets = Assets::default();
+        let camera = camera_at(Vec3::new(0.0, 50.0, 0.0));
+        let mut items = Vec::new();
+        cache.draw_all(&world, &assets, &camera, &mut items, &mut Vec::new());
+        let water = water_items(&items);
+        assert_eq!(water.len(), 1, "the dry cell isn't drawn");
+        assert_eq!(water[0].material.water.unwrap().wave_height, 0.75);
+        let Shape::Mesh(mesh) = &water[0].shape else {
+            panic!("painted water is a mesh of its cells");
+        };
+        // Four cells, each cut 2 × 2 (32 cells a chunk, 64 in the grid).
+        assert_eq!(mesh.indices().len(), 4 * 2 * 2 * 6);
+        assert!(
+            mesh.positions()
+                .iter()
+                .all(|p| (p[1] - (ground + 3.0)).abs() < 1e-3)
+        );
+        let key = mesh.key();
+        // Drawn again unchanged: the same mesh.
+        let mut items = Vec::new();
+        cache.draw_all(&world, &assets, &camera, &mut items, &mut Vec::new());
+        let Shape::Mesh(again) = &water_items(&items)[0].shape else {
+            unreachable!()
+        };
+        assert_eq!(again.key(), key);
+
+        // Flooded higher: the flood covers it, so only the flood draws.
+        world
+            .set_property(terrain, "Water", Value::Bool(true))
+            .unwrap();
+        world
+            .set_property(
+                terrain,
+                "WaterLevel",
+                Value::Number(f64::from(ground) + 5.0),
+            )
+            .unwrap();
+        let mut items = Vec::new();
+        cache.draw_all(&world, &assets, &camera, &mut items, &mut Vec::new());
+        assert!(
+            water_items(&items)
+                .iter()
+                .all(|item| matches!(&item.shape, Shape::Mesh(mesh) if mesh.key() == axcenity_render::water_surface().key()))
+        );
     }
 }

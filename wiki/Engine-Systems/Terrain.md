@@ -4,7 +4,7 @@ type: system
 status: current
 implementation: implemented
 crates: [terrain, core, scene, physics, project, procedural]
-source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/brush/scatter.rs, crates/project/src/scatter_palettes.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs]
+source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/brush/scatter.rs, crates/project/src/scatter_palettes.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs, crates/scene/src/terrain_water.rs]
 docs: [docs/terrain.md, docs/editor/scatter.md, crates/terrain/CLAUDE.md]
 verified: 2026-11-16
 verified_commit: fbfacacb
@@ -24,7 +24,7 @@ flowchart LR
   TB --> TD
   TD --> MESH[terrain::mesh chunks<br/>split cells like parry,<br/>stitched where levels meet]
   MESH --> SC[scene TerrainCache:<br/>levels, then meshes; weights;<br/>foliage draw]
-  SC --> WA[terrain water: one water item<br/>per chunk below WaterLevel]
+  SC --> WA[terrain water: a flood item per chunk<br/>below WaterLevel, a mesh of<br/>painted cells per chunk]
   TD --> PH[physics heightfield + colliding foliage]
   TD <--> PR[project terrain_files: PNG + JSON]
 ```
@@ -32,6 +32,8 @@ flowchart LR
 Chunk meshes (`terrain/src/mesh.rs`, `scene/src/terrain.rs`): each frame the scene picks every chunk's level of detail (by distance, full detail for a chunk with holes), then builds each chunk so its sides meet its neighbours': a side next to a finer chunk takes that chunk's samples and fans its cells out to them, so the surface is watertight across every seam with no T-junctions, and a full-detail chunk is never changed (it stays exactly the collider). There are no skirts: until 2026-11-16 every chunk hung one from each side to hide cracks between levels, and the owner saw them as messy, stepped walls at the terrain's border and slivers at seams. Meshes are quick, so they're built in the frame that needs them, streaming or not; while streaming only the weights are made on the worker. The renderer uploads terrain chunk meshes right away even with background uploads on (the editor's viewport always has them): left to the upload thread, a chunk switching level was missing for a few frames, a sky-coloured square in the ground while the camera moved.
 
 Since LE4 (the 2026-11-13 lighting audit) a Terrain can flood its hollows: `scene/src/terrain_water.rs` draws the renderer's water over every chunk whose lowest ground is below `WaterLevel`. It is drawn only; physics doesn't see it.
+
+Since 2026-11-16 water can also be painted (the Terrain Studio's Water brush, `brush::Operation::Water`): `TerrainData` keeps one water level per cell (in the heights' 0-to-1 units, `NO_WATER` for none, no array until the first paint), with its own per-chunk `water_version` so painting never rebuilds ground meshes, colliders or weights. Undo goes through the same region copies as heights and holes. It saves as an optional `water.png`. The scene builds one mesh per chunk of only the cells that show (ground below the water at some corner, and above the flood if there is one), each cell cut 2 × 2 so it is as fine as the flood's grid, and rebuilds it only when the chunk's water, heights or the flood level change. The same day the waves gained `WaveVariation` (`water.wgsl`): per-wave swell and push from four analytic-slope value noises, so a sea isn't one wave pattern repeated.
 
 Since PW1 (procedural worlds, 2026-11-14) a Terrain can hold `ScatterRule`s that place foliage by height, slope, material layer, clumping and distance from other rules' spots. `procedural::terrain_scatter` places them per 32-sample chunk on a hash grid (one spot per `Spacing` cell from the seed and the cell's number), so chunks are made independently on every device and only those whose ground or rules changed are made again. The result lives in `TerrainData::generated_chunks` beside painted foliage; it is never saved or sent, and changing it bumps `generated_version` (which scene, physics, nav and preload keys include), not `revision`. Bake turns it into painted foliage.
 
