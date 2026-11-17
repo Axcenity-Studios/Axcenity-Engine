@@ -754,16 +754,31 @@ impl BaseManifest {
                 }
             }
         }
-        if let Some(mirror) = &handle.mirror
-            && self
-                .handle(mirror)
-                .and_then(|other| other.mirror.as_deref())
-                != Some(handle.id.as_str())
-        {
-            p.push(Problem::new(
-                at,
-                format!("`{}`'s mirror `{mirror}` doesn't name it back", handle.id),
-            ));
+        if let Some(mirror) = &handle.mirror {
+            let other = self.handle(mirror);
+            if *mirror == handle.id {
+                p.push(Problem::new(
+                    at,
+                    format!("`{}` is named as its own mirror", handle.id),
+                ));
+            } else if other.and_then(|other| other.mirror.as_deref()) != Some(handle.id.as_str()) {
+                p.push(Problem::new(
+                    at,
+                    format!("`{}`'s mirror `{mirror}` doesn't name it back", handle.id),
+                ));
+            }
+            // A pair is one feature's left and right.
+            if let Some(other) = other
+                && other.feature != handle.feature
+            {
+                p.push(Problem::new(
+                    at,
+                    format!(
+                        "`{}`'s mirror `{mirror}` is on another feature (`{}`)",
+                        handle.id, other.feature
+                    ),
+                ));
+            }
         }
         unique(p, &format!("{at}.views"), handle.views.iter());
     }

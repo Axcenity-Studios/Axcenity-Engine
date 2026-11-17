@@ -37,7 +37,8 @@ impl CharacterWorkspace {
     ) -> Option<WorkspaceAction> {
         // A drag always ends with the pointer let go, even when the widget
         // that started it missed the release (a colour picker's popup).
-        if self.dragging() && !ui.input(|input| input.pointer.any_down()) {
+        if self.dragging() && !self.direct.dragging() && !ui.input(|input| input.pointer.any_down())
+        {
             self.history.commit(&self.description);
             self.refresh();
         }
@@ -90,7 +91,7 @@ impl CharacterWorkspace {
         ui.painter().rect_filled(left, 0.0, palette.panel);
         ui.painter().rect_filled(right, 0.0, palette.panel);
         intents.extend(nav::show(&mut child(ui, left.shrink(10.0)), self, &library));
-        self.viewport(ui, view.shrink2(vec2(6.0, 4.0)), render_state);
+        intents.extend(self.viewport(ui, view.shrink2(vec2(6.0, 4.0)), render_state));
         intents.extend(compare::strip(
             &mut child(
                 ui,
@@ -167,12 +168,22 @@ impl CharacterWorkspace {
             Intent::Save => self.save_now(),
             Intent::Undo => self.undo(),
             Intent::Redo => self.redo(),
-            Intent::CancelEdit => self.cancel_edit(),
+            Intent::CancelEdit => {
+                self.cancel_handle_drag();
+                self.cancel_edit();
+            }
             Intent::Reset(scope) => self.reset_scope(&scope),
             Intent::PickCategory(category) => self.pick_category(category),
-            Intent::PickFeature(feature) => self.selection.feature = feature,
+            Intent::PickFeature(feature) => self.pick_feature(feature),
             Intent::PickLevel(level) => self.selection.level = level,
             Intent::SetSymmetry(on) => self.symmetry = on,
+            Intent::SetHandles(on) => {
+                self.direct.on = on;
+                if !on {
+                    self.direct.forget_hover();
+                }
+            }
+            Intent::FocusFeature(feature) => self.focus_feature(&feature),
             Intent::FocusView(view) => self.focus(view),
             Intent::SetLighting(lighting) => self.lighting = lighting,
             Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
@@ -356,12 +367,22 @@ impl CharacterWorkspace {
         self.selection.pick_category(category);
     }
 
-    /// The preview: camera input (turn, pan, zoom; a double click goes
-    /// back to the whole character) and the rendered character.
-    fn viewport(&mut self, ui: &mut egui::Ui, rect: Rect, render_state: Option<&RenderState>) {
+    /// The preview: editing on the character (hover, click to select,
+    /// handles: `direct.rs`), camera input (turn, pan, zoom; a double click
+    /// goes back to the whole character) and the rendered character.
+    fn viewport(
+        &mut self,
+        ui: &mut egui::Ui,
+        rect: Rect,
+        render_state: Option<&RenderState>,
+    ) -> Vec<Intent> {
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
+        let looking = self.comparison.instead().is_some();
+        // A primary drag that starts on a handle edits; any other turns
+        // the camera (ux patterns section 3).
+        let intents = self.direct_input(ui, &response, looking);
         let mut moved = false;
-        if response.dragged_by(egui::PointerButton::Primary) {
+        if response.dragged_by(egui::PointerButton::Primary) && !self.direct.dragging() {
             let delta = response.drag_delta();
             self.orbit.turn(delta.x, delta.y);
             moved |= delta != egui::Vec2::ZERO;
@@ -383,10 +404,13 @@ impl CharacterWorkspace {
         if moved {
             // The view chips no longer say where the camera is.
             self.view = None;
+            self.direct.stop_focus();
         }
         if response.double_clicked() {
+            self.direct.stop_focus();
             self.focus(ViewPreset::FullBody);
         }
+        self.direct.step_focus(&mut self.orbit, Instant::now());
         self.step();
         stage::apply(&mut self.world, self.lighting, self.backdrop);
         let palette = theme::palette(ui.ctx());
@@ -427,6 +451,9 @@ impl CharacterWorkspace {
                 }
             }
         }
+        // Over the current character: the feature under the pointer, the
+        // selected one and its handles.
+        self.direct_paint(ui, right, looking);
         // Say what is shown, so a held version is never taken for the
         // character being edited. Each label sits on a small card of its
         // own: the backdrop is any colour the person picks.
@@ -454,6 +481,7 @@ impl CharacterWorkspace {
                 ),
             );
         }
+        intents
     }
 
     /// The preview World's draw list from `camera`, on the stage.
@@ -490,11 +518,15 @@ impl CharacterWorkspace {
         self.expire_notice(Instant::now());
         let palette = theme::palette(ui.ctx());
         ui.horizontal_centered(|ui| {
-            let text = self.notice.clone().unwrap_or_else(|| {
-                "Drag to turn · right-drag to pan · scroll to zoom · double-click for the whole \
-                 character"
-                    .to_owned()
-            });
+            let text = self
+                .notice
+                .clone()
+                .or_else(|| self.direct.status.clone())
+                .unwrap_or_else(|| {
+                    "Click a feature to select it · drag a handle to change it · drag elsewhere \
+                     to turn · right-drag to pan · scroll to zoom"
+                        .to_owned()
+                });
             ui.label(egui::RichText::new(text).small().color(palette.text_weak));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(

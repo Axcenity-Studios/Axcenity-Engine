@@ -56,12 +56,17 @@ pub(super) fn show(
     let selection = &workspace.selection;
     let category = selection.category;
     let base = library.base(&workspace.description().base);
+    // A manifest feature's label (the waist, the nose), or a group's.
     let feature = selection.feature.as_deref().and_then(|feature| {
-        base?
-            .groups
-            .iter()
-            .find(|group| group.id == feature)
-            .map(|group| group.label.clone())
+        let base = base?;
+        base.feature(feature)
+            .map(|feature| feature.label.clone())
+            .or_else(|| {
+                base.groups
+                    .iter()
+                    .find(|group| group.id == feature)
+                    .map(|group| group.label.clone())
+            })
     });
     let title = match &feature {
         Some(feature) => format!("{} › {feature}", super::nav::label(category)),

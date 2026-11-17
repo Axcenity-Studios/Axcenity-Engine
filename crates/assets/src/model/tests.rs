@@ -824,3 +824,49 @@ fn a_blend_shape_accessor_without_data_reads_as_no_moves() {
     assert!(load_model(broken.as_bytes(), &folder, ModelFormat::Gltf).is_err());
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// Refinement R2: the realistic body's region map (the build's
+/// `TEXCOORD_1`, README "Body regions") reaches the model, one region per
+/// corner, on the body and on its simpler copies, so a pick on the
+/// character can say which part of the body it hit.
+#[test]
+fn the_realistic_bodys_region_map_reaches_every_corner_and_its_simpler_copies() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let picks = [Pick::Objects(vec!["AxcenityRealistic/Body".to_owned()])];
+    let body = load_models(&bytes, &folder, ModelFormat::Gltf, &picks)
+        .unwrap()
+        .remove(0);
+    let mut seen = std::collections::BTreeSet::new();
+    for primitive in &body.primitives {
+        for copy in std::iter::once(primitive).chain(&primitive.lods) {
+            assert_eq!(copy.regions.len(), copy.positions.len(), "one per corner");
+            assert!(copy.regions.iter().all(|region| (1..=14).contains(region)));
+            seen.extend(copy.regions.iter().copied());
+        }
+    }
+    assert_eq!(seen.len(), 14, "all fourteen regions: {seen:?}");
+    // The highest corner is the head's (1), the lowest the feet's (14).
+    let full = &body.primitives;
+    let corners = || {
+        full.iter()
+            .flat_map(|primitive| primitive.positions.iter().zip(&primitive.regions))
+    };
+    let top = corners().max_by(|a, b| a.0[1].total_cmp(&b.0[1])).unwrap();
+    let bottom = corners().min_by(|a, b| a.0[1].total_cmp(&b.0[1])).unwrap();
+    assert_eq!((*top.1, *bottom.1), (1, 14));
+}
+
+/// A second set of texture coordinates that isn't a region map (a
+/// lightmap's) gives no regions; one that is gives each corner's index.
+#[test]
+fn only_a_region_map_in_the_second_coordinates_gives_regions() {
+    let cell = |index: f32| [(index + 0.5) / 16.0, 0.5];
+    assert_eq!(
+        region_map([cell(0.0), cell(3.0), cell(14.0)].into_iter(), 3),
+        vec![0, 3, 14]
+    );
+    assert!(region_map([[0.13, 0.71], cell(3.0)].into_iter(), 2).is_empty());
+    assert!(region_map([cell(1.0), [0.1, 0.5]].into_iter(), 2).is_empty());
+    assert!(region_map([cell(1.0)].into_iter(), 2).is_empty(), "too few");
+}

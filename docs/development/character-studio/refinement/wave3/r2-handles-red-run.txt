@@ -1,0 +1,36 @@
+R2 direct manipulation (r2-handles): the red run, 2026-11-17.
+The new tests run against the wave 2 manifest (no handles) and a stub of the
+studio's direct manipulation (no handles shown, no hover, no switch), before
+the implementation. Command:
+  cargo nextest run -p axcenity-avatar -p axcenity-player -p axcenity-editor --no-fail-fast -E 'test(/realistic_handles|a_handle_s_mirror|handle_tests/)'
+  cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(realistic_handles)'
+
+        FAIL [   0.026s] (1/9) axcenity-avatar tests::contracts::a_handle_s_mirror_is_another_handle_of_its_feature
+        FAIL [   2.373s] (4/9) axcenity-player::bin/axcenity-player handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+        FAIL [   2.868s] (5/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::symmetry_moves_the_mirror
+        FAIL [   2.882s] (6/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::a_camera_drag_never_changes_the_description
+        FAIL [   2.898s] (7/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::handles_off_leaves_the_camera_only
+        FAIL [   2.915s] (8/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::a_drag_through_each_feature_s_handle_gives_what_its_sliders_give
+        FAIL [   2.962s] (9/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::hover_highlights_and_a_click_selects_and_frames_the_feature
+        PASS [   0.088s] (2/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::handles_are_drawn_for_hover_selection_and_a_drag
+        PASS [   2.354s] (3/9) axcenity-player::bin/axcenity-player handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+     Summary [   2.964s] 9 tests run: 2 passed, 7 failed, 1668 skipped
+    thread 'character_workspace::handle_tests::a_camera_drag_never_changes_the_description'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::a_drag_through_each_feature_s_handle_gives_what_its_sliders_give'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::handles_off_leaves_the_camera_only'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::hover_highlights_and_a_click_selects_and_frames_the_feature'  panicked at crates\editor\src\character_workspace\handle_tests.rs:282:57:
+    thread 'character_workspace::handle_tests::symmetry_moves_the_mirror'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends'  panicked at crates\player\src\handle_tests.rs:169:5:
+    thread 'tests::contracts::a_handle_s_mirror_is_another_handle_of_its_feature'  panicked at crates\avatar\src\tests\contracts.rs:289:5:
+
+        FAIL [   0.014s] (1/3) axcenity-avatar::realistic_handles the_seven_features_have_handles_in_the_brief_s_order
+        PASS [   0.015s] (2/3) axcenity-avatar::realistic_handles every_handle_drives_its_own_feature_s_parameters_and_pairs_name_each_other
+        PASS [   0.018s] (3/3) axcenity-avatar::realistic_handles drives_have_a_measured_axis_and_travel_and_one_line_each_per_view
+     Summary [   0.018s] 3 tests run: 2 passed, 1 failed, 0 skipped
+    thread 'the_seven_features_have_handles_in_the_brief_s_order' (32596) panicked at crates\avatar\tests\realistic_handles.rs:36:5:
+
+The two that passed: the travel test has no handles to measure in the old
+manifest (its loop is empty), and the snapshot test only draws when
+AXCENITY_SNAPSHOTS is set. The assets region-map and scene ray tests were
+written with their code (Primitive::regions did not exist, so they could not
+compile before it).

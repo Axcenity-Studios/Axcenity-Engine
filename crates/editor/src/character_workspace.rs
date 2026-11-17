@@ -41,6 +41,7 @@
 pub mod autosave;
 mod bottom_bar;
 pub mod compare;
+pub mod direct;
 pub mod edit;
 pub mod intent;
 mod nav;
@@ -58,6 +59,8 @@ mod toolbar;
 
 #[cfg(test)]
 mod feature_tests;
+#[cfg(test)]
+mod handle_tests;
 #[cfg(test)]
 mod shelf_tests;
 #[cfg(test)]
@@ -307,6 +310,9 @@ pub struct CharacterWorkspace {
     autosave: Autosave,
     /// A character a crash left, offered when the studio opened.
     pub recovery: Option<Recovery>,
+    /// Hover, selection and handles on the character in the viewport
+    /// (R2, `direct.rs`; editor state).
+    pub direct: direct::Direct,
     /// The presets' pictures (the Presets page's tiles).
     pictures: thumbnails::Thumbnails,
     /// Each preset's picture file and its texture once loaded, by ID.
@@ -398,6 +404,7 @@ impl CharacterWorkspace {
                 ..Autosave::default()
             },
             recovery: autosave::read_recovery(folder),
+            direct: direct::Direct::default(),
             pictures,
             preset_pictures: HashMap::new(),
         };

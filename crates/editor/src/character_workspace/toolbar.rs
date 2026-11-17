@@ -1,7 +1,8 @@
 //! The toolbar (brief §3.1): Home, the character's name and whether it's
 //! saved, New (a family or a preset), Open, Save, undo and redo, Reset
-//! with a scope and Randomize with a scope (brief §11). Comparison is the
-//! strip over the viewport (`compare.rs`).
+//! with a scope and Randomize with a scope (brief §11), and the switch for
+//! editing on the character (R2: hover, click to select, handles;
+//! `direct.rs`). Comparison is the strip over the viewport (`compare.rs`).
 
 use axcenity_avatar::{Library, PresetKind};
 use eframe::egui;
@@ -111,6 +112,17 @@ pub(super) fn show(
                 }
             });
             ui.add_space(8.0);
+            let on = workspace.direct.on;
+            let tip = if on {
+                "Edit on character is on: hover, click a feature and drag its handles. Click to \
+                 turn it off and only move the camera"
+            } else {
+                "Edit on character is off: the viewport only moves the camera. Click to turn it on"
+            };
+            if widgets::icon_button(ui, icons::CURSOR_CLICK, tip, on).clicked() {
+                intents.push(Intent::SetHandles(!on));
+            }
+            ui.add_space(4.0);
             if ui
                 .add_enabled(
                     workspace.can_redo(),

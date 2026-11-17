@@ -613,6 +613,7 @@ impl Model {
                 normals,
                 uvs: primitive.uvs.clone(),
                 tangents,
+                regions: primitive.regions.clone(),
                 indices: primitive.indices.clone(),
                 material: primitive.material.clone(),
                 joints: primitive.joints.clone(),

@@ -426,7 +426,8 @@ fn the_realistic_parameters_say_what_they_are() {
             feature.id
         );
     }
-    assert!(base.handles.is_empty(), "handles are R2's");
+    // R2 wrote the handles (`handles.py`); `realistic_handles.rs` checks them.
+    assert!(!base.handles.is_empty(), "the realistic body's handles");
 }
 
 /// Randomize on the shipped base models (R1; R10's 1,000 seeds): every

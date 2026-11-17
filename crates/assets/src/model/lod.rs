@@ -230,6 +230,7 @@ impl Primitive {
             normals: Vec::new(),
             uvs: Vec::new(),
             tangents: Vec::new(),
+            regions: Vec::new(),
             indices: Vec::new(),
             material: like.material.clone(),
             joints: Vec::new(),
@@ -270,6 +271,7 @@ impl Primitive {
             normals: pick(&self.normals, &used),
             uvs: pick(&self.uvs, &used),
             tangents: pick(&self.tangents, &used),
+            regions: pick(&self.regions, &used),
             indices,
             material: self.material.clone(),
             joints: pick(&self.joints, &used),
@@ -310,6 +312,7 @@ impl Primitive {
             added,
             [1.0, 0.0, 0.0, 1.0],
         );
+        join(&mut self.regions, other.regions, before, added, 0);
         join(&mut self.joints, other.joints, before, added, [0; 4]);
         join(&mut self.weights, other.weights, before, added, [0.0; 4]);
         super::morph::append(&mut self.morphs, other.morphs, before as u32);
@@ -332,6 +335,7 @@ mod tests {
             positions: Vec::new(),
             normals: Vec::new(),
             uvs: Vec::new(),
+            regions: Vec::new(),
             tangents: Vec::new(),
             indices: Vec::new(),
             material: Default::default(),
