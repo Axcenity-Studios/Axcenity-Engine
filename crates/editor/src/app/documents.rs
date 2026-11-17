@@ -3,7 +3,8 @@
 //! Every editor that holds a document reports it here: the world's
 //! history, script tabs, block scripts, UI Event Graphs, behavior trees,
 //! dialogues, data tables, materials, the Animation tab's clip and state
-//! machine, and the Model Studio's model. "Is anything unsaved?" (the
+//! machine, the Model Studio's model, and the character open in Character
+//! Studio. "Is anything unsaved?" (the
 //! title's `*`, the close prompts), the prompt's list and "Don't Save" all
 //! read it, so a new editor is added in one place.
 //!
@@ -31,6 +32,8 @@ pub(crate) enum DocKind {
     Animation,
     /// The Model Studio's model.
     Model,
+    /// The character open in Character Studio's workspace.
+    Character,
 }
 
 impl DocKind {
@@ -44,6 +47,7 @@ impl DocKind {
             DocKind::Material => icons::PALETTE,
             DocKind::Animation => icons::PERSON_SIMPLE_RUN,
             DocKind::Model => icons::CUBE,
+            DocKind::Character => icons::USER_FOCUS,
         }
     }
 }
@@ -116,6 +120,14 @@ impl EditorApp {
                 doc.path.clone()
             };
             add(DocKind::Model, name);
+        }
+        if let Some(workspace) = &self.character_workspace
+            && workspace.dirty()
+        {
+            add(
+                DocKind::Character,
+                format!("Character \"{}\"", workspace.description().name),
+            );
         }
         list
     }

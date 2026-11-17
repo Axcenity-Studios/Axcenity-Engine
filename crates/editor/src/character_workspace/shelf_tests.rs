@@ -56,6 +56,8 @@ fn opening_and_saving_put_a_character_first_in_recent() {
     let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
     workspace.edit(|description| description.name = "First".into());
     let first = workspace.save().unwrap();
+    // A second character (a rename would move First's file: audit D-03).
+    workspace.new_character(0);
     workspace.edit(|description| description.name = "Second".into());
     let second = workspace.save().unwrap();
     assert_eq!(recent::recent(&folder), vec![second.clone(), first.clone()]);

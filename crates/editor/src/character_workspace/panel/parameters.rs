@@ -1,0 +1,236 @@
+//! A category's parameters by group, as compact sections: a slider row
+//! each (a chip row for a choice such as the body type), filtered by the
+//! detail level and the picked feature. A category with many features (the
+//! face) lists them folded until one is opened or picked. With Symmetry
+//! on, a left and right pair shows as one row while its sides agree; a pair
+//! whose sides differ shows both, so nothing is flattened unseen (audit
+//! D-11).
+
+use axcenity_avatar::{BaseManifest, Description, Parameter};
+use eframe::egui;
+
+use super::super::intent::Intent;
+use super::super::selection::{
+    Level, Selection, parameter_about, parameter_feature, parameter_level,
+};
+use super::super::{Category, symmetric_label, value_of};
+use super::row::{self, Row};
+use crate::theme::{self, icons};
+use crate::widgets;
+
+/// A row to show: a parameter, alone or with its mirror.
+#[derive(Debug, PartialEq)]
+pub(in super::super) struct Shown<'a> {
+    pub parameter: &'a Parameter,
+    /// It edits its mirror too (Symmetry, sides equal).
+    pub mirrored: bool,
+}
+
+/// The rows of group `group` shown for `selection` with `symmetry`.
+pub(in super::super) fn rows<'a>(
+    base: &'a BaseManifest,
+    description: &Description,
+    group: &str,
+    level: Level,
+    feature: Option<&str>,
+    symmetry: bool,
+) -> Vec<Shown<'a>> {
+    let value = |id: &str| value_of(description, Some(base), id);
+    let index = |id: &str| base.parameters.iter().position(|p| p.id == id);
+    base.parameters
+        .iter()
+        .filter(|p| p.group == group)
+        .filter(|p| feature.is_none_or(|feature| parameter_feature(p) == feature))
+        .filter(|p| level.shows(parameter_level(p)))
+        .filter_map(|p| {
+            let mirror = p
+                .mirror
+                .as_deref()
+                .filter(|_| symmetry)
+                .filter(|mirror| (value(&p.id) - value(mirror)).abs() < 1.0e-4);
+            match mirror {
+                // A pair shows once, as the first of the two.
+                Some(mirror) if index(&p.id) > index(mirror) => None,
+                Some(_) => Some(Shown {
+                    parameter: p,
+                    mirrored: true,
+                }),
+                None => Some(Shown {
+                    parameter: p,
+                    mirrored: false,
+                }),
+            }
+        })
+        .collect()
+}
+
+/// Values of `category` that differ from the default but are hidden at
+/// `level`, and the level that shows them all.
+pub(in super::super) fn hidden_changes(
+    base: &BaseManifest,
+    description: &Description,
+    category: axcenity_avatar::Category,
+    level: Level,
+) -> Option<(usize, Level)> {
+    let hidden: Vec<Level> = base
+        .parameters
+        .iter()
+        .filter(|p| {
+            base.groups
+                .iter()
+                .any(|group| group.id == p.group && group.category == category)
+        })
+        .filter(|p| !level.shows(parameter_level(p)))
+        .filter(|p| (value_of(description, Some(base), &p.id) - p.default).abs() > 1.0e-4)
+        .map(parameter_level)
+        .collect();
+    let needed = hidden.iter().copied().max()?;
+    Some((hidden.len(), needed))
+}
+
+/// Draws `category`'s groups and returns what they ask for.
+pub(super) fn show(
+    ui: &mut egui::Ui,
+    base: &BaseManifest,
+    description: &Description,
+    selection: &Selection,
+    category: Category,
+    symmetry: bool,
+) -> Vec<Intent> {
+    let palette = theme::palette(ui.ctx());
+    let mut intents = Vec::new();
+    let Some(data) = category.data() else {
+        return intents;
+    };
+    let mut any = false;
+    // Many features (the face's nine) start folded, so the page is a list
+    // of features to open rather than a wall of sliders.
+    let groups = base
+        .groups
+        .iter()
+        .filter(|group| group.category == data)
+        .count();
+    for group in base.groups.iter().filter(|group| group.category == data) {
+        let shown = rows(
+            base,
+            description,
+            &group.id,
+            selection.level,
+            selection.feature.as_deref(),
+            symmetry,
+        );
+        if shown.is_empty() {
+            continue;
+        }
+        any = true;
+        let draw = |ui: &mut egui::Ui, intents: &mut Vec<Intent>| {
+            for row in &shown {
+                intents.extend(parameter(ui, base, description, row, selection.level));
+            }
+        };
+        if selection.feature.is_some() {
+            // One feature: its rows without a header (the panel's title
+            // names it).
+            draw(ui, &mut intents);
+        } else {
+            widgets::section(icon(&group.id), &group.label)
+                .id_salt(&group.id)
+                .default_open(groups <= 4)
+                .show(ui, |ui| draw(ui, &mut intents));
+        }
+    }
+    if !any {
+        ui.label(
+            egui::RichText::new(match selection.level {
+                Level::Quick => "Its sliders are at the Detailed level.",
+                _ => "Nothing to change here on this body.",
+            })
+            .color(palette.text_weak),
+        );
+    }
+    if let Some((count, needed)) = hidden_changes(base, description, data, selection.level) {
+        ui.add_space(6.0);
+        let text = format!(
+            "{count} more {} in {}",
+            if count == 1 { "change" } else { "changes" },
+            needed.label()
+        );
+        if ui
+            .link(egui::RichText::new(text).small())
+            .on_hover_text("Show them: nothing changed is ever hidden")
+            .clicked()
+        {
+            intents.push(Intent::PickLevel(needed));
+        }
+    }
+    intents
+}
+
+/// One parameter's row: a slider, or chips for a choice.
+fn parameter(
+    ui: &mut egui::Ui,
+    base: &BaseManifest,
+    description: &Description,
+    shown: &Shown,
+    level: Level,
+) -> Option<Intent> {
+    let parameter = shown.parameter;
+    let value = value_of(description, Some(base), &parameter.id);
+    if !parameter.choices.is_empty() {
+        let picked = parameter.nearest_choice(value).map(|choice| choice.value);
+        let palette = theme::palette(ui.ctx());
+        ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
+            .on_hover_text(parameter_about(parameter));
+        let mut out = None;
+        ui.horizontal_wrapped(|ui| {
+            for choice in &parameter.choices {
+                if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
+                    out = Some(Intent::Choose {
+                        id: parameter.id.clone(),
+                        value: choice.value,
+                    });
+                }
+            }
+        });
+        ui.add_space(4.0);
+        return out;
+    }
+    let label = if shown.mirrored {
+        symmetric_label(&parameter.label)
+    } else {
+        parameter.label.clone()
+    };
+    let about = parameter_about(parameter);
+    let (value, gesture) = row::slider(
+        ui,
+        &Row {
+            id: &parameter.id,
+            label: &label,
+            note: None,
+            about: &about,
+            value,
+            range: parameter.range,
+            default: parameter.default,
+            typed: level == Level::Advanced,
+        },
+    )?;
+    let id = parameter.id.clone();
+    Some(if shown.mirrored {
+        Intent::SetMirrored { id, value, gesture }
+    } else {
+        Intent::SetParameter { id, value, gesture }
+    })
+}
+
+/// A group's icon by its ID, for the groups the shipped bodies have.
+fn icon(group: &str) -> &'static str {
+    match group {
+        "frame" => icons::PERSON,
+        "build" | "build_regions" => icons::BARBELL,
+        "proportions" => icons::RULER,
+        "eyes" => icons::EYE,
+        "ears" => icons::EAR,
+        "lips" => icons::SMILEY,
+        _ => icons::SLIDERS_HORIZONTAL,
+    }
+}
