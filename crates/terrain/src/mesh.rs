@@ -2,14 +2,18 @@
 //!
 //! Each chunk is built on its own (so an edit rebuilds only its chunks) at
 //! one of [`LOD_LEVELS`] levels of detail: level `n` uses every `2^n`th
-//! sample. Neighbouring chunks at different levels don't quite meet, so
-//! every chunk hangs a skirt down from its edges, deep enough to hide the gap.
+//! sample. Where a chunk meets a neighbour drawn in more detail, its side
+//! takes the neighbour's samples (the cells along it are fanned out to
+//! them), so the two meet exactly, with no crack and no T-junction: the
+//! surface is watertight across every seam. The terrain's outer border is
+//! the surface's own edge; nothing hangs from it.
 //!
 //! Corners are relative to the terrain's `Position`. Normals come from the
 //! whole heightfield, so they match across chunk edges. Each cell is split
 //! along the same diagonal as parry's heightfield (from (x, z+1) to
 //! (x+1, z)), so at full detail the drawn surface is exactly the one
-//! physics collides with.
+//! physics collides with. A chunk at full detail is never stitched: only
+//! the coarser side of a seam changes.
 
 use axcenity_core::{CHUNK_CELLS, TerrainData};
 use glam::Vec3;
@@ -18,6 +22,10 @@ use crate::Placement;
 
 /// Full detail, then 1/2, 1/4, 1/8 and 1/16 of the samples.
 pub const LOD_LEVELS: u32 = 5;
+
+/// A chunk's sides, in the order [`chunk_mesh`] and [`side_lods`] take
+/// them: the step to the neighbour across each, toward -Z, +X, +Z and -X.
+pub const SIDES: [(isize, isize); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
 /// One chunk's triangles, with texture coordinates into its splat
 /// textures (one texel per sample, texel centres on the samples).
@@ -40,20 +48,39 @@ pub fn lod_for_distance(distance: f32, detail_distance: f32) -> u32 {
     level.min(LOD_LEVELS - 1)
 }
 
-/// The mesh of chunk (`cx`, `cz`) at level of detail `lod`.
+/// The level chunk (`cx`, `cz`) is drawn at when `lod` is asked for: full
+/// detail if it has holes, so they keep their shape far away.
+pub fn drawn_lod(data: &TerrainData, cx: usize, cz: usize, lod: u32) -> u32 {
+    if data.chunk_has_holes(cx, cz) {
+        0
+    } else {
+        lod.min(LOD_LEVELS - 1)
+    }
+}
+
+/// The level each side of a chunk drawn at `lod` is drawn at, in
+/// [`SIDES`] order, from the levels its neighbours are drawn at (`None`
+/// past the terrain's border, or for a neighbour that isn't drawn): the
+/// finer of the two, so both chunks put the same samples along their seam.
+pub fn side_lods(lod: u32, neighbours: [Option<u32>; 4]) -> [u32; 4] {
+    neighbours.map(|neighbour| neighbour.map_or(lod, |n| n.min(lod)))
+}
+
+/// The mesh of chunk (`cx`, `cz`) at level of detail `lod`, with its
+/// sides at `sides` ([`side_lods`]; a side is never coarser than the chunk).
 pub fn chunk_mesh(
     data: &TerrainData,
     placement: &Placement,
     cx: usize,
     cz: usize,
     lod: u32,
+    sides: [u32; 4],
 ) -> ChunkMesh {
     let rect = data.chunk_rect(cx, cz);
-    // A chunk with holes is always at full detail, so its holes keep
-    // their shape far away.
     let holes = data.chunk_has_holes(cx, cz);
-    let lod = if holes { 0 } else { lod };
-    let step = 1usize << lod.min(LOD_LEVELS - 1);
+    let lod = drawn_lod(data, cx, cz, lod);
+    let step = 1usize << lod;
+    let side_steps = sides.map(|side| 1usize << side.min(lod));
     // The samples used along each side: every `step`th, and always the last.
     let along = |start: usize, end: usize| {
         let mut samples: Vec<usize> = (start..end).step_by(step).collect();
@@ -80,19 +107,34 @@ pub fn chunk_mesh(
             ((z - rect.z0) as f32 + 0.5) / texels_z,
         ]
     };
+    let add = |mesh: &mut ChunkMesh, x: usize, z: usize| {
+        mesh.positions.push(point(x, z).to_array());
+        mesh.normals.push(placement.normal(data, x, z).to_array());
+        mesh.uvs.push(uv(x, z));
+        mesh.positions.len() as u32 - 1
+    };
 
     let mut mesh = ChunkMesh::default();
     for &z in &zs {
         for &x in &xs {
-            mesh.positions.push(point(x, z).to_array());
-            mesh.normals.push(placement.normal(data, x, z).to_array());
-            mesh.uvs.push(uv(x, z));
+            add(&mut mesh, x, z);
         }
     }
-    let columns = xs.len();
+    let (columns, rows) = (xs.len(), zs.len());
     let corner = |i: usize, j: usize| (j * columns + i) as u32;
-    for (j, &z) in zs.iter().enumerate().take(zs.len() - 1) {
-        for (i, &x) in xs.iter().enumerate().take(columns - 1) {
+    // The samples strictly between `from` and `to` on a side drawn every
+    // `side_step`th sample (none on a side at the chunk's own step). Cell
+    // corners are a multiple of the chunk's step from its start, so of the
+    // side's step too.
+    let between = |from: usize, to: usize, side_step: usize| -> Vec<usize> {
+        if side_step >= step {
+            return Vec::new();
+        }
+        (from + side_step..to).step_by(side_step).collect()
+    };
+    for j in 0..rows - 1 {
+        for i in 0..columns - 1 {
+            let (x0, x1, z0, z1) = (xs[i], xs[i + 1], zs[j], zs[j + 1]);
             let (a, b, c, d) = (
                 corner(i, j),
                 corner(i, j + 1),
@@ -100,51 +142,88 @@ pub fn chunk_mesh(
                 corner(i + 1, j + 1),
             );
             // A hole's cell isn't drawn (at full detail, a corner is a cell).
-            if holes && data.is_hole(x, z) {
+            if holes && data.is_hole(x0, z0) {
                 continue;
             }
-            // Counter-clockwise from above, split from (x, z+1) to (x+1, z).
-            mesh.indices.extend_from_slice(&[a, b, c, b, d, c]);
-        }
-    }
-
-    // Skirts: each edge's corners again, lowered, joined to the edge.
-    let edges: [Vec<(usize, usize)>; 4] = [
-        xs.iter().map(|&x| (x, zs[0])).collect(),
-        zs.iter().map(|&z| (*xs.last().unwrap(), z)).collect(),
-        xs.iter().rev().map(|&x| (x, *zs.last().unwrap())).collect(),
-        zs.iter().rev().map(|&z| (xs[0], z)).collect(),
-    ];
-    for edge in edges {
-        // Deep enough to cover any gap: the gap is never more than the
-        // edge's own rise and fall.
-        let heights: Vec<f32> = edge
-            .iter()
-            .map(|&(x, z)| data.height(x as isize, z as isize))
-            .collect();
-        let (low, high) = heights
-            .iter()
-            .fold((f32::MAX, f32::MIN), |(low, high), &h| {
-                (low.min(h), high.max(h))
-            });
-        let depth = (high - low) * placement.size.y + cell.max_element() * step as f32;
-        let first = mesh.positions.len() as u32;
-        for &(x, z) in &edge {
-            let top = point(x, z);
-            mesh.positions.push(top.to_array());
-            mesh.positions
-                .push((top - Vec3::new(0.0, depth, 0.0)).to_array());
-            let normal = placement.normal(data, x, z).to_array();
-            mesh.normals.extend_from_slice(&[normal, normal]);
-            mesh.uvs.extend_from_slice(&[uv(x, z), uv(x, z)]);
-        }
-        // The edges go round the chunk anticlockwise seen from above, so
-        // these face outward.
-        for k in 0..edge.len() as u32 - 1 {
-            let (top, bottom) = (first + k * 2, first + k * 2 + 1);
-            let (next_top, next_bottom) = (top + 2, bottom + 2);
-            mesh.indices
-                .extend_from_slice(&[top, next_top, bottom, bottom, next_top, next_bottom]);
+            // The samples a finer neighbour adds along this cell's sides.
+            let on = |edge: bool, from: usize, to: usize, side: usize| {
+                if edge {
+                    between(from, to, side_steps[side])
+                } else {
+                    Vec::new()
+                }
+            };
+            let near = on(j == 0, x0, x1, 0);
+            let right = on(i == columns - 2, z0, z1, 1);
+            let far = on(j == rows - 2, x0, x1, 2);
+            let left = on(i == 0, z0, z1, 3);
+            if near.is_empty() && right.is_empty() && far.is_empty() && left.is_empty() {
+                // Counter-clockwise from above, split from (x, z+1) to (x+1, z).
+                mesh.indices.extend_from_slice(&[a, b, c, b, d, c]);
+                continue;
+            }
+            // The cell's outline the same way round as its two triangles
+            // (a, b, d, c), with the added samples on its sides.
+            let mut outline = vec![a];
+            for &z in &left {
+                outline.push(add(&mut mesh, x0, z));
+            }
+            let at_b = outline.len();
+            outline.push(b);
+            for &x in &far {
+                outline.push(add(&mut mesh, x, z1));
+            }
+            let at_d = outline.len();
+            outline.push(d);
+            for &z in right.iter().rev() {
+                outline.push(add(&mut mesh, x1, z));
+            }
+            let at_c = outline.len();
+            outline.push(c);
+            for &x in near.iter().rev() {
+                outline.push(add(&mut mesh, x, z0));
+            }
+            // Fanned from a corner neither of whose sides has samples
+            // added (b or c first, keeping the usual diagonal), or else
+            // from the cell's middle (a cell with samples added on
+            // opposite sides, in a chunk one cell across).
+            let apex = [
+                (at_b, left.is_empty() && far.is_empty()),
+                (at_c, right.is_empty() && near.is_empty()),
+                (0, left.is_empty() && near.is_empty()),
+                (at_d, far.is_empty() && right.is_empty()),
+            ]
+            .into_iter()
+            .find_map(|(at, free)| free.then_some(at));
+            let n = outline.len();
+            match apex {
+                Some(at) => {
+                    for k in 1..n - 1 {
+                        mesh.indices.extend_from_slice(&[
+                            outline[at],
+                            outline[(at + k) % n],
+                            outline[(at + k + 1) % n],
+                        ]);
+                    }
+                }
+                None => {
+                    let corners = [a, b, c, d].map(|k| k as usize);
+                    let average = |values: &dyn Fn(usize) -> Vec3| {
+                        corners.iter().map(|&k| values(k)).sum::<Vec3>() / 4.0
+                    };
+                    let middle = average(&|k| Vec3::from(mesh.positions[k]));
+                    let normal = average(&|k| Vec3::from(mesh.normals[k])).normalize_or(Vec3::Y);
+                    let uv = average(&|k| Vec3::new(mesh.uvs[k][0], mesh.uvs[k][1], 0.0));
+                    mesh.positions.push(middle.to_array());
+                    mesh.normals.push(normal.to_array());
+                    mesh.uvs.push([uv.x, uv.y]);
+                    let centre = mesh.positions.len() as u32 - 1;
+                    for k in 0..n {
+                        mesh.indices
+                            .extend_from_slice(&[centre, outline[k], outline[(k + 1) % n]]);
+                    }
+                }
+            }
         }
     }
     mesh
@@ -156,105 +235,5 @@ pub fn chunks_along(samples: usize) -> usize {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn bumpy() -> (TerrainData, Placement) {
-        let mut data = TerrainData::flat(CHUNK_CELLS * 2 + 1, CHUNK_CELLS + 1, 0.0).unwrap();
-        let (size_x, _) = data.size();
-        let all = data.bounds();
-        for (i, h) in data.heights_mut_in(all).iter_mut().enumerate() {
-            let (x, z) = ((i % size_x) as f32, (i / size_x) as f32);
-            *h = 0.5 + 0.3 * (x * 0.4).sin() * (z * 0.3).cos();
-        }
-        let placement = Placement {
-            position: Vec3::ZERO,
-            size: Vec3::new(128.0, 40.0, 64.0),
-        };
-        (data, placement)
-    }
-
-    #[test]
-    fn full_detail_has_a_corner_per_sample_and_two_triangles_per_cell() {
-        let (data, placement) = bumpy();
-        let mesh = chunk_mesh(&data, &placement, 0, 0, 0);
-        let samples = (CHUNK_CELLS + 1) * (CHUNK_CELLS + 1);
-        let cells = CHUNK_CELLS * CHUNK_CELLS;
-        let skirts = 4 * (CHUNK_CELLS + 1) * 2;
-        assert_eq!(mesh.positions.len(), samples + skirts);
-        assert_eq!(mesh.indices.len(), cells * 6 + 4 * CHUNK_CELLS * 6);
-        assert!(
-            mesh.indices
-                .iter()
-                .all(|&i| (i as usize) < mesh.positions.len())
-        );
-        // The first corner is the terrain's corner, at its height.
-        assert_eq!(mesh.positions[0], [-64.0, data.height(0, 0) * 40.0, -32.0]);
-        assert_eq!(mesh.uvs[0], [0.5 / 33.0, 0.5 / 33.0]);
-    }
-
-    #[test]
-    fn surface_triangles_face_up() {
-        let (data, placement) = bumpy();
-        let mesh = chunk_mesh(&data, &placement, 1, 0, 0);
-        let cells = CHUNK_CELLS * CHUNK_CELLS;
-        for triangle in mesh.indices[..cells * 6].chunks(3) {
-            let [a, b, c] = [0, 1, 2].map(|k| Vec3::from(mesh.positions[triangle[k] as usize]));
-            assert!((b - a).cross(c - a).y > 0.0);
-        }
-    }
-
-    #[test]
-    fn neighbouring_chunks_share_their_edge_exactly() {
-        let (data, placement) = bumpy();
-        let left = chunk_mesh(&data, &placement, 0, 0, 0);
-        let right = chunk_mesh(&data, &placement, 1, 0, 0);
-        let columns = CHUNK_CELLS + 1;
-        for row in 0..columns {
-            let a = row * columns + CHUNK_CELLS;
-            let b = row * columns;
-            assert_eq!(left.positions[a], right.positions[b]);
-            assert_eq!(left.normals[a], right.normals[b]);
-        }
-    }
-
-    #[test]
-    fn a_hole_leaves_its_cells_out_at_full_detail_even_far_away() {
-        let (mut data, placement) = bumpy();
-        let (size_x, _) = data.size();
-        let rect = axcenity_core::SampleRect::new(40, 10, 43, 12);
-        let holes = data.holes_mut_in(rect);
-        for z in 10..12 {
-            for x in 40..43 {
-                holes[z * size_x + x] = true;
-            }
-        }
-        let cells = CHUNK_CELLS * CHUNK_CELLS;
-        let skirts = 4 * CHUNK_CELLS * 6;
-        // Chunk (1, 0) holds cells 32 to 63 along X: six are cut out, and
-        // asked for at a quarter of the detail it's still full.
-        let cut = chunk_mesh(&data, &placement, 1, 0, 2);
-        assert_eq!(cut.indices.len(), (cells - 6) * 6 + skirts);
-        // The chunk beside it is as it was.
-        let whole = chunk_mesh(&data, &placement, 0, 0, 0);
-        assert_eq!(whole.indices.len(), cells * 6 + skirts);
-    }
-
-    #[test]
-    fn lower_detail_uses_fewer_corners_and_keeps_the_edges() {
-        let (data, placement) = bumpy();
-        let full = chunk_mesh(&data, &placement, 0, 0, 0);
-        let quarter = chunk_mesh(&data, &placement, 0, 0, 2);
-        assert!(quarter.positions.len() * 8 < full.positions.len());
-        // The far corner is still the chunk's corner.
-        let columns = CHUNK_CELLS / 4 + 1;
-        let last_of_quarter = quarter.positions[columns * columns - 1];
-        let last_of_full = full.positions[(CHUNK_CELLS + 1) * (CHUNK_CELLS + 1) - 1];
-        assert_eq!(last_of_quarter, last_of_full);
-        assert_eq!(lod_for_distance(10.0, 64.0), 0);
-        assert_eq!(lod_for_distance(100.0, 64.0), 1);
-        assert_eq!(lod_for_distance(300.0, 64.0), 3);
-        assert_eq!(lod_for_distance(1e9, 64.0), LOD_LEVELS - 1);
-        assert_eq!(chunks_along(CHUNK_CELLS * 2 + 1), 2);
-    }
-}
+#[path = "mesh_tests.rs"]
+mod tests;
