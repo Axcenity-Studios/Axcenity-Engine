@@ -124,10 +124,13 @@ enum End {
     ReturnsToIdle,
 }
 
-/// The default state machine's states. Walk and Run play the Run and
+/// The default state machine's states. Walk and Run play the Walk and
 /// Sprint takes faster, so the feet keep up with the controller's default
-/// `WalkSpeed` (16 studs a second) and `RunSpeed` (32): the Run take covers
-/// 3.6 m a second (10.3 studs), Sprint 6.0 m (17.1 studs).
+/// `WalkSpeed` (16 studs a second) and `RunSpeed` (32): the Walk take
+/// covers 1.547 m in its 1.067 s (4.1 studs a second; its
+/// `Walk_RootMotion` twin says how far), Sprint 6.0 m a second (17.1
+/// studs). The Walk take plays 3.9 times as fast for that: the default
+/// `WalkSpeed` is a jog.
 const STATES: [State; 26] = {
     use End::*;
     const fn s(name: &'static str, take: &'static str, speed: f64, end: End) -> State {
@@ -140,7 +143,7 @@ const STATES: [State; 26] = {
     }
     [
         s("Idle", "Idle", 1.0, Loops),
-        s("Walk", "Run", 16.0 / (3.6 * 5.0 / 1.75), Loops),
+        s("Walk", "Walk", 16.0 / (1.547 / 1.067 * 5.0 / 1.75), Loops),
         s("Run", "Sprint", 32.0 / (6.0 * 5.0 / 1.75), Loops),
         s("Jump", "Jump", 1.0, Holds),
         s("Fall", "Fall", 1.0, Loops),
@@ -559,6 +562,45 @@ mod tests {
         for state in ["Idle", "Walk", "Run", "Jump", "Fall", "Sit"] {
             assert!(machine.state(state).is_some(), "{state}");
         }
+    }
+
+    /// Walk plays the file's Walk take, not a run (the refinement
+    /// baseline's finding), at the speed that keeps its feet with the
+    /// controller's default `WalkSpeed`: the take's travel is read from
+    /// its `Walk_RootMotion` twin, whose root bone moves.
+    #[test]
+    fn the_walk_state_plays_the_walk_take_at_the_walk_speed() {
+        let takes = axcenity_assets::load_takes(
+            DEFAULT_HUMANOID_ANIMATIONS,
+            axcenity_assets::ModelFormat::Gltf,
+        )
+        .unwrap();
+        let files = default_humanoid_animation_files();
+        let (_, walk) = files
+            .iter()
+            .find(|(path, _)| path.ends_with("/Walk.anim.json"))
+            .unwrap();
+        let walk = ClipFile::from_json(walk).unwrap();
+        assert_eq!(walk.link.as_ref().unwrap().take, "Walk");
+        let moving = takes
+            .iter()
+            .find(|take| take.name == "Walk_RootMotion")
+            .unwrap();
+        let root = moving
+            .tracks
+            .iter()
+            .find(|track| track.bone == "Root")
+            .unwrap();
+        let start = root.translation.sample(0.0).unwrap();
+        let end = root.translation.sample(moving.duration).unwrap();
+        let studs_a_second = (end - start).length() / moving.duration * STUDS_PER_METRE;
+        let machine = StateMachineFile::from_json(&files.last().unwrap().1).unwrap();
+        let speed = machine.state("Walk").unwrap().speed;
+        let feet = speed as f32 * studs_a_second;
+        assert!(
+            (feet - 16.0).abs() < 0.3,
+            "the feet cover {feet} studs a second"
+        );
     }
 
     #[test]

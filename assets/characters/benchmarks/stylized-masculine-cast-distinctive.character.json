@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-cast-distinctive",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "chin_forward": 0.5,
+    "ears_out": 0.7,
+    "eyes_size": -0.4,
+    "frame": 0,
+    "lips_full": -0.4,
+    "nose_bridge": 0.8,
+    "nose_length": 0.6
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

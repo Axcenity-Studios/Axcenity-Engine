@@ -5,5 +5,13 @@
   "parameters": {
     "brow_height_right": -1,
     "frame": 1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
 }

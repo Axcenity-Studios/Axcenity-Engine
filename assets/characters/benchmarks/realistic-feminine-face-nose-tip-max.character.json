@@ -5,5 +5,13 @@
   "parameters": {
     "frame": 1,
     "nose_tip": 1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
 }

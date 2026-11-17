@@ -1,0 +1,14 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-face-brow-length-right-max",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "brow_length_right": 1,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
+}

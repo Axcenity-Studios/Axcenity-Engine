@@ -4,5 +4,10 @@
   "base": "axcenity/realistic",
   "parameters": {
     "frame": 0
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
 }

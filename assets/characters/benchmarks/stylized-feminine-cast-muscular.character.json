@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "stylized-feminine-cast-muscular",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": 0.2,
+    "frame": 1,
+    "muscle": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}
