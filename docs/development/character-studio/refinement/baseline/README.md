@@ -36,6 +36,8 @@ The library holds 214 `realistic-*` benchmark files (180 of them face identity e
 
 Every run ended `test result: ok. 1 passed; 0 failed`. The first release build took 1 min 42 s.
 
+**Since R1 (section 9):** the two `realistic-<frame>-face-neutral` files are gone. To reproduce these runs, use `realistic-<frame>-cast-average.character.json` in their place: the same character apart from the name (no parameters set, the same underwear). The `walk` row can't be reproduced as it stands: `Walk@0.4` now plays the Walk take, where it played the Run take here.
+
 Captured as well and left in scratch (not committed): `Excited:1` (the smile that shows teeth), `Sad:1` (a frown), `Eye_Closed_Left:1,Eye_Closed_Right:1`, and `AXCENITY_CAPTURE_POSE=idle` for the two default bodies. Run the commands above with those values to get them again.
 
 Things to know about the runs:
@@ -233,7 +235,7 @@ A face sheet is 2560 × 1800 (rows: neutral, smile, frown, eyes closed, mouth op
 
 ### The committed set
 
-[engine/cast/](engine/cast/): 9 sheets and 3 `captures.json` files (each lists all 18 characters of its run), **13.2 MB** (13,165,700 bytes). Every one of the 54 sheets was looked at; these were chosen to show the findings below.
+[engine/cast/](engine/cast/): 9 sheets and 3 `captures.json` files (each lists all 18 characters of its run), **12.9 MB** (12,945,297 bytes). Every one of the 54 sheets was looked at; these were chosen to show the findings below. The `lights` run was captured again after the review re-aimed `skin-close` (its first aim missed the masculine cheek and cut the nose); only that column changed (the other three columns of both committed sheets are pixel-identical to the first run, and `captures.json` is byte-identical).
 
 | Folder | Sheets |
 |---|---|
@@ -253,7 +255,7 @@ Against the defects of section 4. "Still" means a defect listed there is visible
 | C4 | Eyes closed: both lids meet and no eyeball shows, in all four views, on every cast member | `face/*`, row 4 | As before: no defect |
 | C5 | **The held poses work and show what the clips did not.** The T-pose and arms raised turn at the shoulder with no visible collapse at this size; the shoulder top flattens a little at 150 degrees. Bent elbows bring the hands to the front of the chest, the fingers at the skin, so whether they pass into it can't be judged from these views. Bent knees fold the shins back, and the body hangs above the floor (only the knees turn, as in the Blender harness's `knee_135`). With the arms raised the hands leave the top of the full-body frames (fixed cameras) | `body/*`, rows 2 to 5 | New poses; no new defect seen at this size. The 90-degree shoulder targets the Blender check misses (section 6) are not visible here |
 | C6 | **Walk is a walk.** `Walk@0.3` is now an upright stride with the arms low, against the running stride of `engine/walk/` | `body/*`, row 6 | Section 2's "the Walk clip is a run": fixed |
-| C7 | Skin under the close view: a coarse, even pebble grain over the nose, cheek and forehead in every light, and an even wet gloss on the nose and lips. The new view shows it at its worst | `lights/*`, the last column | Still H4 |
+| C7 | Skin under the close view (`skin-close`: on both frames the nose from bridge to tip, the eye and the cheek below it; the masculine crop also the lips, the feminine the brow and forehead): a coarse, even pebble grain over the nose, cheek and forehead in every light, and an even wet gloss on the nose tip and lips. Under `outdoor` the grain reads as pitted on the nose and forehead; under `cool` the cheek goes dark and flat. The new view shows the grain at its worst | `lights/*`, the last column | Still H4 |
 | C8 | The new lights read as meant: warm is a low orange sun from the front left with a long floor shadow (the skin turns saturated orange, the darkest shadow brown); cool is a soft blue-grey overcast, under which the face goes dark and muddy; outdoor is a blue-sky midday with a short shadow and a lit face. None shows a defect the studio light hides, except that the grain (H4) and the hard shadow-line on the forehead (H2) show most under `outdoor` | `lights/*` | H2 and H4 still |
 | C9 | The briefs' pointed sides, the bra's flat straps, the ragged shadow edges and the pale jaw line are unchanged on every cast member | Every sheet | Still H1, H2, M4, M9 |
 | C10 | The 50/50 blend still wears the Male boxer briefs: a tie between the Male and Female choices goes to the first (`avatar/src/choices.rs`, `manifest.rs` `nearest_choice`). The benchmark files now list it, so they say what is drawn | `realistic-blend-*.character.json` | Still M11; its cause is the resolver, not `make.py` |

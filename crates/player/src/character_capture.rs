@@ -142,12 +142,15 @@ pub(crate) const MORE_VIEWS: [View; 3] = [
         fov: 30.0,
     },
     // A close crop of the left cheek and the nose at about 3/4, for the
-    // skin's grain, gloss and shadow edges.
+    // skin's grain, gloss and shadow edges. Aimed between the two realistic
+    // frames' faces (the masculine eyes sit about 0.2 studs above the
+    // feminine ones), so both show the nose from bridge to tip and the
+    // cheek below the eye.
     View {
         name: "skin-close",
-        eye: [-0.62, 4.51, -0.84],
-        target: [-0.05, 4.48, -0.31],
-        fov: 24.0,
+        eye: [-0.62, 4.57, -0.84],
+        target: [-0.05, 4.54, -0.31],
+        fov: 30.0,
     },
 ];
 

@@ -13,7 +13,7 @@ Plan 11.6 and 11.7 (RA6), brief §17. Branched from `character-creator-stage0` (
 | `crates/project/src/default_humanoid.rs` | The Walk state plays the `Walk` take (it played `Run`), at 3.86× so its feet keep up with `WalkSpeed` 16; a test |
 | `docs/development/character-studio/visual-qa.md`, `testing.md` | The set's counts, the cast and its sources, the new lights, views, poses and suites with commands, the new tests |
 | `docs/development/character-studio/refinement/baseline/README.md` | Section 9: the cast, the commands, the committed sheets and what they show |
-| `docs/development/character-studio/refinement/baseline/engine/cast/` | 9 contact sheets and 3 `captures.json`, 13.2 MB |
+| `docs/development/character-studio/refinement/baseline/engine/cast/` | 9 contact sheets and 3 `captures.json`, 12.9 MB (after the review fixes) |
 | `docs/research/default-humanoid.md`, `docs/scripting/api-character.md` | The Walk state's take and speed |
 | `wiki/Engine-Systems/Characters.md`, `crates/player/CLAUDE.md` | The capture's additions and the cast (the wiki also said "five fixed cameras"; there are six) |
 
@@ -87,3 +87,35 @@ Captured the 18 realistic cast members with the face suite, the body suite and t
 - `every_benchmark_character_is_sound` now requires the cast for every base: a new base in the catalogue needs a `CAST` entry in `make.py` (an empty table fails the test, on purpose).
 - Decide open issue 1 (the Walk speed). If Walk goes back to Run, `the_walk_state_plays_the_walk_take_at_the_walk_speed` goes with it, and the body suite's walk row becomes a run again.
 - `character_capture.rs` is RA6's (additions only). If RA7 changes the renderer, recapture `engine/cast/` with the commands in the baseline README section 9 before judging a regression.
+
+## Review fixes
+
+The review had one blocking item; it is fixed. Non-blocking items fixed on the way are listed after it.
+
+**Blocking: `skin-close` missed the masculine cheek and cut the nose.** The review was right. On the old aim (eye y 4.51, target y 4.48, field of view 24) the masculine crop started mid-nose and was mostly lips and chin, while the feminine one showed the eye, nose and cheek. The masculine frame's eyes sit about 0.2 studs above the feminine's, so a fixed camera has to be aimed between them and see more.
+
+- How the aim was chosen: ten candidate cameras (eye y 4.555 to 4.60, target y 4.525 to 4.57, field of view 28 to 32, eye and target x and z unchanged) were added temporarily, never committed, and captured on `realistic-masculine-cast-average` and `realistic-feminine-cast-average` with `AXCENITY_CAPTURE_VIEWS=skin-close,<candidates>`. I looked at every cell. Any candidate narrower than 30 degrees cut the masculine eye or the feminine nose tip.
+- New `skin-close` (`crates/player/src/character_capture.rs`, `MORE_VIEWS[2]`): eye `[-0.62, 4.57, -0.84]`, target `[-0.05, 4.54, -0.31]`, field of view 30 degrees. The comment says why it is aimed there.
+- What it shows: the `lights` run was captured again for all 18 realistic cast members, and I looked at the `skin-close` cell of every one. On both frames it shows the nose from bridge to tip, the eye and the left cheek below it. Masculine: the eye about 10 to 14% from the top, the brow cut, the lips in view. Feminine: the brow and forehead in view, the nose tip at 78 to 85% of the height, the nostrils in, the mouth cut. It is less close than before (about 0.42 studs tall at the face, against 0.33), which is the cost of fitting both frames. The skin grain (H4) still shows plainly.
+- Recaptured: `engine/cast/lights/` (both sheets and `captures.json`) with the section 9 command. Only the `skin-close` column changed: the other three columns of both sheets are pixel-identical to the first run, and `captures.json` is byte-identical (it records lights, views and levels of detail, not camera positions). The folder is now 12.9 MB (12,945,297 bytes).
+- Docs: visual-qa.md's additions row for `skin-close`; the baseline README section 9 (size, the recapture note, C7).
+- Tests: none added. This is a camera aim, judged by the pictures above, not code behaviour, and the review said `added_lights_views_and_poses_repeat_and_differ` needs no change. It still passes with the new aim.
+
+**Non-blocking items fixed (docs only):**
+
+- Stale reproduction commands. The baseline README section 1 and `co6/README.md` now say to use `realistic-<frame>-cast-average` in place of the removed `face-neutral` files. Section 1 also says its `walk` row can't be reproduced as it stands, because `Walk@` now plays the Walk take.
+- visual-qa.md's "Faces" row now says that the realistic neutral face is the cast's `average`.
+
+**Non-blocking items left as they were:** the Walk speed decision (open issue 1, for the lead), the Tint coverage of the "differs from studio" test, the env-var defaulting test, the `body-default`/`cast-average` duplicate, the asymmetry sign check against `face.py`, and the blend's underwear (open issue 3). None blocks merging, and the review named no fix for them on this branch.
+
+Runs after the fixes (this worktree):
+
+```text
+cargo fmt --all   (no changes)
+cargo nextest run -p axcenity-player -p axcenity-avatar -p axcenity-project --no-fail-fast
+  Summary [  48.919s] 468 tests run: 468 passed, 19 skipped
+cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/character_capture/)'
+  Summary [  21.378s] 7 tests run: 7 passed, 191 skipped   (the three GPU tests took 18.7 s, 20.6 s and 21.4 s, so they really drew)
+cargo clippy -p axcenity-player -p axcenity-avatar -p axcenity-project --all-targets -- -D warnings   (clean)
+capture_characters --release, lights run, 18 cast members: test result: ok. 1 passed (109.9 s)
+```
