@@ -128,10 +128,18 @@ fn recent_shows_four_then_show_more_lists_the_rest() {
     assert_eq!(count(&drawn, "Edit"), 10);
     assert_eq!(count(&drawn, "Delete…"), 10);
     // The realistic family's six whole-character presets and the stylized
-    // family's default character (both families: plan section 0,
-    // decision 7).
-    assert_eq!(count(&drawn, "Start from this"), 7);
-    assert_eq!(count(&drawn, "label: Stylized character"), 1, "{drawn:?}");
+    // family's three (both families: plan section 0, decision 7; the
+    // stylized ones are data since wave 3).
+    assert_eq!(count(&drawn, "Start from this"), 9);
+    for name in ["Masculine", "Feminine"] {
+        assert!(
+            drawn
+                .iter()
+                .any(|t| t.starts_with(&format!("label: {name}"))),
+            "{name} in {drawn:?}"
+        );
+    }
+    assert_eq!(count(&drawn, "label: Stylized character"), 0, "{drawn:?}");
 
     start.shelf.more_recent = true;
     let drawn = texts(&mut start, vec2(1400.0, 3000.0));

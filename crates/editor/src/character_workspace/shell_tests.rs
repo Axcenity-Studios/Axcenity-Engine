@@ -489,7 +489,7 @@ fn every_page_is_drawn_with_its_controls() {
 }
 
 /// Saves the workspace drawn for real at 1440 by 900 after `frames` frames.
-fn snap(
+pub(super) fn snap(
     workspace: &mut CharacterWorkspace,
     snapshots: &std::path::Path,
     name: &str,
@@ -510,7 +510,7 @@ fn snap(
 
 /// Draws the pictures of every preset of the workspace's base model into
 /// its cache, as the Presets page's thread would (none without a GPU).
-fn paint_preset_pictures(folder: &std::path::Path, workspace: &CharacterWorkspace) {
+pub(super) fn paint_preset_pictures(folder: &std::path::Path, workspace: &CharacterWorkspace) {
     let instance = axcenity_render::adapters::instance();
     let Some((device, queue)) =
         pollster::block_on(axcenity_render::adapters::adapter(&instance, None))

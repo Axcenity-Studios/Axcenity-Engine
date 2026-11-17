@@ -82,6 +82,7 @@ pub fn preset_picture(folder: &Path, id: &str, subject: &Subject) -> PathBuf {
         .collect();
     let (framing, drawn) = match subject {
         Subject::Character(description) => ("whole", description),
+        Subject::Body(description) => ("body", description),
         Subject::Face(description) => ("face", description),
     };
     folder.join(THUMBNAILS_FOLDER).join("presets").join(format!(
@@ -91,11 +92,12 @@ pub fn preset_picture(folder: &Path, id: &str, subject: &Subject) -> PathBuf {
 }
 
 /// What the picture of `listed` shows: the character it makes, a face
-/// preset's framed on the face.
+/// preset's framed on the face, a body preset's on the body.
 pub fn preset_subject(listed: &presets::Listed, library: &Library) -> Subject {
     let shown = listed.pictured(library);
     match listed.info.kind {
         PresetKind::Face => Subject::Face(shown),
+        PresetKind::Body => Subject::Body(shown),
         _ => Subject::Character(shown),
     }
 }
@@ -152,6 +154,8 @@ pub fn remove_character_pictures(folder: &Path, file: &Path) {
 pub enum Subject {
     /// A character, the whole body.
     Character(Description),
+    /// A body preset's character, framed on the body ([`body_orbit`]).
+    Body(Description),
     /// A character's face, close up.
     Face(Description),
 }
@@ -171,6 +175,21 @@ pub fn picture_orbit() -> Orbit {
         pitch: 5.0,
         distance: 10.3,
         target: axcenity_render::glam::Vec3::new(0.0, 2.5, 0.0),
+    }
+}
+
+/// How a body preset's picture frames the character: from the front and a
+/// little turned, neck to knees, so the build fills the tile's width (a
+/// whole figure is small in a tall picture, and slim, average and athletic
+/// looked alike at a tile's size). The crop is below the chin: a body
+/// preset doesn't change the face, and a frame cut through the mouth read
+/// badly.
+pub fn body_orbit() -> Orbit {
+    Orbit {
+        yaw: 15.0,
+        pitch: 4.0,
+        distance: 5.4,
+        target: axcenity_render::glam::Vec3::new(0.0, 2.8, 0.0),
     }
 }
 
@@ -210,6 +229,7 @@ impl Painter {
     pub fn paint(&mut self, subject: &Subject) -> Vec<u8> {
         let (description, orbit) = match subject {
             Subject::Character(description) => (description.clone(), picture_orbit()),
+            Subject::Body(description) => (description.clone(), body_orbit()),
             Subject::Face(description) => (description.clone(), face_orbit()),
         };
         let workspace = &mut self.workspace;

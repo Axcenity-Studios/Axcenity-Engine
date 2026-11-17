@@ -34,7 +34,9 @@
 //! `intent.rs`, `selection.rs` and `edit.rs` are the contracts they share
 //! (what a panel can ask, what is shown, undo and reset). `random.rs` is
 //! Randomize and its locks, `compare.rs` the held versions (before and
-//! after, side by side). `stage.rs` is the camera, lighting, backdrop and
+//! after, side by side), `sides.rs` the asymmetry tools (mirror or reset a
+//! side), `motion.rs` the preview's pose and motion (Still, Idle, Walk,
+//! Run, gestures). `stage.rs` is the camera, lighting, backdrop and
 //! floor; `shelf.rs` lists the saved characters for the start page and
 //! deletes them.
 
@@ -43,6 +45,7 @@ mod bottom_bar;
 pub mod compare;
 pub mod edit;
 pub mod intent;
+pub mod motion;
 mod nav;
 pub mod packs;
 mod panel;
@@ -52,6 +55,7 @@ pub mod recent;
 pub mod selection;
 pub mod shelf;
 mod shell;
+pub mod sides;
 mod stage;
 pub mod thumbnails;
 mod toolbar;
@@ -59,9 +63,15 @@ mod toolbar;
 #[cfg(test)]
 mod feature_tests;
 #[cfg(test)]
+mod motion_tests;
+#[cfg(test)]
+mod polish_tests;
+#[cfg(test)]
 mod shelf_tests;
 #[cfg(test)]
 mod shell_tests;
+#[cfg(test)]
+mod sides_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -90,6 +100,7 @@ use autosave::{Autosave, Recovery};
 use compare::Comparison;
 use edit::{History, Scope};
 pub use intent::{Gesture, Intent};
+pub use motion::Motion;
 use selection::Selection;
 pub use shell::WorkspaceAction;
 pub use stage::{Backdrop, Lighting, Orbit, ViewPreset};
@@ -273,6 +284,15 @@ pub struct CharacterWorkspace {
     /// The built-in expression shown on the preview's face: preview only,
     /// never in the description (brief §10).
     pub expression: Option<String>,
+    /// What the preview's body does (Still, Idle, Walk, Run, a gesture):
+    /// preview only, never in the description (brief §10, R9).
+    pub motion: Motion,
+    /// The clip the preview plays for `motion`, in the folder.
+    preview_clip: Option<String>,
+    /// The point the camera follows while the body moves.
+    follow: Option<Vec3>,
+    /// A motion just stopped: the view frames the still body again.
+    reframe: bool,
     canvas: Canvas,
     last_frame: Option<Instant>,
     /// A line for the status bar: what was saved, what failed.
@@ -377,6 +397,10 @@ impl CharacterWorkspace {
             lighting: Lighting::default(),
             backdrop: Backdrop::default(),
             expression: None,
+            motion: Motion::default(),
+            preview_clip: None,
+            follow: None,
+            reframe: false,
             canvas: Canvas::default(),
             last_frame: None,
             notice: fell_back.or(notice),
@@ -1106,8 +1130,15 @@ impl CharacterWorkspace {
             .min(0.1);
         self.last_frame = Some(now);
         self.refresh();
-        self.step_by(seconds);
+        self.advance(seconds);
         seconds
+    }
+
+    /// Moves the preview on by `seconds`, the camera following a moving
+    /// character (`motion.rs`).
+    pub(crate) fn advance(&mut self, seconds: f64) {
+        self.step_by(seconds);
+        self.follow_motion(seconds);
     }
 
     pub(crate) fn step_by(&mut self, seconds: f64) {

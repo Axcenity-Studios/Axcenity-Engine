@@ -258,4 +258,38 @@ mod tests {
         assert!(workspace.file_path().unwrap().is_file());
         let _ = std::fs::remove_dir_all(&folder);
     }
+
+    /// Quitting with "Don't Save" removes the studio's recovery file at
+    /// once (`discard_unsaved`), not only when the workspace is dropped:
+    /// the next open must not offer work the person threw away.
+    #[test]
+    fn dont_save_on_quit_removes_the_studio_recovery_file() {
+        let mut app = EditorApp::new(None);
+        let folder = crate::character_studio::test_folder("workspace-dont-save");
+        app.set_characters_folder(Some(folder.clone()));
+        app.open_character_workspace(Some(Start::default()), None);
+        let workspace = app.character_workspace.as_mut().unwrap();
+        workspace.apply(crate::character_workspace::Intent::SetParameter {
+            id: "fat".into(),
+            value: 0.4,
+            gesture: crate::character_workspace::Gesture::Commit,
+        });
+        workspace.autosave_step(std::time::Instant::now());
+        let recovery = folder.join(crate::character_workspace::autosave::RECOVERY_FILE);
+        assert!(recovery.is_file(), "unsaved work is autosaved");
+        app.asking = Some(super::super::Discard::Quit);
+        assert_eq!(
+            app.answer(super::super::Answer::DontSave),
+            Some(super::super::Discard::Quit)
+        );
+        assert!(app.character_workspace.is_some(), "not dropped yet");
+        assert!(!recovery.is_file(), "the recovery file is gone already");
+        // A frame before the window closes doesn't write it again.
+        app.character_workspace
+            .as_mut()
+            .unwrap()
+            .autosave_step(std::time::Instant::now() + std::time::Duration::from_secs(10));
+        assert!(!recovery.is_file());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
 }

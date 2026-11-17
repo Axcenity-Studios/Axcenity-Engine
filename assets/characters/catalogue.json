@@ -526,6 +526,155 @@
       "label": "Male",
       "kind": "character",
       "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/stylized-athletic",
+      "file": "humanoid/presets/athletic.preset.json",
+      "label": "Athletic",
+      "kind": "character",
+      "base": "axcenity/stylized"
+    },
+    {
+      "id": "axcenity/stylized-body-athletic-feminine",
+      "file": "humanoid/presets/body-athletic-feminine.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "feminine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-athletic-masculine",
+      "file": "humanoid/presets/body-athletic-masculine.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "masculine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-broad-feminine",
+      "file": "humanoid/presets/body-broad-feminine.preset.json",
+      "label": "Broad",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "feminine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-broad-masculine",
+      "file": "humanoid/presets/body-broad-masculine.preset.json",
+      "label": "Broad",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "masculine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-heavy-feminine",
+      "file": "humanoid/presets/body-heavy-feminine.preset.json",
+      "label": "Heavy",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "feminine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-heavy-masculine",
+      "file": "humanoid/presets/body-heavy-masculine.preset.json",
+      "label": "Heavy",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "masculine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-slim-feminine",
+      "file": "humanoid/presets/body-slim-feminine.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "feminine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-body-slim-masculine",
+      "file": "humanoid/presets/body-slim-masculine.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/stylized",
+      "tags": [
+        "build",
+        "masculine"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-face-angular",
+      "file": "humanoid/presets/face-angular.preset.json",
+      "label": "Angular",
+      "kind": "face",
+      "base": "axcenity/stylized",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-face-long",
+      "file": "humanoid/presets/face-long.preset.json",
+      "label": "Long",
+      "kind": "face",
+      "base": "axcenity/stylized",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-face-round",
+      "file": "humanoid/presets/face-round.preset.json",
+      "label": "Round",
+      "kind": "face",
+      "base": "axcenity/stylized",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-face-soft",
+      "file": "humanoid/presets/face-soft.preset.json",
+      "label": "Soft",
+      "kind": "face",
+      "base": "axcenity/stylized",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/stylized-feminine",
+      "file": "humanoid/presets/feminine.preset.json",
+      "label": "Feminine",
+      "kind": "character",
+      "base": "axcenity/stylized"
+    },
+    {
+      "id": "axcenity/stylized-masculine",
+      "file": "humanoid/presets/masculine.preset.json",
+      "label": "Masculine",
+      "kind": "character",
+      "base": "axcenity/stylized"
     }
   ]
 }

@@ -397,7 +397,10 @@ fn every_new_character_choice_is_sound_on_both_families() {
         ),
         "the first is the default character"
     );
-    assert!(starts.contains(&&Start::Family(axcenity_avatar::V1_BASE.to_owned())));
+    // The stylized family's presets (data since wave 3), its default
+    // character first.
+    assert!(starts.contains(&&Start::Preset("axcenity/stylized-masculine".to_owned())));
+
     for start in starts {
         let made = workspace.starting(start);
         assert!(
