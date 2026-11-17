@@ -2543,6 +2543,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "Which way the waves roll, in degrees: 0 toward +X, 90 toward +Z.",
     ),
     (
+        ClassName::Terrain,
+        "WaveVariation",
+        "How much the waves differ from place to place, 0 to 1: 0 makes every crest alike and straight; more gathers them into drifting patches of higher and calmer water with bent crests.",
+    ),
+    (
         ClassName::TerrainLayer,
         "Color",
         "Tints the layer's color map, or is its color without one.",

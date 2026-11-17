@@ -112,6 +112,39 @@ impl TerrainStudio {
         self.flatten_height = height;
     }
 
+    /// The Water brush: where its surface rests.
+    pub(super) fn water_brush_settings(&mut self, ui: &mut egui::Ui) {
+        let mut from_stroke = self.water_from_stroke;
+        let mut depth = self.water_depth;
+        let mut level = self.water_level;
+        self.brush_settings(
+            ui,
+            Some(&mut |ui: &mut egui::Ui| {
+                field(ui, "Level");
+                ui.vertical(|ui| {
+                    ui.checkbox(&mut from_stroke, "Above where the stroke starts")
+                        .on_hover_text("Start the stroke at the bottom of a hollow and the water rises the depth above it.");
+                    if from_stroke {
+                        ui.add(
+                            egui::DragValue::new(&mut depth)
+                                .speed(0.1)
+                                .range(0.0..=256.0)
+                                .suffix(" studs deep"),
+                        )
+                        .on_hover_text("How far above where the stroke starts the water's surface rests.");
+                    } else {
+                        ui.add(egui::DragValue::new(&mut level).speed(0.25).suffix(" Y"))
+                            .on_hover_text("The world height of the water's surface. Ctrl+click the ground to pick it.");
+                    }
+                });
+                ui.end_row();
+            }),
+        );
+        self.water_from_stroke = from_stroke;
+        self.water_depth = depth;
+        self.water_level = level;
+    }
+
     pub(super) fn sculpt_settings(&mut self, ui: &mut egui::Ui) {
         let mut mode = self.sculpt;
         let mut step = self.terrace_step;

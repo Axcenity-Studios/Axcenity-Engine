@@ -113,6 +113,7 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
             wave_length: water.wave_length,
             wave_speed: water.wave_speed,
             wave_direction: water.wave_direction,
+            wave_variation: water.wave_variation,
             foam: water.foam,
             refraction: water.refraction,
         }),

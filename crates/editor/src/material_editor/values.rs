@@ -621,6 +621,13 @@ pub(super) fn water_rows(
             |water, value| water.wave_direction = value,
         );
         row(
+            "Wave variety",
+            "water wave variety",
+            (own.wave_variation, below.wave_variation),
+            0.0..=1.0,
+            |water, value| water.wave_variation = value,
+        );
+        row(
             "Foam",
             "water foam",
             (own.foam, below.foam),

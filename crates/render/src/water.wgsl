@@ -39,6 +39,8 @@ struct WaterLook {
     direction: f32,
     foam: f32,
     refraction: f32,
+    // 0 to 1: how much the waves differ from place to place.
+    variation: f32,
 }
 
 fn water_look() -> WaterLook {
@@ -46,7 +48,7 @@ fn water_look() -> WaterLook {
     let b = maps.params[1];
     let c = maps.params[2];
     return WaterLook(a.xyz, max(a.w, 0.01), max(b.x, 0.0), max(b.y, 0.1), b.z, b.w, max(c.x, 0.0),
-        c.y);
+        c.y, clamp(c.w, 0.0, 1.0));
 }
 
 // Where the waves move a point of the surface resting at `rest` (over the
@@ -56,35 +58,107 @@ struct Waves {
     normal: vec3<f32>,
 }
 
+// A number from -1 to 1 for each corner of the noise lattice.
+fn water_hash(corner: vec2<i32>) -> f32 {
+    var h = bitcast<u32>(corner.x) * 0x8da6b343u ^ bitcast<u32>(corner.y) * 0xd8163841u;
+    h = (h ^ (h >> 15u)) * 0x2c1b3c6du;
+    h = (h ^ (h >> 12u)) * 0x297a2d39u;
+    h ^= h >> 15u;
+    return f32(h) * (2.0 / 4294967295.0) - 1.0;
+}
+
+// Smooth value noise at `p`: x its value (-1 to 1), yz how fast it changes
+// along x and y, so the waves it shapes keep exact normals.
+fn water_noise(p: vec2<f32>) -> vec3<f32> {
+    let cell = floor(p);
+    let f = p - cell;
+    let corner = vec2<i32>(cell);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+    let a = water_hash(corner);
+    let b = water_hash(corner + vec2<i32>(1, 0));
+    let c = water_hash(corner + vec2<i32>(0, 1));
+    let d = water_hash(corner + vec2<i32>(1, 1));
+    let k1 = b - a;
+    let k2 = c - a;
+    let k4 = a - b - c + d;
+    return vec3<f32>(a + k1 * u.x + k2 * u.y + k4 * u.x * u.y,
+        du * vec2<f32>(k1 + k4 * u.y, k2 + k4 * u.x));
+}
+
 // The first `count` waves at `rest`, `time` seconds in. Each smaller wave
 // is shorter, lower and turned from the one before, so they don't line up.
 // Waves shorter than four `cell`s (the grid's spacing, or the span of a
 // pixel; 0 for none) fade out, since the corners are too far apart, or
 // the pixels too big, to show them.
+//
+// With variation, slow noise a few of the biggest waves across breaks the
+// sameness: each wave rises and calms in patches of its own (two noises
+// mixed at a different angle per wave), and is pushed back and forth
+// along itself by two more (a domain warp, also mixed per wave), so its
+// crests bend, and differently from the others', instead of running dead
+// straight and lining up into a lattice. The patches drift with the
+// waves. All of it is smooth and its slopes go into the normal, so the
+// lighting follows the shape.
 fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f32) -> Waves {
     var turns = array<f32, 7>(0.0, 0.55, -0.8, 1.3, -1.9, 2.4, 0.9);
     var lengths = array<f32, 7>(1.0, 0.62, 0.41, 0.27, 0.13, 0.083, 0.052);
     var heights = array<f32, 7>(1.0, 0.55, 0.32, 0.2, 0.08, 0.05, 0.03);
+    var mixes = array<f32, 7>(0.0, 2.1, 4.0, 1.1, 5.2, 3.1, 0.6);
+
+    let variation = clamp(look.variation, 0.0, 1.0);
+    // Noise per stud: patches about three of the biggest waves across.
+    let scale = 1.0 / (look.length * 3.0);
+    let drift = vec2<f32>(0.021, 0.013) * time * look.speed;
+    let p = rest * scale + drift;
+    let swell_a = water_noise(p);
+    let swell_b = water_noise(p * 1.37 + vec2<f32>(17.3, -9.1));
+    let warp_a = water_noise(p * 0.8 + vec2<f32>(-31.7, 5.9));
+    let warp_b = water_noise(p * 0.8 + vec2<f32>(11.2, 43.5));
+    // How much each wave's height swings around itself (a patch can calm
+    // it to a sixth), and how far the warp pushes, in studs.
+    let swing = 1.6 * variation;
+    let lowest = 0.16;
+    let highest = 1.0 + swing;
+    let push = 0.9 * look.length * variation;
+
     var offset = vec3<f32>(0.0);
     var normal = vec3<f32>(0.0, 1.0, 0.0);
     for (var i = 0u; i < count; i++) {
         let angle = look.direction + turns[i];
         let direction = vec2<f32>(cos(angle), sin(angle));
         let wave_length = look.length * lengths[i];
-        let height = look.height * heights[i]
+        let base = look.height * heights[i]
             * clamp((wave_length / max(cell, 1e-6) - 2.0) * 0.5, 0.0, 1.0);
         let k = 6.2831853 / wave_length;
         let speed = sqrt(WATER_GRAVITY * k) * look.speed;
-        let phase = k * dot(direction, rest) - speed * time + f32(i) * 1.7;
+        // Each wave mixes the noises at an angle of its own, so they rise,
+        // calm and bend in different places.
+        let m = vec2<f32>(cos(mixes[i]), sin(mixes[i]));
+        let swell = swell_a * m.x + swell_b * vec3<f32>(m.y, m.y * 1.37, m.y * 1.37);
+        // The warp, turned: how far along the wave this point is pushed,
+        // and how that changes along the rest surface.
+        let warp = (warp_a * m.x - warp_b * m.y) * direction.x + (warp_a * m.y + warp_b * m.x) * direction.y;
+        let pushed = push * warp.x;
+        let pushed_slope = push * scale * 0.8 * warp.yz;
+        let phase = k * (dot(direction, rest) + pushed) - speed * time + f32(i) * 1.7;
+        let along = k * (direction + pushed_slope);
+        // The swell, kept above `lowest` (flat there).
+        let raw = 1.0 + swing * swell.x * 0.7071;
+        let amount = max(raw, lowest);
+        let amount_slope = select(vec2<f32>(0.0), swing * swell.yz * 0.7071 * scale, raw > lowest);
+        let height = base * amount;
         let kh = k * height;
         // How far the corners circle along the wave, as a share of its
         // height: sharp crests, but never so sharp, even with every wave
-        // at its crest, that the surface loops over itself.
-        let pinch = min(0.6 / max(kh * f32(ALL_WAVES), 1e-6), 1.0);
+        // at its crest and highest swing, that the surface loops over itself.
+        let pinch = min(0.6 / max(k * base * highest * f32(ALL_WAVES), 1e-6), 1.0);
         let c = cos(phase);
         let s = sin(phase);
         offset += vec3<f32>(direction.x * pinch * height * c, height * s, direction.y * pinch * height * c);
-        normal -= vec3<f32>(direction.x * kh * c, pinch * kh * s, direction.y * kh * c);
+        // The height's slope: the wave's, plus its swing's.
+        let slope = height * c * along + base * s * amount_slope;
+        normal -= vec3<f32>(slope.x, pinch * kh * s, slope.y);
     }
     return Waves(offset, normalize(normal));
 }

@@ -29,11 +29,23 @@
 //! set. It isn't drawn, collided with, walked on or hit by rays. A hole
 //! counts as a height change for the chunk versions, so everything built
 //! from the heights is rebuilt. A terrain without holes keeps no mask.
+//!
+//! **Painted water** fills cells with water up to a level of their own
+//! (the Terrain Studio's Water brush), besides the Terrain's own `Water`,
+//! which floods everything below one level. Cell (`x`, `z`) holds water
+//! when sample (`x`, `z`)'s water level isn't [`NO_WATER`]; levels are in
+//! the heights' units (0 the bottom of the height range, 1 the top), so
+//! the water moves with the terrain. Each chunk counts its water edits
+//! (`water_version`) apart from its heights, so painting water rebuilds
+//! only the water. A terrain without painted water keeps no levels.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::Vector3;
+
+/// A sample's painted water level when its cell holds none.
+pub const NO_WATER: f32 = -1.0;
 
 /// The most material layers a terrain blends (its first eight
 /// TerrainLayers). The renderer reads their weights from two RGBA textures.
@@ -352,6 +364,8 @@ pub struct TerrainRegion {
     pub foliage: Vec<FoliageInstance>,
     /// The hole flags, row by row; empty when there are none in it.
     pub holes: Vec<bool>,
+    /// The painted water levels, row by row; empty when there's none in it.
+    pub water: Vec<f32>,
 }
 
 /// What a terrain's scatter rules placed in one chunk, and the key of the
@@ -375,9 +389,14 @@ pub struct TerrainData {
     /// One flag a sample, row by row: the cell from it to +X and +Z is cut
     /// out. Empty while the terrain has never had a hole.
     holes: Vec<bool>,
-    /// Per chunk, row by row: bumped each time its heights or paint change.
+    /// One painted water level a sample, row by row ([`NO_WATER`] for
+    /// none). Empty while the terrain has never had painted water.
+    water: Vec<f32>,
+    /// Per chunk, row by row: bumped each time its heights, paint or
+    /// painted water change.
     height_versions: Vec<u64>,
     paint_versions: Vec<u64>,
+    water_versions: Vec<u64>,
     /// Per chunk, row by row: what the scatter rules placed there.
     generated: Vec<GeneratedChunk>,
     /// Bumped each time generated foliage changes (it isn't saved, so it
@@ -401,8 +420,10 @@ impl Clone for TerrainData {
             paint: self.paint.clone(),
             foliage: self.foliage.clone(),
             holes: self.holes.clone(),
+            water: self.water.clone(),
             height_versions: self.height_versions.clone(),
             paint_versions: self.paint_versions.clone(),
+            water_versions: self.water_versions.clone(),
             generated: self.generated.clone(),
             generated_version: self.generated_version,
             revision: self.revision,
@@ -477,8 +498,10 @@ impl TerrainData {
             paint,
             foliage: Vec::new(),
             holes: Vec::new(),
+            water: Vec::new(),
             height_versions: vec![1; chunks],
             paint_versions: vec![1; chunks],
+            water_versions: vec![1; chunks],
             generated: vec![GeneratedChunk::default(); chunks],
             generated_version: 0,
             revision: 0,
@@ -705,6 +728,78 @@ impl TerrainData {
         true
     }
 
+    /// The painted water levels, one a sample row by row ([`NO_WATER`] for
+    /// none; see the module docs), or empty if the terrain never had any.
+    pub fn water(&self) -> &[f32] {
+        &self.water
+    }
+
+    /// Whether any cell holds painted water.
+    pub fn has_water(&self) -> bool {
+        self.water.iter().any(|&level| level != NO_WATER)
+    }
+
+    /// The painted water level of cell (`x`, `z`) (from sample (`x`, `z`)
+    /// to +X and +Z), in the heights' units, or `None` for none.
+    pub fn water_at(&self, x: usize, z: usize) -> Option<f32> {
+        if x >= self.size_x || z >= self.size_z {
+            return None;
+        }
+        self.water
+            .get(z * self.size_x + x)
+            .copied()
+            .filter(|&level| level != NO_WATER)
+    }
+
+    /// Whether chunk (`cx`, `cz`) has painted water in it.
+    pub fn chunk_has_water(&self, cx: usize, cz: usize) -> bool {
+        if self.water.is_empty() {
+            return false;
+        }
+        let rect = self.chunk_rect(cx, cz);
+        (rect.z0..rect.z1).any(|z| {
+            let row = z * self.size_x;
+            self.water[row + rect.x0..row + rect.x1]
+                .iter()
+                .any(|&level| level != NO_WATER)
+        })
+    }
+
+    /// The painted water levels, for changing samples inside `rect` (made
+    /// if the terrain had none). Only the water's versions count it.
+    pub fn water_mut_in(&mut self, rect: SampleRect) -> &mut [f32] {
+        self.touch_water(rect);
+        if self.water.is_empty() {
+            self.water = vec![NO_WATER; self.size_x * self.size_z];
+        }
+        &mut self.water
+    }
+
+    /// Sets every painted water level at once, as loaded from a file.
+    /// `water` must have one level a sample, or be empty for none; anything
+    /// else is ignored and `false` returned.
+    pub fn load_water(&mut self, water: Vec<f32>) -> bool {
+        if !water.is_empty() && water.len() != self.size_x * self.size_z {
+            return false;
+        }
+        self.touch_water(self.bounds());
+        self.water = if water.iter().any(|&level| level != NO_WATER) {
+            water
+                .into_iter()
+                .map(|level| {
+                    if level == NO_WATER || level.is_nan() {
+                        NO_WATER
+                    } else {
+                        level.clamp(0.0, 1.0)
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        true
+    }
+
     /// Puts heights between 0 and 1 again after they were changed in `rect`.
     pub fn clamp_heights_in(&mut self, rect: SampleRect) {
         let rect = self.clip(rect);
@@ -722,6 +817,7 @@ impl TerrainData {
         let mut heights = Vec::with_capacity(rect.width() * rect.depth());
         let mut paint = Vec::with_capacity(rect.width() * rect.depth());
         let mut holes = Vec::new();
+        let mut water = Vec::new();
         for z in rect.z0..rect.z1 {
             let row = z * self.size_x;
             heights.extend_from_slice(&self.heights[row + rect.x0..row + rect.x1]);
@@ -729,9 +825,15 @@ impl TerrainData {
             if !self.holes.is_empty() {
                 holes.extend_from_slice(&self.holes[row + rect.x0..row + rect.x1]);
             }
+            if !self.water.is_empty() {
+                water.extend_from_slice(&self.water[row + rect.x0..row + rect.x1]);
+            }
         }
         if !holes.iter().any(|&hole| hole) {
             holes.clear();
+        }
+        if !water.iter().any(|&level| level != NO_WATER) {
+            water.clear();
         }
         let foliage = self
             .foliage
@@ -745,6 +847,7 @@ impl TerrainData {
             paint,
             foliage,
             holes,
+            water,
         }
     }
 
@@ -758,7 +861,8 @@ impl TerrainData {
             && rect.z1 <= self.size_z
             && region.heights.len() == count
             && region.paint.len() == count
-            && (region.holes.is_empty() || region.holes.len() == count);
+            && (region.holes.is_empty() || region.holes.len() == count)
+            && (region.water.is_empty() || region.water.len() == count);
         if !fits {
             return false;
         }
@@ -783,6 +887,22 @@ impl TerrainData {
                 }
             }
         }
+        if !region.water.is_empty() || !self.water.is_empty() {
+            self.touch_water(rect);
+        }
+        if !region.water.is_empty() && self.water.is_empty() {
+            self.water = vec![NO_WATER; self.size_x * self.size_z];
+        }
+        if !self.water.is_empty() {
+            for (row, z) in (rect.z0..rect.z1).enumerate() {
+                let at = z * self.size_x + rect.x0;
+                let levels = &mut self.water[at..at + width];
+                match region.water.get(row * width..(row + 1) * width) {
+                    Some(from) => levels.copy_from_slice(from),
+                    None => levels.fill(NO_WATER),
+                }
+            }
+        }
         self.foliage.retain(|instance| !instance.in_rect(rect));
         self.foliage.extend(region.foliage.iter().cloned());
         true
@@ -797,12 +917,14 @@ impl TerrainData {
         self.heights.clone_from(&other.heights);
         self.paint.clone_from(&other.paint);
         self.holes.clone_from(&other.holes);
+        self.water.clone_from(&other.water);
         self.foliage.clone_from(&other.foliage);
         self.generation.clone_from(&other.generation);
         let chunks = chunk_count(self.size_x) * chunk_count(self.size_z);
         let next = self.newest_version() + 1;
         self.height_versions = vec![next; chunks];
         self.paint_versions = vec![next; chunks];
+        self.water_versions = vec![next; chunks];
         self.generated = vec![GeneratedChunk::default(); chunks];
         self.generated_version += 1;
         self.revision += 1;
@@ -819,9 +941,18 @@ impl TerrainData {
         let mut heights = Vec::with_capacity(size_x * size_z);
         let mut paint = Vec::with_capacity(size_x * size_z);
         let mut holes = Vec::new();
+        let mut water = Vec::new();
         for z in 0..size_z {
             for x in 0..size_x {
                 let (fx, fz) = (x as f32 * scale_x, z as f32 * scale_z);
+                if !self.water.is_empty() {
+                    // The old cell under the new cell's middle.
+                    let old = |f: f32, scale: f32, size: usize| {
+                        ((f + scale / 2.0).floor() as usize).min(size.saturating_sub(2))
+                    };
+                    let (ox, oz) = (old(fx, scale_x, self.size_x), old(fz, scale_z, self.size_z));
+                    water.push(self.water_at(ox, oz).unwrap_or(NO_WATER));
+                }
                 heights.push(self.height_at(fx, fz));
                 let near = self.index(
                     (fx.round() as usize).min(self.size_x - 1),
@@ -836,6 +967,7 @@ impl TerrainData {
         }
         let mut data = TerrainData::from_parts(size_x, size_z, heights, paint)?;
         data.load_holes(holes);
+        data.load_water(water);
         data.generation.clone_from(&self.generation);
         let to_new_x = (size_x - 1) as f32 / (self.size_x - 1) as f32;
         let to_new_z = (size_z - 1) as f32 / (self.size_z - 1) as f32;
@@ -899,9 +1031,35 @@ impl TerrainData {
         }
     }
 
+    /// Bumped each time painted water in chunk (`cx`, `cz`) changes.
+    pub fn chunk_water_version(&self, cx: usize, cz: usize) -> u64 {
+        let (chunks_x, _) = self.chunk_counts();
+        self.water_versions[cz * chunks_x + cx]
+    }
+
     fn newest_version(&self) -> u64 {
         let newest = |versions: &[u64]| versions.iter().copied().max().unwrap_or(0);
-        newest(&self.height_versions).max(newest(&self.paint_versions))
+        newest(&self.height_versions)
+            .max(newest(&self.paint_versions))
+            .max(newest(&self.water_versions))
+    }
+
+    /// Marks the chunks holding `rect`'s cells as having new painted water.
+    fn touch_water(&mut self, rect: SampleRect) {
+        let rect = self.clip(rect);
+        if rect.is_empty() {
+            return;
+        }
+        self.revision += 1;
+        let (chunks_x, chunks_z) = self.chunk_counts();
+        let next = self.newest_version() + 1;
+        let first = |sample: usize, chunks: usize| (sample / CHUNK_CELLS).min(chunks - 1);
+        let last = |sample: usize, chunks: usize| ((sample - 1) / CHUNK_CELLS).min(chunks - 1);
+        for cz in first(rect.z0, chunks_z)..=last(rect.z1, chunks_z) {
+            for cx in first(rect.x0, chunks_x)..=last(rect.x1, chunks_x) {
+                self.water_versions[cz * chunks_x + cx] = next;
+            }
+        }
     }
 
     /// Marks the chunks holding `rect` as changed. Heights also change the
@@ -1075,6 +1233,53 @@ mod tests {
         assert!(!other.load_holes(vec![true; 3]));
         assert!(other.load_holes(Vec::new()));
         assert!(!other.has_holes());
+    }
+
+    #[test]
+    fn painted_water_is_cells_that_regions_undo_and_resizing_keeps() {
+        let mut data = TerrainData::flat(65, 65, 0.5).unwrap();
+        assert!(!data.has_water() && data.water().is_empty());
+        let before = data.read_region(SampleRect::new(30, 30, 40, 40));
+        assert!(before.water.is_empty());
+        let (heights, water) = (
+            data.chunk_height_version(1, 1),
+            data.chunk_water_version(1, 1),
+        );
+        let rect = SampleRect::new(33, 33, 36, 35);
+        let (size_x, _) = data.size();
+        let levels = data.water_mut_in(rect);
+        for z in 33..35 {
+            for x in 33..36 {
+                levels[z * size_x + x] = 0.6;
+            }
+        }
+        // Only the water counts it: the ground isn't built again.
+        assert!(data.chunk_water_version(1, 1) > water);
+        assert_eq!(data.chunk_height_version(1, 1), heights);
+        assert_eq!(data.chunk_water_version(0, 0), 1);
+        assert!(data.has_water());
+        assert_eq!(data.water_at(33, 33), Some(0.6));
+        assert_eq!(data.water_at(36, 34), None);
+        assert!(data.chunk_has_water(1, 1) && !data.chunk_has_water(0, 0));
+        // Undo: the region from before has none, so it goes.
+        let after = data.read_region(SampleRect::new(30, 30, 40, 40));
+        assert_eq!(after.water.iter().filter(|&&l| l != NO_WATER).count(), 6);
+        assert!(data.write_region(&before));
+        assert!(!data.has_water());
+        assert!(data.write_region(&after));
+        assert_eq!(data.water_at(34, 34), Some(0.6));
+        // Half the samples a side: the water lands in the same place.
+        let small = data.resampled(33, 33).unwrap();
+        assert_eq!(small.water_at(16, 16), Some(0.6));
+        assert_eq!(small.water_at(10, 10), None);
+        // A copy and a replace keep it.
+        assert_eq!(data.clone().water_at(34, 34), Some(0.6));
+        let mut other = TerrainData::flat(65, 65, 0.0).unwrap();
+        other.replace_with(&data);
+        assert_eq!(other.water_at(34, 34), Some(0.6));
+        assert!(!other.load_water(vec![0.5; 3]));
+        assert!(other.load_water(Vec::new()));
+        assert!(!other.has_water());
     }
 
     #[test]

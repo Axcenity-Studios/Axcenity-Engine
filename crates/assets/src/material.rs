@@ -300,6 +300,9 @@ pub struct WaterFile {
     /// Degrees: 0 rolls toward +X, 90 toward +Z.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wave_direction: Option<f32>,
+    /// 0 to 1: how much the waves differ from place to place.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wave_variation: Option<f32>,
     /// Studs of depth the foam reaches from where the water meets
     /// something; 0 is none.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -319,6 +322,7 @@ impl WaterFile {
             wave_length: self.wave_length.or(base.wave_length),
             wave_speed: self.wave_speed.or(base.wave_speed),
             wave_direction: self.wave_direction.or(base.wave_direction),
+            wave_variation: self.wave_variation.or(base.wave_variation),
             foam: self.foam.or(base.foam),
             refraction: self.refraction.or(base.refraction),
         }
@@ -334,6 +338,7 @@ impl WaterFile {
             wave_length: self.wave_length.unwrap_or(default.wave_length),
             wave_speed: self.wave_speed.unwrap_or(default.wave_speed),
             wave_direction: self.wave_direction.unwrap_or(default.wave_direction),
+            wave_variation: self.wave_variation.unwrap_or(default.wave_variation),
             foam: self.foam.unwrap_or(default.foam),
             refraction: self.refraction.unwrap_or(default.refraction),
         }
@@ -350,6 +355,7 @@ pub struct StandardWater {
     pub wave_length: f32,
     pub wave_speed: f32,
     pub wave_direction: f32,
+    pub wave_variation: f32,
     pub foam: f32,
     pub refraction: f32,
 }
@@ -363,6 +369,7 @@ impl Default for StandardWater {
             wave_length: 12.0,
             wave_speed: 1.0,
             wave_direction: 0.0,
+            wave_variation: 0.6,
             foam: 0.5,
             refraction: 0.3,
         }
@@ -917,6 +924,7 @@ mod tests {
                 wave_length: Some(20.0),
                 wave_speed: Some(0.5),
                 wave_direction: Some(45.0),
+                wave_variation: Some(0.3),
                 foam: Some(1.0),
                 refraction: Some(0.2),
             }),
