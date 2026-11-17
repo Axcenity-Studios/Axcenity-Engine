@@ -12,8 +12,11 @@
     "jaw_width_left": -0.3,
     "jaw_width_right": -0.3,
     "nose_length": 0.4,
+    "nose_tip_projection": 0.3,
+    "nose_width": -0.1,
     "nostril_width_left": -0.1,
     "nostril_width_right": -0.1,
+    "philtrum_length": 0.4,
     "temple_width": -0.3
   },
   "preset": {

@@ -4,7 +4,7 @@ expression and every face identity parameter's two ends, on both frames:
 does the eyeball come through a lid, do the teeth or the tongue come
 through the lips, and does a full blink close the eye.
 
-    python -I face_checks.py --package realistic --out FILE [--check]
+    python -I face_checks.py --package realistic --out FILE [--check] [--only TEXT]
 
 (`python` has the `bpy` module, as for `measure.py`.) It poses the parts
 file as the engine does: a control's blend shape on the body and on every
@@ -61,7 +61,10 @@ ray bare; and in every pose that is the same on both sides the mouth, the
 teeth and the tongue are within `EVEN_MM` of their mirror images, on both
 frames; and no vertex of `LipSeal` is in view with the lips more than
 `SEAL_GONE_MM` apart. The tongue controls are posed with the jaw
-half open: a tongue doesn't leave a closed mouth.
+half open: a tongue doesn't leave a closed mouth. The identity parameters
+in `HELD_IDENTITY` (R4's) are held to the same at both ends: alone, in a
+full blink (no ray bare) and under every expression and viseme
+(`identity_faces`); the others' ends are reported.
 """
 
 import argparse
@@ -109,6 +112,16 @@ LIPS_EDGE = 0.008
 # With the lips further apart than this at the middle (millimetres), no
 # part of `LipSeal` may be in view.
 SEAL_GONE_MM = 6.0
+# The face identity parameters held to the checks at their ends, alone, in
+# a full blink and with every expression and viseme on top (R4's controls,
+# by id or id stem; the older parameters' ends are reported only, as
+# before: some of them are not clean, `co6/README.md`).
+HELD_IDENTITY = ("nose_tip_projection", "nose_tip_rotation", "nose_width", "philtrum_length", "jaw_angle",
+                 "upper_lid_fold", "lower_lid", "eye_corner", "earlobe")
+
+
+def held_identity(pid):
+    return any(pid == stem or pid in (f"{stem}_left", f"{stem}_right") for stem in HELD_IDENTITY)
 
 
 def mm(x):
@@ -438,17 +451,24 @@ def poses(shapes, parameters):
     for name, w in expressions().items():
         out.append(("expressions", name, w, {}, True))
     # Identity: each face parameter's two ends, at rest and in a blink
-    # (reported; a blink on a reshaped eye is not held to zero).
+    # (reported; a blink on a reshaped eye is not held to zero), but for
+    # the `HELD_IDENTITY` ones: held, and also with every expression and
+    # viseme on top (`identity_faces`).
     blink = {"Blink_Left": 1.0, "Blink_Right": 1.0}
+    faces = list(expressions().items()) + [(f"viseme {name}", w) for name, w in visemes().items()]
     for pid, drivers in parameters:
+        held = held_identity(pid)
         for end in (-1.0, 1.0):
             identity = {}
             for shape, value in drivers(end).items():
                 if shape in shapes:
                     identity[shape] = value
             if identity:
-                out.append(("identity", f"{pid}{end:+.0f}", {}, identity, False))
-                out.append(("identity_blink", f"{pid}{end:+.0f}", blink, identity, False))
+                out.append(("identity", f"{pid}{end:+.0f}", {}, identity, held))
+                out.append(("identity_blink", f"{pid}{end:+.0f}", blink, identity, held))
+                if held:
+                    for name, w in faces:
+                        out.append(("identity_faces", f"{pid}{end:+.0f} {name}", w, identity, True))
     return out
 
 
@@ -505,7 +525,7 @@ def failures(report):
                 if m.get("lips_open_mm", 0.0) > SEAL_GONE_MM and m.get("seal_in_view"):
                     bad.append(f"{frame}/{group}/{name}: {m['seal_in_view']} vertices of LipSeal in view with the lips "
                                f"{m['lips_open_mm']} mm apart")
-                if group == "closed" and m["bare_rays"]:
+                if group in ("closed", "identity_blink") and m["bare_rays"]:
                     bad.append(f"{frame}/{group}/{name}: the eye isn't closed: {m['bare_rays']} rays bare, "
                                f"open {m['open_mm']} mm")
         for name in ("Blink", "Eye_Closed"):
@@ -521,6 +541,9 @@ def main():
     ap.add_argument("--custom", default="")
     ap.add_argument("--out", default="face_checks.json")
     ap.add_argument("--check", action="store_true")
+    # Only the poses whose name has this text (and rest, which the others
+    # are measured against): for a quick look at one control.
+    ap.add_argument("--only", default="")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     parts_path, _, custom_path = Q.package_paths(a.package)
     a.parts = a.parts or parts_path
@@ -535,6 +558,8 @@ def main():
     shapes = {kb.name for kb in keys.key_blocks} if keys else set()
     manifest = os.path.join(os.path.dirname(a.parts), "Realistic.base.json" if a.package == "realistic" else "Humanoid.base.json")
     listed = poses(shapes, face_parameters(manifest))
+    if a.only:
+        listed = [p for p in listed if p[0] == "rest" or a.only in p[1]]
     pose(ch, 0.0, {})
     report = {"file": os.path.basename(a.parts), "limits_deg": LIMITS, "tongue_posed_with_jaw_open": TONGUE_JAW,
               "body_open_edges": Piece(ch.parts["Body"]).open_edges(),

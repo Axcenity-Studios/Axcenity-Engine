@@ -1,0 +1,31 @@
+R4 face controls (RA2), red run before the work: cargo nextest run -p axcenity-avatar --no-fail-fast
+(on the package as merged in refinement-r1-wave1: none of the new controls exists, the frames' faces differ by 3.1 mm)
+
+        FAIL [   0.097s] (69/88) axcenity-avatar::realistic_face_controls each_new_control_moves_the_face_within_its_range
+    thread 'each_new_control_moves_the_face_within_its_range' (41516) panicked at crates\avatar\tests\realistic_face_controls.rs:99:41:
+        FAIL [   0.095s] (70/88) axcenity-avatar::realistic_face_controls the_face_has_the_high_value_controls_with_their_metadata
+    thread 'the_face_has_the_high_value_controls_with_their_metadata' (41956) panicked at crates\avatar\tests\realistic_face_controls.rs:56:36:
+    no parameter `nose_tip_projection`
+        FAIL [   1.195s] (83/88) axcenity-avatar::realistic_face_controls the_frames_faces_differ
+    thread 'the_frames_faces_differ' (29624) panicked at crates\avatar\tests\realistic_face_controls.rs:172:5:
+    the frames' faces differ by 3.12 mm
+        FAIL [   1.212s] (84/88) axcenity-avatar::realistic_parameters a_baked_body_keeps_only_its_live_shapes
+    thread 'a_baked_body_keeps_only_its_live_shapes' (21508) panicked at crates\avatar\tests\realistic_parameters.rs:289:5:
+      left: 158
+     right: 172
+        FAIL [   2.837s] (87/88) axcenity-avatar::realistic_parameters every_parameter_moves_the_body_and_its_simpler_copies
+    thread 'every_parameter_moves_the_body_and_its_simpler_copies' (34092) panicked at crates\avatar\tests\realistic_parameters.rs:171:5:
+      left: 148
+     right: 176
+     Summary [   3.200s] 88 tests run: 83 passed, 5 failed, 0 skipped
+
+cargo nextest run -p axcenity-anim --no-fail-fast -E 'binary(realistic_face)' (the teeth must follow the new philtrum shape)
+
+        PASS [   1.114s] (1/4) axcenity-anim::realistic_face the_realistic_bodys_face_fits_its_profile_with_nothing_left_out
+        PASS [   1.197s] (2/4) axcenity-anim::realistic_face every_control_the_arkit_profile_uses_plays_on_the_realistic_head
+        FAIL [   1.213s] (3/4) axcenity-anim::realistic_face the_faces_parts_carry_the_shapes_they_follow
+    test the_faces_parts_carry_the_shapes_they_follow ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.20s
+    Teeth doesn't move with Face_Philtrum_Length
+        PASS [   1.221s] (4/4) axcenity-anim::realistic_face every_standard_control_moves_the_realistic_face
+     Summary [   1.221s] 4 tests run: 3 passed, 1 failed, 0 skipped

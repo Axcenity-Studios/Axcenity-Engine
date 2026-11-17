@@ -50,13 +50,14 @@ FLIP = np.array([-1.0, 1.0, 1.0])
 # are a left and a right (the two of a pair are made mirror images).
 EVEN_SHAPES = ("Mouth_Open", "Mouth_Wide", "Mouth_Narrow", "Mouth_Pucker", "Upper_Lip_Raise", "Lower_Lip_Lower",
                "Cheek_Puff", "Jaw_Open", "Jaw_Forward", "Face_Lip_Fullness_Upper", "Face_Lip_Fullness_Lower",
-               "Face_Mouth_Height", "Face_Chin_Length", "Face_Chin_Forward", "Face_Chin_Width")
+               "Face_Mouth_Height", "Face_Chin_Length", "Face_Chin_Forward", "Face_Chin_Width", "Face_Philtrum_Length")
 EVEN_PAIRS = (("Mouth_Smile_Left", "Mouth_Smile_Right"), ("Mouth_Frown_Left", "Mouth_Frown_Right"),
               ("Lip_Corner_Pull_Left", "Lip_Corner_Pull_Right"), ("Upper_Lip_Raise_Left", "Upper_Lip_Raise_Right"),
               ("Lower_Lip_Lower_Left", "Lower_Lip_Lower_Right"), ("Nose_Sneer_Left", "Nose_Sneer_Right"),
               ("Mouth_Left", "Mouth_Right"), ("Jaw_Left", "Jaw_Right"),
               ("Face_Mouth_Width_Left", "Face_Mouth_Width_Right"),
-              ("Face_Cheek_Fullness_Left", "Face_Cheek_Fullness_Right"), ("Face_Jaw_Width_Left", "Face_Jaw_Width_Right"))
+              ("Face_Cheek_Fullness_Left", "Face_Cheek_Fullness_Right"), ("Face_Jaw_Width_Left", "Face_Jaw_Width_Right"),
+              ("Face_Jaw_Angle_Left", "Face_Jaw_Angle_Right"))
 
 
 def mouth_region(topo, frames, mirror):
@@ -83,15 +84,54 @@ def even(X, mirror, w, other=None):
     return X + w[:, None] * (0.5 * (X + source[mirror] * FLIP) - X)
 
 
+# The feminine frame's face against the bundle's (R4; the baseline's C1 and
+# M6: the two frames had nearly the same face). The bundle's two heads are
+# the same size (bizygomatic breadth 149.3 and 149.1 mm), where women's
+# faces are about 6% narrower and 7.5% shorter than men's and their eyes
+# barely smaller (references/face/README.md, "Population data": zy-zy
+# 135.1 against 143.5, se-me 113.4 against 122.7, pupils 61.9 against
+# 64.5): so the feminine face is made 5% smaller about the eyes, which hold
+# (larger against the face). Beyond size, where the references say they
+# differ: fuller lips (the same red heights, 10.3 mm, on a smaller face),
+# fuller cheeks, a rounder forehead, brows a little higher, a narrower chin
+# and a jaw corner a little more sloped (gonial angle 125.3 against 121.6
+# degrees). The brow ridge (the bundle's feminine glabella stands 0.4 mm
+# behind sellion, against 3.7 mm in front on the masculine frame), the
+# jaw's width against the cheekbones and the nose's width were already
+# feminine. The cranium, the ears and the neck don't move. Metres, or a
+# share for `smaller` and `chin_narrower`.
+FEMININE = {"smaller": 0.05, "chin_narrower": 0.08, "lips_out": 0.0009, "lips_border": 0.0007,
+            "cheeks_out": 0.0010, "malar_out": 0.0018, "forehead_forward": 0.0020, "brows_up": 0.0020,
+            "jaw_corner_in": 0.0030}
+
+
+def feminine_face(topo, F, eyes_f, radius_f):
+    """The offsets that take the bundle's feminine face to the feminine
+    frame's (`FEMININE`), on positions `F`."""
+    F = np.asarray(F, dtype=np.float64)
+    face = Face(topo, F, eyes_f, radius_f, Jaw(np.zeros(3), np.zeros(len(F))))
+    # (The jaw's hinge is a bone not fitted yet: in front of and under the
+    # ear, where the masculine frame's is.)
+    ear = 0.5 * (face.ear_at[1] + face.ear_at[-1])
+    face.jaw = Jaw(np.array([0.0, ear[1] - 0.018, ear[2] - 0.006]), np.zeros(len(F)))
+    return face.feminine()
+
+
 def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f, mirror=None):
     """Both frames' positions (arrays) with the face put right at rest,
-    and a report. `eyes_*` are {1: left centre, -1: right centre}. With
-    `mirror` (each vertex's mirror vertex) the mouth is made even: the
+    and a report. `eyes_*` are {1: left centre, -1: right centre}. The
+    feminine face is first made the feminine frame's (`feminine_face`).
+    With `mirror` (each vertex's mirror vertex) the mouth is made even: the
     bundle's lips differ left from right by up to 0.3 mm (masculine) and
     1.3 mm (feminine), where the gap between closed lips is a tenth of a
     millimetre, so the line between them showed on one half only."""
     M, F = np.array(M, dtype=np.float64), np.array(F, dtype=np.float64)
     report = {}
+    feminine = feminine_face(topo, F, eyes_f, radius_f)
+    if mirror is not None:
+        feminine = even(feminine, mirror, topo.is_head.astype(np.float64))
+    F += feminine
+    report["feminine_face_moved_mm"] = round(float(np.linalg.norm(feminine, axis=1).max()) * 1000, 2)
     moved = 0.0
     for _, s in SIDES:
         eye = lids.Eye(topo, M, s, eyes_m[s], radius_m)
@@ -349,6 +389,59 @@ TILT_SPREADS = 4
 # skin it grows from, and an ear laid back went into the skin above its
 # root.
 EAR_OUT_REACH = 0.012
+# R4's controls (the face references' high-value list; `faceparams.ABOUT`
+# says what each does). Each end is set from the references' population
+# data where there is some (about 2.5 SD at the end), by eye where none
+# was collected, and held short where a larger shape stretched its
+# neighbours (references/face/README.md, "The rule for ranges"); the
+# hand-back (docs/development/character-studio/refinement/r2/
+# r4-face-controls.md) has each end's millimetres against the SD.
+#
+# Nose tip projection: the tip out along the line from subnasale to it
+# (sn-prn 21.1 +- 2.7 mm, men): metres at the tip.
+NOSE_PROJECTS = 0.0065
+# Nose tip rotation: the tip and the column under it turned about
+# subnasale, up at +1 (the nasolabial angle, 105 +- 9.6 degrees).
+NOSE_TURNS_DEG = 26.0
+NOSE_TURN_SMOOTH = 3
+# Whole-nose width: the nose's skin from the root to the wings spread
+# from the middle by this share of its distance from it.
+NOSE_WIDENS = 0.26
+# Philtrum length: the mouth, its bag and the teeth down from a nose held
+# where it is (sn-ls 14.2 +- 2.3 mm, men; 12.7 +- 2.0, women).
+PHILTRUM_GROWS = 0.0050
+PHILTRUM_NOSE_GOES = 0.2
+# Jaw angle: the jaw's corner out along the bisector of its angle, in the
+# side's plane (down and back: a squarer jaw), at most this far.
+JAW_CORNER_OUT = 0.0075
+# Upper lid fold: how far each loop of the upper lid's skin comes down
+# and forward at +1 (mm), a hooded lid; at -1 the fold goes up and back,
+# a high, deep-set crease. The lash line and the rim don't move, so a
+# blink still closes. (The lid shows 3.3 mm from lash line to crease.)
+# The crease itself (loops 5 and 6, which lie at one height) stays: moved
+# by different amounts, one went under the other.
+LID_FOLD_DOWN = {7: 1.6, 8: 2.7, 9: 2.5, 10: 1.5, 11: 0.6}
+LID_FOLD_FORWARD = {7: 1.8, 8: 1.5, 9: 0.9, 10: 0.4}
+# Lower lid: how far each loop of the lower lid's skin rises and comes
+# forward at +1 (mm), a full lower lid with its junction with the cheek
+# set high; at -1 a flat, longer lower lid with the junction low. The
+# rims don't move: a blink must still close, so the lid margin's height
+# (5.2 +- 1.0 mm under the pupil, E-01) is the eye's opening, which no
+# identity shape changes.
+LOWER_LID_UP = {3: 0.3, 4: 0.8, 5: 1.5, 6: 2.2, 7: 2.5, 8: 2.0, 9: 1.2, 10: 0.5}
+LOWER_LID_FORWARD = {3: 0.6, 4: 0.8, 5: 0.6, 6: 0.3, 7: 0.1}
+# Eye corner: the outer part of the eye and the skin beyond its corner
+# raised with the inner corner held, the outer corner by this much
+# (canthal tilt 5.1 +- 2.5 degrees, men; 6.1 +- 2.9, women). The rise
+# starts and is whole at these shares of the way from the inner corner
+# to the outer (`eye_tilt` turns the whole eye about its middle).
+EYE_CORNER_RISES = 0.0030
+EYE_CORNER_FROM = (0.30, 1.05)
+# Earlobe: the lobe down (or drawn up into the ear) by this much at its
+# lowest point (lobe length 25.6 +- 4.5 mm), easing to nothing this far
+# up the ear.
+EARLOBE_GROWS = 0.0060
+EARLOBE_TOP = 0.018
 MOUTH_RISES = 0.0045
 JAW_SHIFTS = 0.0050
 # How far Jaw_Forward brings the jaw (metres).
@@ -1359,6 +1452,52 @@ class Face:
 
     # -- identity (Character Studio's face parameters) -----------------------
 
+    def jaw_landmarks(self, s):
+        """(the jaw's corner, a point up its back edge toward the hinge, a
+        point along its lower edge toward the chin), on the skin of side
+        `s`."""
+        hinge, z_chin = self.jaw.hinge, self.chin[2]
+        corner = self.on_skin(np.array([s * 0.062, hinge[1] + 0.012, z_chin + 0.022]))
+        ramus = self.on_skin(np.array([s * 0.060, hinge[1] + 0.004, hinge[2] - 0.010]))
+        body = self.on_skin(np.array([s * 0.040, self.chin[1] + 0.040, z_chin - 0.008]))
+        return corner, ramus, body
+
+    def jaw_corner(self, s):
+        """Per vertex, the move (at 1 metre) that takes the jaw's corner on
+        side `s` out along the bisector of its angle, in the side's plane:
+        down and back."""
+        corner, ramus, body = self.jaw_landmarks(s)
+        flat = np.array([0.0, 1.0, 1.0])
+
+        def unit(v):
+            v = v * flat
+            return v / np.linalg.norm(v)
+
+        out = -unit(unit(ramus - corner) + unit(body - corner))
+        w = self.near(corner, 0.020) * self.skin * self.side(s)
+        return w[:, None] * out[None, :]
+
+    def _rims_off_ball(self, eye, move, rims, keeps=TILT_KEEPS):
+        """`move` (every vertex) with what of a rim vertex's move would
+        bring it nearer the eyeball than `TILT_KEEPS` of its resting
+        height over it taken off along the line from the eyeball's
+        centre, and that change spread over the lid round it, so the
+        lid's edge keeps its shape. (Risen straight, the lower lid's inner
+        edge went 0.4 mm into the eyeball on the outer half, where the
+        eyeball's surface faces down. The rims then differ only in how far
+        they stand off the eyeball, and still meet in a blink. Turned with
+        the skin round it instead, the lower lid left a blink open.)"""
+        P = self.P
+        out_of_ball = P[rims] - eye.c
+        out_of_ball /= np.linalg.norm(out_of_ball, axis=1)[:, None]
+        room = np.maximum(eye.ball.above(P[rims]), 0.0) * (1.0 - keeps)
+        radial = (move[rims] * out_of_ball).sum(axis=1)
+        excess = np.sign(radial) * np.maximum(np.abs(radial) - room, 0.0)
+        kept_off = np.zeros((len(P), 3))
+        kept_off[rims] = -excess[:, None] * out_of_ball
+        held = rims[np.abs(excess) > 1e-9]
+        return move + self.topo.smooth(kept_off, TILT_SPREADS, keep=held, among=eye.idx)
+
     def eye_region(self, s):
         """How much each vertex belongs to eye `s`: the lids, their lining
         and the skin round them, easing off over the loops beyond."""
@@ -1416,26 +1555,48 @@ class Face:
             # (The rims only rise and fall: slid sideways against each
             # other they would not meet at the corners.)
             tilt[rims] = (along[rims] * angle[rims])[:, None] * eye.up
-            # (Risen straight, the lower lid's inner edge went 0.4 mm into
-            # the eyeball on the outer half, where the eyeball's surface
-            # faces down. What of a rim vertex's move would bring it nearer
-            # the eyeball than `TILT_KEEPS` of its resting height over it,
-            # at either end, is taken off along the line from the
-            # eyeball's centre, and that change is spread over the lid
-            # round it, so the lid's edge keeps its shape. The rims then
-            # differ only in how far they stand off the eyeball, and still
-            # meet in a blink. Turned with the skin round it instead, the
-            # lower lid left a blink open.)
-            out_of_ball = P[rims] - eye.c
-            out_of_ball /= np.linalg.norm(out_of_ball, axis=1)[:, None]
-            room = np.maximum(eye.ball.above(P[rims]), 0.0) * (1.0 - TILT_KEEPS)
-            radial = (tilt[rims] * out_of_ball).sum(axis=1)
-            excess = np.sign(radial) * np.maximum(np.abs(radial) - room, 0.0)
-            kept_off = np.zeros((len(P), 3))
-            kept_off[rims] = -excess[:, None] * out_of_ball
-            held = rims[np.abs(excess) > 1e-9]
-            tilt += self.topo.smooth(kept_off, TILT_SPREADS, keep=held, among=eye.idx)
-            put(f"Face_Eye_Tilt_{side}", tilt, teeth=False)
+            # (Kept off the eyeball at both ends: `_rims_off_ball`.)
+            put(f"Face_Eye_Tilt_{side}", self._rims_off_ball(eye, tilt, rims), teeth=False)
+            # Eye corner (R4): the outer part of the eye raised with the
+            # inner corner held, rims and skin alike at each place along
+            # the eye (as the tilt; so a blink still closes), and the
+            # skin beyond the outer corner with it, easing off over the
+            # eye's region (`w`).
+            u = (along - eye.t_in) / (eye.t_out - eye.t_in)
+            corner = (smoothstep(EYE_CORNER_FROM[0], EYE_CORNER_FROM[1], u) * w * EYE_CORNER_RISES)[:, None] * eye.up
+            # (Kept off the eyeball over the whole lid and its lining, not
+            # the rims only: raised at the outer corner, where the
+            # eyeball's surface faces down, the lining and the lower lid's
+            # skin went into it, and lowered, the upper lid did.)
+            # The rims as the tilt's (they differ only in how far they stand
+            # off the eyeball, so a blink still closes); nothing else of it
+            # moves toward the eyeball (`keeps` 1: it slides over it), so
+            # the squinting expressions, which bring the lids to it, still
+            # find it where it was.
+            near_ball = np.array([i for i in eye.idx if -4 <= eye.step[i] <= 6 and not 1 <= eye.step[i] <= 3],
+                                 dtype=np.int64)
+            corner = self._rims_off_ball(eye, corner, rims)
+            put(f"Face_Eye_Corner_{side}", self._rims_off_ball(eye, corner, near_ball, keeps=1.0), teeth=False)
+            # Upper lid fold and lower lid (R4): loops of the lids' skin,
+            # none at the inner corner and whole from a third of the way
+            # along the eye; the rims don't move.
+            taper = smoothstep(-0.05, 0.35, u)
+            fold_taper = taper * (1.0 - smoothstep(1.0, 1.35, u))
+            fold, lower_lid = np.zeros((len(P), 3)), np.zeros((len(P), 3))
+            for i in eye.idx:
+                k = eye.step[i]
+                if eye.upper[i]:
+                    fold[i] = (-LID_FOLD_DOWN.get(k, 0.0) * up + LID_FOLD_FORWARD.get(k, 0.0) * eye.fwd) * 0.001 * fold_taper[i]
+                else:
+                    end = smoothstep(-0.10, 0.25, u[i]) * (1.0 - smoothstep(0.85, 1.15, u[i]))
+                    lower_lid[i] = (LOWER_LID_UP.get(k, 0.0) * up + LOWER_LID_FORWARD.get(k, 0.0) * eye.fwd) * 0.001 * end
+            # (Averaged over the fold only: the crease's loops lie on each
+            # other, and a few tenths of a millimetre averaged into them
+            # put one through the other.)
+            still = [i for i in eye.idx if eye.step[i] <= 2]
+            crease = [i for i in eye.idx if eye.step[i] <= 6]
+            put(f"Face_Lid_Fold_{side}", self.topo.smooth(fold, 2, keep=crease, among=eye.idx), teeth=False)
+            put(f"Face_Lower_Lid_{side}", self.topo.smooth(lower_lid, 2, keep=still, among=eye.idx), teeth=False)
             # Brows: a shape for each end (`BROW_RAISES` above). Lowering,
             # the skin is put back on its resting surface as the brow
             # controls put it, not on the lids and the fold over them
@@ -1471,6 +1632,12 @@ class Face:
             angle_at = self.on_skin(np.array([s * 0.062, self.jaw.hinge[1] + 0.012, z_chin + 0.022]))
             jw = self.near(angle_at, 0.030) * skin * self.side(s)
             put(f"Face_Jaw_Width_{side}", vec(jw, lateral * 0.0062) + vec(jw, up * -0.0014))
+            # Jaw angle (R4): the corner out along the bisector of the
+            # angle between the jaw's back edge (up toward the hinge) and
+            # its lower edge (forward toward the chin), in the side's
+            # plane, not wider (the jaw width does that): down and back
+            # is a squarer jaw, up and forward a sloped one.
+            put(f"Face_Jaw_Angle_{side}", self.jaw_corner(s) * JAW_CORNER_OUT)
             corner = self.corner_pull(s, (s * 1.0, 0.45, 0.0), 0.0048, radius=0.017, start=-0.2, power=1.3)
             put(f"Face_Mouth_Width_{side}", corner, slide=slide)
             ear = self.ear.astype(np.float64) * self.side(s, 0.001)
@@ -1487,6 +1654,16 @@ class Face:
                 if hit is not None:
                     reach[i] = min(1.5, float(np.linalg.norm(P[i] - hit[0])) / EAR_OUT_REACH)
             put(f"Face_Ear_Out_{side}", vec(ear * reach, lateral * 0.0048 + back * -0.0016), teeth=False)
+            # Earlobe (R4): the ear's lowest part down, most at its bottom
+            # and none `EARLOBE_TOP` up the ear; the skin it hangs from
+            # eases with it, as for the ear's size.
+            ear_z = P[self.ear & (ear > 0.5)][:, 2]
+            lobe = ear * smoothstep(ear_z.min() + EARLOBE_TOP, ear_z.min(), P[:, 2])
+            # (Averaged over the ear first: drawn up with a sharp edge to
+            # its weight, the short lobe came to a point.)
+            lobe = self.topo.smooth(lobe, 3, among=np.where(self.ear & (ear > 0.5))[0])
+            lobe = self.topo.smooth(lobe, 3, keep=np.where(self.ear)[0])
+            put(f"Face_Earlobe_{side}", vec(lobe, up * -EARLOBE_GROWS), teeth=False)
         # The middle of the face.
         mid_nose = self.near(self.nose_tip + np.array([0.0, 0.012, 0.004]), 0.024) * skin
         low_nose = smoothstep(z_nose + 0.022, z_nose - 0.006, P[:, 2])
@@ -1498,6 +1675,32 @@ class Face:
         bridge = self.near(bridge_at, 0.015) * skin * (1.0 - smoothstep(0.009, 0.022, np.abs(P[:, 0])))
         put("Face_Nose_Bridge", vec(bridge, back * -0.0046), teeth=False)
         put("Face_Nose_Tilt", vec(mid_nose * low_nose, np.array([0.0052, 0.0, 0.0])), teeth=False)
+        # R4: the tip's projection and rotation apart (`Face_Nose_Tip`
+        # moves both, and stays for saved characters), and the whole
+        # nose's width. Above subnasale only: the lip under it holds.
+        sn = self.subnasale()
+        over_lip = smoothstep(sn[2] - 0.001, sn[2] + 0.003, P[:, 2])
+        lobule = self.near(self.nose_tip, 0.013) * skin * over_lip
+        out_of_face = (self.nose_tip - sn) / np.linalg.norm(self.nose_tip - sn)
+        put("Face_Nose_Tip_Projection", vec(lobule, out_of_face * NOSE_PROJECTS), teeth=False)
+        # (A turn about the body's left through subnasale, made straight:
+        # each point moves along its arc's tangent by the sine, the same
+        # way at both ends.) The column, the tip's underside and the
+        # nostrils' rims turn whole, the wings less, the cheek beside them
+        # not at all, and the turn eases off over the tip itself, so the
+        # dorsum holds: turning the tip whole, with the dorsum easing off
+        # above it, bent the nose into a hook at +1 and creased it across.
+        # The field is then averaged over the nose a few times.
+        tip_z = self.nose_tip[2]
+        column = skin * over_lip * (1.0 - smoothstep(0.008, 0.020, np.abs(P[:, 0]))) \
+            * (1.0 - smoothstep(tip_z - 0.003, tip_z + 0.006, P[:, 2])) \
+            * smoothstep(sn[1] + 0.008, sn[1] + 0.002, P[:, 1])
+        r = P - sn
+        tangent = np.stack([np.zeros(len(P)), r[:, 2], -r[:, 1]], axis=1)
+        turn = tangent * (column * np.sin(np.radians(NOSE_TURNS_DEG)))[:, None]
+        nose = np.where((self.near(self.nose_tip, 0.030) > 0.05) & self.skin)[0]
+        put("Face_Nose_Tip_Rotation", self.topo.smooth(turn, NOSE_TURN_SMOOTH, among=nose), teeth=False)
+        put("Face_Nose_Width", self.nose_width(sn) * NOSE_WIDENS, teeth=False)
         glabella = self.on_skin(np.array([0.0, self.nose_tip[1], eye_z + 0.019]))
         ridge = gauss(P[:, 2] - glabella[2], 0.012) * (1.0 - smoothstep(0.035, 0.06, np.abs(P[:, 0]))) * skin * ~self.lid
         ridge *= P[:, 1] < glabella[1] + 0.03
@@ -1513,7 +1716,8 @@ class Face:
         # The chin and the jaw.
         # (The mouth's lining goes less far than the chin's skin: the
         # lower teeth stand in it.)
-        chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness)             * (self.skin + 0.15 * self.lining)
+        chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness) \
+            * (self.skin + 0.15 * self.lining)
         put("Face_Chin_Length", vec(chin, up * -0.0062))
         # (Forward and back, the skin inside the lower lip that faces the
         # lower teeth goes as little as the lining does: as skin it went
@@ -1546,7 +1750,109 @@ class Face:
         # the same shape).
         mouth_all = np.maximum(gauss(self.d_line, 0.028) * self.skin, self.lining.astype(np.float64))
         put("Face_Mouth_Height", vec(mouth_all, up * MOUTH_RISES), teeth=False)
+        # Philtrum length (R4): the mouth and its bag down, with the teeth
+        # (`build` gives them the same move), from the nose held where it
+        # is: the upper lip's skin between subnasale and the lip's red
+        # stretches. (`Face_Mouth_Height` moves the nose's base most of the
+        # way with the mouth.)
+        red_top = self.stomion[2] + 0.006
+        # (The nose's base goes a share of the way, easing off up the nose:
+        # held whole, the mouth's bag, moved up at -1 with the teeth in it,
+        # pushed the lips' seal out under the nose in a laugh.)
+        held = PHILTRUM_NOSE_GOES + (1.0 - PHILTRUM_NOSE_GOES) * (1.0 - smoothstep(red_top, sn[2] - 0.001, P[:, 2]))
+        held *= 1.0 - smoothstep(sn[2] - 0.001, sn[2] + 0.008, P[:, 2])
+        # (The lips move as one, all of them within 18 mm of their line:
+        # a lower lip that moved a little less than the upper one went
+        # through it where they touch.)
+        mouth_all = np.maximum(1.0 - smoothstep(0.018, 0.050, self.d_line), 0.0) * self.skin
+        # (The bag goes whole, with the teeth in it: held under the nose as
+        # the lip's skin is, the upper gum went into it at -1.)
+        put("Face_Philtrum_Length", vec(np.maximum(mouth_all * held, self.lining.astype(np.float64)),
+                                        up * -PHILTRUM_GROWS), teeth=False)
         return out
+
+    def feminine(self):
+        """The offsets (every vertex) of `FEMININE`, on this face, with the
+        identity shapes' fields, so they ease off as those do. Raw
+        offsets: the lips are closed and the teeth placed after them
+        (`prepare`, `parts.teeth`)."""
+        P, N, k = self.P, self.N, FEMININE
+        up, back = np.array([0.0, 0.0, 1.0]), np.array([0.0, 1.0, 0.0])
+        vec = lambda w, v: np.asarray(w)[:, None] * np.asarray(v, dtype=np.float64)  # noqa: E731
+        skin = self.skin.astype(np.float64)
+        # The face smaller about the point between the eyes: the whole of
+        # it in front of the ears and under the brows, the mouth's bag
+        # with it, none on the eyes' lids (the eyeballs hold) and easing
+        # off toward the ears, over the forehead and under the chin.
+        centre = 0.5 * (self.eye[1].c + self.eye[-1].c)
+        centre[1] = 0.5 * (self.eye[1].c[1] + self.nose_tip[1])
+        ear_y = 0.5 * (self.ear_at[1][1] + self.ear_at[-1][1])
+        face = smoothstep(ear_y - 0.010, ear_y - 0.040, P[:, 1]) \
+            * (1.0 - smoothstep(centre[2] + 0.010, centre[2] + 0.040, P[:, 2])) \
+            * smoothstep(self.chin[2] - 0.035, self.chin[2] - 0.015, P[:, 2]) * self.topo.is_head * ~self.ear
+        for _, s in SIDES:
+            face *= 1.0 - self.eye_region(s)
+        out = vec(face * k["smaller"], centre) - P * (face * k["smaller"])[:, None]
+        # (The mouth, its bag and the lips go as one, by the move of their
+        # middle: made smaller with the face, the mouth was tighter round
+        # teeth of the same size, and a laughing mouth showed the seal
+        # behind the lips.)
+        mouth_one = np.maximum(1.0 - smoothstep(0.014, 0.034, self.d_line), self.lining.astype(np.float64))
+        middle = k["smaller"] * (centre - self.stomion) * face[self.mouth.mid]
+        out = out * (1.0 - mouth_one)[:, None] + vec(mouth_one * face, middle) / max(face[self.mouth.mid], 1e-9)
+        # The chin narrower.
+        chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness) \
+            * (self.skin + 0.15 * self.lining)
+        out[:, 0] -= P[:, 0] * chin * k["chin_narrower"]
+        # The lips fuller: their outer faces out, their borders apart.
+        red = gauss(self.d_line - 0.0055, 0.0042) * skin * self.corner_taper(0.55) * (N[:, 1] < -0.2)
+        border = gauss(self.d_line - 0.0095, 0.0045) * skin * self.corner_taper(0.55)
+        out += (red * k["lips_out"])[:, None] * N * np.array([1.0, 1.0, 0.35])
+        out += vec(border * (self.upper_side.astype(np.float64) - self.lower_side), up * k["lips_border"])
+        for _, s in SIDES:
+            # Fuller cheeks, the soft cheek and over the cheekbone.
+            hollow_at = self.on_skin(np.array([s * 0.050, self.corner[s][1] + 0.022, self.stomion[2] + 0.012]))
+            out += (self.near(hollow_at, 0.026) * skin * (1.0 - self.lipness) * k["cheeks_out"])[:, None] * N
+            out += (self.near(self.cheek_point(s), 0.024) * skin * ~self.lid * k["malar_out"])[:, None] * N
+            # The brows a little higher (the brow's skin, as the raising
+            # shapes move it) and the jaw's corner a little more sloped.
+            bw, _ = self.brow(s)
+            out += vec(bw, up * k["brows_up"])
+            out -= self.jaw_corner(s) * k["jaw_corner_in"]
+        # A rounder, more upright forehead.
+        eye_z = self.eye[1].c[2]
+        front = gauss(P[:, 2] - (eye_z + 0.055), 0.03) * smoothstep(-0.06, -0.11, P[:, 1]) * self.topo.is_head * ~self.lid
+        out += vec(front, back * -k["forehead_forward"])
+        out[~self.topo.is_head] = 0.0
+        return out
+
+    def subnasale(self):
+        """Where the nose's column meets the upper lip: the deepest point
+        of the face's middle between the nose's tip and the lips."""
+        P = self.P
+        front = np.where(self.skin & (np.abs(P[:, 0]) < 1e-4) & (P[:, 1] < self.nose_tip[1] + 0.03)
+                         & (P[:, 2] < self.nose_tip[2]) & (P[:, 2] > self.stomion[2] + 0.008))[0]
+        return P[front[np.argmax(P[front][:, 1])]].copy()
+
+    def nose_width(self, sn):
+        """Per vertex, the whole nose spread from the middle (at a share of
+        1 of each point's distance from it): its skin from the root
+        between the eyes down to the wings, narrow at the root and wide
+        at the wings, none on the lids, the cheeks or the lip."""
+        P = self.P
+        eye_z = self.eye[1].c[2]
+        z = P[:, 2]
+        # How far out the nose reaches at each height: the root's sides
+        # at the eyes, the wings' crease at the nose's base.
+        low = smoothstep(eye_z - 0.004, sn[2] + 0.010, z)
+        edge = 0.009 + 0.011 * low
+        across = 1.0 - smoothstep(0.0, 1.0, (np.abs(P[:, 0]) - edge) / 0.010)
+        along = smoothstep(sn[2] - 0.006, sn[2] + 0.001, z) * (1.0 - smoothstep(eye_z, eye_z + 0.012, z))
+        front = smoothstep(sn[1] + 0.016, sn[1] + 0.008, P[:, 1])
+        w = across * along * self.skin * front
+        for _, s in SIDES:
+            w *= 1.0 - self.eye_region(s)
+        return np.stack([P[:, 0] * w, np.zeros(len(P)), np.zeros(len(P))], axis=1)
 
 
 def tongue_open(points, lower_teeth):
@@ -1572,20 +1878,22 @@ def tongue_open(points, lower_teeth):
     return out - points
 
 
-def _teeth_follow(teeth, lift):
+def _teeth_follow(teeth, lifts):
     """The shapes a `Teeth` object follows the body's with: the mouth's
-    height and the jaw's shift (identity), and `Jaw_Open`: the lower
-    teeth glide forward with the opening jaw, and the tongue settles
-    into the floor of the mouth."""
+    height and the philtrum's length (`lifts`: {shape: the move of the
+    mouth's middle}; the teeth go with it whole) and the jaw's shift
+    (identity), and `Jaw_Open`: the lower teeth glide forward with the
+    opening jaw, and the tongue settles into the floor of the mouth."""
     me = teeth.data
     points = np.array([v.co[:] for v in me.vertices])
     polys = [tuple(p.vertices) for p in me.polygons]
     head_group = teeth.vertex_groups["Head"].index
     upper = np.array([any(g.group == head_group for g in v.groups) for v in me.vertices])
-    key = teeth.shape_key_add(name="Face_Mouth_Height", from_mix=False)
-    for i, p in enumerate(points):
-        key.data[i].co = p + lift
-    key.value = 0.0
+    for name, lift in lifts.items():
+        key = teeth.shape_key_add(name=name, from_mix=False)
+        for i, p in enumerate(points):
+            key.data[i].co = p + lift
+        key.value = 0.0
     key = teeth.shape_key_add(name="Face_Jaw_Shift", from_mix=False)
     for i in np.nonzero(~upper)[0]:
         key.data[i].co = points[i] + np.array([JAW_SHIFTS, 0.0, 0.0])
@@ -1823,9 +2131,9 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     made["Brows"] = brow
     made["LipSeal"] = lip_seal(face, F, shapes, jaw_w)
     # The teeth go where the mouth goes (and their simpler copies alike).
-    lift = identity["Face_Mouth_Height"][0][face.mouth.mid]
+    lifts = {name: identity[name][0][face.mouth.mid] for name in ("Face_Mouth_Height", "Face_Philtrum_Length")}
     for part in (teeth, *teeth_copies):
-        _teeth_follow(part, lift)
+        _teeth_follow(part, lifts)
     bones = {}
     for name, (_, changes) in identity.items():
         if changes:
