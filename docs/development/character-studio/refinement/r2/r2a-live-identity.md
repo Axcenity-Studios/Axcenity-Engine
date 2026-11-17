@@ -13,7 +13,7 @@ Task: a character on screen is its base model's shared mesh plus live identity w
 - **`Assets`.** `register_identity` registers an identity by key without making a model. `identity(key)` looks it up. `derived_count()` counts bakes. `derive` registers the identity the same way.
 - **`anim`.**
   - A MeshPart names the identity it wears in the attribute `Identity` (16 hex digits, `anim::IDENTITY`; `identity_key`, `set_identity_key`).
-  - `Animators` keeps a `LiveIdentity` per model and identity (`live_identity.rs`, at most 1024).
+  - `Animators` keeps a `LiveIdentity` per model and identity (`live_identity.rs`). Past 1024 kept, the ones not asked for this frame or the last are let go; the limit grows to twice what's in use, so a crowd's are never remade (see Review fixes).
   - In both posing paths the identity is settled right after the clips, where `Model::settle` was, and dressed last in `skinned`, after the face and the correctives.
   - Followers take the leader's weights by name as before, then put on their own identity: the body's, plus the item's own shapes.
 - **The applier (`gameplay::description`).**
@@ -141,11 +141,11 @@ None regenerated: no manifest, model, catalogue, preset or benchmark changed.
 
 ## Open issues
 
-- **Ray-traced shadows of live characters** lack the identity and expression shapes (the bone changes and the joint corrections are in them). `ray_skin.wgsl` skins without morphing. Before R2a the derived rest mesh carried the identity, so with hardware RT shadows on this is a regression for live characters. A baked character is right. It is RA7's, with CO8 step 3.
+- **Hardware ray-traced effects of live characters** lack the identity and expression shapes (the bone changes and the joint corrections are in them). `ray_skin.wgsl` skins the ray tracing copy without morphing, and that copy is in the one TLAS that ray-traced shadows, ambient occlusion, reflections and hardware GI all trace (`ray_shadows.rs`, `ray_ao.rs`, `ray_reflections.rs`, `ray_gi.rs`). Before R2a the derived rest mesh carried the identity, so with any of these on this is a regression for live characters; all four are off at every preset (`render-types` `graphics.rs` tests). A baked character's identity is right. It is RA7's, with CO8 step 3.
 - **GPU cost** with many live characters (above): CO8.
 - **The Game Editor's Face Rig tab** (`editor/src/character_studio.rs`, `anim::pose_face`) poses a copy of a MeshPart at rest and doesn't put on the part's live identity, so an applied character's face shows the base face there. `CharacterWorkspace::head()`'s fallback before the first frame uses `Model::settle` and misses a live identity's bone changes. Both are editor code, not touched here (the task allows only the throttle). Each needs `LiveIdentity` from `assets.identity(identity_key(...))` and `Model::live`.
 - **Edit mode** (CO13, unchanged): a placed character's kept description isn't applied in the Game Editor's edit mode, so it shows base meshes, as before.
-- **Identities are kept for the run** (audit D4, unchanged). A drag now registers one per frame instead of one per 120 ms (a few kilobytes each for the realistic body), so a long drag session grows memory by megabytes. A prune of keys no MeshPart names would fix it.
+- **Identities are kept for the run** (audit D4, unchanged). A realistic identity names every identity shape, even at weight 0 (about 150 `(String, f32)` entries with the corners and masks) plus its bone changes: about 8 to 10 KB each (estimated from its entries, not measured), and one more per part with item parameters. A drag now registers one per frame instead of one per 120 ms: about 0.6 to 1.4 MB a second of continuous dragging at 60 to 144 Hz, against about 80 KB a second with the throttle, so a long editing session can reach hundreds of MB. The fix is a reference-aware prune: drop keys that no MeshPart's `Identity` attribute names, run from the workspace when a drag ends (or the applier unregisters a character's previous key). In Known limitations.
 - **Clothing shapes by binding transfer** (ADR-0041 decision 4) is CO9's. `fit: shapes` garments already follow live weights by name.
 
 ## For the lead at merge
@@ -154,3 +154,50 @@ None regenerated: no manifest, model, catalogue, preset or benchmark changed.
 - `crates/player/src/character_capture.rs` gained `draw_staged` (split from `capture_in`, same behaviour) and one test. `bench_tests.rs`'s `run`, `camera` and `Steps` are now `pub(crate)` for the new bench.
 - Anything that asserted a derived body `MeshId` after `apply_description` must look at `anim::identity_key` instead. All such tests in this repository were updated.
 - Update the plan's 11.5 R2a row (implemented in part: the applier, followers, `DescriptionSync`, item parameters and the bake are done; CO8 is not) and the progress entry. ADR-0041's status line says "implemented in part".
+
+## Review fixes
+
+The review asked for two blocking fixes. Both are done.
+
+### 1. The LiveIdentity cache no longer drops everything at 1024
+
+`LiveIdentities::of` used to clear the whole map when it reached 1024 entries. A crowd wearing more than 1024 (model, identity) pairs (about 100 live characters at 8 to 12 parts each) therefore emptied and refilled the map every frame, and nearly every part ran a full `Model::live` every frame.
+
+Now (`crates/anim/src/live_identity.rs`):
+
+- Each entry keeps the frame it was last asked for. `Animators::update` calls `LiveIdentities::next_frame` once per update, and a hit refreshes the stamp.
+- When the map reaches its limit, only entries not asked for this frame or the last are let go (`retain`). An entry the current frame is using is never dropped.
+- After letting go, the limit becomes twice what's left (at least 1024). A crowd that needs more than 1024 keeps them all, and letting go stays rare, so the `retain` is amortised and doesn't run on every miss.
+- A drag still stays bounded: one new identity per frame, the old ones let go once 1024 are kept.
+
+Tests, written first (red run appended to `r2a-live-identity-red-run.txt`; the old cache failed with "frame 1 remade 2000 live identities"):
+
+- `live_identity::tests::a_crowd_larger_than_the_cache_limit_is_not_remade_every_frame`: 2,000 distinct (model, identity) pairs asked for on three updates in a row. The first makes 2,000 and the next two make none (counted by a miss counter, `made`).
+- `live_identity::tests::identities_no_part_wears_any_more_are_let_go`: 3,072 identities, a new one each frame, as a drag makes them. The map never holds more than 1024, and the one worn this frame is still there.
+
+Runs after the fix:
+
+- `cargo nextest run -p axcenity-anim --no-fail-fast`: Summary [3.604s] 182 tests run: 182 passed, 0 skipped
+- `cargo nextest run -p axcenity-anim -p axcenity-assets -p axcenity-gameplay -p axcenity-scene -p axcenity-avatar -p axcenity-player --no-fail-fast`: Summary [158.239s] 900 tests run: 900 passed (7 slow), 23 skipped (the gate tests among them: the explicit bake's pixels, weights only, item parameters, the frame's bone offsets, CO2 determinism)
+- `cargo nextest run -p axcenity-editor -E 'test(a_character_file_applied) | test(a_slider_changes_the_realistic) | test(character_workspace)'`: Summary [27.673s] 48 tests run: 48 passed, 1303 skipped
+- `cargo clippy -p axcenity-anim -p axcenity-assets -p axcenity-gameplay -p axcenity-player --all-targets -- -D warnings`: clean; `cargo fmt --all --check`: clean
+
+No frame-time numbers changed: the 50-character bench (about 500 pairs) never reached the old limit, so the fix changes nothing it measured.
+
+### 2. Wiki and architecture pages
+
+- `wiki/Engine-Systems/Animation.md`: the settle-step bullet and its diagram node now describe live identity (`LiveIdentity::settle` after the clips in both posing paths, `LiveIdentity::dress` last in `skinned` and on followers after the leader's shapes, `Model::settle` only for a baked model), link ADR-0041, and add `live_identity.rs` to the page's sources. The correctives bullet no longer says "after the identity bake".
+- `wiki/Roadmap/Known-Limitations.md`, Characters: the old "identity bake's cost isn't measured" entry is replaced by three: live identity's GPU cost in every pass until CO8 (the measured 1, 10 and 50 numbers, with the advice to bake crowds that don't change); hardware ray-traced shadows, AO, reflections and GI tracing an unmorphed copy (all four trace the one TLAS that `ray_skin.wgsl` poses; all are off at every preset); and registered identities kept for the run, with the corrected memory figure. The edit-mode entry no longer speaks of derived `MeshId`s alone.
+- `wiki/Engine-Systems/Characters.md`: the body parameters line says identity shapes are worn live or baked on request, and the limits paragraph names all four ray-traced effects.
+- `docs/development/character-studio/architecture.md`: lines 5, 12, 24, 39 (the data flow), 166, 288 and 449 say identity is worn live (ADR-0041) and the bake is optional (`gameplay::description::bake`).
+- This hand-back: the ray-tracing open issue names all four effects. The memory wording is corrected: about 8 to 10 KB per identity (estimated from its ~150 entries, not measured), about 0.6 to 1.4 MB a second of continuous dragging at 60 to 144 Hz against about 80 KB a second with the throttle. That can reach hundreds of MB over a long session, not "megabytes". The planned fix is a reference-aware prune when a drag ends.
+
+`python3 -I scripts/check-wiki.py`: 113 pages, 0 errors, 58 warnings (the same staleness warnings as before).
+
+### Non-blocking items not changed here
+
+- The editor agreement test would also pass if neither World wore its identity. The player tests check the weights; a check that the identity shows (a non-zero `Fat`-driven weight, or corners more than 1 mm from the base's) is left for the lead or RA1, since this delegation may not change editor code beyond the throttle.
+- The Face Rig tab and `CharacterWorkspace::head()`'s fallback (editor code) still don't wear a live identity. Assign them to RA1 or the lead before R4.
+- `Humanoid:ApplyDescription` on a baked character makes it live again. This is documented in architecture.md §16; a note in `docs/scripting/api-character.md` is left for the scripting docs' owner.
+- A "before" capture at `refinement-r1-wave1` for the two cast members wasn't made. The live-against-bake pixel test is the before-and-after evidence for R2a.
+- Plan 11.5's R2a "Done when" items that belong to CO8 (20 characters with 150 shapes as fast as today with 41; ray-traced shadows showing expressions) remain unmet. The row stays "implemented in part".

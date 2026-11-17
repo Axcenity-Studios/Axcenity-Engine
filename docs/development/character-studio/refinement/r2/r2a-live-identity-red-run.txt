@@ -67,3 +67,15 @@
         FAIL [   2.080s] (29/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes
         FAIL [   2.419s] (30/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description_lua::a_script_builds_a_description_and_applies_it_to_the_character
         FAIL [   8.302s] (33/34) axcenity-player::bin/axcenity-player character_capture::an_explicit_bake_draws_the_same_pixels_as_the_live_character
+
+## Review fixes: the LiveIdentity cache (red run)
+
+cargo nextest run -p axcenity-anim --no-fail-fast live_identity, against
+the old clear-all cache with only a miss counter and an empty next_frame:
+
+    FAIL axcenity-anim live_identity::tests::a_crowd_larger_than_the_cache_limit_is_not_remade_every_frame
+    assertion `left == right` failed: frame 1 remade 2000 live identities
+      left: 2000
+     right: 0
+    PASS axcenity-anim live_identity::tests::identities_no_part_wears_any_more_are_let_go
+    Summary [0.057s] 2 tests run: 1 passed, 1 failed, 180 skipped

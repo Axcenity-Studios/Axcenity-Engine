@@ -530,6 +530,7 @@ impl Animators {
     /// what scripts should hear about, in order.
     pub fn update(&mut self, world: &mut World, assets: &Assets, dt: f64) -> Vec<AnimatorEvent> {
         self.local.clear();
+        self.identities.next_frame();
         let mut owners: Vec<(InstanceId, Parts)> = Vec::new();
         let animated = world.all_below(world.workspace(), |class| {
             matches!(
