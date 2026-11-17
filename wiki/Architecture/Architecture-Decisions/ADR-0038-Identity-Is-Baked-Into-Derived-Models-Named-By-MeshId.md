@@ -2,10 +2,10 @@
 title: "ADR-0038: A character's identity is baked into derived models named by their MeshId"
 type: adr
 adr: 38
-adr_status: Proposed
+adr_status: Superseded
 date: 2026-11-14
 supersedes:
-superseded_by:
+superseded_by: ADR-0041
 affects: [assets, anim, avatar, gameplay, scene]
 source: [crates/assets/src/model/identity.rs, crates/assets/src/derived.rs, crates/avatar/src/resolve.rs, crates/gameplay/src/description.rs, crates/anim/src/animators.rs]
 docs: [docs/development/character-studio/architecture.md, plans/axcenity-engine-character-studio.md]
@@ -14,7 +14,7 @@ tags: [adr, characters, assets, animation]
 
 # ADR-0038: A character's identity is baked into derived models named by their MeshId
 
-- **Status:** Proposed (the lead, Character Studio overhaul CO3; it carries out plan decision D4, which Paul approved on 2026-11-14, and fixes how; Paul accepts or changes it when he reviews CO3)
+- **Status:** **Superseded by [ADR-0041](ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md)** (2026-11-17). Paul didn't accept baked identity as the foundation: live identity morphs on a shared base mesh are the source of truth, and the derived `MeshId` below stays as the mechanism of the optional bake. Written by the lead for CO3, carrying out plan decision D4.
 - **Date:** 2026-11-14
 - **Affected systems:** Assets (models), Animation (posing, followers), Character Data (`avatar::resolve`), the Character Runtime (`gameplay`'s applier), `scene` (drawing by `MeshId`)
 

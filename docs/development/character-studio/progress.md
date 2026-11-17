@@ -12,6 +12,23 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 | 5. Integration (CO13) | Not started | |
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
+| Refinement R0 (Paul's brief of 2026-11-16) | **Done** (2026-11-16) | Audits, reference index, baseline of `main`, plan section 11 (stages R1 to R11); see the log |
+| Refinement R1 to R11 | Not started | R1 (the studio shell and the contracts) next; CO7 and CO9 in parallel |
+
+## 2026-11-17: Paul's answers to the refinement's questions
+
+- **Decisions 7 to 10** (plan section 0): both families selectable, realistic the default; proportion ranges widened to ends set by deformation quality and population data, with hips both ways; ADR-0038 superseded by [ADR-0041](../../../wiki/Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md) (a shared base mesh with live identity morphs; baking only as an optional optimization); hair and clothing held to [asset-quality.md](asset-quality.md) and treated as drafts until they pass it.
+- **Plan changes:** R1 makes both families selectable; a new track **R2a** moves identity to live weights and brings CO8's compute posing forward; R3 widens the ranges; R6 and R7 count only items that pass the standard. Wave 1 (already running) is unaffected, except that work leaning on baked identity is adapted at merge.
+
+## 2026-11-16: the refinement, Stage 0 (R0)
+
+- **Brief:** Paul's "Comprehensive Character Creator Refinement Plan" of 2026-11-16, kept as [refinement/brief.md](refinement/brief.md). It extends the overhaul with a Sims-like interaction layer: a three-panel studio, direct manipulation on the character, presets, randomize, comparison, capability-aware assets. The plan's new section 11 maps its Stages 0 to 11 onto the CO milestones as R0 to R11.
+- **Agents:** a workflow of 24 agents, read-only on code: five auditors (studio UI, Character Data, runtime and rendering, asset pipeline, plan status), six web researchers (UX, face, body, hair, clothing, skin), one QA runner allowed to build, an adversarial verifier after each auditor and researcher, and a completeness critic. The lead read the results, looked at the capture sheets and settled the contracts where the audits disagreed (plan 11.3, 11.4).
+- **Written:** [refinement/](refinement/) (five audits, `audit-gaps.md`, the baseline) and [references/](references/README.md) (thirteen indexes, the licence classes and what ships today by class).
+- **Tests run:** `cargo nextest run -p axcenity-avatar -p axcenity-anim --no-fail-fast`: 226 passed; the editor's character tests, 37 passed (as unit tests only: an open editor locked its program file); `-p axcenity-gameplay -p axcenity-project` `description`: 8 passed; `-p axcenity-player` `default_humanoid`: 17 passed. The full suite was not run (no code changed). `measure.py --package realistic --check` passes every measured limit; it exits 1 only on the sliders lines it did not measure (OPEN-37).
+- **Found by looking, not by tests:** fat at 1 barely changes the body (under 1% of front-view pixels; no belly in profile); the athletic abdominal normal map is on every body; a limb casts a hatched shadow on the body; the skin is grainy; the open mouth is a bell with pointed corners; the two frames' faces are nearly the same; the default character's Walk state plays the Run take; the feminine briefs have no sides. All are in [refinement/baseline/README.md](refinement/baseline/README.md) and carried into R3 to R9.
+- **Defects found in the studio** (audit-studio-ui.md): Save overwrites another character of the same name; closing the editor with unsaved studio changes doesn't ask; Ctrl+Shift+Z undoes instead of redoing. Fixed in R1.
+- **Dependencies added:** none. No code changed.
 
 ## 2026-11-16: Paul's studio feedback (male or female, shoulders, feet, underwear, brow length, the stylized body)
 

@@ -1,0 +1,47 @@
+# Character Studio references
+
+The reference library asked for by the refinement brief, §13 ([brief](../refinement/brief.md)). Stage 0 built it on 2026-11-16. Each index was written by a researcher, then checked by a second agent that re-opened every licence page of a usable asset and a sample of the other rows (each index ends with its "Verification" section).
+
+**What this folder holds: links, numbers and descriptions in our own words. Nothing else.** No photograph, scan, mesh or texture from any source is stored in the repository, because it is public and a public picture is not a licence to redistribute it. Photographs Paul supplies for review are looked at and never committed.
+
+## The indexes
+
+| Area | Index | Also holds |
+|---|---|---|
+| Character creation UX | [ux/README.md](ux/README.md) | [ux/patterns.md](ux/patterns.md): the layout, hover, select and handle behaviour, a handle table per feature, randomize with locks, comparison, what to avoid |
+| Face | [face/README.md](face/README.md) | The brief's §5.2 controls against the existing parameters, with population means and SDs and recommended ranges; nine face presets; natural asymmetry. Per feature: [eyes](face/eyes/README.md), [nose](face/nose/README.md), [jaw](face/jaw/README.md), [lips](face/lips/README.md), [ears](face/ears/README.md) (brows, cheeks, chin and forehead are sections of the face index) |
+| Body | [body/README.md](body/README.md) | The §4.1 controls with anthropometry, the meaningful controls per region, eight body presets, implausible combinations. Per area: [overall](body/overall/README.md), [upper](body/upper/README.md), [lower](body/lower/README.md) |
+| Hair | [hair/README.md](hair/README.md) | A production approach per style group, what a card style can honestly support, facial hair, review checks |
+| Clothing and accessories | [clothing/README.md](clothing/README.md) | A production approach per category, a first-wave pick list, a capability-manifest design note, a fit review checklist |
+| Skin, makeup, markings | [skin/README.md](skin/README.md) | A recommended skin model (melanin, haemoglobin, undertone) with a tone palette, the layer order for details and makeup, decal options |
+| Materials | [materials/README.md](materials/README.md) | Fabric, hair, eye and general PBR references; previewing under neutral, warm, cool and outdoor light |
+
+Every index uses the same eight columns: Reference, Source URL, Author or publisher, Date collected, Feature, What it demonstrates, Licence or restrictions, Use (visual guidance, data or actual asset).
+
+**Known gaps** (from [audit-gaps.md](../refinement/audit-gaps.md)): the face and body indexes are mostly data papers and drawn plates, not consistent photographs from the front, side and three-quarter; there are no pictures of arms raised or joints bent; nose tips and nostril shapes lack data. These are to be filled before R3 and R4 author new shapes (plan section 11.5).
+
+## Licence classes (brief §13.5)
+
+| Class | What | May ship in the engine? |
+|---|---|---|
+| 1 | CC0 and public domain | Yes |
+| 2 | Open licences compatible with an Apache-2.0 engine that redistributes the asset (MIT, Apache-2.0, CC BY with its attribution kept) | Yes, with the attribution recorded beside the asset |
+| 3 | Licensed commercial assets | **Never in the repository.** A person may import their own into their project (the premium tier, plan section 0, decision 2) |
+| 4 | Reference only | No: link and describe. This includes the game files and custom content of The Sims 4 and other games, MetaHuman, Character Creator, 3D.sk, Anatomy for Sculptors, ArtStation, TexturingXYZ and Pinterest |
+| 5 | Original Axcenity work | Yes, released CC0 like the rest of the character library |
+
+A licence is recorded only after reading it on the source's own page; a per-asset licence on a community site (MakeHuman's asset packs, Sketchfab) is checked per asset, not by the site's default.
+
+## What ships today, by class
+
+Every character asset in `assets/characters/` on 2026-11-16.
+
+| Asset | Made from | Class | Where the licence is recorded |
+|---|---|---|---|
+| The realistic body family (`assets/characters/realistic/`) | Blender Studio's Human Base Meshes v1.4.1 (CC0 1.0), rebuilt by our scripts | 1 and 5 | [realistic/README.md](../../../../assets/characters/realistic/README.md), "Source and licence", with the bundle's SHA-256 |
+| The realistic body's composition shapes (`source/body_shapes.npz`) | MakeHuman's targets and base mesh (CC0 1.0) at a pinned commit, transferred by `assets/characters/transfer/` | 1 | [transfer/shapes/LICENCE-RECORD.md](../../../../assets/characters/transfer/shapes/LICENCE-RECORD.md), `transfer/makehuman.sha256` |
+| The stylized body family (`assets/characters/humanoid/`) | Human Base Meshes, stylized pair (CC0 1.0) | 1 and 5 | [humanoid/README.md](../../../../assets/characters/humanoid/README.md), "Licence" |
+| 15 items: the realistic underwear (3), the stylized clothes and hair (12) | Generated by the build scripts | 5 (released CC0-1.0) | Each item manifest's `source` |
+| Benchmark descriptions | Generated by `benchmarks/make.py` | 5 | — |
+
+The base manifests carry no `source` field of their own; the package READMEs hold it. A new asset gets a row here and a `source` in its manifest in the same change.
