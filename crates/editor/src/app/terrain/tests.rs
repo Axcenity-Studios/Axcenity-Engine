@@ -406,3 +406,59 @@ fn the_holes_brush_cuts_a_cave_mouth_that_saves_and_shift_fills_it() {
     assert!(!app.world.terrain(terrain).unwrap().has_holes());
     std::fs::remove_dir_all(folder).unwrap();
 }
+
+/// Runs one frame of the studio's keys with `key` pressed.
+fn press_studio_key(app: &mut EditorApp, key: egui::Key) {
+    let input = egui::RawInput {
+        events: vec![egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        }],
+        ..Default::default()
+    };
+    let _ = crate::theme::run(&egui::Context::default(), input, |ui| {
+        let ctx = ui.ctx().clone();
+        app.terrain_frame(&ctx);
+    });
+}
+
+#[test]
+fn a_tool_picked_by_key_ribbon_or_search_shows_its_studio_tab() {
+    use crate::terrain_studio::StudioTab;
+    let (mut app, folder) = app_with_project("tabs");
+    create(&mut app);
+    // A new terrain starts with Raise, on Sculpt.
+    assert_eq!(app.terrain.tool, Some(TerrainTool::Raise));
+    assert_eq!(app.terrain.tab(), StudioTab::Sculpt);
+    // Keys: 7 is Paint, 9 Generate; Escape keeps the tab.
+    press_studio_key(&mut app, egui::Key::Num7);
+    assert_eq!(app.terrain.tool, Some(TerrainTool::Paint));
+    assert_eq!(app.terrain.tab(), StudioTab::Materials);
+    press_studio_key(&mut app, egui::Key::Num9);
+    assert_eq!(app.terrain.tab(), StudioTab::Terrain);
+    press_studio_key(&mut app, egui::Key::Escape);
+    assert_eq!(app.terrain.tool, None);
+    assert_eq!(app.terrain.tab(), StudioTab::Terrain);
+    // The ribbon's Brush menu.
+    app.layout.toggle(Pane::Terrain);
+    assert!(!app.layout.is_open(Pane::Terrain));
+    app.pick_terrain_tool(TerrainTool::Foliage);
+    assert!(app.layout.is_open(Pane::Terrain));
+    assert_eq!(app.terrain.tab(), StudioTab::Materials);
+    // Universal search's Terrain Brush commands.
+    let ctx = crate::theme::test_context();
+    app.run_command(
+        &ctx,
+        super::super::command_palette::Command::TerrainTool(TerrainTool::Raise),
+    );
+    assert_eq!(app.terrain.tab(), StudioTab::Sculpt);
+    // Back on Materials, the last tool there is picked again.
+    app.terrain.switch_tab(StudioTab::Materials);
+    assert_eq!(app.terrain.tool, Some(TerrainTool::Foliage));
+    app.terrain.switch_tab(StudioTab::Terrain);
+    assert_eq!(app.terrain.tool, Some(TerrainTool::Generate));
+    std::fs::remove_dir_all(folder).unwrap();
+}

@@ -767,8 +767,7 @@ impl EditorApp {
                             theme::menu_item(ui.ctx(), tool.icon(), tool.label()),
                         );
                         if ui.add(item).on_hover_text(tool.hint()).clicked() {
-                            self.terrain.tool = Some(tool);
-                            self.layout.open(Pane::Terrain);
+                            self.pick_terrain_tool(tool);
                         }
                     }
                 });

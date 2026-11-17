@@ -557,7 +557,7 @@ impl TerrainStudio {
                     format!("Only the first {MAX_TERRAIN_LAYERS} layers are drawn."),
                 );
             }
-            ui.horizontal(|ui| {
+            responsive::toolbar(ui, |ui| {
                 crate::widgets::menu_button(ui, Some(icons::PLUS), "Add layer", |ui| {
                     for preset in presets::ALL {
                         if ui.button(preset.name).clicked() {
@@ -577,6 +577,20 @@ impl TerrainStudio {
                         }
                     }
                 });
+                if ui
+                    .add(widgets::button(
+                        Role::Ghost,
+                        Some(icons::ERASER),
+                        "Clear painted",
+                        &palette,
+                    ))
+                    .on_hover_text(
+                        "Takes away all painting, leaving the automatic rules. You can undo it.",
+                    )
+                    .clicked()
+                {
+                    actions.push(TerrainAction::ClearPaint);
+                }
             });
         });
     }
@@ -603,7 +617,7 @@ impl TerrainStudio {
         });
     }
 
-    /// Resolution, heightmaps and clearing paint, folded away.
+    /// Resolution and heightmaps, folded away.
     pub(super) fn data_section(
         &mut self,
         ui: &mut egui::Ui,
@@ -646,13 +660,6 @@ impl TerrainStudio {
                         actions.push(TerrainAction::ExportHeightmap);
                     }
                 });
-                if ui
-                    .button(theme::with_icon(icons::ERASER, "Clear painted materials"))
-                    .on_hover_text("Takes away all painting, leaving the automatic rules. You can undo it.")
-                    .clicked()
-                {
-                    actions.push(TerrainAction::ClearPaint);
-                }
             });
     }
 }

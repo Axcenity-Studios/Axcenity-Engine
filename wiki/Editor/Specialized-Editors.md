@@ -47,7 +47,7 @@ Lays one ScreenGui out on an artboard (`ui::layout_artboard`), with several sele
 
 ## Terrain Studio
 
-Tools in Sculpt, Materials and Terrain rows; generation and erosion run as `terrain::job`s on a worker with progress and cancel; foliage is painted from the Assets panel's props and models.
+Three tabs, Sculpt, Materials and Terrain, each with its tools and the sections that go with them; the tab shown follows the held tool however it was picked (`TerrainStudio::pick`); generation and erosion run as `terrain::job`s on a worker with progress and cancel; foliage is painted from the Assets panel's props and models.
 
 ## Shared pieces
 
