@@ -15,6 +15,35 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 | Refinement R0 (Paul's brief of 2026-11-16) | **Done** (2026-11-16) | Audits, reference index, baseline of `main`, plan section 11 (stages R1 to R11); see the log |
 | Refinement R1 to R11 | Not started | R1 (the studio shell and the contracts) next; CO7 and CO9 in parallel |
 
+## 2026-11-17: the refinement, R1 wave 1 merged (branch `refinement-r1-wave1`)
+
+- **Agents:** five specialists in their own Desktop worktrees, each followed by an adversarial reviewer and a fix agent (every review found something blocking; all fixed). Hand-backs in [refinement/r1/](refinement/r1/).
+  - `r1-contracts` (on the lead's behalf): plan 11.3 in `avatar`: parameter `about`, `feature`, `level`, `random`; features with bone anchors (`anchors.py` measures them on the model); item capabilities; worn item parameters, transform and `extra`; presets as data (`apply_preset`, 29 shipped presets: 14 body, 9 face, 6 character); `randomize` with scopes and locks ([ADR-0040](../../../wiki/Architecture/Architecture-Decisions/ADR-0040-Character-Metadata-Item-Capabilities-And-Presets-Are-Data-In-The-Manifests.md)). The review found that nothing tested Randomize keeping the constraints; the new test found an ordering bug.
+  - `r1-studio-shell` (RA1): the panels return `Intent`s that only `shell.rs` applies (architecture §15c); the navigation in the brief's order; Quick, Detailed and Advanced; the toolbar (New, Open, Save, a scoped Reset) and the bottom bar (views, including a named three-quarter view, lighting and backdrop); Skin and Makeup, Accessories and Expressions pages (expressions are preview-only); defects D-01 (Save no longer overwrites a same-named character), D-02 (closing with unsaved studio changes asks), D-04 (the name field), D-16 (Ctrl+Shift+Z redoes); the drag timing in [r1/drag-timing.md](refinement/r1/drag-timing.md).
+  - `r1-benchmarks` (RA6): the cast of nine per family and frame; `warm`, `cool` and `outdoor` lights, a `skin-close` view, held poses (T-pose, arms raised, elbows and knees bent) and face and body suites, all added beside the fixed views and lights; sheets in [baseline/engine/cast/](refinement/baseline/engine/cast/).
+  - `r3-body-fat` (RA3): fat reads as fat. Regional MakeHuman CC0 targets add a belly and profile depth on both frames, distributed by frame, and the slight masculine body's belly is gone; `measure.py --package realistic --check` passes with the sliders section. Sheets in [r3/](refinement/r3/).
+  - `co7-skin-values` (RA7): the renderer draws `melanin`, `redness`, `undertone` and `detail_strength` (a pigment curve per material, not a tint), and shadow terms reach normal-mapped surfaces only. Sheets in [co7/](refinement/co7/).
+- **The lead at merge:**
+  - Swapped the studio's stand-ins for the manifest's `level`, `feature` and `about`: the Body navigation now lists regions (shoulders, chest, waist, hips and so on), not groups.
+  - Moved the regional build and the main proportions from Advanced to **Detailed** (brief §3.3 puts regional adjustments at Level 2) and put Proportions before Build by region.
+  - Quick says where the other sliders are.
+  - Regenerated the manifest, presets, catalogue and benchmarks from the merged sources: the anchors moved a few millimetres because they were re-measured on the new body.
+  - **Kept the game's Walk state on the Run take**: the Walk take at the controller's default `WalkSpeed` (a jog, 5.6 m/s) plays 3.9 times as fast and looks hurried. The true walk becomes a preview in R9.
+  - **Restated R3's gate**: "5% of the picture" was impossible, since the figure is 6 to 7% of it; it is now 20% of the figure's own pixels, and the new fat changes about 30%.
+- **Seen in the sheets (lead):**
+  - Heavy bodies have a belly in profile and fuller hips and thighs; the athletic abdominal lines still show on every heavy belly (OPEN-07).
+  - Heavy-muscular is still a bodybuilder, and the feminine heavy-muscular has a sharp outer-thigh bulge.
+  - Skin tone spans pale to deep brown believably; the light end is a little lavender.
+  - The stippled shadow edge on the face is only a little better under TAA and unchanged under MSAA. It needs the grain halved and subsurface scattering (R5), and is not counted as fixed.
+- **Tests:** full suite on the merge: 5090 run, 5086 passed, 4 failed (studio tests written against the stand-ins), then fixed. After the fixes: `-p axcenity-editor -p axcenity-avatar character`: 73 passed; `-p axcenity-avatar`: 85 passed; `-p axcenity-player -p axcenity-project -p axcenity-gameplay -p axcenity-anim`: 645 passed. `cargo clippy --workspace --all-targets -- -D warnings` clean.
+- **Still open from wave 1** (in the hand-backs):
+  - the bake of item parameter shapes (now R2a's live weights);
+  - an existing workspace or project keeps an old copy of a shipped package (audit D2);
+  - anchors are measured on the masculine frame only;
+  - the blend frame's underwear tie;
+  - MSAA contact shadows;
+  - `pupil_size`, `limbal_ring`, `iris_depth` and `scatter_scale` are not drawn.
+
 ## 2026-11-17: Paul's answers to the refinement's questions
 
 - **Decisions 7 to 10** (plan section 0): both families selectable, realistic the default; proportion ranges widened to ends set by deformation quality and population data, with hips both ways; ADR-0038 superseded by [ADR-0041](../../../wiki/Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md) (a shared base mesh with live identity morphs; baking only as an optional optimization); hair and clothing held to [asset-quality.md](asset-quality.md) and treated as drafts until they pass it.

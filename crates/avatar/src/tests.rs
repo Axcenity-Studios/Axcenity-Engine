@@ -2,9 +2,12 @@
 //! find what is wrong, parameters resolve. The repository's own library is
 //! checked against its models in `tests/shipped_library.rs`.
 
+mod contracts;
 mod formats;
 mod migration;
 mod models;
+mod presets;
+mod randomizing;
 mod resolving;
 mod validation;
 

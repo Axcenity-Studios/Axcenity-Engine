@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Athletic male",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -0.4,
+    "muscle": 0.7
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/realistic-athletic-male",
+    "kind": "character",
+    "about": "Lean and muscular.",
+    "order": 30
+  }
+}

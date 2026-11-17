@@ -1251,7 +1251,9 @@ impl EditorApp {
                 | Discard::CloseProject
                 | Discard::NewProject
                 | Discard::OpenLevel(_)
-                | Discard::Update(_) => self.save().then_some(discard),
+                | Discard::Update(_) => (self.save_character_workspace()
+                    && (self.project.is_none() || self.save()))
+                .then_some(discard),
             },
             Answer::DontSave => {
                 if !matches!(discard, Discard::CloseTab(_)) {
@@ -1409,7 +1411,12 @@ impl EditorApp {
         let Some(discard) = &self.asking else {
             return;
         };
-        let project = self.project.as_ref().map_or("", |project| &project.name);
+        // With no project open, what's unsaved is Character Studio's.
+        let project = match (&self.project, &self.character_workspace) {
+            (Some(project), _) => project.name.as_str(),
+            (None, Some(workspace)) => workspace.description().name.as_str(),
+            (None, None) => "",
+        };
         let (name, doing) = match discard {
             Discard::Quit => (project, "closing"),
             Discard::OpenAnother | Discard::OpenSample(_) | Discard::NewProject => {

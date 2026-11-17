@@ -5,5 +5,13 @@
   "parameters": {
     "frame": 1,
     "temple_width": -1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
 }

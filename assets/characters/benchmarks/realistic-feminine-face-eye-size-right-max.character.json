@@ -5,5 +5,13 @@
   "parameters": {
     "eye_size_right": 1,
     "frame": 1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
 }

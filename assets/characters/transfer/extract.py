@@ -19,8 +19,8 @@ body's.
 joint centres (from the joint cubes in the base mesh), each gender's
 neutral (default ethnicity mix, young), and the 16 "universal" corner
 targets at the young age (gender x muscle x weight; the two average ones
-are empty) with how each moves the joints, plus a few regional targets,
-all as dense arrays in metres, Z up, facing -Y.
+are empty) with how each moves the joints, plus the regional targets of
+`EXTRA`, all as dense arrays in metres, Z up, facing -Y.
 """
 
 import argparse
@@ -36,8 +36,12 @@ import mh  # noqa: E402
 BODIES = {"masculine": "GEO-body_male_realistic", "feminine": "GEO-body_female_realistic"}
 SCULPT_LEVEL = 3
 
-# Regional targets carried along to show the method isn't limited to the
-# macro corners: {our name: (target, gender whose neutral it is shown on)}.
+# Regional targets: {our name: target, or a tuple of targets summed (a
+# control's left and right)}. The first six were carried in the spike to
+# show the method isn't limited to the macro corners (`sheets.py` draws
+# them); the rest are the fat the realistic body's `fat` slider adds (R3,
+# `../realistic/shapes.py`'s `SOFT` and `FLAT`; `transfer.py --pack-extras`
+# vendors them).
 EXTRA = {
     "pregnant": "stomach/stomach-pregnant-incr",
     "stomach_tone": "stomach/stomach-tone-incr",
@@ -45,6 +49,13 @@ EXTRA = {
     "pectoral": "torso/torso-muscle-pectoral-incr",
     "breast_maxcup": "breast/female-young-averagemuscle-averageweight-maxcup-averagefirmness",
     "breast_mincup": "breast/female-young-averagemuscle-averageweight-mincup-averagefirmness",
+    "pregnant_decr": "stomach/stomach-pregnant-decr",
+    "m_thyroid": "bodyshapes/bodyshapes-elvs-man-thyroid",
+    "m_adrenal": "bodyshapes/bodyshapes-elvs-man-adrenal",
+    "f_ovary": "bodyshapes/bodyshapes-elvs-fem-ovary",
+    "f_liver": "bodyshapes/bodyshapes-elvs-fem-liver",
+    "neck_double": "neck/neck-double-incr",
+    "upperarm_fat": ("armslegs/l-upperarm-fat-incr", "armslegs/r-upperarm-fat-incr"),
 }
 
 
@@ -113,7 +124,9 @@ def makehuman(root, out):
                 data[f"jcorner_{gender}_{muscle}_{weight}"] = np.array(
                     [t[c].mean(axis=0) for c in cubes], dtype=np.float32)
     for name, target in EXTRA.items():
-        data[f"extra_{name}"] = mh.load_target(root, target)[:n].astype(np.float32)
+        # A tuple is MakeHuman's left and right targets of one control, summed.
+        targets = target if isinstance(target, tuple) else (target,)
+        data[f"extra_{name}"] = sum(mh.load_target(root, t) for t in targets)[:n].astype(np.float32)
     np.savez_compressed(out, **data)
     print(f"makehuman: {n} body vertices, {len(base['faces'])} quads, {len(names)} joints, "
           f"{sum(k.startswith('corner_') for k in data)} corner targets, {len(EXTRA)} extras")

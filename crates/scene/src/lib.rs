@@ -30,6 +30,8 @@ mod graphics_volumes;
 mod lens;
 mod light_probes;
 mod material;
+#[cfg(test)]
+mod material_values_tests;
 mod mesh_cache;
 mod orientation;
 mod outlines;
@@ -39,6 +41,7 @@ mod preload;
 #[cfg(test)]
 mod reload_tests;
 mod retained;
+mod skin_tone;
 mod streaming;
 mod surfaces;
 mod terrain;

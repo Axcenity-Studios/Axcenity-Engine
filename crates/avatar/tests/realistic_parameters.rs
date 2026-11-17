@@ -100,7 +100,9 @@ fn the_realistic_base_has_its_body_parameters() {
         for kind in ["fat", "muscle"] {
             let id = format!("{kind}_{region}");
             let parameter = base.parameter(&id).unwrap_or_else(|| panic!("{id}"));
-            assert!(parameter.advanced, "{id}");
+            // Regional body adjustments are the detailed level (brief §3.3).
+            assert!(!parameter.advanced, "{id}");
+            assert_eq!(parameter.level(), axcenity_avatar::Level::Detailed, "{id}");
         }
     }
     let proportions = base
@@ -279,7 +281,9 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // `Corrective_Shoulder_Lowered_*`. Seven more on 2026-11-16: the
     // brows' length, four shapes the body carries empty for the `Brows`
     // card, and a mask shape under each of the three underwear items.)
-    assert_eq!(model.morph_targets.len(), 155);
+    // Three more in R3: `Masculine_Fat_Soft`, `Feminine_Fat_Soft` (fat that
+    // is fat) and `Masculine_Belly_Flat` (the slight body's belly).
+    assert_eq!(model.morph_targets.len(), 158);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always

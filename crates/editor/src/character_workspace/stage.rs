@@ -25,21 +25,24 @@ impl Default for Orbit {
     }
 }
 
-/// The view buttons.
+/// The view buttons (brief §3.1: front, side, rear and three-quarter,
+/// full body and face).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ViewPreset {
     FullBody,
     Face,
     Front,
+    ThreeQuarter,
     Side,
     Back,
 }
 
 impl ViewPreset {
-    pub const ALL: [ViewPreset; 5] = [
+    pub const ALL: [ViewPreset; 6] = [
         ViewPreset::FullBody,
         ViewPreset::Face,
         ViewPreset::Front,
+        ViewPreset::ThreeQuarter,
         ViewPreset::Side,
         ViewPreset::Back,
     ];
@@ -49,6 +52,7 @@ impl ViewPreset {
             ViewPreset::FullBody => "Full body",
             ViewPreset::Face => "Face",
             ViewPreset::Front => "Front",
+            ViewPreset::ThreeQuarter => "Three-quarter",
             ViewPreset::Side => "Side",
             ViewPreset::Back => "Back",
         }
@@ -74,6 +78,7 @@ impl ViewPreset {
                 target: Vec3::new(0.0, HEIGHT * 0.905, -0.05),
             },
             ViewPreset::Front => full(0.0),
+            ViewPreset::ThreeQuarter => full(45.0),
             ViewPreset::Side => full(90.0),
             ViewPreset::Back => full(180.0),
         }

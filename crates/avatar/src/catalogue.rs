@@ -1,6 +1,6 @@
 //! The catalogue (`catalogue.json` at a library's root): every base model
 //! and item in the library with what a browser shows without opening each
-//! manifest (label, kind, slot, tags, thumbnail). It is an index made from
+//! manifest (label, kind, slot, tags, thumbnail), and every preset. It is an index made from
 //! the manifests (`assets/characters/catalogue.py` for the repository's
 //! library); [`Catalogue::of`] makes the same one, so a check can tell a
 //! stale catalogue.
@@ -8,7 +8,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::item::{ContentTier, ItemKind};
-use crate::{BaseManifest, FormatError, ItemManifest, Library, pretty, read_versioned};
+use crate::{
+    BaseManifest, Description, FormatError, ItemManifest, Library, PresetKind, pretty,
+    read_versioned,
+};
 
 /// The catalogue's format version.
 pub const CATALOGUE_VERSION: u32 = 1;
@@ -22,6 +25,46 @@ pub struct Catalogue {
     /// By ID.
     #[serde(default)]
     pub items: Vec<CatalogueItem>,
+    /// Presets (`*.preset.json`), by ID. Left out when there are none,
+    /// so a catalogue without presets reads and writes as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub presets: Vec<CataloguePreset>,
+}
+
+/// A preset: its ID, file (relative to the library), label (the preset's
+/// `name`), kind, base model, tags and thumbnail (relative to the
+/// library).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CataloguePreset {
+    pub id: String,
+    pub file: String,
+    pub label: String,
+    pub kind: PresetKind,
+    pub base: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail: Option<String>,
+}
+
+impl CataloguePreset {
+    /// The entry of `preset`, whose file is at `path`; `None` when it has
+    /// no `preset` block.
+    pub fn of(path: &str, preset: &Description) -> Option<Self> {
+        let block = preset.preset()?;
+        Some(Self {
+            id: block.id,
+            file: path.to_owned(),
+            label: preset.name.clone(),
+            kind: block.kind,
+            base: preset.base.clone(),
+            tags: block.tags,
+            thumbnail: block
+                .thumbnail
+                .as_deref()
+                .and_then(|thumbnail| crate::resolve_path(path, thumbnail)),
+        })
+    }
 }
 
 /// A base model: its ID, manifest (relative to the library), label and
@@ -105,6 +148,13 @@ impl Catalogue {
                 .items
                 .values()
                 .map(|item| CatalogueItem::of(&path(&item.id), item))
+                .collect(),
+            presets: library
+                .presets
+                .iter()
+                .filter_map(|(id, preset)| {
+                    CataloguePreset::of(library.preset_path(id).unwrap_or_default(), preset)
+                })
                 .collect(),
         }
     }

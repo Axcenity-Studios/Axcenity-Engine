@@ -3,7 +3,7 @@ the correspondence onto the realistic topology and writes
 `WORK/shapes.npz` (and, with `--pack`, the compact file the spike proposes
 to vendor).
 
-    python -I transfer.py --work WORK [--method full] [--pack FILE [--pack-extras]]
+    python -I transfer.py --work WORK [--method full] [--pack FILE [--pack-extras [frame/name,...]]]
 
 (`python` has the `bpy` module; run `register.py` first.)
 
@@ -273,16 +273,20 @@ def run(work, method="full", log=print):
 
 
 def pack(shapes, path, extras=False):
-    """The compact form proposed for vendoring: the 16 corner shapes
-    (and the regional ones with `extras`) on the bundle's pose as 16-bit
-    steps of 0.02 mm, only the vertices a shape moves by more than
-    0.05 mm, compressed."""
+    """The compact form vendored as `realistic/source/body_shapes.npz`:
+    the 16 corner shapes and the regional ones `extras` names, on the
+    bundle's pose as 16-bit steps of 0.02 mm, only the vertices a shape
+    moves by more than 0.05 mm, compressed. `extras` is True (every
+    regional shape) or a list of `frame/name` (`masculine/m_thyroid`)."""
     step = 2e-5
     data = {"step": np.float64(step)}
     for key, d in shapes.items():
-        if not key.startswith("bundle/") or ("muscle" not in key and not extras):
+        if not key.startswith("bundle/"):
             continue
         name = key[len("bundle/"):].replace("/", "_")
+        wanted = extras is True or (extras and key[len("bundle/"):] in extras)
+        if "muscle" not in key and not wanted:
+            continue
         moved = np.flatnonzero(np.linalg.norm(d, axis=1) > 5e-5)
         q = np.round(d[moved] / step)
         assert np.abs(q).max() < 32767
@@ -312,14 +316,18 @@ def main():
     ap.add_argument("--work", required=True)
     ap.add_argument("--method", default="full", choices=METHODS)
     ap.add_argument("--pack")
-    ap.add_argument("--pack-extras", action="store_true")
+    # Bare: every regional shape. With a value: the ones it lists, as
+    # `frame/name` separated by commas (what the realistic build reads:
+    # `realistic/shapes.py`'s `SOFT` and `FLAT`).
+    ap.add_argument("--pack-extras", nargs="?", const="all")
     a = ap.parse_args()
     shapes, _ = run(a.work, a.method)
     name = "shapes.npz" if a.method == "full" else f"shapes_{a.method}.npz"
     np.savez_compressed(os.path.join(a.work, name), **shapes)
     print(f"{sum(k.startswith('posed/') for k in shapes)} shapes -> {name}")
     if a.pack:
-        size = pack(shapes, a.pack, a.pack_extras)
+        extras = a.pack_extras == "all" or (a.pack_extras.split(",") if a.pack_extras else False)
+        size = pack(shapes, a.pack, extras)
         back = unpack(a.pack)
         worst = max(float(np.abs(back[k[len("bundle/"):].replace("/", "_")] - shapes[k]).max())
                     for k in shapes if k[len("bundle/"):].replace("/", "_") in back and k.startswith("bundle/"))

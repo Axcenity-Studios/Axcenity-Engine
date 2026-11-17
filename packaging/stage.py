@@ -55,8 +55,10 @@ def copy_file(src: Path, dst: Path, executable: bool = False) -> None:
 def character_library_files(root: Path = CHARACTERS) -> list[str]:
     """The files of the character library in `root` an editor needs, relative
     to `root`: `catalogue.json`, every manifest it lists and every file a
-    manifest names (a base model's or item's model, a groom's cards and
-    strands, a thumbnail). Build scripts, sources and QA files stay behind."""
+    manifest names (a base model's or item's model, a groom's cards, strands
+    and mesh, thumbnails, variants' pictures), and every preset it lists
+    (`*.preset.json`) with its picture. Build scripts, sources and QA files
+    stay behind."""
     catalogue = json.loads((root / "catalogue.json").read_text(encoding="utf-8"))
     files = {"catalogue.json"}
 
@@ -73,8 +75,15 @@ def character_library_files(root: Path = CHARACTERS) -> list[str]:
         named(manifest_path, model.get("file"))
         groom = manifest.get("groom") or {}
         named(manifest_path, (groom.get("cards") or {}).get("file"))
+        named(manifest_path, (groom.get("mesh") or {}).get("file"))
         named(manifest_path, groom.get("strands"))
         named(manifest_path, manifest.get("thumbnail"))
+        for variant in manifest.get("variants", []):
+            named(manifest_path, variant.get("thumbnail"))
+    for entry in catalogue.get("presets", []):
+        files.add(entry["file"])
+        preset = json.loads((root / entry["file"]).read_text(encoding="utf-8"))
+        named(entry["file"], (preset.get("preset") or {}).get("thumbnail"))
     return sorted(files)
 
 

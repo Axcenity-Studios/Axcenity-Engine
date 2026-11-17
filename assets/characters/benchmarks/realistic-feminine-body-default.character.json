@@ -4,5 +4,13 @@
   "base": "axcenity/realistic",
   "parameters": {
     "frame": 1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-briefs"
+    },
+    {
+      "id": "axcenity/realistic-sports-bra"
+    }
+  ]
 }

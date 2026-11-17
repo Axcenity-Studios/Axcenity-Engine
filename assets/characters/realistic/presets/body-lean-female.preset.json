@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Lean",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -0.6,
+    "height": 0.97,
+    "muscle": 0.3
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-lean-female",
+    "kind": "body",
+    "about": "Low fat with the muscle tone showing: a runner.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 60
+  }
+}

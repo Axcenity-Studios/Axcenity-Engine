@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Athletic",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": -0.1,
+    "height": 0.97,
+    "muscle": 0.6
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-athletic-female",
+    "kind": "body",
+    "about": "Trained but not bulky.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 30
+  }
+}

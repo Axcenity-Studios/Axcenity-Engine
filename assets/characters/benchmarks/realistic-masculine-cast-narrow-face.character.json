@@ -1,0 +1,30 @@
+{
+  "format_version": 2,
+  "name": "realistic-masculine-cast-narrow-face",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "cheek_fullness_left": -0.3,
+    "cheek_fullness_right": -0.3,
+    "cheekbone_left": -0.4,
+    "cheekbone_right": -0.4,
+    "chin_length": 0.1,
+    "chin_width": -0.3,
+    "eye_spacing_left": -0.3,
+    "eye_spacing_right": -0.3,
+    "forehead_height": 0.1,
+    "frame": 0,
+    "jaw_width_left": -0.5,
+    "jaw_width_right": -0.5,
+    "mouth_width_left": -0.2,
+    "mouth_width_right": -0.2,
+    "nose_length": 0.1,
+    "nostril_width_left": -0.2,
+    "nostril_width_right": -0.2,
+    "temple_width": -0.6
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
+}

@@ -23,21 +23,41 @@
 //! start page's Recent list (`recent.rs`), character packs (`packs.rs`)
 //! and the cached pictures of characters and presets (`thumbnails.rs`).
 //!
-//! `ui.rs` draws it; `stage.rs` is the viewport (camera, lighting,
-//! backdrop and drawing); `shelf.rs` lists the saved characters for the
-//! start page and deletes them.
+//! The studio is split by area (audit-studio-ui.md section 3), each
+//! drawing from `&CharacterWorkspace` and returning [`Intent`]s that only
+//! the shell applies: `shell.rs` (the frame, shortcuts, notices, applying
+//! intents), `nav.rs` (categories and features down the left),
+//! `panel.rs` (the contextual panel on the right), `toolbar.rs` and
+//! `bottom_bar.rs` (camera, lighting and backdrop under the viewport).
+//! `intent.rs`, `selection.rs` and `edit.rs` are the contracts they share
+//! (what a panel can ask, what is shown, undo and reset). `stage.rs` is the
+//! camera, lighting, backdrop and floor; `shelf.rs` lists the saved
+//! characters for the start page and deletes them.
 
+mod bottom_bar;
+pub mod edit;
+pub mod intent;
+mod nav;
 pub mod packs;
+mod panel;
 pub mod recent;
+pub mod selection;
 pub mod shelf;
+mod shell;
 mod stage;
 pub mod thumbnails;
-mod ui;
+mod toolbar;
 
 #[cfg(test)]
 mod shelf_tests;
 #[cfg(test)]
+mod shell_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod timing_tests;
+#[cfg(test)]
+mod walkthrough_tests;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -47,14 +67,19 @@ use axcenity_anim::Animators;
 use axcenity_assets::Assets;
 pub use axcenity_avatar::chosen_slots;
 use axcenity_avatar::{
-    BaseManifest, Description, Library, Parameter, WornItem, wear_choice, wear_choices,
+    BaseManifest, Description, Library, MaterialValue, Parameter, WornItem, wear_choice,
+    wear_choices,
 };
-use axcenity_core::{InstanceId, Vector3, World};
+use axcenity_core::{ClassName, InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
 use axcenity_gameplay::description as applier;
+use axcenity_render::glam::Vec3;
 
-pub use stage::{Backdrop, Lighting, Orbit};
-pub use ui::WorkspaceAction;
+use edit::{History, Scope};
+pub use intent::{Gesture, Intent};
+use selection::Selection;
+pub use shell::WorkspaceAction;
+pub use stage::{Backdrop, Lighting, Orbit, ViewPreset};
 
 /// The command-line flag that opens the editor straight into the workspace.
 pub const FLAG: &str = "--character-studio";
@@ -221,26 +246,32 @@ pub fn symmetric_label(label: &str) -> String {
         .replace(" right", "")
 }
 
-/// The categories down the left of the workspace.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// The categories down the left of the workspace, in the brief's order
+/// (§3.1). The view (camera, lighting, backdrop) is in the bottom bar, not
+/// a category: it is about looking, not about the character.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Category {
     #[default]
-    Presets,
     Body,
     Face,
     Hair,
     Clothing,
-    Stage,
+    SkinAndMakeup,
+    Accessories,
+    Expressions,
+    Presets,
 }
 
 impl Category {
-    pub const ALL: [Category; 6] = [
-        Category::Presets,
+    pub const ALL: [Category; 8] = [
         Category::Body,
         Category::Face,
         Category::Hair,
         Category::Clothing,
-        Category::Stage,
+        Category::SkinAndMakeup,
+        Category::Accessories,
+        Category::Expressions,
+        Category::Presets,
     ];
 
     /// The manifest's category this one shows, if it shows one.
@@ -251,9 +282,26 @@ impl Category {
             Category::Face => Some(Data::Face),
             Category::Hair => Some(Data::Hair),
             Category::Clothing => Some(Data::Clothing),
-            Category::Presets | Category::Stage => None,
+            Category::SkinAndMakeup => Some(Data::Skin),
+            Category::Accessories => Some(Data::Accessories),
+            Category::Expressions | Category::Presets => None,
         }
     }
+
+    /// Whether its page looks at the face (the camera frames it).
+    fn frames_the_face(self) -> bool {
+        matches!(self, Category::Face | Category::Expressions)
+    }
+}
+
+/// Why a save went where it did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Saved {
+    /// Written to the character's own file.
+    Written(PathBuf),
+    /// Another character had the name: saved under a free one (audit
+    /// D-01), which the character now has.
+    Renamed { path: PathBuf, from: String },
 }
 
 /// The workspace: the character being edited, its preview and its undo.
@@ -266,26 +314,35 @@ pub struct CharacterWorkspace {
     description: Description,
     /// The description as last saved or opened (`None`: never saved).
     saved: Option<Description>,
-    history: Vec<Description>,
-    future: Vec<Description>,
-    /// A slider being dragged: its edit is one undo step.
-    dragging: bool,
+    /// The file it was opened from or last saved to: a save after a rename
+    /// moves it instead of leaving a copy (audit D-03).
+    file: Option<PathBuf>,
+    history: History,
     /// What the preview shows, and when it was applied.
     applied: Option<(Description, Instant)>,
     /// Sliders with a mirror move it too.
     pub symmetry: bool,
-    /// Show the manifest's advanced parameters.
-    pub advanced: bool,
-    pub category: Category,
+    /// The category, feature and detail level shown (editor state).
+    pub selection: Selection,
     pub orbit: Orbit,
+    /// The view preset the camera is at, until it's moved.
+    pub view: Option<ViewPreset>,
     pub lighting: Lighting,
     pub backdrop: Backdrop,
+    /// The built-in expression shown on the preview's face: preview only,
+    /// never in the description (brief §10).
+    pub expression: Option<String>,
     canvas: Canvas,
     last_frame: Option<Instant>,
     /// A line for the status bar: what was saved, what failed.
     pub notice: Option<String>,
+    /// The notice shown and since when: it clears itself (audit D-13).
+    notice_shown: Option<(String, Instant)>,
     /// Home was asked for with unsaved changes: the editor asks to save.
     pub leaving: bool,
+    /// New or Open was asked for with unsaved changes: the shell asks to
+    /// save first, then does it.
+    pub asking: Option<Intent>,
     /// The files saved since the editor last looked (it draws their
     /// pictures again).
     pub saved_files: Vec<PathBuf>,
@@ -294,6 +351,12 @@ pub struct CharacterWorkspace {
 /// Held while a workspace writes the library into its folder: the start
 /// page's pictures open a workspace of their own on another thread.
 static WRITING_LIBRARY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// The name of the FaceControls the preview adds to show an expression.
+const PREVIEW_FACE: &str = "Studio Expression Preview";
+
+/// How long a notice stays in the status line.
+const NOTICE_FOR: Duration = Duration::from_secs(8);
 
 impl CharacterWorkspace {
     /// Opens the workspace on `description`, its files in `folder` (written
@@ -328,22 +391,7 @@ impl CharacterWorkspace {
         drop(writing);
         let assets = Assets::new(folder);
         let library = applier::library(&assets);
-        let mut description = description;
-        if library.base(&description.base).is_none() {
-            let base = if library.base(DEFAULT_BASE).is_some() {
-                DEFAULT_BASE
-            } else {
-                axcenity_avatar::V1_BASE
-            };
-            notice = Some(format!(
-                "\"{}\" is on a body this library hasn't ({}); showing the default character.",
-                description.name, description.base
-            ));
-            let name = description.name.clone();
-            description = applier::default_description(&library, base);
-            description.name = name;
-        }
-        let description = tidy(description, &library);
+        let (description, fell_back) = adopt(description, &library);
         let mut workspace = Self {
             folder: folder.to_owned(),
             assets,
@@ -352,20 +400,22 @@ impl CharacterWorkspace {
             animators: Animators::new(),
             saved: saved.then(|| description.clone()),
             description,
-            history: Vec::new(),
-            future: Vec::new(),
-            dragging: false,
+            file: None,
+            history: History::default(),
             applied: None,
             symmetry: true,
-            advanced: false,
-            category: Category::default(),
+            selection: Selection::default(),
             orbit: Orbit::default(),
+            view: Some(ViewPreset::FullBody),
             lighting: Lighting::default(),
             backdrop: Backdrop::default(),
+            expression: None,
             canvas: Canvas::default(),
             last_frame: None,
-            notice,
+            notice: fell_back.or(notice),
+            notice_shown: None,
             leaving: false,
+            asking: None,
             saved_files: Vec::new(),
         };
         workspace.build_world();
@@ -374,10 +424,9 @@ impl CharacterWorkspace {
 
     /// Opens a saved character file (any format up to this version's).
     pub fn open_file(folder: &Path, file: &Path) -> Result<Self, String> {
-        let text = std::fs::read_to_string(file)
-            .map_err(|err| format!("Could not read {}: {err}", file.display()))?;
-        let description = Description::from_json(&text).map_err(|err| err.to_string())?;
-        let workspace = Self::open(folder, description, true)?;
+        let description = read_character(file)?;
+        let mut workspace = Self::open(folder, description, true)?;
+        workspace.file = Some(file.to_owned());
         recent::remember(folder, file);
         Ok(workspace)
     }
@@ -402,6 +451,46 @@ impl CharacterWorkspace {
         Ok(workspace)
     }
 
+    /// Starts a new character from preset `index` in place of this one:
+    /// not saved, with an undo of its own.
+    pub fn new_character(&mut self, index: usize) {
+        let library = self.library();
+        let preset = presets().into_iter().nth(index).unwrap_or(presets()[0]);
+        let description = if library.base(preset.base).is_some() {
+            preset.description("New Character", &library)
+        } else {
+            applier::default_description(&library, &self.description.base)
+        };
+        self.start_over(tidy(description, &library), None);
+    }
+
+    /// Opens the character saved in `file` in place of this one.
+    pub fn open_character(&mut self, file: &Path) -> Result<(), String> {
+        let description = read_character(file)?;
+        let (description, fell_back) = adopt(description, &self.library());
+        self.start_over(description, Some(file.to_owned()));
+        if fell_back.is_some() {
+            self.notice = fell_back;
+        }
+        recent::remember(&self.folder, file);
+        Ok(())
+    }
+
+    /// Edits `description` from scratch: a fresh undo, saved when `file`
+    /// holds it.
+    fn start_over(&mut self, description: Description, file: Option<PathBuf>) {
+        self.saved = file.is_some().then(|| description.clone());
+        self.description = description;
+        self.file = file;
+        self.history = History::default();
+        self.expression = None;
+        self.leaving = false;
+        self.asking = None;
+        self.animators.clear();
+        self.applied = None;
+        self.refresh(true);
+    }
+
     pub fn description(&self) -> &Description {
         &self.description
     }
@@ -410,11 +499,17 @@ impl CharacterWorkspace {
         &self.folder
     }
 
+    /// The file the character was opened from or last saved to.
+    pub fn file(&self) -> Option<&Path> {
+        self.file.as_deref()
+    }
+
     /// The character library in the workspace's folder.
     pub fn library(&self) -> Arc<Library> {
         applier::library(&self.assets)
     }
 
+    #[cfg(test)]
     /// The base model the character is on.
     pub fn base(&self) -> Option<BaseManifest> {
         self.library().base(&self.description.base).cloned()
@@ -426,87 +521,145 @@ impl CharacterWorkspace {
         self.saved.as_ref() != Some(&self.description)
     }
 
-    /// Changes the description as one undo step and shows it.
+    /// Changes the description as one undo step and shows it. A drag that
+    /// was open is closed first.
     pub fn edit(&mut self, change: impl FnOnce(&mut Description)) {
+        self.history.commit(&self.description);
         let before = self.description.clone();
         let mut changed = before.clone();
         change(&mut changed);
-        self.description = tidy(changed, &self.library());
-        if self.description != before {
-            self.history.push(before);
-            self.future.clear();
+        let library = self.library();
+        self.description = tidy(changed, &library);
+        if edit::same_character(&before, &self.description, library.base(&before.base)) {
+            // A change of nothing makes no step and keeps redo (audit D-05).
+            self.description = before;
+        } else if self.history.record(before, &self.description) {
             self.refresh(true);
         }
     }
 
-    /// A slider's change: the whole drag is one undo step (`done` ends it).
-    pub fn drag(&mut self, change: impl FnOnce(&mut Description), done: bool) {
-        if !self.dragging {
-            self.history.push(self.description.clone());
-            self.future.clear();
-            self.dragging = true;
-        }
+    /// A change that is part of a gesture: a drag's changes are one undo
+    /// step, closed by its [`Gesture::Commit`]; nothing changed, no step.
+    pub fn transact(&mut self, change: impl FnOnce(&mut Description), gesture: Gesture) {
+        self.history.begin(&self.description);
         let mut changed = self.description.clone();
         change(&mut changed);
-        self.description = tidy(changed, &self.library());
+        let library = self.library();
+        self.description = tidy(changed, &library);
+        let done = gesture == Gesture::Commit;
         if done {
-            self.dragging = false;
-            if self.history.last() == Some(&self.description) {
-                self.history.pop();
+            // A drag that ends where it started changes nothing (D-05).
+            if let Some(start) = self.history.start()
+                && edit::same_character(start, &self.description, library.base(&start.base))
+            {
+                self.description = start.clone();
             }
+            self.history.commit(&self.description);
         }
         self.refresh(done);
     }
 
+    /// Whether a drag is going on (its undo step is open).
+    pub fn dragging(&self) -> bool {
+        self.history.is_open()
+    }
+
+    /// Ends a drag going back to where it started.
+    pub fn cancel_edit(&mut self) {
+        if let Some(start) = self.history.cancel() {
+            self.description = start;
+            self.refresh(true);
+        }
+    }
+
+    #[cfg(test)]
     /// The value of parameter `id` (its default when the description leaves
     /// it out).
     pub fn parameter(&self, id: &str) -> f32 {
-        let default = self
-            .base()
-            .and_then(|base| base.parameter(id).map(|parameter| parameter.default))
-            .unwrap_or_default();
-        self.description
-            .parameters
-            .get(id)
-            .copied()
-            .unwrap_or(default)
+        let library = self.library();
+        let base = library.base(&self.description.base);
+        value_of(&self.description, base, id)
     }
 
+    #[cfg(test)]
     /// Sets parameter `parameter` (and, with symmetry on, its mirror) while
     /// a slider is dragged; `done` ends the drag.
     pub fn set_parameter(&mut self, parameter: &Parameter, value: f32, done: bool) {
-        let mirror = parameter.mirror.clone().filter(|_| self.symmetry);
-        let id = parameter.id.clone();
-        self.drag(
+        let gesture = if done { Gesture::Commit } else { Gesture::Drag };
+        self.set_value(&parameter.id, value, self.symmetry, gesture);
+    }
+
+    /// Sets parameter `id` (and its mirror when `mirrored`).
+    pub fn set_value(&mut self, id: &str, value: f32, mirrored: bool, gesture: Gesture) {
+        let mirror = mirrored
+            .then(|| {
+                self.library()
+                    .base(&self.description.base)?
+                    .parameter(id)?
+                    .mirror
+                    .clone()
+            })
+            .flatten();
+        let id = id.to_owned();
+        self.transact(
             |description| {
                 description.parameters.insert(id, value);
                 if let Some(mirror) = mirror {
                     description.parameters.insert(mirror, value);
                 }
             },
-            done,
+            gesture,
         );
     }
 
-    /// The items the library has for `slot` on this character's base model.
-    pub fn items_for(&self, slot: &str) -> Vec<(String, String)> {
-        let library = self.library();
-        library
-            .items
-            .values()
-            .filter(|item| item.slot == slot && item.bases.contains(&self.description.base))
-            .map(|item| (item.id.clone(), item.label.clone()))
-            .collect()
+    /// Sets value `name` of material slot `slot` (`None`: back to the
+    /// material as made).
+    pub fn set_material(
+        &mut self,
+        slot: &str,
+        name: &str,
+        to: Option<MaterialValue>,
+        gesture: Gesture,
+    ) {
+        let (slot, name) = (slot.to_owned(), name.to_owned());
+        self.transact(
+            |description| {
+                let values = description.materials.entry(slot.clone()).or_default();
+                match to {
+                    Some(value) => {
+                        values.insert(name, value);
+                    }
+                    None => {
+                        values.remove(&name);
+                    }
+                }
+                if values.is_empty() {
+                    description.materials.remove(&slot);
+                }
+            },
+            gesture,
+        );
     }
 
+    /// Value `name` of material slot `slot`, if the description sets it.
+    pub fn material_value(&self, slot: &str, name: &str) -> Option<MaterialValue> {
+        self.description
+            .materials
+            .get(slot)
+            .and_then(|values| values.get(name))
+            .copied()
+    }
+
+    #[cfg(test)]
+    /// The items the library has for `slot` on this character's base model.
+    pub fn items_for(&self, slot: &str) -> Vec<(String, String)> {
+        items_for(&self.library(), &self.description.base, slot)
+    }
+
+    #[cfg(test)]
     /// The item worn in `slot`, if any.
     pub fn worn_in(&self, slot: &str) -> Option<String> {
-        let library = self.library();
-        self.description
-            .items
-            .iter()
-            .find(|worn| library.item(&worn.id).is_some_and(|item| item.slot == slot))
-            .map(|worn| worn.id.clone())
+        worn_in(&self.library(), &self.description, slot)
     }
 
     /// Wears `item` in `slot` (taking off what was there), or nothing.
@@ -530,6 +683,13 @@ impl CharacterWorkspace {
         let library = self.library();
         let parameter = parameter.clone();
         self.edit(|description| choose(description, &library, &parameter, value));
+    }
+
+    /// Renames the character, as one undo step (an empty name is "New
+    /// Character").
+    pub fn rename(&mut self, name: &str) {
+        let name = name.trim().to_owned();
+        self.edit(|description| description.name = name);
     }
 
     /// Moves the character onto base model `base`: that body's default
@@ -561,51 +721,53 @@ impl CharacterWorkspace {
         self.edit(|description| *description = preset.description(&name, &library));
     }
 
-    /// Whether the character is `preset` (whatever its name).
-    pub fn is_preset(&self, preset: &Preset) -> bool {
-        preset.matches(&self.description, &self.library())
-    }
-
     pub fn can_undo(&self) -> bool {
-        !self.history.is_empty()
+        self.history.can_undo()
     }
 
     pub fn can_redo(&self) -> bool {
-        !self.future.is_empty()
+        self.history.can_redo()
     }
 
     pub fn undo(&mut self) {
-        if let Some(before) = self.history.pop() {
-            self.future
-                .push(std::mem::replace(&mut self.description, before));
-            self.dragging = false;
+        if let Some(before) = self.history.undo(self.description.clone()) {
+            self.description = before;
             self.refresh(true);
         }
     }
 
     pub fn redo(&mut self) {
-        if let Some(after) = self.future.pop() {
-            self.history
-                .push(std::mem::replace(&mut self.description, after));
+        if let Some(after) = self.history.redo(self.description.clone()) {
+            self.description = after;
             self.refresh(true);
         }
     }
 
+    #[cfg(test)]
     /// Back to the default character of the current body (keeping the
     /// name), as an undo step.
     pub fn reset(&mut self) {
+        self.reset_scope(&Scope::All);
+    }
+
+    /// Puts `scope` back to the body's defaults, as an undo step.
+    pub fn reset_scope(&mut self, scope: &Scope) {
         let library = self.library();
-        let name = self.description.name.clone();
-        let base = self.description.base.clone();
-        self.edit(|description| {
-            *description = applier::default_description(&library, &base);
-            description.name = name;
-        });
+        let Some(base) = library.base(&self.description.base) else {
+            return;
+        };
+        let defaults = applier::default_description(&library, &self.description.base);
+        let reset = edit::reset(&self.description, &defaults, base, &library, scope);
+        self.edit(|description| *description = reset);
     }
 
     /// The saved file's path for the character's name.
     pub fn file_path(&self) -> Option<PathBuf> {
-        let name = crate::character_studio::file_name(&self.description.name)?;
+        self.file_for(&self.description.name)
+    }
+
+    fn file_for(&self, name: &str) -> Option<PathBuf> {
+        let name = crate::character_studio::file_name(name)?;
         Some(
             self.folder
                 .join(CHARACTERS_FOLDER)
@@ -613,18 +775,74 @@ impl CharacterWorkspace {
         )
     }
 
+    /// Whether `path` is this character's own file.
+    fn is_own_file(&self, path: &Path) -> bool {
+        self.file.as_deref().is_some_and(|own| same_file(own, path))
+    }
+
     /// Saves the description as `characters/<name>.character.json`
-    /// (format 2).
+    /// (format 2). Another character's file is never written over: the
+    /// character is saved under the first free "<name> 2", "<name> 3"…
+    /// (audit D-01). After a rename the old file is moved, not kept beside
+    /// the new one (D-03): its Recent entry, pictures and pack places go
+    /// with it.
     pub fn save(&mut self) -> Result<PathBuf, String> {
-        let path = self
+        self.save_reporting().map(|saved| match saved {
+            Saved::Written(path) | Saved::Renamed { path, .. } => path,
+        })
+    }
+
+    /// [`save`](Self::save), saying whether the name had to change.
+    pub fn save_reporting(&mut self) -> Result<Saved, String> {
+        let wanted = self
             .file_path()
             .ok_or_else(|| "Give the character a name to save it.".to_owned())?;
+        let taken = |path: &Path| path.exists() && !self.is_own_file(path);
+        let mut renamed_from = None;
+        let path = if taken(&wanted) {
+            let name = packs::free_name(&self.description.name, |name| {
+                self.file_for(name).is_none_or(|path| taken(&path))
+            });
+            renamed_from = Some(std::mem::replace(&mut self.description.name, name));
+            self.file_path()
+                .ok_or_else(|| "Give the character a name to save it.".to_owned())?
+        } else {
+            wanted
+        };
         std::fs::write(&path, self.description.to_json())
             .map_err(|err| format!("Could not save {}: {err}", path.display()))?;
+        if let Some(old) = self.file.take()
+            && !same_file(&old, &path)
+            && old.parent() == path.parent()
+        {
+            self.move_away(&old, &path);
+        }
+        self.file = Some(path.clone());
         self.saved = Some(self.description.clone());
         recent::remember(&self.folder, &path);
         self.saved_files.push(path.clone());
-        Ok(path)
+        Ok(match renamed_from {
+            Some(from) => Saved::Renamed { path, from },
+            None => Saved::Written(path),
+        })
+    }
+
+    /// The character was saved as `new` after a rename: `old` goes, and
+    /// its places in packs follow it.
+    fn move_away(&self, old: &Path, new: &Path) {
+        if let (Some(old_name), Some(new_name)) = (
+            old.file_name().and_then(|n| n.to_str()),
+            new.file_name().and_then(|n| n.to_str()),
+        ) {
+            packs::rename_character(&self.folder, old_name, new_name);
+        }
+        thumbnails::remove_character_pictures(&self.folder, old);
+        recent::forget(&self.folder, old);
+        if let Err(err) = std::fs::remove_file(old)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            log::warn!("could not remove {}: {err}", old.display());
+        }
     }
 
     /// Shows `description` in the preview in place of the character being
@@ -632,19 +850,7 @@ impl CharacterWorkspace {
     /// pictures): its undo is left alone.
     pub(crate) fn show_only(&mut self, description: Description) {
         let library = self.library();
-        let description = if library.base(&description.base).is_some() {
-            description
-        } else {
-            let base = if library.base(DEFAULT_BASE).is_some() {
-                DEFAULT_BASE
-            } else {
-                axcenity_avatar::V1_BASE
-            };
-            let mut fallback = applier::default_description(&library, base);
-            fallback.name = description.name;
-            fallback
-        };
-        self.description = tidy(description, &library);
+        self.description = adopt(description, &library).0;
         self.animators.clear();
         self.applied = None;
         self.refresh(true);
@@ -688,12 +894,112 @@ impl CharacterWorkspace {
         ) {
             Ok(applied) => {
                 if let Some(problem) = applied.problems.first() {
-                    self.notice = Some(problem.message.clone());
+                    let more = applied.problems.len() - 1;
+                    self.notice = Some(if more == 0 {
+                        problem.message.clone()
+                    } else {
+                        format!("{} (and {more} more)", problem.message)
+                    });
                 }
             }
             Err(error) => self.notice = Some(format!("Could not show the character: {error}")),
         }
         self.applied = Some((self.description.clone(), Instant::now()));
+    }
+
+    /// Frames `view`. The Face view aims at the character's head bone as
+    /// it's posed, so a tall or short character's face is framed too
+    /// (audit D-06).
+    pub fn focus(&mut self, view: ViewPreset) {
+        self.orbit = view.orbit();
+        if view == ViewPreset::Face
+            && let Some(head) = self.head()
+        {
+            // The fixed view looked at the default character's head bone
+            // (0.905 of its height) from 0.05 in front of it.
+            self.orbit.target = head + Vec3::new(0.0, 0.0, -0.05);
+        }
+        self.view = Some(view);
+    }
+
+    /// Where the preview's head bone is in the world, as it's posed (or at
+    /// rest before the first frame).
+    pub(crate) fn head(&self) -> Option<Vec3> {
+        let body = applier::body_of(&self.world, self.character?)?;
+        let instance = self.world.get(body)?;
+        let at = crate::gizmo::Pose::of(instance)?;
+        let mesh = instance.property("MeshId")?.as_str()?;
+        let model = self.assets.model_blocking(mesh)?;
+        let rig = model.rig.as_deref()?;
+        let bone = rig.bone("Head")?;
+        let position = match self.animators.poses().get(&body) {
+            Some(posed) => posed.bones().get(bone)?.position,
+            None => {
+                let mut pose = rig.rest_pose();
+                model.settle(&mut pose);
+                rig.skeleton(&pose).get(bone)?.position
+            }
+        };
+        let place = axcenity_render::glam::Mat4::from_scale_rotation_translation(
+            at.size,
+            at.rotation,
+            at.position,
+        );
+        Some(place.transform_point3(position)).filter(|point| point.is_finite())
+    }
+
+    /// Shows `name` (a built-in expression) on the preview's face, or none:
+    /// a FaceControls of the preview's own on the body, as the capture tool
+    /// does. The description is not touched.
+    pub fn preview_expression(&mut self, name: Option<String>) {
+        let name = name.filter(|name| !name.eq_ignore_ascii_case("Neutral"));
+        self.expression = name;
+        let Some(body) = self
+            .character
+            .and_then(|character| applier::body_of(&self.world, character))
+        else {
+            return;
+        };
+        let existing = self.world.get(body).and_then(|body| {
+            body.children().iter().copied().find(|child| {
+                self.world.get(*child).is_some_and(|child| {
+                    child.class() == ClassName::FaceControls && child.name() == PREVIEW_FACE
+                })
+            })
+        });
+        let Some(name) = self.expression.clone() else {
+            if let Some(face) = existing {
+                let _ = self.world.destroy(face);
+            }
+            return;
+        };
+        let face = match existing {
+            Some(face) => face,
+            None => {
+                let Ok(face) = self.world.create(ClassName::FaceControls) else {
+                    return;
+                };
+                let _ = self.world.set_name(face, PREVIEW_FACE);
+                let _ = self.world.set_parent(face, Some(body));
+                face
+            }
+        };
+        if let Some(state) = self.world.face_mut(face) {
+            let order = state.next_order;
+            state.next_order += 1;
+            state.expressions = vec![axcenity_core::face::ExpressionPlay {
+                name,
+                intensity: 1.0,
+                target_intensity: 1.0,
+                presence: 0.0,
+                target_presence: 1.0,
+                transition: None,
+                weight: 1.0,
+                priority: 0,
+                asymmetry: 0.0,
+                order,
+            }];
+        }
     }
 
     /// The MeshParts the preview's body wears, by name, with the body's own
@@ -736,7 +1042,7 @@ impl CharacterWorkspace {
             .map_or(0.0, |last| now.duration_since(last).as_secs_f64())
             .min(0.1);
         self.last_frame = Some(now);
-        self.refresh(!self.dragging);
+        self.refresh(!self.dragging());
         self.step_by(seconds);
         seconds
     }
@@ -749,6 +1055,73 @@ impl CharacterWorkspace {
     /// The preview's poses.
     pub fn poses(&self) -> &axcenity_scene::Poses {
         self.animators.poses()
+    }
+}
+
+/// Reads a character file (any format up to this version's).
+fn read_character(file: &Path) -> Result<Description, String> {
+    let text = std::fs::read_to_string(file)
+        .map_err(|err| format!("Could not read {}: {err}", file.display()))?;
+    Description::from_json(&text).map_err(|err| err.to_string())
+}
+
+/// `description` ready to edit: tidied, or the default character keeping
+/// its name when the library hasn't its body (with a notice saying so).
+fn adopt(description: Description, library: &Library) -> (Description, Option<String>) {
+    if library.base(&description.base).is_some() {
+        return (tidy(description, library), None);
+    }
+    let base = if library.base(DEFAULT_BASE).is_some() {
+        DEFAULT_BASE
+    } else {
+        axcenity_avatar::V1_BASE
+    };
+    let notice = format!(
+        "\"{}\" is on a body this library hasn't ({}); showing the default character.",
+        description.name, description.base
+    );
+    let mut fallback = applier::default_description(library, base);
+    fallback.name = description.name;
+    (tidy(fallback, library), Some(notice))
+}
+
+/// The value of parameter `id` in `description` (its default when left
+/// out), without cloning the manifest: what panels call per slider.
+pub(crate) fn value_of(description: &Description, base: Option<&BaseManifest>, id: &str) -> f32 {
+    description.parameters.get(id).copied().unwrap_or_else(|| {
+        base.and_then(|base| base.parameter(id))
+            .map_or(0.0, |parameter| parameter.default)
+    })
+}
+
+/// The items `library` has for `slot` on base model `base`.
+pub(crate) fn items_for(library: &Library, base: &str, slot: &str) -> Vec<(String, String)> {
+    library
+        .items
+        .values()
+        .filter(|item| item.slot == slot && item.bases.iter().any(|b| b == base))
+        .map(|item| (item.id.clone(), item.label.clone()))
+        .collect()
+}
+
+/// The item `description` wears in `slot`, if any.
+pub(crate) fn worn_in(library: &Library, description: &Description, slot: &str) -> Option<String> {
+    description
+        .items
+        .iter()
+        .find(|worn| library.item(&worn.id).is_some_and(|item| item.slot == slot))
+        .map(|worn| worn.id.clone())
+}
+
+/// Whether `a` and `b` are the same file (on a file system that ignores
+/// case, "sam" and "Sam" are).
+fn same_file(a: &Path, b: &Path) -> bool {
+    if a == b {
+        return true;
+    }
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
     }
 }
 

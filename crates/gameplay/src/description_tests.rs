@@ -208,6 +208,8 @@ fn an_item_goes_in_its_slot_in_place_of_what_the_slot_held() {
             id: "navy".to_owned(),
             label: "Navy".to_owned(),
             materials: Default::default(),
+            thumbnail: None,
+            parameters: Default::default(),
         });
     let mut character = default_character(&library);
     character.items[1].materials.insert(

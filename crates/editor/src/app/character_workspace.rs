@@ -44,6 +44,28 @@ impl EditorApp {
         self.open_character_workspace(Some(0), None);
     }
 
+    /// Saves the workspace's character if it has unsaved changes (for
+    /// "Save changes?" on closing the window). False when that failed,
+    /// which the workspace's status line says.
+    pub(super) fn save_character_workspace(&mut self) -> bool {
+        let Some(workspace) = self.character_workspace.as_mut() else {
+            return true;
+        };
+        if !workspace.dirty() {
+            return true;
+        }
+        match workspace.save() {
+            Ok(file) => {
+                self.start.character_saved(&file);
+                true
+            }
+            Err(error) => {
+                workspace.notice = Some(error);
+                false
+            }
+        }
+    }
+
     /// Draws the open workspace and does what it asks.
     pub(super) fn character_workspace_ui(
         &mut self,
@@ -190,6 +212,50 @@ mod tests {
         app.open_character_workspace(None, Some(&saved));
         assert!(!app.character_workspace.as_ref().unwrap().dirty());
         assert_eq!(app.title(), "New Character - Character Studio");
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// D-02: closing the editor's window with unsaved changes in the
+    /// workspace asks first, and Save saves the character.
+    #[test]
+    fn closing_the_window_with_unsaved_studio_changes_asks_and_saves_the_character() {
+        let ctx = crate::theme::test_context();
+        let mut app = EditorApp::new(None);
+        let folder = crate::character_studio::test_folder("workspace-close");
+        app.set_characters_folder(Some(folder.clone()));
+        app.open_character_workspace(Some(0), None);
+        assert!(app.unsaved(), "a new character isn't saved");
+        let modified = app.modified_documents();
+        assert!(
+            modified
+                .iter()
+                .any(|doc| doc.name.contains("New Character")),
+            "{modified:?}"
+        );
+        // The window's close button.
+        let mut input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1440.0, 900.0),
+            )),
+            ..Default::default()
+        };
+        input
+            .viewports
+            .entry(egui::ViewportId::ROOT)
+            .or_default()
+            .events
+            .push(egui::ViewportEvent::Close);
+        let _ = crate::theme::run(&ctx, input, |ui| app.frame(ui, None));
+        assert_eq!(app.asking, Some(super::super::Discard::Quit), "it asks");
+        // Save saves the character and lets the window close.
+        assert_eq!(
+            app.answer(super::super::Answer::Save),
+            Some(super::super::Discard::Quit)
+        );
+        let workspace = app.character_workspace.as_ref().unwrap();
+        assert!(!workspace.dirty());
+        assert!(workspace.file_path().unwrap().is_file());
         let _ = std::fs::remove_dir_all(&folder);
     }
 }

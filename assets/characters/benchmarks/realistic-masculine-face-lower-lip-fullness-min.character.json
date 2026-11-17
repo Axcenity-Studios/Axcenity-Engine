@@ -5,5 +5,10 @@
   "parameters": {
     "frame": 0,
     "lower_lip_fullness": -1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
 }

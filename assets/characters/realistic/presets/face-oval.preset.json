@@ -1,0 +1,26 @@
+{
+  "format_version": 2,
+  "name": "Oval",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "cheek_fullness_left": -0.1,
+    "cheek_fullness_right": -0.1,
+    "cheekbone_left": 0.2,
+    "cheekbone_right": 0.2,
+    "chin_length": 0.1,
+    "chin_width": -0.2,
+    "forehead_height": 0.2,
+    "jaw_width_left": -0.3,
+    "jaw_width_right": -0.3,
+    "temple_width": -0.1
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-oval",
+    "kind": "face",
+    "about": "Slightly longer than wide, widest at the cheekbones, tapering gently to the chin.",
+    "tags": [
+      "shape"
+    ],
+    "order": 20
+  }
+}

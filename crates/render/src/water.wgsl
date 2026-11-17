@@ -282,7 +282,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // the reflection probes, and at High what's on the screen, and with
     // ray tracing what rays find where the screen has nothing (LE5).
     var color = shade_surface(in.world_position, up, n, pixel, vec3<f32>(0.0), 0.0,
-        WATER_ROUGHNESS, 1.0, f0, false);
+        WATER_ROUGHNESS, 1.0, f0, false, false);
     let r = reflect(-v, n);
     // A reflection that dips under the surface would find what's under it.
     if frame.reflection_probes.y != 0u && dot(r, up) > 0.0 {

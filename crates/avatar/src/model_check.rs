@@ -110,6 +110,14 @@ impl BaseManifest {
             bone(p, at.clone(), &added.name);
             bone(p, at, &added.parent);
         }
+        for (index, feature) in self.features.iter().enumerate() {
+            for (k, anchor) in feature.anchors.iter().enumerate() {
+                bone(p, format!("features[{index}].anchors[{k}]"), &anchor.bone);
+            }
+        }
+        for (index, handle) in self.handles.iter().enumerate() {
+            bone(p, format!("handles[{index}].anchor"), &handle.anchor.bone);
+        }
         let mut materials = body.materials.clone();
         for part in parts {
             materials.extend(part.materials.iter().cloned());
@@ -139,6 +147,17 @@ impl ItemManifest {
                 }
                 if !body.shapes.contains(shape) {
                     p.push(Problem::new(at, format!("the body has no shape `{shape}`")));
+                }
+            }
+        }
+        // The item's own parameters drive its own shapes.
+        for (index, parameter) in self.parameters.iter().enumerate() {
+            for (k, driver) in parameter.shapes.iter().enumerate() {
+                if !item.shapes.contains(&driver.shape) {
+                    p.push(Problem::new(
+                        format!("parameters[{index}].shapes[{k}]"),
+                        format!("the item has no shape `{}`", driver.shape),
+                    ));
                 }
             }
         }

@@ -49,7 +49,8 @@ Networking replicates the description (small data), never meshes; each machine r
 
 **Versions.** Every file has `format_version`. A reader refuses a newer version with a message ("It was saved by a newer Axcenity (character format 3; this version reads up to 2)") and migrates an older one on load (`avatar::FormatError::Newer`). A file with no `format_version` is version 1.
 
-- Adding an **optional** field is not a version change: readers keep fields they don't know (the description's `extra`; manifests ignore them), so a file survives a round trip through an older editor.
+- Adding an **optional** field is not a version change. A description keeps fields it doesn't know at its top level and on each worn item (`Description::extra`, `WornItem::extra`), so they survive a round trip through an older editor. Manifests and the catalogue **ignore** unknown fields: the engine copies manifests as files, but it writes a project's catalogue again from its typed value, which drops what it doesn't know.
+- **A new value in an existing enum is a breaking change**: an older engine rejects the whole file (`category`, `kind`, `fit.method`, `constraints[].kind`, `shading`, `tier`). Add a field instead, or bump the version with a migration. The enums added in R1 (`level`, `materials[].role`, a preset's `kind`) read a value they don't know as `other` (`#[serde(other)]`), so they can grow.
 - Changing what a field means, renaming or removing one, or making one required **is**: bump the format's version constant in `avatar`, add the migration, add a test that an old file migrates, and update this section.
 - Damaged files are errors, never panics (`FormatError::Damaged`). Checks return every `Problem` they find (`at`: a path into the file such as `parameters[3].shapes[0]`; `message`).
 
@@ -89,7 +90,7 @@ One character: its base model, parameter values, items and material values. **Va
 | `name` | string | Shown in the studio and to scripts; not empty |
 | `base` | ID | The base model package |
 | `parameters` | map ID → number | Values by the base manifest's parameter IDs; one left out takes its default; resolution clamps to the range (a check reports values outside it) |
-| `items` | list of `{id, variant?, materials?}` | Worn items, each in its manifest's slot; one per slot unless the slot is `multiple`. `variant` names one of the item's variants; `materials` are values over the variant's, by the item's material slot names |
+| `items` | list of `{id, variant?, materials?, parameters?, transform?}` | Worn items, each in its manifest's slot (and its `also_fills` slots); one per slot unless the slot is `multiple`. `variant` names one of the item's variants; `materials` are values over the variant's, by the item's material slot names; `parameters` are values for the item's own parameters (R1), over the variant's; `transform` `{offset, turn, scale}` moves a socket item (metres, degrees about X, Y, Z, a factor; each part optional) inside its `adjust` (R1). Unknown fields of a worn item are kept (`WornItem::extra`) |
 | `materials` | map slot → values | Values for the base model's materials (skin, eyes, brows, lashes, mouth, teeth), see section 10 |
 | anything else | any | Kept as it was (`Description::extra`): room for additive fields such as skin and makeup layers *(CO17)* |
 
@@ -108,16 +109,18 @@ Ships beside a base model's glTF file. The stylized one is `assets/characters/hu
 | `family` | string | `stylized`, `realistic`: groups bases; items name the exact bases they fit |
 | `model` | `{file, body, parts[]}` | The glTF file; the body's object path; parts always worn with it (eyes, teeth, brows, lashes), which follow its pose and shapes |
 | `skeleton` | `{convention, height, pose, added_bones[]}` | `humanoid` (Unity/VRM names), metres standing, `a-pose-45`; twist and helper bones added as `{name, parent}` (section 12) |
-| `groups` | `[{id, label, category}]` | Parameter groups; `category` is a studio category: `body`, `face`, `skin`, `hair`, `clothing`, `accessories` |
+| `groups` | `[{id, label, category, about?, icon?}]` | Parameter groups; `category` is a studio category: `body`, `face`, `skin`, `hair`, `clothing`, `accessories`. `about` is a tooltip sentence, `icon` a name from the editor's icon set (an unknown one draws none) (R1) |
 | `parameters` | `[Parameter]` | The sliders, in display order (section 7) |
 | `corners` | `[{shape, factors[]}]` | Shapes driven by several parameters at once (section 7) |
 | `constraints` | `[{kind: "max_sum", parameters, limit}` or `{kind: "follow", source, target, factor}]` | Rules between parameters (section 7) |
 | `regions` | `[{id, label, mask_shape?, map_index?}]` | Body regions items hide: by a mask shape (stylized, ADR-0030) or an index in the body's region map ([ADR-0035](../../../wiki/Architecture/Architecture-Decisions/ADR-0035-Clothing-Fits-By-Surface-Binding-With-Region-Hiding.md)); at least one |
-| `slots` | `[{id, label, category, multiple?, empty_label?}]` | Where items are worn; data, so a new slot is not a code change |
+| `slots` | `[{id, label, category, multiple?, empty_label?, about?, icon?}]` | Where items are worn; data, so a new slot is not a code change |
 | `sockets` | `[{name, bone}]` | Attachments that follow a bone (`anim`'s sockets); the stylized ones are `project::HUMANOID_SOCKETS` |
-| `materials` | `[{name, shading}]` | **Every** material of the body and its parts, with its shading model (section 10) |
+| `materials` | `[{name, shading, label?, values?, role?}]` | **Every** material of the body and its parts, with its shading model (section 10). R1: `label` is its name for people; `values` the values of its shading model it offers (all when absent; each must be one of the model's); `role` `primary`, `secondary` or `accent` |
 | `face` | `{profile, eye_bones[], jaw_bone?}` | The FaceControls profile the head uses and its eye and jaw bones (section 13) |
 | `defaults` | `{items[]}` | What a new character on this base wears |
+| `features` | `[Feature]` | What a person can point at on the character (R1, below) |
+| `handles` | `[Handle]` | Handles on the character that move parameters (R1 schema, R2 content, below) |
 
 **Parameter:**
 
@@ -127,13 +130,23 @@ Ships beside a base model's glTF file. The stylized one is `assets/characters/hu
 | `group` | group ID | |
 | `range` | `[min, max]` | min < max |
 | `default` | number | Inside the range; 0 when absent |
-| `advanced` | bool | Shown only in the advanced view (D3's basic/advanced) |
+| `advanced` | bool | Shown only in the advanced view (D3's basic/advanced). Kept beside `level`, written in step with it |
+| `about` | string | R1: one sentence, the friendly description and the tooltip |
+| `feature` | feature ID | R1: the feature it belongs to (selection, randomizing a feature). Absent: its group's ID, when a feature has that ID (`BaseManifest::feature_of`). A parameter can sit in group `proportions` and belong to feature `shoulders`: the group orders the page, the feature drives selection |
+| `level` | `quick`, `detailed`, `advanced` | R1: brief §3.3's three levels. Absent: `advanced` when `advanced` is true, else `detailed` (`Parameter::level`). Generators write both, so an older editor hides the same sliders; a check reports a parameter whose two disagree |
+| `random` | `[min, max]` | R1: the part of the range Randomize draws from; the middle half of the range when absent (`avatar::random_span`) |
 | `mirror` | parameter ID | The other side's parameter, for symmetric editing; each names the other |
 | `shapes` | `[{shape, from?, to?}]` | Blend shape weights |
 | `bones` | `[{bone, from?, to?, offset?, scale?}]` | At mapped weight w: the bone's head moves by `offset × w` (model space, metres, glTF axes: Y up, +Z front) and the bone scales by `1 + (scale − 1) × w`; applied after the animated pose *(CO3)* |
 | `attributes` | `[{attribute, from?, to?}]` | A number attribute on the character's skinned body: `anim`'s body sliders (`BodyHeight`, `LegLength`, `ArmLength`, `ShoulderWidth`, `WaistWidth`, `HipWidth`, `HeadSize`, `HandSize`, `FootSize`; PR #400), which become one output of applying a description (D2) |
 | `material_values` | `[{material, value, from?, to?}]` | A number value of a material slot's shading model |
 | `choices` | `[{value, label, items?}]` | Named values to pick from instead of a slider (each inside the range): Character Studio shows a chip each and keeps the parameter at one of them (the nearest). Picking one wears its `items` in their slots and takes off the items the other choices name. The realistic body's `frame` is Male (0, boxer briefs) or Female (1, briefs and a sports bra). Optional, no version bump |
+
+**Feature** (R1; plan section 11.3): `{id, label, category, about?, icon?, anchors: [{bone, offset}], radius, regions?}`. An anchor is a bone and an offset from its head in model space at rest (metres, glTF axes): it follows bone changes. One anchor for a middle feature, two for a pair (left first). A click picks the feature whose anchor is nearest within `radius` (metres), and the camera frames its anchors; `regions` are body regions that also pick it. The realistic body has 23 (`body` for the whole body; `head`, `neck`, `shoulders`, `chest`, `arms`, `hands`, `abdomen`, `waist`, `back`, `hips`, `thighs`, `calves`, `feet`; `eyes`, `brows`, `nose`, `cheeks`, `jaw`, `chin`, `lips`, `forehead`, `ears`), measured on the model by `assets/characters/realistic/anchors.py`: the weighted centre of the vertices the feature's shapes move (or of its region in the region map), on the skin for the face's features and at the centre of the part for the body's, following the bone that carries most of them, on the masculine frame. Their placement on the feminine frame is not checked yet.
+
+**Handle** (R1 schema; R2 writes them): `{id, feature, label?, mirror?, anchor: {bone, offset}, drives: [{parameter, axis, travel, screen?, sensitivity?}], views?}`. A handle only names parameters: no second geometry state (brief §3.4). It sits at its anchor plus `travel × t` along each drive's `axis` (model space, the direction the surface moves for a rising value; `t` the value's share of the range), so it follows the cursor one to one; `sensitivity` multiplies that, `screen` `{view: [dx, dy]}` overrides the direction for a parameter that isn't a straight move. `mirror` names the other side's handle, each naming the other. `views` (`front`, `side`, `three_quarter`, `back`) limits where it is shown. `travel` is generated from the build's largest move per shape (`Realistic.build.json`, `face.largest_move_mm`).
+
+**Checks** (`BaseManifest::validate`, `check_model`): feature and handle IDs unique; a parameter's `feature`, a handle's `feature` and `drives[].parameter` exist; `mirror` names back; `regions` exist; an anchor's offset and a drive's axis are finite, the axis not zero; `travel`, `radius` and `sensitivity` above 0; `random` inside the range; `level` and `advanced` agree; a material slot's `values` are values of its shading model; anchor bones are bones of the body (`check_model`).
 
 ## 7. What parameters mean (resolution)
 
@@ -145,8 +158,10 @@ Ships beside a base model's glTF file. The stylized one is `assets/characters/hu
 4. **Shapes.** A shape's weight is the sum of its drivers' results plus its **corners'**: a corner's weight is the product of its factors' spans (MakeHuman's corner targets, D5: `Feminine_Heavy` is frame × fat, so fat and muscle layers mix without cancelling). Every shape the manifest names is in the result, at 0 when nothing drives it.
 5. **Regions.** Each region with a mask shape is in the result at 0, and at 1 when a worn item hides it (`body_shape_weights`). Map regions are hidden by the renderer from the region map *(CO9)*.
 6. **`follow` constraints** are editing rules, not resolution: changing `source` by d moves `target` by `factor × d` unless the person pinned `target` *(CO12)*. A saved description holds the result.
-7. **Bones, attributes and material values** use the same spans. Bone offsets and scales from several parameters add (offsets) and multiply (scales). Attributes are written to the body MeshPart; `anim::BodyShape` applies them after the pose as it does today. A parameter's material values are the defaults the description's own `materials` go over.
-8. **What a bone change does to a mesh.** A bone's `offset` moves its head in model space, absolutely: a bone no driver names stays where it is, whatever its parent does. A `scale` scales the bone and everything on it. Every pose gets the changes **after the clips** (`axcenity_assets::Model::settle`, called by `anim`), so every clip plays on every character. What that does to a surface depends on the mesh, per parameter: **a mesh that has one of the parameter's shapes was already moved by it and is only re-seated** (its bind moves with the joint: nothing more moves at rest, poses turn about the new joint; the body under `frame`), and **a mesh that has none of them is carried by the bone** (the eyeballs and teeth have no `Frame_Feminine`: they move, and the eyes scale, with their bones). That is why a parameter keeps its shapes and its bones together: `avatar::resolve` gives the bake one *layer* per parameter, corner and region mask.
+7. **Item parameters** (R1) resolve the same way on the item's own part: each value is the worn item's, else its variant's, else the default, clamped; shape drivers give `ResolvedPart::shapes` (the item's shapes, never the body's) and material drivers go under the variant's and the worn item's material values. The applier does not bake `ResolvedPart::shapes` into the item's derived model yet (an open issue for the hair stage, R6). A socket item carries its worn `transform` in `ResolvedPart::transform` (applied from R8).
+8. **Which items are worn.** One item per slot unless the slot is `multiple`, counting `also_fills`; two items where either `excludes` the other can't both be worn. In both cases the later one in the description is worn and the earlier one is left out with a reason. An item whose `requires` aren't all worn is left out too (R1).
+9. **Bones, attributes and material values** use the same spans. Bone offsets and scales from several parameters add (offsets) and multiply (scales). Attributes are written to the body MeshPart; `anim::BodyShape` applies them after the pose as it does today. A parameter's material values are the defaults the description's own `materials` go over.
+10. **What a bone change does to a mesh.** A bone's `offset` moves its head in model space, absolutely: a bone no driver names stays where it is, whatever its parent does. A `scale` scales the bone and everything on it. Every pose gets the changes **after the clips** (`axcenity_assets::Model::settle`, called by `anim`), so every clip plays on every character. What that does to a surface depends on the mesh, per parameter: **a mesh that has one of the parameter's shapes was already moved by it and is only re-seated** (its bind moves with the joint: nothing more moves at rest, poses turn about the new joint; the body under `frame`), and **a mesh that has none of them is carried by the bone** (the eyeballs and teeth have no `Frame_Feminine`: they move, and the eyes scale, with their bones). That is why a parameter keeps its shapes and its bones together: `avatar::resolve` gives the bake one *layer* per parameter, corner and region mask.
 
 **Pose-driven corrective shapes (CO5).** `correctives`: `[{shape, bone, axis, angles: [start, full]}]`. Such a shape's weight is `clamp((θ − start) / (full − start), 0, 1)`, where θ is the twist, in degrees, about `axis` of the bone's turn from rest (its local rotation times the inverse of its rest local rotation, so in its parent's space). `axis` is a unit vector in the space of the bone's parent at rest; several entries may name one bone. A shape named here is driven by no parameter and stays live after the identity bake. Today the realistic body's six (`Corrective_Shoulder_Level_*`, `_Raised_*` and `_Lowered_*`, on the upper arms; lowering is a turn about the raise axis reversed, so every rule has `start < full`) are written to `Realistic.build.json` and are constants in `anim` (`correctives.rs`), which a test holds equal to the build data; the manifest field takes their place when a second body needs other rules.
 
@@ -174,8 +189,19 @@ One garment, accessory or groom. The stylized ones are `assets/characters/humano
 | `tags` | `[string]` | For the wardrobe browser's search and filters |
 | `thumbnail` | path | For the browser *(CO9 makes them)* |
 | `source` | `{author, licence, url?}` | Provenance; `licence` is an SPDX ID (`CC0-1.0`). Imports must fill it |
+| `about` | string | R1: a sentence for the browser |
+| `parameters` | `[ItemParameter]` | R1: the item's own sliders (a hairstyle's length): `{id, label, range, default?, about?, level?, random?, shapes?, material_values?, choices?}`, shaped like a base parameter without `group`, `mirror`, `feature`, bones or attributes. `shapes` name shapes of the item's model, `material_values` its own material slots; a choice wears nothing |
+| `materials[].label`, `.values`, `.role` | | R1, as on a base manifest's material slot: what the slot is called, which values it offers (recolouring), its colour role |
+| `variants[].thumbnail`, `.parameters` | path; map ID → number | R1: a picture of the variant; values for the item's parameters |
+| `also_fills` | `[slot ID]` | R1: other slots it occupies (a dress: `bottom`) |
+| `requires` | `[item ID]` | R1: items that must be worn with it |
+| `excludes` | `[item ID]` | R1: items it can't be worn with (either naming the other is enough) |
+| `limitations` | `[{note, parameter?, range?}]` | R1: known limits, a note for the browser; with `parameter` (the item's or the base's) and `range` the editor can warn outside the range |
+| `adjust` | `{offset?: [[min, max] × 3], turn?: [[min, max] × 3], scale?: [min, max]}` | R1, socket items only: how far a person may move (metres per axis), turn (degrees about each axis) and scale it. Each limit holds the item as made (0, 0, 1); a part left out can't change |
 
-**Rules** (`ItemManifest::validate`, `check_against`): a garment needs a model and a layer; an accessory needs a model and no layer; only accessories hang on a socket; a groom has no `model`, has `groom`, and has **cards or a mesh** (strands are never the only tier); the slot, every hidden region and the socket exist on every base it fits; variant values suit the shading models.
+**Supported operations are derived, not listed** (brief §14.1): an item can be recoloured when a material slot offers values, has variants when it lists them, has sliders when it has `parameters`, can be moved when it has `adjust`. An `operations` list can be added later if something can't be derived.
+
+**Rules** (`ItemManifest::validate`, `check_against`): a garment needs a model and a layer; an accessory needs a model and no layer; only accessories hang on a socket; a groom has no `model`, has `groom`, and has **cards or a mesh** (strands are never the only tier); the slot, every hidden region and the socket exist on every base it fits; variant values suit the shading models. R1: item parameter IDs are unique, ranges go upwards and hold their defaults and `random`; material drivers drive number values of the item's own slots; a material slot's `values` are its shading model's; variant parameters exist and are in range; `also_fills` doesn't name the item's own slot and names slots every base has; `requires` and `excludes` are IDs, not the item itself, and the library has them (`Library::validate`); a limitation with a range names a parameter of the item or the base; only socket items have `adjust`. `ItemManifest::check_model`: item parameter shapes are shapes of the item's model. A description (`Description::validate`): worn parameters exist and are in range; an item without what it `requires` worn, or worn with one it `excludes`, is a problem; `transform` is inside `adjust` (no `adjust`: only the identity).
 
 ## 9. Fitting (ADR-0035)
 
@@ -191,7 +217,7 @@ One garment, accessory or groom. The stylized ones are `assets/characters/humano
 
 ## 10. Character materials (ADR-0036)
 
-Each material slot has a **shading model**. Values **modulate** the material's own maps (a tint multiplies the base colour map; a scale multiplies roughness); they never replace them, and a material with no values looks exactly as authored (every value's neutral setting changes nothing; audit §3.8). **In the World** a value is an attribute of the MeshPart whose model has the material, named `Mat_<material>_<value>` (`core::material_value_attribute`; a number or a `Color3`), written by the applier and read by `scene` (`material::modulate`), so it is saved, copied and replicated with the part. Until the renderer has the new models *(CO7)*, `scene` draws skin, eye, cloth and hair as Standard and reads `tint`, `iris_tint` and `roughness_scale`; the other values are stored and wait for CO7. The set is `avatar::ShadingModel::values`:
+Each material slot has a **shading model**. Values **modulate** the material's own maps (a tint multiplies the base colour map; a scale multiplies roughness); they never replace them, and a material with no values looks exactly as authored (every value's neutral setting changes nothing; audit §3.8). **In the World** a value is an attribute of the MeshPart whose model has the material, named `Mat_<material>_<value>` (`core::material_value_attribute`; a number or a `Color3`), written by the applier and read by `scene` (`material::modulate`), so it is saved, copied and replicated with the part. Until the renderer has the new models *(CO7)*, `scene` draws skin, eye, cloth and hair as Standard. Since 2026-11-17 (CO7's first slice, `material::modulate`) it draws `melanin`, `undertone` and `redness` as one colour ratio in linear light on the base colour (`scene::skin_tone`: the tone table of `references/skin/README.md` §1.3, interpolated in optical density; all three at 0 give exactly 1), then `tint`, `iris_tint` and `sclera_tint` as multiplies, `roughness_scale` on the roughness and `detail_strength` on the normal map's strength (held to 0 to 2). The ratio is per material, not per texel: lips, nails, palms and soles tone with the skin until the Skin model has masks. `scene` does not know a slot's shading model, so it draws a value by its name (Hair's `melanin` and `redness` take the skin's curve meanwhile). Still stored only: `scatter_scale`, `pupil_size`, `limbal_ring`, `iris_depth`, the cloth and hair values beyond `tint` and `roughness_scale`. The set is `avatar::ShadingModel::values`:
 
 | Model | Value | Kind, range, neutral | Meaning |
 |---|---|---|---|
@@ -287,7 +313,49 @@ assets/characters/
   realistic/                      (CO4) the realistic package: <Name>.base.json, glTF, items/…
 ```
 
-**`catalogue.json`:** `format_version` 1; `bases`: `[{id, manifest, label, family}]`; `items`: `[{id, manifest, label, kind, slot, tier, bases, tags?, thumbnail?}]`, both sorted by ID, `manifest` and `thumbnail` relative to the library. It is an index made from the manifests (`avatar::Catalogue::of` makes the same one), so the browser can list a large wardrobe without opening every manifest.
+**`catalogue.json`:** `format_version` 1; `bases`: `[{id, manifest, label, family}]`; `items`: `[{id, manifest, label, kind, slot, tier, bases, tags?, thumbnail?}]`; `presets` (R1, left out when empty): `[{id, file, label, kind, base, tags?, thumbnail?}]`, all sorted by ID, `manifest`, `file` and `thumbnail` relative to the library. `Library::read` reads every preset it lists. An older engine that writes a project's catalogue again drops `presets` (section 4); the files stay where they are. It is an index made from the manifests (`avatar::Catalogue::of` makes the same one), so the browser can list a large wardrobe without opening every manifest.
+
+## 15a. Presets (R1)
+
+A preset file (`*.preset.json`, `avatar::PRESET_SUFFIX`) is a **format 2 description with a `preset` block**, so no new parser reads it and any engine checks it against the library:
+
+```json
+{
+  "format_version": 2, "name": "Athletic", "base": "axcenity/realistic",
+  "parameters": { "muscle": 0.4, "fat": -0.1 },
+  "preset": { "id": "axcenity/realistic-body-athletic-male", "kind": "body",
+              "about": "Trained but not bulky.", "tags": ["build", "male"], "order": 30 }
+}
+```
+
+`name` is the preset's label. The block rides in `Description::extra` (`Description::preset` reads it as `PresetInfo {id, kind, about, tags, thumbnail?, order?}`). `kind` says what applying it sets; everything else is left alone:
+
+| `kind` | Sets | Left out of the file means |
+|---|---|---|
+| `body` | Every parameter of a `body` group | Its default. A parameter with `choices` (the frame) changes only when the file names it |
+| `face` | Every parameter of a `face` group | The default: a face preset is a complete face (brief §5.1) |
+| `hair` | The items in `hair` slots (with variant, materials, parameters), and `hair` group parameters | Bald |
+| `outfit` | The items in `clothing` and `accessories` slots, except the slots a parameter's choices fill (`chosen_slots`) | Nothing worn there |
+| `skin` | The base's `materials` values and `skin` group parameters | Neutral |
+| `character` | Everything but the name (base, parameters, items, materials) | As a description |
+
+**One function**, `avatar::apply_preset(&mut Description, &preset, &Library) -> Result<(), Problem>`, is the rule for the studio, scripts and Randomize. It never copies the preset's `extra` (the block can't leak into a saved character), keeps the character's own `extra` and name, and puts the choices' items right afterwards (`wear_choices`). It refuses, changing nothing, a description without a block, a kind it doesn't know, or (but for `character`) a preset of another base. `matches_preset` says whether applying it would change nothing (the studio's "Custom" is no preset of a kind matching). `check_preset` holds a preset sound: its block (an ID, a sentence, a path), the description against the library, and nothing set outside what its kind owns; `Library::validate` runs it on every preset.
+
+**Shipped presets** are written by `assets/characters/realistic/presets.py` into `realistic/presets/`: seven body presets per frame (brief §4.1's Slim, Average, Athletic, Muscular, Heavyset, Lean, Broad, from `references/body/README.md` section 6; tagged `male` or `female`, never naming `frame`), the nine face presets of brief §5.1 (`references/face/README.md` section 3) and the six starting characters the editor had in code (kind `character`). A person's own presets are the same files in the workspace's `presets/` folder; favourites are editor state. `project::add_character_packages` and `packaging/stage.py` copy preset files with the rest of a package. The test `every_shipped_preset_is_sound_listed_and_resolves` holds them.
+
+## 15b. Randomize (R1)
+
+`avatar::randomize(&Description, &Scope, locks: &BTreeSet<String>, seed: u64, &Library) -> Description`, in `avatar` because games randomize NPCs too (section 0, decision 6).
+
+- **Scope**: `All`; `Category(category)` (parameters of its groups and its slots); `Feature(id)` (parameters whose feature it is); `Parameters(ids)`. Only what it names changes; the name and everything else is kept.
+- **Locks** are parameter IDs and slot IDs that never change.
+- **Values** are drawn evenly inside `random` (`random_span`: the middle half of the range when absent), rounded to a thousandth. A parameter with choices takes one of its choices, so `All` and `Category(Body)` can switch `frame` (male and female); the Studio should lock `frame` by default (RA1). The base's constraints come next: every `follow` first (a target that wasn't drawn or locked moves with its drawn source, held in range), then every `max_sum` (what changed, drawn or moved by a follow, is scaled down; locked and out-of-scope values stay), so the limit holds whatever order the manifest lists them in (test `randomize_keeps_max_sum_and_moves_follow_targets`).
+- **Items**: each slot in scope (not locked, not a choice's slot) gets one of the items that fit the base there, or nothing, drawn evenly; never one that conflicts with what is worn (`excludes`), needs what isn't (`requires`) or also fills a slot already taken. A `multiple` slot draws up to two. A drawn item gets a random variant and random values for its own parameters. Material values are left alone (skin is R5's).
+- **Deterministic**: a small in-crate SplitMix64 generator, so a seed gives the same character on every machine. 1,000 seeds on every shipped base and on the test library validate and resolve with nothing left out, and locks hold (tests).
+
+## 15c. Character Studio's editing contract (R1)
+
+The workspace's panels never change the character themselves. Each draw function reads the workspace and returns `Intent`s (`editor/src/character_workspace/intent.rs`: set a parameter, wear, pick a category or feature or level, focus a view, undo, redo, save, reset a scope, apply a preset). Only the shell (`shell.rs`) applies them. `edit.rs` holds the history: snapshots of the description, with transactions (begin, commit, cancel) so a drag is one undo step, and reset by scope (everything, a category, a group). `selection.rs` holds what is being shown: the category, the feature and the level (Quick, Detailed, Advanced, read from each parameter's `level`, `feature` and `about`, §6). Selection, levels, locks, favourites, comparison states, the camera and the stage are editor state: none of them is ever written into a description (A3). Direct manipulation (R2) and comparison (CO19) go through the same `Intent`s, so a handle and a slider produce the same description.
 
 ## 16. Rust API (`axcenity_avatar`)
 
@@ -302,6 +370,19 @@ ItemManifest::{from_json, to_json, validate, check_against(&self, &BaseManifest)
 Catalogue::{from_json, to_json, of(&Library)}
 Library::{new, add_base, add_item, base, item, manifest_path, path_of, read(root: &Path) -> (Library, Option<Catalogue>, Vec<Problem>), validate}
 ModelContents::of(&axcenity_assets::Model)                          // shapes, bones, materials by name
+// R1 contracts
+Parameter::level() -> Level;  ItemParameter::level() -> Level     // Level::{Quick, Detailed, Advanced, Other}
+BaseManifest::{group, feature, handle, category_of(&Parameter), feature_of(&Parameter)}
+ItemManifest::{parameter, slots(), conflicts_with(&ItemManifest)}
+Feature { id, label, category, about, icon, anchors: Vec<Anchor { bone, offset }>, radius, regions }
+Handle { id, feature, label, mirror, anchor, drives: Vec<Drive { parameter, axis, travel, screen, sensitivity }>, views }
+MaterialSlot { name, shading, label, values, role: Option<MaterialRole> };  MaterialSlot::{new, offered}
+WornItem { id, variant, materials, parameters, transform: Option<Transform { offset, turn, scale }>, extra }
+Library::{add_preset, preset, preset_path, presets};  CataloguePreset
+Description::preset() -> Option<PresetInfo>;  PresetKind;  PRESET_SUFFIX
+apply_preset(&mut Description, &Description, &Library) -> Result<(), Problem>
+matches_preset(&Description, &Description, &Library) -> bool;  check_preset(&Description, &Library) -> Vec<Problem>
+randomize(&Description, &Scope, &BTreeSet<String>, seed: u64, &Library) -> Description;  random_span(range, random)
 // Resolution
 parameter_values(&BaseManifest, &Description) -> BTreeMap<String, f32>
 body_shape_weights(&BaseManifest, &Description, &Library) -> BTreeMap<String, f32>
@@ -318,7 +399,8 @@ resolve(&Library, &Description) -> Result<Resolved, Problem>       // Err: no su
 Resolved { base, body: ResolvedPart, parts: Vec<ResolvedPart>,     // base parts, then items as worn
            shapes, bones: BTreeMap<String, BoneChange>, identity: Identity,
            attributes, materials, problems }                      // items left out, and why
-ResolvedPart { name, item, slot, model /* MeshId relative to the library */, fit: PartFit, materials }
+ResolvedPart { name, item, slot, model /* MeshId relative to the library */, fit: PartFit, materials,
+               shapes /* the item's own parameters' shape weights (R1) */, transform /* a socket item's (R1) */ }
 PartFit::{Skinned, Socket(name)}
 LIBRARY_FOLDER                                                     // "assets/characters"
 // assets
@@ -365,4 +447,4 @@ ClassName::HumanoidDescription { Base, Data };  material_value_attribute(materia
 | CO9 clothing | Sections 8, 9, 15 | Binding files, region maps, the import flow, thumbnails |
 | CO11 hair | Section 11 | The groom file and converter |
 | CO12 studio | Sections 6, 7 (`follow`), 15 | Panels from the manifest; writes format 2 |
-| CO13 presets, network | Section 5 | Preset files (descriptions without `name`), replication of `Data` |
+| CO13 presets, network | Sections 5, 15a | Preset files (format 2 descriptions with a `preset` block, built in R1), replication of `Data` |

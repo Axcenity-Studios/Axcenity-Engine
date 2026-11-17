@@ -122,6 +122,8 @@ A face pose in the engine (both frames; see [visual-qa.md](../visual-qa.md)):
 AXCENITY_CAPTURE_DESCRIPTIONS=assets/characters/benchmarks AXCENITY_CAPTURE_ONLY=realistic-masculine-face-neutral AXCENITY_CAPTURE_FACE="Blink_Left:1,Blink_Right:1" AXCENITY_CAPTURE_SIZE=1920x1080 AXCENITY_CAPTURE_DIR=<folder> cargo test -p axcenity-player --release -- --ignored capture_characters --nocapture
 ```
 
+Since the refinement's R1 the realistic `face-neutral` files are folded into the cast: use `AXCENITY_CAPTURE_ONLY=realistic-masculine-cast-average` (the same character).
+
 Tests: `crates/anim/tests/realistic_face.rs` (four: `check_face` finds nothing; every standard control moves a vertex or a bone; the parts carry the shapes they follow; the ARKit profile's controls all play). Red runs before the work: [red-run-anim.txt](red-run-anim.txt), [red-run-face-checks.txt](red-run-face-checks.txt). Now: [face-checks-run.txt](face-checks-run.txt), [face_checks.json](face_checks.json).
 
 ## Measured (`face_checks.py`, both frames)

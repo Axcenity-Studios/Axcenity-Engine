@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "Muscular",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "fat": 0.4,
+    "muscle": 0.9
+  },
+  "preset": {
+    "id": "axcenity/realistic-body-muscular-female",
+    "kind": "body",
+    "about": "Visible mass in the arms, chest and thighs.",
+    "tags": [
+      "build",
+      "female"
+    ],
+    "order": 40
+  }
+}

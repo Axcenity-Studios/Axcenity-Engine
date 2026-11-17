@@ -40,7 +40,7 @@ Paul's spec of 2026-11-14, "Axcenity Default Humanoid: Character Design and Tech
 
 ## Speeds (HD3)
 
-The engine's default `WalkSpeed` is 16 studs a second and `RunSpeed` 32: 5.6 and 11.2 m/s at this character's scale, a run and a sprint for a 1.75 m person. The default character keeps them (games are tuned for them) and plays its takes faster so the feet keep up: the Walk state is the Run take (3.6 m/s) at 1.56×, Run is Sprint (6.0 m/s) at 1.87×. Its controller's `CrouchSpeedScale` is 0.25 (4 studs a second, 1.4 m/s), so CrouchWalk (0.9 m/s) plays at 1.56× too. A game wanting a walking pace sets `WalkSpeed` near 5 and points the Walk state at the Walk take.
+The engine's default `WalkSpeed` is 16 studs a second and `RunSpeed` 32: 5.6 and 11.2 m/s at this character's scale, a run and a sprint for a 1.75 m person. The default character keeps them (games are tuned for them) and plays its takes faster so the feet keep up: the Walk state is the Walk take (1.45 m/s) at 3.86× (since the Character Studio refinement, R1: it was the Run take at 1.56×, which made every walk a run), Run is Sprint (6.0 m/s) at 1.87×. Its controller's `CrouchSpeedScale` is 0.25 (4 studs a second, 1.4 m/s), so CrouchWalk (0.9 m/s) plays at 1.56× too. At `WalkSpeed` 16 the walk's steps are quick; a game wanting a walking pace sets `WalkSpeed` near 4 and the Walk state's speed to 1.
 
 ## Acceptance (spec section 14)
 

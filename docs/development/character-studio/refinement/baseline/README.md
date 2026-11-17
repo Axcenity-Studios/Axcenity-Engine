@@ -36,6 +36,8 @@ The library holds 214 `realistic-*` benchmark files (180 of them face identity e
 
 Every run ended `test result: ok. 1 passed; 0 failed`. The first release build took 1 min 42 s.
 
+**Since R1 (section 9):** the two `realistic-<frame>-face-neutral` files are gone. To reproduce these runs, use `realistic-<frame>-cast-average.character.json` in their place: the same character apart from the name (no parameters set, the same underwear). The `walk` row can't be reproduced as it stands: `Walk@0.4` now plays the Walk take, where it played the Run take here.
+
 Captured as well and left in scratch (not committed): `Excited:1` (the smile that shows teeth), `Sad:1` (a frown), `Eye_Closed_Left:1,Eye_Closed_Right:1`, and `AXCENITY_CAPTURE_POSE=idle` for the two default bodies. Run the commands above with those values to get them again.
 
 Things to know about the runs:
@@ -194,3 +196,68 @@ Two things to know before any of these are kept:
 2. H1 to H3 are visible in the default view of the default characters and are not in the plan's defect lists. H1 (the briefs) shows in every full-body view of the Female body.
 3. The benchmark set has no arms-raised, bent-elbow or bent-knee capture in the engine, no warm, cool or outdoor light, and its cameras miss the head of the shortest and tallest bodies (section 5). The benchmark plan should decide whether to add views and presets (the rule in visual-qa.md is to add, never change).
 4. The `Walk` capture is a run stride: the default state machine plays the `Run` take for Walk and the `Sprint` take for Run (`crates/project/src/default_humanoid.rs:127` to `:144`). Brief §17.2 asks for a walking animation; the benchmark plan should say which take that is.
+
+## 9. The R1 cast (RA6, 2026-11-17)
+
+Added in the refinement's R1 (plan 11.6, brief §17.1 and §17.2): the benchmark **cast**, the capture's new lights, views, held poses and suites, and the Walk state playing the Walk take. Captured on the same reference PC from the `r1-benchmarks` branch (this folder's `main` plus RA6's change); how to run everything is in [visual-qa.md](../../visual-qa.md) ("Added beside them").
+
+### The cast
+
+`assets/characters/benchmarks/realistic-<frame>-cast-<name>.character.json`, for `masculine` and `feminine`, written by `make.py` (`CAST`). All bare: underwear and bald, as the family has no clothes or hair.
+
+| Name | Realistic parameters (both frames unless shown) | Source |
+|---|---|---|
+| `average` | None: the default body. It replaces the `face-neutral` files, which were the same characters as `body-default` (section 2) | Brief §17.1 |
+| `slim` | `fat` −0.6, `muscle` −0.2 | Asset audit's proposal |
+| `athletic` | `muscle` 0.7 (masculine) or 0.6 (feminine), `fat` −0.4 | The workspace's Athletic presets |
+| `muscular` | `muscle` 0.9, `fat` 0.1, `shoulder_width` 1.05 | Asset audit |
+| `heavyset` | `fat` 0.8, `muscle` 0.2 | The workspace's Heavyset presets |
+| `broad-face` | The Broad face preset: temples 0.6, cheekbones 0.6, jaw 0.5, eye spacing 0.3, mouth 0.3, chin width 0.3 and the rest of its column | [references/face/README.md](../../references/face/README.md) §3 |
+| `narrow-face` | The Narrow face preset (temples −0.6, jaw −0.5, cheekbones −0.4, …) | The same |
+| `distinctive` | `nose_bridge` 0.8, `nose_length` 0.6, `brow_ridge` 0.7, `chin_forward` 0.5, ears out 0.6, eyes deep 0.5, `upper_lip_fullness` −0.4 | Asset audit |
+| `asymmetry` | Every row of the face references' §4 "benchmark asymmetry face" column at once: the left brow and eye higher, the right cheekbone, jaw, ear and eye larger, `jaw_shift` 0.7 and `nose_tilt` 0.6, the mouth wider on the same side | The same, §4 |
+
+The stylized family has the same cast less `asymmetry` (its manifest has no sided parameter), on its own parameters (`build`, `muscle`, `head_width`, …).
+
+### Commands
+
+`<cast>` is the 18 files `assets/characters/benchmarks/realistic-*-cast-*.character.json`, separated by `;`; `<scratch>` a folder under the system temp directory. Every run ended `test result: ok. 1 passed; 0 failed`.
+
+| Run | Command (all with `AXCENITY_CAPTURE_DESCRIPTIONS=<cast> AXCENITY_CAPTURE_SHEETS=only cargo test -p axcenity-player --release -- --ignored capture_characters --nocapture`) | Time |
+|---|---|---|
+| `face` | `AXCENITY_CAPTURE_SUITE=face AXCENITY_CAPTURE_DIR=<scratch>/cast/face` | 168 s (6.7 to 13 s a character, 20 pictures) |
+| `body` | `AXCENITY_CAPTURE_SUITE=body AXCENITY_CAPTURE_DIR=<scratch>/cast/body` | 224 s (24 pictures each) |
+| `lights` | `AXCENITY_CAPTURE_LIGHTS=studio,warm,cool,outdoor AXCENITY_CAPTURE_VIEWS=front,three-quarter,face-front,skin-close AXCENITY_CAPTURE_DIR=<scratch>/cast/lights` | 152 s (16 pictures each) |
+
+A face sheet is 2560 × 1800 (rows: neutral, smile, frown, eyes closed, mouth open; columns: `face-front`, `face`, `face-three-quarter`, `face-side`), a body sheet 2560 × 2160 (rows: rest, T-pose, arms raised, elbows bent, knees bent, `Walk@0.3`; columns: front, three-quarter, side, back), a lights sheet 2560 × 1440 (rows: studio, warm, cool, outdoor).
+
+**The default run is unchanged.** Captured without the new options, `realistic-masculine-body-default` and `realistic-feminine-body-heavy` give sheets byte-identical to `engine/rest/` here, and the same `captures.json` settings.
+
+### The committed set
+
+[engine/cast/](engine/cast/): 9 sheets and 3 `captures.json` files (each lists all 18 characters of its run), **12.9 MB** (12,945,297 bytes). Every one of the 54 sheets was looked at; these were chosen to show the findings below. The `lights` run was captured again after the review re-aimed `skin-close` (its first aim missed the masculine cheek and cut the nose); only that column changed (the other three columns of both committed sheets are pixel-identical to the first run, and `captures.json` is byte-identical).
+
+| Folder | Sheets |
+|---|---|
+| [engine/cast/face/](engine/cast/face/) | `realistic-masculine-cast-average-face`, `realistic-feminine-cast-average-face`, `realistic-feminine-cast-asymmetry-face`, `realistic-masculine-cast-distinctive-face` |
+| [engine/cast/body/](engine/cast/body/) | `realistic-masculine-cast-average-body`, `realistic-feminine-cast-heavyset-body`, `realistic-masculine-cast-muscular-body` |
+| [engine/cast/lights/](engine/cast/lights/) | `realistic-masculine-cast-average`, `realistic-feminine-cast-heavyset` |
+
+### What the sheets show
+
+Against the defects of section 4. "Still" means a defect listed there is visible again; "new" means it isn't in that list.
+
+| # | What | Where | Against section 4 |
+|---|---|---|---|
+| C1 | **The face cast barely differs.** In the neutral `face-front` picture the face members differ from `average` by 0.3 to 0.7 % of the pixels (masculine: asymmetry 0.66, broad 0.45, distinctive 0.42, narrow 0.37; feminine 0.61, 0.39, 0.46, 0.32), less than the body members (heavyset 1.8, muscular 1.5). Side by side the broad and narrow faces differ in the jaw and a little at the cheekbones; the skull, brow and eyes stay the same, so they read as the same person. The asymmetry shows as one brow and eye a little higher and the chin off to one side; it reads as a person, not a fault, but only beside the average. The distinctive face shows its ears and a slightly heavier brow; the high bridge and long nose hardly show from the front. At the references' preset strengths the face parameters are too weak to make different people: R4's work (and M6, the two frames' nearly identical faces) | `face/*-face.png`, row 1 | **New** (M6 is its frame-to-frame form) |
+| C2 | **Heavyset is not heavy** on either frame: a thicker waist and arms, abdominal lines still drawn, no belly in the side view | `body/realistic-feminine-cast-heavyset-body.png`, `lights/realistic-feminine-cast-heavyset.png` | Still H6, H5 |
+| C3 | The open mouth is a dark bell with pointed corners; from the side the jaw drops as a block. The smile is a thin line with no cheek movement; the frown moves the brows and the mouth corners only | `face/*`, rows 2, 3, 5 | Still H8, M12 |
+| C4 | Eyes closed: both lids meet and no eyeball shows, in all four views, on every cast member | `face/*`, row 4 | As before: no defect |
+| C5 | **The held poses work and show what the clips did not.** The T-pose and arms raised turn at the shoulder with no visible collapse at this size; the shoulder top flattens a little at 150 degrees. Bent elbows bring the hands to the front of the chest, the fingers at the skin, so whether they pass into it can't be judged from these views. Bent knees fold the shins back, and the body hangs above the floor (only the knees turn, as in the Blender harness's `knee_135`). With the arms raised the hands leave the top of the full-body frames (fixed cameras) | `body/*`, rows 2 to 5 | New poses; no new defect seen at this size. The 90-degree shoulder targets the Blender check misses (section 6) are not visible here |
+| C6 | **Walk is a walk.** `Walk@0.3` is now an upright stride with the arms low, against the running stride of `engine/walk/` | `body/*`, row 6 | Section 2's "the Walk clip is a run": fixed |
+| C7 | Skin under the close view (`skin-close`: on both frames the nose from bridge to tip, the eye and the cheek below it; the masculine crop also the lips, the feminine the brow and forehead): a coarse, even pebble grain over the nose, cheek and forehead in every light, and an even wet gloss on the nose tip and lips. Under `outdoor` the grain reads as pitted on the nose and forehead; under `cool` the cheek goes dark and flat. The new view shows the grain at its worst | `lights/*`, the last column | Still H4 |
+| C8 | The new lights read as meant: warm is a low orange sun from the front left with a long floor shadow (the skin turns saturated orange, the darkest shadow brown); cool is a soft blue-grey overcast, under which the face goes dark and muddy; outdoor is a blue-sky midday with a short shadow and a lit face. None shows a defect the studio light hides, except that the grain (H4) and the hard shadow-line on the forehead (H2) show most under `outdoor` | `lights/*` | H2 and H4 still |
+| C9 | The briefs' pointed sides, the bra's flat straps, the ragged shadow edges and the pale jaw line are unchanged on every cast member | Every sheet | Still H1, H2, M4, M9 |
+| C10 | The 50/50 blend still wears the Male boxer briefs: a tie between the Male and Female choices goes to the first (`avatar/src/choices.rs`, `manifest.rs` `nearest_choice`). The benchmark files now list it, so they say what is drawn | `realistic-blend-*.character.json` | Still M11; its cause is the resolver, not `make.py` |
+
+Not captured: the stylized cast (its sheets are in [../../baseline/engine/](../../baseline/engine/) for the older cases), the face suite under `hard`, the `face-three-quarter`, `face-side` and `skin-close` views of the body members.

@@ -5,5 +5,10 @@
   "parameters": {
     "frame": 0,
     "temple_width": 1
-  }
+  },
+  "items": [
+    {
+      "id": "axcenity/realistic-boxer-briefs"
+    }
+  ]
 }

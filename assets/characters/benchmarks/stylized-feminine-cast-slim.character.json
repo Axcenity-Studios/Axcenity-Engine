@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-feminine-cast-slim",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": -0.6,
+    "frame": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}
