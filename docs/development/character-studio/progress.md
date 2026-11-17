@@ -15,6 +15,11 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 | Refinement R0 (Paul's brief of 2026-11-16) | **Done** (2026-11-16) | Audits, reference index, baseline of `main`, plan section 11 (stages R1 to R11); see the log |
 | Refinement R1 to R11 | Not started | R1 (the studio shell and the contracts) next; CO7 and CO9 in parallel |
 
+## 2026-11-17: Paul's answers to the refinement's questions
+
+- **Decisions 7 to 10** (plan section 0): both families selectable, realistic the default; proportion ranges widened to ends set by deformation quality and population data, with hips both ways; ADR-0038 superseded by [ADR-0041](../../../wiki/Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md) (a shared base mesh with live identity morphs; baking only as an optional optimization); hair and clothing held to [asset-quality.md](asset-quality.md) and treated as drafts until they pass it.
+- **Plan changes:** R1 makes both families selectable; a new track **R2a** moves identity to live weights and brings CO8's compute posing forward; R3 widens the ranges; R6 and R7 count only items that pass the standard. Wave 1 (already running) is unaffected, except that work leaning on baked identity is adapted at merge.
+
 ## 2026-11-16: the refinement, Stage 0 (R0)
 
 - **Brief:** Paul's "Comprehensive Character Creator Refinement Plan" of 2026-11-16, kept as [refinement/brief.md](refinement/brief.md). It extends the overhaul with a Sims-like interaction layer: a three-panel studio, direct manipulation on the character, presets, randomize, comparison, capability-aware assets. The plan's new section 11 maps its Stages 0 to 11 onto the CO milestones as R0 to R11.
