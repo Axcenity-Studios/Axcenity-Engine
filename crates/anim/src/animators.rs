@@ -31,7 +31,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use axcenity_assets::{
-    Assets, FaceProfiles, Model, ModelFormat, Posed, Rig, RigDefinitions, Slot, Take,
+    Assets, FaceProfiles, LiveIdentity, Model, ModelFormat, Posed, Rig, RigDefinitions, Slot, Take,
 };
 use axcenity_core::{
     ClassName, InstanceId, LayerWeight, Parameter, PlayRequest, Value, Vector3, World,
@@ -49,6 +49,7 @@ use crate::files::{
     CLIP_EXTENSION, ClipFile, DEFAULT_BLEND, STATE_MACHINE_EXTENSION, StateMachineFile,
 };
 use crate::ik_control;
+use crate::live_identity::LiveIdentities;
 use crate::property_clip::{Applied, apply_evaluated, blend_evaluated};
 use crate::ragdoll;
 use crate::retarget::RetargetProfile;
@@ -161,6 +162,8 @@ pub struct Animators {
     /// Which of a leader's blend shapes each of a follower's takes its
     /// weight from, by the two models' keys ([`same_shapes`]).
     shape_maps: HashMap<(u64, u64), Arc<[Option<usize>]>>,
+    /// How each model wears each identity live (R2a, ADR-0041).
+    identities: LiveIdentities,
 }
 
 /// A pose to work out off the calling thread: everything it needs from
@@ -179,6 +182,8 @@ struct PoseJob {
     face: Option<FaceFrame>,
     /// Its body sliders, if any is set.
     shape: Option<BodyShape>,
+    /// The identity it wears live, if any.
+    live: Option<Arc<LiveIdentity>>,
 }
 
 /// A face's layers this frame (shared with the frames that reuse them
@@ -255,12 +260,17 @@ impl FaceFrame {
 /// are turned here, after everything that poses a bone and before the skin
 /// is posed, in the `pose` the caller keeps, so a character's parts
 /// (followers, which take that pose by bone name) get them too.
+///
+/// A live identity (`live`, R2a) is put on last: its shape weights over
+/// the face's and the correctives', and its joint corrections. Its bone
+/// changes were added to `pose` after the clips by the caller.
 fn skinned(
     model: &Model,
     rig: &Rig,
     face: Option<&FaceFrame>,
     pose: &mut axcenity_assets::Pose,
     shape: &mut [glam::Vec3],
+    live: Option<&LiveIdentity>,
 ) -> Option<Posed> {
     crate::twist::drive(rig, pose, shape);
     let mut posed = match face {
@@ -271,6 +281,9 @@ fn skinned(
     // `correctives.rs`): leaned on for the finished pose, after the face's
     // own shapes are set.
     crate::correctives::drive(model, rig, pose, &mut posed);
+    if let Some(live) = live {
+        live.dress(&mut posed);
+    }
     Some(posed)
 }
 
@@ -283,7 +296,7 @@ pub(crate) fn skinned_for_test(
     pose: &mut axcenity_assets::Pose,
     shape: &mut [glam::Vec3],
 ) -> Option<Posed> {
-    skinned(model, rig, None, pose, shape)
+    skinned(model, rig, None, pose, shape, None)
 }
 
 /// The profile a FaceControls was matched to its model with.
@@ -451,6 +464,7 @@ impl Animators {
         self.reported.clear();
         self.changed.clear();
         self.shape_maps.clear();
+        self.identities.clear();
     }
 
     /// Plays the new version of the clip, state machine or model file at
@@ -611,8 +625,12 @@ impl Animators {
                 &job.bone_layers,
             );
             // A character's identity moves its bones after the clips, so
-            // every clip plays on every character.
+            // every clip plays on every character: a baked one's (a
+            // derived model) or one worn live.
             job.model.settle(&mut pose);
+            if let Some(live) = &job.live {
+                live.settle(&mut pose);
+            }
             let mut shape = match &job.shape {
                 Some(shape) => shape.apply(&job.rig, &mut pose),
                 None => Vec::new(),
@@ -623,6 +641,7 @@ impl Animators {
                 job.face.as_ref(),
                 &mut pose,
                 &mut shape,
+                job.live.as_deref(),
             );
             (pose, shape, posed)
         });
@@ -713,6 +732,9 @@ impl Animators {
                 let Some(mut made) = model.pose_shaped(&follows, &follows_shape) else {
                     continue;
                 };
+                // Its own live identity (the body's, plus an item's own
+                // parameters), put on after its leader's shapes.
+                let live = self.identities.of(world, assets, child, &model);
                 if let Some((leader_model, leader_posed)) = &leading
                     && !model.morph_targets.is_empty()
                 {
@@ -735,6 +757,9 @@ impl Animators {
                             made.set_morph_weights(&weights);
                         }
                     }
+                }
+                if let Some(live) = &live {
+                    live.dress(&mut made);
                 }
                 self.poses.insert(child, Arc::new(made));
                 posed.insert(child);
@@ -985,6 +1010,11 @@ impl Animators {
             )
         });
 
+        // The identity it wears live (R2a), if any.
+        let worn = mesh
+            .as_ref()
+            .and_then(|mesh| self.identities.of(world, assets, owner, mesh));
+
         // Bones: the state machine's pose, then each layer over it.
         let mut posed = false;
         if let (Some(model), Some(rig)) = (&model, &rig) {
@@ -1052,6 +1082,7 @@ impl Animators {
                         bone_layers,
                         face,
                         shape: BodyShape::read(world, owner),
+                        live: worn.clone(),
                     });
                     posed = true;
                 } else {
@@ -1063,6 +1094,9 @@ impl Animators {
                         &bone_layers,
                     );
                     model.settle(&mut pose);
+                    if let Some(worn) = &worn {
+                        worn.settle(&mut pose);
+                    }
                     // Body sliders first, so IK and the feet work on the
                     // body as it's shaped.
                     let mut shape = match BodyShape::read(world, owner) {
@@ -1122,7 +1156,14 @@ impl Animators {
                             self.report(problem);
                         }
                     }
-                    let made = skinned(model, rig, face.as_ref(), &mut pose, &mut shape);
+                    let made = skinned(
+                        model,
+                        rig,
+                        face.as_ref(),
+                        &mut pose,
+                        &mut shape,
+                        worn.as_deref(),
+                    );
                     if let Some(made) = made {
                         self.poses.insert(owner, Arc::new(made));
                         self.local.insert(owner, (Arc::clone(rig), pose, shape));
@@ -1132,7 +1173,11 @@ impl Animators {
             }
         } else if let (Some(face), Some(mesh)) = (&face, &mesh) {
             // Blend shapes and no skeleton: posed for the face alone.
-            self.poses.insert(owner, Arc::new(face.shapes_only(mesh)));
+            let mut made = face.shapes_only(mesh);
+            if let Some(worn) = &worn {
+                worn.dress(&mut made);
+            }
+            self.poses.insert(owner, Arc::new(made));
             posed = true;
         } else if let Some(&control) = parts.ik.first() {
             let name = world.full_name(control).unwrap_or_default();

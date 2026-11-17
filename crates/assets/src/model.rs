@@ -25,7 +25,7 @@ mod test_rig;
 
 pub use collision::is_piece as is_collision_piece;
 pub use identity::{
-    BoneChange, BoneDelta, Identity, IdentityLayer, derived_mesh_id, split_derived,
+    BoneChange, BoneDelta, Identity, IdentityLayer, LiveIdentity, derived_mesh_id, split_derived,
 };
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};

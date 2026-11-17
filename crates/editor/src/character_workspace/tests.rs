@@ -142,31 +142,34 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// A slider on the realistic body re-bakes the preview: the body's model
-/// changes with the description, and a drag is shown while it goes on.
+/// A slider on the realistic body changes the preview's identity, worn
+/// live (ADR-0041): the body keeps its base model and wears a new identity
+/// key, nothing is baked, and a drag is shown while it goes on.
 #[test]
 fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
     let folder = test_folder("workspace-slider");
     let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
-    let before = workspace.worn()[0].clone();
+    let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
+    let identity = |workspace: &CharacterWorkspace| {
+        axcenity_anim::identity_key(&workspace.world, body).expect("worn live")
+    };
+    let mesh = workspace.worn()[0].clone();
+    let before = identity(&workspace);
     let base = workspace.base().unwrap();
     let fat = base.parameter("fat").unwrap().clone();
 
     let started = Instant::now();
     workspace.set_parameter(&fat, 0.8, true);
-    println!(
-        "applied a slider (the bake included) in {:?}",
-        started.elapsed()
-    );
+    println!("applied a slider in {:?}", started.elapsed());
     assert_eq!(workspace.parameter("fat"), 0.8);
-    let after = workspace.worn()[0].clone();
-    assert_ne!(after, before, "a new identity, a new derived model");
+    let after = identity(&workspace);
+    assert_ne!(after, before, "a new identity");
+    assert_eq!(workspace.worn()[0], mesh, "on the same base model");
 
-    // While a slider is dragged, frames show it at most every so often.
+    // While a slider is dragged, every step shows it (no throttle: a
+    // live change is new weights).
     workspace.set_parameter(&fat, 0.2, false);
-    std::thread::sleep(DRAG_APPLY_EVERY);
-    workspace.step();
-    assert_ne!(workspace.worn()[0], after, "shown during the drag");
+    assert_ne!(identity(&workspace), after, "shown during the drag");
     workspace.set_parameter(&fat, 0.3, true);
     workspace.undo();
     assert_eq!(
@@ -174,7 +177,8 @@ fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
         0.8,
         "the drag was one undo step"
     );
-    assert_eq!(workspace.worn()[0], after);
+    assert_eq!(identity(&workspace), after);
+    assert_eq!(workspace.assets.derived_count(), 0, "nothing was baked");
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -473,14 +477,21 @@ fn the_views_look_at_the_character_from_where_they_say() {
     assert!(orbit.target.length() < Vec3::new(4.0, 6.0, 4.0).length() + 0.01);
 }
 
-/// Overhaul CO3 and CO12: a character the workspace saves, applied to a
-/// character in a game, is drawn from the same models as the preview (the
-/// preview is the game's applier, so the identity bakes are the same).
+/// Overhaul CO3 and CO12, refinement R2a: a character the workspace saves,
+/// applied to a character in a game, is drawn from the same models as the
+/// preview and puts every corner of every part in the same place, in the
+/// same pose, to 0.2 mm. Both wear the identity live (ADR-0041): no
+/// derived `MeshId` anywhere in either World.
 #[test]
-fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
+fn a_character_file_applied_in_a_game_matches_the_workspaces_preview() {
+    use axcenity_render::glam::Vec3;
     let folder = test_folder("workspace-agrees");
     let mut workspace = CharacterWorkspace::open_preset(&folder, 2).unwrap();
-    workspace.edit(|description| description.name = "Agrees".to_owned());
+    workspace.edit(|description| {
+        description.name = "Agrees".to_owned();
+        description.parameters.insert("fat".to_owned(), 0.6);
+        description.parameters.insert("nose_length".to_owned(), 0.5);
+    });
     let path = workspace.save().unwrap();
 
     let assets = Assets::new(&folder);
@@ -491,8 +502,19 @@ fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
     let description = Description::from_json(&std::fs::read_to_string(&path).unwrap()).unwrap();
     let applied = applier::apply_description(&mut world, &assets, character, &description).unwrap();
     assert!(applied.problems.is_empty(), "{:?}", applied.problems);
+    let mut animators = axcenity_anim::Animators::new();
+    for _ in 0..20 {
+        workspace.step_by(1.0 / 60.0);
+        animators.update(&mut world, &assets, 1.0 / 60.0);
+    }
 
-    let models = |world: &World, body: InstanceId| -> BTreeMap<String, String> {
+    // Each MeshPart's `MeshId` and its corners where its pose puts them,
+    // in its file's space (metres), by the part's name.
+    let corners = |world: &World,
+                   assets: &Assets,
+                   poses: &axcenity_scene::Poses,
+                   body: InstanceId|
+     -> BTreeMap<String, (String, Vec<Vec3>)> {
         let mut parts = vec![body];
         parts.extend(world.get(body).unwrap().children().iter().copied());
         parts
@@ -500,15 +522,48 @@ fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
             .filter_map(|part| {
                 let instance = world.get(part)?;
                 let mesh = instance.property("MeshId")?.as_str()?.to_owned();
-                Some((instance.name().to_owned(), mesh))
+                assert!(
+                    axcenity_assets::split_derived(&mesh).1.is_none(),
+                    "{} draws a derived model: {mesh}",
+                    instance.name()
+                );
+                let model = assets.model_blocking(&mesh).unwrap();
+                let posed = poses.get(&part).expect("every part is posed");
+                let unfit = model.rig.as_ref().unwrap().fit.inverse();
+                let points = (0..model.primitives.len())
+                    .flat_map(|index| posed.primitive(&model, index, 0).positions.clone())
+                    .map(|corner| unfit.transform_point3(Vec3::from(corner)))
+                    .collect();
+                Some((instance.name().to_owned(), (mesh, points)))
             })
             .collect()
     };
     let preview_body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
-    assert_eq!(
-        models(&workspace.world, preview_body),
-        models(&world, applied.body)
+    let preview = corners(
+        &workspace.world,
+        &workspace.assets,
+        workspace.poses(),
+        preview_body,
     );
+    let game = corners(&world, &assets, animators.poses(), applied.body);
+    assert_eq!(
+        preview.keys().collect::<Vec<_>>(),
+        game.keys().collect::<Vec<_>>()
+    );
+    for (name, (mesh, points)) in &preview {
+        let (game_mesh, game_points) = &game[name];
+        assert_eq!(mesh, game_mesh, "{name}");
+        assert_eq!(points.len(), game_points.len(), "{name}");
+        let worst = points
+            .iter()
+            .zip(game_points)
+            .map(|(a, b)| a.distance(*b))
+            .fold(0.0, f32::max);
+        assert!(worst < 2e-4, "{name}: {worst} m apart");
+    }
+    // The identity is worn: the body is not its plain base.
+    let plain = axcenity_anim::identity_key(&world, applied.body);
+    assert!(plain.is_some(), "the game's body wears an identity");
     let _ = std::fs::remove_dir_all(&folder);
 }
 

@@ -1,0 +1,69 @@
+        PASS [   0.011s] ( 1/34) axcenity-assets model::identity::tests::a_bone_no_change_names_stays_where_it_is
+        PASS [   0.016s] ( 2/34) axcenity-assets derived::tests::an_identity_that_changes_nothing_is_the_base_model
+        PASS [   0.020s] ( 3/34) axcenity-assets model::identity::tests::identity_shapes_are_baked_in_and_live_shapes_stay
+        PASS [   0.026s] ( 4/34) axcenity-assets model::identity::tests::a_shape_named_at_zero_is_still_an_identity_shape
+        PASS [   0.029s] ( 5/34) axcenity-assets model::identity::tests::a_model_with_the_layers_shape_keeps_its_surface_and_turns_about_the_new_joint
+        PASS [   0.091s] ( 6/34) axcenity-assets model::identity::tests::an_empty_identity_changes_nothing_but_the_key
+        PASS [   0.095s] ( 7/34) axcenity-assets model::identity::tests::the_key_is_the_same_for_the_same_identity_and_differs_otherwise
+        PASS [   0.109s] ( 8/34) axcenity-assets model::identity::tests::a_model_without_the_layers_shape_is_carried_by_the_bone
+        PASS [   0.119s] ( 9/34) axcenity-assets model::identity::tests::derived_mesh_ids_split_back_into_their_base_and_key
+        FAIL [   0.124s] (10/34) axcenity-assets model::identity::tests::an_identity_worn_live_poses_the_mesh_where_its_bake_does
+    thread 'model::identity::tests::an_identity_worn_live_poses_the_mesh_where_its_bake_does' (31720) panicked at crates\assets\src\model\identity.rs:854:21:
+        PASS [   0.138s] (11/34) axcenity-assets derived::tests::a_derived_model_of_a_missing_file_fails_like_its_base
+        PASS [   0.151s] (12/34) axcenity-editor::bin/axcenity-editor command_palette::tests::synonyms_and_descriptions_find_a_command_by_other_words
+        PASS [   0.200s] (13/34) axcenity-editor::bin/axcenity-editor app::search_tests::synonyms_and_descriptions_find_commands_and_tools
+        PASS [   0.835s] (14/34) axcenity-assets derived::tests::a_derived_model_is_found_by_its_mesh_id_and_shared
+        PASS [   0.841s] (15/34) axcenity-assets derived::tests::an_identity_this_run_never_registered_is_the_base_model
+        PASS [   0.900s] (16/34) axcenity-assets derived::tests::a_registered_identity_is_found_by_its_key_and_bakes_nothing
+        PASS [   1.270s] (17/34) axcenity-assets derived::tests::a_reloaded_base_is_baked_again
+        FAIL [   2.106s] (18/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_description_applied_in_the_player_wears_its_parts
+    thread 'default_humanoid_tests::description::a_description_applied_in_the_player_wears_its_parts' (27912) panicked at crates\player\src\default_humanoid_tests\description.rs:167:5:
+      left: "assets/characters/humanoid/HumanoidParts.glb#AxcenityHumanoid/Body#ide6eda6c06a1525e"
+     right: "assets/characters/humanoid/HumanoidParts.glb#AxcenityHumanoid/Body"
+        PASS [   2.183s] (19/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_descriptions_proportions_reach_the_body_sliders
+        FAIL [   2.183s] (20/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_kept_description_is_applied_again_where_the_world_is_loaded
+    thread 'default_humanoid_tests::description::a_kept_description_is_applied_again_where_the_world_is_loaded' (6532) panicked at crates\player\src\default_humanoid_tests\description.rs:613:62:
+        FAIL [   2.384s] (21/34) axcenity-editor::bin/axcenity-editor character_workspace::tests::a_slider_changes_the_realistic_preview_while_it_is_dragged
+    thread 'character_workspace::tests::a_slider_changes_the_realistic_preview_while_it_is_dragged' (22056) panicked at crates\editor\src\character_workspace\tests.rs:154:61:
+        FAIL [   2.632s] (22/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::an_explicit_bake_puts_every_corner_where_the_live_character_has_it
+    thread 'default_humanoid_tests::description::an_explicit_bake_puts_every_corner_where_the_live_character_has_it' (17044) panicked at crates\player\src\default_humanoid_tests\description.rs:750:5:
+      left: 0
+     right: 10
+        PASS [   2.648s] (23/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::an_applied_character_with_nothing_playing_still_wears_its_parts
+        FAIL [   2.695s] (24/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_parameter_change_on_an_applied_character_changes_weights_only
+    thread 'default_humanoid_tests::description::a_parameter_change_on_an_applied_character_changes_weights_only' (27132) panicked at crates\player\src\default_humanoid_tests\description.rs:94:28:
+        FAIL [   1.907s] (25/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::applied_parts_wear_the_bodys_identity_live_and_follow_its_live_shapes
+    thread 'default_humanoid_tests::description::applied_parts_wear_the_bodys_identity_live_and_follow_its_live_shapes' (32984) panicked at crates\player\src\default_humanoid_tests\description.rs:239:5:
+      left: "assets/characters/humanoid/HumanoidParts.glb#AxcenityHumanoid/Jacket_Cropped#ic640d1f516e9c324"
+     right: "assets/characters/humanoid/HumanoidParts.glb#AxcenityHumanoid/Jacket_Cropped"
+        FAIL [   2.110s] (26/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::an_items_own_parameters_are_live_weights_on_its_part
+    thread 'default_humanoid_tests::description::an_items_own_parameters_are_live_weights_on_its_part' (18956) panicked at crates\player\src\default_humanoid_tests\description.rs:94:28:
+        FAIL [   4.357s] (27/34) axcenity-editor::bin/axcenity-editor character_workspace::tests::a_character_file_applied_in_a_game_matches_the_workspaces_preview
+    thread 'character_workspace::tests::a_character_file_applied_in_a_game_matches_the_workspaces_preview' (25036) panicked at crates\editor\src\character_workspace\tests.rs:526:17:
+        PASS [   2.374s] (28/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::material_values_modulate_the_material_and_keep_its_maps
+        FAIL [   2.080s] (29/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes
+    thread 'default_humanoid_tests::description::the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes' (35768) panicked at crates\player\src\default_humanoid_tests\description.rs:115:9:
+        FAIL [   2.419s] (30/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description_lua::a_script_builds_a_description_and_applies_it_to_the_character
+    thread 'default_humanoid_tests::description_lua::a_script_builds_a_description_and_applies_it_to_the_character' (41756) panicked at crates\player\src\default_humanoid_tests\description_lua.rs:146:5:
+    assets/characters/humanoid/HumanoidParts.glb#AxcenityHumanoid/Body#i8bad0c22e27e1bcf
+        PASS [   2.699s] (31/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description_lua::a_kept_description_changed_by_a_script_is_applied_the_next_frame
+        PASS [   2.391s] (32/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description_lua::players_makes_a_character_from_a_description
+        FAIL [   8.302s] (33/34) axcenity-player::bin/axcenity-player character_capture::an_explicit_bake_draws_the_same_pixels_as_the_live_character
+    thread 'character_capture::an_explicit_bake_draws_the_same_pixels_as_the_live_character' (32448) panicked at crates\player\src\character_capture.rs:1786:5:
+    assertion `left == right` failed: live: nothing baked
+      left: 9
+     right: 0
+        PASS [  17.333s] (34/34) axcenity-player::bin/axcenity-player character_capture::the_same_description_captures_identical_pictures_and_every_view_is_drawn
+     Summary [  17.336s] 34 tests run: 22 passed, 12 failed, 1735 skipped
+        FAIL [   0.124s] (10/34) axcenity-assets model::identity::tests::an_identity_worn_live_poses_the_mesh_where_its_bake_does
+        FAIL [   2.106s] (18/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_description_applied_in_the_player_wears_its_parts
+        FAIL [   2.183s] (20/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_kept_description_is_applied_again_where_the_world_is_loaded
+        FAIL [   2.384s] (21/34) axcenity-editor::bin/axcenity-editor character_workspace::tests::a_slider_changes_the_realistic_preview_while_it_is_dragged
+        FAIL [   2.632s] (22/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::an_explicit_bake_puts_every_corner_where_the_live_character_has_it
+        FAIL [   2.695s] (24/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::a_parameter_change_on_an_applied_character_changes_weights_only
+        FAIL [   1.907s] (25/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::applied_parts_wear_the_bodys_identity_live_and_follow_its_live_shapes
+        FAIL [   2.110s] (26/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::an_items_own_parameters_are_live_weights_on_its_part
+        FAIL [   4.357s] (27/34) axcenity-editor::bin/axcenity-editor character_workspace::tests::a_character_file_applied_in_a_game_matches_the_workspaces_preview
+        FAIL [   2.080s] (29/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description::the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes
+        FAIL [   2.419s] (30/34) axcenity-player::bin/axcenity-player default_humanoid_tests::description_lua::a_script_builds_a_description_and_applies_it_to_the_character
+        FAIL [   8.302s] (33/34) axcenity-player::bin/axcenity-player character_capture::an_explicit_bake_draws_the_same_pixels_as_the_live_character

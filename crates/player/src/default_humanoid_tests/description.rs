@@ -1,8 +1,10 @@
-//! Character Studio overhaul CO3: a character description applied in the
-//! player (`gameplay`'s applier, `docs/development/character-studio/
-//! architecture.md`). The character wears the description's parts, its
-//! meshes have the identity baked in, its eyes move with the frame's
-//! bones, its body sliders are set and its material values modulate.
+//! Character Studio overhaul CO3 and refinement R2a: a character
+//! description applied in the player (`gameplay`'s applier,
+//! `docs/development/character-studio/architecture.md`). The character
+//! wears the description's parts on its base meshes with its identity worn
+//! live (ADR-0041: shape weights and bone changes on every pose), its eyes
+//! move with the frame's bones, its body sliders are set and its material
+//! values modulate. An explicit bake draws the same.
 
 use axcenity_assets::Model;
 use axcenity_avatar::{Colour, Description, MaterialValue, WornItem};
@@ -75,8 +77,57 @@ fn corners(model: &Model, positions: impl Fn(usize) -> Vec<[f32; 3]>) -> Vec<Vec
         .collect()
 }
 
-fn rest_corners(model: &Model) -> Vec<Vec3> {
-    corners(model, |index| model.primitives[index].positions.clone())
+/// `part`'s corners as the game posed it last, in its file's space.
+fn posed_corners(game: &Game, part: InstanceId) -> Vec<Vec3> {
+    let model = game.assets.model_blocking(&mesh_id(game, part)).unwrap();
+    let posed = game.animators.poses()[&part].clone();
+    corners(&model, |index| {
+        posed.primitive(&model, index, 0).positions.clone()
+    })
+}
+
+/// The live weight of `part`'s blend shape `name` as the game posed it.
+fn weight(game: &Game, part: InstanceId, name: &str) -> f32 {
+    let model = game.assets.model_blocking(&mesh_id(game, part)).unwrap();
+    let index = model
+        .morph_targets
+        .iter()
+        .position(|target| target.name == name)
+        .unwrap_or_else(|| panic!("no shape {name}"));
+    game.animators.poses()[&part].morph_weights()[index]
+}
+
+/// Every MeshPart's `MeshId` in the Workspace, by its full name.
+fn mesh_ids(game: &Game) -> Vec<(String, String)> {
+    game.world
+        .all_below(game.world.workspace(), |class| class == ClassName::MeshPart)
+        .into_iter()
+        .map(|part| {
+            (
+                game.world.full_name(part).unwrap_or_default(),
+                mesh_id(game, part),
+            )
+        })
+        .collect()
+}
+
+/// No MeshPart draws a derived (baked) model.
+fn nothing_derived(game: &Game) {
+    for (name, mesh) in mesh_ids(game) {
+        assert!(
+            axcenity_assets::split_derived(&mesh).1.is_none(),
+            "{name} draws the derived model {mesh}"
+        );
+    }
+}
+
+/// The character's Animator plays nothing: it poses the body at rest,
+/// with its identity, and leads its parts (as the capture tool does).
+fn still(game: &mut Game, body: InstanceId) {
+    let animator = game.world.find_first_child(body, "Animator").unwrap();
+    game.world
+        .set_property(animator, "StateMachine", Value::String(String::new()))
+        .unwrap();
 }
 
 fn middle(points: &[Vec3]) -> Vec3 {
@@ -112,13 +163,12 @@ fn a_description_applied_in_the_player_wears_its_parts() {
             "Teeth"
         ]
     );
-    // The body is the library's, with the identity baked in: the clothes
-    // hide regions of it, so it's a derived model.
+    // The body is the library's own mesh, wearing its identity live (the
+    // clothes hide regions of it: an identity): no derived model.
     let body_mesh = mesh_id(&game, body);
-    assert!(
-        body_mesh.starts_with(&format!("{PARTS}#AxcenityHumanoid/Body#")),
-        "{body_mesh}"
-    );
+    assert_eq!(body_mesh, format!("{PARTS}#AxcenityHumanoid/Body"));
+    assert!(axcenity_anim::identity_key(&game.world, body).is_some());
+    nothing_derived(&game);
     // Its feet stayed where they were: the two files share a skeleton.
     game.frames(30, MoveInput::default());
     let after = game.vector(body, "Position");
@@ -179,28 +229,41 @@ fn a_description_applied_in_the_player_wears_its_parts() {
 }
 
 #[test]
-fn applied_parts_have_the_bodys_identity_baked_in_and_follow_its_live_shapes() {
+fn applied_parts_wear_the_bodys_identity_live_and_follow_its_live_shapes() {
     let mut game = game("description-shapes");
     let character = game.character();
     let body = game.world.find_first_child(character, "Body").unwrap();
+    still(&mut game, body);
     let plain = described(&[], &["axcenity/cropped-jacket"]);
     apply_description(&mut game.world, &game.assets, character, &plain).unwrap();
     let jacket = game.world.find_first_child(body, "Jacket_Cropped").unwrap();
-    let slim_jacket = game.assets.model_blocking(&mesh_id(&game, jacket)).unwrap();
-    let slim_body = game.assets.model_blocking(&mesh_id(&game, body)).unwrap();
+    let jacket_mesh = format!("{PARTS}#AxcenityHumanoid/Jacket_Cropped");
+    assert_eq!(mesh_id(&game, jacket), jacket_mesh);
+    game.frames(3, MoveInput::default());
+    let slim_body = posed_corners(&game, body);
 
     let heavy = described(&[("build", 1.0)], &["axcenity/cropped-jacket"]);
     apply_description(&mut game.world, &game.assets, character, &heavy).unwrap();
-    let heavy_jacket = game.assets.model_blocking(&mesh_id(&game, jacket)).unwrap();
-    let heavy_body = game.assets.model_blocking(&mesh_id(&game, body)).unwrap();
-    assert_ne!(heavy_jacket.key(), slim_jacket.key());
+    game.frames(3, MoveInput::default());
+    // Still the base meshes: the build is a live weight on the body and,
+    // by name, on the jacket.
+    assert_eq!(mesh_id(&game, jacket), jacket_mesh);
+    nothing_derived(&game);
+    assert_eq!(weight(&game, body, "Build_Heavy"), 1.0);
+    assert_eq!(weight(&game, jacket, "Build_Heavy"), 1.0);
+    // The regions the jacket hides are masked on the body.
+    let body_model = game.assets.model_blocking(&mesh_id(&game, body)).unwrap();
+    let masked = body_model
+        .morph_targets
+        .iter()
+        .filter(|target| target.name.starts_with("Mask_"))
+        .filter(|target| weight(&game, body, &target.name) == 1.0)
+        .count();
+    assert!(masked > 0, "the jacket hides some of the body");
 
-    // The heavy build is in the rest meshes themselves, the jacket's as
-    // well as the body's: exactly the base's `Build_Heavy` shape.
-    let base = game
-        .assets
-        .model_blocking(&format!("{PARTS}#AxcenityHumanoid/Jacket_Cropped"))
-        .unwrap();
+    // At rest the jacket is exactly the base's `Build_Heavy` shape, as the
+    // bake made it.
+    let base = game.assets.model_blocking(&jacket_mesh).unwrap();
     let target = base
         .morph_targets
         .iter()
@@ -213,44 +276,19 @@ fn applied_parts_have_the_bodys_identity_baked_in_and_follow_its_live_shapes() {
     let expected = corners(&base, |index| {
         leaned.primitive(&base, index, 0).positions.clone()
     });
-    let baked = rest_corners(&heavy_jacket);
-    assert_eq!(baked.len(), expected.len());
-    let worst = baked
+    let live = posed_corners(&game, jacket);
+    assert_eq!(live.len(), expected.len());
+    let worst = live
         .iter()
         .zip(&expected)
         .map(|(a, b)| a.distance(*b))
         .fold(0.0, f32::max);
     assert!(worst < 1e-4, "{worst} m from the base's shape");
-    let grew = middle(&rest_corners(&heavy_body)).distance(middle(&rest_corners(&slim_body)));
+    let grew = middle(&posed_corners(&game, body)).distance(middle(&slim_body));
     assert!(grew > 1e-4, "the body is heavier: {grew}");
 
-    // Identity shapes are gone from the derived models (nothing morphs
-    // them each frame); the face's expression shapes are still live.
-    let names = |model: &Model| -> Vec<String> {
-        model
-            .morph_targets
-            .iter()
-            .map(|target| target.name.clone())
-            .collect()
-    };
-    assert!(!names(&heavy_body).iter().any(|name| name == "Build_Heavy"));
-    assert!(
-        !names(&heavy_body)
-            .iter()
-            .any(|name| name.starts_with("Mask_"))
-    );
-    assert!(
-        !names(&heavy_jacket)
-            .iter()
-            .any(|name| name == "Build_Heavy")
-    );
-    let blink = names(&heavy_body)
-        .iter()
-        .position(|name| name == "Blink_Left")
-        .expect("expressions stay live");
-
-    // A live shape on the body reaches the parts that have it: the lashes
-    // close with the lid.
+    // A live expression shape on the body reaches the parts that have it:
+    // the lashes close with the lid.
     let face = game.world.create(ClassName::FaceControls).unwrap();
     game.world.set_parent(face, Some(body)).unwrap();
     for name in ["BlinkEnabled", "ProceduralEnabled"] {
@@ -262,24 +300,16 @@ fn applied_parts_have_the_bodys_identity_baked_in_and_follow_its_live_shapes() {
         .set_property(face, "Blink_Left", Value::Number(1.0))
         .unwrap();
     game.frames(20, MoveInput::default());
-    let body_pose = game.animators.poses()[&body].clone();
-    assert!(
-        body_pose.morph_weights()[blink] > 0.9,
-        "the body blinks: {:?}",
-        body_pose.morph_weights()[blink]
-    );
+    let blink = weight(&game, body, "Blink_Left");
+    assert!(blink > 0.9, "the body blinks: {blink}");
     let lashes = game.world.find_first_child(body, "Lashes").unwrap();
-    let lash_model = game.assets.model_blocking(&mesh_id(&game, lashes)).unwrap();
-    let lash_blink = names(&lash_model)
-        .iter()
-        .position(|name| name == "Blink_Left")
-        .expect("the lashes carry the blink");
-    let lash_pose = game.animators.poses()[&lashes].clone();
     assert_eq!(
-        lash_pose.morph_weights()[lash_blink],
-        body_pose.morph_weights()[blink],
+        weight(&game, lashes, "Blink_Left"),
+        blink,
         "the lashes blink with the lid"
     );
+    // The identity is still worn under the expression.
+    assert_eq!(weight(&game, body, "Build_Heavy"), 1.0);
     game.no_errors();
 }
 
@@ -310,42 +340,40 @@ fn the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes() {
         .and_then(|driver| driver.scale)
         .expect("the feminine eyes are another size");
 
+    // Measured posed at rest, as the game poses it (no derived models:
+    // the identity is worn live).
+    let animator = game.world.find_first_child(body, "Animator").unwrap();
+    let machine = game
+        .world
+        .get(animator)
+        .unwrap()
+        .property("StateMachine")
+        .cloned();
+    still(&mut game, body);
     let measure = |game: &mut Game, frame: f32| {
         let description = described(&[("frame", frame)], &[]);
         apply_description(&mut game.world, &game.assets, character, &description).unwrap();
         game.frames(3, MoveInput::default());
+        nothing_derived(game);
         let eyes = game.world.find_first_child(body, "Eyes").unwrap();
         let body_model = game.assets.model_blocking(&mesh_id(game, body)).unwrap();
-        let eyes_model = game.assets.model_blocking(&mesh_id(game, eyes)).unwrap();
-        // Where the rest pose puts each bone once the identity is added.
+        // Where the pose puts each bone, the identity added.
         let rig = body_model.rig.clone().unwrap();
-        let mut pose = rig.rest_pose();
-        body_model.settle(&mut pose);
-        let world = rig.world(&pose);
-        let bone = |name: &str| world[rig.bone(name).unwrap()].transform_point3(Vec3::ZERO);
-        // The eyes as they're posed in the game, in their file's space.
-        let posed = game.animators.poses()[&eyes].clone();
-        let unfit = eyes_model.rig.as_ref().unwrap().fit.inverse();
-        let posed_bones: Vec<Vec3> = posed
-            .bones()
-            .iter()
-            .map(|bone| unfit.transform_point3(bone.position))
-            .collect();
-        let eye_rig = eyes_model.rig.clone().unwrap();
-        let posed_left = posed_bones[eye_rig.bone("LeftEye").unwrap()];
-        let posed_head = posed_bones[eye_rig.bone("Head").unwrap()];
+        let posed = game.animators.poses()[&body].clone();
+        let unfit = rig.fit.inverse();
+        let bone =
+            |name: &str| unfit.transform_point3(posed.bones()[rig.bone(name).unwrap()].position);
         (
             bone("Hips"),
             bone("LeftHand"),
             bone("LeftEye"),
-            rest_corners(&eyes_model),
-            rest_corners(&body_model),
-            posed_left - posed_head,
+            posed_corners(game, eyes),
+            posed_corners(game, body),
             bone("LeftEye") - bone("Head"),
         )
     };
-    let (m_hips, m_hand, m_eye, m_eyes, m_body, _, _) = measure(&mut game, 0.0);
-    let (f_hips, f_hand, f_eye, f_eyes, f_body, posed_eye, rest_eye) = measure(&mut game, 1.0);
+    let (m_hips, m_hand, m_eye, m_eyes, m_body, _) = measure(&mut game, 0.0);
+    let (f_hips, f_hand, f_eye, f_eyes, f_body, rest_eye) = measure(&mut game, 1.0);
     // The skeleton's joints are the feminine frame's.
     for (name, masculine, feminine) in [
         ("Hips", m_hips, f_hips),
@@ -385,9 +413,21 @@ fn the_frames_bone_offsets_move_the_skeleton_and_carry_the_eyes() {
     };
     let grew = radius(&f_left) / radius(&m_left);
     assert!((grew - eye_scale).abs() < 0.01, "{grew} vs {eye_scale}");
-    // And posed by the game's Animator, the eye bone is where the settled
-    // skeleton has it, relative to the head (the idle clip turns the
-    // head a little, so compare lengths).
+    // And posed by the game's Animator playing its idle, the eyes' bone
+    // is where the settled skeleton has it, relative to the head (the
+    // idle clip turns the head a little, so compare lengths).
+    game.world
+        .set_property(animator, "StateMachine", machine.unwrap())
+        .unwrap();
+    game.frames(10, MoveInput::default());
+    let eyes = game.world.find_first_child(body, "Eyes").unwrap();
+    let eyes_model = game.assets.model_blocking(&mesh_id(&game, eyes)).unwrap();
+    let eye_rig = eyes_model.rig.clone().unwrap();
+    let posed = game.animators.poses()[&eyes].clone();
+    let unfit = eye_rig.fit.inverse();
+    let at =
+        |name: &str| unfit.transform_point3(posed.bones()[eye_rig.bone(name).unwrap()].position);
+    let posed_eye = at("LeftEye") - at("Head");
     assert!(
         (posed_eye.length() - rest_eye.length()).abs() < 1e-3,
         "{posed_eye} vs {rest_eye}"
@@ -578,22 +618,24 @@ fn a_kept_description_is_applied_again_where_the_world_is_loaded() {
     let body = game.world.find_first_child(character, "Body").unwrap();
     let heavy = described(&[("build", 1.0), ("frame", 1.0)], &OUTFIT);
     apply_description(&mut game.world, &game.assets, character, &heavy).unwrap();
-    let derived = mesh_id(&game, body);
+    let mesh = mesh_id(&game, body);
+    let key = axcenity_anim::identity_key(&game.world, body).expect("worn live");
     // Another run of the engine: its assets know no identities, so the
-    // saved `MeshId` is the plain body until the description is applied.
+    // saved key names nothing (the plain body) until the description is
+    // applied again.
     let fresh = Assets::new(&game.folder);
-    let plain = fresh.model_blocking(&derived).unwrap();
-    assert!(!plain.settles());
+    assert!(fresh.identity(key).is_none());
     let mut sync = DescriptionSync::default();
     let errors = sync.step(&mut game.world, &fresh);
     assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(mesh_id(&game, body), mesh, "the base mesh, as before");
     assert_eq!(
-        mesh_id(&game, body),
-        derived,
-        "the same identity, the same ID"
+        axcenity_anim::identity_key(&game.world, body),
+        Some(key),
+        "the same identity, the same key"
     );
-    let baked = fresh.model_blocking(&derived).unwrap();
-    assert!(baked.settles(), "now it's the derived model");
+    assert!(fresh.identity(key).is_some(), "now this run knows it");
+    assert_eq!(fresh.derived_count(), 0, "and baked nothing");
     // Stepped again, nothing is applied twice.
     let before = game.world.structure_version();
     assert!(sync.step(&mut game.world, &fresh).is_empty());
@@ -612,4 +654,160 @@ fn a_kept_description_is_applied_again_where_the_world_is_loaded() {
         .unwrap();
     assert_eq!(sync.step(&mut game.world, &fresh).len(), 1);
     assert!(sync.step(&mut game.world, &fresh).is_empty());
+}
+
+/// R2a (ADR-0041): changing a parameter of an applied character changes
+/// its weights and bones only. The MeshIds stay the base models', and
+/// `Assets` bakes nothing.
+#[test]
+fn a_parameter_change_on_an_applied_character_changes_weights_only() {
+    let mut game = game("description-weights");
+    let character = game.character();
+    let body = game.world.find_first_child(character, "Body").unwrap();
+    let heavy = described(&[("build", 1.0), ("frame", 1.0)], &OUTFIT);
+    apply_description(&mut game.world, &game.assets, character, &heavy).unwrap();
+    game.frames(5, MoveInput::default());
+    let meshes = mesh_ids(&game);
+    let bakes = game.assets.derived_count();
+    let jacket = game.world.find_first_child(body, "Jacket_Cropped").unwrap();
+    assert_eq!(weight(&game, body, "Build_Heavy"), 1.0);
+    assert_eq!(weight(&game, jacket, "Build_Heavy"), 1.0);
+
+    let lighter = described(&[("build", 0.4), ("frame", 1.0)], &OUTFIT);
+    apply_description(&mut game.world, &game.assets, character, &lighter).unwrap();
+    game.frames(3, MoveInput::default());
+    assert!((weight(&game, body, "Build_Heavy") - 0.4).abs() < 1e-6);
+    assert!((weight(&game, jacket, "Build_Heavy") - 0.4).abs() < 1e-6);
+    assert_eq!(mesh_ids(&game), meshes, "no MeshId changed");
+    assert_eq!(game.assets.derived_count(), bakes, "no model baked");
+    assert_eq!(bakes, 0, "nothing baked at all");
+    nothing_derived(&game);
+    game.no_errors();
+}
+
+/// R2a: an item's own parameters (wave 1's `ResolvedPart::shapes`) are
+/// live weights on the item's part, not a bake: changing one changes the
+/// weight and nothing else.
+#[test]
+fn an_items_own_parameters_are_live_weights_on_its_part() {
+    let mut game = game("description-item-parameters");
+    // The T-shirt gets a parameter of its own, driving one of its shapes.
+    let file = game
+        .folder
+        .join("assets/characters/humanoid/items/tee.item.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    manifest["parameters"] = serde_json::json!([{
+        "id": "looseness",
+        "label": "Looseness",
+        "range": [0.0, 1.0],
+        "default": 0.0,
+        "shapes": [{"shape": "Build_Muscular"}]
+    }]);
+    std::fs::write(&file, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
+    let character = game.character();
+    let body = game.world.find_first_child(character, "Body").unwrap();
+    let worn = |value: f32| {
+        let mut description = described(&[], &["axcenity/tee"]);
+        description.items[0]
+            .parameters
+            .insert("looseness".to_owned(), value);
+        description
+    };
+    apply_description(&mut game.world, &game.assets, character, &worn(0.6)).unwrap();
+    game.frames(3, MoveInput::default());
+    let tee = game.world.find_first_child(body, "Shirt_Tee").unwrap();
+    let meshes = mesh_ids(&game);
+    assert!((weight(&game, tee, "Build_Muscular") - 0.6).abs() < 1e-6);
+    assert_eq!(
+        weight(&game, body, "Build_Muscular"),
+        0.0,
+        "the item's alone"
+    );
+    apply_description(&mut game.world, &game.assets, character, &worn(0.3)).unwrap();
+    game.frames(3, MoveInput::default());
+    assert!((weight(&game, tee, "Build_Muscular") - 0.3).abs() < 1e-6);
+    assert_eq!(mesh_ids(&game), meshes);
+    assert_eq!(game.assets.derived_count(), 0);
+    game.no_errors();
+}
+
+/// R2a: the bake stays as an explicit optimization. Baking an applied
+/// character gives each of its MeshParts a derived model and stops the
+/// live identity; it is drawn in the same place (0.2 mm); a kept
+/// description applied again where the world is loaded keeps it baked;
+/// applying a description makes it live again.
+#[test]
+fn an_explicit_bake_puts_every_corner_where_the_live_character_has_it() {
+    let mut game = game("description-bake");
+    let character = game.character();
+    let body = game.world.find_first_child(character, "Body").unwrap();
+    still(&mut game, body);
+    let heavy = described(&[("build", 0.8), ("frame", 1.0)], &OUTFIT);
+    apply_description(&mut game.world, &game.assets, character, &heavy).unwrap();
+    game.frames(3, MoveInput::default());
+    let mut owned = vec![body];
+    owned.extend(
+        game.world
+            .get(body)
+            .unwrap()
+            .children()
+            .iter()
+            .copied()
+            .filter(|child| game.world.get(*child).unwrap().class() == ClassName::MeshPart),
+    );
+    let live: Vec<Vec<Vec3>> = owned
+        .iter()
+        .map(|part| posed_corners(&game, *part))
+        .collect();
+
+    let baked =
+        axcenity_gameplay::description::bake(&mut game.world, &game.assets, character).unwrap();
+    assert_eq!(baked, owned.len(), "the body and every part");
+    assert!(axcenity_gameplay::description::is_baked(
+        &game.world,
+        character
+    ));
+    for part in &owned {
+        assert!(
+            axcenity_assets::split_derived(&mesh_id(&game, *part))
+                .1
+                .is_some()
+        );
+        assert_eq!(axcenity_anim::identity_key(&game.world, *part), None);
+    }
+    game.frames(3, MoveInput::default());
+    assert!(game.assets.derived_count() >= owned.len());
+    for (part, live) in owned.iter().zip(&live) {
+        let drawn = posed_corners(&game, *part);
+        assert_eq!(drawn.len(), live.len());
+        let worst = drawn
+            .iter()
+            .zip(live)
+            .map(|(a, b)| a.distance(*b))
+            .fold(0.0, f32::max);
+        let name = game.world.get(*part).unwrap().name().to_owned();
+        assert!(worst < 2e-4, "{name}: {worst} m from the live character");
+    }
+
+    // Loaded again elsewhere: the kept description is applied and baked.
+    let baked_mesh = mesh_id(&game, body);
+    let fresh = Assets::new(&game.folder);
+    let mut sync = DescriptionSync::default();
+    assert!(sync.step(&mut game.world, &fresh).is_empty());
+    assert_eq!(
+        mesh_id(&game, body),
+        baked_mesh,
+        "still baked, the same key"
+    );
+
+    // Applied again, it's live.
+    apply_description(&mut game.world, &game.assets, character, &heavy).unwrap();
+    assert_eq!(
+        mesh_id(&game, body),
+        format!("{PARTS}#AxcenityHumanoid/Body")
+    );
+    assert!(axcenity_anim::identity_key(&game.world, body).is_some());
+    nothing_derived(&game);
+    game.no_errors();
 }

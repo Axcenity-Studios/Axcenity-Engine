@@ -35,3 +35,7 @@ The apply + step + draw list column of run 3 was within a millisecond of run 2's
 - An attribute-only parameter (height and the eight proportions) costs about 0.1 ms: no bake.
 - The worst step of each parameter (10 to 18 ms) is usually the first: a new identity's first bake allocates; later steps reuse.
 - **Not covered:** the GPU upload of the new buffers; a dressed character with hair (more parts to bake per step: the realistic default wears only underwear today); the minimum development GPU class (RX 6600 / RTX 3060) and its usual CPU. Measure again when R6 and R7 add hair and clothes, and on a slower machine, before deciding the throttle or the live-morph path.
+
+## After R2a (live identity)
+
+Refinement R2a made identity live weights (ADR-0041), and the same test now times a live and a baked pass per parameter: a live apply is 0.06 to 0.12 ms (median) and 0.14 to 0.25 ms with the next step and draw list, so the 120 ms throttle was removed. Numbers and method: [../r2/r2a-live-identity.md](../r2/r2a-live-identity.md).

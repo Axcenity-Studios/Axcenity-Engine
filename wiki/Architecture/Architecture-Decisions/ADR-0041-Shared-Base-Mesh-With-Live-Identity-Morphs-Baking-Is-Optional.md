@@ -14,7 +14,7 @@ tags: [adr, characters, assets, animation, rendering]
 
 # ADR-0041: A character is a shared base mesh with live identity morphs; baking is an optional optimization
 
-- **Status:** Accepted. Paul decided the direction on 2026-11-17 (plan section 0, decision 9) when he declined to accept [ADR-0038](ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) as the foundation. The implementation is the refinement's R2a track (plan section 11.5); until it lands, the code still works as ADR-0038 describes.
+- **Status:** Accepted. Paul decided the direction on 2026-11-17 (plan section 0, decision 9) when he declined to accept [ADR-0038](ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) as the foundation. **Implemented in part (R2a, 2026-11-17):** decisions 1, 3 (the runtime side), 5 and 6 and the item parameters are built: the applier, followers and `DescriptionSync` wear identity live on the base meshes, and `gameplay::description::bake` is the explicit bake. Not yet: CO8's compute posing (decision 2; the renderer still morphs every pass, measured in `docs/development/character-studio/refinement/r2/r2a-live-identity.md`), ray-traced shadows of live identity shapes, and clothing shapes transferred by binding (decision 4, CO9).
 - **Date:** 2026-11-17
 - **Supersedes:** ADR-0038 as the source of truth for identity. ADR-0038's derived `MeshId` stays as the mechanism of the optional bake.
 - **Affected systems:** Character Data (`avatar::resolve`), the Character Runtime (`gameplay`'s applier, `DescriptionSync`), Assets (derived models), Animation (posing, followers, `settle`), `scene` and `render` (morphing and skinning), Character Studio (live editing).
@@ -63,3 +63,10 @@ Paul's decision: keep a shared base mesh with morph targets, or an equivalent de
 - Derived-model registration and the 96-model cache serve the bake only.
 - An item's own parameters (a hairstyle's length) are live weights on the item's part, not a bake.
 - Revisit if a GPU class in plan section 0, decision 5 can't hold the posed buffers for the crowd budget of plan section 7. The fallback is the optional bake for static NPCs, which this decision keeps.
+
+## Implementation references
+
+- `crates/assets/src/model/identity.rs` (`Model::live`, `LiveIdentity`), `crates/assets/src/model/rig.rs` (`Posed::rebind`), `crates/assets/src/derived.rs` (`Assets::register_identity`, `identity`, `derived_count`)
+- `crates/anim/src/live_identity.rs` (the `Identity` attribute, the per-model cache), `crates/anim/src/animators.rs` (settle after the clips, dress last, followers)
+- `crates/gameplay/src/description.rs` (`apply_description`, `bake`, `is_baked`, `DescriptionSync`)
+- Tests: `assets` `an_identity_worn_live_poses_the_mesh_where_its_bake_does`; `player` `default_humanoid_tests::description` (weights only on a change, item parameters live, an explicit bake within 0.2 mm) and `character_capture::an_explicit_bake_draws_the_same_pixels_as_the_live_character`; `editor` `a_character_file_applied_in_a_game_matches_the_workspaces_preview`
