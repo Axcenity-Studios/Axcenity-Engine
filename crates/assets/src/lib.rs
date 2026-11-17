@@ -126,9 +126,9 @@ pub use model::{
     AlphaMode, Blend, Bone, BoneChange, BoneDelta, BoneTransform, Channel, ChannelTexture,
     Identity, IdentityLayer, Image, Joint, Keys, LevelReport, LodReport, LodWarning,
     MESH_CACHE_FOLDER, MODEL_CACHE_FOLDER, MODEL_EXTENSIONS, MapSlot, Model, ModelError,
-    ModelFormat, ModelMaterial, ModelObject, MorphTarget, Pick, Pose, Posed, PosedBone,
-    PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Take, TextureRole, Track,
-    apply_morphs, cached_meshes, cooked_models, derived_mesh_id, embedded_files,
+    ModelFormat, ModelMaterial, ModelObject, ModelShading, MorphTarget, Pick, Pose, Posed,
+    PosedBone, PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Take, TextureRole,
+    Track, apply_morphs, cached_meshes, cooked_models, derived_mesh_id, embedded_files,
     is_collision_piece, list_objects, load_model, load_models, load_takes, lod_level,
     split_derived, tangents, texture_pack_name, texture_roles,
 };

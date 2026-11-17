@@ -335,3 +335,40 @@ fn the_underwear_is_always_worn_and_follows_the_frame() {
     axcenity_avatar::wear_choices(&mut dressed, &library);
     assert_eq!(dressed, again);
 }
+
+/// The skin's normal map shows its defined (lean, muscular) layer only on
+/// lean, muscular bodies: `muscle` drives the Skin's `definition` and
+/// `fat` its `softness`, and the renderer shows `definition × (1 −
+/// softness)` of it (R5, OPEN-07). Heavy bellies get none.
+#[test]
+fn muscle_and_fat_drive_how_much_of_the_skins_definition_shows() {
+    use axcenity_avatar::MaterialValue;
+    let library = library();
+    let shown = |muscle: f32, fat: f32| {
+        let mut description = Description::new("Build", BASE);
+        description.parameters.insert("muscle".into(), muscle);
+        description.parameters.insert("fat".into(), fat);
+        let resolved = resolve(&library, &description).unwrap();
+        assert!(resolved.problems.is_empty(), "{:?}", resolved.problems);
+        let skin = &resolved.materials["Skin"];
+        let value = |name: &str| match skin.get(name) {
+            Some(MaterialValue::Number(n)) => *n,
+            other => panic!("Skin {name}: {other:?}"),
+        };
+        value("definition") * (1.0 - value("softness"))
+    };
+    // The benchmark cast's bodies (muscle, fat).
+    let athletic = shown(0.7, -0.4);
+    let heavyset = shown(0.2, 0.8);
+    let average = shown(0.0, 0.0);
+    let slim = shown(-0.2, -0.6);
+    let heavy_muscular = shown(1.0, 1.0);
+    assert!(athletic > 0.7, "athletic: {athletic}");
+    assert!(heavyset < 0.05, "heavyset: {heavyset}");
+    assert!(
+        heavy_muscular < 0.05,
+        "heavy and muscular: {heavy_muscular}"
+    );
+    assert!(average < 0.3, "average: {average}");
+    assert!(slim < 0.3, "slim, not muscular: {slim}");
+}

@@ -96,10 +96,10 @@ At most four weights per vertex on every mesh. A clip made for the stylized huma
 
 One set of texture coordinates for the skin (`TEXCOORD_0`), 26 islands: the head is one island cut up the back, the torso is cut down the sides, arms and legs along their inner sides; hands, feet, ears, eye sockets and the mouth's interior keep the bundle's islands. Texel density is weighted (face 2.2, hands 1.15, hidden linings 0.4) and is about 10.9 texels per centimetre at 2048.
 
-Materials: `Skin` (the manifest marks it `skin`), `Mouth` (the mouth's interior, on the skin's maps), `Sclera` and `Iris` (`eye`), `Teeth`, `Gums`, `Tongue` (below). The skin's maps, embedded in the file:
+Materials: `Skin` (the manifest marks it `skin`, and so does the file: its glTF `extras` say `"axcenity_shading": "skin"`, which the engine draws with its Skin shading model, `docs/rendering/skin.md`), `Mouth` (the mouth's interior, on the skin's maps), `Sclera` and `Iris` (`eye`), `Teeth`, `Gums`, `Tongue` (below). The skin's maps, embedded in the file:
 
 - **Albedo** (JPEG): one tone with flush on the cheeks, nose, ears, chin, knuckles, elbows and knees, both lips, paler palms and soles, nails.
-- **Normal** (PNG): the sculpt's forms above the base mesh plus pore grain. One map serves both frames: where the two frames' bakes agree it is their mean, where they differ it leans to the flatter.
+- **Normal**, two of them (PNG): the sculpt's forms above the base mesh plus grain. One map serves both frames: where the two frames' bakes agree it is their mean, where they differ it leans to the flatter. `RealisticSkin_NormalDefined` is that map (lean and muscular: abdominal lines, muscle separation); `RealisticSkin_Normal`, the material's own, is a smooth copy with the sculpt's forms flattened (90%) over soft tissue (`skin.soft_tissue`: the trunk, shoulders, arms and legs, but not the head, hands, feet, knees, elbows or nipples, nor deep creases such as the navel). `skin.mark` adds the defined map to the file after export (`extras.axcenity_defined_normal`); the engine blends the two by `definition × (1 − softness)`, which the manifest drives from `muscle` and `fat` (`manifests.SKIN_DRIVERS`), so soft and heavy bodies show no abdominal lines (R5, OPEN-07). The grain's cells are 5 texels across and its bump 0.09 texels high (`skin.GRAIN_*`; 2.6 texels before R5, half as steep now), so it reads as skin at a metre and as smooth at three.
 - **Occlusion, roughness, metalness** (JPEG, red, green, blue): cavity occlusion baked on the sculpt; roughness lower on the forehead, nose and lips, higher on elbows, knees and heels.
 
 ## The inside of the mouth
@@ -126,7 +126,7 @@ The engine reads `_LOD1` and `_LOD2` objects in a file as a model's levels of de
 
 ## Body shapes (CO5)
 
-`Body` and both of its copies carry, besides the face's shapes, `Frame_Feminine`, 51 for muscle and fat (`shapes.py`: 48 from CO5 and 3 from R3) and 6 pose-driven correctives (`correctives.py`). All but the correctives are **identity** shapes: a character's description sets them once and the engine bakes them into its model (ADR-0038). `RealisticParts.glb` is 37.0 MB (36.4 MB before R3's three shapes).
+`Body` and both of its copies carry, besides the face's shapes, `Frame_Feminine`, 51 for muscle and fat (`shapes.py`: 48 from CO5 and 3 from R3) and 6 pose-driven correctives (`correctives.py`). All but the correctives are **identity** shapes: a character's description sets them once and the engine bakes them into its model (ADR-0038). `RealisticParts.glb` is 40.7 MB (37.0 MB before R5 added the defined normal map; 36.4 MB before R3's three shapes).
 
 **Source.** MakeHuman's CC0 targets (base mesh, 24 macro targets and, since R3, 8 regional and body-shape targets at the pinned commit in `../transfer/makehuman.sha256`; licence record in `../transfer/shapes/LICENCE-RECORD.md`), carried onto this topology by `../transfer/` and vendored as `source/body_shapes.npz` (0.55 MB: 16 sculpted bodies as offsets, 8 per frame, and 8 regional targets, in the bundle's pose). The build needs neither MakeHuman's files nor the network. To regenerate the file, see `docs/development/character-studio/co5/README.md` (its "Regenerating the vendored shapes" block, which carries R3's `--pack-extras` list).
 

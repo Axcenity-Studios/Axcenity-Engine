@@ -27,8 +27,8 @@ use super::{
     FrameUniform, InstanceRaw, LIGHT_SCALE, LIGHTS_PER_TILE, LightRaw, MATERIAL_TEXTURES,
     MAX_LIGHTS, MAX_POINT_SHADOWS, MAX_SPOT_SHADOW_DEGREES, MAX_SPOT_SHADOWS, MAX_SUN_SIZE,
     MAX_TILES, MIN_TILE_SIZE, MapsUniform, MaterialKey, MeshKey, NEAR_PLANE, POINT_SHADOW_SPREAD,
-    PointShadow, PostUniform, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT, SHADOW_CASCADES,
-    SHADOW_CASTER_RANGE, SpotShadow,
+    PointShadow, PostUniform, SHADING_SKIN, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT,
+    SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
 };
 use crate::SURFACE_PARAMETERS;
 
@@ -1126,9 +1126,11 @@ pub(super) fn material_textures(
         maps.occlusion.as_ref().map(|map| &map.texture),
         maps.emissive.as_ref(),
         maps.opacity.as_ref().map(|map| &map.texture),
-        // A toon ramp takes the specular map's place.
+        // A toon ramp takes the specular map's place, and so does skin's
+        // defined normal map (skin reads no specular map).
         match &material.shading {
             Shading::Toon(toon) if material.water.is_none() => toon.ramp.as_ref(),
+            Shading::Skin(skin) if material.water.is_none() => skin.defined_normal.as_ref(),
             _ => maps.specular.as_ref(),
         },
     ]
@@ -1151,6 +1153,20 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
             [0.0; 4],
         ),
         Shading::Unlit => ([SHADING_UNLIT, 0.0, 0.0, 0.0], [0.0; 4]),
+        // skin.wgsl: the defined normal map's share (none without one),
+        // how far light spreads, and whether that map is BC5.
+        Shading::Skin(skin) => {
+            let defined = skin.defined_normal.as_ref();
+            (
+                [
+                    SHADING_SKIN,
+                    defined.map_or(0.0, |_| skin.normal_blend.clamp(0.0, 1.0)),
+                    skin.scatter.clamp(0.0, 4.0),
+                    f32::from(defined.is_some_and(|map| !map.bc5_levels().is_empty())),
+                ],
+                [0.0; 4],
+            )
+        }
         Shading::Toon(toon) => {
             let steps = if toon.ramp.is_some() {
                 0.0

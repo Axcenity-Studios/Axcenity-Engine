@@ -9,9 +9,20 @@ a packed occlusion-roughness map, at 2K by default (4K for the hero set).
   agree (collarbones, knees, the navel, the spine, hands, feet, the face's
   folds) it is their mean; where they differ (the chest, the belly's
   muscles) it leans to the flatter of the two, so neither frame shows the
-  other's anatomy. Skin grain (cells a few texels across, and finer
-  wrinkling) is added on top from a bump texture in the body's space,
-  which has no seams.
+  other's anatomy. That map is the **defined** one (lean and
+  muscular: abdominal lines, muscle separation). A **smooth** copy
+  (what fat makes of it) flattens the sculpt's forms over the soft parts
+  of the body (`soft_tissue`: the trunk, shoulders, arms and legs, but
+  not the head, hands, feet, knees, elbows, navel or nipples, nor any
+  deep crease) and is the material's own normal map; the defined one
+  rides beside it in the glTF material's `extras`
+  (`axcenity_defined_normal`, `mark`), and the renderer's Skin model
+  blends the two by the material values `definition` and `softness`,
+  which the manifest drives from `muscle` and `fat` (R5, OPEN-07). Skin
+  grain (cells about five texels across, and finer wrinkling; R5
+  doubled the cells and halved the slope, so it reads as skin at a
+  metre and as smooth at three) is added on top of both from a bump
+  texture in the body's space, which has no seams.
 - **Albedo**: a skin tone varied by region (a flush on the cheeks, nose,
   ears, chin, knuckles, elbows and knees; lips; paler palms and soles;
   nails), mottled at three scales, darkened a little in the
@@ -22,9 +33,11 @@ a packed occlusion-roughness map, at 2K by default (4K for the hero set).
   heels, smooth lips and nails), blue (metalness) 0. One image, as glTF's
   `metallicRoughnessTexture` and `occlusionTexture`.
 
-The renderer draws skin as a standard PBR surface until it has a skin
-shading model (CO7); the maps are ordinary glTF ones, on the material
-`Skin`.
+The maps are ordinary glTF ones on the material `Skin`, which `mark`
+marks `"axcenity_shading": "skin"` in its `extras`: the engine draws it
+with its Skin shading model (diffusion, two specular lobes;
+`docs/rendering/skin.md`), and any other viewer as standard PBR with the
+smooth normal map.
 """
 
 import os
@@ -35,7 +48,8 @@ from mathutils import Vector
 
 import rig
 from common import (
-    FS_EAR, FS_FINGERS, FS_FOOT, FS_HEAD, FS_MUZZLE, FS_PALM, FS_SOCKET, FS_TOES, FS_TOE_BASE, HEAD_SETS,
+    FS_EAR, FS_FINGERS, FS_FOOT, FS_HEAD, FS_MUZZLE, FS_PALM, FS_SOCKET, FS_TOES, FS_TOE_BASE, FS_TORSO,
+    HEAD_SETS,
     MOUTH_SETS, SIDES, SOURCE, array, duplicate, edge_neighbours, face_sets, fit_sphere, select_only,
     shade_smooth, subdivide,
 )
@@ -76,7 +90,18 @@ PALE = (1.08, 1.01, 0.97)
 ROUGHNESS = 0.50
 # Nail sets: the fourth of each finger's, and the toes' smallest.
 TOE_NAILS = (37, 42, 43, 44, 45, 47, 51, 55, 59, 63)
-FILES = ("RealisticSkin_Albedo.jpg", "RealisticSkin_Normal.png", "RealisticSkin_ORM.jpg")
+FILES = ("RealisticSkin_Albedo.jpg", "RealisticSkin_Normal.png", "RealisticSkin_ORM.jpg",
+         "RealisticSkin_NormalDefined.png")
+# Skin grain (R5): the cells' size and the finer wrinkling's, in texels,
+# and the bump's height, in texels. Cells under four texels read as a
+# speckle a pixel wide in a face seen from a metre (wave 1: 2.6 texels,
+# 0.09 high); these are twice as wide and half as steep.
+GRAIN_CELL = 5.0
+GRAIN_FINE = 12.0
+GRAIN_HEIGHT = 0.09
+# How far the smooth normal map flattens the sculpt's forms over soft
+# tissue (`soft_tissue`): what fat leaves of the definition.
+SMOOTHED = 0.9
 
 
 def srgb_to_linear(c):
@@ -446,6 +471,57 @@ def fields(body, P, lm):
             "oily": clip(oily), "dry": clip(dry)}
 
 
+def soft_tissue(P, lm):
+    """Per vertex, 0 to 1: how much of the sculpt's forms there are soft
+    tissue that fat covers (abdominal lines, the separation between
+    muscles), for the smooth normal map. None on the head (down to the
+    neck's middle), the hands and the feet, and less over the knees,
+    elbows and nipples, whose forms stay on a heavy body."""
+    X = array(P)
+    of_set = {fs: np.array(sorted(idx), dtype=np.int64) for fs, idx in lm.of_set.items()}
+    eyes = {s: np.array(fit_sphere(P[i] for i in lm.verts(FS_SOCKET[s]))[0]) for s in (1, -1)}
+    joints = rig.fit_joints(P, lm, {s: Vector(c) for s, c in eyes.items()})
+    J = {name: np.array(h) for name, (h, _, _) in joints.items()}
+
+    def blob(centre, radius):
+        return np.exp(-((X - centre) ** 2).sum(axis=1) / (radius * radius))
+
+    soft = np.ones(len(X))
+    head = np.unique(np.concatenate([of_set[fs] for fs in HEAD_SETS]))
+    soft[head] = _step(J["Head"][2], J["Neck"][2], X[head][:, 2])
+    torso = of_set[FS_TORSO]
+    for side, s in SIDES:
+        ends = [of_set[FS_PALM[s]], of_set[FS_FOOT[s]], of_set[FS_TOE_BASE[s]]]
+        ends += [of_set[fs] for g in FS_FINGERS[s].values() for fs in g]
+        ends += [of_set[fs] for fs in FS_TOES[s]]
+        soft[np.unique(np.concatenate(ends))] = 0.0
+        soft *= 1.0 - blob(J[f"{side}LowerLeg"] + np.array([0.0, -0.04, 0.0]), 0.06)
+        soft *= 1.0 - blob(J[f"{side}LowerArm"], 0.045)
+        # The nipple: the chest's most forward point on this side, at the
+        # height of the chest.
+        on_side = torso[(s * X[torso][:, 0] > 0.05) & (s * X[torso][:, 0] < 0.16)
+                        & (X[torso][:, 2] > J["Chest"][2]) & (X[torso][:, 2] < J["Neck"][2])]
+        if len(on_side):
+            soft *= 1.0 - blob(X[on_side[np.argmin(X[on_side][:, 1])]], 0.025)
+    return np.clip(soft, 0.0, 1.0)
+
+
+def _soft_texels(low, P, lm, size):
+    """`soft_tissue` over the texels, blurred so it fades in."""
+    soft = soft_tissue(P, lm)
+    _attribute(low, "Soft", np.stack([soft, soft, soft], axis=1))
+    img = _image("Soft", size)
+
+    def emit(nt, bsdf):
+        colour = nt.nodes.new("ShaderNodeVertexColor")
+        colour.layer_name = "Soft"
+        _emit(nt, colour.outputs["Color"])
+
+    _target(low, img, emit)
+    _bake("EMIT", low, size=size)
+    return np.clip(_blur(_pixels(img)[:, :, 0], max(2, size // 256)), 0.0, 1.0)
+
+
 # -- the bakes ---------------------------------------------------------------------
 
 def bake(body, source, lm, size, out_dir, cage=None):
@@ -547,10 +623,10 @@ def bake(body, source, lm, size, out_dir, cage=None):
         coords = nt.nodes.new("ShaderNodeTexCoord")
         cells = nt.nodes.new("ShaderNodeTexVoronoi")
         cells.feature = "DISTANCE_TO_EDGE"
-        cells.inputs["Scale"].default_value = 1.0 / (2.6 * texel)
+        cells.inputs["Scale"].default_value = 1.0 / (GRAIN_CELL * texel)
         nt.links.new(coords.outputs["Object"], cells.inputs["Vector"])
         fine = nt.nodes.new("ShaderNodeTexNoise")
-        fine.inputs["Scale"].default_value = 1.0 / (9.0 * texel)
+        fine.inputs["Scale"].default_value = 1.0 / (GRAIN_FINE * texel)
         fine.inputs["Detail"].default_value = 3.0
         nt.links.new(coords.outputs["Object"], fine.inputs["Vector"])
         # Grooves between the cells, on a gentler wrinkling.
@@ -581,7 +657,7 @@ def bake(body, source, lm, size, out_dir, cage=None):
         strength.inputs["To Max"].default_value = 0.25
         nt.links.new(smooth.outputs["Value"], strength.inputs["Value"])
         node = nt.nodes.new("ShaderNodeBump")
-        node.inputs["Distance"].default_value = 0.09 * texel
+        node.inputs["Distance"].default_value = GRAIN_HEIGHT * texel
         nt.links.new(strength.outputs["Result"], node.inputs["Strength"])
         nt.links.new(mix.outputs["Value"], node.inputs["Height"])
         nt.links.new(node.outputs["Normal"], bsdf.inputs["Normal"])
@@ -590,10 +666,22 @@ def bake(body, source, lm, size, out_dir, cage=None):
     _bake("NORMAL", low, samples=4, size=size)
     g = _pixels(grain) * 2.0 - 1.0
     g[hidden] = (0.0, 0.0, 1.0)
-    # The grain over the sculpt (both in tangent space).
-    normal = np.stack([shared[:, :, 0] + g[:, :, 0], shared[:, :, 1] + g[:, :, 1],
-                       shared[:, :, 2] * np.maximum(g[:, :, 2], 0.2)], axis=2)
-    normal /= np.maximum(np.linalg.norm(normal, axis=2, keepdims=True), 1e-9)
+    # The smooth map: the sculpt's forms flattened over soft tissue, but
+    # not in deep creases (the navel, the fold under a breast, the
+    # buttocks'), which fat deepens rather than hides.
+    soft = _soft_texels(low, P, lm, size) * _step(0.80, 0.92, ao)
+    flat_share = (SMOOTHED * soft)[:, :, None]
+    smooth = shared * (1.0 - flat_share) + flat * flat_share
+    smooth /= np.maximum(np.linalg.norm(smooth, axis=2, keepdims=True), 1e-9)
+
+    def grained(forms):
+        """The grain over `forms` (both in tangent space)."""
+        out = np.stack([forms[:, :, 0] + g[:, :, 0], forms[:, :, 1] + g[:, :, 1],
+                        forms[:, :, 2] * np.maximum(g[:, :, 2], 0.2)], axis=2)
+        return out / np.maximum(np.linalg.norm(out, axis=2, keepdims=True), 1e-9)
+
+    normal = grained(smooth)
+    defined = grained(shared)
 
     # Colour and roughness from the fields, mottled in the body's space.
     colour = _image("Colour", size)
@@ -704,17 +792,20 @@ def bake(body, source, lm, size, out_dir, cage=None):
     paths = [os.path.join(out_dir, name) for name in FILES]
     Image.fromarray((linear_to_srgb(albedo) * 255 + 0.5).astype(np.uint8)).save(paths[0], quality=95, subsampling=0)
     Image.fromarray(((normal * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8)).save(paths[1], optimize=True)
+    Image.fromarray(((defined * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8)).save(paths[3], optimize=True)
     orm = np.stack([ao, np.clip(roughness, 0.05, 1.0), np.zeros_like(ao)], axis=2)
     Image.fromarray((orm * 255 + 0.5).astype(np.uint8)).save(paths[2], quality=95, subsampling=0)
     bpy.data.objects.remove(low)
     images = {}
-    for key, path, space in zip(("albedo", "normal", "orm"), paths, ("sRGB", "Non-Color", "Non-Color")):
+    for key, path, space in zip(("albedo", "normal", "orm"), paths[:3], ("sRGB", "Non-Color", "Non-Color")):
         img = bpy.data.images.load(path)
         img.colorspace_settings.name = space
         images[key] = img
     images["report"] = {
         "size": size, "texels_per_cm": round(1.0 / texel / 100.0, 2),
         "frames_differ_share": round(float((lean[:, :, 0] > 0.5).mean()), 3),
+        "smoothed_share": round(float((soft > 0.5).mean()), 3),
+        "grain": {"cell_texels": GRAIN_CELL, "fine_texels": GRAIN_FINE, "height_texels": GRAIN_HEIGHT},
     }
     return images
 
@@ -799,6 +890,49 @@ def materials(body, sets, maps):
     body.data.materials.append(mouth)
     for poly, fs in zip(body.data.polygons, sets):
         poly.material_index = 1 if fs in hidden else 0
+
+
+def mark(glb, out_dir):
+    """Marks the `Skin` material of the exported file `glb` as skin
+    (`extras.axcenity_shading`) and adds the defined normal map beside its
+    own, smooth one (`extras.axcenity_defined_normal`: a texture placed
+    like the normal map; `bake` wrote it to `out_dir`). Blender's exporter
+    writes only the images a material's nodes use, so it is added to the
+    file here."""
+    import json
+    import struct
+    with open(glb, "rb") as f:
+        data = f.read()
+    _, version, _ = struct.unpack_from("<III", data, 0)
+    chunks, at = [], 12
+    while at < len(data):
+        length, kind = struct.unpack_from("<II", data, at)
+        chunks.append([kind, data[at + 8:at + 8 + length]])
+        at += 8 + length
+    doc = json.loads(chunks[0][1])
+    binary = bytearray(chunks[1][1]) if len(chunks) > 1 else bytearray()
+    skin = next(m for m in doc["materials"] if m.get("name") == "Skin")
+    extras = dict(skin.get("extras", {}), axcenity_shading="skin")
+    path = os.path.join(out_dir, FILES[3])
+    if "normalTexture" in skin and os.path.exists(path):
+        with open(path, "rb") as f:
+            png = f.read()
+        binary.extend(b"\0" * (-len(binary) % 4))
+        doc["bufferViews"].append({"buffer": 0, "byteOffset": len(binary), "byteLength": len(png)})
+        binary.extend(png)
+        doc["images"].append({"bufferView": len(doc["bufferViews"]) - 1, "mimeType": "image/png",
+                              "name": os.path.splitext(FILES[3])[0]})
+        own = doc["textures"][skin["normalTexture"]["index"]]
+        doc["textures"].append(dict(own, source=len(doc["images"]) - 1))
+        extras["axcenity_defined_normal"] = {"index": len(doc["textures"]) - 1}
+    skin["extras"] = extras
+    binary.extend(b"\0" * (-len(binary) % 4))
+    doc["buffers"][0]["byteLength"] = len(binary)
+    text = json.dumps(doc, separators=(",", ":")).encode()
+    text += b" " * (-len(text) % 4)
+    out = struct.pack("<II", len(text), 0x4E4F534A) + text + struct.pack("<II", len(binary), 0x004E4942) + binary
+    with open(glb, "wb") as f:
+        f.write(struct.pack("<III", 0x46546C67, version, 12 + len(out)) + out)
 
 
 def clean_up(out_dir):

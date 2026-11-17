@@ -3,6 +3,9 @@
 
 use super::*;
 
+use axcenity_assets::ModelShading;
+use axcenity_render::{Shading, SkinShading};
+
 /// A Part's material from its Material preset and properties, with
 /// `appearance`'s maps over it. `None` when it's invisible.
 pub(super) fn preset_material(
@@ -273,6 +276,16 @@ pub(super) fn model_material(material: &ModelMaterial) -> Material {
         double_sided: material.double_sided,
         translucency: material.translucency,
         terrain: None,
+        shading: match material.shading {
+            ModelShading::Standard => Shading::Standard,
+            // The file marks it skin (ADR-0036's contract, glTF `extras`):
+            // its smooth normal map is its own, the defined one beside it;
+            // the material values (`material::modulate`) blend them.
+            ModelShading::Skin => Shading::Skin(SkinShading {
+                defined_normal: material.defined_normal_texture.as_ref().map(normal_texture),
+                ..SkinShading::default()
+            }),
+        },
         ..Material::default()
     }
 }

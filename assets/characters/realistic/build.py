@@ -233,6 +233,8 @@ def main(out_dir, texture_size=2048, bakes=True):
         obj.name = name
         obj.data.name = name
     export_glb(os.path.join(out_dir, PARTS_FILE), armature, list(objects.values()))
+    # The skin marked skin, with its defined normal map (R5).
+    skin.mark(os.path.join(out_dir, PARTS_FILE), out_dir)
     with open(os.path.join(out_dir, DATA_FILE), "w", newline="\n") as f:
         json.dump(data, f, indent=1, sort_keys=True)
         f.write("\n")

@@ -32,6 +32,7 @@ mod realtime_gi;
 mod reflection_probes;
 mod shading;
 mod shadows;
+mod skin;
 mod skinning;
 mod streaming;
 mod sun_rays;

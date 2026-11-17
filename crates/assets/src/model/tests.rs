@@ -27,6 +27,74 @@ fn a_fluttering_material_is_a_leaf_unless_it_says_otherwise() {
 }
 
 #[test]
+fn a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map() {
+    let of = |text: &str| {
+        let raw = serde_json::value::RawValue::from_string(text.to_owned()).unwrap();
+        super::shading_of(&Some(raw))
+    };
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin", "axcenity_defined_normal": {"index": 3}}"#),
+        (ModelShading::Skin, Some(3))
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin"}"#),
+        (ModelShading::Skin, None)
+    );
+    // A defined map only means something on skin; an unknown model (a
+    // newer file's "eye", say) draws as standard.
+    assert_eq!(
+        of(r#"{"axcenity_defined_normal": {"index": 3}}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": "eye"}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(
+        of(r#"{"axcenity_shading": 7, "axcenity_sway": 0.2}"#),
+        (ModelShading::Standard, None)
+    );
+    assert_eq!(super::shading_of(&None), (ModelShading::Standard, None));
+}
+
+/// The realistic body's skin, as the build writes it: marked skin, with
+/// its smooth normal map as glTF's own and the defined one beside it.
+#[test]
+fn the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    assert_eq!(skin.shading, ModelShading::Skin);
+    let smooth = skin.normal_texture.as_ref().expect("a smooth normal map");
+    let defined = skin
+        .defined_normal_texture
+        .as_ref()
+        .expect("a defined normal map");
+    assert_eq!(
+        (smooth.width, smooth.height),
+        (defined.width, defined.height)
+    );
+    assert_ne!(smooth.rgba(), defined.rgba(), "the two maps differ");
+    // Every other material draws as standard (the mouth shares the maps).
+    for primitive in &model.primitives {
+        if primitive.material.name != "Skin" {
+            assert_eq!(
+                primitive.material.shading,
+                ModelShading::Standard,
+                "{}",
+                primitive.material.name
+            );
+        }
+    }
+}
+
+#[test]
 fn the_example_pyramid_loads_fitted_into_the_unit_cube() {
     let model = load_model(&example_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
     assert_eq!(model.size, [4.0, 3.0, 4.0]);

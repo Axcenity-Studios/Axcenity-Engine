@@ -970,7 +970,21 @@
       ],
       "about": "How much muscle the whole body carries, from slight to strong.",
       "feature": "body",
-      "level": "quick"
+      "level": "quick",
+      "material_values": [
+        {
+          "material": "Skin",
+          "value": "definition",
+          "from": [
+            -0.5,
+            0.8
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
     },
     {
       "id": "fat",
@@ -982,7 +996,21 @@
       ],
       "about": "How much fat the whole body carries, from lean to heavy.",
       "feature": "body",
-      "level": "quick"
+      "level": "quick",
+      "material_values": [
+        {
+          "material": "Skin",
+          "value": "softness",
+          "from": [
+            -0.5,
+            0.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
     },
     {
       "id": "muscle_chest",
