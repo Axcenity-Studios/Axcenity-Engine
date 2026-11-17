@@ -42,12 +42,16 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
             "eye_height_left",
             "eye_spacing_left",
             "eye_size_left",
-            "eye_tilt_left"
+            "eye_tilt_left",
+            // R4's eye controls.
+            "eye_corner_left",
+            "upper_lid_fold_left",
+            "lower_lid_left"
         ]
     );
     // Advanced adds the depth; Symmetry off shows both sides.
     assert!(ids(&eyes(&description, Level::Advanced, true)).contains(&"eye_depth_left".into()));
-    assert_eq!(eyes(&description, Level::Detailed, false).len(), 8);
+    assert_eq!(eyes(&description, Level::Detailed, false).len(), 14);
     // Audit D-11: a pair whose sides differ shows both, even with Symmetry.
     description.parameters.insert("eye_size_left".into(), 0.3);
     let shown = eyes(&description, Level::Detailed, true);
