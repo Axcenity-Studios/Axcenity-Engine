@@ -177,6 +177,38 @@ impl egui::Widget for RibbonButton<'_> {
     }
 }
 
+/// Where the height of the tallest ribbon tab seen is kept, per density:
+/// every tab keeps it, so the panels under the ribbon don't jump when tabs
+/// change.
+pub fn tallest_id(ctx: &egui::Context) -> egui::Id {
+    egui::Id::new(("ribbon tallest", format!("{:?}", theme::density(ctx))))
+}
+
+/// Where [`separately`] notes which ribbon is being drawn.
+fn scope_id() -> egui::Id {
+    egui::Id::new("ribbon row scope")
+}
+
+/// Draws `add` as a ribbon of its own (the tab editor's preview): its
+/// groups' rows line up among themselves, and neither change the real
+/// ribbon's row heights nor take theirs.
+pub fn separately<R>(
+    ui: &mut egui::Ui,
+    scope: egui::Id,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    let before = ui.data(|data| data.get_temp::<egui::Id>(scope_id()));
+    ui.data_mut(|data| data.insert_temp(scope_id(), scope));
+    let result = add(ui);
+    ui.data_mut(|data| match before {
+        Some(before) => {
+            data.insert_temp(scope_id(), before);
+        }
+        None => data.remove::<egui::Id>(scope_id()),
+    });
+    result
+}
+
 /// The tallest ribbon row drawn: in the frame before (which this frame's
 /// groups grow to) and so far in this one.
 #[derive(Clone, Copy, Default)]
@@ -203,7 +235,8 @@ pub fn group_tinted(
 ) {
     let density = theme::density(ui.ctx());
     let palette = theme::palette(ui.ctx());
-    let id = egui::Id::new(("ribbon row heights", density as u8));
+    let scope = ui.data(|data| data.get_temp::<egui::Id>(scope_id()));
+    let id = egui::Id::new(("ribbon row heights", density as u8, scope));
     let frame = theme::frame_number(ui.ctx());
     let mut heights = ui.data(|data| data.get_temp::<RowHeights>(id).unwrap_or_default());
     if heights.frame != frame {

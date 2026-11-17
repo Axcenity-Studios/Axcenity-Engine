@@ -154,3 +154,95 @@ fn a_texture_comes_in_on_the_thread_and_replaces_the_white_it_drew_with() {
     until_uploaded(&mut renderer, &list);
     assert!(renderer.scene.textures.contains_key(&903));
 }
+
+/// Flat ground 20 studs across, as a terrain chunk is at one level of
+/// detail: each level is a mesh of its own key.
+struct ChunkLevel(u64);
+
+impl MeshSource for ChunkLevel {
+    fn key(&self) -> u64 {
+        self.0
+    }
+    fn positions(&self) -> &[[f32; 3]] {
+        &[
+            [-10.0, 0.0, -10.0],
+            [-10.0, 0.0, 10.0],
+            [10.0, 0.0, -10.0],
+            [10.0, 0.0, 10.0],
+        ]
+    }
+    fn normals(&self) -> &[[f32; 3]] {
+        &[[0.0, 1.0, 0.0]; 4]
+    }
+    fn uvs(&self) -> &[[f32; 2]] {
+        &[[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+    }
+    fn indices(&self) -> &[u32] {
+        &[0, 1, 2, 1, 3, 2]
+    }
+}
+
+#[test]
+fn a_terrain_chunk_switching_level_is_drawn_in_the_frame_it_switches() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    // As in the editor, which always uploads in the background.
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+    renderer.set_background_uploads(true);
+    let layers = Arc::new(crate::TerrainLayers {
+        id: 1,
+        key: 1,
+        layers: vec![crate::TerrainLayer {
+            color: [1.0, 0.0, 0.0],
+            ..terrain::tests::layer()
+        }],
+        view: crate::TerrainView::Shaded,
+        height_range: [0.0, 1.0],
+        grid_origin: [-10.0, -10.0],
+        grid_cell: [1.0, 1.0],
+    });
+    let weights: [Arc<dyn TextureSource>; 2] = [
+        Arc::new(Picture(911, [255, 0, 0, 0].repeat(16))),
+        Arc::new(Picture(912, vec![0; 64])),
+    ];
+    let chunk_at_level = |key| {
+        let mut item = big_block();
+        item.shape = Shape::Mesh(Arc::new(ChunkLevel(key)));
+        item.transform = Mat4::from_translation(Vec3::new(0.0, -2.0, 0.0));
+        item.material = Material {
+            terrain: Some(crate::TerrainSurface {
+                layers: layers.clone(),
+                weights: weights.clone(),
+            }),
+            ..Material::default()
+        };
+        let mut list = list_of(vec![item]);
+        // Looking straight down at it, in sunlight.
+        list.camera.look_at = Vec3::new(0.0, -1.0, -0.001);
+        list.ambient.intensity = 0.2;
+        list
+    };
+    let middle = |renderer: &TextureRenderer| {
+        let pixels = renderer.read_pixels();
+        let at = (32 * 64 + 32) * 4;
+        [pixels[at], pixels[at + 1], pixels[at + 2]]
+    };
+    // The camera moves and the chunk's level changes every frame: each
+    // level is drawn in the frame that first asks for it, never a frame
+    // with a hole where the ground was.
+    for key in [921, 922, 923, 922, 924] {
+        renderer.render(&chunk_at_level(key)).unwrap();
+        assert!(
+            renderer.scene.gpu_mesh(MeshKey::Custom(key)).is_some(),
+            "level {key} is on the GPU in the frame that draws it"
+        );
+        let [red, green, blue] = middle(&renderer);
+        assert!(
+            red > 100 && red > blue * 3 && red > green * 3,
+            "level {key} shows the ground: {red}, {green}, {blue}"
+        );
+    }
+    assert_eq!(renderer.pending_uploads(), 0, "nothing waits on the thread");
+}

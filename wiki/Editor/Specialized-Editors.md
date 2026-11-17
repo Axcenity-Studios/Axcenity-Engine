@@ -31,7 +31,7 @@ The editor's tabs beyond the Scene, Explorer and Properties. Each is a module (o
 
 ## Character Studio
 
-A workspace of its own, opened from the start screen's Character Studio page with no project ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)): presets, body, hair, clothing and stage over a live preview of the default humanoid, posed by the engine's `Animators` in a World of its own (`crates/editor/src/character_workspace.rs`). The face tools stay a Game Editor tab for placed characters (`crates/editor/src/character_studio.rs`). Behaviour: `docs/editor/character-studio.md`.
+A workspace of its own, opened from the start screen's Character Studio page with no project ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)): presets, body, hair, clothing and stage over a live preview of the default humanoid, posed by the engine's `Animators` in a World of its own (`crates/editor/src/character_workspace.rs`). The face tools stay a Game Editor tab for placed characters (`crates/editor/src/character_studio.rs`). Its start page (`crates/editor/src/start/characters.rs`) shows Recent, every saved character and preset as a card with a picture (the workspace's preview rendered offscreen on a background thread on the editor's GPU device, cached as PNGs keyed by a hash of the file) and an overview, Edit and Delete, and character packs (plain versioned JSON; exported as one `.characterpack.json`; Add to Project writes their characters to the project's `assets/characters/descriptions/`). Behaviour: `docs/editor/character-studio.md`.
 
 ## Model Studio
 
@@ -47,7 +47,7 @@ Lays one ScreenGui out on an artboard (`ui::layout_artboard`), with several sele
 
 ## Terrain Studio
 
-Tools in Sculpt, Materials and Terrain rows; generation and erosion run as `terrain::job`s on a worker with progress and cancel; foliage is painted from the Assets panel's props and models.
+Three tabs, Sculpt, Materials and Terrain, each with its tools and the sections that go with them; the tab shown follows the held tool however it was picked (`TerrainStudio::pick`); generation and erosion run as `terrain::job`s on a worker with progress and cancel; foliage is painted from the Assets panel's props and models.
 
 ## Shared pieces
 

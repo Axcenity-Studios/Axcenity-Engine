@@ -6,7 +6,7 @@ samples: [hello-part, hello-plugins]
 
 # Editor interface
 
-The editor is one window: a header with the menus, a **ribbon** of tools under it, and a docking area of **panels** below. Everything you can click is also reachable from the keyboard through search.
+The editor is one window: a header with the menus and a **search box**, a **ribbon** of tools under it, and a docking area of **panels** below. Everything you can click is also reachable from the keyboard through search.
 
 ## The header and menus
 
@@ -17,7 +17,7 @@ The editor is one window: a header with the menus, a **ribbon** of tools under i
 - **Debug**: **Graphics Benchmark…**, which measures how this computer draws the viewport and recommends the editor's own graphics settings (never your game's).
 - **Help**: **Learn** (this page, the Documentation and the API Reference in a window beside your project), the Version Explorer, Check for Updates and About.
 
-The title in the middle shows the project's name, with a `*` while there are unsaved changes.
+The search box after the menus searches the whole project (see Search everything, below). The title shows the project's name, with a `*` while there are unsaved changes.
 
 ## The ribbon
 
@@ -32,7 +32,7 @@ The ribbon's tabs group the tools by task:
 | **Script** | New Script, LocalScript and ModuleScript, and script tools |
 | **Test** | Play with several clients, network conditions, Check Assets, and view options such as overlays |
 
-Press **+** after the tabs to make your own tab from any of the ribbon's groups; right-click it to edit or delete it. With the **Compact** density setting the ribbon shows icons only, with names in tooltips.
+Press **+** after the tabs to make your own tab: give it a name and an icon (pick from suggestions or search every icon), add any of the ribbon's groups and drag them into order, and see a preview of the tab as you go. Right-click your tab to edit it, change its icon or delete it; **Settings > Layout & ribbon** lists your tabs too. With the **Compact** density setting the ribbon shows icons only, with names in tooltips.
 
 ## Panels
 
@@ -60,7 +60,7 @@ The **view cube** in the Scene's corner shows which way you face; click a face, 
 
 ## Search everything
 
-Press **Ctrl+K** (**Cmd+K** on macOS) to search the whole editor at once: commands, tools, objects in the world, assets, scripts, levels, settings and the selected object's properties. Chips under the search box narrow it to one kind. **Ctrl+Shift+P** opens it on commands only (the Command Palette) and **Ctrl+P** is Quick Open. Every menu item and ribbon button can be run from here, with its shortcut shown.
+Click the **Search** box in the header, or press **Ctrl+K** (**Cmd+K** on macOS), to search the whole editor at once; results drop down under the box: commands, tools, objects in the world, assets, scripts, levels, settings and the selected object's properties. Chips under the search box narrow it to one kind. **Ctrl+Shift+P** opens it on commands only (the Command Palette) and **Ctrl+P** is Quick Open. Every menu item and ribbon button can be run from here, with its shortcut shown.
 
 ## Settings
 
@@ -68,7 +68,7 @@ Press **Ctrl+K** (**Cmd+K** on macOS) to search the whole editor at once: comman
 
 - **Appearance**: dark, light or system theme, accent colour and interface scale. (The theme is no longer in the View menu.)
 - **Text & density**: Comfortable or Compact, and the code font size.
-- **Editor layout**: panels, layout presets and your saved layouts, and the start screen's navigation.
+- **Layout & ribbon**: layout presets and your saved layouts, Reset Layout, your own ribbon tabs, and the start screen's navigation. (Show or hide panels from the Home tab's **Panels** menu or **View > Panels**.)
 - **Viewport**: the grid and its strength, the view cube, light cones, the movement guide, the view mode and the overlays: the same switches as the Viewport menu.
 - **Graphics**: the viewport's quality preset, shadows, post-processing, render scale, texture quality and anti-aliasing for this computer. These change how the editor draws, not your game's own Lighting.
 - **Shortcuts**: every keyboard shortcut, grouped by where it works.

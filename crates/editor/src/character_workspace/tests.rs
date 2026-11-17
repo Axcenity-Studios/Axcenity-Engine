@@ -339,8 +339,13 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
         path.display()
     );
     assert!(!workspace.dirty());
-    let listed = saved_characters(&folder);
+    let listed: Vec<(String, PathBuf)> = shelf::list(&folder)
+        .into_iter()
+        .map(|saved| (saved.name, saved.path))
+        .collect();
     assert_eq!(listed, vec![("Test Hero".to_owned(), path.clone())]);
+    // Saving puts it first in Recent.
+    assert_eq!(recent::recent(&folder), vec![path.clone()]);
     let reopened = CharacterWorkspace::open_file(&folder, &path).unwrap();
     assert_eq!(reopened.description(), workspace.description());
     assert!(!reopened.dirty());

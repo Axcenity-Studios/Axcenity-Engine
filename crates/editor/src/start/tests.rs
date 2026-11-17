@@ -661,7 +661,7 @@ fn copy_diagnostics_names_the_build_system_gpu_and_known_issues() {
 /// Every label and button drawn, with AccessKit on: its text (without icon
 /// characters; a label's starts "label: ") and its bounds as left, right,
 /// top and bottom.
-fn drawn_text(output: &egui::FullOutput) -> Vec<(String, f32, f32, f32, f32)> {
+pub(super) fn drawn_text(output: &egui::FullOutput) -> Vec<(String, f32, f32, f32, f32)> {
     let update = output
         .platform_output
         .accesskit_update

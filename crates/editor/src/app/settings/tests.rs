@@ -422,3 +422,125 @@ fn the_in_use_line_lists_each_ray_traced_effect() {
         "{line}"
     );
 }
+
+/// Layout & ribbon has no checkbox per panel (those are the ribbon's Panels
+/// menu and View › Panels): its one checkbox is the start screen's. It
+/// lists the custom ribbon tabs, and Edit opens one in the tab editor.
+#[test]
+fn the_layout_page_lists_ribbon_tabs_and_has_no_panel_checkboxes() {
+    use crate::ribbon_tabs::RibbonGroup;
+    use egui::accesskit::Role;
+    let ctx = theme::test_context();
+    ctx.enable_accesskit();
+    let mut app = EditorApp::new(None);
+    app.ribbon_tabs.add_custom(
+        "Building",
+        "HAMMER",
+        &[RibbonGroup::Parts, RibbonGroup::Tools],
+    );
+    app.settings.open = true;
+    app.settings.page = SettingsPage::Layout;
+    let mut clock = 0.0;
+    let mut frame = |app: &mut EditorApp, events: Vec<egui::Event>| {
+        clock += 0.05;
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(900.0, 640.0),
+            )),
+            time: Some(clock),
+            events,
+            ..Default::default()
+        };
+        crate::theme::run(&ctx, input, |ui| {
+            let ctx = &ui.ctx().clone();
+            egui::CentralPanel::default().show(ui, |_| {});
+            app.settings_window(ctx);
+        })
+    };
+    frame(&mut app, Vec::new());
+    let output = frame(&mut app, Vec::new());
+    let nodes = &output
+        .platform_output
+        .accesskit_update
+        .as_ref()
+        .expect("AccessKit is on")
+        .nodes;
+    let labelled = |role: Role| -> Vec<(String, egui::Pos2)> {
+        nodes
+            .iter()
+            .filter(|(_, node)| node.role() == role)
+            .filter_map(|(_, node)| {
+                let bounds = node.bounds()?;
+                let middle = egui::pos2(
+                    ((bounds.x0 + bounds.x1) * 0.5) as f32,
+                    ((bounds.y0 + bounds.y1) * 0.5) as f32,
+                );
+                Some((node.label()?.to_owned(), middle))
+            })
+            .collect()
+    };
+    let checkboxes: Vec<String> = labelled(Role::CheckBox)
+        .into_iter()
+        .map(|(label, _)| label)
+        .collect();
+    assert_eq!(checkboxes, ["Fold the sidebar to its icons"]);
+    let edit = labelled(Role::Button)
+        .into_iter()
+        .find(|(label, _)| label == "Edit its name, icon and groups")
+        .expect("each custom tab has Edit")
+        .1;
+    for events in [
+        vec![egui::Event::PointerMoved(edit)],
+        vec![super::super::ui_designer_tests::press(edit, true)],
+        vec![super::super::ui_designer_tests::press(edit, false)],
+    ] {
+        frame(&mut app, events);
+    }
+    assert!(app.ribbon_tabs.is_editing(), "Edit opens the tab editor");
+}
+
+/// With `AXCENITY_SNAPSHOTS` set: Layout & ribbon in both themes.
+#[test]
+fn the_layout_page_draws_in_both_themes() {
+    use crate::ribbon_tabs::RibbonGroup;
+    let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) else {
+        return;
+    };
+    for (name, appearance) in [
+        ("settings-layout-dark", Appearance::default()),
+        (
+            "settings-layout-light",
+            Appearance {
+                theme: ThemeChoice::Light,
+                ..Appearance::default()
+            },
+        ),
+    ] {
+        let mut app = EditorApp::new(None);
+        app.ribbon_tabs.add_custom(
+            "Building",
+            "HAMMER",
+            &[
+                RibbonGroup::Parts,
+                RibbonGroup::Tools,
+                RibbonGroup::Snapping,
+            ],
+        );
+        app.ribbon_tabs
+            .add_custom("Lights", "LIGHTBULB", &[RibbonGroup::Lights]);
+        app.settings.open = true;
+        app.settings.page = SettingsPage::Layout;
+        crate::snapshot::snapshot(
+            &folder.join(format!("{name}.png")),
+            egui::vec2(900.0, 640.0),
+            vec![Vec::new(); 3],
+            |ui| {
+                let ctx = &ui.ctx().clone();
+                theme::apply(ctx, &appearance);
+                egui::CentralPanel::default().show(ui, |_| {});
+                app.settings_window(ctx);
+            },
+        );
+    }
+}

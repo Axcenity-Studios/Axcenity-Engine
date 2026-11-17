@@ -38,7 +38,7 @@ Rule of thumb: **anything that reads or writes the World runs on the frame's thr
 | Terrain layer maps | `scene` / loading workers | Decoded on the asset loading workers even when cooked, and the layer arrays built in parallel, each texture resized once (PRs #67, #69) | Pixels for the terrain's texture arrays |
 | `rmcp` thread (editor `--mcp`) | `mcp/src/server.rs` | MCP protocol on stdio; hands calls to the editor thread as `Job`s | Tool results |
 | `mcp listener` + one `mcp client` thread per connection (editor with Settings ▸ AI connections on) | `editor/src/app/mcp/live.rs` | Loopback listener; each relayed client's hello, then `rmcp` on that TCP connection (`serve_tcp`) | `Job`s drained on the main thread at the start of a frame, 4 ms budget, a repaint to wake it |
-| Terrain chunk worker | `scene/src/terrain.rs` | Builds terrain chunk meshes | Chunk meshes into `TerrainCache` |
+| Terrain chunk worker | `scene/src/terrain.rs` | Makes chunks' weight textures while streaming (meshes are built in the frame, stitched to their neighbours' levels) | Weights into `TerrainCache` |
 | `terrain job` | `terrain/src/job.rs` | Generation and erosion (editor) | A new heightfield |
 | CSG worker (per call) | `script/src/csg.rs` | `UnionAsync`, `SubtractAsync`, `IntersectAsync` through `mesh_edit::combine` | Resumes the script from `Context::step` |
 | `project watcher` | `project/src/watch.rs` | `notify` file events, polling fallback (I10) | Changed-file lists polled by the host |

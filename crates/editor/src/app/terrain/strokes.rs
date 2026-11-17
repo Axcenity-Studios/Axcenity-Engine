@@ -31,7 +31,7 @@ impl EditorApp {
             )
         });
         if let Some(tool) = tool {
-            self.terrain.tool = Some(tool);
+            self.terrain.pick(Some(tool));
         }
         let brush = &mut self.terrain.brush;
         if smaller {
@@ -41,7 +41,7 @@ impl EditorApp {
             brush.radius = (brush.radius * BRUSH_STEP).min(256.0);
         }
         if escape {
-            self.terrain.tool = None;
+            self.terrain.pick(None);
         }
     }
 

@@ -116,6 +116,13 @@ impl EditorApp {
             .collect()
     }
 
+    /// Picks a terrain tool from outside the panel (the ribbon's Brush menu,
+    /// universal search) and opens the panel on its tab.
+    pub(super) fn pick_terrain_tool(&mut self, tool: TerrainTool) {
+        self.terrain.pick(Some(tool));
+        self.layout.open(Pane::Terrain);
+    }
+
     /// Runs every frame, before the panels are drawn: finished jobs become
     /// previews, the viewport is told what to draw, and the studio's keys.
     pub(super) fn terrain_frame(&mut self, ctx: &egui::Context) {
@@ -124,8 +131,8 @@ impl EditorApp {
             return;
         }
         // Closing the panel puts the tool down.
-        if !self.layout.is_open(Pane::Terrain) {
-            self.terrain.tool = None;
+        if !self.layout.is_open(Pane::Terrain) && self.terrain.tool.is_some() {
+            self.terrain.pick(None);
         }
         self.terrain.resolve_target(&self.world, self.selected);
         // A preview or stroke for a terrain that's gone (deleted, or an insert undone).
@@ -340,7 +347,9 @@ impl EditorApp {
         if let Some(id) = self.insert_terrain(size, data, Preset::RollingHills, None) {
             self.select_from_viewport(Some(id));
             self.terrain.target = Some(id);
-            self.terrain.tool.get_or_insert(TerrainTool::Raise);
+            if self.terrain.tool.is_none() {
+                self.terrain.pick(Some(TerrainTool::Raise));
+            }
             self.layout.open(Pane::Terrain);
         }
     }

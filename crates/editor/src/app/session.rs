@@ -1473,8 +1473,17 @@ impl EditorApp {
     }
     /// Fills the window under the menu bar with the start screen, and opens
     /// what's picked there.
-    pub(super) fn start_screen(&mut self, ui: &mut egui::Ui) {
+    pub(super) fn start_screen(
+        &mut self,
+        ui: &mut egui::Ui,
+        render_state: Option<&eframe::egui_wgpu::RenderState>,
+    ) {
         let ctx = &ui.ctx().clone();
+        if let Some(render_state) = render_state {
+            // The Character Studio page draws its pictures on it.
+            self.start
+                .set_gpu(&render_state.device, &render_state.queue);
+        }
         self.follow_start_join();
         if self.start.wants_team_projects() {
             let records = self.collaborate_projects(None);

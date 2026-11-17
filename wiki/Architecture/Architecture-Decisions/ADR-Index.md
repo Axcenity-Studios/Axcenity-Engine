@@ -74,6 +74,7 @@ Earlier decisions that later work replaced. They live in the plans' "Architectur
 | References name assets by path only | L2 | References may also name the asset ID (`ax://…`), resolved by `Assets::resolve` (PR #78) | 2026-11-11 |
 | Scripts only as files under `scripts/`, never in `world.json` | v1 Phase 4 | Scripts may also sit inside objects as `SourceFile` references, usually in `objects/` (G2, PRs #111, #114, #115) | 2026-11-11 |
 | No physics interpolation | physics docs | Moving parts drawn between steps (G3, PR #110) | 2026-11-11 |
+| Terrain chunks hang skirts from every side to hide cracks between levels of detail | `terrain/src/mesh.rs`, `docs/terrain.md` | Seams stitched (a side next to a finer chunk takes its samples), no skirts; chunk meshes built in the frame and uploaded right away (`docs/terrain.md`) | 2026-11-16 |
 
 ## Candidates not yet written
 
