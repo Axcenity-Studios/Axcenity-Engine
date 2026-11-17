@@ -15,6 +15,7 @@ use axcenity_render::{
 };
 
 use crate::draw_list::{GLOW_BOOST, texture};
+use crate::skin_tone;
 
 /// The material file `instance`'s `MaterialVariant` names, put together
 /// with its bases, or `None` when it names none or it can't be read (then
@@ -143,23 +144,58 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 
 /// Modulates `material` (the one named `name` in its model) by the
 /// character material values `instance` (a MeshPart) has for it, as
-/// attributes (`core::material_value_attribute`): a tint multiplies its
-/// base colour and a roughness scale its roughness, so its maps stay. A
-/// part with no values is drawn as authored.
+/// attributes (`core::material_value_attribute`), keeping its maps:
+///
+/// - `melanin`, `undertone` and `redness` tone the base colour by one
+///   ratio in linear light, along the pigment curve of
+///   [`skin_tone`](crate::skin_tone) (lighter to darker, cool to warm,
+///   pallor to flush);
+/// - `tint`, `iris_tint` and `sclera_tint` multiply the base colour, after
+///   toning;
+/// - `roughness_scale` multiplies the roughness;
+/// - `detail_strength` multiplies the normal map's strength (0 to 2).
+///
+/// Every value at its neutral setting changes nothing, and a part with no
+/// values is drawn as authored. The rest (`scatter_scale`, `pupil_size`,
+/// `limbal_ring`, `iris_depth`, cloth sheen and hair dye) wait for the
+/// renderer's Skin, Eye, Cloth and Hair shading models (CO7): until then
+/// each material draws as Standard. `scene` doesn't know a material's
+/// shading model, so a value is drawn by its name whatever the slot: Hair's
+/// `melanin` and `redness` take the skin's curve for now.
 pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str) {
     let value = |value: &str| instance.attribute(&material_value_attribute(name, value));
-    // Until the renderer has skin, eye, cloth and hair shading (CO7), each
-    // is drawn as a standard material with its tint and roughness.
-    for tint in ["tint", "iris_tint"] {
+    let number = |name: &str| {
+        value(name)
+            .and_then(Value::as_number)
+            .filter(|number| number.is_finite())
+            .map(|number| number as f32)
+    };
+    let pigments = [number("melanin"), number("undertone"), number("redness")];
+    if pigments.iter().any(Option::is_some) {
+        let [melanin, undertone, redness] = pigments.map(|value| value.unwrap_or(0.0));
+        let ratio = skin_tone::ratio(melanin, undertone, redness);
+        // Neutral is exactly (1, 1, 1): the colour is left bit for bit.
+        if ratio != [1.0; 3] {
+            // The base colour is sRGB; the ratio is in linear light.
+            material.base_color = std::array::from_fn(|c| {
+                let linear = skin_tone::srgb_to_linear(material.base_color[c]) * ratio[c];
+                skin_tone::linear_to_srgb(linear)
+            });
+        }
+    }
+    for tint in ["tint", "iris_tint", "sclera_tint"] {
         if let Some(tint) = value(tint).and_then(Value::as_color3) {
             let [r, g, b] = material.base_color;
             material.base_color = [r * tint.r, g * tint.g, b * tint.b];
         }
     }
-    if let Some(scale) = value("roughness_scale").and_then(Value::as_number)
-        && scale.is_finite()
+    if let Some(scale) = number("roughness_scale") {
+        material.roughness = (material.roughness * scale).clamp(0.0, 1.0);
+    }
+    if let Some(strength) = number("detail_strength")
+        && let Some(normal) = &mut material.maps.normal
     {
-        material.roughness = (material.roughness * scale as f32).clamp(0.0, 1.0);
+        normal.scale *= strength.clamp(0.0, 2.0);
     }
 }
 

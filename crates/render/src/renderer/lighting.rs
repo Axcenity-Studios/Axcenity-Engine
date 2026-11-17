@@ -170,6 +170,8 @@ pub(super) fn frame_uniform(
         ray_shadows: [0.0; 4],
         // And while ray traced reflections are.
         ray_reflections: [0.0; 4],
+        // And while TAA is on.
+        noise: [0.0; 4],
     }
 }
 

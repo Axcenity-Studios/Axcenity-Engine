@@ -501,6 +501,14 @@ pub(super) fn wants_motion_blur(lens: &LensEffects) -> bool {
         .is_some_and(|share| share.is_finite() && share > 0.0)
 }
 
+impl History {
+    /// How many frames have been drawn with the motion target: the index
+    /// the jitter and the per-frame noise step by.
+    pub(super) fn frame_index(&self) -> u64 {
+        self.frame
+    }
+}
+
 /// How many jitter places TAA steps through for a scene `scale` times the
 /// output's size: [`JITTER_PHASES`] at full size, more as each output pixel
 /// gets fewer of the scene's (as FSR 2 does: 8 × the area ratio).

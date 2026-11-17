@@ -324,3 +324,74 @@ fn contact_shadows_alone_draw_the_prepass_but_not_ambient_occlusion() {
     assert_eq!(renderer.scene.occlusion_targets_alive(), 0);
     assert_eq!(renderer.stats().draw_calls, plain);
 }
+
+/// `with_contact(High, true)` with `anti_aliasing` and motion blur, so
+/// (for a list with `lens.motion_blur`) the motion target's history
+/// counts frames even without TAA.
+fn soft_edges_with(anti_aliasing: crate::AntiAliasing) -> GraphicsSettings {
+    GraphicsSettings {
+        anti_aliasing: Some(anti_aliasing),
+        motion_blur: Some(crate::graphics::MotionBlurQuality::High),
+        ..with_contact(ShadowQuality::High, true)
+    }
+}
+
+#[test]
+fn without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    // The block's soft sun shadow and its contact shadow both turn their
+    // samples by a per-pixel noise. Nothing averages it without TAA, so
+    // it must stay put, or their edges flicker.
+    let mut list = block_resting_on_a_floor();
+    list.lens.motion_blur = Some(0.5);
+    for anti_aliasing in [
+        crate::AntiAliasing::Off,
+        crate::AntiAliasing::Fxaa,
+        crate::AntiAliasing::Msaa4,
+    ] {
+        let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+        renderer.set_graphics(&soft_edges_with(anti_aliasing));
+        frame(&mut renderer, &list);
+        let first = frame(&mut renderer, &list);
+        // Frames are counted, so a noise that moved would move here.
+        assert!(
+            renderer.scene.history.frame_index() > 0,
+            "{anti_aliasing:?}"
+        );
+        assert_eq!(
+            renderer.scene.shading_noise_step(),
+            0.0,
+            "{anti_aliasing:?}"
+        );
+        let second = frame(&mut renderer, &list);
+        assert!(
+            first == second,
+            "{anti_aliasing:?}: {} pixels changed between still frames",
+            changed(&first, &second).len()
+        );
+    }
+}
+
+#[test]
+fn with_taa_the_shadow_noise_moves_every_frame() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut list = block_resting_on_a_floor();
+    list.lens.motion_blur = Some(0.5);
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.set_graphics(&soft_edges_with(crate::AntiAliasing::Taa));
+    let steps: Vec<f32> = (0..4)
+        .map(|_| {
+            frame(&mut renderer, &list);
+            renderer.scene.shading_noise_step()
+        })
+        .collect();
+    for pair in steps.windows(2) {
+        assert_ne!(pair[0], pair[1], "the noise moves each frame: {steps:?}");
+    }
+}

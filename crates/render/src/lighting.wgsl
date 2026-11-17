@@ -94,6 +94,9 @@ struct Frame {
     // a traced one stands for each way, z the traced width in pixels, w
     // unused.
     ray_reflections: vec4<f32>,
+    // x: which of 64 frames this is while TAA is on, 0 otherwise
+    // (`shading_noise`).
+    noise: vec4<f32>,
 }
 
 // The most light probe volumes drawn at once. Must match `MAX_VOLUMES` in
@@ -237,6 +240,15 @@ fn pixel_noise(pixel: vec2<f32>) -> f32 {
     return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
 }
 
+// `pixel_noise` for the shadow filters and contact shadows, moved on each
+// frame while TAA is on (`frame.noise.x`, 0 otherwise), so TAA averages
+// their per-pixel turn into a smooth edge instead of keeping one fixed
+// pattern, which shows as stipple and diagonal hatching. 5.588238 is
+// Jimenez's step for interleaved gradient noise over frames.
+fn shading_noise(pixel: vec2<f32>) -> f32 {
+    return pixel_noise(pixel + 5.588238 * frame.noise.x);
+}
+
 // Sunlight reaching `world_position` as seen by cascade `index`: x is 1 in
 // the open and 0 in shadow, y how far toward the cascade's edge the point
 // is (0 inside, rising to 1 at the edge), or -1 if the cascade doesn't
@@ -370,7 +382,7 @@ fn cascade_sun_visibility(world_position: vec3<f32>, normal: vec3<f32>, pixel: v
     if frame.shadow.x == 0.0 {
         return 1.0;
     }
-    let angle = pixel_noise(pixel) * 6.2831853;
+    let angle = shading_noise(pixel) * 6.2831853;
     let rotation = mat2x2<f32>(cos(angle), sin(angle), -sin(angle), cos(angle));
     // How steeply the surface faces away from the sun (the tangent of the
     // angle), for depth bias: tilted surfaces need more.
@@ -410,7 +422,7 @@ fn soft_sun_visibility(world_position: vec3<f32>, normal: vec3<f32>, pixel: vec2
     if frame.shadow.x == 0.0 {
         return 1.0;
     }
-    let angle = pixel_noise(pixel) * 6.2831853;
+    let angle = shading_noise(pixel) * 6.2831853;
     let rotation = mat2x2<f32>(cos(angle), sin(angle), -sin(angle), cos(angle));
     let spread = SOFT_SUN_FILTER_TEXELS / f32(textureDimensions(shadow_map).x);
     let count = u32(frame.shadow.z);
@@ -528,7 +540,7 @@ fn contact_visibility(
     let bias = 0.01 + distance(camera, world_position) * 0.002;
     let start = world_position + normal * bias;
     let step = toward * (reach / f32(CONTACT_STEPS));
-    let jitter = pixel_noise(pixel);
+    let jitter = shading_noise(pixel);
     for (var i = 0u; i < CONTACT_STEPS; i++) {
         let along = f32(i) + jitter;
         let p = start + step * along;
@@ -916,6 +928,9 @@ fn shade(
 // screen-space ambient occlusion together), `dielectric` how much a
 // non-metal reflects head-on (usually 4%), and `solid` whether it's in the
 // prepass (see-through surfaces aren't), so contact shadows can fall on it.
+// `bumped` says `n` comes from a normal map, so the bumps shadow each other
+// as the light grazes them (`bump_shadowing`); a shading normal leaned any
+// other way (a leaf's crown, a surface shader's) is lit as it says.
 // The weather changes the surface first (`weathered`).
 fn light_surface(
     world_position: vec3<f32>,
@@ -928,10 +943,11 @@ fn light_surface(
     occlusion: f32,
     dielectric: vec3<f32>,
     solid: bool,
+    bumped: bool,
 ) -> vec3<f32> {
     let weather = weathered(geometric, n, base_color, metalness, roughness);
     return shade_surface(world_position, geometric, weather.normal, pixel, weather.base_color,
-        weather.metalness, weather.roughness, occlusion, dielectric, solid);
+        weather.metalness, weather.roughness, occlusion, dielectric, solid, bumped);
 }
 
 // How much darker a soaked non-metal is: water fills its pores, so less
@@ -1018,7 +1034,7 @@ struct TileLamps {
 }
 
 fn tile_lamps(pixel: vec2<f32>) -> TileLamps {
-    let angle = pixel_noise(pixel) * 6.2831853;
+    let angle = shading_noise(pixel) * 6.2831853;
     let rotation = mat2x2<f32>(cos(angle), sin(angle), -sin(angle), cos(angle));
     let tile_size = max(frame.lights.y, 1u);
     let tile = vec2<u32>(pixel) / tile_size;
@@ -1126,6 +1142,41 @@ fn lamp_arrival(lamps: TileLamps, i: u32, slot: u32, world_position: vec3<f32>,
 }
 
 // `light_surface` for a surface the weather has already changed.
+// How much of a light toward `l` a normal-mapped surface keeps where its
+// mapped normal `n` leans away from its own `geometric` one: the bumps
+// shadow each other as the light grazes the surface (Conty Estevez, Lecocq
+// and Stein, "A Microfacet-Based Shadowing Function to Solve the Bump
+// Terminator Problem", Ray Tracing Gems, 2019), and nothing is lit where
+// the surface itself faces away. Without it each bump's own n·l decides
+// alone, and the line where light ends breaks up into lit and unlit
+// speckles. Only for a normal map's normal (`shade_surface`'s `bumped`):
+// it would darken any other leaned normal, such as a leaf's crown's.
+fn bump_shadowing(geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 {
+    let cos_i = dot(geometric, l);
+    if cos_i <= 0.0 {
+        return 0.0;
+    }
+    let cos_d = min(abs(dot(geometric, n)), 1.0);
+    if cos_d >= 1.0 {
+        return 1.0;
+    }
+    // The bumps' slope as a microfacet roughness (alpha squared): the
+    // spread of normals whose mean leans `cos_d` off the surface.
+    let tan2_d = (1.0 - cos_d * cos_d) / max(cos_d * cos_d, 1e-6);
+    let alpha2 = clamp(0.125 * tan2_d, 0.0, 1.0);
+    let cos2_i = max(cos_i * cos_i, 1e-6);
+    let tan2_i = (1.0 - cos2_i) / cos2_i;
+    return 2.0 / (1.0 + sqrt(1.0 + alpha2 * tan2_i));
+}
+
+// `bump_shadowing` for a normal map's normal (`bumped`), 1 for any other.
+fn bumps(bumped: bool, geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 {
+    if !bumped {
+        return 1.0;
+    }
+    return bump_shadowing(geometric, n, l);
+}
+
 fn shade_surface(
     world_position: vec3<f32>,
     geometric: vec3<f32>,
@@ -1137,6 +1188,7 @@ fn shade_surface(
     occlusion: f32,
     dielectric: vec3<f32>,
     solid: bool,
+    bumped: bool,
 ) -> vec3<f32> {
     let v = normalize(frame.camera_position.xyz - world_position);
     let n_dot_v = max(dot(n, v), 0.0001);
@@ -1145,7 +1197,7 @@ fn shade_surface(
 
     let sun_light = sun_arrival(world_position, geometric, pixel, solid);
     let sun = shade(n, v, sun_light.l, base_color, metalness, roughness, f0)
-        * sun_light.radiance * sun_light.visible;
+        * sun_light.radiance * sun_light.visible * bumps(bumped, geometric, n, sun_light.l);
 
     // Point and spot lights: only the ones listed for this pixel's tile.
     var lit = vec3<f32>(0.0);
@@ -1156,7 +1208,7 @@ fn shade_surface(
         slot += lamp_slots(lamps, i);
         if lamp.visible > 0.0 {
             lit += shade(n, v, lamp.l, base_color, metalness, roughness, f0) * lamp.radiance
-                * lamp.visible;
+                * lamp.visible * bumps(bumped, geometric, n, lamp.l);
         }
     }
 

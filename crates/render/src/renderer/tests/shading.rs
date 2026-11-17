@@ -460,3 +460,187 @@ fn a_translucent_leaf_glows_green_with_the_sun_behind_it() {
         "more green than blue comes through: {solid:?} against {leaf:?}"
     );
 }
+
+/// The green of a leaf card's crown edge (the card of
+/// `a_leaf_on_the_outside_of_its_crown_is_brighter_than_one_deep_inside`)
+/// lit by a sun of `intensity` from `sun`, with no shadows or sky. A leaf
+/// is lit by its crown (`CANOPY_BEND`), so its light leans away from the
+/// card's own normal, with no normal map.
+fn crown_edge_green(renderer: &mut TextureRenderer, sun: Vec3, intensity: f32) -> u8 {
+    let mut list = list_of(vec![DrawItem {
+        transform: Mat4::from_scale_rotation_translation(
+            Vec3::splat(4.4),
+            glam::Quat::IDENTITY,
+            Vec3::new(0.0, 0.0, -5.0),
+        ),
+        material: Material {
+            base_color: [0.3, 0.6, 0.2],
+            double_sided: true,
+            translucency: 0.42,
+            ..Material::default()
+        },
+        casts_shadow: false,
+        ..item(Shape::Mesh(Arc::new(Square)), Vec3::ZERO, 1.0)
+    }]);
+    list.sun.direction = sun.normalize();
+    list.sun.intensity = intensity;
+    list.shadows.enabled = false;
+    renderer.render(&list).unwrap();
+    renderer.read_pixels()[(16 * 32 + 25) * 4 + 1]
+}
+
+#[test]
+fn a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 32, 32);
+    // The sun to the right, a little behind the card and a little in
+    // front of it. The crown's right edge faces it either way; only the
+    // card's own facing differs, and bump shadowing (for normal maps
+    // only) mustn't take the light away where the card turns from it.
+    let behind = crown_edge_green(&mut renderer, Vec3::new(1.0, 0.0, -0.3), 2.0);
+    let in_front = crown_edge_green(&mut renderer, Vec3::new(1.0, 0.0, 0.3), 2.0);
+    let dark = crown_edge_green(&mut renderer, Vec3::new(1.0, 0.0, -0.3), 0.0);
+    eprintln!("crown edge green: behind {behind}, in front {in_front}, no sun {dark}");
+    assert!(
+        u32::from(behind) * 10 >= u32::from(in_front) * 8,
+        "lit from behind {behind} against from in front {in_front}"
+    );
+    assert!(
+        behind > dark + 30,
+        "the sun lights it from behind: {behind} against {dark}"
+    );
+}
+
+/// Leans a surface's normal 70 degrees toward +X, with no normal map.
+const LEANING: &str = "\
+fn surface(input: SurfaceInput) -> Surface {
+    var out = standard_surface(input);
+    out.normal = normalize(input.normal + vec3<f32>(2.75, 0.0, 0.0));
+    return out;
+}
+";
+
+#[test]
+fn a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    // A card facing the camera whose surface shader leans its normal
+    // toward the sun, which is a little behind the card: the shading
+    // normal faces the sun though the card doesn't. Without a normal map
+    // the sun lights it by that normal, as before bump shadowing.
+    let card = |sun: f32| {
+        let mut list = scene(vec![DrawItem {
+            transform: Mat4::from_scale(Vec3::new(6.0, 6.0, 0.1)),
+            material: Material {
+                base_color: [0.8; 3],
+                surface_shader: Some(crate::SurfaceShader::new("leaning", LEANING)),
+                ..Material::default()
+            },
+            casts_shadow: false,
+            ..item(Shape::Block, Vec3::ZERO, 1.0)
+        }]);
+        list.sun.direction = Vec3::new(1.0, 0.0, -0.3).normalize();
+        list.sun.intensity = sun;
+        list
+    };
+    let mut renderer = renderer(&device, &queue);
+    let middle = |pixels: &[u8]| pixel(pixels, Vec2::splat(SIZE as f32 / 2.0));
+    let lit = middle(&draw(&mut renderer, &card(2.0)));
+    let unlit = middle(&draw(&mut renderer, &card(0.0)));
+    assert!(
+        brightness(lit) > brightness(unlit) + 150,
+        "the sun lights it: {lit:?} against {unlit:?}"
+    );
+}
+
+/// A normal map of bumps leaning every way up to about 35 degrees, a
+/// different way on each texel.
+fn bumpy_normal_map() -> NormalMap {
+    let mut seed = 0x2545_f491_u32;
+    let mut next = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed as f32 / u32::MAX as f32) * 2.0 - 1.0
+    };
+    let texels: Vec<[u8; 4]> = (0..32 * 32)
+        .map(|_| {
+            let (x, y) = (next() * 0.6, next() * 0.6);
+            let z = (1.0 - x * x - y * y).sqrt();
+            let byte = |v: f32| ((v * 0.5 + 0.5) * 255.0).round() as u8;
+            [byte(x), byte(y), byte(z), 255]
+        })
+        .collect();
+    NormalMap {
+        texture: Arc::new(super::Painted::new(32, |x, y| {
+            texels[(y * 32 + x) as usize]
+        })),
+        scale: 1.0,
+        flip_green: false,
+    }
+}
+
+#[test]
+fn a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    // A bumpy ball 8 studs wide, lit from straight right: its own
+    // terminator is the vertical line through its middle as seen from the
+    // camera, about 18 pixels a stud away.
+    let radius = 4.0;
+    let mut ball = sphere(0.0, [0.8; 3], Shading::Standard);
+    ball.transform = Mat4::from_scale(Vec3::splat(radius * 2.0));
+    ball.material.roughness = 1.0;
+    ball.material.maps.normal = Some(bumpy_normal_map());
+    // About 3 pixels a texel.
+    ball.material.uv_scale = [16.0, 16.0];
+    let mut list = scene(vec![ball]);
+    list.sun.direction = Vec3::X;
+    let mut renderer = renderer(&device, &queue);
+    let pixels = draw(&mut renderer, &list);
+
+    // Points on the ball's front, `side` of the way across from its middle
+    // to its right edge (where the surface faces the sun), on rows through
+    // its middle third.
+    let at = |side: f32, row: f32| {
+        let (x, y) = (side * radius, row * radius);
+        let z = (radius * radius - x * x - y * y).max(0.0).sqrt();
+        pixel(&pixels, on_screen(&list, Vec3::new(x, y, z)))
+    };
+    let rows: Vec<f32> = (-15..=15).map(|i| i as f32 * 0.02).collect();
+
+    // Past the surface's own terminator the sun doesn't reach, whatever
+    // way a bump leans.
+    let past: Vec<i32> = rows
+        .iter()
+        .flat_map(|&row| (2..20).map(move |i| (row, -0.015 * i as f32)))
+        .map(|(row, side)| brightness(at(side, row)))
+        .collect();
+    let speckles = past.iter().filter(|&&b| b > 6).count();
+
+    // Across the line, where the sun grazes, how much each pixel differs
+    // from the next one: the bumps' noise.
+    let mut steps = Vec::new();
+    for &row in &rows {
+        let band: Vec<i32> = (-6..=4)
+            .map(|i| brightness(at(0.015 * i as f32, row)))
+            .collect();
+        steps.extend(band.windows(2).map(|pair| (pair[1] - pair[0]).abs()));
+    }
+    let noise = steps.iter().sum::<i32>() as f32 / steps.len() as f32;
+    eprintln!(
+        "past the terminator: {speckles} lit of {}; noise across it: {noise}",
+        past.len()
+    );
+    assert_eq!(speckles, 0, "{speckles} pixels lit past the terminator");
+    // Measured: 25 with bump shadowing, 38 without (each bump's own n·l
+    // deciding alone).
+    assert!(noise < 31.0, "noise across the terminator: {noise}");
+}

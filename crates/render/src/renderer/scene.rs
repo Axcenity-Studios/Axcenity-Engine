@@ -734,6 +734,7 @@ impl ScenePipeline {
         };
         frame_uniform.view_proj = drawn_view_proj.to_cols_array_2d();
         frame_uniform.inv_view_proj = drawn_view_proj.inverse().to_cols_array_2d();
+        frame_uniform.noise[0] = self.shading_noise_step();
         (frame_uniform.environment, frame_uniform.sky_light) = self.environment.uniform();
         let sky_colors = [
             &mut frame_uniform.sky_top,
@@ -2333,6 +2334,25 @@ impl ScenePipeline {
     #[cfg(test)]
     pub(super) fn probes_ray_traced(&self) -> Option<u64> {
         self.ray_gi.as_ref().map(|gi| gi.probes_traced)
+    }
+
+    /// How far lighting.wgsl's `shading_noise` moves the shadow filters'
+    /// and contact shadows' per-pixel turn in the next frame
+    /// (`Frame::noise.x`). With TAA it's the frame's index (of 64), so the
+    /// turn changes every frame and TAA averages it into a smooth edge.
+    /// Without TAA it's 0: nothing would average a moving turn, so it
+    /// would flicker, and a still scene draws the same pixels every frame.
+    pub(super) fn shading_noise_step(&self) -> f32 {
+        let taa = self
+            .frame_targets
+            .temporal
+            .as_ref()
+            .is_some_and(|temporal| temporal.has_taa());
+        if taa {
+            (self.history.frame_index() % 64) as f32
+        } else {
+            0.0
+        }
     }
 
     /// How many sets of scene targets are alive: 1, unless one leaked.
