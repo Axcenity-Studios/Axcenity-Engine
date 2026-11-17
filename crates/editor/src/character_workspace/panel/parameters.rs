@@ -147,6 +147,20 @@ pub(super) fn show(
             })
             .color(palette.text_weak),
         );
+    } else if selection.level == Level::Quick
+        && base
+            .parameters
+            .iter()
+            .filter(|p| base.group(&p.group).is_some_and(|g| g.category == data))
+            .any(|p| !Level::Quick.shows(parameter_level(p)))
+    {
+        // Quick shows the broad controls only: say where the rest are.
+        ui.add_space(6.0);
+        ui.label(
+            egui::RichText::new("More sliders at the Detailed level.")
+                .small()
+                .color(palette.text_weak),
+        );
     }
     if let Some((count, needed)) = hidden_changes(base, description, data, selection.level) {
         ui.add_space(6.0);

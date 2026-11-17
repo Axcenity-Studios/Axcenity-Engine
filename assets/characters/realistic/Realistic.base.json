@@ -98,13 +98,13 @@
       "category": "body"
     },
     {
-      "id": "build_regions",
-      "label": "Build by region",
+      "id": "proportions",
+      "label": "Proportions",
       "category": "body"
     },
     {
-      "id": "proportions",
-      "label": "Proportions",
+      "id": "build_regions",
+      "label": "Build by region",
       "category": "body"
     },
     {
@@ -792,7 +792,7 @@
       ],
       "about": "How long the legs are against the body.",
       "feature": "thighs",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -802,8 +802,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "arm_length",
@@ -815,7 +814,7 @@
       ],
       "about": "How long the arms are against the body.",
       "feature": "arms",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -825,8 +824,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "shoulder_width",
@@ -838,7 +836,7 @@
       ],
       "about": "How wide the shoulders are.",
       "feature": "shoulders",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -848,8 +846,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "waist_width",
@@ -861,7 +858,7 @@
       ],
       "about": "How wide the waist is.",
       "feature": "waist",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -871,8 +868,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "hip_width",
@@ -884,7 +880,7 @@
       ],
       "about": "How wide the hips are.",
       "feature": "hips",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -894,8 +890,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "head_size",
@@ -907,7 +902,7 @@
       ],
       "about": "How large the head is against the body.",
       "feature": "head",
-      "level": "advanced",
+      "level": "detailed",
       "default": 1,
       "attributes": [
         {
@@ -917,8 +912,7 @@
             1.15
           ]
         }
-      ],
-      "advanced": true
+      ]
     },
     {
       "id": "hand_size",
@@ -1000,8 +994,7 @@
       ],
       "about": "How much muscle is on the chest, beyond the whole body's.",
       "feature": "chest",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_chest",
@@ -1013,8 +1006,7 @@
       ],
       "about": "How much fat is on the chest, beyond the whole body's.",
       "feature": "chest",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_shoulders",
@@ -1026,8 +1018,7 @@
       ],
       "about": "How much muscle is on the shoulders, beyond the whole body's.",
       "feature": "shoulders",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_shoulders",
@@ -1039,8 +1030,7 @@
       ],
       "about": "How much fat is on the shoulders, beyond the whole body's.",
       "feature": "shoulders",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_arms",
@@ -1052,8 +1042,7 @@
       ],
       "about": "How much muscle is on the arms, beyond the whole body's.",
       "feature": "arms",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_arms",
@@ -1065,8 +1054,7 @@
       ],
       "about": "How much fat is on the arms, beyond the whole body's.",
       "feature": "arms",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_abdomen",
@@ -1078,8 +1066,7 @@
       ],
       "about": "How much muscle is on the belly, beyond the whole body's.",
       "feature": "abdomen",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_abdomen",
@@ -1091,8 +1078,7 @@
       ],
       "about": "How much fat is on the belly, beyond the whole body's.",
       "feature": "abdomen",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_back",
@@ -1104,8 +1090,7 @@
       ],
       "about": "How much muscle is on the back, beyond the whole body's.",
       "feature": "back",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_back",
@@ -1117,8 +1102,7 @@
       ],
       "about": "How much fat is on the back, beyond the whole body's.",
       "feature": "back",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_hips",
@@ -1130,8 +1114,7 @@
       ],
       "about": "How much muscle is on the hips and buttocks, beyond the whole body's.",
       "feature": "hips",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_hips",
@@ -1143,8 +1126,7 @@
       ],
       "about": "How much fat is on the hips and buttocks, beyond the whole body's.",
       "feature": "hips",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_thighs",
@@ -1156,8 +1138,7 @@
       ],
       "about": "How much muscle is on the thighs, beyond the whole body's.",
       "feature": "thighs",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_thighs",
@@ -1169,8 +1150,7 @@
       ],
       "about": "How much fat is on the thighs, beyond the whole body's.",
       "feature": "thighs",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "muscle_calves",
@@ -1182,8 +1162,7 @@
       ],
       "about": "How much muscle is on the calves, beyond the whole body's.",
       "feature": "calves",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "fat_calves",
@@ -1195,8 +1174,7 @@
       ],
       "about": "How much fat is on the calves, beyond the whole body's.",
       "feature": "calves",
-      "level": "advanced",
-      "advanced": true
+      "level": "detailed"
     },
     {
       "id": "eye_height_left",
@@ -4364,12 +4342,12 @@
           "bone": "Chest",
           "offset": [
             0.0,
-            -0.0268,
-            -0.0093
+            -0.025,
+            -0.0095
           ]
         }
       ],
-      "radius": 0.4341
+      "radius": 0.435
     },
     {
       "id": "head",
@@ -4423,17 +4401,17 @@
         {
           "bone": "LeftShoulderHelper",
           "offset": [
-            -0.037,
-            0.0156,
-            0.022
+            -0.0376,
+            0.0161,
+            0.0216
           ]
         },
         {
           "bone": "RightShoulderHelper",
           "offset": [
-            0.035,
-            0.0163,
-            0.0206
+            0.0357,
+            0.0168,
+            0.0202
           ]
         }
       ],
@@ -4453,12 +4431,12 @@
           "bone": "Chest",
           "offset": [
             0.0001,
-            0.1289,
-            0.1035
+            0.1237,
+            0.1034
           ]
         }
       ],
-      "radius": 0.143
+      "radius": 0.1452
     },
     {
       "id": "arms",
@@ -4470,21 +4448,21 @@
         {
           "bone": "LeftUpperArm",
           "offset": [
-            0.196,
-            -0.1999,
-            0.0086
+            0.1974,
+            -0.2009,
+            0.0091
           ]
         },
         {
           "bone": "RightUpperArm",
           "offset": [
-            -0.1962,
-            -0.2,
-            0.0085
+            -0.1976,
+            -0.2009,
+            0.0089
           ]
         }
       ],
-      "radius": 0.1441,
+      "radius": 0.1442,
       "regions": [
         "upper_arms_low",
         "forearms"
@@ -4529,13 +4507,13 @@
         {
           "bone": "Chest",
           "offset": [
-            0.0001,
-            0.0498,
-            0.1035
+            0.0,
+            0.0385,
+            0.1037
           ]
         }
       ],
-      "radius": 0.1541
+      "radius": 0.1543
     },
     {
       "id": "waist",
@@ -4569,12 +4547,12 @@
           "bone": "Chest",
           "offset": [
             0.0001,
-            0.0936,
-            -0.0673
+            0.0914,
+            -0.0664
           ]
         }
       ],
-      "radius": 0.1815
+      "radius": 0.1832
     },
     {
       "id": "hips",
@@ -4587,12 +4565,12 @@
           "bone": "Spine",
           "offset": [
             0.0,
-            -0.0125,
-            -0.0008
+            -0.0101,
+            0.0027
           ]
         }
       ],
-      "radius": 0.1481,
+      "radius": 0.1484,
       "regions": [
         "hips"
       ]
@@ -4607,21 +4585,21 @@
         {
           "bone": "LeftUpperLegTwist",
           "offset": [
-            0.0197,
-            -0.0697,
-            0.0098
+            0.0229,
+            -0.0572,
+            0.0104
           ]
         },
         {
           "bone": "RightUpperLegTwist",
           "offset": [
-            -0.0205,
-            -0.0701,
-            0.011
+            -0.0234,
+            -0.0573,
+            0.0117
           ]
         }
       ],
-      "radius": 0.1804,
+      "radius": 0.1819,
       "regions": [
         "thighs_top",
         "thighs_low"
@@ -4637,21 +4615,21 @@
         {
           "bone": "LeftLowerLegTwist",
           "offset": [
-            0.0059,
-            -0.0009,
-            -0.0134
+            0.006,
+            -0.0037,
+            -0.013
           ]
         },
         {
           "bone": "RightLowerLegTwist",
           "offset": [
-            -0.0058,
-            -0.0008,
-            -0.0133
+            -0.0059,
+            -0.0037,
+            -0.013
           ]
         }
       ],
-      "radius": 0.133,
+      "radius": 0.1335,
       "regions": [
         "shins_top",
         "shins_low"

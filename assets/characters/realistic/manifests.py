@@ -44,8 +44,10 @@ FACE_PARTS = ["Eyes", "Teeth", "EyeShell", "Lashes", "Brows", "LipSeal"]
 GROUPS = [
     ("frame", "Frame", "body"),
     ("build", "Build", "body"),
-    ("build_regions", "Build by region", "body"),
+    # The whole body's proportions before the per-region build: Character
+    # Studio draws groups in this order.
     ("proportions", "Proportions", "body"),
+    ("build_regions", "Build by region", "body"),
 ]
 BODY_GROUPS = {gid for gid, _, _ in GROUPS}
 
@@ -114,6 +116,11 @@ REGION_WORDS = {"chest": "the chest", "shoulders": "the shoulders", "arms": "the
 # The quick level (brief §3.3): the body's overall shape. The rest is
 # detailed, or advanced where the slider is flagged advanced.
 BODY_QUICK = {"frame", "height", "muscle", "fat"}
+# The detailed level holds the regional body controls and the main
+# proportions (brief §3.3, Level 2 "regional body adjustments"); only the
+# hands' and feet's sizes stay advanced. These lose the shared generators'
+# `advanced` flag here, so `advanced` and `level` still agree.
+BODY_DETAILED = {"leg_length", "arm_length", "shoulder_width", "waist_width", "hip_width", "head_size"}
 
 # The body's features (R1): the whole body, then its regions, found by the
 # shapes that move them or by the region map (`anchors.py`). Their anchors
@@ -218,6 +225,9 @@ def base_manifest(data, parts, folder=HERE):
     # The face's parameters (CO6; faceparams.py).
     import faceparams
     parameters += faceparams.parameters(data.get("face", {}).get("face_identity", {}))
+    for parameter in parameters:
+        if parameter["id"] in BODY_DETAILED or parameter["group"] == "build_regions":
+            parameter.pop("advanced", None)
     parameters = [describe(p) if p["group"] in BODY_GROUPS else p for p in parameters]
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})

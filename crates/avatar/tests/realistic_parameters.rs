@@ -100,7 +100,9 @@ fn the_realistic_base_has_its_body_parameters() {
         for kind in ["fat", "muscle"] {
             let id = format!("{kind}_{region}");
             let parameter = base.parameter(&id).unwrap_or_else(|| panic!("{id}"));
-            assert!(parameter.advanced, "{id}");
+            // Regional body adjustments are the detailed level (brief §3.3).
+            assert!(!parameter.advanced, "{id}");
+            assert_eq!(parameter.level(), axcenity_avatar::Level::Detailed, "{id}");
         }
     }
     let proportions = base

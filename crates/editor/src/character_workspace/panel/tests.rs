@@ -57,10 +57,34 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
         .map(|row| (row.parameter.id.as_str(), row.mirrored))
         .collect();
     assert_eq!(sizes, [("eye_size_left", false), ("eye_size_right", false)]);
-    // Quick shows only the body type of the body.
+    // Quick shows the manifest's quick controls: the body type and the
+    // whole body's build, not the regions.
     let frame = rows(&base, &description, "frame", Level::Quick, None, true);
     assert_eq!(ids(&frame), ["frame"]);
-    assert!(rows(&base, &description, "build", Level::Quick, None, true).is_empty());
+    let build = rows(&base, &description, "build", Level::Quick, None, true);
+    assert_eq!(ids(&build), ["muscle", "fat"]);
+    assert!(
+        rows(
+            &base,
+            &description,
+            "build_regions",
+            Level::Quick,
+            None,
+            true
+        )
+        .is_empty()
+    );
+    assert!(
+        !rows(
+            &base,
+            &description,
+            "build_regions",
+            Level::Detailed,
+            None,
+            true
+        )
+        .is_empty()
+    );
     // A feature filters to its own group.
     assert!(
         rows(
@@ -84,8 +108,9 @@ fn a_change_hidden_by_the_level_is_counted_with_the_level_that_shows_it() {
         hidden_changes(&base, &description, face, Level::Detailed),
         None
     );
+    // An advanced slider and a detailed one (nose_length is quick: always shown).
     description.parameters.insert("jaw_shift".into(), 0.4);
-    description.parameters.insert("nose_length".into(), 0.4);
+    description.parameters.insert("nose_tip".into(), 0.4);
     assert_eq!(
         hidden_changes(&base, &description, face, Level::Detailed),
         Some((1, Level::Advanced))
@@ -131,15 +156,27 @@ fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
     assert_eq!(face.iter().find(|f| f.id == "nose").unwrap().changed, 2);
     assert!(nav::features(&base, &description, Category::Face, Level::Quick).is_empty());
     assert!(nav::features(&base, &description, Category::Hair, Level::Advanced).is_empty());
-    // Build by region is all advanced: shown only at Advanced.
+    // The body's features are its regions (the manifest's `features`),
+    // listed from Detailed; hands and feet have only advanced sliders.
     let body = |level| -> Vec<String> {
         nav::features(&base, &description, Category::Body, level)
             .into_iter()
             .map(|f| f.id)
             .collect()
     };
-    assert!(!body(Level::Detailed).contains(&"build_regions".to_owned()));
-    assert!(body(Level::Advanced).contains(&"build_regions".to_owned()));
+    let detailed = body(Level::Detailed);
+    for region in ["shoulders", "chest", "abdomen", "waist", "hips", "thighs"] {
+        assert!(
+            detailed.contains(&region.to_owned()),
+            "{region} in {detailed:?}"
+        );
+    }
+    assert!(
+        !detailed.contains(&"build_regions".to_owned()),
+        "groups aren't features"
+    );
+    assert!(!detailed.contains(&"hands".to_owned()));
+    assert!(body(Level::Advanced).contains(&"hands".to_owned()));
     assert_eq!(nav::changed(&base, &description, Category::Face), 2);
     assert_eq!(nav::changed(&base, &description, Category::Body), 0);
 }

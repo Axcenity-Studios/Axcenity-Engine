@@ -353,6 +353,10 @@ A preset file (`*.preset.json`, `avatar::PRESET_SUFFIX`) is a **format 2 descrip
 - **Items**: each slot in scope (not locked, not a choice's slot) gets one of the items that fit the base there, or nothing, drawn evenly; never one that conflicts with what is worn (`excludes`), needs what isn't (`requires`) or also fills a slot already taken. A `multiple` slot draws up to two. A drawn item gets a random variant and random values for its own parameters. Material values are left alone (skin is R5's).
 - **Deterministic**: a small in-crate SplitMix64 generator, so a seed gives the same character on every machine. 1,000 seeds on every shipped base and on the test library validate and resolve with nothing left out, and locks hold (tests).
 
+## 15c. Character Studio's editing contract (R1)
+
+The workspace's panels never change the character themselves. Each draw function reads the workspace and returns `Intent`s (`editor/src/character_workspace/intent.rs`: set a parameter, wear, pick a category or feature or level, focus a view, undo, redo, save, reset a scope, apply a preset). Only the shell (`shell.rs`) applies them. `edit.rs` holds the history: snapshots of the description, with transactions (begin, commit, cancel) so a drag is one undo step, and reset by scope (everything, a category, a group). `selection.rs` holds what is being shown: the category, the feature and the level (Quick, Detailed, Advanced, read from each parameter's `level`, `feature` and `about`, §6). Selection, levels, locks, favourites, comparison states, the camera and the stage are editor state: none of them is ever written into a description (A3). Direct manipulation (R2) and comparison (CO19) go through the same `Intent`s, so a handle and a slider produce the same description.
+
 ## 16. Rust API (`axcenity_avatar`)
 
 ```rust

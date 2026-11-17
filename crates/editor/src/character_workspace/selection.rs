@@ -4,10 +4,9 @@
 //! step. Panels read it; only the shell changes it, through an
 //! [`Intent`](super::intent::Intent).
 //!
-//! The three functions at the end are **shims** until the parameter
-//! manifest carries `level`, `feature` and `about` (the lead's contract
-//! change in `avatar`): each reads what the manifest has today. At merge
-//! the lead swaps their bodies for the new fields; nothing else changes.
+//! The three functions at the end read a parameter's `level`, `feature`
+//! and `about` from the manifest (refinement plan 11.3), with fallbacks
+//! for a base model whose manifest doesn't carry them (the stylized one).
 
 use axcenity_avatar::Parameter;
 
@@ -72,29 +71,33 @@ impl Selection {
     }
 }
 
-/// Shim (lead swaps at merge for `Parameter.level`): the level a
-/// parameter is shown from. `advanced` is Advanced; a choice (body type) is
-/// Quick; everything else is Detailed.
+/// The level a parameter is shown from: its manifest `level`
+/// ([`Parameter::level`], which falls back to `advanced`). A parameter with
+/// no `level` but with choices (a body type) is Quick.
 pub fn parameter_level(parameter: &Parameter) -> Level {
-    if parameter.advanced {
-        Level::Advanced
-    } else if !parameter.choices.is_empty() {
-        Level::Quick
-    } else {
-        Level::Detailed
+    use axcenity_avatar::Level as Data;
+    if parameter.level.is_none() && !parameter.choices.is_empty() && !parameter.advanced {
+        return Level::Quick;
+    }
+    match parameter.level() {
+        Data::Quick => Level::Quick,
+        Data::Advanced => Level::Advanced,
+        Data::Detailed | Data::Other => Level::Detailed,
     }
 }
 
-/// Shim (lead swaps at merge for `Parameter.feature`): the feature a
-/// parameter belongs to. Today a feature is the parameter's group.
+/// The feature a parameter belongs to: its manifest `feature`, or its
+/// group where the manifest has none.
 pub fn parameter_feature(parameter: &Parameter) -> &str {
-    &parameter.group
+    parameter.feature.as_deref().unwrap_or(&parameter.group)
 }
 
-/// Shim (lead swaps at merge for `Parameter.about`): what a parameter's
-/// tooltip says. Today only its label is known.
+/// What a parameter's tooltip says: its manifest `about`, or its label.
 pub fn parameter_about(parameter: &Parameter) -> String {
-    parameter.label.clone()
+    parameter
+        .about
+        .clone()
+        .unwrap_or_else(|| parameter.label.clone())
 }
 
 #[cfg(test)]
@@ -125,13 +128,26 @@ mod tests {
     }
 
     #[test]
-    fn the_shims_read_what_the_manifest_has_today() {
+    fn without_metadata_a_parameter_falls_back_to_what_it_has() {
         assert_eq!(parameter_level(&parameter(true, false)), Level::Advanced);
         assert_eq!(parameter_level(&parameter(false, false)), Level::Detailed);
         assert_eq!(parameter_level(&parameter(false, true)), Level::Quick);
         let nose = parameter(false, false);
         assert_eq!(parameter_feature(&nose), "nose");
         assert_eq!(parameter_about(&nose), "Nose length");
+    }
+
+    #[test]
+    fn the_manifest_s_level_feature_and_about_win() {
+        let tip: Parameter = serde_json::from_str(
+            r#"{"id": "nose_tip", "label": "Nose tip", "group": "nose", "range": [-1, 1],
+                "level": "quick", "feature": "nose_tip_area",
+                "about": "How far the tip turns up or down."}"#,
+        )
+        .unwrap();
+        assert_eq!(parameter_level(&tip), Level::Quick);
+        assert_eq!(parameter_feature(&tip), "nose_tip_area");
+        assert_eq!(parameter_about(&tip), "How far the tip turns up or down.");
     }
 
     #[test]

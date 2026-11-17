@@ -1,6 +1,7 @@
 //! The navigation down the left (brief §3.1, the lead's DIS-06): the
 //! categories in the brief's order and, from the Detailed level, the open
-//! category's features (the manifest's groups today: Eyes, Nose, Jaw…).
+//! category's features (the manifest's `features`: Shoulders, Waist, Hips…;
+//! Eyes, Nose, Jaw…; a manifest without them lists its groups instead).
 //! Each shows how many of its values differ from the default.
 
 use axcenity_avatar::{BaseManifest, Description, Library};
@@ -38,8 +39,8 @@ pub(super) fn icon(category: Category) -> &'static str {
     }
 }
 
-/// A feature of a category: a manifest group with something to show at
-/// `level`.
+/// A feature of a category: a manifest feature (or, without them, a
+/// group) with something to show at `level`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Feature {
     pub id: String,
@@ -62,21 +63,34 @@ pub(super) fn features(
     if level == Level::Quick {
         return Vec::new();
     }
-    base.groups
+    let mut entries: Vec<(&str, &str)> = base
+        .features
         .iter()
-        .filter(|group| group.category == data)
-        .filter_map(|group| {
+        .filter(|feature| feature.category == data)
+        .map(|feature| (feature.id.as_str(), feature.label.as_str()))
+        .collect();
+    if entries.is_empty() {
+        entries = base
+            .groups
+            .iter()
+            .filter(|group| group.category == data)
+            .map(|group| (group.id.as_str(), group.label.as_str()))
+            .collect();
+    }
+    entries
+        .into_iter()
+        .filter_map(|(id, label)| {
             let parameters: Vec<_> = base
                 .parameters
                 .iter()
-                .filter(|p| parameter_feature(p) == group.id)
+                .filter(|p| parameter_feature(p) == id)
                 .collect();
             parameters
                 .iter()
                 .any(|p| level.shows(parameter_level(p)))
                 .then(|| Feature {
-                    id: group.id.clone(),
-                    label: group.label.clone(),
+                    id: id.to_owned(),
+                    label: label.to_owned(),
                     changed: parameters
                         .iter()
                         .filter(|p| value_of(description, Some(base), &p.id) != p.default)

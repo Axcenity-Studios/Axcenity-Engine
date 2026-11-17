@@ -314,12 +314,21 @@ fn every_page_is_drawn_with_its_controls() {
         (
             Category::Body,
             Level::Detailed,
-            &["Build", "Body fat", "Height", "Start from"],
+            &[
+                "Build",
+                "Body fat",
+                "Height",
+                "Shoulder width",
+                "Start from",
+            ],
         ),
         (
+            // Hands and feet have only advanced sliders, so Advanced adds
+            // them to the navigation (the sliders themselves are below the
+            // fold here; panel::tests holds the rows).
             Category::Body,
             Level::Advanced,
-            &["Build by region", "Chest fat", "Shoulders muscle"],
+            &["Proportions", "Hands", "Feet"],
         ),
         (
             Category::Face,
@@ -374,11 +383,12 @@ fn every_page_is_drawn_with_its_controls() {
             assert!(drawn.iter().any(|t| t.contains(text)), "{text}");
         }
     }
-    // Quick hides the face's sliders and says where they are.
+    // Quick shows the face's broad sliders only and says where the rest are.
     workspace.apply(Intent::PickCategory(Category::Face));
     workspace.apply(Intent::PickLevel(Level::Quick));
     let quick = draw(&mut workspace);
-    assert!(!quick.iter().any(|t| t.contains("Nose length")));
+    // Nose length is a quick control (the manifest's `level`); the bridge isn't.
+    assert!(!quick.iter().any(|t| t.contains("Nose bridge")));
     assert!(
         quick.iter().any(|t| t.contains("Detailed level")),
         "{quick:?}"
