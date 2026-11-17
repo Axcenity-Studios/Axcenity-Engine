@@ -2,9 +2,10 @@
 //!
 //! At the top, the terrain being edited (or a way to make one). Then three
 //! tabs (`tabs.rs`), each with its row of tools: Sculpt (Raise / Lower,
-//! Smooth, Flatten, Sculpt, Stamp, Noise, Holes), Materials (Paint,
-//! Foliage, Auto Materials, then the terrain's layers, biomes and scatter
-//! rules) and Terrain (Generate, Erosion, Masks, then its water and data).
+//! Smooth, Flatten, Sculpt, Stamp, Noise, Holes), Materials (Paint, Auto
+//! Materials, then the terrain's layers, biomes and scatter rules) and
+//! Terrain (Generate, Erosion, Masks, then its water and data). Painting
+//! plants and props by hand is the Scatter pane (`scatter_pane.rs`).
 //! Under the tools, only the settings of the tool picked, with the rarely
 //! needed ones folded away; at the bottom, how the viewport shows the
 //! terrain, on every tab.
@@ -34,10 +35,7 @@ use layers::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use axcenity_core::{
-    ClassName, Color3, FoliagePlant, FoliageProp, FoliageSource, InstanceId, MAX_TERRAIN_LAYERS,
-    TerrainData, Value, World,
-};
+use axcenity_core::{ClassName, Color3, InstanceId, MAX_TERRAIN_LAYERS, TerrainData, Value, World};
 use axcenity_render::TerrainView;
 use axcenity_terrain::brush::{
     Brush, Curve, FlattenMode, PaintMode, SculptMode, Shape, Stamp, StampMode, StampShape, Symmetry,
@@ -273,12 +271,6 @@ pub struct TerrainStudio {
     /// The layer Paint paints (an index into the terrain's layers).
     pub paint_layer: usize,
     pub paint_mode: PaintMode,
-    /// The plant, prop, or model Foliage scatters (picked from Assets).
-    pub foliage_source: FoliageSource,
-    /// Instances per square stud at full strength.
-    pub foliage_density: f32,
-    /// Whether new strokes collide with parts.
-    pub foliage_collide: bool,
     /// Where the Water brush's surface rests: `water_depth` studs above
     /// where the stroke starts, or at `water_level` (world Y).
     pub water_from_stroke: bool,
@@ -342,9 +334,6 @@ impl Default for TerrainStudio {
             stamp_image: None,
             paint_layer: 0,
             paint_mode: PaintMode::Blend,
-            foliage_source: FoliageSource::Prop(FoliageProp::Tree),
-            foliage_density: 0.08,
-            foliage_collide: false,
             water_from_stroke: true,
             water_depth: 3.0,
             water_level: 0.0,
@@ -452,14 +441,6 @@ impl TerrainStudio {
     /// The brush's color in the viewport: the accent for sculpting, the
     /// layer's own color for painting.
     pub fn brush_color(&self, world: &World, accent: egui::Color32) -> egui::Color32 {
-        if self.tool == Some(TerrainTool::Foliage) {
-            let color = axcenity_scene::foliage_brush_color(&self.foliage_source);
-            return egui::Color32::from_rgb(
-                (color[0] * 255.0) as u8,
-                (color[1] * 255.0) as u8,
-                (color[2] * 255.0) as u8,
-            );
-        }
         if self.tool == Some(TerrainTool::Water) {
             return egui::Color32::from_rgb(70, 160, 230);
         }
@@ -552,7 +533,6 @@ impl TerrainStudio {
             TerrainTool::Holes => self.brush_settings(ui, None),
             TerrainTool::Paint => self.paint_settings(ui),
             TerrainTool::Water => self.water_brush_settings(ui),
-            TerrainTool::Foliage => self.foliage_settings(ui),
             TerrainTool::Auto => self.auto_settings(ui, cx.world, terrain, actions),
             TerrainTool::Generate => self.generate_settings(ui, cx, terrain, actions),
             TerrainTool::Erode => self.erosion_settings(ui, actions),
@@ -848,7 +828,7 @@ impl TerrainStudio {
 }
 
 /// A collapsible group, like the Properties panel's.
-fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
+pub(crate) fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
     let palette = theme::palette(ui.ctx());
     ui.add_space(4.0);
     widgets::divider(ui);
@@ -864,7 +844,7 @@ fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
 }
 
 /// A quiet box around related controls.
-fn card(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
+pub(crate) fn card(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     let palette = theme::palette(ui.ctx());
     egui::Frame::new()
         .fill(palette.surface)
@@ -878,7 +858,7 @@ fn card(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     ui.add_space(4.0);
 }
 
-fn hint(ui: &mut egui::Ui, text: &str) {
+pub(crate) fn hint(ui: &mut egui::Ui, text: &str) {
     let palette = theme::palette(ui.ctx());
     ui.label(
         egui::RichText::new(text)
@@ -887,29 +867,8 @@ fn hint(ui: &mut egui::Ui, text: &str) {
     );
 }
 
-fn foliage_icon(source: &FoliageSource) -> &'static str {
-    match source {
-        FoliageSource::Plant(FoliagePlant::Grass) => icons::LEAF,
-        FoliageSource::Plant(FoliagePlant::Bush) => icons::PLANT,
-        FoliageSource::Plant(FoliagePlant::Flower) => icons::FLOWER,
-        FoliageSource::Plant(FoliagePlant::Tree) | FoliageSource::Prop(FoliageProp::Tree) => {
-            icons::TREE
-        }
-        FoliageSource::Prop(FoliageProp::Crate) => icons::PACKAGE,
-        FoliageSource::Prop(FoliageProp::Lamp) => icons::LAMP,
-        FoliageSource::Prop(FoliageProp::Table) => icons::TABLE,
-        FoliageSource::Prop(FoliageProp::Floor) => icons::SQUARE,
-        FoliageSource::Prop(FoliageProp::Wall) => icons::WALL,
-        FoliageSource::Prop(FoliageProp::Stairs) => icons::STEPS,
-        FoliageSource::Prop(FoliageProp::Ramp) => icons::TRIANGLE,
-        FoliageSource::Prop(FoliageProp::Rock) => icons::POLYGON,
-        FoliageSource::Prop(FoliageProp::Cliff) => icons::MOUNTAINS,
-        FoliageSource::Model(_) => icons::CUBE_TRANSPARENT,
-    }
-}
-
 /// A name in a settings grid's left column.
-fn field(ui: &mut egui::Ui, name: &str) -> egui::Response {
+pub(crate) fn field(ui: &mut egui::Ui, name: &str) -> egui::Response {
     let palette = theme::palette(ui.ctx());
     ui.add(egui::Label::new(egui::RichText::new(name).color(palette.text_secondary)).extend())
 }

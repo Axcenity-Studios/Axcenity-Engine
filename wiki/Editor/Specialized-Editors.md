@@ -4,10 +4,10 @@ type: system
 status: current
 implementation: implemented
 crates: [editor, mesh_edit, anim, blocks, ui]
-source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/effect_editor.rs]
-docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/research/usability/usability-audit.md]
-verified: 2026-11-11
-verified_commit: 19c7179d
+source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/scatter_pane.rs, crates/editor/src/app/scatter_pane.rs, crates/editor/src/effect_editor.rs]
+docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/editor/scatter.md, docs/research/usability/usability-audit.md]
+verified: 2026-11-16
+verified_commit: fbfacacb
 tags: [system/editor, tools]
 ---
 
@@ -27,7 +27,8 @@ The editor's tabs beyond the Scene, Explorer and Properties. Each is a module (o
 | Dialogue | `dialogue_editor.rs` | Dialogues | `*.dialogue.json` | `script::dialogue` |
 | Data Table | `data_table.rs` | Data tables | `*.data.json` | `assets::data_table`, `DataService` |
 | Effect | `effect_editor.rs`, `app/effect_tab.rs` (R17.3) | The selected particle effect: a preview of its own (play, loop, slow motion), each emitter's module stack (Properties' rows, the world's undo), counts and costs; R17.5: a Place backdrop with the place's Lighting and wind, and Lighting-aware presets (`scene::EffectPreset`) added as one undo step | `assets/effects/*.prefab.json` (a prefab) | `scene::Particles`, `render` particles |
-| Terrain Studio | `terrain_studio.rs`, `terrain_studio/` | Sculpt, paint, generate, erode, foliage, layers | terrain folders | `terrain` |
+| Terrain Studio | `terrain_studio.rs`, `terrain_studio/` | Sculpt, paint, generate, erode, layers, biomes, scatter rules | terrain folders | `terrain` |
+| Scatter | `scatter_pane.rs`, `app/scatter_pane.rs` | A palette of props and models (weight, size, collide, turn, lean, sink) painted onto terrain | `presets/*.axscatter`; painted foliage in the terrain's `foliage.json` | `terrain::brush` (`Operation::Scatter`) |
 
 ## Character Studio
 
@@ -47,7 +48,11 @@ Lays one ScreenGui out on an artboard (`ui::layout_artboard`), with several sele
 
 ## Terrain Studio
 
-Three tabs, Sculpt, Materials and Terrain, each with its tools and the sections that go with them; the tab shown follows the held tool however it was picked (`TerrainStudio::pick`); generation and erosion run as `terrain::job`s on a worker with progress and cancel; foliage is painted from the Assets panel's props and models.
+Three tabs, Sculpt, Materials and Terrain, each with its tools and the sections that go with them; the tab shown follows the held tool however it was picked (`TerrainStudio::pick`); generation and erosion run as `terrain::job`s on a worker with progress and cancel. Hand-painted foliage moved to the Scatter pane.
+
+## Scatter
+
+A pane opened from the ribbon's Models group: a per-project palette of props and models picked from the Assets panel (`Picking::Scatter`), each with its share of the mix, size range, collide, turn, lean and sink, and a brush (size, density per 100 square studs, spacing, erase everything). Paint arms the brush through the same viewport plumbing as a terrain brush (`TerrainBrush`, `TerrainPointer`); arming it puts a terrain tool down and the other way round. A stroke is one terrain undo step ("Scatter N Items", "Erase Scatter"). It edits the world's undo, not its own. See `docs/editor/scatter.md`.
 
 ## Shared pieces
 

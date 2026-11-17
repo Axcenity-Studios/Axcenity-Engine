@@ -79,6 +79,17 @@ struct FoliageRecord {
     scale: f32,
     #[serde(default)]
     collide: bool,
+    /// 0 (upright) to 1 (square to the ground). Left out when 0, so files
+    /// written before it had a value read the same.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    lean: f32,
+    /// Studs lowered into the ground; left out when 0.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    sink: f32,
+}
+
+fn is_zero(value: &f32) -> bool {
+    *value == 0.0
 }
 
 /// Every file of `data`, by name, ready to write. The same terrain always
@@ -202,6 +213,8 @@ fn foliage_record(instance: &FoliageInstance) -> FoliageRecord {
         yaw: instance.yaw,
         scale: instance.scale,
         collide: instance.collide,
+        lean: instance.lean,
+        sink: instance.sink,
     }
 }
 
@@ -228,8 +241,16 @@ fn decode_foliage(bytes: &[u8]) -> Result<Vec<FoliageInstance>, String> {
             yaw: record.yaw,
             scale: record.scale.max(0.01),
             collide: record.collide,
-            lean: 0.0,
-            sink: 0.0,
+            lean: if record.lean.is_finite() {
+                record.lean.clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
+            sink: if record.sink.is_finite() {
+                record.sink
+            } else {
+                0.0
+            },
         });
     }
     Ok(instances)
@@ -567,10 +588,35 @@ mod tests {
         let old = decode_foliage(text).unwrap();
         assert_eq!(old.len(), 1);
         assert!(!old[0].collide);
+        assert_eq!((old[0].lean, old[0].sink), (0.0, 0.0));
         assert_eq!(
             old[0].source,
             axcenity_core::FoliageSource::Prop(axcenity_core::FoliageProp::Crate)
         );
+    }
+
+    #[test]
+    fn foliage_keeps_lean_and_sink_and_leaves_them_out_when_upright() {
+        let mut data = TerrainData::flat(9, 9, 0.0).unwrap();
+        let fern = |lean: f32, sink: f32| axcenity_core::FoliageInstance {
+            source: axcenity_core::FoliageSource::Prop(axcenity_core::FoliageProp::Rock),
+            x: 1.0,
+            z: 2.0,
+            yaw: 0.5,
+            scale: 1.2,
+            collide: false,
+            lean,
+            sink,
+        };
+        data.foliage_mut().push(fern(0.6, 0.25));
+        data.foliage_mut().push(fern(0.0, 0.0));
+        let files: HashMap<&str, Vec<u8>> = encode(&data).into_iter().collect();
+        let loaded = decode(|name| files.get(name).cloned()).unwrap();
+        assert_eq!(loaded.foliage(), data.foliage());
+        // An upright instance is written as before lean and sink existed.
+        let text = String::from_utf8(files[FOLIAGE_FILE].clone()).unwrap();
+        assert_eq!(text.matches("\"lean\"").count(), 1, "{text}");
+        assert_eq!(text.matches("\"sink\"").count(), 1, "{text}");
     }
 
     #[test]

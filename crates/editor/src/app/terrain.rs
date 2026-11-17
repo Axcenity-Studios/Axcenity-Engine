@@ -18,7 +18,7 @@ use axcenity_core::{
 use axcenity_render::glam::{Vec2, Vec3};
 use axcenity_terrain::Placement;
 use axcenity_terrain::brush::{
-    self, EditRecorder, Operation, SculptMode, Shape, StampImage, Stroke,
+    self, Brush, EditRecorder, Operation, SculptMode, Shape, StampImage, Stroke,
 };
 use axcenity_terrain::erosion::{self, HydraulicSettings, Scale};
 use axcenity_terrain::files;
@@ -47,6 +47,7 @@ pub(super) use world_presets::WorldPresets;
 pub(super) use disk::terrain_revisions;
 use disk::*;
 use layers::*;
+pub(in crate::app) use strokes::stroke_active;
 use strokes::*;
 
 /// How long generator settings must stay still before a new preview is made.

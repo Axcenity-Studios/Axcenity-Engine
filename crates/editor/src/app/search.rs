@@ -320,6 +320,7 @@ pub(super) fn command_category(command: &Command) -> Category {
         | Command::TerrainTool(_)
         | Command::TerrainStudio
         | Command::ModelStudio
+        | Command::Scatter
         | Command::Constraint(_)
         | Command::RibbonTab(_) => Category::Tool,
         Command::TogglePane(pane) if TOOL_PANES.contains(pane) => Category::Tool,
@@ -329,10 +330,11 @@ pub(super) fn command_category(command: &Command) -> Category {
 
 /// The panels that are tools of their own (editors, studios, monitors),
 /// rather than the Explorer, Properties, Console and Assets.
-const TOOL_PANES: [Pane; 24] = [
+const TOOL_PANES: [Pane; 25] = [
     Pane::Animation,
     Pane::UiDesigner,
     Pane::Terrain,
+    Pane::Scatter,
     Pane::Profiler,
     Pane::Mixer,
     Pane::AssetCheck,
@@ -535,7 +537,10 @@ fn command_description(command: &Command) -> String {
         Command::Constraint(Some(_)) => "Pick two surfaces to join with this constraint.",
         Command::Constraint(None) => "Stop picking surfaces for a constraint.",
         Command::InsertControls => "Add an on-screen controls menu for touch and gamepad.",
-        Command::TerrainStudio => "Sculpt, paint, scatter foliage on and generate terrain.",
+        Command::TerrainStudio => "Sculpt, paint and generate terrain.",
+        Command::Scatter => {
+            "Paint a mix of plants, props and models onto terrain, each with its size, share and collide."
+        }
         Command::ModelStudio => "Make and edit models: meshes, UVs, painting, sculpting and rigs.",
         Command::PluginButton { .. } => "A button a plugin added.",
         Command::PluginAction { .. } => "A command a plugin added.",

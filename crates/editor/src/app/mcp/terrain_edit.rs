@@ -11,7 +11,8 @@ use axcenity_mcp::{Args, Class, Code, Kind, Outcome, Param, Profile, ToolError, 
 use axcenity_render::glam::{Vec2, Vec3};
 use axcenity_terrain::Placement;
 use axcenity_terrain::brush::{
-    self, Brush, EditRecorder, FlattenMode, Operation, PaintMode, SculptMode, Stroke,
+    self, Brush, EditRecorder, FlattenMode, Operation, PaintMode, Scatter, ScatterErase,
+    ScatterItem, SculptMode, Stroke,
 };
 use axcenity_terrain::generate::Preset;
 use axcenity_terrain::materials;
@@ -451,12 +452,13 @@ fn stroke(
                 source.name()
             );
             (
-                Operation::Foliage {
-                    source,
+                Operation::Scatter(Scatter {
+                    items: vec![ScatterItem::new(source)],
                     density,
-                    erase,
-                    collide: false,
-                },
+                    spacing: 0.0,
+                    erase: erase.then_some(ScatterErase::Palette),
+                    seed: 1,
+                }),
                 what,
             )
         }

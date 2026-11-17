@@ -4,10 +4,10 @@ type: system
 status: current
 implementation: implemented
 crates: [terrain, core, scene, physics, project, procedural]
-source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs, crates/scene/src/terrain_water.rs]
-docs: [docs/terrain.md, crates/terrain/CLAUDE.md]
+source: [crates/terrain/src/lib.rs, crates/terrain/src/brush.rs, crates/terrain/src/brush/scatter.rs, crates/project/src/scatter_palettes.rs, crates/terrain/src/generate.rs, crates/terrain/src/erosion.rs, crates/terrain/src/mesh.rs, crates/terrain/src/files.rs, crates/terrain/src/job.rs, crates/terrain/src/volume.rs, crates/core/src/terrain.rs, crates/scene/src/terrain.rs, crates/scene/src/foliage.rs, crates/procedural/src/terrain_scatter.rs, crates/procedural/src/paths.rs, crates/procedural/src/obstacles.rs, crates/terrain/src/biomes.rs, crates/project/src/world_presets.rs, crates/project/src/terrain_files.rs, crates/scene/src/terrain_water.rs]
+docs: [docs/terrain.md, docs/editor/scatter.md, crates/terrain/CLAUDE.md]
 verified: 2026-11-16
-verified_commit: 78776924
+verified_commit: fbfacacb
 tags: [system/terrain]
 ---
 
@@ -38,6 +38,8 @@ Since 2026-11-16 water can also be painted (the Terrain Studio's Water brush, `b
 Since PW1 (procedural worlds, 2026-11-14) a Terrain can hold `ScatterRule`s that place foliage by height, slope, material layer, clumping and distance from other rules' spots. `procedural::terrain_scatter` places them per 32-sample chunk on a hash grid (one spot per `Spacing` cell from the seed and the cell's number), so chunks are made independently on every device and only those whose ground or rules changed are made again. The result lives in `TerrainData::generated_chunks` beside painted foliage; it is never saved or sent, and changing it bumps `generated_version` (which scene, physics, nav and preload keys include), not `revision`. Bake turns it into painted foliage.
 
 Since PW2, `Biome`s inside a Terrain split it into areas, each with a ground layer and its own ScatterRules. `terrain::biomes` weighs them by height, slope and shared moisture noise with soft edges; a biome's hand paint is its ground layer's paint, so nothing new is stored. `MaterialRules` carries the biomes, laying each ground layer under the layers' own rules, and a rule inside a Biome is scaled by that biome's weight.
+
+Since the Scatter pane (2026-11-16), painted foliage is no longer a Terrain Studio tool: the editor's Scatter pane (ribbon Models group, `docs/editor/scatter.md`) paints a palette, and the brush op is `Operation::Scatter` (`terrain/src/brush/scatter.rs`): each stamp places a weighted random mix of the palette's enabled items with each one's scale range, turn, collide, lean and sink, deterministic for the stroke's seed and the stamp's middle, keeping a minimum spacing from all painted foliage (a hash grid of the instances near the stamp) and skipping holes; erasing takes the palette's items or everything. Palettes are project files, `presets/*.axscatter` (`project::scatter_palettes`). `foliage.json` keeps `lean` and `sink` as optional fields, left out at 0, so old files read the same and baked rule output keeps its lean.
 
 Since PW5, rules keep off anchored parts near the ground (`AvoidParts`, `procedural/src/obstacles.rs`, cached between frames by revision), and generated foliage can lean with the slope and sink (`FoliageInstance::lean`, `sink`, read by the scene and physics). Conform to Terrain and Blend into Terrain (Solid Modeling group) set models on the ground and level it under them.
 

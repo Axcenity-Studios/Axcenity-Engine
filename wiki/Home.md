@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-16 | Terrain, specialized editors, file formats | The Scatter pane: a palette of props and models painted onto terrain as a weighted mix, replacing the Foliage tool |
 | 2026-11-16 | Terrain, file formats | Painted terrain water (the Water brush, `water.png`) and waves that vary from place to place |
 | 2026-11-16 | ADR-0039, Mesh editing and CSG, known limitations | Group as Mesh: parts into one optimized MeshPart, the parts kept for Ungroup Mesh |
 | 2026-11-16 | Terrain, world streaming, threading model | Terrain seams stitched between levels of detail, no skirts at the border, and no chunk missing while it changes level |
 | 2026-11-16 | Characters, known limitations, Home | The realistic body's lowered-shoulder corrective shapes: no squared cap or ridge beside the neck when the arms hang |
-| 2026-11-16 | Known limitations, Home | Character Studio overhaul CO12, first part: the workspace edits descriptions on the realistic body through the applier, its pages drawn from the manifest |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

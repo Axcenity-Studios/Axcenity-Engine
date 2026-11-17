@@ -166,15 +166,15 @@ impl EditorApp {
     /// The Assets panel, then what was asked for in it.
     pub(in crate::app) fn assets_pane(&mut self, ui: &mut egui::Ui) {
         let can_save = assets::any_prefab(&self.world, &self.selection_roots());
-        let picking_foliage =
-            self.terrain.tool == Some(crate::terrain_studio::TerrainTool::Foliage);
+        // The Scatter pane adds the props and models clicked.
+        let picking_scatter = self.scatter_picking();
         // A selected SplineMesh or SplineScatter takes the models clicked.
         let spline_models = self.spline_models_picking();
         // A selected ScatterRule takes the props and models clicked (PW1).
         let scatter_models = self.scatter_rule_picking();
         let action = {
-            let picking = if picking_foliage {
-                Some(Picking::Foliage(self.terrain.foliage_source.clone()))
+            let picking = if picking_scatter {
+                Some(Picking::Scatter(self.scatter.sources()))
             } else if let Some((_, entries)) = &scatter_models {
                 Some(Picking::ScatterModels(entries.clone()))
             } else {
@@ -214,11 +214,11 @@ impl EditorApp {
         }
         match action {
             Some(BrowserAction::Place(entry)) => self.drop_asset(&entry, None),
-            Some(BrowserAction::Pick(entry)) if picking_foliage => {
+            Some(BrowserAction::Pick(entry)) if picking_scatter => {
                 if let Some(source) = entry.foliage_source()
                     && self.use_global_asset(&entry.path)
                 {
-                    self.terrain.foliage_source = source;
+                    self.add_scatter_item(source);
                 }
             }
             Some(BrowserAction::Pick(entry)) if scatter_models.is_some() => {
@@ -1059,7 +1059,9 @@ impl EditorApp {
         // No tool during Play or the preview, so nothing can be dragged.
         let tool = (!self.playing() && sequence.is_none()).then_some(self.tool);
         let preview = self.angular_preview();
-        let terrain_brush = self.terrain_brush_view(&ctx);
+        let terrain_brush = self
+            .terrain_brush_view(&ctx)
+            .or_else(|| self.scatter_brush_view(&ctx));
         let plugin_mouse = self
             .plugins
             .entries

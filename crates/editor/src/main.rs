@@ -77,6 +77,7 @@ mod rebuild;
 mod relaunch;
 mod ribbon;
 mod ribbon_tabs;
+mod scatter_pane;
 mod script_completion;
 mod scripts;
 mod sequencer;

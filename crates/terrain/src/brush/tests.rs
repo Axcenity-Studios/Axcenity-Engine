@@ -1,4 +1,5 @@
 use super::*;
+use axcenity_core::FoliageSource;
 
 fn flat(height: f32) -> (TerrainData, Placement) {
     // 2 studs between samples, 100 studs of height, centered on the origin.
@@ -270,73 +271,236 @@ fn a_recorded_stroke_undoes_and_redoes_and_keeps_only_the_chunks_it_changed() {
     assert!(recorder.finish(&data).is_none());
 }
 
-#[test]
-fn foliage_scatters_at_density_and_undo_removes_the_stroke() {
-    let (mut data, placement) = flat(0.2);
-    let brush = Brush {
-        radius: 16.0,
+fn hard_brush(radius: f32) -> Brush {
+    Brush {
+        radius,
         strength: 1.0,
         falloff: 0.0,
         ..Brush::default()
-    };
-    let plant = Operation::Foliage {
-        source: FoliageSource::Plant(axcenity_core::FoliagePlant::Grass),
-        density: 0.2,
-        erase: false,
+    }
+}
+
+fn item(source: FoliageSource, weight: f32) -> ScatterItem {
+    ScatterItem {
+        weight,
+        ..ScatterItem::new(source)
+    }
+}
+
+fn grass() -> FoliageSource {
+    FoliageSource::Plant(axcenity_core::FoliagePlant::Grass)
+}
+
+fn crate_prop() -> FoliageSource {
+    FoliageSource::Prop(axcenity_core::FoliageProp::Crate)
+}
+
+fn rock() -> FoliageSource {
+    FoliageSource::Prop(axcenity_core::FoliageProp::Rock)
+}
+
+fn scatter(items: Vec<ScatterItem>, density: f32, spacing: f32) -> Operation {
+    Operation::Scatter(Scatter {
+        items,
+        density,
+        spacing,
+        erase: None,
+        seed: 7,
+    })
+}
+
+fn count(data: &TerrainData, source: &FoliageSource) -> usize {
+    data.foliage()
+        .iter()
+        .filter(|instance| instance.source == *source)
+        .count()
+}
+
+#[test]
+fn scatter_mixes_items_by_weight_with_each_items_settings() {
+    let (mut data, placement) = flat(0.2);
+    let brush = hard_brush(30.0);
+    let rocks = ScatterItem {
+        min_scale: 2.0,
+        max_scale: 3.0,
+        rotation: 90.0,
         collide: true,
+        align_to_slope: 0.5,
+        sink: 0.25,
+        ..item(rock(), 3.0)
     };
+    let off = ScatterItem {
+        enabled: false,
+        ..item(crate_prop(), 50.0)
+    };
+    let items = vec![item(grass(), 1.0), rocks, off];
+    assert_eq!(shares(&items), vec![0.25, 0.75, 0.0]);
+    // Stamps across the terrain, for a large sample.
+    let operation = scatter(items, 0.3, 0.0);
+    for x in [-40.0, 0.0, 40.0] {
+        for z in [-40.0, 0.0, 40.0] {
+            apply(
+                &mut data,
+                &placement,
+                &brush,
+                &operation,
+                Vec3::new(x, 0.0, z),
+            );
+        }
+    }
+    let (grasses, rocks, crates) = (
+        count(&data, &grass()),
+        count(&data, &rock()),
+        count(&data, &crate_prop()),
+    );
+    let total = grasses + rocks;
+    assert!(total > 400, "placed {total}");
+    assert_eq!(crates, 0, "an item that's off isn't placed");
+    let rock_share = rocks as f32 / total as f32;
+    assert!(
+        (rock_share - 0.75).abs() < 0.06,
+        "rocks are {rock_share} of the mix"
+    );
+    for instance in data.foliage() {
+        if instance.source == rock() {
+            assert!((2.0..=3.0).contains(&instance.scale), "{}", instance.scale);
+            assert!((0.0..=std::f32::consts::FRAC_PI_2 + 1e-4).contains(&instance.yaw));
+            assert!(instance.collide);
+            assert_eq!((instance.lean, instance.sink), (0.5, 0.25));
+        } else {
+            assert!(
+                (0.85..=1.15).contains(&instance.scale),
+                "{}",
+                instance.scale
+            );
+            assert!(!instance.collide);
+            assert_eq!((instance.lean, instance.sink), (0.0, 0.0));
+        }
+    }
+    // The same seed and stamps place the same items.
+    let (mut again, _) = flat(0.2);
+    for x in [-40.0, 0.0, 40.0] {
+        for z in [-40.0, 0.0, 40.0] {
+            apply(
+                &mut again,
+                &placement,
+                &brush,
+                &operation,
+                Vec3::new(x, 0.0, z),
+            );
+        }
+    }
+    assert_eq!(again.foliage(), data.foliage());
+}
+
+#[test]
+fn scatter_keeps_its_spacing_and_stamping_again_adds_no_closer_items() {
+    let (mut data, placement) = flat(0.2);
+    let brush = hard_brush(20.0);
+    let spacing = 3.0;
+    let operation = scatter(vec![item(grass(), 1.0), item(rock(), 1.0)], 2.0, spacing);
+    apply(&mut data, &placement, &brush, &operation, Vec3::ZERO);
+    let first = data.foliage().len();
+    assert!(first > 20, "placed {first}");
+    // The same ground again (another seed): only the gaps fill.
+    let Operation::Scatter(mut again) = operation.clone() else {
+        unreachable!()
+    };
+    again.seed = 99;
+    for _ in 0..3 {
+        apply(
+            &mut data,
+            &placement,
+            &brush,
+            &Operation::Scatter(again.clone()),
+            Vec3::new(2.0, 0.0, 1.0),
+        );
+        again.seed += 1;
+    }
+    let points: Vec<Vec2> = data
+        .foliage()
+        .iter()
+        .map(|i| placement.to_world_xz(&data, Vec2::new(i.x, i.z)))
+        .collect();
+    for (a, p) in points.iter().enumerate() {
+        for q in &points[a + 1..] {
+            assert!(
+                p.distance(*q) >= spacing - 1e-3,
+                "{p} and {q} are too close"
+            );
+        }
+    }
+    // Without spacing, the same stroke piles far more on.
+    let (mut piled, _) = flat(0.2);
+    let dense = scatter(vec![item(grass(), 1.0)], 2.0, 0.0);
+    apply(&mut piled, &placement, &brush, &dense, Vec3::ZERO);
+    assert!(piled.foliage().len() > first * 2);
+}
+
+#[test]
+fn scatter_erases_the_palettes_items_or_everything_and_undoes_as_one_step() {
+    let (mut data, placement) = flat(0.2);
+    let brush = hard_brush(16.0);
     let mut recorder = EditRecorder::new();
     recorder.before_change(
         &data,
         footprint(&data, &placement, Vec2::ZERO, brush.radius),
     );
-    apply(&mut data, &placement, &brush, &plant, Vec3::ZERO);
-    let count = data.foliage().len();
-    assert!(count > 5, "scattered {count} plants");
-    assert!(
-        data.foliage()
-            .iter()
-            .all(|i| i.source == FoliageSource::Plant(axcenity_core::FoliagePlant::Grass))
-    );
+    let grass_only = scatter(vec![item(grass(), 1.0)], 0.3, 0.0);
+    apply(&mut data, &placement, &brush, &grass_only, Vec3::ZERO);
+    let rocks_only = scatter(vec![item(rock(), 1.0)], 0.1, 0.0);
+    apply(&mut data, &placement, &brush, &rocks_only, Vec3::ZERO);
+    let (grasses, rocks) = (count(&data, &grass()), count(&data, &rock()));
+    assert!(grasses > 5 && rocks > 2, "{grasses} grass, {rocks} rocks");
+
     let heights = data.heights().to_vec();
     let edit = recorder.finish(&data).unwrap();
     edit.undo(&mut data);
     assert!(data.foliage().is_empty());
     assert_eq!(data.heights(), heights.as_slice());
     edit.redo(&mut data);
-    assert_eq!(data.foliage().len(), count);
-    assert!(data.foliage().iter().all(|i| i.collide));
+    assert_eq!(data.foliage().len(), grasses + rocks);
 
-    let crate_op = Operation::Foliage {
-        source: FoliageSource::Prop(axcenity_core::FoliageProp::Crate),
-        density: 0.05,
-        erase: false,
-        collide: false,
+    // Erasing with the grass palette leaves the rocks.
+    let erase = |items, what| {
+        Operation::Scatter(Scatter {
+            erase: Some(what),
+            ..match scatter(items, 0.0, 0.0) {
+                Operation::Scatter(scatter) => scatter,
+                _ => unreachable!(),
+            }
+        })
     };
     apply(
         &mut data,
         &placement,
         &brush,
-        &crate_op,
-        Vec3::new(20.0, 0.0, 0.0),
+        &erase(vec![item(grass(), 1.0)], ScatterErase::Palette),
+        Vec3::ZERO,
     );
-    assert!(
-        data.foliage()
-            .iter()
-            .any(|i| i.source == FoliageSource::Prop(axcenity_core::FoliageProp::Crate))
-    );
-    let erase = Operation::Foliage {
-        source: FoliageSource::Plant(axcenity_core::FoliagePlant::Grass),
-        density: 0.2,
-        erase: true,
-        collide: false,
+    assert_eq!((count(&data, &grass()), count(&data, &rock())), (0, rocks));
+    // An item that's off isn't erased by its palette.
+    let off = ScatterItem {
+        enabled: false,
+        ..item(rock(), 1.0)
     };
-    apply(&mut data, &placement, &brush, &erase, Vec3::ZERO);
-    assert!(
-        data.foliage()
-            .iter()
-            .all(|i| i.source == FoliageSource::Prop(axcenity_core::FoliageProp::Crate))
+    apply(
+        &mut data,
+        &placement,
+        &brush,
+        &erase(vec![off.clone()], ScatterErase::Palette),
+        Vec3::ZERO,
     );
+    assert_eq!(count(&data, &rock()), rocks);
+    // Erase everything takes any painted foliage, whatever the palette.
+    apply(
+        &mut data,
+        &placement,
+        &brush,
+        &erase(vec![off], ScatterErase::Everything),
+        Vec3::ZERO,
+    );
+    assert!(data.foliage().is_empty());
 }
 
 #[test]

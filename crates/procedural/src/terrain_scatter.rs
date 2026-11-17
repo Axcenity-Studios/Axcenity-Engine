@@ -24,8 +24,8 @@
 use std::collections::HashMap;
 
 use axcenity_core::{
-    ClassName, FoliageInstance, FoliagePlant, FoliageProp, FoliageSource, Instance, InstanceId,
-    MAX_TERRAIN_LAYERS, TerrainData, Value, World,
+    ClassName, FoliageInstance, FoliageSource, Instance, InstanceId, MAX_TERRAIN_LAYERS,
+    TerrainData, Value, World,
 };
 use axcenity_terrain::Placement;
 use axcenity_terrain::biomes::MAX_BIOMES;
@@ -171,26 +171,12 @@ impl Rule {
 /// built-in ones, anything else a model file. `None` for an empty entry or
 /// an unknown built-in.
 pub fn source(entry: &str) -> Option<FoliageSource> {
-    let entry = entry.trim();
-    if entry.is_empty() {
-        return None;
-    }
-    if let Some(name) = entry.strip_prefix("plant:") {
-        return FoliagePlant::from_name(name.trim()).map(FoliageSource::Plant);
-    }
-    if let Some(name) = entry.strip_prefix("prop:") {
-        return FoliageProp::from_name(name.trim()).map(FoliageSource::Prop);
-    }
-    Some(FoliageSource::Model(entry.to_owned()))
+    FoliageSource::from_entry(entry)
 }
 
 /// How a source is written in a rule's `Models` (the reverse of [`source`]).
 pub fn entry(source: &FoliageSource) -> String {
-    match source {
-        FoliageSource::Plant(plant) => format!("plant:{}", plant.label()),
-        FoliageSource::Prop(prop) => format!("prop:{}", prop.label()),
-        FoliageSource::Model(path) => path.clone(),
-    }
+    source.entry()
 }
 
 /// The ScatterRules a terrain uses, at most [`MAX_RULES`], in order: its

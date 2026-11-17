@@ -75,6 +75,7 @@ mod probe_fill;
 mod probes;
 mod project_upgrade;
 mod save_template;
+mod scatter_pane;
 mod search;
 mod sequencer;
 mod session;
@@ -498,6 +499,8 @@ pub struct EditorApp {
     ui_designer: UiDesigner,
     /// The Terrain panel's tools, settings, previews and work under way.
     terrain: TerrainStudio,
+    /// The Scatter pane's palettes, brush and stroke under way.
+    scatter: crate::scatter_pane::ScatterPane,
     /// Where the dockable panels are. Saved between runs.
     layout: Layout,
     /// Layouts saved by name (View › Layout).
@@ -625,6 +628,7 @@ impl DockViewer<'_> {
             Pane::Animation => self.app.animation_pane(ui, self.render_state),
             Pane::UiDesigner => self.app.ui_designer_pane(ui, self.render_state),
             Pane::Terrain => self.app.terrain_pane(ui),
+            Pane::Scatter => self.app.scatter_pane(ui),
             Pane::Profiler => {
                 self.app.profiler.show(ui);
                 if let Some((path, line)) = self.app.profiler.take_open() {
@@ -1128,6 +1132,7 @@ impl EditorApp {
             scene_drawn_pass: None,
             ui_designer: UiDesigner::default(),
             terrain: TerrainStudio::default(),
+            scatter: Default::default(),
             layout: Layout::default(),
             saved_layouts: Default::default(),
             layout_name: None,
@@ -1636,6 +1641,7 @@ impl EditorApp {
             self.settings.open = !self.settings.open;
         }
         self.terrain_frame(ctx);
+        self.scatter_frame(ctx);
         // Collaborate: send what this frame's tools did, then catch up.
         self.team_frame();
         // The project's repository: automatic checkpoints and uploads.
@@ -1864,7 +1870,11 @@ impl EditorApp {
             ctx.request_repaint();
         }
         if let Some(pointer) = output.terrain {
-            self.terrain_pointer(pointer);
+            if self.scatter_brushing() {
+                self.scatter_pointer(pointer);
+            } else {
+                self.terrain_pointer(pointer);
+            }
             ctx.request_repaint();
         }
         if let Some(pick) = output.surface {

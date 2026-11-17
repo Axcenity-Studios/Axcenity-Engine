@@ -196,6 +196,12 @@ pub type PresetProblem = (PathBuf, WorldPresetError);
 /// A file name for a preset called `name`, such as `My Island.axworld`
 /// (characters file systems don't allow become `-`).
 pub fn world_preset_file_name(name: &str) -> String {
+    format!("{}.{WORLD_PRESET_EXTENSION}", safe_file_stem(name, "World"))
+}
+
+/// `name` as a file name without its extension: characters file systems
+/// don't allow become `-`, and an empty name is `fallback`.
+pub(crate) fn safe_file_stem(name: &str, fallback: &str) -> String {
     let safe: String = name
         .trim()
         .chars()
@@ -208,8 +214,11 @@ pub fn world_preset_file_name(name: &str) -> String {
         })
         .collect();
     let safe = safe.trim().trim_end_matches('.');
-    let safe = if safe.is_empty() { "World" } else { safe };
-    format!("{safe}.{WORLD_PRESET_EXTENSION}")
+    if safe.is_empty() {
+        fallback.to_owned()
+    } else {
+        safe.to_owned()
+    }
 }
 
 /// Saves `preset` in `folder` (made if missing), named after it, replacing

@@ -38,7 +38,8 @@ Every file the engine reads or writes, with its owner and where the full format 
 | `build-profiles.json`; beside a built game `build-report.json`, `build-report.txt` | Build profiles (R13; not packed); what a build put in the game and with what settings | `project::build_profiles` | format_version 1 | `docs/project/export.md` |
 | `CREDITS.txt` | Credits for assets fetched through the Toolbox | `toolbox::provenance` | — | `docs/research/asset-sources/` |
 | `assets/probes/*` | Reflection-probe and light-probe bakes | `assets::probe`, `light_probes` | — | `docs/rendering/sky.md` |
-| Terrain folders (`heights.png`, paint maps, optional `foliage.json`, `holes.png` and `water.png`) | Terrain data | `terrain::files`, `project::terrain_files` | `GENERATOR_VERSION` for generators | `docs/terrain.md` |
+| Terrain folders (`heights.png`, paint maps, optional `foliage.json`, `holes.png` and `water.png`) | Terrain data; each painted instance's `lean` and `sink` are optional (left out at 0, so older files read the same) | `terrain::files`, `project::terrain_files` | `GENERATOR_VERSION` for generators | `docs/terrain.md` |
+| `presets/*.axscatter` | Scatter palettes: the Scatter pane's items (`prop:Crate`, `plant:Grass` or a model path) with weight, size range, collide, rotation, align to slope and sink, and the palette's density and spacing | `project::scatter_palettes` | `format` 1 | `docs/editor/scatter.md` |
 | `assets/characters/` (`catalogue.json`, `<package>/*.base.json`, `<package>/items/*.item.json`, the packages' glTF files) | The project's character library, which applying a description resolves against (Character Studio overhaul CO3). `project::add_character_library` writes the engine's built-in stylized package there, keeping files already present | `avatar` (`LIBRARY_FOLDER`), `project::character_library` | format_version 1 each | `docs/development/character-studio/architecture.md` §15 |
 
 ## Per-machine files (git-ignored `.axcenity/`)

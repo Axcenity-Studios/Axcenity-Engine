@@ -24,7 +24,7 @@ fn the_target_follows_the_selection_and_falls_back_to_the_first_terrain() {
 #[test]
 fn only_sculpting_and_painting_tools_brush_the_viewport() {
     let brushes: Vec<TerrainTool> = TerrainTool::all().filter(|t| t.is_brush()).collect();
-    assert_eq!(brushes.len(), 10);
+    assert_eq!(brushes.len(), 9);
     assert!(!TerrainTool::Generate.is_brush());
     let keys: Vec<_> = TerrainTool::all().filter_map(TerrainTool::key).collect();
     let mut unique = keys.clone();
@@ -419,7 +419,7 @@ fn each_tool_is_on_exactly_one_tab() {
     let on_tabs: usize = StudioTab::ALL.iter().map(|tab| tab.tools().len()).sum();
     assert_eq!(on_tabs, TerrainTool::all().count());
     assert_eq!(StudioTab::of(TerrainTool::Holes), StudioTab::Sculpt);
-    assert_eq!(StudioTab::of(TerrainTool::Foliage), StudioTab::Materials);
+    assert_eq!(StudioTab::of(TerrainTool::Paint), StudioTab::Materials);
     assert_eq!(StudioTab::of(TerrainTool::Masks), StudioTab::Terrain);
 }
 
@@ -430,14 +430,14 @@ fn a_picked_tool_shows_its_tab_and_a_tab_picks_its_last_tool_again() {
     // No tool held: switching tabs picks nothing.
     studio.switch_tab(StudioTab::Terrain);
     assert_eq!((studio.tab(), studio.tool), (StudioTab::Terrain, None));
+    studio.pick(Some(TerrainTool::Auto));
     studio.pick(Some(TerrainTool::Paint));
-    studio.pick(Some(TerrainTool::Foliage));
     assert_eq!(studio.tab(), StudioTab::Materials);
     studio.pick(Some(TerrainTool::Flatten));
     assert_eq!(studio.tab(), StudioTab::Sculpt);
     // With a tool held, a tab picks its last tool, or its first.
     studio.switch_tab(StudioTab::Materials);
-    assert_eq!(studio.tool, Some(TerrainTool::Foliage));
+    assert_eq!(studio.tool, Some(TerrainTool::Paint));
     studio.switch_tab(StudioTab::Terrain);
     assert_eq!(studio.tool, Some(TerrainTool::Generate));
     studio.switch_tab(StudioTab::Sculpt);
@@ -496,7 +496,13 @@ fn each_section_is_drawn_under_its_tab_only() {
         (StudioTab::Sculpt, &["Raise / Lower", "Holes"]),
         (
             StudioTab::Materials,
-            &["Paint", "Foliage", "Add layer", "Biomes", "Scatter Rules"],
+            &[
+                "Paint",
+                "Auto Materials",
+                "Add layer",
+                "Biomes",
+                "Scatter Rules",
+            ],
         ),
         (
             StudioTab::Terrain,
