@@ -928,6 +928,9 @@ fn shade(
 // screen-space ambient occlusion together), `dielectric` how much a
 // non-metal reflects head-on (usually 4%), and `solid` whether it's in the
 // prepass (see-through surfaces aren't), so contact shadows can fall on it.
+// `bumped` says `n` comes from a normal map, so the bumps shadow each other
+// as the light grazes them (`bump_shadowing`); a shading normal leaned any
+// other way (a leaf's crown, a surface shader's) is lit as it says.
 // The weather changes the surface first (`weathered`).
 fn light_surface(
     world_position: vec3<f32>,
@@ -940,10 +943,11 @@ fn light_surface(
     occlusion: f32,
     dielectric: vec3<f32>,
     solid: bool,
+    bumped: bool,
 ) -> vec3<f32> {
     let weather = weathered(geometric, n, base_color, metalness, roughness);
     return shade_surface(world_position, geometric, weather.normal, pixel, weather.base_color,
-        weather.metalness, weather.roughness, occlusion, dielectric, solid);
+        weather.metalness, weather.roughness, occlusion, dielectric, solid, bumped);
 }
 
 // How much darker a soaked non-metal is: water fills its pores, so less
@@ -1145,8 +1149,8 @@ fn lamp_arrival(lamps: TileLamps, i: u32, slot: u32, world_position: vec3<f32>,
 // Terminator Problem", Ray Tracing Gems, 2019), and nothing is lit where
 // the surface itself faces away. Without it each bump's own n·l decides
 // alone, and the line where light ends breaks up into lit and unlit
-// speckles. 1 where `n` is `geometric` (no normal map) and the light is in
-// front, so plain surfaces are unchanged.
+// speckles. Only for a normal map's normal (`shade_surface`'s `bumped`):
+// it would darken any other leaned normal, such as a leaf's crown's.
 fn bump_shadowing(geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 {
     let cos_i = dot(geometric, l);
     if cos_i <= 0.0 {
@@ -1165,6 +1169,14 @@ fn bump_shadowing(geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 {
     return 2.0 / (1.0 + sqrt(1.0 + alpha2 * tan2_i));
 }
 
+// `bump_shadowing` for a normal map's normal (`bumped`), 1 for any other.
+fn bumps(bumped: bool, geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 {
+    if !bumped {
+        return 1.0;
+    }
+    return bump_shadowing(geometric, n, l);
+}
+
 fn shade_surface(
     world_position: vec3<f32>,
     geometric: vec3<f32>,
@@ -1176,6 +1188,7 @@ fn shade_surface(
     occlusion: f32,
     dielectric: vec3<f32>,
     solid: bool,
+    bumped: bool,
 ) -> vec3<f32> {
     let v = normalize(frame.camera_position.xyz - world_position);
     let n_dot_v = max(dot(n, v), 0.0001);
@@ -1184,7 +1197,7 @@ fn shade_surface(
 
     let sun_light = sun_arrival(world_position, geometric, pixel, solid);
     let sun = shade(n, v, sun_light.l, base_color, metalness, roughness, f0)
-        * sun_light.radiance * sun_light.visible * bump_shadowing(geometric, n, sun_light.l);
+        * sun_light.radiance * sun_light.visible * bumps(bumped, geometric, n, sun_light.l);
 
     // Point and spot lights: only the ones listed for this pixel's tile.
     var lit = vec3<f32>(0.0);
@@ -1195,7 +1208,7 @@ fn shade_surface(
         slot += lamp_slots(lamps, i);
         if lamp.visible > 0.0 {
             lit += shade(n, v, lamp.l, base_color, metalness, roughness, f0) * lamp.radiance
-                * lamp.visible * bump_shadowing(geometric, n, lamp.l);
+                * lamp.visible * bumps(bumped, geometric, n, lamp.l);
         }
     }
 

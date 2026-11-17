@@ -24,3 +24,69 @@ cargo nextest run -p axcenity-player --no-fail-fast skin_value_tests
     front: melanin 0.8 changed 0
     thread 'skin_value_tests::skin_surface_and_eye_values_change_the_picture_the_way_they_mean' panicked at crates\player\src\skin_value_tests.rs:260:5:
     thread 'skin_value_tests::skin_tone_values_change_the_picture_the_way_they_mean' panicked at crates\player\src\skin_value_tests.rs:189:9:
+
+
+== Review fixes: render-side tests (bump shadowing scope, shading noise) ==
+
+Five new GPU tests in axcenity-render: shading.rs (a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is,
+a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal, a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun)
+and point_and_contact_shadows.rs (with_taa_the_shadow_noise_moves_every_frame,
+without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame).
+Each was seen failing against the shader it guards against. Mutations were made by hand and reverted.
+
+1. Against the branch as handed in (de92f9a3: bump_shadowing applied to every shading normal):
+   the leaf and the surface-shader test fail (the bug the review found).
+
+   cargo nextest run -p axcenity-render --no-fail-fast -E <the five tests>
+            PASS [   2.622s] (1/5) axcenity-render renderer::tests::point_and_contact_shadows::with_taa_the_shadow_noise_moves_every_frame
+            PASS [   2.822s] (2/5) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+    crown edge green: behind 45, in front 84, no sun 0
+    thread 'renderer::tests::shading::a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is' panicked at crates\render\src\renderer\tests\shading.rs:507:5:
+    lit from behind 45 against from in front 84
+            FAIL [   2.555s] (3/5) axcenity-render renderer::tests::shading::a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is
+    past the terminator: 0 lit of 558; noise across it: 25.122581
+            PASS [   2.603s] (4/5) axcenity-render renderer::tests::shading::a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun
+    thread 'renderer::tests::shading::a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal' panicked at crates\render\src\renderer\tests\shading.rs:555:5:
+    the sun lights it: [0, 0, 0, 255] against [0, 0, 0, 255]
+            FAIL [   3.037s] (5/5) axcenity-render renderer::tests::shading::a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal
+         Summary [  13.641s] 5 tests run: 3 passed, 2 failed, 371 skipped
+            FAIL [   2.555s] (3/5) axcenity-render renderer::tests::shading::a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is
+            FAIL [   3.037s] (5/5) axcenity-render renderer::tests::shading::a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal
+
+2. Against the base commit 5b650d5d's behaviour (bump_shadowing returning 1, noise step pinned to 0):
+   the TAA noise test and the bump terminator test fail.
+
+    thread 'renderer::tests::point_and_contact_shadows::with_taa_the_shadow_noise_moves_every_frame' panicked at crates\render\src\renderer\tests\point_and_contact_shadows.rs:383:9:
+    assertion `left != right` failed: the noise moves each frame: [0.0, 0.0, 0.0, 0.0]
+            FAIL [   2.607s] (1/5) axcenity-render renderer::tests::point_and_contact_shadows::with_taa_the_shadow_noise_moves_every_frame
+            PASS [   2.837s] (2/5) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+    crown edge green: behind 104, in front 103, no sun 0
+            PASS [   2.527s] (3/5) axcenity-render renderer::tests::shading::a_leafs_sunlit_crown_edge_is_lit_whichever_side_of_its_card_the_sun_is
+    past the terminator: 21 lit of 558; noise across it: 37.703224
+    thread 'renderer::tests::shading::a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun' panicked at crates\render\src\renderer\tests\shading.rs:640:5:
+    assertion `left == right` failed: 21 pixels lit past the terminator
+            FAIL [   2.602s] (4/5) axcenity-render renderer::tests::shading::a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun
+            PASS [   3.022s] (5/5) axcenity-render renderer::tests::shading::a_surface_without_a_normal_map_is_lit_by_its_own_shading_normal
+         Summary [  13.596s] 5 tests run: 3 passed, 2 failed, 371 skipped
+            FAIL [   2.607s] (1/5) axcenity-render renderer::tests::point_and_contact_shadows::with_taa_the_shadow_noise_moves_every_frame
+            FAIL [   2.602s] (4/5) axcenity-render renderer::tests::shading::a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun
+
+3. Mutation: the noise moves without TAA too (`if taa || true`): the still-frame test fails on the noise step.
+
+            PASS [   2.687s] (1/2) axcenity-render renderer::tests::point_and_contact_shadows::with_taa_the_shadow_noise_moves_every_frame
+    thread 'renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame' panicked at crates\render\src\renderer\tests\point_and_contact_shadows.rs:361:9:
+    assertion `left == right` failed: Off
+            FAIL [   2.684s] (2/2) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+         Summary [   5.371s] 2 tests run: 1 passed, 1 failed, 374 skipped
+            FAIL [   2.684s] (2/2) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+
+4. Same mutation with the noise-step assert removed: the pixel comparison alone catches it.
+
+    thread 'renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame' panicked at crates\render\src\renderer\tests\point_and_contact_shadows.rs:363:9:
+    Off: 99 pixels changed between still frames
+            FAIL [   2.703s] (1/1) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+         Summary [   2.704s] 1 test run: 0 passed, 1 failed, 375 skipped
+            FAIL [   2.703s] (1/1) axcenity-render renderer::tests::point_and_contact_shadows::without_taa_soft_and_contact_shadow_edges_draw_the_same_pixels_every_frame
+
+After the fix (bumped flag): 5 tests run: 5 passed; crown edge green behind 104, in front 103 (the base values);
+past the terminator 0 lit of 558, noise across it 25.1 (38 without the term).

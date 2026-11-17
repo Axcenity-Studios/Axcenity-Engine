@@ -573,8 +573,11 @@ fn lit_pixel(
         color = lit_leaf(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
             solid, maps.shading.y);
     } else {
+        // Bump shadowing only with a normal map (`maps.settings.x`, its
+        // scale, is 0 without one).
         color = light_surface(in.world_position, geometric, shaded.normal, in.clip_position.xy,
-            shaded.base_color, metalness, roughness, occlusion, dielectric, solid);
+            shaded.base_color, metalness, roughness, occlusion, dielectric, solid,
+            maps.settings.x != 0.0);
     }
 
     // Solid items stay solid whatever the texture's alpha, so the window's
@@ -661,8 +664,9 @@ fn lit_leaf(
     let open = mix(CANOPY_DEPTH_SHADE, 1.0, canopy.openness);
     let rough = max(roughness,
         mix(LEAF_ROUGHNESS_INSIDE, LEAF_ROUGHNESS_OUTSIDE, canopy.openness));
+    // `bent` leans by the crown, not by bumps: no bump shadowing.
     let reflected_light = light_surface(in.world_position, geometric, bent, in.clip_position.xy,
-        base_color, metalness, rough, occlusion * open, dielectric, solid);
+        base_color, metalness, rough, occlusion * open, dielectric, solid, false);
     // What passes through isn't also reflected.
     return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * amount)
         + through_leaf(in.world_position, geometric, shaded.normal, bent, in.clip_position.xy,
