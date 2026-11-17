@@ -299,7 +299,7 @@ fn file_path(part: &Instance, folder: &str, project: &Path, pieces_id: &str) -> 
 }
 
 /// A color channel as people pick it (sRGB) to the linear value glTF wants.
-fn srgb_to_linear(c: f32) -> f32 {
+pub(crate) fn srgb_to_linear(c: f32) -> f32 {
     if c <= 0.04045 {
         c / 12.92
     } else {

@@ -22,6 +22,7 @@ Instance classes: everything that can be in the tree.
 | [MeshPart](classes/MeshPart.md) | A solid 3D model imported from a glTF or FBX file, drawn with the file's own materials (or its SurfaceAppearances'). |
 | [UnionOperation](classes/UnionOperation.md) | Parts combined into one solid by Union or Intersect (Model ▸ Solid Modeling), or by `UnionAsync`, `SubtractAsync` or `IntersectAsync`. |
 | [NegateOperation](classes/NegateOperation.md) | A Part made negative by Negate (Model ▸ Solid Modeling): shown pink and see-through, and when it's unioned with other parts it cuts itself out of them, as a doorway out of a wall. |
+| [GroupedParts](classes/GroupedParts.md) | The parts a MeshPart made by Group as Mesh (Model ▸ Solid Modeling) was made of, kept inside it for Ungroup Mesh. |
 | [Seat](classes/Seat.md) | A Part that characters sit on. |
 | [VehicleSeat](classes/VehicleSeat.md) | A Seat that drives the car it's welded into: the body made of every part welded to it, the chassis. |
 | [DamageZone](classes/DamageZone.md) | A Part that hurts: every Health whose Model has a part inside it loses DamagePerSecond a second, with the zone as the source. |

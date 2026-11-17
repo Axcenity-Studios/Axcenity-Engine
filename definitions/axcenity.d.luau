@@ -2199,6 +2199,15 @@ declare extern type NegateOperation extends Instance with
 	function GetMass(self): number
 end
 
+--- The parts a MeshPart made by Group as Mesh (Model ▸ Solid Modeling) was made of, kept inside it for Ungroup Mesh. Like a UnionOperation's parts, everything inside it is out of the world: not drawn, colliding or hit by raycasts. The Explorer lists them, dimmed, so they can be looked at.
+declare extern type GroupedParts extends Instance with
+	--- Where the grouped MeshPart it's in was when Group as Mesh made it. Ungroup Mesh moves and turns the parts by how the MeshPart has moved and turned since.
+	Origin: CFrame
+	--- The grouped MeshPart's Size when Group as Mesh made it. Ungroup Mesh stretches the parts by how the MeshPart has been resized since.
+	OriginSize: Vector3
+	[string]: any
+end
+
 --- A Part that characters sit on. A character that touches it while it's empty and not Disabled sits down: it's welded to the seat (so it rides along on a moving cart), plays its Animator's `Sit` state if there is one, and ignores move keys. Jump stands it up in front of the seat. Everything a Part has, and Occupant, Disabled and SeatOffset.
 declare extern type Seat extends Instance with
 	--- If true, the part stays where it is. If false, it falls and collides with other parts.
@@ -6071,6 +6080,7 @@ declare extern type InstanceLibrary with
 		& ((className: "MeshPart") -> MeshPart)
 		& ((className: "UnionOperation") -> UnionOperation)
 		& ((className: "NegateOperation") -> NegateOperation)
+		& ((className: "GroupedParts") -> GroupedParts)
 		& ((className: "Seat") -> Seat)
 		& ((className: "VehicleSeat") -> VehicleSeat)
 		& ((className: "DamageZone") -> DamageZone)

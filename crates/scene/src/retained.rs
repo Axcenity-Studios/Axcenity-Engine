@@ -339,6 +339,7 @@ impl DrawCache {
         profiling::scope!("DrawCache::go_over_tree");
         // Most worlds have neither, and then nothing is out of the world.
         let unions_or_tools = world.all_of(ClassName::UnionOperation).next().is_some()
+            || world.all_of(ClassName::GroupedParts).next().is_some()
             || world.all_of(ClassName::Tool).next().is_some();
         let mut kept: FxHashMap<InstanceId, Entry> = self
             .entries

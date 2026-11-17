@@ -1,9 +1,11 @@
 //! `solid_op`: the ribbon's Solid Modeling group (`app/solid.rs`) on
 //! `id`/`ids`: Union and Intersect (two or more parts into a
 //! UnionOperation, its mesh saved under `assets/models/`), Negate (a part
-//! that cuts, or back), Separate (a UnionOperation back into its parts) and
-//! To Terrain (parts become ground on the Terrain under them). One undo
-//! step each; a boolean that fails says why and changes nothing.
+//! that cuts, or back), Separate (a UnionOperation back into its parts),
+//! Group as Mesh (parts into one MeshPart with one optimized model, the
+//! parts kept inside it), Ungroup Mesh (back) and To Terrain (parts become
+//! ground on the Terrain under them). One undo step each; one that fails
+//! says why and changes nothing.
 
 use axcenity_mcp::{Args, Class, Code, Kind, Outcome, Param, Profile, ToolError, ToolSpec};
 
@@ -15,14 +17,22 @@ use crate::app::solid::SolidAction;
 pub const SPEC: ToolSpec = ToolSpec {
     name: "solid_op",
     title: "Solid modeling",
-    summary: "Union, intersect, negate or separate parts, or turn them into terrain, as the Solid Modeling buttons do.",
+    summary: "Union, intersect, negate, separate, group as one optimized mesh or ungroup parts, or turn them into terrain, as Solid Modeling does.",
     profile: Profile::Full,
     class: Class::Modify,
     idempotent: false,
     params: &[
         Param::required(
             "op",
-            Kind::Enum(&["union", "intersect", "negate", "separate", "to_terrain"]),
+            Kind::Enum(&[
+                "union",
+                "intersect",
+                "negate",
+                "separate",
+                "group_mesh",
+                "ungroup_mesh",
+                "to_terrain",
+            ]),
             "",
         ),
         ID,
@@ -48,6 +58,8 @@ pub fn call(host: &mut Host, args: &Args) -> Outcome {
         "intersect" => SolidAction::Intersect,
         "negate" => SolidAction::Negate,
         "separate" => SolidAction::Separate,
+        "group_mesh" => SolidAction::GroupAsMesh,
+        "ungroup_mesh" => SolidAction::UngroupMesh,
         _ => SolidAction::ToTerrain,
     };
     let mut ids = Vec::new();

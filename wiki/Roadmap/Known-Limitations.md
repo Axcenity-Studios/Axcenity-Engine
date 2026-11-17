@@ -66,8 +66,11 @@ The realistic base body (Character Studio overhaul CO4, built and waiting for re
 
 - Script completion and Go to Definition (F12) follow chains and declarations but doesn't type-check: a value it can't follow (a function's result, a table field, a module's return) offers nothing, luau-lsp ships in every package (a source build downloads it on request) and follows `require(game.ReplicatedStorage.X)` and `GetService` paths into modules (not `require(script.Parent.X)`, nor children's types such as `workspace.Door`); only open tabs are checked, and VS Code's set-up still checks each file alone.
 - Panics while drawing the Play world aren't caught.
+- **Group as Mesh** carries what a glTF material can hold. A Part's built-in Material texture (Wood, Brick, Concrete…, drawn from maps `scene` makes in memory) is grouped in its color; MaterialVariants, a Part's SurfaceAppearance, opacity and specular maps, DirectX normal maps and Decals aren't carried either (Output names each part). Hidden faces are only taken away when one solid part, or opposite faces in one plane, cover them; a face hidden by two overlapping parts together stays. Faces only partly pressed together stay whole (`docs/architecture/solid-modeling.md`).
 - Model files aren't watched for changes while the editor runs (read again on open).
 - Bakes (reflection probes, light probe volumes) go stale and must be rebaked by hand (flagged). A bake runs a little each frame with progress and Cancel, but each probe still reads its six faces back one at a time, so thousands of probes take minutes.
+
+- **A SurfaceAppearance's normal map on a model whose own material has none is drawn without tangents** (every corner's tangent is `render::mesh::NO_TANGENT`, +X in the model), because `assets` works tangents out only for a material with a normal map of its own. Found by Group as Mesh's picture test on hello-mesh's ATM: the grouped model's material links the map itself, gets real tangents, and its bumps light differently (more correctly) than the separate MeshPart's.
 
 ## Content and platforms
 

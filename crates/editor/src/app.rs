@@ -87,6 +87,7 @@ mod collab_project;
 mod collab_repo;
 mod collab_repo_ui;
 mod collab_setup;
+mod group_mesh;
 mod inventory;
 mod sky;
 mod solid;
@@ -2178,6 +2179,8 @@ mod collab_setup_tests;
 mod collab_trust_tests;
 #[cfg(test)]
 mod decal_tests;
+#[cfg(test)]
+mod group_mesh_tests;
 #[cfg(test)]
 mod level_tests;
 #[cfg(test)]

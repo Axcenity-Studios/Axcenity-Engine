@@ -68,6 +68,18 @@ struct Face {
 /// need. Pieces of a face whose uvs don't meet only join when `plain` says
 /// their surface has no texture. Unused vertices are dropped.
 pub(crate) fn merge_flat_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> Mesh {
+    merge_flat_faces_with(mesh, plain, false)
+}
+
+/// [`merge_flat_faces`], and with `same_uv_map` a textured face's pieces
+/// join only where their uvs are one flat mapping across both (a texture
+/// stretched the same way), so filling the face again can't move the
+/// texture: what Group as Mesh needs, since it must not change the look.
+pub(crate) fn merge_flat_faces_with(
+    mesh: &Mesh,
+    plain: &dyn Fn(Surface) -> bool,
+    same_uv_map: bool,
+) -> Mesh {
     // Number the distinct positions.
     let mut ids: HashMap<[u32; 3], u32> = HashMap::new();
     let mut points: Vec<DVec3> = Vec::new();
@@ -93,7 +105,7 @@ pub(crate) fn merge_flat_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> 
         .max(min.abs().max(max.abs()).max_element());
     let tolerance = STRAIGHT * f64::from(size);
 
-    let (face_of, mixed) = group_faces(mesh, plain);
+    let (face_of, mixed) = group_faces(mesh, plain, same_uv_map);
     let mut faces: Vec<Face> = Vec::new();
     let mut face_index: HashMap<usize, usize> = HashMap::new();
     for (triangle, root) in face_of.iter().enumerate() {
@@ -203,7 +215,11 @@ pub(crate) fn merge_flat_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> 
 /// whose uvs don't meet its own. Triangles are in one face when they share
 /// an edge (the same two positions), a surface and a normal, and their uvs
 /// meet along that edge or `plain` says the surface has no texture.
-fn group_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> (Vec<Option<usize>>, Vec<bool>) {
+fn group_faces(
+    mesh: &Mesh,
+    plain: &dyn Fn(Surface) -> bool,
+    same_uv_map: bool,
+) -> (Vec<Option<usize>>, Vec<bool>) {
     let grid = |normal: Vec3| (normal * NORMAL_GRID).round().as_ivec3().to_array();
     let key = |triangle: &Triangle| {
         let [a, b, c] = triangle.corners.map(|c| grid(mesh.normals[c as usize]));
@@ -241,6 +257,9 @@ fn group_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> (Vec<Option<usiz
                     if !continuous && !plain(key.0) {
                         continue;
                     }
+                    if same_uv_map && !plain(key.0) && !same_map(mesh, index, other) {
+                        continue;
+                    }
                     if !continuous {
                         mixed[index] = true;
                         mixed[other] = true;
@@ -260,6 +279,43 @@ fn group_faces(mesh: &Mesh, plain: &dyn Fn(Surface) -> bool) -> (Vec<Option<usiz
         .map(|index| key(&mesh.triangles[index]).map(|_| find(&mut leader, index)))
         .collect();
     (faces, mixed)
+}
+
+/// True if triangles `a` and `b` (in one plane) stretch their uvs the
+/// same way: each uv grows by the same amount for the same step across
+/// either, so the uvs are one flat mapping over both.
+fn same_map(mesh: &Mesh, a: usize, b: usize) -> bool {
+    let (ga, gb) = (uv_gradient(mesh, a), uv_gradient(mesh, b));
+    let scale = ga[0]
+        .length()
+        .max(ga[1].length())
+        .max(gb[0].length())
+        .max(gb[1].length());
+    (0..2).all(|k| (ga[k] - gb[k]).length() <= SAME_GRADIENT * scale.max(f64::MIN_POSITIVE))
+}
+
+/// Gradients this close, as a fraction of the larger, count as the same.
+const SAME_GRADIENT: f64 = 1e-4;
+
+/// How triangle `t`'s u and v grow across it: for each, the direction in
+/// its plane (scaled by the rate) along which it grows fastest.
+fn uv_gradient(mesh: &Mesh, t: usize) -> [DVec3; 2] {
+    let [a, b, c] = mesh.triangles[t].corners.map(|c| c as usize);
+    let p = |k: usize| mesh.positions[k].as_dvec3();
+    let uv = |k: usize| mesh.uvs[k].as_dvec2();
+    let (e1, e2) = (p(b) - p(a), p(c) - p(a));
+    let (d1, d2) = (uv(b) - uv(a), uv(c) - uv(a));
+    let (e11, e22, e12) = (e1.dot(e1), e2.dot(e2), e1.dot(e2));
+    let det = e11 * e22 - e12 * e12;
+    if det.abs() <= f64::MIN_POSITIVE {
+        return [DVec3::ZERO; 2];
+    }
+    let gradient = |d1: f64, d2: f64| {
+        let s = (d1 * e22 - d2 * e12) / det;
+        let t = (d2 * e11 - d1 * e12) / det;
+        e1 * s + e2 * t
+    };
+    [gradient(d1.x, d2.x), gradient(d1.y, d2.y)]
 }
 
 /// Works out `face`'s outline: the edges only one of its triangles uses

@@ -633,8 +633,13 @@ fn gather(
         let inside = std::iter::once(id).chain(world.descendants(id));
         for part in inside {
             // What a generator made follows the generator (a building's
-            // box moves, and it's made again there).
-            if world.is_locked(part) || axcenity_core::spline::is_generated(world, part) {
+            // box moves, and it's made again there). The parts a grouped
+            // MeshPart keeps stay where they were grouped: Ungroup Mesh
+            // moves them by how the MeshPart has moved since.
+            if world.is_locked(part)
+                || axcenity_core::spline::is_generated(world, part)
+                || axcenity_core::csg::in_group(world, part)
+            {
                 continue;
             }
             let pose = world
