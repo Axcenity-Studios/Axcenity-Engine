@@ -60,7 +60,7 @@ New tests (`crates/avatar/tests/realistic_fat.rs`, on the baked rest body in met
 
 In-engine before (this worktree before the rebuild, the baseline's assets) and after, for `realistic-<frame>-body-{default,heavy,heavy-soft,slim,slight,heavy-muscular}` at rest and in `Walk@0.4`, full size and as sheets; a Blender side-lit close-up of the belly and flank for both frames. What I saw is in [../r3/README.md](../r3/README.md). In short: heavy now reads as a heavier person with a belly in profile on both frames, fat placed by frame; the slight masculine belly is gone; slim is lean and unchanged; the bony landmarks still show (knees, ankles, wrists, collarbones in the face views); heavy-muscular has a belly now but its upper body is still a bodybuilder's.
 
-**The 5% pixel gate.** Heavy against default in `studio-front`: 18,944 pixels (2.06%) masculine and 18,664 (2.03%) feminine differ by more than 16 in a channel, against 7,373 and 5,726 before (the rule closest to the baseline's 7,564 and 6,052). With any change counted: 9.29% and 8.68% (6.79% and 5.21% before, so that rule passed already). Under the baseline's rule 5% is out of reach for any body: the whole figure covers about 28,000 to 33,000 pixels of the 921,600. About 60% of the figure's pixels changed. The gate needs restating (for example as a share of the figure's pixels, or with the rule written down); I did not inflate the shapes to chase it.
+**The 5% pixel gate.** Heavy against default in `studio-front`: 18,944 pixels (2.06%) masculine and 18,664 (2.03%) feminine differ by more than 16 in a channel, against 7,373 and 5,726 before (the rule closest to the baseline's 7,564 and 6,052). With any change counted: 9.29% and 8.68% (6.79% and 5.21% before, so that rule passed already). **The gate is not met.** The figure covers about 62,000 pixels (masculine) and 53,000 (feminine), 6.7% and 5.8% of the frame, counted as skin (red minus blue above 20) plus near-black underwear (every channel below 40). About 20% of its pixels changed by more than 15. Reaching 5% under that rule would need about two-thirds (masculine) to three-quarters (feminine) of the default and heavy outlines' pixels to change. The lead should restate the gate in plan 11.5 R3, with the rule written down, before R3 is ticked. I did not inflate the shapes to chase it. (An earlier version of this paragraph said the figure covered 28,000 to 33,000 pixels and that 5% was out of reach for any body. Both claims were wrong: see "Review fixes".)
 
 ## Open issues
 
@@ -78,4 +78,30 @@ In-engine before (this worktree before the rebuild, the baseline's assets) and a
 
 - Rebuild the generated files after merging with RA2 and RA4 (`build.py`, `catalogue.py`, `make.py`) as plan 11.7 says. The morph target count in `realistic_parameters.rs` (158 here) adds to whatever RA2's face work adds.
 - The vendored `source/body_shapes.npz` must stay this branch's (it holds the regional targets the build now reads; the build fails without them).
-- Decide the 5% gate's rule (above).
+- The 5% gate is **not met** (about 2.1%). Restate it in plan 11.5 R3, with the rule written down, before R3 is ticked (above).
+
+## Review fixes
+
+The reviewer found three blocking problems, all in the docs. No code or asset changed.
+
+1. **The figure-coverage numbers were wrong.** I recounted from the same captures (studio-front, heavy against default, rest), counting the figure as skin (red minus blue above 20) plus near-black underwear (every channel below 40). Masculine default: 52,322 skin and 9,568 dark, so 61,890 pixels (6.72%); heavy 69,081 (7.50%). Feminine default: 53,134 (5.77%); heavy 61,366 (6.66%). Under the rule of more than 15 in any channel, 19,528 (2.12%) and 19,124 (2.08%) pixels changed. Of those, 14,045 and 13,002 fall inside the default and heavy outlines together (69,940 and 62,220 pixels), which is about 20%, not 60%. The reviewer's figures hold. The "cannot be met by any body" claim is gone from `../r3/README.md` and from this file. Both now say the gate is unmet, give the counting rule and the measured coverage, and ask the lead to restate the gate. Reaching 5% (46,080 pixels) would need about two-thirds of the masculine outlines' pixels, and three-quarters of the feminine's, to change by more than 15.
+2. **The regenerate command in `co5/README.md` had a literal `\n`.** It now ends the `--pack` line with a real ` \` continuation, with `--pack-extras ...` on the next line. I checked it by sourcing the block in bash with `PY` stubbed out: it splits into `--work WORK --method filtered --pack ../realistic/source/body_shapes.npz --pack-extras masculine/m_thyroid,...,feminine/neck_double`, ten arguments, with no stray `n`. Each name is a key of `extract.py`'s `EXTRA`.
+3. **`assets/characters/realistic/README.md` pointed to a `--pack-extras` list in `r3/README.md` that wasn't there.** It now points to the "Regenerating the vendored shapes" block of `co5/README.md`.
+
+Also, from the non-blocking notes: `co5/README.md`'s "Still short" item 2 now has a one-line pointer saying R3 addressed the belly at `fat` 1 and the slight masculine belly. I didn't act on the other non-blocking notes. They are for the lead:
+- The kept-apart cut also shrinks the feminine muscle shapes (`Feminine_Muscle_Arms` 47.8 to 39.2 mm). Look at `realistic-feminine-body-muscular` before and after.
+- The jodhpur silhouette on feminine heavy-muscular.
+- Nothing checks `fat` 1 together with an open jaw.
+- The CRLF hashes.
+- The stale benchmarks.
+
+Re-run after the fixes:
+
+| Command | Result |
+|---|---|
+| `cargo nextest run -p axcenity-avatar -p axcenity-anim --no-fail-fast` | `Summary [   5.812s] 229 tests run: 229 passed, 0 skipped` |
+| `cargo clippy -p axcenity-avatar -p axcenity-anim --all-targets -- -D warnings` | clean |
+| `cargo fmt --all --check` | clean |
+| `python3 -I scripts/check-wiki.py` | `111 pages, 0 errors, 58 warnings` (the existing ones) |
+
+I didn't re-run `measure.py` or `face_checks.py`. The fixes change no asset, and the reviewer re-ran `face_checks` on this build (0 failures).

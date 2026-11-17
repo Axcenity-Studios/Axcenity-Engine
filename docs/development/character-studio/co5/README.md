@@ -82,7 +82,7 @@ Looked at against anatomy: where fat sits (belly, flanks, chest, hips and thighs
 ## Still short
 
 1. Muscle definition and the fat body's smoothness need the normal-map layers (CO7): today one map, baked from the athletic sculpt, is on every body.
-2. The heavy and muscular corner; the face under fat; the masculine slight body (above).
+2. The heavy and muscular corner; the face under fat; the masculine slight body (above). (R3, 2026-11-17, gave `fat` 1 a belly and flattened the slight masculine belly: `docs/development/character-studio/refinement/r3/README.md`.)
 3. Correspondence along the limbs is as loose as in the spike (1 to 3 cm); only the navel and nipples are pinned.
 4. Corrective shapes exist for one motion (the arm raised sideways, collarbone still). Elbow, knee, hip, the arm raised forward and a turned collarbone have none. The shoulder's local-volume number is under its target and its old limit (above).
 8. The fold under the feminine breast is a soft curve now, shallower than the sculpt's; the normal map there was baked for the sharper fold.
@@ -100,7 +100,8 @@ python3 fetch_makehuman.py MH
 PY -I extract.py --bundle path/to/human_base_meshes_bundle.blend --makehuman MH --work WORK
 PY -I marks.py --work WORK                 # navel and nipples of both bodies
 PY -I register.py --work WORK              # pins them
-PY -I transfer.py --work WORK --method filtered --pack ../realistic/source/body_shapes.npz \n    --pack-extras masculine/m_thyroid,masculine/m_adrenal,masculine/neck_double,masculine/pregnant_decr,feminine/f_ovary,feminine/f_liver,feminine/upperarm_fat,feminine/neck_double
+PY -I transfer.py --work WORK --method filtered --pack ../realistic/source/body_shapes.npz \
+    --pack-extras masculine/m_thyroid,masculine/m_adrenal,masculine/neck_double,masculine/pregnant_decr,feminine/f_ovary,feminine/f_liver,feminine/upperarm_fat,feminine/neck_double
 ```
 
 Then build the package (`assets/characters/realistic/README.md`). The `--pack-extras` list (R3, 2026-11-17) is the regional targets `realistic/shapes.py`'s `SOFT` and `FLAT` name; without it the build stops for want of them. The bundle path and `MH` must hold the files `makehuman.sha256` lists (41).

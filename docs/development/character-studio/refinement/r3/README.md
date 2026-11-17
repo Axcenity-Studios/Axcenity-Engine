@@ -29,4 +29,13 @@ Heavy against the default, `studio-front`, 921,600 pixels:
 | any channel differs by more than 8 | 12,057 (1.31%) | 25,802 (2.80%) | 9,789 (1.06%) | 23,670 (2.57%) |
 | any channel differs by more than 16 | 7,373 (0.80%) | 18,944 (2.06%) | 5,726 (0.62%) | 18,664 (2.03%) |
 
-The baseline's 7,564 and 6,052 are close to the third rule (more than 15 gives 7,693 and 5,975). Under that rule the 5% gate cannot be met by any body: the whole figure in `studio-front` covers about 28,000 to 33,000 pixels (3 to 3.6% of the frame, counted by skin and cloth colour), and about 60% of it changed. See the hand-back.
+The baseline's 7,564 and 6,052 are close to the third rule (more than 15 gives 7,693 and 5,975 before, 19,528 (2.12%) and 19,124 (2.08%) after). **The 5% gate (plan 11.5, R3 "Done when") is not met**: heavy reaches about 2.1% under that rule.
+
+How big the figure is in `studio-front`, counted as skin (red minus blue above 20) plus near-black underwear (every channel below 40); the grey backdrop and floor fall in neither:
+
+| | Default figure | Heavy figure | Both outlines together | Changed by more than 15, inside them |
+|---|---|---|---|---|
+| Masculine | 61,890 (6.72%) | 69,081 (7.50%) | 69,940 | 14,045 (20%) |
+| Feminine | 53,134 (5.77%) | 61,366 (6.66%) | 62,220 | 13,002 (21%) |
+
+The rest of the changed pixels (about 5,500 and 6,100) are the floor shadow and the outline's soft edge. 5% of the frame is 46,080 pixels: about two-thirds of the masculine outlines' pixels, and three-quarters of the feminine's, would have to change by more than 15. The gate is left unmet, not argued away. The lead should restate it in plan 11.5 R3 before R3 is ticked, with the rule written down: the channel threshold, and whether it is a share of the frame or of the figure. (An earlier version of this page put the figure at 28,000 to 33,000 pixels and the changed share at 60%. Both numbers were wrong.)
