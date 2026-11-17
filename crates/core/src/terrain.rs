@@ -284,6 +284,33 @@ impl FoliageSource {
         }
     }
 
+    /// How it's written in a ScatterRule's `Models` and a scatter
+    /// palette: `plant:<name>` and `prop:<name>` for the built-in ones, a
+    /// model's path as it is. [`FoliageSource::from_entry`] reads it back.
+    pub fn entry(&self) -> String {
+        match self {
+            FoliageSource::Plant(plant) => format!("plant:{}", plant.label()),
+            FoliageSource::Prop(prop) => format!("prop:{}", prop.label()),
+            FoliageSource::Model(path) => path.clone(),
+        }
+    }
+
+    /// The source an [`entry`](FoliageSource::entry) names: `None` for an
+    /// empty entry or an unknown built-in, anything else a model file.
+    pub fn from_entry(entry: &str) -> Option<FoliageSource> {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            return None;
+        }
+        if let Some(name) = entry.strip_prefix("plant:") {
+            return FoliagePlant::from_name(name.trim()).map(FoliageSource::Plant);
+        }
+        if let Some(name) = entry.strip_prefix("prop:") {
+            return FoliageProp::from_name(name.trim()).map(FoliageSource::Prop);
+        }
+        Some(FoliageSource::Model(entry.to_owned()))
+    }
+
     /// Size and center of a built-in plant or prop, or `None` for a model
     /// (those use the file's hull).
     pub fn bounds(&self) -> Option<(Vector3, Vector3)> {
@@ -299,8 +326,8 @@ impl FoliageSource {
 /// the instance stays on the surface when the heights change. `collide` is
 /// whether physics treats it as solid. `lean` (0 upright, 1 square to the
 /// ground) tilts it with the slope and `sink` (studs) lowers it into the
-/// ground; scatter rules set them (procedural worlds PW5), painted foliage
-/// stands upright on the surface.
+/// ground; scatter rules (procedural worlds PW5) and the Scatter pane's
+/// palette items set them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FoliageInstance {
     pub source: FoliageSource,
@@ -849,8 +876,8 @@ impl TerrainData {
                 yaw: instance.yaw,
                 scale: instance.scale,
                 collide: instance.collide,
-                lean: 0.0,
-                sink: 0.0,
+                lean: instance.lean,
+                sink: instance.sink,
             })
             .collect();
         Ok(data)

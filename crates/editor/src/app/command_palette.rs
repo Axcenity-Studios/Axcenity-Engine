@@ -234,6 +234,8 @@ pub(super) enum Command {
     InsertControls,
     TerrainStudio,
     ModelStudio,
+    /// The Scatter pane (the ribbon's Models group).
+    Scatter,
     TerrainTool(TerrainTool),
     /// A button on a plugin's toolbar.
     PluginButton {
@@ -1115,6 +1117,14 @@ impl EditorApp {
             when(project, "Open a project first."),
         );
         add(
+            Command::Scatter,
+            "Scatter",
+            &ribbon("Models"),
+            &["Scatter", "Foliage", "Paint foliage", "Scatter tool"],
+            None,
+            when(project, "Open a project first."),
+        );
+        add(
             Command::InsertControls,
             "Insert Controls Menu",
             &ribbon("UI"),
@@ -1143,7 +1153,6 @@ impl EditorApp {
         for tool in [
             TerrainTool::Raise,
             TerrainTool::Paint,
-            TerrainTool::Foliage,
             TerrainTool::Generate,
         ] {
             add(
@@ -1387,6 +1396,7 @@ impl EditorApp {
             Command::InsertControls if !playing => self.insert_controls_ui(),
             Command::TerrainStudio => self.layout.open(Pane::Terrain),
             Command::ModelStudio => self.layout.open(Pane::ModelStudio),
+            Command::Scatter => self.open_scatter(),
             Command::TerrainTool(tool) if !playing => self.pick_terrain_tool(tool),
             Command::PluginButton { plugin, button } if !playing => {
                 self.click_plugin_button(plugin, button);

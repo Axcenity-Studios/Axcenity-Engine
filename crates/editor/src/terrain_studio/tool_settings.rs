@@ -259,47 +259,6 @@ impl TerrainStudio {
         self.paint_mode = mode;
     }
 
-    pub(super) fn foliage_settings(&mut self, ui: &mut egui::Ui) {
-        let source = self.foliage_source.clone();
-        let mut density = self.foliage_density;
-        let mut collide = self.foliage_collide;
-        self.brush_settings(
-            ui,
-            Some(&mut |ui: &mut egui::Ui| {
-                field(ui, "Item").on_hover_text(
-                    "Click a prop or a model in the Assets panel to paint it on the terrain.",
-                );
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} {}", foliage_icon(&source), source.name()));
-                    });
-                    ui.label(
-                        egui::RichText::new("Click a prop or model in Assets.")
-                            .size(theme::type_scale::SMALL)
-                            .color(theme::palette(ui.ctx()).text_weak),
-                    );
-                });
-                ui.end_row();
-                field(ui, "Collide").on_hover_text(
-                    "Parts rest on this foliage. Off, they fall through it onto the terrain.",
-                );
-                ui.checkbox(&mut collide, "Solid");
-                ui.end_row();
-                field(ui, "Density").on_hover_text(
-                    "How many to scatter per square stud. Shift+drag removes this item.",
-                );
-                ui.add(
-                    egui::Slider::new(&mut density, 0.01..=1.0)
-                        .logarithmic(true)
-                        .suffix(" / stud²"),
-                );
-                ui.end_row();
-            }),
-        );
-        self.foliage_density = density;
-        self.foliage_collide = collide;
-    }
-
     pub(super) fn mask_settings(&mut self, ui: &mut egui::Ui) {
         let brush = &mut self.brush;
         section(ui, "Masks", |ui| {

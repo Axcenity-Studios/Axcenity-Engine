@@ -13,7 +13,7 @@ pub enum StudioTab {
     /// The sculpting brushes.
     #[default]
     Sculpt,
-    /// Painting, foliage, layers, biomes and scatter rules.
+    /// Painting, layers, biomes and scatter rules.
     Materials,
     /// Whole-terrain tools, water and the terrain's data.
     Terrain,
@@ -64,7 +64,7 @@ impl StudioTab {
     fn tip(self) -> &'static str {
         match self {
             StudioTab::Sculpt => "Brushes that shape the ground",
-            StudioTab::Materials => "Paint, foliage, layers, biomes and scatter rules",
+            StudioTab::Materials => "Paint, layers, biomes and scatter rules",
             StudioTab::Terrain => "Generate and erode the landscape, its water and its data",
         }
     }
@@ -73,7 +73,7 @@ impl StudioTab {
     pub(super) fn pick_hint(self) -> &'static str {
         match self {
             StudioTab::Sculpt => "Pick a brush to start shaping the terrain.",
-            StudioTab::Materials => "Pick a tool to paint the ground or scatter foliage.",
+            StudioTab::Materials => "Pick a tool to paint the ground.",
             StudioTab::Terrain => "Pick a tool to generate or erode the whole landscape.",
         }
     }

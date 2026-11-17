@@ -56,6 +56,9 @@ pub enum Pane {
     UiDesigner,
     /// The Terrain Studio: sculpting, painting and generating terrains.
     Terrain,
+    /// A palette of plants, props and models painted onto terrain
+    /// (`scatter_pane.rs`). Starts closed; the ribbon's Models group opens it.
+    Scatter,
     /// What the game costs during Play (`profiler.rs`).
     Profiler,
     /// The SoundGroups with live levels, mute and solo (`mixer.rs`, Phase
@@ -136,7 +139,7 @@ pub enum Pane {
 
 impl Pane {
     /// The panels that can be closed and opened again, in menu order.
-    pub const CLOSABLE: [Pane; 30] = [
+    pub const CLOSABLE: [Pane; 31] = [
         Pane::Explorer,
         Pane::Properties,
         Pane::Console,
@@ -144,6 +147,7 @@ impl Pane {
         Pane::Animation,
         Pane::UiDesigner,
         Pane::Terrain,
+        Pane::Scatter,
         Pane::Profiler,
         Pane::Mixer,
         Pane::AssetCheck,
@@ -180,6 +184,7 @@ impl Pane {
             Pane::Animation => "Animation",
             Pane::UiDesigner => "UI Designer",
             Pane::Terrain => "Terrain",
+            Pane::Scatter => "Scatter",
             Pane::Profiler => "Profiler",
             Pane::Mixer => "Mixer",
             Pane::AssetCheck => "Asset Check",
@@ -219,6 +224,7 @@ impl Pane {
             Pane::Animation => theme::AnimKind::Animator.icon(),
             Pane::UiDesigner => icons::LAYOUT,
             Pane::Terrain => icons::MOUNTAINS,
+            Pane::Scatter => icons::TREE,
             Pane::Profiler => icons::GAUGE,
             Pane::Mixer => icons::FADERS,
             Pane::AssetCheck => icons::LIST,
@@ -368,6 +374,7 @@ impl Layout {
             | Pane::TeamBoard => Some(Pane::Scene),
             // A tab beside Properties, down the right.
             Pane::Terrain
+            | Pane::Scatter
             | Pane::Tags
             | Pane::Layers
             | Pane::Levels
@@ -397,6 +404,7 @@ impl Layout {
                 Pane::Explorer
                 | Pane::Properties
                 | Pane::Terrain
+                | Pane::Scatter
                 | Pane::Tags
                 | Pane::Layers
                 | Pane::Levels
@@ -801,6 +809,7 @@ mod tests {
                     | Pane::VersionExplorer
                     | Pane::TeamCreate
                     | Pane::TeamBoard
+                    | Pane::Scatter
             ) {
                 assert!(!layout.is_open(pane), "{pane:?} starts closed");
                 continue;

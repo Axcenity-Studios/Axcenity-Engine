@@ -82,9 +82,9 @@ const BUTTONS_BESIDE_FROM: f32 = 520.0;
 /// What a click on a tile picks, instead of selecting it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Picking {
-    /// The Terrain Studio's foliage brush, while the Foliage tool is on: a
-    /// prop or a model.
-    Foliage(FoliageSource),
+    /// The Scatter pane's palette, while it's adding from Assets: a click
+    /// on a prop or model adds it.
+    Scatter(Vec<FoliageSource>),
     /// The models the selected SplineMesh or SplineScatter uses (Phase
     /// 74): a click on a model uses it (or, for a scatter, takes it out).
     SplineModels(Vec<String>),
@@ -98,7 +98,7 @@ impl Picking {
     /// Whether a click on `entry` picks it.
     fn takes(&self, entry: &AssetEntry) -> bool {
         match self {
-            Picking::Foliage(_) => matches!(entry.kind, AssetKind::Prop | AssetKind::Model),
+            Picking::Scatter(_) => matches!(entry.kind, AssetKind::Prop | AssetKind::Model),
             Picking::SplineModels(_) => entry.kind == AssetKind::Model,
             Picking::ScatterModels(_) => matches!(entry.kind, AssetKind::Prop | AssetKind::Model),
         }
@@ -107,7 +107,9 @@ impl Picking {
     /// Whether `entry` is what's picked now, to highlight it.
     fn has(&self, entry: &AssetEntry) -> bool {
         match self {
-            Picking::Foliage(source) => foliage_matches(source, entry),
+            Picking::Scatter(sources) => {
+                sources.iter().any(|source| foliage_matches(source, entry))
+            }
             Picking::SplineModels(models) => {
                 entry.kind == AssetKind::Model && models.contains(&entry.path)
             }
@@ -119,7 +121,7 @@ impl Picking {
 
     fn hover(&self) -> &'static str {
         match self {
-            Picking::Foliage(_) => "Click to paint this as foliage.",
+            Picking::Scatter(_) => "Click to add this to the scatter palette.",
             Picking::SplineModels(_) => "Click to use this model along the selected spline.",
             Picking::ScatterModels(_) => {
                 "Click to have the selected scatter rule place this (click again to take it out)."
@@ -226,8 +228,8 @@ pub enum BrowserAction {
     OpenToolbox,
     /// Place this at the camera's focus point (a double-click).
     Place(AssetEntry),
-    /// A click while [`Picking`]: use this as the Terrain Studio's foliage
-    /// brush, or along the selected SplineMesh or SplineScatter.
+    /// A click while [`Picking`]: add this to the Scatter pane's palette,
+    /// or use it along the selected SplineMesh or SplineScatter.
     Pick(AssetEntry),
     /// Copy files into the project; images go in this folder.
     Import { image_folder: &'static str },

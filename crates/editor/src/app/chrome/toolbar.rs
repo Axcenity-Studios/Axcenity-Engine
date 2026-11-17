@@ -681,6 +681,18 @@ impl EditorApp {
                 {
                     self.layout.open(Pane::ModelStudio);
                 }
+                let scatter = RibbonButton::new(Pane::Scatter.icon(), "Scatter")
+                    .selected(self.layout.is_open(Pane::Scatter));
+                if ui
+                    .add_enabled(can_play, scatter)
+                    .on_hover_text(
+                        "Open the Scatter pane: choose props and models, how big each is, its share of the mix and whether it collides, then paint them onto terrain.",
+                    )
+                    .on_disabled_hover_text("Open a project first.")
+                    .clicked()
+                {
+                    self.open_scatter();
+                }
             }),
             RibbonGroup::Ui => ribbon::group_tinted(ui, "UI", Some(group.hue()), |ui| {
                 let screen = Insertable::ScreenGui;
@@ -766,7 +778,7 @@ impl EditorApp {
                 if ui
                     .add_enabled(can_play, editor)
                     .on_hover_text(
-                        "Open the Terrain Studio: make, sculpt, paint, scatter foliage and generate terrain.",
+                        "Open the Terrain Studio: make, sculpt, paint and generate terrain.",
                     )
                     .on_disabled_hover_text("Open a project first.")
                     .clicked()
@@ -780,7 +792,7 @@ impl EditorApp {
                     .dropdown();
                 let button = ui
                     .add_enabled(!playing && can_play, button)
-                    .on_hover_text("Pick a terrain tool: sculpt, paint, foliage or generate.")
+                    .on_hover_text("Pick a terrain tool: sculpt, paint or generate.")
                     .on_disabled_hover_text(if playing {
                         "Press Stop to edit."
                     } else {
@@ -790,7 +802,6 @@ impl EditorApp {
                     for tool in [
                         TerrainTool::Raise,
                         TerrainTool::Paint,
-                        TerrainTool::Foliage,
                         TerrainTool::Generate,
                     ] {
                         let item = egui::Button::selectable(

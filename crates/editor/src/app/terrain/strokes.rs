@@ -203,24 +203,6 @@ impl EditorApp {
                     format!("Paint {name}"),
                 )
             }
-            TerrainTool::Foliage if shift => (
-                Operation::Foliage {
-                    source: studio.foliage_source.clone(),
-                    density: studio.foliage_density,
-                    erase: true,
-                    collide: studio.foliage_collide,
-                },
-                format!("Erase {} Foliage", studio.foliage_source.name()),
-            ),
-            TerrainTool::Foliage => (
-                Operation::Foliage {
-                    source: studio.foliage_source.clone(),
-                    density: studio.foliage_density,
-                    erase: false,
-                    collide: studio.foliage_collide,
-                },
-                format!("Paint {} Foliage", studio.foliage_source.name()),
-            ),
             TerrainTool::Auto | TerrainTool::Generate | TerrainTool::Erode | TerrainTool::Masks => {
                 return None;
             }
@@ -233,43 +215,26 @@ impl EditorApp {
             return;
         };
         let brush = self.terrain.brush.clone();
-        let placement = self.world.get(active.terrain).and_then(Placement::of);
-        let stamps = if active.once {
-            // A stamp happens once, where the click was.
-            let first = active.stroke.advance(point, f32::MAX, seconds, None);
-            first.into_iter().take(1).collect()
-        } else {
-            // Foliage doesn't repeat while held still: that would pile plants.
-            let repeat = match active.operation {
-                Operation::Foliage { .. } => None,
-                _ => Some(STROKE_REPEAT),
-            };
-            active
-                .stroke
-                .advance(point, brush.spacing_studs(), seconds, repeat)
-        };
-        if let (Some(placement), Some(data)) = (placement, self.world.terrain_mut(active.terrain)) {
-            for center in stamps {
-                for rect in brush::affected_rects(data, &placement, &brush, center) {
-                    active.recorder.before_change(data, rect);
-                }
-                brush::apply(data, &placement, &brush, &active.operation, center);
-            }
-        }
+        stroke_active(&mut self.world, &mut active, &brush, point, seconds);
         self.terrain.stroke = Some(active);
     }
 
     /// Ends the stroke under way, as one undo step if it changed anything.
     pub(super) fn finish_stroke(&mut self) {
-        let Some(active) = self.terrain.stroke.take() else {
-            return;
-        };
+        if let Some(active) = self.terrain.stroke.take() {
+            self.record_stroke(active);
+        }
+    }
+
+    /// Makes `active`'s changes one undo step, named by its label, if it
+    /// changed anything. True if it did.
+    pub(in crate::app) fn record_stroke(&mut self, active: ActiveStroke) -> bool {
         let Some(edit) = self
             .world
             .terrain(active.terrain)
             .and_then(|data| active.recorder.finish(data))
         else {
-            return;
+            return false;
         };
         let fields = history::snapshot(&self.world, active.terrain);
         self.history.record_terrain(
@@ -280,6 +245,7 @@ impl EditorApp {
             fields.clone(),
             fields,
         );
+        true
     }
 
     /// Ctrl+click: Flatten takes the height there, Paint the layer showing.
@@ -304,6 +270,40 @@ impl EditorApp {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// Moves `active` to `point` with `brush`, stamping `world`'s terrain along
+/// the way and keeping what each stamp changes for undo.
+pub(in crate::app) fn stroke_active(
+    world: &mut World,
+    active: &mut ActiveStroke,
+    brush: &Brush,
+    point: Vec3,
+    seconds: f32,
+) {
+    let placement = world.get(active.terrain).and_then(Placement::of);
+    let stamps = if active.once {
+        // A stamp happens once, where the click was.
+        let first = active.stroke.advance(point, f32::MAX, seconds, None);
+        first.into_iter().take(1).collect()
+    } else {
+        // Scatter doesn't repeat while held still: that would pile items.
+        let repeat = match active.operation {
+            Operation::Scatter(_) => None,
+            _ => Some(STROKE_REPEAT),
+        };
+        active
+            .stroke
+            .advance(point, brush.spacing_studs(), seconds, repeat)
+    };
+    if let (Some(placement), Some(data)) = (placement, world.terrain_mut(active.terrain)) {
+        for center in stamps {
+            for rect in brush::affected_rects(data, &placement, brush, center) {
+                active.recorder.before_change(data, rect);
+            }
+            brush::apply(data, &placement, brush, &active.operation, center);
         }
     }
 }

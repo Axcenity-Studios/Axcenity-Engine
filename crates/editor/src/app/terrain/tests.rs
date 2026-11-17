@@ -123,69 +123,6 @@ fn painting_needs_a_layer_and_ctrl_click_picks_one() {
 }
 
 #[test]
-fn painting_foliage_scatters_plants_and_props_and_undo_removes_the_stroke() {
-    let (mut app, folder) = app_with_project("foliage");
-    let terrain = create(&mut app);
-    app.terrain.tool = Some(TerrainTool::Foliage);
-    app.terrain.foliage_source =
-        axcenity_core::FoliageSource::Plant(axcenity_core::FoliagePlant::Grass);
-    app.terrain.foliage_density = 0.4;
-    app.terrain.brush.radius = 10.0;
-    app.terrain.brush.strength = 1.0;
-    app.terrain.brush.falloff = 0.0;
-    app.terrain_pointer(pointer(Vec3::ZERO, true, true, false));
-    app.terrain_pointer(pointer(Vec3::ZERO, false, false, true));
-    let plants = app.world.terrain(terrain).unwrap().foliage().len();
-    assert!(plants > 3, "scattered {plants} plants");
-    assert_eq!(app.history.undo_label(), Some("Paint Grass Foliage"));
-    app.undo();
-    assert!(app.world.terrain(terrain).unwrap().foliage().is_empty());
-    app.redo();
-    assert_eq!(app.world.terrain(terrain).unwrap().foliage().len(), plants);
-    assert!(
-        app.world
-            .terrain(terrain)
-            .unwrap()
-            .foliage()
-            .iter()
-            .all(|i| !i.collide)
-    );
-
-    app.terrain.foliage_source =
-        axcenity_core::FoliageSource::Prop(axcenity_core::FoliageProp::Crate);
-    app.terrain.foliage_collide = true;
-    app.terrain.foliage_density = 0.15;
-    app.terrain_pointer(pointer(Vec3::new(20.0, 0.0, 0.0), true, true, false));
-    app.terrain_pointer(pointer(Vec3::new(20.0, 0.0, 0.0), false, false, true));
-    let mixed = app.world.terrain(terrain).unwrap().foliage().len();
-    assert!(
-        mixed > plants,
-        "a prop stroke adds more: {mixed} vs {plants}"
-    );
-    assert!(
-        app.world
-            .terrain(terrain)
-            .unwrap()
-            .foliage()
-            .iter()
-            .any(|i| i.source
-                == axcenity_core::FoliageSource::Prop(axcenity_core::FoliageProp::Crate)
-                && i.collide)
-    );
-    app.undo();
-    assert_eq!(app.world.terrain(terrain).unwrap().foliage().len(), plants);
-    assert!(
-        app.world
-            .terrain(terrain)
-            .unwrap()
-            .foliage()
-            .iter()
-            .all(|i| !i.collide)
-    );
-    std::fs::remove_dir_all(folder).unwrap();
-}
-
-#[test]
 fn a_generated_preview_changes_nothing_until_applied_then_saves_and_reloads() {
     let (mut app, folder) = app_with_project("generate");
     let terrain = create(&mut app);
@@ -445,7 +382,7 @@ fn a_tool_picked_by_key_ribbon_or_search_shows_its_studio_tab() {
     // The ribbon's Brush menu.
     app.layout.toggle(Pane::Terrain);
     assert!(!app.layout.is_open(Pane::Terrain));
-    app.pick_terrain_tool(TerrainTool::Foliage);
+    app.pick_terrain_tool(TerrainTool::Paint);
     assert!(app.layout.is_open(Pane::Terrain));
     assert_eq!(app.terrain.tab(), StudioTab::Materials);
     // Universal search's Terrain Brush commands.
@@ -457,7 +394,7 @@ fn a_tool_picked_by_key_ribbon_or_search_shows_its_studio_tab() {
     assert_eq!(app.terrain.tab(), StudioTab::Sculpt);
     // Back on Materials, the last tool there is picked again.
     app.terrain.switch_tab(StudioTab::Materials);
-    assert_eq!(app.terrain.tool, Some(TerrainTool::Foliage));
+    assert_eq!(app.terrain.tool, Some(TerrainTool::Paint));
     app.terrain.switch_tab(StudioTab::Terrain);
     assert_eq!(app.terrain.tool, Some(TerrainTool::Generate));
     std::fs::remove_dir_all(folder).unwrap();

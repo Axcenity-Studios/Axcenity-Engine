@@ -57,6 +57,7 @@ Source and tests win when a doc is wrong. Update the topic file you used.
 | The Model Studio tab, editable meshes (`EditMesh`, `ModelDoc`), modeling operations (`MeshOp`), modifiers and the `.meshedit.json` sidecar, Generate LODs, saving `.glb` | [editor/model-studio.md](editor/model-studio.md) |
 | Paint, materials, lights, or the angular tool | [editor/building.md](editor/building.md) |
 | The Assets panel | [editor/assets.md](editor/assets.md) |
+| The Scatter pane (painting a palette of props and models onto terrain), `.axscatter` palettes, the Scatter brush op | [editor/scatter.md](editor/scatter.md) |
 | Learn, the Documentation page, the API Reference page, `documentation/` (user docs and GitBook) or generating `documentation/api/` | [editor/learn-and-docs.md](editor/learn-and-docs.md) |
 | Scripts, LocalScripts, or RemoteEvents in the editor | [editor/sides.md](editor/sides.md) |
 | Lua, the sandbox, blocks, or graphs | [scripting.md](scripting.md), then one file |

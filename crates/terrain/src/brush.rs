@@ -8,19 +8,22 @@
 //!
 //! [`EditRecorder`] keeps a copy of each chunk the first time a stroke
 //! changes it, so the whole stroke undoes as one step without copying the
-//! whole terrain. Foliage stamps scatter plants and props the same way.
+//! whole terrain. Scatter stamps (`brush/scatter.rs`) place a palette's
+//! plants, props and models the same way.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axcenity_core::{
-    CHUNK_CELLS, FoliageInstance, FoliageSource, MAX_FOLIAGE_INSTANCES, MAX_TERRAIN_LAYERS,
-    PaintWeights, SampleRect, TerrainData, TerrainRegion,
+    CHUNK_CELLS, MAX_TERRAIN_LAYERS, PaintWeights, SampleRect, TerrainData, TerrainRegion,
 };
 use glam::{Vec2, Vec3};
 
 use crate::Placement;
-use crate::noise::{Noise, Rng, mix, smoothstep};
+use crate::noise::{Noise, smoothstep};
+
+mod scatter;
+pub use scatter::{MAX_ITEM_SCALE, MIN_ITEM_SCALE, Scatter, ScatterErase, ScatterItem, shares};
 
 /// How much Raise, Lower and Sculpt move the ground in one stamp at full
 /// strength, as a fraction of the brush's radius.
@@ -30,7 +33,7 @@ const BLEND_PER_STAMP: f32 = 0.5;
 /// The most stamps one call to [`Stroke::advance`] makes, so a huge jump
 /// (the mouse leaving and coming back far away) can't freeze the editor.
 const MAX_STAMPS_PER_STEP: usize = 64;
-/// The most plants or props one foliage stamp adds, so a huge cell or a
+/// The most plants or props one Scatter stamp adds, so a huge cell or a
 /// high density can't freeze the editor.
 const MAX_FOLIAGE_PER_STAMP: usize = 256;
 
@@ -402,15 +405,9 @@ pub enum Operation {
     Erase {
         locked: [bool; MAX_TERRAIN_LAYERS],
     },
-    /// Scatters `source` at `density` plants per square stud, or removes
-    /// that source when `erase` is set. `collide` is stored on each new
-    /// instance.
-    Foliage {
-        source: FoliageSource,
-        density: f32,
-        erase: bool,
-        collide: bool,
-    },
+    /// Places a weighted mix of a palette's items as painted foliage, or
+    /// erases them (see [`Scatter`]).
+    Scatter(Scatter),
     /// Cuts the cells under the brush out of the surface (procedural
     /// worlds PW7), or fills them back in when `fill` is set.
     Holes {
@@ -425,7 +422,7 @@ impl Operation {
             self,
             Operation::Paint { .. }
                 | Operation::Erase { .. }
-                | Operation::Foliage { .. }
+                | Operation::Scatter(_)
                 | Operation::Holes { .. }
         )
     }
@@ -536,16 +533,8 @@ fn apply_one(
         return SampleRect::default();
     }
 
-    if let Operation::Foliage {
-        source,
-        density,
-        erase,
-        collide,
-    } = operation
-    {
-        apply_foliage(
-            data, placement, brush, rect, &weights, source, *density, *erase, *collide, center_xz,
-        );
+    if let Operation::Scatter(scatter) = operation {
+        scatter::apply_scatter(data, placement, brush, rect, &weights, scatter, center_xz);
         return rect;
     }
 
@@ -703,7 +692,7 @@ fn apply_one(
                 }
                 Operation::Paint { .. }
                 | Operation::Erase { .. }
-                | Operation::Foliage { .. }
+                | Operation::Scatter(_)
                 | Operation::Holes { .. } => height,
             };
             let new = match limits {
@@ -752,103 +741,6 @@ fn limits_mask(
         }
     }
     1.0
-}
-
-#[allow(clippy::too_many_arguments)] // Stamp inputs: brush, samples, and what to scatter.
-fn apply_foliage(
-    data: &mut TerrainData,
-    placement: &Placement,
-    brush: &Brush,
-    rect: SampleRect,
-    weights: &[f32],
-    source: &FoliageSource,
-    density: f32,
-    erase: bool,
-    collide: bool,
-    center: Vec2,
-) {
-    if erase {
-        let drop: Vec<bool> = data
-            .foliage()
-            .iter()
-            .map(|instance| {
-                if instance.source != *source || !instance.in_rect(rect) {
-                    return false;
-                }
-                let at = placement.to_world_xz(data, Vec2::new(instance.x, instance.z));
-                brush.weight(at - center) > 0.0
-            })
-            .collect();
-        if drop.iter().any(|&drop| drop) {
-            let mut index = 0;
-            data.foliage_mut().retain(|_| {
-                let gone = drop[index];
-                index += 1;
-                !gone
-            });
-        }
-        return;
-    }
-    let density = density.max(0.0);
-    if density <= 0.0 {
-        return;
-    }
-    let (size_x, size_z) = data.size();
-    let cell = placement.cell_size(data);
-    let cell_area = cell.x * cell.y;
-    let seed = mix(source.name().len() as u64
-        ^ (center.x.to_bits() as u64)
-        ^ (center.y.to_bits() as u64).rotate_left(32));
-    let mut rng = Rng::new(seed);
-    let mut added = Vec::new();
-    let mut index = 0;
-    for z in rect.z0..rect.z1 {
-        for x in rect.x0..rect.x1 {
-            let weight = weights[index] * brush.strength;
-            index += 1;
-            if weight <= 0.0 {
-                continue;
-            }
-            let mut expected = density * cell_area * weight;
-            while expected > 0.0 && added.len() < MAX_FOLIAGE_PER_STAMP {
-                let chance = expected.min(1.0);
-                expected -= 1.0;
-                if rng.next_f32() >= chance {
-                    continue;
-                }
-                let jitter_x = (rng.next_f32() - 0.5) * 0.9;
-                let jitter_z = (rng.next_f32() - 0.5) * 0.9;
-                let gx = (x as f32 + jitter_x).clamp(0.0, (size_x - 1) as f32);
-                let gz = (z as f32 + jitter_z).clamp(0.0, (size_z - 1) as f32);
-                let at = placement.to_world_xz(data, Vec2::new(gx, gz));
-                if brush.weight(at - center) <= 0.0 {
-                    continue;
-                }
-                added.push(FoliageInstance {
-                    source: source.clone(),
-                    x: gx,
-                    z: gz,
-                    yaw: rng.next_f32() * std::f32::consts::TAU,
-                    scale: 0.85 + rng.next_f32() * 0.3,
-                    collide,
-                    lean: 0.0,
-                    sink: 0.0,
-                });
-            }
-            if added.len() >= MAX_FOLIAGE_PER_STAMP {
-                break;
-            }
-        }
-        if added.len() >= MAX_FOLIAGE_PER_STAMP {
-            break;
-        }
-    }
-    if added.is_empty() {
-        return;
-    }
-    let foliage = data.foliage_mut();
-    let room = MAX_FOLIAGE_INSTANCES.saturating_sub(foliage.len());
-    foliage.extend(added.into_iter().take(room));
 }
 
 /// One sample's paint after painting or erasing with `amount` (0 to 1).

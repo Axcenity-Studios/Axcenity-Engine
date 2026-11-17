@@ -12,7 +12,7 @@ A **Terrain** object is a heightmap landscape: smooth hills and valleys, painted
 
 On the **World** tab, the **Terrain** group opens the Terrain Studio panel; **Brush ▾** picks a tool directly. With a brush up, the left mouse button paints in the Scene, **[** and **]** make the brush smaller and bigger, and **Escape** puts it down. Hover a tool for its name, key and what it does.
 
-The panel has three tabs: **Sculpt** for the brushes that shape the ground, **Materials** for painting, foliage, layers, biomes and scatter rules, and **Terrain** for generating and eroding the whole landscape, masks, water, and the terrain's resolution and heightmaps. Picking a tool any way (its key, **Brush ▾** or search) shows its tab, and going back to a tab picks the tool you last used there.
+The panel has three tabs: **Sculpt** for the brushes that shape the ground, **Materials** for painting, layers, biomes and scatter rules, and **Terrain** for generating and eroding the whole landscape, masks, water, and the terrain's resolution and heightmaps. Picking a tool any way (its key, **Brush ▾** or search) shows its tab, and going back to a tab picks the tool you last used there.
 
 ## Tools
 
@@ -29,7 +29,6 @@ The panel has three tabs: **Sculpt** for the brushes that shape the ground, **Ma
 | **8** | Auto Materials | Paint by height and slope rules: grass on flat ground, rock on cliffs |
 | **9** | Generate | Make a whole landscape from settings and a seed, or a preset |
 | **0** | Erosion | Weather the landscape with water and gravity |
-| | Foliage | Paint plants, props or models |
 | | Masks | Limit tools by height or slope |
 
 Generate and Erosion run in the background with a progress bar and Cancel. A seed always gives the same landscape.
@@ -40,7 +39,7 @@ A terrain is painted with **layers** (TerrainLayer objects inside it), each with
 
 ## Foliage
 
-The **Foliage** tool scatters the selected item from the Assets panel (a built-in plant or prop, or one of your models) as you paint, with a density. Click a prop or model in Assets to choose it, and hold **Shift** to erase it. Foliage can be solid, so parts rest on it, or only visual. Painted plants sway in the Workspace's **GlobalWind** and are drawn only near the camera (grass to about 120 studs, trees to 800), so a large painted forest stays fast.
+Plants, props and models are painted onto the terrain with the **Scatter** pane: on the ribbon's **Models** group, pick **Scatter**. Turn on **Add from Assets** and click the props or models you want in the Assets panel; each becomes an item in the pane's palette, with its **Weight** (its share of the mix, shown as a percentage), **Size** (smallest and largest scale), **Collide** (solid, so parts rest on it, or only visual), **Rotation** (how far each copy is turned at random), **Align to slope** and **Sink**. Set the brush's **Size**, **Density** (items per 100 square studs) and **Spacing** (the least distance between items, so painting over the same ground fills gaps instead of piling up), press **Paint** and drag on the terrain. Hold **Shift** to erase the palette's items, or tick **Erase everything** to erase any painted foliage. Each stroke is one undo step. Palettes are saved in your project's `presets` folder as `.axscatter` files: make more with **New**, and switch between them with the dropdown. Painted plants sway in the Workspace's **GlobalWind** and are drawn only near the camera (grass to about 120 studs, trees to 800), so a large painted forest stays fast.
 
 ## Scatter rules
 

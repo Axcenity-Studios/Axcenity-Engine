@@ -52,6 +52,7 @@ mod package;
 mod packed;
 mod prefabs;
 mod recovery;
+mod scatter_palettes;
 mod starter_character;
 mod terrain_files;
 mod validate;
@@ -155,6 +156,11 @@ pub use packed::{
     pack_game_with, unpack_game,
 };
 pub use prefabs::{PrefabError, Prefabs, applied_text, prefab_references, variant_text};
+pub use scatter_palettes::{
+    DEFAULT_SCATTER_DENSITY, DEFAULT_SCATTER_SPACING, SCATTER_PALETTE_EXTENSION,
+    SCATTER_PALETTE_FORMAT, ScatterPalette, ScatterPaletteError, list_scatter_palettes,
+    save_scatter_palette, scatter_palette_file_name,
+};
 pub use starter_character::load_starter_character;
 pub use terrain_files::{
     TERRAIN_FOLDER, data_folder, is_safe_folder, keep_terrain_folder, load_terrains,
