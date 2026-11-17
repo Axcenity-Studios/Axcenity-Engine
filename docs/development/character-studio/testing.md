@@ -85,7 +85,7 @@ Starting points from the Stage 1 baseline (`baseline/measurements.json`); a mile
 
 **The realistic face at CO6** (`co6/sliders.json`, `co6/sliders-check.txt`).
 
-The sliders check now covers the face's 45 parameters as well: 73 parameters, 2,556 pairs, 10,082 bodies a frame. No body newly crosses itself on either frame; before the identity work, 14 masculine and 8 feminine did. Since R4 the realistic manifest has 89 parameters (3,828 pairs, 15,138 bodies a frame), and `face_checks.py` also holds R4's 14 face parameters at their ends alone, in a blink and under every expression and viseme (`HELD_IDENTITY`).
+The sliders check now covers the face's 45 parameters as well: 73 parameters, 2,556 pairs, 10,082 bodies a frame. No body newly crosses itself on either frame; before the identity work, 14 masculine and 8 feminine did. Since R4 the realistic manifest has 89 parameters (3,828 pairs, 15,138 bodies a frame), and `face_checks.py` also holds R4's 14 face parameters at their ends alone, in a blink and under every expression and viseme (`HELD_IDENTITY`), and to no new crossing of the head's skin triangles alone or on top of any other face parameter's end, including the pairs within 4 mm at rest that the sliders check leaves out (`identity_pairs`; the closed lips' contact aside).
 
 The harness now moves and scales the eye bones by the parameters' `bones` drivers, as `avatar::resolve` and the bake do (`qa_scene.manifest_bones`). Before, it moved the lids off eyeballs left at rest, which made 13 to 14 of each frame's 17 eye-in-flesh entries.
 

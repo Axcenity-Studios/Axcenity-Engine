@@ -6692,7 +6692,7 @@
      ],
      "required": true,
      "seal_in_view": 9,
-     "self_crossing": 352,
+     "self_crossing": 350,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -32983,7 +32983,7 @@
      ],
      "required": true,
      "seal_in_view": 13,
-     "self_crossing": 337,
+     "self_crossing": 335,
      "teeth_in_flesh": 0,
      "teeth_in_flesh_max_mm": 0.0,
      "tongue_in_flesh": 0,
@@ -52630,6 +52630,47 @@
      "tongue_in_flesh_max_mm": 0.0
     }
    }
+  }
+ },
+ "identity_pairs": {
+  "feminine": {
+   "offenders": [],
+   "poses": 3388
+  },
+  "masculine": {
+   "offenders": [
+    {
+     "new_crossings": 1,
+     "required": false,
+     "sliders": "eye_corner_left-1, brow_height_left-1"
+    },
+    {
+     "new_crossings": 4,
+     "required": false,
+     "sliders": "eye_corner_left+1, brow_height_left-1"
+    },
+    {
+     "new_crossings": 4,
+     "required": false,
+     "sliders": "eye_corner_left+1, brow_arch_left-1"
+    },
+    {
+     "new_crossings": 4,
+     "required": false,
+     "sliders": "eye_corner_left+1, brow_ridge+1"
+    },
+    {
+     "new_crossings": 4,
+     "required": false,
+     "sliders": "eye_corner_left+1, cheekbone_left+1"
+    },
+    {
+     "new_crossings": 2,
+     "required": false,
+     "sliders": "eye_corner_right+1, brow_ridge+1"
+    }
+   ],
+   "poses": 3388
   }
  },
  "limits_deg": {

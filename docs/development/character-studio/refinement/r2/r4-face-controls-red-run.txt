@@ -29,3 +29,24 @@ cargo nextest run -p axcenity-anim --no-fail-fast -E 'binary(realistic_face)' (t
     Teeth doesn't move with Face_Philtrum_Length
         PASS [   1.221s] (4/4) axcenity-anim::realistic_face every_standard_control_moves_the_realistic_face
      Summary [   1.221s] 4 tests run: 3 passed, 1 failed, 0 skipped
+
+Review fixes (2026-11-17), against the package as reviewed (commit 7d83f73d):
+
+cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_controls)' --no-fail-fast
+
+        PASS [   0.392s] (2/4) axcenity-avatar::realistic_face_controls the_face_has_the_high_value_controls_with_their_metadata
+        PASS [   0.409s] (3/4) axcenity-avatar::realistic_face_controls each_new_control_moves_the_face_within_its_range
+        PASS [   2.277s] (4/4) axcenity-avatar::realistic_face_controls the_frames_faces_differ
+        FAIL [   0.359s] (1/4) axcenity-avatar::realistic_face_controls the_lower_lid_and_the_earlobe_move_enough_to_be_seen
+    `Face_Lower_Lid_Left` moves 2.32 mm (at least 3.4)
+     Summary [   2.301s] 4 tests run: 3 passed, 1 failed, 0 skipped
+(The same build data has `Face_Earlobe_Left` at 5.57 mm, under the test's 7.)
+
+face_checks.py's new `identity_pairs` (each held parameter's ends alone and on top of every other face
+parameter's ends; pairs of the head's skin triangles that cross with both and neither at rest nor with
+the other alone), counted on the reviewed package with the same code (left side shown):
+  upper_lid_fold_left +1 with eye_size_left -1 (masculine): 11 new pairs; with cheekbone_left +1: 10;
+    with brow_ridge +1 (feminine): 14. Alone, at either end: 0.
+  eye_corner_left +1 with brow_height_left -1, brow_arch_left -1, brow_ridge +1, cheekbone_left +1
+    (masculine): 4 each; eye_corner_left -1 with brow_height_left -1: 1.
+  lower_lid_left +1 with eye_size_left -1 (feminine): 1.

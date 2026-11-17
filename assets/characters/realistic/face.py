@@ -418,18 +418,29 @@ JAW_CORNER_OUT = 0.0075
 # and forward at +1 (mm), a hooded lid; at -1 the fold goes up and back,
 # a high, deep-set crease. The lash line and the rim don't move, so a
 # blink still closes. (The lid shows 3.3 mm from lash line to crease.)
-# The crease itself (loops 5 and 6, which lie at one height) stays: moved
-# by different amounts, one went under the other.
-LID_FOLD_DOWN = {7: 1.6, 8: 2.7, 9: 2.5, 10: 1.5, 11: 0.6}
-LID_FOLD_FORWARD = {7: 1.8, 8: 1.5, 9: 0.9, 10: 0.4}
+# The crease itself (loops 5 and 6, which lie on each other) stays: moved
+# by different amounts, one went under the other. The fold's underside
+# (loop 6 to loop 7) slides along itself, loop 7 out from the crease by
+# `LID_FOLD_SLIDES` (mm at +1; back toward it at -1), so it keeps its angle
+# to the lid below the crease: turned down onto that lid, as at first, it
+# crossed it with a lower brow, a fuller cheekbone or a smaller eye.
+LID_FOLD_DOWN = {8: 3.2, 9: 3.0, 10: 1.8, 11: 0.7}
+LID_FOLD_FORWARD = {8: 1.6, 9: 1.0, 10: 0.4}
+LID_FOLD_SLIDES = 1.3
 # Lower lid: how far each loop of the lower lid's skin rises and comes
 # forward at +1 (mm), a full lower lid with its junction with the cheek
-# set high; at -1 a flat, longer lower lid with the junction low. The
-# rims don't move: a blink must still close, so the lid margin's height
-# (5.2 +- 1.0 mm under the pupil, E-01) is the eye's opening, which no
-# identity shape changes.
-LOWER_LID_UP = {3: 0.3, 4: 0.8, 5: 1.5, 6: 2.2, 7: 2.5, 8: 2.0, 9: 1.2, 10: 0.5}
-LOWER_LID_FORWARD = {3: 0.6, 4: 0.8, 5: 0.6, 6: 0.3, 7: 0.1}
+# (the tear trough, loops 7 to 9, 9 to 13 mm under the rim) set high and
+# filled; at -1 a flat, longer lower lid with the junction low and
+# hollow. The rims don't move: a blink must still close, so the lid
+# margin's height (5.2 +- 1.0 mm under the pupil, E-01) is the eye's
+# opening, which no identity shape changes. (Only raised, as at first,
+# the lid's skin slid within its own surface and the studio light showed
+# nothing: the hollow is what shows.) None of it at the inner corner, and
+# whole from `LOWER_LID_FROM` of the way along the eye: begun nearer the
+# corner, it crossed the skin there with a smaller eye.
+LOWER_LID_UP = {3: 0.3, 4: 0.9, 5: 1.8, 6: 2.8, 7: 3.6, 8: 3.4, 9: 2.2, 10: 1.0}
+LOWER_LID_FORWARD = {3: 0.5, 4: 0.8, 5: 0.9, 6: 1.0, 7: 1.3, 8: 1.5, 9: 1.3, 10: 0.7, 11: 0.3}
+LOWER_LID_FROM = (0.15, 0.45)
 # Eye corner: the outer part of the eye and the skin beyond its corner
 # raised with the inner corner held, the outer corner by this much
 # (canthal tilt 5.1 +- 2.5 degrees, men; 6.1 +- 2.9, women). The rise
@@ -437,11 +448,16 @@ LOWER_LID_FORWARD = {3: 0.6, 4: 0.8, 5: 0.6, 6: 0.3, 7: 0.1}
 # to the outer (`eye_tilt` turns the whole eye about its middle).
 EYE_CORNER_RISES = 0.0030
 EYE_CORNER_FROM = (0.30, 1.05)
-# Earlobe: the lobe down (or drawn up into the ear) by this much at its
-# lowest point (lobe length 25.6 +- 4.5 mm), easing to nothing this far
-# up the ear.
-EARLOBE_GROWS = 0.0060
-EARLOBE_TOP = 0.018
+# Earlobe: the lobe stretched down (or drawn up into the ear) from a
+# point this far up the ear, by up to this much at its lowest point
+# (lobe length 25.6 +- 4.5 mm), and front to back by this share of that;
+# where it joins the head it moves by `EARLOBE_JOIN` of that, easing to
+# its whole move this many rings of the ear's vertices from there.
+EARLOBE_GROWS = 0.013
+EARLOBE_TOP = 0.024
+EARLOBE_WIDENS = 0.35
+EARLOBE_FREE = 5
+EARLOBE_JOIN = 0.55
 MOUTH_RISES = 0.0045
 JAW_SHIFTS = 0.0050
 # How far Jaw_Forward brings the jaw (metres).
@@ -1579,24 +1595,33 @@ class Face:
             put(f"Face_Eye_Corner_{side}", self._rims_off_ball(eye, corner, near_ball, keeps=1.0), teeth=False)
             # Upper lid fold and lower lid (R4): loops of the lids' skin,
             # none at the inner corner and whole from a third of the way
-            # along the eye; the rims don't move.
+            # along the eye (the lower lid's from `LOWER_LID_FROM`); the
+            # rims don't move.
             taper = smoothstep(-0.05, 0.35, u)
             fold_taper = taper * (1.0 - smoothstep(1.0, 1.35, u))
             fold, lower_lid = np.zeros((len(P), 3)), np.zeros((len(P), 3))
+            loop6 = [j for j in eye.idx if eye.upper[j] and eye.step[j] == 6]
             for i in eye.idx:
                 k = eye.step[i]
                 if eye.upper[i]:
                     fold[i] = (-LID_FOLD_DOWN.get(k, 0.0) * up + LID_FOLD_FORWARD.get(k, 0.0) * eye.fwd) * 0.001 * fold_taper[i]
+                    if k == 7:
+                        # (Along the fold's underside: from the nearest
+                        # vertex of the crease's upper loop.)
+                        j = min(loop6, key=lambda j: float(np.linalg.norm(P[j] - P[i])))
+                        way = (P[i] - P[j]) / max(float(np.linalg.norm(P[i] - P[j])), 1e-9)
+                        fold[i] = way * LID_FOLD_SLIDES * 0.001 * fold_taper[i]
                 else:
-                    end = smoothstep(-0.10, 0.25, u[i]) * (1.0 - smoothstep(0.85, 1.15, u[i]))
+                    end = smoothstep(*LOWER_LID_FROM, u[i]) * (1.0 - smoothstep(0.85, 1.15, u[i]))
                     lower_lid[i] = (LOWER_LID_UP.get(k, 0.0) * up + LOWER_LID_FORWARD.get(k, 0.0) * eye.fwd) * 0.001 * end
-            # (Averaged over the fold only: the crease's loops lie on each
-            # other, and a few tenths of a millimetre averaged into them
-            # put one through the other.)
+            # (Averaged over the fold above loop 7 only: the crease's loops
+            # lie on each other, and a few tenths of a millimetre averaged
+            # into them put one through the other; averaged into loop 7,
+            # the fold's underside turned down again.)
             still = [i for i in eye.idx if eye.step[i] <= 2]
-            crease = [i for i in eye.idx if eye.step[i] <= 6]
+            crease = [i for i in eye.idx if eye.step[i] <= 7]
             put(f"Face_Lid_Fold_{side}", self.topo.smooth(fold, 2, keep=crease, among=eye.idx), teeth=False)
-            put(f"Face_Lower_Lid_{side}", self.topo.smooth(lower_lid, 2, keep=still, among=eye.idx), teeth=False)
+            put(f"Face_Lower_Lid_{side}", self.topo.smooth(lower_lid, 3, keep=still, among=eye.idx), teeth=False)
             # Brows: a shape for each end (`BROW_RAISES` above). Lowering,
             # the skin is put back on its resting surface as the brow
             # controls put it, not on the lids and the fold over them
@@ -1654,16 +1679,35 @@ class Face:
                 if hit is not None:
                     reach[i] = min(1.5, float(np.linalg.norm(P[i] - hit[0])) / EAR_OUT_REACH)
             put(f"Face_Ear_Out_{side}", vec(ear * reach, lateral * 0.0048 + back * -0.0016), teeth=False)
-            # Earlobe (R4): the ear's lowest part down, most at its bottom
-            # and none `EARLOBE_TOP` up the ear; the skin it hangs from
-            # eases with it, as for the ear's size.
-            ear_z = P[self.ear & (ear > 0.5)][:, 2]
-            lobe = ear * smoothstep(ear_z.min() + EARLOBE_TOP, ear_z.min(), P[:, 2])
-            # (Averaged over the ear first: drawn up with a sharp edge to
-            # its weight, the short lobe came to a point.)
-            lobe = self.topo.smooth(lobe, 3, among=np.where(self.ear & (ear > 0.5))[0])
+            # Earlobe (R4): the ear's lowest part made longer (or shorter),
+            # none of it `EARLOBE_TOP` up the ear. Stretched from a point
+            # inside the ear at that height, not moved down as one: moved,
+            # the long lobe ended in a straight, cut edge and the short one
+            # in a point at its front; stretched, the lobe's outline keeps
+            # its round shape at both ends.
+            on_ear = self.ear & (ear > 0.5)
+            ear_z = P[on_ear][:, 2]
+            top = ear_z.min() + EARLOBE_TOP
+            level = on_ear & (np.abs(P[:, 2] - top) < 0.002)
+            pivot = np.array([*P[level][:, :2].mean(axis=0), top])
+            lobe = ear * smoothstep(top, ear_z.min(), P[:, 2])
+            # (Averaged over the ear, both its faces.)
+            lobe = self.topo.smooth(lobe, 3, among=np.where(on_ear)[0])
+            # Where the lobe joins the head it moves less (`EARLOBE_JOIN`),
+            # easing to its whole move `EARLOBE_FREE` rings of the ear's
+            # vertices from there, and the skin it hangs from eases with
+            # it: moved with the rest, the front of the lobe, where it
+            # joins the cheek, was drawn out into a point at +1; held, it
+            # was left as a point under the short lobe at -1.
+            rings = np.full(len(P), float(EARLOBE_FREE))
+            ring = {i for i in np.where(on_ear)[0] if any(not self.ear[j] for j in self.topo.nbr[i])}
+            for k in range(EARLOBE_FREE):
+                rings[list(ring)] = k
+                ring = {j for i in ring for j in self.topo.nbr[i] if on_ear[j] and rings[j] == EARLOBE_FREE}
+            lobe *= EARLOBE_JOIN + (1.0 - EARLOBE_JOIN) * smoothstep(0.0, float(EARLOBE_FREE), rings)
             lobe = self.topo.smooth(lobe, 3, keep=np.where(self.ear)[0])
-            put(f"Face_Earlobe_{side}", vec(lobe, up * -EARLOBE_GROWS), teeth=False)
+            stretch = (P - pivot) * np.array([0.0, EARLOBE_WIDENS, 1.0]) * (EARLOBE_GROWS / EARLOBE_TOP)
+            put(f"Face_Earlobe_{side}", stretch * lobe[:, None], teeth=False)
         # The middle of the face.
         mid_nose = self.near(self.nose_tip + np.array([0.0, 0.012, 0.004]), 0.024) * skin
         low_nose = smoothstep(z_nose + 0.022, z_nose - 0.006, P[:, 2])

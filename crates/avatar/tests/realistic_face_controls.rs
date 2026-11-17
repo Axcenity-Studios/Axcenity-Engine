@@ -115,6 +115,26 @@ fn each_new_control_moves_the_face_within_its_range() {
     }
 }
 
+/// The review of R4: the lower lid moved 2.3 mm, within the lid's own
+/// surface, and under the studio light showed nearly nothing; the earlobe
+/// stopped near 1 SD of the lobe's length (25.6 +- 4.5 mm, EAR-02). The
+/// lower lid's shape now also brings its junction with the cheek forward
+/// (filled) and back (hollow), 3.4 mm or more at its most, and the lobe's
+/// lowest point moves 7 mm or more (about 1.6 SD) each way.
+#[test]
+fn the_lower_lid_and_the_earlobe_move_enough_to_be_seen() {
+    let text = std::fs::read_to_string(root().join("realistic/Realistic.build.json")).unwrap();
+    let data: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let largest = &data["face"]["largest_move_mm"];
+    for side in ["Left", "Right"] {
+        for (shape, least) in [("Face_Lower_Lid", 3.4), ("Face_Earlobe", 7.0)] {
+            let name = format!("{shape}_{side}");
+            let mm = largest[&name].as_f64().unwrap();
+            assert!(mm >= least, "`{name}` moves {mm} mm (at least {least})");
+        }
+    }
+}
+
 fn body(library: &Library) -> Model {
     let base = library.base(BASE).unwrap();
     let bytes = std::fs::read(root().join("realistic").join(&base.model.file)).unwrap();
