@@ -1,0 +1,1967 @@
+{
+  "anti_aliasing": "TAA",
+  "characters": [
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-heavy-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-heavy-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-heavy-soft",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-heavy-soft"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-heavy",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-heavy"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-lean-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-lean-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-slight",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-slight"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-slim",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-slim"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-blend-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-blend-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-heavy-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-heavy-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-heavy-soft",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-heavy-soft"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-heavy",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-heavy"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-lean-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-lean-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-slight",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-slight"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-slim",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-slim"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-face-neutral",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-face-neutral"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-feminine-outfit-underwear",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_Bra": 0,
+          "Underwear_Briefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_Bra": 1,
+          "Underwear_Briefs": 1
+        }
+      },
+      "name": "realistic-feminine-outfit-underwear"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-default",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-default"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-heavy-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-heavy-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-heavy-soft",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-heavy-soft"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-heavy",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-heavy"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-lean-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-lean-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-muscular",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-muscular"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-shortest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-shortest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-slight",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-slight"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-slim",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-slim"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-body-tallest",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-body-tallest"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-face-neutral",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-face-neutral"
+    },
+    {
+      "base": "axcenity/realistic",
+      "description": "realistic-masculine-outfit-underwear",
+      "levels_of_detail": {
+        "back": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "face": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "face-front": {
+          "Body": 0,
+          "Brows": 1,
+          "EyeShell": 1,
+          "Eyes": 1,
+          "Teeth": 1,
+          "Underwear_BoxerBriefs": 0
+        },
+        "front": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "side": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        },
+        "three-quarter": {
+          "Body": 0,
+          "Brows": 2,
+          "EyeShell": 2,
+          "Eyes": 2,
+          "Teeth": 2,
+          "Underwear_BoxerBriefs": 1
+        }
+      },
+      "name": "realistic-masculine-outfit-underwear"
+    }
+  ],
+  "face": [],
+  "frames": 48,
+  "lights": [
+    "studio",
+    "hard"
+  ],
+  "quality": "High",
+  "size": [
+    1280,
+    720
+  ],
+  "stance": "rest",
+  "views": [
+    "front",
+    "three-quarter",
+    "side",
+    "back",
+    "face",
+    "face-front"
+  ]
+}

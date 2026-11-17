@@ -1,6 +1,6 @@
 # Plan: Axcenity Engine, Character Studio overhaul
 
-> Source: Paul's Character Studio overhaul brief of 2026-11-14 (its Stages 1 to 7; milestones CO1 to CO18 here), approved the same day with the decisions and additions in section 0. **Section 0 wins wherever the rest of this plan disagrees with it.** Stage 1's research, audit, progress log and baseline renders are in [docs/development/character-studio/](../docs/development/character-studio/), and Stage 2's documents (`architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md`) go beside them. Read the stage you're on, not the whole file.
+> Source: Paul's Character Studio overhaul brief of 2026-11-14 (its Stages 1 to 7; milestones CO1 to CO18 here), approved the same day with the decisions and additions in section 0. **Section 0 wins wherever the rest of this plan disagrees with it.** Stage 1's research, audit, progress log and baseline renders are in [docs/development/character-studio/](../docs/development/character-studio/), and Stage 2's documents (`architecture.md`, `agent-assignments.md`, `testing.md`, `visual-qa.md`, `dependencies.md`) go beside them. Read the stage you're on, not the whole file. **Section 11** is Paul's refinement brief of 2026-11-16 (stages R0 to R11), which extends this plan.
 
 ## 0. Paul's decisions and additions (2026-11-14)
 
@@ -234,3 +234,113 @@ Answered on 2026-11-14 (section 0). Kept for the record:
 4. **Open PRs:** merge #401, #402 and #400 (rebased) before Stage 2, as proposed?
 5. **Hardware:** which GPU is the minimum for the hero character's strand tier, and is the RX 9070 XT the reference for budgets?
 6. **In-game creators:** should games be able to change characters at runtime (an in-game character creator, NPC variety)? The plan assumes yes for applying descriptions (the applier is in the runtime) and no for the editing UI (editor only).
+
+## 11. The refinement (Paul's brief of 2026-11-16)
+
+The brief, kept as given: [refinement/brief.md](../docs/development/character-studio/refinement/brief.md) ("brief §5.2" refers to its sections). It turns the overhaul toward the creator's interaction: a dedicated three-panel studio, direct manipulation on the character, presets, randomize, comparison and capability-aware assets. **It extends this plan; it doesn't replace it.** Section 0 still wins, and every milestone CO7 to CO18 above stays. The refinement's stages are **R1 to R11** (R0 is Stage 0). Each one maps onto CO milestones where they exist and adds new ones (CO19 onward) where they don't.
+
+### 11.1 Stage 0 (R0): done 2026-11-16
+
+Five audits, each verified by a second agent that tried to refute it; six reference indexes, each with its licences re-checked; a baseline of `main`; a completeness critic. Every brief bullet has a row with a status and `path:line` evidence.
+
+| Deliverable | Where |
+|---|---|
+| Audit: the studio and its interface (196 rows: 33 implemented, 79 partial, 84 missing; 16 defects) | [audit-studio-ui.md](../docs/development/character-studio/refinement/audit-studio-ui.md) |
+| Audit: Character Data, manifests, catalogue (173 rows; the contract proposal; presets as data) | [audit-character-data.md](../docs/development/character-studio/refinement/audit-character-data.md) |
+| Audit: runtime and rendering (100 rows; skin, makeup and decal options; what rebuilds what) | [audit-runtime-render.md](../docs/development/character-studio/refinement/audit-runtime-render.md) |
+| Audit: asset pipeline, content, QA harness (180 rows; the benchmark plan) | [audit-asset-pipeline.md](../docs/development/character-studio/refinement/audit-asset-pipeline.md) |
+| Audit: CO1 to CO18, section 9, 44 open items carried forward, the brief mapped onto the plan, 18 disagreements | [audit-plan-status.md](../docs/development/character-studio/refinement/audit-plan-status.md) |
+| What no audit covered (74 bullets), contradictions between audits, references still missing | [audit-gaps.md](../docs/development/character-studio/refinement/audit-gaps.md) |
+| Reference index (brief §13): UX patterns; face (eyes, nose, jaw, lips, ears); body (overall, upper, lower); hair; clothing; skin; materials; the licence classes of every shipped asset. Links and data only, nothing downloaded | [references/](../docs/development/character-studio/references/README.md) |
+| Baseline of `main` (99f5b181): 288 character tests passing, 25 in-engine contact sheets of the realistic family, 26 visible defects | [refinement/baseline/](../docs/development/character-studio/refinement/baseline/README.md) |
+
+**What the baseline shows** (the lead's review of the sheets): every character is bald in underwear; "heavy" (fat 1) differs from the default by under 1% of the pixels in the front view and reads as athletic, with no belly in profile; the athletic abdominal normal map is on every body, feminine included; the skin is grainy and evenly glossy with ragged, hatched shadow edges; the open mouth is a bell with pointed corners; the two frames have nearly the same face; the default character's Walk state plays the Run take. Most are recorded defects with an owner (CO7, CO9 to CO11, OPEN-07, OPEN-14); the ones that weren't (hatched limb shadows, skin grain, the jaw seam line, the briefs' side panels, Walk playing Run) are in the baseline README and carried into the stages below.
+
+### 11.2 What stays, what is refined, what is new
+
+| | |
+|---|---|
+| **Retained as is** | The `avatar` crate as the one source of character data; format 2 descriptions; base and item manifests; the catalogue and library; `resolve` and the applier (`Humanoid:ApplyDescription`, derived models); the realistic body, its 75 parameters, correctives, twist bones and face; the face runtime and its 15 expressions; the capture tool's VIEWS, LIGHTS and settings; the Blender harness and its thresholds; the workspace's edit model (one description, undo by snapshots, the 120 ms drag throttle until it is measured) |
+| **Refined** | The workspace shell becomes the three-panel studio of brief §3.1, split into modules with one owner each; the Advanced bool becomes three levels; presets move from code into data files; the parameter and item manifests gain optional metadata; the body's fat, the difference between the frames' faces and the open mouth are reworked against the references; Walk plays a walk |
+| **New** | Viewport selection, highlighting and handles; comparison and variants; randomize with locks; skin tone, makeup and markings in the description; capability-aware item controls; hair, clothing and accessory browsers; autosave; the benchmark cast and extra light presets |
+
+### 11.3 Contracts the lead settles before parallel work (R1, step 1)
+
+The audits proposed up to three shapes for some of these; this is the one adopted. All fields are **optional with defaults**: no `format_version` changes and **no new enum value** (an older engine rejects a file with an unknown enum value: [audit-character-data.md](../docs/development/character-studio/refinement/audit-character-data.md) §4.6). The detail and JSON shapes are in that audit's §4 and §5. They go into [architecture.md](../docs/development/character-studio/architecture.md) and an ADR in the same change, tests first.
+
+| Contract | Fields | Decided |
+|---|---|---|
+| Parameter metadata | `about` (the tooltip), `feature` (a feature ID), `level` (`quick` / `detailed` / `advanced`; `advanced` kept and written in step), `random` (the `[min, max]` Randomize draws from) | `about`, not `description` |
+| Features | top-level `features: [{id, label, category, about?, icon?, anchors: [{bone, offset}], radius, regions?}]` | Bone-and-offset anchors (they follow bone changes; a handle sits at its anchor plus `travel × value` along its axis), not body-vertex anchors |
+| Handles | top-level `handles: [{id, feature, mirror?, anchor, drives: [{parameter, axis, travel, screen?, sensitivity?}], views?}]`; `travel` generated from the build's largest move per shape | A handle only names parameters: no second geometry state (brief §3.4) |
+| Group and slot | `about`, `icon` | |
+| Item capabilities | `about`; `parameters` (shaped like a base parameter, without `group` and `mirror`); `materials[].label`, `materials[].values` (the values offered), `materials[].role` (`primary` / `secondary` / `accent`); `variants[].thumbnail`, `variants[].parameters`; `also_fills`, `requires`, `excludes`, `limitations: [{note, parameter?, range?}]`; for socket items, `adjust: {offset, turn, scale}` limits | Operations are derived from what an item declares, not listed |
+| Worn item | `parameters`; `transform` (inside the item's `adjust`); an `extra` map, so unknown fields survive | |
+| Presets | a `*.preset.json` is a format 2 description with a `preset: {id, kind, about, tags?, thumbnail?, order?}` block; kinds `body`, `face`, `hair`, `outfit`, `skin`, `character`; listed in the catalogue's `presets`; `avatar::apply_preset` copies only what its kind owns, never `extra`. A person's presets live in the workspace's `presets/`; favourites are editor state | One function, shared by the studio, scripts and Randomize |
+| Randomizer | `avatar::randomize(&Description, scope, locks, seed, &Library)`: parameters drawn inside `random`, items only from what fits and isn't excluded, the base's constraints applied | In `avatar`, not the editor: games randomize NPCs too (section 0, decision 6) |
+| Skin and makeup | a description field `skin: {tone, undertone, details, makeup, markings}`, decided in R5 with its ADR (the options are in the runtime audit and the skin references) | Waits for R5; nothing is stored in `extra` meanwhile |
+| Editor-only state | selection, level, locks, favourites, comparison states, camera and stage stay in the workspace, never in a description (A3) | |
+
+### 11.4 Where the brief and the plan disagree: the lead's calls
+
+From [audit-plan-status.md](../docs/development/character-studio/refinement/audit-plan-status.md), "Where the brief and the plan disagree". **Paul can overturn any of these**; the ones that need him are in 11.8.
+
+| ID | Decided |
+|---|---|
+| DIS-02 (order) | Interaction first, as the brief asks: R1, R2, then R3 and R4. Rendering (CO7, CO8) and fitting (CO9) run **in parallel** from R1 in disjoint files, because R5 to R8 can't finish without them |
+| DIS-04 (underwear) | Stays always on (#416). The wardrobe lists underwear as a category showing what the body type wears |
+| DIS-05 (agents) | The brief's six agents, named **RA1 to RA6** so they don't clash with progress.md's "Agent 1" to "Agent 6", plus **RA7 Rendering** (CO7, CO8, CO17, CO18), which the brief leaves out and R5 needs |
+| DIS-06 (navigation) | The brief's order: Body, Face, Hair, Clothing, Skin and Makeup, Accessories, Expressions, Presets. Stage moves to the bottom bar (lighting, backdrop, camera) |
+| DIS-07 (face tab) | The workspace's Expressions are preview-only (brief §10). The rig, mapping and lip-sync editors stay in the Game Editor's tab, which is renamed Face Rig (D12) |
+| DIS-08, DIS-09 (licences) | Class 3 (licensed commercial) assets never enter the repository. The references tree holds index files with links only. Game files and custom content from The Sims 4, MetaHuman, Character Creator and the like are reference only |
+| DIS-10 (lights) | Warm, cool, outdoor and close-up-skin presets are **added** to the capture tool beside `studio` and `hard`, which never change |
+| DIS-11 (thresholds) | The proportion ranges cut to 0.85 to 1.15 at CO5 are recorded as a decision awaiting Paul (OPEN-02), not as a loosened threshold |
+| DIS-13 (randomizer) | In `avatar` (11.3) |
+| DIS-15, DIS-16 (groom and binding) | Both are schemas with no code behind them; they are planned as new work (CO9, CO11). The brief's hair work is the card tier; strand controls show only where a groom has strands |
+| DIS-17 (gate for UI stages) | A UI stage passes on scripted walkthrough tests (a fixed task list driven through `Intent`s), drawing snapshots reviewed by the lead, and **no regression** in the benchmark captures |
+| DIS-18 (live drag) | Measured first, in R1. If a full apply during a drag takes over 33 ms in a release build, the drag previews with live morph weights and bakes on release (ADR-0038 amended), so a handle keeps up with the cursor |
+
+### 11.5 Stages
+
+Each stage is one or more PRs, red then green, gated by section 0's rule: a stage doesn't advance because the code works. Sizes are the audits' (S to XL). "Done when" is the test evidence; **every stage also needs before-and-after captures of the benchmark set and the lead's review of them**.
+
+| Stage | Content (brief) | Milestones | Owner | Depends on | Done when (tests written first and seen failing) |
+|---|---|---|---|---|---|
+| **R1** UX shell | §3.1 to §3.3, §12, §15 "Character editing". Step 1, the lead: the contracts of 11.3 in `avatar` with their checks; `Intent`, `Selection`, `edit.rs` (transactions, scoped reset, locks), `features.rs`. Step 2, RA1: shell, navigation, contextual panel, toolbar, bottom bar (camera, pose, lighting, clips), three levels, numeric entry, tooltips; comparison (before and after, A/B variants kept outside undo); autosave. Fixes: **D-01** Save overwrites a same-named character, **D-02** closing with unsaved work doesn't ask, **D-16** Ctrl+Shift+Z undoes | CO12 (rest), CO19 comparison, CO20 autosave | Lead, RA1 | – | Manifests with the new fields round-trip and old ones read unchanged; `apply_preset` and `randomize` unit tests; a walkthrough test drives the brief's task list (new character, pick a preset, change body and face, undo, redo, compare, restore, save, reopen identical) through `Intent`s; a comparison state never enters undo or the saved file; a snapshot of each page; apply time during a drag measured in release |
+| **R2** Direct manipulation | §3.4, §5.3, §4.3. Picking against the posed skinned mesh (a shared ray test in `scene`), hover highlight, click to select a feature and show its controls, camera focus, handles that write the same parameters as the sliders, symmetry, camera and editing kept apart (a handle takes a primary drag only when the drag starts on it; the camera orbits otherwise), a switch to turn handles off. Order: nose, eyes, jaw, mouth, shoulders, waist, hips | CO21 | RA1 (UI); the lead (the `scene` ray test, the handle data written by `manifests.py`) | R1 | For each of the seven features: a drag through a handle and through the slider give **identical descriptions**; one drag is one undo step; a camera drag never changes the description; symmetry moves the mirror; the handle stays within 2 mm of the surface at the parameter's ends (a player test against the applied mesh) |
+| **R3** Body | §4. Body presets as data (slim, average, athletic, muscular, heavyset, lean, broad; "Custom" when none matches); regions selectable, each with its two to four controls (references/body); **fat that looks like fat** (a belly and profile depth, from further MakeHuman CC0 targets; the baseline's H6); the slight body's belly; tooltips; Walk plays a walk | CO5 follow-up, CO22 body presets | RA3 (shapes, Blender), RA1 (pages) | R1; R2 for handles | Every preset resolves sound on both frames; heavy differs from the default by at least 5% of the front-view pixels and shows a belly in the side view; `measure.py --package realistic --check` passes with nothing loosened, sliders section included; the extremes of every pair make no new crossings |
+| **R4** Face | §5. Parameters regrouped by feature; only the brief's high-value missing controls (from references/face: tip projection and rotation, whole-nose width, philtrum length, chin height, jaw angle, upper and lower lid shape, eye corner position, pupil, earlobe), each limited by population data (±2.5 SD unless the reference says otherwise); nine face presets as data; asymmetry tools (mirror, copy left to right and back, reset a side); the two frames' faces made more different | CO6 follow-up, CO23 face presets | RA2 (shapes), RA1 (UI) | R1; R2 | `face_checks.py --check` 0 failures; every new parameter's ends cross nothing (sliders check); each preset differs visibly from the default in the front and side captures (lead review against the references); asymmetry tool unit tests |
+| **R5** Skin and appearance | §6. Skin tone as melanin and haemoglobin (a palette of numbered tones and an advanced picker), undertone, roughness, detail; freckles, moles and scars as seeded masks; makeup layers (foundation, blush, eyeliner, eyeshadow, lips, brows) with colour, opacity and roughness; the markings and decal architecture (an ADR; no authoring tool); the renderer draws the skin values it stores today | CO7 (skin and eyes first), CO17, CO24 makeup and markings | RA5 (data, masks), RA7 (renderer) | R1; CO7 | Every Skin value changes the pixels of a capture (a test per value against neutral); a layered description round-trips; a colour change re-applies without a re-bake (measured); renders under studio, warm, cool and outdoor light reviewed |
+| **R6** Hair | §7. The groom card tier for the realistic head: about 8 styles across short to long and straight to coily, a ponytail, a bun, buzz and bald; facial hair (stubble as a skin layer, beards as cards); hair colour by melanin with highlights and roots; per-style capabilities; a browser with thumbnails, search, filters and favourites | CO11, CO25 hair browser | RA4 (content), RA7 (hair shading), RA1 (browser) | R1; CO7 hair shading; OPEN-19 (cut-outs on skinned parts) | Every style declares only what it supports and the browser shows only that (test); styles reviewed at rest and in Idle and Walk, with no slab shadows and no clipping into the scalp |
+| **R7** Clothing | §8. Fitting by binding (CO9) and region hiding; the first realistic wardrobe from FreeSewing (MIT) patterns and CC0 fabrics; outfit presets; colour roles and material variants; compatibility filtering; the wardrobe browser (thumbnails, categories, search, favourites, recently used, preview without committing) | CO9, CO10, CO26 wardrobe browser | RA4, RA1 | R1; CO7 cloth | Every item fits both frames and the composition extremes with poke-through under the agreed threshold; preview without committing leaves undo untouched; an imported garment fits |
+| **R8** Accessories | §9. Socket accessories (glasses, earrings, a necklace, a watch, hats, a belt, a bag) with offset, turn and scale inside each item's `adjust`; material variants | CO10 sockets, CO27 | RA4, RA1 | R7 | An accessory saved, reopened and applied in a game sits in the same place (0.5 mm); it stays on its socket through Idle and Walk |
+| **R9** Expressions and animation | §10. An Expressions page (the 15 built-ins and the controls, preview-only); clip preview (idle, walk, run, gestures); a face preview mode; the open mouth and the smile reworked (OPEN-14) | CO12 (rest), CO28 | RA2, RA1 | R1 | Expressions never change the saved description; each expression captured on the face benchmarks and reviewed against reference photographs (Paul's rule) |
+| **R10** Presets, randomize, polish | §11, §12, §15. User presets by kind, favourites, randomize everything, a category or a feature, with locks; comparison complete; save and open polish; the Game Editor round trip (Edit in Character Studio, and back); a saved described character shows in edit mode (OPEN-21); the realistic body as the default game character (OPEN-22) | CO13, CO29 | RA1, lead | R1 to R9 | 1,000 seeded randomizations all validate and resolve; locked parameters never change; the round-trip test (insert, edit, return, play) |
+| **R11** Final QA and docs | §17, §20, §21. The benchmark cast (11.6), the extra light presets, the full suite, Blender QA, runtime consistency, performance budgets measured (CO18), the user guide | CO18, CO30 | RA6, lead | all | Section 9 and brief §21 each ticked against evidence |
+
+### 11.6 Benchmarks (brief §17)
+
+The benchmark files stay generated by `make.py` and checked by `every_benchmark_character_is_sound`. Added in R1: a **cast** per family and frame (`<family>-<frame>-cast-<name>`: average, slim, athletic, muscular, heavyset, broad face, narrow face, distinctive features, natural asymmetry), each bare and, once clothes exist, dressed; the neutral-face files that duplicate the default bodies are folded into the cast. Added to the capture tool **beside** the existing constants: lights `warm`, `cool` and `outdoor`; a `skin-close` view; face suites (neutral, smile, frown, eyes closed, mouth open) and pose suites (A-pose, T-pose, arms raised, elbows and knees bent, a walk frame), each run by one command. The stylized family keeps its set (brief §17.1) while games still default to it.
+
+### 11.7 Agents and file ownership
+
+Each specialist works in **its own worktree** on the Desktop (`../axcenity-<branch>`, made by hand: `isolation: "worktree"` fails in this repo) on its own branch; only the lead merges. The lead owns everything section 5 gives it, plus the new contracts (the `avatar` schemas, `intent.rs`, `selection.rs`, `edit.rs`, `features.rs`).
+
+| Agent | Owns | Never touches |
+|---|---|---|
+| RA1 UX and Studio | `crates/editor/src/character_workspace/` except the lead's four files; `start/characters*`; editor-kit additions (new widgets only) | `avatar`, assets, `render` |
+| RA2 Face | the realistic package's face modules (`face.py`, `faceparams.py`, `facetopo.py`, `lids.py`, `mouth.py`, `eyes.py`, `lashes.py`, `teeth.py`), face presets, `anim/src/faces/` | body modules, the editor |
+| RA3 Body | the realistic package's body modules (`body.py`, `shapes.py`, `correctives.py`, `rig.py`, `regions.py`, the normal layers of `skin.py`), `assets/characters/transfer/`, body presets, `anim`'s correctives and twist | face modules, the editor |
+| RA4 Hair, clothing, accessories | new `assets/characters/realistic/hair/`, `garments/` and `accessories/`, item manifests; fitting code in `avatar::fit` (signatures from the lead) | body and face modules |
+| RA5 Skin and materials | skin masks, makeup and marking content, the albedo and detail maps of `skin.py`, what the material values mean (with the lead) | `render` (asks RA7) |
+| RA6 QA and integration | `assets/characters/benchmarks/`, `character_capture.rs` (additions only), the `qa/` scripts and thresholds (tighten only), the refinement baseline folders | product code |
+| RA7 Rendering | `crates/render`, the material translation in `crates/scene` | character content |
+
+The generated files (`*.glb`, `*.base.json`, `catalogue.json`, the benchmarks, `face_checks.json`) conflict between RA2, RA3 and RA4: the lead rebuilds them at each merge (`build.py`, `catalogue.py`, `make.py`).
+
+### 11.8 Questions for Paul
+
+1. **The stylized family (DIS-03, OPEN-31):** the brief says both families stay supported and benchmarked; on 2026-11-16 the stylized body stopped being offered for new characters. Keep it as "opens old files, and stays every game's default until R10", or offer it in the studio again?
+2. **Proportion ranges (OPEN-02):** confirm the 0.85 to 1.15 cut and hips that only widen, or ask R3 to widen them with correctives.
+3. **ADR-0038** (identity baked into derived models) is still Proposed (OPEN-29): accept it, with the R1 drag measurement as a possible amendment?
+4. **The bar for generated hair and clothes (risk 1):** the first realistic wardrobe and hair will be generated (FreeSewing patterns, CC0 fabrics, MakeHuman's CC0 hair as a start). Is "clean and well made" the bar for R6 and R7, with the import path for artist-made items later?
