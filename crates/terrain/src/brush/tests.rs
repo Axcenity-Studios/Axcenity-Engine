@@ -338,3 +338,55 @@ fn foliage_scatters_at_density_and_undo_removes_the_stroke() {
             .all(|i| i.source == FoliageSource::Prop(axcenity_core::FoliageProp::Crate))
     );
 }
+
+#[test]
+fn water_fills_the_cells_under_the_brush_at_its_level_and_undoes() {
+    let (mut data, placement) = flat(0.2);
+    let brush = Brush {
+        radius: 6.0,
+        falloff: 0.0,
+        ..Brush::default()
+    };
+    let mut recorder = EditRecorder::new();
+    recorder.before_change(
+        &data,
+        footprint(&data, &placement, Vec2::ZERO, brush.radius),
+    );
+    let fill = Operation::Water {
+        level: 25.0,
+        erase: false,
+    };
+    let rect = apply(
+        &mut data,
+        &placement,
+        &brush,
+        &fill,
+        Vec3::new(0.0, 20.0, 0.0),
+    );
+    assert!(!rect.is_empty());
+    // The middle sample is (32, 32): 25 studs up a 100-stud range.
+    assert_eq!(data.water_at(32, 32), Some(0.25));
+    assert_eq!(data.water_at(2, 2), None, "outside the brush stays dry");
+    // Painting changes no heights.
+    assert!(data.heights().iter().all(|&h| h == 0.2));
+    let edit = recorder
+        .finish(&data)
+        .expect("the stroke changed the water");
+    edit.undo(&mut data);
+    assert!(!data.has_water());
+    edit.redo(&mut data);
+    assert_eq!(data.water_at(32, 32), Some(0.25));
+    // Erasing takes it away again.
+    let erase = Operation::Water {
+        level: 0.0,
+        erase: true,
+    };
+    apply(
+        &mut data,
+        &placement,
+        &brush,
+        &erase,
+        Vec3::new(0.0, 20.0, 0.0),
+    );
+    assert!(!data.has_water());
+}

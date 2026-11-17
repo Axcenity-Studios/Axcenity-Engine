@@ -59,8 +59,8 @@ pub use strings::StringTable;
 pub use terrain::{
     CHUNK_CELLS, DEFAULT_TERRAIN_HEIGHT, DEFAULT_TERRAIN_SAMPLES, FoliageInstance, FoliagePlant,
     FoliageProp, FoliageSource, MAX_FOLIAGE_INSTANCES, MAX_TERRAIN_LAYERS, MAX_TERRAIN_SAMPLES,
-    MIN_TERRAIN_SAMPLES, PaintWeights, SampleRect, TerrainData, TerrainError, TerrainRegion,
-    valid_terrain_size,
+    MIN_TERRAIN_SAMPLES, NO_WATER, PaintWeights, SampleRect, TerrainData, TerrainError,
+    TerrainRegion, valid_terrain_size,
 };
 pub use ui_settings::{TEXT_SCALE_RANGE, UI_SETTING_NAMES, UI_SETTING_PREFIX, UiSettings};
 pub use value::{

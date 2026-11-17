@@ -80,7 +80,8 @@ impl WaterMode {
 /// A water material's values as `water.wgsl`'s `water_look` reads them,
 /// in the material's `params`: the deep color (linear) and clarity; the
 /// waves' height, length, speed and direction (radians); the foam and
-/// refraction, then 1, so a water material's key never matches a plain one.
+/// refraction, then 1, so a water material's key never matches a plain one,
+/// then the waves' variation.
 pub(super) fn water_params(water: &Water) -> [[f32; 4]; 3] {
     let deep = linear_color(water.deep_color);
     let finite = |value: f32, otherwise: f32| if value.is_finite() { value } else { otherwise };
@@ -96,7 +97,7 @@ pub(super) fn water_params(water: &Water) -> [[f32; 4]; 3] {
             finite(water.foam, 0.0),
             finite(water.refraction, 0.0),
             1.0,
-            0.0,
+            finite(water.wave_variation, 0.0).clamp(0.0, 1.0),
         ],
     ]
 }
@@ -517,6 +518,7 @@ mod tests {
         assert_eq!(params[0], [1.0, 0.0, 0.0, 4.0]);
         assert!((params[1][3] - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         assert_eq!(params[2][2], 1.0);
+        assert_eq!(params[2][3], crate::DEFAULT_WAVE_VARIATION);
         let broken = Water {
             clarity: f32::NAN,
             wave_length: f32::INFINITY,

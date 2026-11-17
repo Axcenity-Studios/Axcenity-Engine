@@ -407,6 +407,60 @@ fn the_holes_brush_cuts_a_cave_mouth_that_saves_and_shift_fills_it() {
     std::fs::remove_dir_all(folder).unwrap();
 }
 
+#[test]
+fn the_water_brush_paints_a_pond_that_saves_undoes_and_shift_removes() {
+    let (mut app, folder) = app_with_project("water");
+    let terrain = create(&mut app);
+    app.terrain.tool = Some(TerrainTool::Water);
+    app.terrain.brush.radius = 4.0;
+    let placement = Placement::of(app.world.get(terrain).unwrap()).unwrap();
+    let ground = placement
+        .ground_y(app.world.terrain(terrain).unwrap(), 0.0, 0.0)
+        .unwrap();
+    let middle = |app: &EditorApp| {
+        let data = app.world.terrain(terrain).unwrap();
+        let (size_x, size_z) = data.size();
+        data.water_at(size_x / 2, size_z / 2)
+            .map(|level| placement.world_y(level))
+    };
+    // Above where the stroke starts, by the depth.
+    app.terrain.water_depth = 2.0;
+    let start = Vec3::new(0.0, ground, 0.0);
+    app.terrain_pointer(pointer(start, true, true, false));
+    app.terrain_pointer(pointer(start, false, false, true));
+    assert_eq!(app.history.undo_label(), Some("Paint Terrain Water"));
+    let level = middle(&app).expect("the brush painted water");
+    assert!((level - (ground + 2.0)).abs() < 0.01, "{level} vs {ground}");
+    // It saves with the terrain.
+    assert!(app.save());
+    let project = app.project.as_ref().unwrap().folder.clone();
+    assert!(project.join("assets/terrain/Terrain/water.png").exists());
+    app.undo();
+    assert!(
+        !app.world.terrain(terrain).unwrap().has_water(),
+        "one undo takes it away"
+    );
+    app.redo();
+    assert!(middle(&app).is_some());
+    // Ctrl+click picks a level of its own.
+    app.terrain_pointer(TerrainPointer {
+        modifiers: egui::Modifiers::COMMAND,
+        ..pointer(Vec3::new(0.0, ground + 5.0, 0.0), true, true, false)
+    });
+    app.terrain_pointer(pointer(start, false, false, true));
+    assert!(!app.terrain.water_from_stroke);
+    assert_eq!(app.terrain.water_level, ground + 5.0);
+    // Shift removes it.
+    app.terrain_pointer(TerrainPointer {
+        modifiers: egui::Modifiers::SHIFT,
+        ..pointer(start, true, true, false)
+    });
+    app.terrain_pointer(pointer(start, false, false, true));
+    assert_eq!(app.history.undo_label(), Some("Remove Terrain Water"));
+    assert!(!app.world.terrain(terrain).unwrap().has_water());
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
 /// Runs one frame of the studio's keys with `key` pressed.
 fn press_studio_key(app: &mut EditorApp, key: egui::Key) {
     let input = egui::RawInput {

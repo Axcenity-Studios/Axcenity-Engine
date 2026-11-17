@@ -112,10 +112,10 @@ pub fn save_terrain(folder: &Path, data_folder: &str, data: &TerrainData) -> Res
         fs::write(&temporary, bytes).map_err(SaveError::new(&path))?;
         fs::rename(&temporary, &path).map_err(SaveError::new(&path))?;
     }
-    // Foliage and holes are optional extra files: drop a leftover when
-    // this landscape has none, so undoing every plant or hole and saving
-    // clears it.
-    for optional in [files::FOLIAGE_FILE, files::HOLES_FILE] {
+    // Foliage, holes and painted water are optional extra files: drop a
+    // leftover when this landscape has none, so undoing every plant, hole
+    // or pond and saving clears it.
+    for optional in [files::FOLIAGE_FILE, files::HOLES_FILE, files::WATER_FILE] {
         if !encoded.iter().any(|(name, _)| *name == optional) {
             let leftover = disk.join(optional);
             if leftover.exists() {

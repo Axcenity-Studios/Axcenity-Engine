@@ -1,10 +1,12 @@
-//! The Water section (LE4): floods the terrain's hollows up to a level, with
-//! the renderer's waves, foam and reflections (`docs/terrain.md`).
+//! The Water section (LE4): floods the terrain's hollows up to a level, and
+//! sets the look of that and the Water brush's painted water: the
+//! renderer's waves, foam and reflections (`docs/terrain.md`).
 
 use super::*;
 
 impl TerrainStudio {
-    /// The terrain's water: on or off, its level, color and waves.
+    /// The terrain's water: flooding on or off and its level, and the color
+    /// and waves of all its water (flooded or painted).
     pub(super) fn water_section(
         &mut self,
         ui: &mut egui::Ui,
@@ -37,8 +39,12 @@ impl TerrainStudio {
             {
                 set("Water", Value::Bool(on));
             }
-            if !on {
+            let painted = world.terrain(terrain).is_some_and(|data| data.has_water());
+            if !on && !painted && self.tool != Some(TerrainTool::Water) {
                 return;
+            }
+            if !on {
+                hint(ui, "Its look is the painted water's too.");
             }
             // The level slides over the terrain's height range.
             let (bottom, top) = match (vector("Position"), vector("Size")) {
@@ -51,16 +57,18 @@ impl TerrainStudio {
                 .num_columns(2)
                 .spacing([8.0, 4.0])
                 .show(ui, |ui| {
-                    field(ui, "Level");
-                    let mut level = number("WaterLevel", 0.0);
-                    if ui
-                        .add(egui::Slider::new(&mut level, bottom..=top).suffix(" Y"))
-                        .on_hover_text("The world height of the water's surface at rest.")
-                        .changed()
-                    {
-                        set("WaterLevel", Value::Number(level));
+                    if on {
+                        field(ui, "Level");
+                        let mut level = number("WaterLevel", 0.0);
+                        if ui
+                            .add(egui::Slider::new(&mut level, bottom..=top).suffix(" Y"))
+                            .on_hover_text("The world height of the flood's surface at rest.")
+                            .changed()
+                        {
+                            set("WaterLevel", Value::Number(level));
+                        }
+                        ui.end_row();
                     }
-                    ui.end_row();
                     field(ui, "Color");
                     let color = instance
                         .property("WaterColor")
@@ -82,6 +90,7 @@ impl TerrainStudio {
                         ("WaveLength", "Wave length", 12.0, 1.0..=128.0, " studs", "From one crest of the biggest wave to the next."),
                         ("WaveSpeed", "Wave speed", 1.0, 0.0..=3.0, "×", "1 rolls like real waves of that length; 0 stills them."),
                         ("WaveDirection", "Wave direction", 0.0, -180.0..=180.0, "°", "0 rolls toward +X, 90 toward +Z."),
+                        ("WaveVariation", "Wave variety", 0.6, 0.0..=1.0, "", "How much the waves differ from place to place. 0 makes every crest alike; more gathers them into drifting patches of rougher and calmer water, with bent crests."),
                     ] {
                         field(ui, label);
                         let mut value = number(name, otherwise);

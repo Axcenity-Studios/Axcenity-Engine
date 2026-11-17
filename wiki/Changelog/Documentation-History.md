@@ -12,6 +12,7 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-16 | Terrain, File formats, Home | Painted terrain water (the Water brush): a level per cell, its own chunk versions, `water.png`, a mesh of the cells that show; waves varied from place to place (`WaveVariation`) | Claude |
 | 2026-11-16 | ADR-0039 (new, Proposed), ADR index, Mesh editing and CSG, Known limitations, Home | Group as Mesh and Ungroup Mesh: parts into one MeshPart with one optimized `.group.glb`, the parts kept in a `GroupedParts`; the optimizer's passes and measurements; what isn't carried; a SurfaceAppearance normal map drawn without tangents, found on the way | Claude |
 | 2026-11-16 | Terrain, World streaming, Threading model, ADR index, Home | Terrain chunks stitched where levels of detail meet, with no skirts (clean outer border); meshes built in the frame and uploaded right away, so a chunk changing level is never missing | Claude |
 | 2026-11-16 | Characters, Known limitations, Home | The realistic body's lowered-shoulder corrective shapes (`Corrective_Shoulder_Lowered_*`): what skinning loses when the arm hangs below the A-pose, as the starter clips hold it | Claude |

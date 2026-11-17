@@ -17,12 +17,16 @@
 //!   8-bit greyscale, white at a cell's first corner where it's a hole.
 //!   Written only when there are holes; missing means none. An extra file
 //!   too (an older engine shows the holes filled in).
+//! - `water.png`: the painted water (the Water brush), 16-bit greyscale:
+//!   black where a cell holds none, otherwise its level, from just above
+//!   black at the bottom of the height range to white at the top. Written
+//!   only when there's some; an extra file (an older engine shows none).
 
 use std::io::Cursor;
 
 use axcenity_core::{
     FoliageInstance, FoliagePlant, FoliageProp, FoliageSource, MAX_FOLIAGE_INSTANCES,
-    MAX_TERRAIN_LAYERS, PaintWeights, TerrainData, valid_terrain_size,
+    MAX_TERRAIN_LAYERS, NO_WATER, PaintWeights, TerrainData, valid_terrain_size,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +36,7 @@ pub const HEIGHTS_FILE: &str = "heights.png";
 pub const PAINT_FILES: [&str; 2] = ["paint-1-4.png", "paint-5-8.png"];
 pub const FOLIAGE_FILE: &str = "foliage.json";
 pub const HOLES_FILE: &str = "holes.png";
+pub const WATER_FILE: &str = "water.png";
 
 #[derive(Debug, thiserror::Error)]
 pub enum FileError {
@@ -132,7 +137,48 @@ pub fn encode(data: &TerrainData) -> Vec<(&'static str, Vec<u8>)> {
             ),
         ));
     }
+    if data.has_water() {
+        files.push((WATER_FILE, encode_water(size_x, size_z, data.water())));
+    }
     files
+}
+
+/// Painted water levels as a 16-bit greyscale PNG: 0 for none, otherwise
+/// 1 (the bottom) to 65535 (the top).
+fn encode_water(size_x: usize, size_z: usize, water: &[f32]) -> Vec<u8> {
+    let bytes: Vec<u8> = water
+        .iter()
+        .flat_map(|&level| {
+            let value = if level == NO_WATER {
+                0
+            } else {
+                1 + (level.clamp(0.0, 1.0) * 65534.0).round() as u16
+            };
+            value.to_be_bytes()
+        })
+        .collect();
+    encode_png(
+        size_x,
+        size_z,
+        &bytes,
+        png::ColorType::Grayscale,
+        png::BitDepth::Sixteen,
+    )
+}
+
+/// The levels [`encode_water`] wrote, from an image's 0-to-1 values.
+fn decode_water(values: &[f32]) -> Vec<f32> {
+    values
+        .iter()
+        .map(|&value| {
+            let value = (value * 65535.0).round();
+            if value < 1.0 {
+                NO_WATER
+            } else {
+                (value - 1.0) / 65534.0
+            }
+        })
+        .collect()
 }
 
 fn encode_foliage(foliage: &[FoliageInstance]) -> Vec<u8> {
@@ -243,6 +289,15 @@ pub fn decode(mut read: impl FnMut(&str) -> Option<Vec<u8>>) -> Result<TerrainDa
             ));
         }
         data.load_holes(image.values.iter().map(|&value| value > 0.5).collect());
+    }
+    if let Some(bytes) = read(WATER_FILE) {
+        let image = decode_image(&bytes).map_err(invalid(WATER_FILE))?;
+        if (image.width, image.height) != (manifest.size_x, manifest.size_z) {
+            return Err(invalid(WATER_FILE)(
+                "its size doesn't match the heightmap".to_owned(),
+            ));
+        }
+        data.load_water(decode_water(&image.values));
     }
     Ok(data)
 }
@@ -404,6 +459,36 @@ mod tests {
         // Saving the loaded one gives the same files.
         let again: HashMap<&str, Vec<u8>> = encode(&loaded).into_iter().collect();
         assert_eq!(again, files);
+    }
+
+    #[test]
+    fn painted_water_saves_only_when_there_is_some_and_loads_the_same() {
+        let mut data = TerrainData::flat(17, 17, 0.5).unwrap();
+        assert!(!encode(&data).iter().any(|(name, _)| *name == WATER_FILE));
+        let (size_x, _) = data.size();
+        let levels = data.water_mut_in(data.bounds());
+        levels[4 * size_x + 3] = 0.0;
+        levels[4 * size_x + 4] = 0.625;
+        levels[5 * size_x + 4] = 1.0;
+        let files = encode(&data);
+        assert!(files.iter().any(|(name, _)| *name == WATER_FILE));
+        let loaded = decode(|name| {
+            files
+                .iter()
+                .find(|(file, _)| *file == name)
+                .map(|(_, bytes)| bytes.clone())
+        })
+        .unwrap();
+        assert_eq!(
+            loaded.water_at(3, 4),
+            Some(0.0),
+            "the bottom is still water"
+        );
+        let level = loaded.water_at(4, 4).unwrap();
+        assert!((level - 0.625).abs() < 1e-4, "{level}");
+        assert_eq!(loaded.water_at(4, 5), Some(1.0));
+        assert_eq!(loaded.water_at(5, 5), None);
+        assert_eq!(loaded.water().iter().filter(|&&l| l != NO_WATER).count(), 3);
     }
 
     #[test]

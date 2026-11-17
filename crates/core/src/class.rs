@@ -2504,6 +2504,7 @@ impl ClassName {
                 ("WaveLength", Value::Number(12.0)),
                 ("WaveSpeed", Value::Number(1.0)),
                 ("WaveDirection", Value::Number(0.0)),
+                ("WaveVariation", Value::Number(0.6)),
             ],
             ClassName::TerrainLayer => vec![
                 // The material: a tint, the texture maps (files relative to

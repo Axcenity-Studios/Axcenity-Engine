@@ -279,6 +279,11 @@ pub struct TerrainStudio {
     pub foliage_density: f32,
     /// Whether new strokes collide with parts.
     pub foliage_collide: bool,
+    /// Where the Water brush's surface rests: `water_depth` studs above
+    /// where the stroke starts, or at `water_level` (world Y).
+    pub water_from_stroke: bool,
+    pub water_depth: f32,
+    pub water_level: f32,
     /// Layers painting doesn't take from.
     pub locked: [bool; MAX_TERRAIN_LAYERS],
     /// The layer whose material is shown for editing.
@@ -340,6 +345,9 @@ impl Default for TerrainStudio {
             foliage_source: FoliageSource::Prop(FoliageProp::Tree),
             foliage_density: 0.08,
             foliage_collide: false,
+            water_from_stroke: true,
+            water_depth: 3.0,
+            water_level: 0.0,
             locked: [false; MAX_TERRAIN_LAYERS],
             open_layer: None,
             texture_search: String::new(),
@@ -452,6 +460,9 @@ impl TerrainStudio {
                 (color[2] * 255.0) as u8,
             );
         }
+        if self.tool == Some(TerrainTool::Water) {
+            return egui::Color32::from_rgb(70, 160, 230);
+        }
         if self.tool != Some(TerrainTool::Paint) {
             return accent;
         }
@@ -503,6 +514,9 @@ impl TerrainStudio {
                         StudioTab::Materials => {
                             let painting =
                                 matches!(self.tool, Some(TerrainTool::Paint | TerrainTool::Auto));
+                            if self.tool == Some(TerrainTool::Water) {
+                                self.water_section(ui, cx.world, terrain, &mut actions);
+                            }
                             self.layers_section(ui, cx, terrain, painting, &mut actions);
                             self.biomes_section(ui, cx, terrain, &mut actions);
                             self.scatter_section(ui, cx, terrain, &mut actions);
@@ -537,6 +551,7 @@ impl TerrainStudio {
             TerrainTool::Noise => self.noise_settings(ui),
             TerrainTool::Holes => self.brush_settings(ui, None),
             TerrainTool::Paint => self.paint_settings(ui),
+            TerrainTool::Water => self.water_brush_settings(ui),
             TerrainTool::Foliage => self.foliage_settings(ui),
             TerrainTool::Auto => self.auto_settings(ui, cx.world, terrain, actions),
             TerrainTool::Generate => self.generate_settings(ui, cx, terrain, actions),

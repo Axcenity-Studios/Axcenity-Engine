@@ -54,7 +54,7 @@ pub use renderer::{
     SHADOW_CASCADE_COUNT, ShaderError, SurfaceShader, TextureRenderer,
 };
 pub use tone_mapping::ToneMapping;
-pub use water::{WATER_GRID, Water, water_surface};
+pub use water::{DEFAULT_WAVE_VARIATION, WATER_GRID, Water, water_surface};
 
 /// Re-exported so callers build transforms with the same `glam` version.
 pub use glam;

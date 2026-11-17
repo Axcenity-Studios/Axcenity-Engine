@@ -16,6 +16,7 @@ pub enum TerrainTool {
     Noise,
     Holes,
     Paint,
+    Water,
     Foliage,
     Auto,
     Generate,
@@ -33,8 +34,12 @@ impl TerrainTool {
         TerrainTool::Noise,
         TerrainTool::Holes,
     ];
-    pub const MATERIALS: [TerrainTool; 3] =
-        [TerrainTool::Paint, TerrainTool::Foliage, TerrainTool::Auto];
+    pub const MATERIALS: [TerrainTool; 4] = [
+        TerrainTool::Paint,
+        TerrainTool::Water,
+        TerrainTool::Foliage,
+        TerrainTool::Auto,
+    ];
     pub const WHOLE: [TerrainTool; 3] = [
         TerrainTool::Generate,
         TerrainTool::Erode,
@@ -51,6 +56,7 @@ impl TerrainTool {
             TerrainTool::Noise => "Noise",
             TerrainTool::Holes => "Holes",
             TerrainTool::Paint => "Paint",
+            TerrainTool::Water => "Water",
             TerrainTool::Foliage => "Foliage",
             TerrainTool::Auto => "Auto Materials",
             TerrainTool::Generate => "Generate",
@@ -69,6 +75,7 @@ impl TerrainTool {
             TerrainTool::Noise => icons::DOTS_NINE,
             TerrainTool::Holes => icons::CIRCLE_DASHED,
             TerrainTool::Paint => icons::PAINT_BRUSH,
+            TerrainTool::Water => icons::DROP,
             TerrainTool::Foliage => icons::TREE,
             TerrainTool::Auto => icons::MAGIC_WAND,
             TerrainTool::Generate => icons::PLANET,
@@ -95,7 +102,11 @@ impl TerrainTool {
 
     /// True for the tools used by brushing the terrain in the viewport.
     pub fn is_brush(self) -> bool {
-        Self::SCULPTING.contains(&self) || matches!(self, TerrainTool::Paint | TerrainTool::Foliage)
+        Self::SCULPTING.contains(&self)
+            || matches!(
+                self,
+                TerrainTool::Paint | TerrainTool::Water | TerrainTool::Foliage
+            )
     }
 
     /// One line on how to use it.
@@ -114,6 +125,9 @@ impl TerrainTool {
             }
             TerrainTool::Paint => {
                 "Drag to paint the chosen layer. Shift erases back to the automatic materials. Ctrl+click picks a layer."
+            }
+            TerrainTool::Water => {
+                "Drag to paint water: ponds, lakes and rivers at a level of their own. Shift removes it. Ctrl+click the ground to pick the level."
             }
             TerrainTool::Foliage => {
                 "Drag to scatter the chosen plant or prop. Shift removes it. Density is how many per square stud."
