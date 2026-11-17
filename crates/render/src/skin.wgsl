@@ -55,6 +55,10 @@ const SKIN_PENUMBRA: vec3<f32> = vec3<f32>(0.55, 0.85, 0.95);
 // The most red a shadow's edge has over its green: red at most half as
 // bright again, and a little, so deep inside a shadow skin doesn't glow.
 const SKIN_PENUMBRA_RED: vec2<f32> = vec2<f32>(1.5, 0.02);
+// Over how much cosine, from where the triangles' own light ends, a
+// normal map's relief comes back in full: below it, diffuse light is held
+// to what the triangles get (`skin_light`).
+const SKIN_FACING: f32 = 0.15;
 // The table's smallest row: a 4 mm radius. The curvature is the
 // triangles' (screen-space derivatives), which jumps at a nostril's rim
 // or a crease's edge; sharper rows only redden those.
@@ -198,6 +202,19 @@ fn skin_light(
         spread = vec3<f32>(red, green.g, blue.b);
         shadow = skin_penumbra(parts.shadow, maps.shading.z) * parts.veil;
     }
+    // Light reaches only a surface that faces it. Past where the
+    // triangles' own light ends, a normal map's slope toward the light (a
+    // navel's inner wall in the body's shadowed half) gets no more than
+    // the triangles do, which the table still spreads past that line by
+    // the surface's curvature; over `SKIN_FACING` of cosine on the lit side
+    // the relief comes back. Unheld, the wall glowed orange in shadow
+    // (Standard's `bump_shadowing` ends its light at the same line).
+    let own_cos = dot(geometric, l);
+    var own = vec3<f32>(max(own_cos, 0.0));
+    if row >= 0.0 {
+        own = skin_table(own_cos, row);
+    }
+    spread = mix(min(spread, own), spread, smoothstep(0.0, SKIN_FACING, own_cos));
     let diffuse = (1.0 - fresnel) * base_color / PI * spread * shadow;
 
     let lobes = mix(distribution_ggx(n_dot_h, broad), distribution_ggx(n_dot_h, sharp),

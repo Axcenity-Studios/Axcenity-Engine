@@ -112,3 +112,28 @@ flat red over green 1; the folded square's reddest 82, 28 pixels darker than hal
 thread 'renderer::tests::skin::red_light_doesnt_fill_a_normal_maps_fold_that_green_leaves_dark' panicked at crates\render\src\renderer\tests\skin.rs:643:5:
 red over green in the fold: 82 (flat 1)
      Summary [  12.550s] 1 test run: 0 passed, 1 failed, 385 skipped
+
+== Second review: light past the triangles' terminator (red, before the fix) ==
+
+-- render: a normal map leaning 50 degrees toward a sun just behind the square's plane (cosine -0.15): the navel's inner wall in the body's shadowed half
+-- cargo nextest run -p axcenity-render -E "test(a_normal_maps_slope_toward)" --no-capture
+behind the plane: standard 0, skin flat 0, skin leaned 408; in front: skin flat 204, leaned 468.64893
+thread 'renderer::tests::skin::a_normal_maps_slope_toward_a_light_behind_the_surface_stays_dark_on_skin' panicked at crates\render\src\renderer\tests\skin.rs:712:5:
+skin draws the slope as dark as the plain square: 408 vs 0
+     Summary [  15.568s] 1 test run: 0 passed, 1 failed, 386 skipped
+
+-- assets: the navel test's relief check (non-blocking item), the test's place moved sideways by a temporary offset
+at the navel (760, 667) the defined map leans up to 78 steps off flat   (the build's place: passes)
+at the navel (800, 667) the defined map leans up to 35 steps off flat   (40 texels aside: under 50, fails)
+at the navel (720, 667) the defined map leans up to 20 steps off flat
+at the navel (840, 667) the defined map leans up to 25 steps off flat
+at the navel (680, 667) the defined map leans up to 19 steps off flat
+at the navel (880, 667) the defined map leans up to 26 steps off flat
+
+-- render: what the groove test guards (second review's question). Today's code with only the curvature put back to the unsigned original (length(dpdx(n)) + length(dpdy(n))) / (length(dpdx(p)) + length(dpdy(p))), everything else as committed:
+red over green where the light ends in a groove: standard 1, skin 1.0647502
+skin in a groove isn't reddened: 1.0647502
+     Summary [   9.474s] 1 test run: 0 passed, 1 failed, 386 skipped
+-- and with the signed curvature restored:
+red over green where the light ends in a groove: standard 1, skin 1
+        PASS [   9.666s] (1/1) axcenity-render renderer::tests::skin::light_ending_in_a_groove_isnt_reddened_as_on_a_ball

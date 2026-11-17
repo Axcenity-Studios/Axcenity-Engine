@@ -148,6 +148,10 @@ fn the_realistic_skins_smooth_normal_map_keeps_the_navel() {
     // mean difference of every channel, in steps of 255.
     let reach = 12;
     let (mut sum, mut count, mut most) = (0.0, 0.0, 0u8);
+    // How far the defined map leans off flat (128 in red and green) there:
+    // the navel's walls, so the place the build chose isn't a flat spot
+    // (78 at the navel; 19 to 35 on the belly 40 to 120 texels beside it).
+    let mut leaning = 0u8;
     for dy in -reach..=reach {
         for dx in -reach..=reach {
             if dx * dx + dy * dy > reach * reach {
@@ -161,9 +165,17 @@ fn the_realistic_skins_smooth_normal_map_keeps_the_navel() {
                 most = most.max(apart);
                 count += 1.0;
             }
+            for c in 0..2 {
+                leaning = leaning.max(defined.rgba()[at + c].abs_diff(128));
+            }
         }
     }
     let mean = sum / count;
+    eprintln!("at the navel ({x}, {y}) the defined map leans up to {leaning} steps off flat");
+    assert!(
+        leaning >= 50,
+        "the navel's place ({x}, {y}) is a dimple in the defined map: it leans {leaning} steps at most"
+    );
     assert!(
         mean < 1.5 && most < 12,
         "the smooth map flattens the navel at ({x}, {y}): the maps differ by {mean:.2} on average, {most} at most"

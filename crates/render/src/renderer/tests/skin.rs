@@ -545,6 +545,12 @@ fn a_bumpy_normal_maps_pores_dont_grain_skins_diffuse_light() {
 
 /// A square facing the camera with normal map `own`, lit from the right.
 fn square(own: Arc<dyn TextureSource>, shading: Shading) -> Vec<u8> {
+    square_under(own, shading, Vec3::new(1.0, 0.0, 0.6))
+}
+
+/// A square facing the camera (+Z) with normal map `own`, under a sun
+/// toward `sun`.
+fn square_under(own: Arc<dyn TextureSource>, shading: Shading, sun: Vec3) -> Vec<u8> {
     let Some((device, queue)) = test_device() else {
         return Vec::new();
     };
@@ -554,7 +560,7 @@ fn square(own: Arc<dyn TextureSource>, shading: Shading) -> Vec<u8> {
     square.material.maps.normal = normal(own);
     square.material.shading = shading;
     let mut list = scene(vec![square], 5.0, 40.0);
-    list.sun.direction = Vec3::new(1.0, 0.0, 0.6).normalize();
+    list.sun.direction = sun.normalize();
     let mut renderer = renderer(&device, &queue);
     draw(&mut renderer, &list)
 }
@@ -657,6 +663,59 @@ fn red_light_doesnt_fill_a_normal_maps_fold_that_green_leaves_dark() {
         reddest < 1.5,
         "red over green in the fold: {reddest} (flat {})",
         ratio(middle)
+    );
+}
+
+/// The mean brightness (0 to 765) of the middle half of a frame.
+fn middle_brightness(pixels: &[u8]) -> f32 {
+    let quarter = SIZE / 4;
+    let (mut sum, mut count) = (0.0, 0.0);
+    for y in quarter..SIZE - quarter {
+        for x in quarter..SIZE - quarter {
+            let at = ((y * SIZE + x) * 4) as usize;
+            sum += brightness(pixels[at..][..4].try_into().unwrap()) as f32;
+            count += 1.0;
+        }
+    }
+    sum / count
+}
+
+#[test]
+fn a_normal_maps_slope_toward_a_light_behind_the_surface_stays_dark_on_skin() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    // The sun is just behind the square's plane (its cosine to the
+    // triangles' normal is about -0.15), and the normal map leans 50
+    // degrees toward it: a navel's inner wall, past where the belly's light
+    // ends. The surface itself faces away, so no light reaches the wall;
+    // Standard draws it dark (`bump_shadowing`). Skin drew it lit through
+    // the rim: an orange spot in the body's shadowed half.
+    let behind = Vec3::new(1.0, 0.0, -0.15);
+    let toward = || leaning(0x5e_b1, 50.0);
+    let flat = || leaning(0x5e_b2, 0.0);
+    let standard = middle_brightness(&square_under(toward(), Shading::Standard, behind));
+    let plain = middle_brightness(&square_under(flat(), skin(None, 0.0), behind));
+    let leaned = middle_brightness(&square_under(toward(), skin(None, 0.0), behind));
+    // With the sun in front of the plane (cosine about 0.29) the same
+    // slope does light skin more than the plain square: the map leans
+    // toward the light, and relief on the lit side survives.
+    let in_front = Vec3::new(1.0, 0.0, 0.3);
+    let lit_flat = middle_brightness(&square_under(flat(), skin(None, 0.0), in_front));
+    let lit_leaned = middle_brightness(&square_under(toward(), skin(None, 0.0), in_front));
+    eprintln!(
+        "behind the plane: standard {standard}, skin flat {plain}, skin leaned {leaned}; \
+         in front: skin flat {lit_flat}, leaned {lit_leaned}"
+    );
+    assert!(
+        lit_leaned > lit_flat + 20.0,
+        "the slope faces the light: {lit_leaned} vs {lit_flat}"
+    );
+    assert!(standard < 3.0, "Standard draws the slope dark: {standard}");
+    assert!(
+        leaned < plain + 3.0,
+        "skin draws the slope as dark as the plain square: {leaned} vs {plain}"
     );
 }
 
