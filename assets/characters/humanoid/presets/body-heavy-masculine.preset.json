@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Heavy",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": 0.8,
+    "frame": 0,
+    "waist_width": 1.1
+  },
+  "preset": {
+    "id": "axcenity/stylized-body-heavy-masculine",
+    "kind": "body",
+    "about": "Soft and heavy.",
+    "tags": [
+      "build",
+      "masculine"
+    ],
+    "order": 30
+  }
+}

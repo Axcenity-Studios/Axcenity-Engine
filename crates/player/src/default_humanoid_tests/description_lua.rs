@@ -91,7 +91,7 @@ fn a_script_builds_a_description_and_applies_it_to_the_character() {
         &mut game,
         r#"
 local description = Instance.new("HumanoidDescription")
-description:SetParameter("height", 1.2)
+description:SetParameter("height", 1.1)
 description:SetParameter("build", 0.5)
 description:SetItem("hair", "axcenity/hair-bob")
 description:RemoveItem("outerwear")
@@ -120,7 +120,7 @@ print(#humanoid:GetAppliedDescription():GetItems())
             "true",
             "true",
             "axcenity/stylized true",
-            "1.2 4",
+            "1.1 4",
             "4",
         ]
     );
@@ -137,15 +137,17 @@ print(#humanoid:GetAppliedDescription():GetItems())
             "Teeth"
         ]
     );
-    // The body slider, and the build baked into a derived body.
+    // The body slider, and the build worn live on the library's body
+    // (ADR-0041): its own mesh, the identity named by its key.
     let height = attribute(&game, body, "BodyHeight").and_then(|value| value.as_number());
-    assert!((height.unwrap() - 1.2).abs() < 1e-6, "{height:?}");
+    assert!((height.unwrap() - 1.1).abs() < 1e-6, "{height:?}");
     let mesh = game.world.get(body).unwrap().property("MeshId").cloned();
     let mesh = mesh.as_ref().and_then(Value::as_str).unwrap();
     assert!(
-        mesh.contains("HumanoidParts.glb#AxcenityHumanoid/Body#"),
+        mesh.ends_with("HumanoidParts.glb#AxcenityHumanoid/Body"),
         "{mesh}"
     );
+    assert!(axcenity_anim::identity_key(&game.world, body).is_some());
     // The material values, on the body.
     let melanin = attribute(&game, body, &material_value_attribute("Skin", "melanin"))
         .and_then(|value| value.as_number());
@@ -296,7 +298,7 @@ description.Parent = humanoid
         r#"
 local kept = humanoid:FindFirstChildOfClass("HumanoidDescription")
 kept:SetItem("hair", "axcenity/hair-long")
-kept:SetParameter("height", 0.8)
+kept:SetParameter("height", 0.9)
 "#,
         2,
     );
@@ -305,7 +307,7 @@ kept:SetParameter("height", 0.8)
     assert!(names.contains(&"Hair_Long".to_owned()), "{names:?}");
     assert!(!names.contains(&"Hair_Bob".to_owned()), "{names:?}");
     let height = attribute(&game, body, "BodyHeight").and_then(|value| value.as_number());
-    assert!((height.unwrap() - 0.8).abs() < 1e-6, "{height:?}");
+    assert!((height.unwrap() - 0.9).abs() < 1e-6, "{height:?}");
 
     // Changed as a plain property: another description's Data.
     let lines = run(

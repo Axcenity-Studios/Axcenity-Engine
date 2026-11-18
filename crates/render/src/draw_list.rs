@@ -2114,6 +2114,102 @@ pub enum Shading {
     Unlit,
     /// Cel shading: see [`Toon`].
     Toon(Toon),
+    /// Skin: light spreads under the surface and comes back out softened
+    /// and redder, with two specular lobes. See [`SkinShading`].
+    Skin(SkinShading),
+}
+
+/// Skin shading (characters' `skin` model, ADR-0036;
+/// `docs/rendering/skin.md`). Its diffuse light is lit by a blurred copy of
+/// the normal map (a pore is smaller than the distance light travels under
+/// skin) and spread across the line where light ends by a table
+/// pre-integrated from human skin's diffusion profile, further in red than
+/// in green and blue; its shadows' edges are redder too. Its specular
+/// light is two GGX lobes (a sharp and a broad one) on the full normal
+/// map, widened where the normal changes faster than a pixel can show, so
+/// pores don't glitter. Metalness and the specular map are left out: skin
+/// reflects 2.8% head-on, in white.
+#[derive(Clone, Debug)]
+pub struct SkinShading {
+    /// How far light spreads under the surface, as a multiple of human
+    /// skin's at the engine's scale (a stud is 0.35 m): 0 spreads none
+    /// (diffuse light is Lambert's, on the full normal map), 2 twice as
+    /// far.
+    pub scatter: f32,
+    /// A second normal map placed like the material's own, blended with it
+    /// by `normal_blend` before anything is lit: the realistic body's
+    /// defined one (lean and muscular), the material's own being the
+    /// smooth one. It takes the specular map's place, and is read at the
+    /// own map's scale and green convention.
+    pub defined_normal: Option<Arc<dyn TextureSource>>,
+    /// 0 draws the material's own normal map, 1 `defined_normal`, and
+    /// between them a blend. Without a `defined_normal` it changes nothing.
+    pub normal_blend: f32,
+    /// Makeup and markings (ADR-0042), drawn into the albedo and roughness
+    /// before light: `None` draws the skin as made.
+    pub layers: Option<Box<SkinLayers>>,
+}
+
+impl Default for SkinShading {
+    fn default() -> Self {
+        Self {
+            scatter: 1.0,
+            defined_normal: None,
+            normal_blend: 0.0,
+            layers: None,
+        }
+    }
+}
+
+/// How many makeup layers [`SkinLayers::makeup`] holds, in the order they
+/// are drawn: foundation, blush, eyeshadow, eyeliner, lip colour, brow
+/// fill.
+pub const SKIN_MAKEUP_LAYERS: usize = 6;
+
+/// A skin's makeup and markings (ADR-0042, `docs/rendering/skin.md`):
+/// three masks placed like the base colour map, one layer to a channel,
+/// and each layer's values. Drawn in the order of the skin references:
+/// markings in the skin (freckles, moles, a scar), then makeup over it
+/// from foundation up to brow fill, all under the specular light. The
+/// masks take the metalness, emissive and opacity maps' places, which
+/// skin with layers doesn't read.
+#[derive(Clone, Debug)]
+pub struct SkinLayers {
+    /// Foundation, blush, eyeshadow, eyeliner (red to alpha); lips, brow
+    /// fill, scar (red to blue); freckles, their ranks, moles, their
+    /// ranks. Read as plain values, not sRGB.
+    pub masks: [Arc<dyn TextureSource>; 3],
+    /// In drawing order (see [`SKIN_MAKEUP_LAYERS`]).
+    pub makeup: [Makeup; SKIN_MAKEUP_LAYERS],
+    pub freckles: Spots,
+    pub moles: Spots,
+    /// How much of the scar's mask shows, 0 to 1.
+    pub scar: f32,
+}
+
+/// One makeup layer: off at opacity 0.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Makeup {
+    /// Its colour (sRGB, as written); `None` is the skin's own tone, the
+    /// albedo blurred (foundation that evens the tone).
+    pub colour: Option<[f32; 3]>,
+    /// How much it covers where its mask is whole, 0 to 1.
+    pub opacity: f32,
+    /// Its roughness where it covers; `None` keeps the skin's.
+    pub roughness: Option<f32>,
+}
+
+/// A marking made of spots: each spot of the mask has a rank, and the
+/// spots whose rank, offset by `seed`, is below `amount` show.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Spots {
+    /// The share of the spots shown, 0 to 1.
+    pub amount: f32,
+    /// How dark they are, 0 to 1.
+    pub opacity: f32,
+    /// Which spots show, 0 to 1: the description's seed times the golden
+    /// ratio, its fraction.
+    pub seed: f32,
 }
 
 /// Toon shading: each light's share (how squarely it falls, times its

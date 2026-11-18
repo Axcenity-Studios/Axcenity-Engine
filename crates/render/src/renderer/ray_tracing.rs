@@ -16,16 +16,18 @@
 //!   only when a slot changed (an item moved, came or went). wgpu uploads
 //!   the instances from the lowest changed slot up, so a still scene costs
 //!   nothing after its first frame.
-//! - Posed (skinned) items are posed again in a compute pass each frame
-//!   into a copy of their own, built into a BLAS of their own
-//!   (`ray_sway.rs`, `ray_skin.wgsl`), within a budget, nearest first; one
-//!   past the budget is left out (its mesh's rest pose would be wrong).
+//! - Posed (skinned or morphed) items get a BLAS of their own each frame,
+//!   built from the frame's posed corners (`posing.rs`, CO8: joints,
+//!   identity shapes and expressions alike), within a budget, nearest
+//!   first; one past the budget is left out (its mesh's rest pose would be
+//!   wrong).
 //! - Swaying plants in a wind get a bent copy of their mesh each frame, a
 //!   BLAS of their own (`ray_sway.rs`), within a budget, nearest first.
 
 use glam::{Mat4, Vec3};
 use rustc_hash::FxHashMap;
 
+use super::posing::Posing;
 use super::ray_cut_outs::{CutOutRaw, CutOuts, has_holes};
 use super::ray_sway::{BENT_TRIANGLES, BentKey, BentMeshes, POSED_TRIANGLES, bending, bent_raw};
 use super::scene::gpu_mesh_in;
@@ -186,7 +188,7 @@ impl RayScene {
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         encoder: &mut wgpu::CommandEncoder,
         (frame, camera, reach, surfaces, clock): (u64, Vec3, f32, bool, [f32; 4]),
-        draws: &[Draw],
+        (draws, posing): (&[Draw], &Posing),
         mesh: impl Fn(MeshKey) -> Option<&'a GpuMesh>,
     ) {
         if !surfaces {
@@ -208,17 +210,9 @@ impl RayScene {
             let Some(gpu) = mesh(key) else {
                 continue;
             };
-            // A posed item is bounded by where its joints move it.
-            let bounds = match (&item.skin, &gpu.skin) {
-                (Some(skin), Some(gpu_skin)) => gpu_skin.bounds(skin),
-                _ => gpu.bounds,
-            };
-            let (center, radius) = bounds.sphere(item.transform);
-            // Also leaves out an item whose bounds aren't a number.
-            let within = center.distance(camera) - radius <= reach;
-            if !within {
+            let Some(distance) = within_reach(item, gpu, camera, reach) else {
                 continue;
-            }
+            };
             let cut_out = has_holes(&item.material);
             wanted.push((
                 (key, cut_out),
@@ -227,7 +221,7 @@ impl RayScene {
                 mask_of(&item.material, draw),
             ));
             wanted_items.push(item);
-            wanted_distances.push(center.distance(camera) - radius);
+            wanted_distances.push(distance);
             if surfaces {
                 let table = self.surfaces.get_or_insert_with(|| Surfaces::new(device));
                 wanted_surfaces.push(surface_of(&item.material, &mut table.texture_colors));
@@ -298,7 +292,7 @@ impl RayScene {
             (device, queue),
             in_slots,
             (&wanted, &wanted_items, &wanted_distances),
-            clock,
+            (clock, posing),
             frame,
         );
         let slots: Vec<Slot> = in_slots
@@ -379,7 +373,11 @@ impl RayScene {
         }
         let bent_entries = in_slots.iter().zip(&bent).filter_map(|(&index, key)| {
             let key = key.as_ref()?;
-            Some(self.bent.as_ref()?.build_entry(key, wanted[index].1))
+            Some(
+                self.bent
+                    .as_ref()?
+                    .build_entry(key, wanted[index].1, posing.posed()),
+            )
         });
         let entries: Vec<wgpu::BlasBuildEntry> = to_build
             .iter()
@@ -434,9 +432,9 @@ impl RayScene {
         };
     }
 
-    /// Poses this frame's skinned items and bends its swaying ones in the
-    /// wind of `clock`, nearest first within [`POSED_TRIANGLES`] and
-    /// [`BENT_TRIANGLES`]. Returns `in_slots` (indices into the wanted
+    /// Builds this frame's posed items from their posed corners (`posing`)
+    /// and bends its swaying ones in the wind of `clock`, nearest first
+    /// within [`POSED_TRIANGLES`] and [`BENT_TRIANGLES`]. Returns `in_slots` (indices into the wanted
     /// items) without the posed items past the budget, each one's bent or
     /// posed copy (`None` to keep its mesh's rest pose), and how many posed
     /// items were left out.
@@ -445,21 +443,17 @@ impl RayScene {
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         in_slots: Vec<usize>,
         (wanted, items, distances): (&[Wanted<'_>], &[&DrawItem], &[f32]),
-        clock: [f32; 4],
+        (clock, posing): ([f32; 4], &Posing),
         frame: u64,
     ) -> (Vec<usize>, Vec<Option<BentKey>>, u32) {
         let mut bent = vec![None; in_slots.len()];
         // Posed items first (a skinned mesh never also sways here), then
         // swaying ones, each nearest first.
+        // Where an item's posed corners start this frame: its joints and its
+        // shapes, as every pass draws it.
         let posed_mesh = |index: usize| {
-            let gpu = wanted[index].1;
-            // Ray tracing poses joints only: a mesh that only morphs is
-            // traced at rest (its blend shapes aren't traced yet).
-            items[index]
-                .skin
-                .as_ref()
-                .zip(gpu.skin.as_ref())
-                .filter(|(skin, gpu_skin)| gpu_skin.jointed && !skin.joints().is_empty())
+            let ((mesh, _), _, _, _) = wanted[index];
+            posing.offset(items[index].skin.as_deref()?, mesh)
         };
         let mut posing: Vec<usize> = (0..in_slots.len())
             .filter(|&slot| posed_mesh(in_slots[slot]).is_some())
@@ -497,7 +491,7 @@ impl RayScene {
             let index = in_slots[slot];
             let (blas_key, gpu, _, _) = wanted[index];
             let triangles = u64::from(gpu.index_count / 3);
-            let Some((skin, gpu_skin)) = posed_mesh(index) else {
+            let Some(first) = posed_mesh(index) else {
                 continue;
             };
             if triangles > budget {
@@ -507,15 +501,12 @@ impl RayScene {
             }
             budget -= triangles;
             let key = copy_of(blas_key);
-            let joints: Vec<[[f32; 4]; 4]> =
-                skin.joints().iter().map(Mat4::to_cols_array_2d).collect();
             meshes.pose(
-                (device, queue),
+                device,
                 key,
                 gpu,
-                &gpu_skin.buffer,
                 size_of_mesh(gpu, blas_key.1),
-                &joints,
+                first,
                 frame,
             );
             bent[slot] = Some(key);
@@ -606,7 +597,7 @@ pub(super) fn prepare_scene(
     ),
     encoder: &mut wgpu::CommandEncoder,
     (traces, frame, camera, reach, surfaces, clock): (bool, u64, Vec3, f32, bool, [f32; 4]),
-    draws: &[Draw],
+    draws: (&[Draw], &Posing),
 ) -> bool {
     let ((device, queue), meshes, custom_meshes) = pipeline;
     if !traces {
@@ -773,6 +764,24 @@ fn create_tlas(device: &wgpu::Device, capacity: u32) -> wgpu::Tlas {
 /// Usage a mesh's buffers need to be built into a BLAS on `device`, and
 /// read (as storage) for a cut-out's texture coordinates
 /// (`ray_cut_outs.rs`).
+/// How far `item` (drawn with `gpu`) is from `camera` at its nearest, if
+/// that's within ray tracing's `reach`. A posed item is bounded by where
+/// its joints move it; an item whose bounds aren't a number is out.
+pub(super) fn within_reach(
+    item: &DrawItem,
+    gpu: &GpuMesh,
+    camera: Vec3,
+    reach: f32,
+) -> Option<f32> {
+    let bounds = match (&item.skin, &gpu.skin) {
+        (Some(skin), Some(gpu_skin)) => gpu_skin.bounds(skin),
+        _ => gpu.bounds,
+    };
+    let (center, radius) = bounds.sphere(item.transform);
+    let distance = center.distance(camera) - radius;
+    (distance <= reach).then_some(distance)
+}
+
 pub(super) fn blas_input(device: &wgpu::Device) -> wgpu::BufferUsages {
     if device
         .features()

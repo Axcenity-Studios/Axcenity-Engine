@@ -87,13 +87,16 @@ pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
 /// into `project`'s library: each base model's and item's manifest and the
 /// files it names (models, a groom's cards, strands and mesh, thumbnails,
 /// variants' pictures), and each preset file (`*.preset.json`) and its
-/// picture. A file is copied when
-/// it's missing or its size differs, so a newer engine's package replaces
-/// an older copy and an unchanged one isn't copied again. The catalogue is
-/// written again with what the project's library had and what was copied
-/// (the project's entry wins where both have an ID). Returns the IDs of the
-/// base models, items and presets copied in; what `from` can't read is
-/// skipped.
+/// picture. A file is copied when it's missing or differs from the shipped
+/// one (in size or in its bytes), so a newer engine's package replaces an
+/// older copy, file by file, and an unchanged one isn't copied again
+/// (audit D2: a package the folder already had used to be skipped, so an
+/// old `Realistic.base.json` stayed for good). The project's own files,
+/// which the shipped packages haven't, are never touched, and neither is
+/// an ID the project has at a path of its own (its entry wins). The
+/// catalogue is written again with what the project's library had and
+/// what was copied. Returns the IDs of the base models, items and presets
+/// copied in or brought up to date; what `from` can't read is skipped.
 ///
 /// Character Studio's workspace calls it for its own folder, so it offers
 /// every family the engine ships, not only the one built in (the realistic
@@ -102,43 +105,53 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
     let (shipped, _, _) = Library::read(from);
     let root = project.join(CHARACTER_LIBRARY_PATH);
     let (mut library, _, _) = Library::read(&root);
-    let copy = |path: &str| -> Result<(), SaveError> {
+    // Copies `path` when the project's copy is missing or differs; says
+    // whether it did.
+    let copy = |path: &str| -> Result<bool, SaveError> {
         let source = from.join(path);
         let target = root.join(path);
-        let size = |file: &Path| fs::metadata(file).ok().map(|meta| meta.len());
-        if size(&source).is_none() || size(&source) == size(&target) {
-            return Ok(());
+        if !source.is_file() || same_contents(&source, &target) {
+            return Ok(false);
         }
         if let Some(folder) = target.parent() {
             fs::create_dir_all(folder).map_err(SaveError::new(folder))?;
         }
         fs::copy(&source, &target)
-            .map(|_| ())
+            .map(|_| true)
             .map_err(SaveError::new(&target))
     };
+    // A shipped ID the project has at a path of its own is the project's.
+    let own = |listed: Option<&str>, shipped: &str| listed.is_some_and(|path| path != shipped);
     let mut added = Vec::new();
     for (id, base) in &shipped.bases {
-        if library.base(id).is_some() {
-            continue;
-        }
         let Some(manifest) = shipped.manifest_path(id) else {
             continue;
         };
-        copy(manifest)?;
-        if let Some(model) = shipped.path_of(id, &base.model.file) {
-            copy(&model)?;
+        if own(library.manifest_path(id), manifest) {
+            continue;
         }
-        library.add_base(manifest, base.clone());
-        added.push(id.clone());
+        let mut copied = copy(manifest)?;
+        if let Some(model) = shipped.path_of(id, &base.model.file) {
+            copied |= copy(&model)?;
+        }
+        // The region map hides the skin a worn item covers (CO9).
+        let map = base.model.regions_map.as_deref();
+        if let Some(map) = map.and_then(|map| shipped.path_of(id, map)) {
+            copied |= copy(&map)?;
+        }
+        if copied || library.base(id) != Some(base) {
+            library.add_base(manifest, base.clone());
+            added.push(id.clone());
+        }
     }
     for (id, item) in &shipped.items {
-        if library.item(id).is_some() {
-            continue;
-        }
         let Some(manifest) = shipped.manifest_path(id) else {
             continue;
         };
-        copy(manifest)?;
+        if own(library.manifest_path(id), manifest) {
+            continue;
+        }
+        let mut copied = copy(manifest)?;
         let groom = item.groom.as_ref();
         let files = item
             .model
@@ -151,25 +164,29 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()));
         for file in files {
             if let Some(path) = shipped.path_of(id, file) {
-                copy(&path)?;
+                copied |= copy(&path)?;
             }
         }
-        library.add_item(manifest, item.clone());
-        added.push(id.clone());
+        if copied || library.item(id) != Some(item) {
+            library.add_item(manifest, item.clone());
+            added.push(id.clone());
+        }
     }
     for (id, preset) in &shipped.presets {
-        if library.preset(id).is_some() {
-            continue;
-        }
         let Some(file) = shipped.preset_path(id) else {
             continue;
         };
-        copy(file)?;
+        if own(library.preset_path(id), file) {
+            continue;
+        }
+        let mut copied = copy(file)?;
         let picture = preset.preset().and_then(|block| block.thumbnail);
         if let Some(path) = picture.and_then(|p| axcenity_avatar::resolve_path(file, &p)) {
-            copy(&path)?;
+            copied |= copy(&path)?;
         }
-        if library.add_preset(file, preset.clone()).is_ok() {
+        if (copied || library.preset(id) != Some(preset))
+            && library.add_preset(file, preset.clone()).is_ok()
+        {
             added.push(id.clone());
         }
     }
@@ -180,6 +197,33 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .map_err(SaveError::new(&catalogue))?;
     }
     Ok(added)
+}
+
+/// Whether files `a` and `b` hold the same bytes (a missing one doesn't).
+/// The sizes are compared first, so a changed model is usually told
+/// without reading it.
+fn same_contents(a: &Path, b: &Path) -> bool {
+    use std::io::Read;
+    let size = |file: &Path| fs::metadata(file).ok().map(|meta| meta.len());
+    if size(a).is_none() || size(a) != size(b) {
+        return false;
+    }
+    let (Ok(mut a), Ok(mut b)) = (fs::File::open(a), fs::File::open(b)) else {
+        return false;
+    };
+    let (mut left, mut right) = (vec![0u8; 1 << 16], vec![0u8; 1 << 16]);
+    loop {
+        // Whatever `a` gives, exactly as much is read from `b`, so the two
+        // stay in step.
+        let n = match a.read(&mut left) {
+            Ok(0) => return b.read(&mut right).is_ok_and(|m| m == 0),
+            Ok(n) => n,
+            Err(_) => return false,
+        };
+        if b.read_exact(&mut right[..n]).is_err() || left[..n] != right[..n] {
+            return false;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +337,106 @@ mod tests {
             Catalogue::of(&library).to_json(),
         )
         .unwrap();
+        assert!(
+            add_character_packages(&folder, &shipped)
+                .unwrap()
+                .is_empty()
+        );
+        let _ = fs::remove_dir_all(&folder);
+    }
+
+    /// Audit D2: a folder that already has a shipped package (an older
+    /// copy) gets the shipped files again where they differ, even at the
+    /// same size; a project's own files, which the shipped package hasn't,
+    /// are left alone, and so are its own catalogue entries.
+    #[test]
+    fn an_older_copy_of_a_shipped_package_is_brought_up_to_date() {
+        let folder = std::env::temp_dir().join(format!(
+            "axcenity-character-packages-update-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&folder);
+        add_character_library(&folder).unwrap();
+        let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+        add_character_packages(&folder, &shipped).unwrap();
+        let root = folder.join(CHARACTER_LIBRARY_PATH);
+        let (repository, _, _) = Library::read(&shipped);
+        let manifest = repository.manifest_path("axcenity/realistic").unwrap();
+        let preset_id = repository.presets.keys().next().unwrap().clone();
+        let preset_file = repository.preset_path(&preset_id).unwrap();
+
+        // An older engine's copies: the base manifest with its label
+        // changed at the same size (one letter), and a preset's about.
+        let shipped_text = fs::read_to_string(shipped.join(manifest)).unwrap();
+        let older = shipped_text.replacen("\"Realistic\"", "\"Realistix\"", 1);
+        assert_ne!(older, shipped_text, "the label is in the manifest");
+        assert_eq!(older.len(), shipped_text.len());
+        fs::write(root.join(manifest), &older).unwrap();
+        let preset_text = fs::read_to_string(shipped.join(preset_file)).unwrap();
+        fs::write(
+            root.join(preset_file),
+            preset_text.replacen("\"about\": \"", "\"about\": \"Older. ", 1),
+        )
+        .unwrap();
+        // The project's own files: an item of its own, listed in its
+        // catalogue, and a note beside the package.
+        let briefs = repository
+            .manifest_path("axcenity/realistic-briefs")
+            .unwrap();
+        let mut item: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(shipped.join(briefs)).unwrap()).unwrap();
+        item["id"] = "studio-x/briefs".into();
+        item["label"] = "Our briefs".into();
+        // Beside the shipped item, so its paths still resolve.
+        let own_path = briefs.replace(".item.json", "-ours.item.json");
+        let own_text = serde_json::to_string_pretty(&item).unwrap();
+        fs::write(root.join(&own_path), &own_text).unwrap();
+        let (mut library, _, _) = Library::read(&root);
+        library.add_item(&own_path, ItemManifest::from_json(&own_text).unwrap());
+        fs::write(
+            root.join("catalogue.json"),
+            Catalogue::of(&library).to_json(),
+        )
+        .unwrap();
+        fs::write(root.join("realistic/NOTES.txt"), "ours").unwrap();
+
+        let updated = add_character_packages(&folder, &shipped).unwrap();
+        assert!(
+            updated.iter().any(|id| id == "axcenity/realistic"),
+            "{updated:?}"
+        );
+        assert!(updated.contains(&preset_id), "{updated:?}");
+        assert_eq!(
+            fs::read_to_string(root.join(manifest)).unwrap(),
+            shipped_text,
+            "the shipped manifest replaced the older one"
+        );
+        assert_eq!(
+            fs::read(root.join(preset_file)).unwrap(),
+            fs::read(shipped.join(preset_file)).unwrap()
+        );
+        let (library, _, problems) = Library::read(&root);
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(
+            library.base("axcenity/realistic").unwrap().label,
+            "Realistic",
+            "the library reads the new manifest"
+        );
+        assert_eq!(
+            library.preset(&preset_id),
+            repository.preset(&preset_id),
+            "and the new preset"
+        );
+        assert!(
+            library.item("studio-x/briefs").is_some(),
+            "the project's own item stays in the catalogue"
+        );
+        assert_eq!(fs::read_to_string(root.join(&own_path)).unwrap(), own_text);
+        assert_eq!(
+            fs::read_to_string(root.join("realistic/NOTES.txt")).unwrap(),
+            "ours"
+        );
+        // Up to date now: nothing to copy.
         assert!(
             add_character_packages(&folder, &shipped)
                 .unwrap()

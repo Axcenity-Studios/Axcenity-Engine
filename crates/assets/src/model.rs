@@ -11,6 +11,7 @@ mod collision;
 pub(crate) mod cooked_model;
 mod fbx;
 mod gltf_takes;
+mod hide;
 mod identity;
 mod lod;
 mod lod_cache;
@@ -24,8 +25,10 @@ mod stamped;
 mod test_rig;
 
 pub use collision::is_piece as is_collision_piece;
+pub(crate) use identity::last_tag;
 pub use identity::{
-    BoneChange, BoneDelta, Identity, IdentityLayer, derived_mesh_id, split_derived,
+    BoneChange, BoneDelta, Identity, IdentityLayer, LiveIdentity, derived_mesh_id, split_derived,
+    strip_tags,
 };
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
@@ -178,6 +181,7 @@ impl Model {
                     normals: primitive.normals.clone(),
                     uvs: primitive.uvs.clone(),
                     tangents,
+                    regions: primitive.regions.clone(),
                     indices: primitive.indices.clone(),
                     material,
                     joints: primitive.joints.clone(),
@@ -242,6 +246,13 @@ pub struct Primitive {
     /// the direction U grows along the surface, and in `w` 1 or -1, the
     /// side of the normal the texture's "up" (V shrinking) is on.
     pub tangents: Vec<[f32; 4]>,
+    /// One per position, or empty: the body region each corner belongs to,
+    /// for a character's body whose build stores its region map in the
+    /// second set of texture coordinates (`TEXCOORD_1`, `u = (index + 0.5)
+    /// / 16`, `v = 0.5`; `assets/characters/realistic/README.md`, "Body
+    /// regions"). Picking on the character reads it (refinement R2). A
+    /// second set that isn't such a map (a lightmap's) leaves it empty.
+    pub regions: Vec<u8>,
     /// Three per triangle, counter-clockwise seen from outside.
     pub indices: Vec<u32>,
     pub material: ModelMaterial,
@@ -272,6 +283,7 @@ impl Primitive {
             + std::mem::size_of_val(self.normals.as_slice())
             + std::mem::size_of_val(self.uvs.as_slice())
             + std::mem::size_of_val(self.tangents.as_slice())
+            + self.regions.len()
             + std::mem::size_of_val(self.indices.as_slice())
             + std::mem::size_of_val(self.joints.as_slice())
             + std::mem::size_of_val(self.weights.as_slice())
@@ -292,9 +304,11 @@ impl Primitive {
             &material.normal_texture,
             &material.emissive_texture,
             &material.specular_texture,
+            &material.defined_normal_texture,
         ]
         .into_iter()
-        .flatten();
+        .flatten()
+        .chain(&material.skin_masks);
         let channels = [
             &material.metalness_texture,
             &material.roughness_texture,
@@ -327,6 +341,7 @@ impl Primitive {
             normals,
             uvs,
             tangents: Vec::new(),
+            regions: Vec::new(),
             indices,
             material,
             joints: Vec::new(),
@@ -390,6 +405,65 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
     }
 }
 
+/// How a glTF material's `extras` say it's lit (`axcenity_shading`), and
+/// the texture index of a skin's defined normal map
+/// (`axcenity_defined_normal: {"index": n}`), if it names one.
+fn shading_of(extras: &gltf::json::Extras) -> (ModelShading, Option<usize>) {
+    #[derive(serde::Deserialize)]
+    struct TextureRef {
+        index: usize,
+    }
+    #[derive(serde::Deserialize)]
+    struct Shading {
+        axcenity_shading: Option<serde_json::Value>,
+        axcenity_defined_normal: Option<TextureRef>,
+    }
+    let Some(shading) = extras
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<Shading>(raw.get()).ok())
+    else {
+        return (ModelShading::Standard, None);
+    };
+    match shading.axcenity_shading.as_ref().and_then(|v| v.as_str()) {
+        Some("skin") => (
+            ModelShading::Skin,
+            shading.axcenity_defined_normal.map(|texture| texture.index),
+        ),
+        _ => (ModelShading::Standard, None),
+    }
+}
+
+/// The texture indexes of a skin's makeup and marking masks
+/// (`axcenity_skin_masks: [{"index": a}, {"index": b}, {"index": c}]`,
+/// ADR-0042): exactly three on a material marked skin, or none.
+fn skin_masks_of(extras: &gltf::json::Extras) -> Vec<usize> {
+    #[derive(serde::Deserialize)]
+    struct TextureRef {
+        index: usize,
+    }
+    #[derive(serde::Deserialize)]
+    struct Masks {
+        axcenity_skin_masks: Option<Vec<TextureRef>>,
+    }
+    if shading_of(extras).0 != ModelShading::Skin {
+        return Vec::new();
+    }
+    let masks = extras
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<Masks>(raw.get()).ok())
+        .and_then(|masks| masks.axcenity_skin_masks)
+        .unwrap_or_default();
+    if masks.len() == SKIN_MASKS {
+        masks.into_iter().map(|texture| texture.index).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// How many makeup and marking masks a skin has (ADR-0042; their
+/// channels are listed in `docs/rendering/skin.md`).
+pub const SKIN_MASKS: usize = 3;
+
 /// A glTF metallic-roughness material. Colors are linear, as in the file.
 /// The textures all use the primitive's one set of texture coordinates.
 #[derive(Clone, Debug)]
@@ -447,6 +521,33 @@ pub struct ModelMaterial {
     /// How much light passes through it from behind, 0 for none: leaves.
     /// From glTF `extras`: `axcenity_translucency`, or a leaf's default.
     pub translucency: f32,
+    /// How it's lit. From glTF `extras`: `axcenity_shading` (`"skin"`);
+    /// anything else, or nothing, is [`ModelShading::Standard`].
+    pub shading: ModelShading,
+    /// A [`ModelShading::Skin`] material's second, "defined" normal map
+    /// (lean and muscular; `normal_texture` is the smooth one), which the
+    /// renderer blends with the first by a material value. From glTF
+    /// `extras`: `axcenity_defined_normal: {"index": <texture>}`, placed
+    /// like the normal map.
+    pub defined_normal_texture: Option<Arc<Image>>,
+    /// A [`ModelShading::Skin`] material's makeup and marking masks
+    /// (ADR-0042): [`SKIN_MASKS`] images placed like the base colour map,
+    /// or none. Each channel is one layer's coverage (foundation, blush,
+    /// eyeshadow, eyeliner; lips, brow fill, scar; freckles and their
+    /// ranks, moles and theirs). From glTF `extras`:
+    /// `axcenity_skin_masks: [{"index": <texture>}, …]`.
+    pub skin_masks: Vec<Arc<Image>>,
+}
+
+/// How a [`ModelMaterial`] is lit, as its glTF `extras` say
+/// (`axcenity_shading`): characters' shading models (ADR-0036) that the
+/// model file itself carries, so it draws the same wherever it is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ModelShading {
+    #[default]
+    Standard,
+    /// Skin: light spreads under the surface (`render::SkinShading`).
+    Skin,
 }
 
 impl Default for ModelMaterial {
@@ -477,6 +578,9 @@ impl Default for ModelMaterial {
             sway: 0.0,
             flutter: 0.0,
             translucency: 0.0,
+            shading: ModelShading::Standard,
+            defined_normal_texture: None,
+            skin_masks: Vec::new(),
         }
     }
 }
@@ -492,6 +596,8 @@ impl ModelMaterial {
             || self.emissive_texture.is_some()
             || self.opacity_texture.is_some()
             || self.specular_texture.is_some()
+            || self.defined_normal_texture.is_some()
+            || !self.skin_masks.is_empty()
     }
 
     /// Takes every texture off, for a mesh with no texture coordinates.
@@ -504,6 +610,8 @@ impl ModelMaterial {
         self.emissive_texture = None;
         self.opacity_texture = None;
         self.specular_texture = None;
+        self.defined_normal_texture = None;
+        self.skin_masks.clear();
     }
 }
 
@@ -1135,6 +1243,10 @@ fn read(
         joints: Vec::new(),
         skins: HashMap::new(),
         morph_names: morph::MorphNames::default(),
+        texture_images: document
+            .textures()
+            .map(|texture| texture.source())
+            .collect(),
     };
     let mut models = Vec::new();
     for pick in picks {
@@ -1455,6 +1567,9 @@ struct Reader<'a> {
     skins: HashMap<usize, u16>,
     /// The blend shapes' names so far (see [`morph`]).
     morph_names: morph::MorphNames,
+    /// Each texture's image, by texture index, for textures a material's
+    /// `extras` name (a skin's defined normal map).
+    texture_images: Vec<gltf::Image<'a>>,
 }
 
 impl Reader<'_> {
@@ -1622,6 +1737,10 @@ impl Reader<'_> {
             if uvs.is_empty() {
                 material.remove_textures();
             }
+            let regions = reader
+                .read_tex_coords(1)
+                .map(|uvs| region_map(uvs.into_f32(), count))
+                .unwrap_or_default();
 
             // Each corner's 4 joints (the skin's numbers after the ones
             // before it) and weights, adding up to 1.
@@ -1682,6 +1801,7 @@ impl Reader<'_> {
                 normals,
                 uvs,
                 tangents: Vec::new(),
+                regions,
                 indices,
                 material,
                 joints,
@@ -1805,6 +1925,27 @@ impl Reader<'_> {
         let occlusion_texture = image(occlusion.map(|i| (i.texture(), i.tex_coord())))?
             .map(|image| ChannelTexture::new(image, Channel::Red));
         let emissive_texture = image(emissive.map(|i| (i.texture(), i.tex_coord())))?;
+        // A skin's defined normal map is placed like its normal map, so it
+        // is read only where the normal map is.
+        let (shading, defined) = shading_of(material.extras());
+        let defined_normal_texture = match defined.and_then(|i| self.texture_images.get(i)) {
+            Some(source) if normal_texture.is_some() => Some(self.image(&source.clone())?),
+            _ => None,
+        };
+        // Its makeup and marking masks (ADR-0042): placed like the base
+        // colour map, all three or none.
+        let mut skin_masks = Vec::new();
+        if base_color_texture.is_some() {
+            for index in skin_masks_of(material.extras()) {
+                match self.texture_images.get(index) {
+                    Some(source) => skin_masks.push(self.image(&source.clone())?),
+                    None => {
+                        skin_masks.clear();
+                        break;
+                    }
+                }
+            }
+        }
         let material = ModelMaterial {
             name: material.name().unwrap_or_default().to_owned(),
             base_color: pbr.base_color_factor(),
@@ -1844,6 +1985,9 @@ impl Reader<'_> {
             uv_rotation: transform.as_ref().map_or(0.0, |t| t.rotation()),
             uv_offset: transform.as_ref().map_or([0.0, 0.0], |t| t.offset()),
             double_sided: material.double_sided(),
+            shading,
+            defined_normal_texture,
+            skin_masks,
             ..wind_of(material.extras())
         };
         Ok((material, uv_set))
@@ -2041,6 +2185,27 @@ pub(crate) fn decode_image(bytes: &[u8], name: &str) -> Result<Image, String> {
         return Err("it has no pixels".to_owned());
     }
     Ok(Image::new(rgba.width(), rgba.height(), rgba.into_raw()))
+}
+
+/// A character body's region map read from its second texture coordinates
+/// (`Primitive::regions`): each corner's `u` is `(index + 0.5) / 16` and
+/// its `v` is 0.5. Anything else (a lightmap's coordinates, a count that
+/// doesn't match the corners) is no region map, and gives none.
+fn region_map(uvs: impl Iterator<Item = [f32; 2]>, count: usize) -> Vec<u8> {
+    let mut regions = Vec::with_capacity(count);
+    for [u, v] in uvs {
+        let cell = u * 16.0 - 0.5;
+        let index = cell.round();
+        if (v - 0.5).abs() > 1e-3 || (cell - index).abs() > 1e-2 || !(0.0..16.0).contains(&index) {
+            return Vec::new();
+        }
+        regions.push(index as u8);
+    }
+    if regions.len() == count {
+        regions
+    } else {
+        Vec::new()
+    }
 }
 
 /// Normals for a mesh that has none: each corner gets the average of the

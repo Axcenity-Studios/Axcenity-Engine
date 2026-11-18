@@ -1,0 +1,16 @@
+measure.py --package realistic --only files,weights,clipping,face,shapes,sliders,proportions,deformation,twist --out docs/development/character-studio/refinement/r3/ranges/measurements.json --check assets/characters/realistic/qa/thresholds.json (branch r3-ranges, 1,598 s)
+
+files 3.2
+weights 4.6
+face 17.8
+shapes 18.1
+masculine pairs 2701 bodies 10804 with new crossings 0
+feminine pairs 2701 bodies 10804 with new crossings 0
+sliders 1596.1
+proportions 1596.1
+deformation 1596.8
+twist 1598.1
+wrote docs/development/character-studio/refinement/r3/ranges/measurements.json 1598.1 s
+TARGET NOT MET: deformation/masculine/shoulder_abd_90/local_volume_ratio: 0.847, at least 0.853
+TARGET NOT MET: deformation/feminine/shoulder_abd_90/local_volume_ratio: 0.88, at least 0.992
+check: passed (2 targets not met)

@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Athletic",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": -0.2,
+    "frame": 1,
+    "muscle": 0.6,
+    "shoulder_width": 1.04,
+    "waist_width": 0.96
+  },
+  "preset": {
+    "id": "axcenity/stylized-body-athletic-feminine",
+    "kind": "body",
+    "about": "Trained: more muscle, a little narrower at the waist.",
+    "tags": [
+      "build",
+      "feminine"
+    ],
+    "order": 20
+  }
+}

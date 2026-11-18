@@ -30,6 +30,8 @@ metres, Blender axes (Z up, the character faces -Y).
 
 import numpy as np
 
+import shapes as body_shapes
+
 # How far the cloth stands off the skin, and how far under the skin's
 # resting surface its rim folds (onto the sunk skin, `RECESS`).
 GAP = {"Underwear_BoxerBriefs": 0.0028, "Underwear_Briefs": 0.0024, "Underwear_Bra": 0.0030}
@@ -52,6 +54,15 @@ ARMS = ("UpperArm", "LowerArm", "Hand", "Thumb", "Index", "Middle", "Ring", "Lit
 # Shapes a garment leaves out: they move nothing under it, or are the
 # face's (driven live, moving nothing below the neck).
 LEAST = 1e-5
+# The push-out (CO9): how far the cloth is kept outside the skin at every
+# shape's full weight on both frames, how far from the cloth a body
+# vertex is looked at, and how a push fades to the neighbours (a share a
+# ring, over this many rings).
+MARGIN = 0.002
+PUSH_REACH = 0.03
+PUSH_FADE = 0.7
+PUSH_RINGS = 4
+PUSH_ROUNDS = 5
 
 
 def smoothstep(a, b, x):
@@ -340,11 +351,135 @@ def garment(body, name, fields, keep, band, bridges=(), parents=None):
         moved = (A @ delta)[source]
         if float(np.abs(moved).max()) > LEAST:
             shapes[shape] = moved
+    pushes = push_out(body, rest, piece.tris, len(piece.mixes), hem_verts, shapes)
     W, moved = limit((A @ body.W)[source], body.groups, parents or {})
     hem_at = A @ body.M
     mask = recess(body, covered, [(hem_at[u], hem_at[v]) for u, v in hem])
-    report = {"triangles": len(tris), "shapes": len(shapes), "weight_moved_most": round(moved, 3)}
+    report = {"triangles": len(tris), "shapes": len(shapes), "weight_moved_most": round(moved, 3),
+              "shapes_pushed": pushes[0], "push_most": round(pushes[1], 4)}
     return rest, tris, material, shapes, W, mask, report
+
+
+def push_out(body, rest, cloth_tris, count, hem_verts, shapes, margin=MARGIN):
+    """Keeps the cloth `margin` outside the skin at each of its shapes' full
+    weight, on both frames (the same push-out `avatar::fit` gives a
+    garment it fits, CO9). A garment vertex moves with the body vertices it
+    was cut from, but where the cloth bridges a hollow (the gusset under the
+    crotch, the cleft of the buttocks) the skin beside it can swell past
+    it: heavy and soft, the inner thighs come out under the gusset. Each
+    shape that brings skin within `margin` of the cloth, or through it,
+    takes the move out along the skin's normal (spread to the neighbours,
+    and to each hem vertex's rim). Both ways round are looked at: cloth
+    vertices inside the skin, and skin vertices under the cloth that come
+    out between its vertices. `rest` and `shapes` are of the whole
+    garment, the cloth's `count` vertices first and then the rim's (one per
+    vertex of `hem_verts`). Returns (shapes pushed, the farthest push)."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+
+    neighbours = [set() for _ in range(count)]
+    for a, b, c in cloth_tris:
+        for u, v in ((a, b), (b, c), (c, a)):
+            neighbours[u].add(v)
+            neighbours[v].add(u)
+    cloth_tris = np.asarray(cloth_tris, dtype=np.int64)
+    rim = {v: count + k for k, v in enumerate(hem_verts)}
+    # The cloth away from its hems (two rings in): skin by a hem is beside
+    # the cloth, not under it.
+    near_hem = np.zeros(count, dtype=bool)
+    near_hem[hem_verts] = True
+    for _ in range(2):
+        touching = near_hem[cloth_tris].any(axis=1)
+        near_hem[cloth_tris[touching].ravel()] = True
+    inner = cloth_tris[~near_hem[cloth_tris].any(axis=1)]
+
+    def over(tree, p, normal):
+        """The inner cloth's point over `p` (whose skin normal is
+        `normal`): nearest, within reach, along the cloth's normal from it
+        and facing the skin's way; or None."""
+        loc, n, face, _ = tree.find_nearest(Vector(p), PUSH_REACH)
+        if loc is None or np.dot(n, normal) <= 0.5:
+            return None
+        away = p - np.array(loc)
+        along = float(np.dot(away, n))
+        across = np.linalg.norm(away - np.array(n) * along)
+        if across > 0.85 * abs(along) + 0.0005:
+            return None
+        return np.array(loc), np.array(n), face, along
+
+    # The skin near the cloth (within 5 cm of its box at rest): which of it
+    # the cloth covers is found in each state, as the body's shapes move
+    # skin under it (a heavy thigh under a gusset).
+    low, high = rest[:count].min(axis=0) - 0.05, rest[:count].max(axis=0) + 0.05
+    near = np.nonzero(((body.M >= low) & (body.M <= high)).all(axis=1))[0]
+
+    def spread(need):
+        amount = need.copy()
+        for _ in range(PUSH_RINGS):
+            before = amount.copy()
+            lengths = np.linalg.norm(before, axis=1)
+            for v in range(count):
+                for u in neighbours[v]:
+                    if lengths[u] * PUSH_FADE > np.linalg.norm(amount[v]):
+                        amount[v] = before[u] * PUSH_FADE
+        return amount
+
+    frame_body = body.shapes.get("Frame_Feminine", np.zeros_like(body.M))
+    frame_cloth = shapes.get("Frame_Feminine", np.zeros_like(rest))
+    own = [name for name in sorted(shapes)
+           if name != "Frame_Feminine" and name in body.shapes and not name.startswith("Mask_")]
+    # The states: each shape at its full weight, and the build's corners
+    # (muscle and fat at either end: heavy and soft among them), on both
+    # frames.
+    states = [({name: 1.0}, feminine) for name in own for feminine in (0.0, 1.0)]
+    for feminine in (0.0, 1.0):
+        for muscle in (-1.0, 1.0):
+            for fat in (-1.0, 1.0):
+                mix = body_shapes.weights_of({"muscle": muscle, "fat": fat}, feminine)
+                states.append(({k: w for k, w in mix.items() if k in shapes and abs(w) > 1e-6}, feminine))
+    pushed, most = set(), 0.0
+    for mix, feminine in states:
+        if not mix:
+            continue
+        for _ in range(PUSH_ROUNDS):
+            P = body.M + feminine * frame_body + sum(w * body.shapes[k] for k, w in mix.items())
+            cloth = rest + feminine * frame_cloth + sum(w * shapes[k] for k, w in mix.items())
+            skin = BVHTree.FromPolygons(P.tolist(), body.tris.tolist(), all_triangles=True)
+            need = np.zeros((count, 3))
+            for v in range(count):
+                loc, normal, _, _ = skin.find_nearest(Vector(cloth[v]), PUSH_REACH)
+                if loc is None:
+                    continue
+                out = float(np.dot(cloth[v] - np.array(loc), normal))
+                if out < margin:
+                    need[v] = np.array(normal) * (margin - out)
+            tree = BVHTree.FromPolygons(cloth[:count].tolist(), inner.tolist(), all_triangles=True)
+            normals = body.normals(P)
+            for v in near:
+                found = over(tree, P[v], normals[v])
+                if found is None:
+                    continue
+                _, normal, face, out = found
+                if out <= -margin:
+                    continue
+                push = normal * (out + margin)
+                for c in inner[face]:
+                    if np.linalg.norm(push) > np.linalg.norm(need[c]):
+                        need[c] = push
+            if not need.any():
+                break
+            most = max(most, float(np.linalg.norm(need, axis=1).max()))
+            amount = spread(need)
+            # Shared by the state's shapes, each by its weight's share, so
+            # that together, at these weights, they move the cloth by it.
+            total = sum(w * w for w in mix.values())
+            for k, w in mix.items():
+                share = amount * (w / total)
+                shapes[k][:count] += share
+                for v, r in rim.items():
+                    shapes[k][r] += share[v]
+                pushed.add(k)
+    return len(pushed), most
 
 
 def recess(body, covered, hem):

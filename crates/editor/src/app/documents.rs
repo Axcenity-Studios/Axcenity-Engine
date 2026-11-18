@@ -136,7 +136,13 @@ impl EditorApp {
     /// the last save, and forgets the editors' unwritten changes. The world
     /// itself is dropped by whatever comes next (closing, opening another).
     /// In a Collaborate session the files are everyone's, so they're left.
+    /// Character Studio's recovery file goes at once (it has no project),
+    /// so the next open never offers work the person threw away, even if
+    /// the app isn't dropped at exit.
     pub(crate) fn discard_unsaved(&mut self) {
+        if let Some(workspace) = &mut self.character_workspace {
+            workspace.discard_recovery();
+        }
         if self.team.is_some() {
             return;
         }

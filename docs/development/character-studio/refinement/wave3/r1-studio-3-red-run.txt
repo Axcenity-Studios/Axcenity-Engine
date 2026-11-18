@@ -1,0 +1,94 @@
+# r1-studio-3 red run (RA1, wave 3)
+
+The tests were written first. For a run that fails at runtime rather than at
+compile time, each new feature's entry point was switched off with an early
+return (use_sides, preview_motion, follow_motion, the Left and right menu,
+the pair menus, the motion chips and the bottom bar's motion menu), body
+tiles were drawn with the old full-body framing, and the status line,
+stylized presets and the recovery removal were not written yet.
+
+Command: cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_workspace::(sides_tests|motion_tests|polish_tests)/) | test(the_whole_r1_walkthrough) | test(dont_save_on_quit_removes) | test(every_new_character_choice_is_sound)'
+
+        FAIL [   4.003s] ( 1/21) character_workspace::sides_tests::mirror_left_to_right_copies_the_feature_s_left_side_in_one_step
+        FAIL [   4.079s] ( 2/21) character_workspace::sides_tests::mirror_right_to_left_copies_the_feature_s_right_side_in_one_step
+        FAIL [   4.081s] ( 3/21) app::character_workspace::tests::dont_save_on_quit_removes_the_studio_recovery_file
+        PASS [   4.110s] ( 4/21) character_workspace::tests::every_new_character_choice_is_sound_on_both_families
+        FAIL [   4.128s] ( 5/21) character_workspace::sides_tests::a_pair_s_tools_change_only_that_pair
+        FAIL [   4.142s] ( 6/21) character_workspace::sides_tests::symmetry_still_works_and_a_mirrored_pair_is_one_row_again
+        FAIL [   4.190s] ( 7/21) character_workspace::motion_tests::still_idle_run_and_the_gestures_each_pose_the_preview
+        FAIL [   4.206s] ( 8/21) character_workspace::polish_tests::the_status_line_says_a_held_version_is_shown
+        FAIL [   4.244s] ( 9/21) character_workspace::sides_tests::reset_left_and_reset_right_put_one_side_back
+        FAIL [   4.257s] (10/21) character_workspace::sides_tests::hidden_pairs_stay_put_and_the_hidden_changes_notice_counts_them
+        FAIL [   4.268s] (11/21) character_workspace::polish_tests::the_stylized_family_has_sound_presets_and_new_offers_them
+        PASS [   4.316s] (12/21) character_workspace::sides_tests::pairs_are_found_by_side_and_by_feature
+        FAIL [   4.362s] (13/21) character_workspace::sides_tests::a_tool_with_nothing_to_change_makes_no_step
+        FAIL [   4.834s] (14/21) character_workspace::motion_tests::walk_plays_the_walk_take_at_its_own_speed_in_place
+        FAIL [   4.850s] (15/21) character_workspace::sides_tests::the_tools_are_drawn_with_the_feature_s_controls
+        FAIL [   4.866s] (16/21) character_workspace::motion_tests::pose_and_motion_are_on_the_expressions_page_and_the_bottom_bar
+        FAIL [   4.911s] (17/21) character_workspace::motion_tests::a_motion_is_never_saved_or_undone
+        FAIL [   4.928s] (18/21) character_workspace::motion_tests::the_camera_keeps_framing_a_moving_character
+        FAIL [   4.943s] (19/21) character_workspace::motion_tests::an_expression_shows_on_top_of_a_walk
+        FAIL [   5.695s] (20/21) character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery
+        FAIL [  13.877s] (21/21) character_workspace::polish_tests::body_preset_tiles_are_framed_so_the_builds_read_apart
+
+     Summary [  13.880s] 21 tests run: 2 passed, 19 failed, 1361 skipped
+
+Failure lines (one per test, in order):
+    thread 'character_workspace::sides_tests::mirror_left_to_right_copies_the_feature_s_left_side_in_one_step'  panicked at crates\editor\src\character_workspace\sides_tests.rs:121:5:
+    assertion `left == right` failed
+      left: -0.3
+     right: 0.4
+    thread 'character_workspace::sides_tests::mirror_right_to_left_copies_the_feature_s_right_side_in_one_step'  panicked at crates\editor\src\character_workspace\sides_tests.rs:146:5:
+    assertion `left == right` failed
+      left: 0.4
+     right: -0.3
+    thread 'app::character_workspace::tests::dont_save_on_quit_removes_the_studio_recovery_file'  panicked at crates\editor\src\app\character_workspace.rs:286:9:
+    the recovery file is gone already
+    thread 'character_workspace::sides_tests::a_pair_s_tools_change_only_that_pair'  panicked at crates\editor\src\character_workspace\sides_tests.rs:202:5:
+    assertion `left == right` failed
+      left: 0.4
+     right: -0.3
+    thread 'character_workspace::sides_tests::symmetry_still_works_and_a_mirrored_pair_is_one_row_again'  panicked at crates\editor\src\character_workspace\sides_tests.rs:333:5:
+    assertion `left == right` failed
+      left: [("eye_size_left", false), ("eye_size_right", false)]
+     right: [("eye_size_left", true)]
+    thread 'character_workspace::motion_tests::still_idle_run_and_the_gestures_each_pose_the_preview'  panicked at crates\editor\src\character_workspace\motion_tests.rs:148:5:
+    assertion `left == right` failed
+      left: "assets/animations/Humanoid/Humanoid.statemachine.json"
+     right: ""
+    thread 'character_workspace::polish_tests::the_status_line_says_a_held_version_is_shown'  panicked at crates\editor\src\character_workspace\polish_tests.rs:41:5:
+    Held as A. Change the character, then compare it with A.
+    thread 'character_workspace::sides_tests::reset_left_and_reset_right_put_one_side_back'  panicked at crates\editor\src\character_workspace\sides_tests.rs:164:9:
+    assertion `left == right` failed: eye_size_left
+      left: 0.4
+     right: 0.0
+    thread 'character_workspace::sides_tests::hidden_pairs_stay_put_and_the_hidden_changes_notice_counts_them'  panicked at crates\editor\src\character_workspace\sides_tests.rs:292:5:
+    assertion `left == right` failed
+      left: 0.0
+     right: 0.5
+    thread 'character_workspace::polish_tests::the_stylized_family_has_sound_presets_and_new_offers_them'  panicked at crates\editor\src\character_workspace\polish_tests.rs:77:9:
+    Body: 0
+    thread 'character_workspace::sides_tests::a_tool_with_nothing_to_change_makes_no_step'  panicked at crates\editor\src\character_workspace\sides_tests.rs:233:41:
+    called `Option::unwrap` on a `None` value
+    thread 'character_workspace::motion_tests::walk_plays_the_walk_take_at_its_own_speed_in_place'  panicked at crates\editor\src\character_workspace\motion_tests.rs:79:5:
+    assertion `left == right` failed
+      left: Idle
+     right: Walk
+    thread 'character_workspace::sides_tests::the_tools_are_drawn_with_the_feature_s_controls'  panicked at crates\editor\src\character_workspace\sides_tests.rs:358:5:
+    ["\u{e2c2}", "\u{e6fc}  Character Studio", "New Character", "Not saved", "\u{e248}  Save", "\u{e038}  Reset  \u{e136}", "\u{e256}  Open  \u{e136}", "\u{e236}  New  \u{e136}", "\u{e1ee}  Randomize  \u{e136}", "\u{e036}", "\u{e038}", "CUSTOMIZE", "\u{e3a8}", "Body", "\u{e436}", "Face", "5", "Eyes  ·  4", "Brows", "Nose  ·  1", "Cheeks", "Jaw", "Chin", "Lips", "Forehead", "Ears", "\u{eae0}", "H
+    thread 'character_workspace::motion_tests::pose_and_motion_are_on_the_expressions_page_and_the_bottom_bar'  panicked at crates\editor\src\character_workspace\motion_tests.rs:340:5:
+    the bottom bar's motion menu: ["\u{e2c2}", "\u{e6fc}  Character Studio", "New Character", "Not saved", "\u{e248}  Save", "\u{e038}  Reset  \u{e136}", "\u{e256}  Open  \u{e136}", "\u{e236}  New  \u{e136}", "\u{e1ee}  Randomize  \u{e136}", "\u{e036}", "\u{e038}", "CUSTOMIZE", "\u{e3a8}", "Body", "Whole body", "Head", "Shoulders", "Chest", "Arms", "Abdomen", "Waist", "Back", "Hips", "Thighs", "Ca
+    thread 'character_workspace::motion_tests::a_motion_is_never_saved_or_undone'  panicked at crates\editor\src\character_workspace\motion_tests.rs:210:5:
+    assertion `left == right` failed: undo leaves the preview alone
+      left: Idle
+     right: Walk
+    thread 'character_workspace::motion_tests::the_camera_keeps_framing_a_moving_character'  panicked at crates\editor\src\character_workspace\motion_tests.rs:309:9:
+    assertion failed: workspace.following.is_some()
+    thread 'character_workspace::motion_tests::an_expression_shows_on_top_of_a_walk'  panicked at crates\editor\src\character_workspace\motion_tests.rs:270:5:
+    and still walks
+    thread 'character_workspace::walkthrough_tests::the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery'  panicked at crates\editor\src\character_workspace\walkthrough_tests.rs:454:5:
+    assertion `left == right` failed
+      left: 0.207
+     right: 0.35
+    thread 'character_workspace::polish_tests::body_preset_tiles_are_framed_so_the_builds_read_apart'  panicked at crates\editor\src\character_workspace\polish_tests.rs:215:9:
+    Slim and Average differ by 2.5%

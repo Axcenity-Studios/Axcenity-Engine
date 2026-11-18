@@ -87,6 +87,63 @@ SOFT_AT_LEAST_MUSCLE = 0.5
 # muscled body's slack lower belly on the masculine frame;
 # `<Frame>_Belly_Flat` takes it in by MakeHuman's own flatter belly.
 FLAT = {"Masculine": {"pregnant_decr": 1.0}, "Feminine": {}}
+# Narrower hips (R3, plan section 0 decision 8). `anim`'s `HipWidth` below
+# 1 pulls the legs' roots in with the pelvis, and the inner thighs cross at
+# the crotch (CO5: 26 pairs at 0.93), so below 1 no bone moves (the
+# manifest's attribute driver starts at 1) and `<Frame>_Hips_Narrow` takes
+# the surface in. It is the hip bone's own width change, built from the
+# skin: every vertex of the pelvis and the thighs' tops brought toward the
+# middle by `1 - NARROW_SCALE` of its distance from it, the inner thighs
+# held (they are near the middle, and are let go only past `NARROW_HELD`),
+# fading out above the hip crest and down the thigh. At `hip_width`
+# `NARROW_AT` the shape is whole: `NARROW_SCALE` is chosen so that the hips'
+# breadth falls as fast below 1 as `HipWidth` widens them above it (half a
+# per cent of breadth per per cent of slider), so the slider has no kink.
+NARROW_AT = 0.6
+NARROW_SCALE = 0.8
+NARROW_HELD = (0.012, 0.07)   # metres from the middle: held, then wholly narrowed
+# Where it is whole and where it fades, in metres from the hip joints'
+# height (up: the hip crest, then the waist; down: the crotch, then mid-thigh).
+NARROW_UP = (0.08, 0.24)
+NARROW_DOWN = (0.1, 0.25)
+# The bones whose skin narrows (a hand hanging by the hip doesn't).
+NARROW_BONES = ("Hips", "Spine", "Chest")
+NARROW_SIDE_BONES = ("UpperLeg", "UpperLegTwist", "HipHelper", "LowerLeg", "LowerLegTwist", "KneeHelper")
+# The waist (R3, wave 3). `anim`'s `WaistWidth` scales only the skin
+# weighted to the Spine bone side to side, which moved the waist's breadth
+# by about a quarter of the slider and left a step where the bone's weight
+# ends. `<Frame>_Waist_Wide` (whole at `WAIST_AT[1]`) and
+# `<Frame>_Waist_Narrow` (whole at `WAIST_AT[0]`) carry the difference
+# between that and the waist the slider means (`waist`): the trunk scaled
+# about its middle by `WAIST_BREADTH` of the slider's change side to side
+# and `WAIST_DEPTH` front to back (the back less: `WAIST_BACK`), whole at
+# the natural waist (the trunk's narrowest level) and fading smoothly to
+# nothing at the hip joints' height below and `WAIST_UP` of the hip joints'
+# to chest joint's height above it. The two shapes are one shape signed and
+# linear in the slider, so the bone and the shapes together give that
+# waist at every value, with no kink at 1 and no step at the bone's edge.
+WAIST_AT = (0.5, 1.5)
+WAIST_BREADTH = 0.9   # the natural waist's breadth changes by this share of the slider's change
+WAIST_DEPTH = 0.5     # its depth by this share (breadth and depth go together in people, r = 0.87)
+WAIST_BACK = 0.35     # the back moves this share of what the belly does
+WAIST_UP = 0.9        # where the change has faded above the waist, in hip-to-chest heights above it
+WAIST_DOWN = -0.15     # and below it: at the hip joints' height
+# The bones whose skin is not the trunk's (the arms hang beside the waist).
+ARM_WORDS = ("Shoulder", "UpperArm", "LowerArm", "Hand", "Thumb", "Index", "Middle", "Ring", "Little", "Elbow")
+# The heavy and muscular body (R3, wave 3). MakeHuman's most muscular and
+# heaviest corner is a heavyweight bodybuilder: defined deltoids, biceps
+# and trapezius, a V-taper, and on the feminine frame narrow hips over
+# flared thighs (its muscle takes the fat off the hips while `Fat_Soft`'s
+# saddlebags stay). `<Frame>_Fat_Over_Muscle`, driven by `muscle` times
+# `fat` (both from 0 to 1), makes it a strong, heavy person: what muscle
+# adds to the heavy body (`E`, the heavy and muscular body less the heavy
+# one) keeps its mass smoothed over (`COVER_SMOOTH` rounds of
+# neighbour averaging, about 10 cm), loses `COVER_DEFINITION` of its
+# definition (the detail finer than that) and `1 - COVER_MASS` of its
+# mass, as fat covers muscle.
+COVER_SMOOTH = 40
+COVER_DEFINITION = 0.8
+COVER_MASS = 0.55
 
 
 def _transfer():
@@ -200,6 +257,14 @@ def corners():
         out.append({"shape": f"{frame}_Fat_Soft",
                     "factors": [frame_factor(frame), {"parameter": "fat", "from": [0, 1]},
                                 {"parameter": "muscle", "from": [-1, 0], "to": [SOFT_AT_LEAST_MUSCLE, 1]}]})
+        out.append({"shape": f"{frame}_Hips_Narrow",
+                    "factors": [frame_factor(frame), {"parameter": "hip_width", "from": [1, NARROW_AT], "to": [0, 1]}]})
+        for name, end in (("Narrow", WAIST_AT[0]), ("Wide", WAIST_AT[1])):
+            out.append({"shape": f"{frame}_Waist_{name}",
+                        "factors": [frame_factor(frame), {"parameter": "waist_width", "from": [1, end], "to": [0, 1]}]})
+        out.append({"shape": f"{frame}_Fat_Over_Muscle",
+                    "factors": [frame_factor(frame), {"parameter": "muscle", "from": [0, 1]},
+                                {"parameter": "fat", "from": [0, 1]}]})
         if FLAT[frame]:
             out.append({"shape": f"{frame}_Belly_Flat",
                         "factors": [frame_factor(frame), {"parameter": "muscle", "from": [0, -1], "to": [0, 1]},
@@ -233,7 +298,8 @@ def weights_of(values, frame_value):
     for corner in corners():
         w = 1.0
         for factor in corner["factors"]:
-            value = frame_value if factor["parameter"] == "frame" else values.get(factor["parameter"], 0.0)
+            default = 1.0 if factor["parameter"] in ("hip_width", "waist_width") else 0.0
+            value = frame_value if factor["parameter"] == "frame" else values.get(factor["parameter"], default)
             w *= span(value, factor.get("from", [0, 1]), factor.get("to", factor.get("from", [0, 1])))
         out[corner["shape"]] = out.get(corner["shape"], 0.0) + w
     return out
@@ -334,6 +400,113 @@ def face_hold(P, lm, eyes, eye_radius, lap):
     return v[:, 0]
 
 
+def smoothstep(x, a, b):
+    t = np.clip((x - a) / (b - a), 0.0, 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def hips_narrow(P, joints, weights, lap):
+    """`<Frame>_Hips_Narrow`'s offsets for a frame's rest positions `P`
+    (`NARROW_SCALE`): side to side only, toward the middle (x = 0), so
+    the two sides can't cross, by a share of each vertex's distance from
+    it that is smooth over the skin and never shrinks a step of the skin
+    by more than it narrows the whole (the map x -> x + dx keeps its order)."""
+    X = array(P)
+    k = (X[:, 2].max() - X[:, 2].min()) / 1.75
+    hip = float(np.array(joints["LeftUpperLeg"][0])[2])
+    z = X[:, 2] - hip
+    up = 1.0 - smoothstep(z, NARROW_UP[0] * k, NARROW_UP[1] * k)
+    down = smoothstep(z, -NARROW_DOWN[1] * k, -NARROW_DOWN[0] * k)
+    across = smoothstep(np.abs(X[:, 0]), NARROW_HELD[0] * k, NARROW_HELD[1] * k)
+    own = sum(weights.col(n) for n in NARROW_BONES)
+    own = own + sum(weights.col(side + n) for n in NARROW_SIDE_BONES for side in ("Left", "Right"))
+    mask = (up * down * np.clip(own, 0.0, 1.0))[:, None]
+    for _ in range(4):
+        mask = (mask + lap.mean(mask)) / 2
+    d = np.zeros_like(X)
+    d[:, 0] = (NARROW_SCALE - 1.0) * X[:, 0] * across * mask[:, 0]
+    return d
+
+
+def trunk_levels(X, edges, trunk, heights):
+    """Where level planes at `heights` cut the trunk's skin (the edges
+    whose two ends are `trunk`): per height (left, right, front, back), or
+    None where too few edges cross."""
+    e = edges[trunk[edges[:, 0]] & trunk[edges[:, 1]]]
+    a, b = X[e[:, 0]], X[e[:, 1]]
+    out = []
+    for z in heights:
+        cross = ((a[:, 2] - z) * (b[:, 2] - z) <= 0) & (a[:, 2] != b[:, 2])
+        if cross.sum() < 8:
+            out.append(None)
+            continue
+        t = (z - a[cross, 2]) / (b[cross, 2] - a[cross, 2])
+        p = a[cross] + (b[cross] - a[cross]) * t[:, None]
+        out.append((p[:, 0].min(), p[:, 0].max(), p[:, 1].min(), p[:, 1].max()))
+    return out
+
+
+def waist(P, joints, weights, edges, lap):
+    """`<Frame>_Waist_Wide`'s and `_Narrow`'s offsets for a frame's rest
+    positions `P` (`WAIST_BREADTH`), and where the waist is ({name:
+    offsets}, report). Per unit of the slider, the waist the slider means
+    is `T`: each trunk vertex moved from the trunk's middle at its height
+    by `WAIST_BREADTH` of its distance side to side and `WAIST_DEPTH` front
+    to back, times a profile that is 1 at the natural waist. `anim`'s
+    `WaistWidth` already moves it by `B`: the Spine bone's share of its
+    distance side to side (the bone lies on the middle, and its own X is
+    the body's side to side). The shapes are `T - B`, scaled to where each
+    is whole, so the bone and a shape add up to `T` times the slider's
+    change."""
+    X = array(P)
+    hip = float(np.array(joints["LeftUpperLeg"][0])[2])
+    chest = float(np.array(joints["Chest"][0])[2])
+    span = chest - hip
+    arms = sum(weights.col(n) for n in weights.bones if any(w in n for w in ARM_WORDS))
+    own = np.clip(1.0 - arms, 0.0, 1.0)
+    shares = np.linspace(-0.6, 1.6, 111)
+    levels = trunk_levels(X, edges, own > 0.5, hip + shares * span)
+    found = [(s, lv) for s, lv in zip(shares, levels) if lv is not None]
+    # The natural waist: the trunk's narrowest level between the hip crest
+    # and the ribs. Below it the change fades out by the hip joints' height
+    # (the hips are `hip_width`'s).
+    waist_at, _ = min(((s, lv[1] - lv[0]) for s, lv in found if 0.2 <= s <= 1.4), key=lambda c: c[1])
+    hips_at = WAIST_DOWN
+    z = X[:, 2]
+    zw, zl, zu = hip + waist_at * span, hip + hips_at * span, hip + (waist_at + WAIST_UP) * span
+    profile = np.where(z < zw, smoothstep(z, zl, zw), 1.0 - smoothstep(z, zw, zu))
+    mask = (profile * own)[:, None]
+    for _ in range(4):
+        mask = (mask + lap.mean(mask)) / 2
+    mask = mask[:, 0]
+    # The middle front to back at each height (side to side it is x = 0).
+    centre = np.interp(z, [hip + s * span for s, _ in found], [(lv[2] + lv[3]) / 2 for _, lv in found])
+    k = (X[:, 2].max() - X[:, 2].min()) / 1.75
+    front = smoothstep(centre - X[:, 1], -0.02 * k, 0.02 * k)  # the front is -y
+    T = np.zeros_like(X)
+    T[:, 0] = WAIST_BREADTH * mask * X[:, 0]
+    T[:, 1] = WAIST_DEPTH * (WAIST_BACK + (1.0 - WAIST_BACK) * front) * mask * (X[:, 1] - centre)
+    B = np.zeros_like(X)
+    B[:, 0] = weights.col("Spine") * X[:, 0]
+    unit = T - B
+    shapes = {"Narrow": (WAIST_AT[0] - 1.0) * unit, "Wide": (WAIST_AT[1] - 1.0) * unit}
+    report = {"natural_waist_share": round(float(waist_at), 3), "fades_down_to_share": round(float(hips_at), 3),
+              "fades_up_to_share": round(float(waist_at + WAIST_UP), 3), "hip_to_chest_m": round(span, 4)}
+    return shapes, report
+
+
+def fat_over_muscle(shapes, frame, lap):
+    """`<Frame>_Fat_Over_Muscle`'s offsets (`COVER_*`): what muscle adds to
+    the heavy body, `E`, is split into its smooth part `S` (its mass) and
+    the rest (its definition); the shape takes off `COVER_DEFINITION` of
+    the definition and `1 - COVER_MASS` of the mass."""
+    E = mixed(shapes, {"muscle": 1.0, "fat": 1.0}, frame) - mixed(shapes, {"fat": 1.0}, frame)
+    S = E.copy()
+    for _ in range(COVER_SMOOTH):
+        S = (S + lap.mean(S)) / 2
+    return -COVER_DEFINITION * (E - S) - (1.0 - COVER_MASS) * S
+
+
 # -- the build's step -------------------------------------------------------------------
 
 def unpack(path=PACK):
@@ -429,6 +602,9 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, 
             if "Fat" in name:
                 shapes[name] = shapes[name] * (1.0 - HOLD * hold)[:, None]
             shapes[name] = transfer.symmetric(shapes[name] * free[:, None], mirror)
+        # Fat over muscle (from the held shapes; kept apart with them).
+        cover = fat_over_muscle(shapes, frame, lap)
+        shapes[f"{frame}_Fat_Over_Muscle"] = transfer.symmetric(cover * free[:, None], mirror)
         # Kept apart, in the rest pose.
         known = transfer.crossing_pairs(P, tris)
         factor = np.ones(len(P))
@@ -444,9 +620,18 @@ def build(body, source, rest, lm, joints, weights, eyes, eye_radius, log=print, 
                 f"(to {f.min():.2f} at most)")
         for name in shapes:
             shapes[name] = shapes[name] * factor[:, None]
+        # (After keeping apart: the narrowing is checked by the ranges sweep,
+        # `../humanoid/qa/ranges.py`, and takes nothing off the other shapes.)
+        shapes[f"{frame}_Hips_Narrow"] = transfer.symmetric(hips_narrow(P, joints[frame], weights, lap), mirror)
+        # The waist likewise (checked by the ranges sweep).
+        waists, where = waist(P, joints[frame], weights, edges, lap)
+        for name, d in waists.items():
+            shapes[f"{frame}_Waist_{name}"] = transfer.symmetric(d, mirror)
+        log(f"  {frame} waist: {where}")
+        for name in shapes:
             out[name] = (frame, shapes[name])
         report["frames"][frame] = {
-            "neutral_crossings": len(known), "kept_apart": cut,
+            "neutral_crossings": len(known), "kept_apart": cut, "waist": where,
             "largest_move_mm": {n: round(float(np.linalg.norm(d, axis=1).max()) * 1000, 1) for n, d in shapes.items()},
             "bony_vertices": int((hold > 0.5).sum()), "held_face_vertices": int((free < 0.5).sum()),
         }

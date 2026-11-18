@@ -87,7 +87,7 @@ Looked at against anatomy: where fat sits (belly, flanks, chest, hips and thighs
 4. Corrective shapes exist for one motion (the arm raised sideways, collarbone still). Elbow, knee, hip, the arm raised forward and a turned collarbone have none. The shoulder's local-volume number is under its target and its old limit (above).
 8. The fold under the feminine breast is a soft curve now, shallower than the sculpt's; the normal map there was baked for the sharper fold.
 9. Fists: 240 to 306 pairs of finger triangles cross in Cheer (and 247 and 199 in the QA fist pose). Not looked into here.
-5. The hips can't narrow, and the proportion sliders stop at 15%: the body crosses itself beyond.
+5. The hips can't narrow, and the proportion sliders stop at 15%: the body crosses itself beyond. (R3, 2026-11-17: each slider's ends are now found by a sweep, and the hips narrow by a shape: `docs/development/character-studio/refinement/r3/ranges.md`.)
 6. The eyes and teeth don't follow body shapes because no shape moves the skin near them. If CO6 wants a fat face (jowls up to the lips, heavy lids), the held zone (`shapes.face_hold`) has to shrink and the eyes and teeth have to follow.
 7. `assets/characters/benchmarks/make.py` names the realistic body's slim case `{"fat": 0, "muscle": 0, "weight": -1}`; with these parameters it should be `{"fat": -1}` (and heavy-and-soft `{"fat": 1, "muscle": -1}` is worth adding). Not changed here.
 

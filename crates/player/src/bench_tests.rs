@@ -64,10 +64,10 @@ pub(crate) fn bench_gpu() -> Option<(wgpu::Device, wgpu::Queue)> {
 
 /// The CPU time of a frame's named steps.
 #[derive(Default)]
-struct Steps(Vec<(&'static str, Duration)>);
+pub(crate) struct Steps(Vec<(&'static str, Duration)>);
 
 impl Steps {
-    fn time<T>(&mut self, name: &'static str, step: impl FnOnce() -> T) -> T {
+    pub(crate) fn time<T>(&mut self, name: &'static str, step: impl FnOnce() -> T) -> T {
         let start = Instant::now();
         let out = step();
         self.0.push((name, start.elapsed()));
@@ -84,7 +84,7 @@ struct Measured {
 /// Draws the frames `frame` builds, and prints each step's CPU time, the
 /// GPU's frame and pass times, and the last frame's counts. Returns the
 /// last frame's counts and the GPU's frame time (where it can be timed).
-fn run(
+pub(crate) fn run(
     name: &str,
     mut frame: impl FnMut(&mut Steps) -> DrawList,
 ) -> Option<(RenderStats, Option<Duration>)> {
@@ -146,6 +146,17 @@ fn run(
         mb(stats.target_bytes),
         mb(stats.buffer_bytes)
     );
+    let posing = stats.posing;
+    if posing.items > 0 {
+        println!(
+            "  posing (CO8): {} items, {} corners, {} active shapes, {} shape moves, {:.2} MB of posing buffers",
+            posing.items,
+            posing.corners,
+            posing.shapes,
+            posing.moves,
+            mb(posing.bytes)
+        );
+    }
     for &(step, _) in &frames[0].steps {
         let time = best(&|frame| {
             let (_, time) = frame.steps.iter().find(|(name, _)| *name == step)?;
@@ -210,7 +221,7 @@ fn add_part(world: &mut World, class: ClassName, properties: &[(&str, Value)]) -
     part
 }
 
-fn camera(position: Vec3, look_at: Vec3) -> Camera {
+pub(crate) fn camera(position: Vec3, look_at: Vec3) -> Camera {
     Camera {
         position,
         look_at,

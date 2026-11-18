@@ -39,7 +39,9 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
     ]
   },
   "tags": [

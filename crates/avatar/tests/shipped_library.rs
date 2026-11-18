@@ -276,6 +276,13 @@ fn every_benchmark_character_is_sound() {
             "{id} has no face benchmarks"
         );
         assert!(has("-outfit-underwear"), "{id} has no outfit benchmarks");
+        // The hips' two ends (R3: they narrow as well as widen).
+        if base.parameters.iter().any(|p| p.id == "hip_width") {
+            assert!(
+                has("-body-narrowest-hips") && has("-body-widest-hips"),
+                "{id} has no hip benchmarks"
+            );
+        }
         assert!(
             names.iter().all(|name| name.starts_with(&base.family)),
             "{id}: benchmarks are named <family>-<frame>-<case>"
@@ -366,7 +373,8 @@ fn the_realistic_parameters_say_what_they_are() {
     use axcenity_avatar::Level;
     let library = read();
     let base = library.base("axcenity/realistic").unwrap();
-    assert_eq!(base.parameters.len(), 75);
+    // (75 at R1; R4 added the face's 14.)
+    assert_eq!(base.parameters.len(), 89);
     for parameter in &base.parameters {
         let id = &parameter.id;
         let about = parameter.about.as_deref().unwrap_or_default();
@@ -418,7 +426,8 @@ fn the_realistic_parameters_say_what_they_are() {
             feature.id
         );
     }
-    assert!(base.handles.is_empty(), "handles are R2's");
+    // R2 wrote the handles (`handles.py`); `realistic_handles.rs` checks them.
+    assert!(!base.handles.is_empty(), "the realistic body's handles");
 }
 
 /// Randomize on the shipped base models (R1; R10's 1,000 seeds): every

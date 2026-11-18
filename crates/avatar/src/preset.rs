@@ -132,6 +132,7 @@ pub fn apply_preset(
         description.parameters = preset.parameters.clone();
         description.items = preset.items.clone();
         description.materials = preset.materials.clone();
+        description.skin = preset.skin.clone();
         wear_choices(description, library);
         return Ok(());
     }
@@ -173,6 +174,8 @@ pub fn apply_preset(
         .extend(preset.items.iter().filter(|worn| owned(&worn.id)).cloned());
     if kind.owns_materials() {
         description.materials = preset.materials.clone();
+        // Makeup and markings go with the skin (ADR-0042).
+        description.skin = preset.skin.clone();
     }
     wear_choices(description, library);
     Ok(())
@@ -267,7 +270,14 @@ pub fn check_preset(preset: &Description, library: &Library) -> Vec<Problem> {
                 format!("a {} preset doesn't set material values", kind.name()),
             ));
         }
+        if !preset.skin.is_empty() {
+            p.push(Problem::new(
+                "skin",
+                format!("a {} preset doesn't set makeup or markings", kind.name()),
+            ));
+        }
     }
+
     problems
 }
 

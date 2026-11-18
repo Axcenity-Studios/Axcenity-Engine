@@ -23,7 +23,7 @@ use glam::{Mat4, Quat, Vec3};
 use super::stamped::Cache;
 use super::{
     AlphaMode, Bone, BoneTransform, Channel, ChannelTexture, Image, ImageOrigin, Joint, Model,
-    ModelMaterial, MorphTarget, Primitive, PrimitiveMorph, Rig, new_key,
+    ModelMaterial, ModelShading, MorphTarget, Primitive, PrimitiveMorph, Rig, new_key,
 };
 use crate::cooked::{self, SourceStamp, content_hash};
 
@@ -197,6 +197,7 @@ fn encode_primitive(out: &mut Output, images: &mut Images, primitive: &Primitive
         normals,
         uvs,
         tangents,
+        regions,
         indices,
         material,
         joints,
@@ -209,6 +210,8 @@ fn encode_primitive(out: &mut Output, images: &mut Images, primitive: &Primitive
     out.array(normals);
     out.array(uvs);
     out.array(tangents);
+    out.u32(regions.len() as u32);
+    out.0.extend_from_slice(regions);
     out.u32s(indices);
     out.u32(joints.len() as u32);
     for joint in joints {
@@ -265,6 +268,9 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         sway,
         flutter,
         translucency,
+        shading,
+        defined_normal_texture,
+        skin_masks,
     } = material;
     out.text(name);
     out.floats(base_color);
@@ -295,6 +301,15 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
     out.floats(uv_offset);
     out.u8(u8::from(*double_sided));
     out.floats(&[*sway, *flutter, *translucency]);
+    out.u8(match shading {
+        ModelShading::Standard => 0,
+        ModelShading::Skin => 1,
+    });
+    images.write(out, defined_normal_texture.as_ref());
+    out.u8(skin_masks.len() as u8);
+    for mask in skin_masks {
+        images.write(out, Some(mask));
+    }
     Some(())
 }
 
@@ -601,6 +616,7 @@ fn whole(primitive: &Primitive) -> bool {
     fits(primitive.normals.len())
         && fits(primitive.uvs.len())
         && fits(primitive.tangents.len())
+        && fits(primitive.regions.len())
         && fits(primitive.joints.len())
         && primitive.weights.len() == primitive.joints.len()
 }
@@ -610,6 +626,8 @@ fn decode_primitive(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Prim
     let normals = input.array()?;
     let uvs = input.array()?;
     let tangents = input.array()?;
+    let region_count = input.count(1)?;
+    let regions = input.take(region_count)?.to_vec();
     let indices = input.u32s()?;
     let corners = positions.len();
     if indices.iter().any(|&index| index as usize >= corners) {
@@ -661,6 +679,7 @@ fn decode_primitive(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Prim
         normals,
         uvs,
         tangents,
+        regions,
         indices,
         material,
         joints,
@@ -723,6 +742,16 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     let uv_offset = input.floats()?;
     let double_sided = input.bool()?;
     let [sway, flutter, translucency] = input.floats()?;
+    let shading = match input.u8()? {
+        0 => ModelShading::Standard,
+        1 => ModelShading::Skin,
+        _ => return None,
+    };
+    let defined_normal_texture = image(input)?;
+    let mut skin_masks = Vec::new();
+    for _ in 0..input.u8()? {
+        skin_masks.push(image(input)??);
+    }
     Some(ModelMaterial {
         name,
         base_color,
@@ -748,6 +777,9 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         sway,
         flutter,
         translucency,
+        shading,
+        defined_normal_texture,
+        skin_masks,
     })
 }
 
@@ -864,11 +896,13 @@ mod tests {
         fn describe_primitive(out: &mut String, primitive: &Primitive) {
             let material = &primitive.material;
             out.push_str(&format!(
-                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {} {} {}\n",
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {:?} {} {}
+",
                 primitive.positions,
                 primitive.normals,
                 primitive.uvs,
                 primitive.tangents,
+                primitive.regions,
                 primitive.indices,
                 primitive.joints,
                 primitive.weights,
@@ -889,7 +923,15 @@ mod tests {
                 image(&material.specular_texture),
                 (material.double_sided, material.sway),
                 material.flutter,
-                material.translucency,
+                (material.translucency, material.shading),
+                (
+                    image(&material.defined_normal_texture),
+                    material
+                        .skin_masks
+                        .iter()
+                        .map(|mask| image(&Some(mask.clone())))
+                        .collect::<Vec<_>>()
+                ),
                 primitive.lods.len(),
                 "",
             ));
@@ -975,6 +1017,35 @@ mod tests {
         assert_eq!(describe(&again), describe(&first));
         assert_eq!(again.morph_targets, first.morph_targets);
         assert_eq!(again.primitives[0].morphs, first.primitives[0].morphs);
+        let _ = fs::remove_dir_all(project);
+    }
+
+    /// Refinement R2: a character body's region map (`Primitive::regions`)
+    /// is kept, so a cooked body picks by region as its file does.
+    #[test]
+    fn a_cooked_model_keeps_its_region_map() {
+        let project = std::env::temp_dir().join(format!(
+            "axcenity-cooked-model-regions-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&project);
+        let model = "assets/models/body.glb";
+        fs::create_dir_all(project.join("assets/models")).unwrap();
+        let bytes = b"a body".to_vec();
+        fs::write(project.join(model), &bytes).unwrap();
+        let mut primitive = Primitive::new(
+            vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            vec![[0.0, 0.0, 1.0]; 3],
+            Vec::new(),
+            vec![0, 1, 2],
+            ModelMaterial::default(),
+        );
+        primitive.regions = vec![1, 4, 14];
+        let first = Model::from_primitives(vec![primitive]).unwrap();
+        write(&project, model, "", &bytes, &first);
+        let again = read(&project, model, "").expect("cooked");
+        assert_eq!(again.primitives[0].regions, vec![1, 4, 14]);
+        assert_eq!(describe(&again), describe(&first));
         let _ = fs::remove_dir_all(project);
     }
 

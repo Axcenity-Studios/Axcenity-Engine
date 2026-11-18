@@ -22,7 +22,7 @@ fn worn_models(workspace: &CharacterWorkspace) -> Vec<String> {
 fn the_workspace_offers_the_realistic_body_and_shows_it() {
     let folder = test_folder("workspace-realistic");
     let started = Instant::now();
-    let workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     println!("opened on the realistic body in {:?}", started.elapsed());
     let library = workspace.library();
     assert!(
@@ -41,10 +41,15 @@ fn the_workspace_offers_the_realistic_body_and_shows_it() {
     for part in ["Eyes", "Teeth", "Lashes", "Brows", "Underwear_BoxerBriefs"] {
         assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
     }
-    // The stylized body isn't offered for new characters any more.
+    // Both families are offered (plan section 0, decision 7), the
+    // realistic one first.
     assert!(offers_base(&library, DEFAULT_BASE));
-    assert!(!offers_base(&library, axcenity_avatar::V1_BASE));
-    assert!(presets().iter().all(|preset| preset.base == DEFAULT_BASE));
+    assert!(offers_base(&library, axcenity_avatar::V1_BASE));
+    let families: Vec<&str> = presets::families(&library)
+        .iter()
+        .map(|base| base.id.as_str())
+        .collect();
+    assert_eq!(families, [DEFAULT_BASE, axcenity_avatar::V1_BASE]);
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -54,7 +59,7 @@ fn the_workspace_offers_the_realistic_body_and_shows_it() {
 #[test]
 fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     let folder = test_folder("workspace-frame");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let frame = workspace
         .base()
         .unwrap()
@@ -142,31 +147,34 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// A slider on the realistic body re-bakes the preview: the body's model
-/// changes with the description, and a drag is shown while it goes on.
+/// A slider on the realistic body changes the preview's identity, worn
+/// live (ADR-0041): the body keeps its base model and wears a new identity
+/// key, nothing is baked, and a drag is shown while it goes on.
 #[test]
 fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
     let folder = test_folder("workspace-slider");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
-    let before = workspace.worn()[0].clone();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
+    let identity = |workspace: &CharacterWorkspace| {
+        axcenity_anim::identity_key(&workspace.world, body).expect("worn live")
+    };
+    let mesh = workspace.worn()[0].clone();
+    let before = identity(&workspace);
     let base = workspace.base().unwrap();
     let fat = base.parameter("fat").unwrap().clone();
 
     let started = Instant::now();
     workspace.set_parameter(&fat, 0.8, true);
-    println!(
-        "applied a slider (the bake included) in {:?}",
-        started.elapsed()
-    );
+    println!("applied a slider in {:?}", started.elapsed());
     assert_eq!(workspace.parameter("fat"), 0.8);
-    let after = workspace.worn()[0].clone();
-    assert_ne!(after, before, "a new identity, a new derived model");
+    let after = identity(&workspace);
+    assert_ne!(after, before, "a new identity");
+    assert_eq!(workspace.worn()[0], mesh, "on the same base model");
 
-    // While a slider is dragged, frames show it at most every so often.
+    // While a slider is dragged, every step shows it (no throttle: a
+    // live change is new weights).
     workspace.set_parameter(&fat, 0.2, false);
-    std::thread::sleep(DRAG_APPLY_EVERY);
-    workspace.step();
-    assert_ne!(workspace.worn()[0], after, "shown during the drag");
+    assert_ne!(identity(&workspace), after, "shown during the drag");
     workspace.set_parameter(&fat, 0.3, true);
     workspace.undo();
     assert_eq!(
@@ -174,7 +182,8 @@ fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
         0.8,
         "the drag was one undo step"
     );
-    assert_eq!(workspace.worn()[0], after);
+    assert_eq!(identity(&workspace), after);
+    assert_eq!(workspace.assets.derived_count(), 0, "nothing was baked");
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -182,7 +191,7 @@ fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
 #[test]
 fn symmetry_moves_a_parameters_mirror_too() {
     let folder = test_folder("workspace-symmetry");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let base = workspace.base().unwrap();
     let left = base
         .parameters
@@ -211,7 +220,7 @@ fn symmetry_moves_a_parameters_mirror_too() {
 #[test]
 fn switching_the_body_starts_its_default_character_and_undo_returns() {
     let folder = test_folder("workspace-switch");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.edit(|description| description.name = "Sam".to_owned());
     let realistic = workspace.description().clone();
 
@@ -273,8 +282,7 @@ fn a_format_1_character_file_opens_on_the_stylized_body_and_saves_as_format_2() 
 #[test]
 fn the_workspace_dresses_the_preview_undoes_and_saves() {
     let folder = test_folder("workspace");
-    let female = presets().iter().position(|p| p.name == "Female").unwrap();
-    let mut workspace = CharacterWorkspace::open_preset(&folder, female).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
     // The humanoid's files are written for the preview.
     assert!(
         folder
@@ -363,45 +371,58 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// Every preset is on a body the library has and wears only items that
-/// fit it; the first is the realistic default character.
+/// Every new character the studio offers (New's families and presets,
+/// the start page's cards) is sound and on its family's body: realistic
+/// first, its first choice the realistic default character; the stylized
+/// family, which has no presets, offers its default character.
 #[test]
-fn every_preset_is_sound_for_the_shipped_library() {
-    let shipped = find_character_library().expect("the repository's library");
-    let (library, _, problems) = Library::read(&shipped);
-    assert!(problems.is_empty(), "{problems:?}");
-    let all = presets();
-    assert_eq!(all[0].base, DEFAULT_BASE);
-    assert!(all[0].parameters.is_empty());
-    for preset in &all {
-        let base = library
-            .base(preset.base)
-            .unwrap_or_else(|| panic!("{}", preset.name));
-        for (id, value) in preset.parameters {
-            let parameter = base
-                .parameter(id)
-                .unwrap_or_else(|| panic!("{}: {id}", preset.name));
-            let [low, high] = parameter.range;
-            assert!(
-                (low.min(high)..=low.max(high)).contains(value),
-                "{}: {id}",
-                preset.name
-            );
-        }
-        let description = preset.description("x", &library);
+fn every_new_character_choice_is_sound_on_both_families() {
+    let folder = test_folder("workspace-new-choices");
+    let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let library = workspace.library();
+    let choices = toolbar::new_choices(&library, &workspace);
+    let headings: Vec<&str> = choices
+        .iter()
+        .filter(|(_, _, start)| start.is_none())
+        .map(|(label, _, _)| label.as_str())
+        .collect();
+    assert_eq!(headings, ["Realistic", "Stylized"]);
+    let starts: Vec<&Start> = choices.iter().filter_map(|(_, _, s)| s.as_ref()).collect();
+    assert_eq!(starts[0], &Start::shipped("male"));
+    assert_eq!(
+        workspace.starting(starts[0]),
+        tidy(
+            applier::default_description(&library, DEFAULT_BASE),
+            &library
+        ),
+        "the first is the default character"
+    );
+    // The stylized family's presets (data since wave 3), its default
+    // character first.
+    assert!(starts.contains(&&Start::Preset("axcenity/stylized-masculine".to_owned())));
+
+    for start in starts {
+        let made = workspace.starting(start);
         assert!(
-            description.validate(&library).is_empty(),
-            "{}: {:?}",
-            preset.name,
-            description.validate(&library)
+            made.validate(&library).is_empty(),
+            "{start:?}: {:?}",
+            made.validate(&library)
         );
+        assert!(
+            made.extra.is_empty(),
+            "{start:?}: no preset block comes along"
+        );
+        if let Start::Preset(id) = start {
+            assert_eq!(made.base, library.preset(id).unwrap().base, "{start:?}");
+        }
     }
+    let _ = std::fs::remove_dir_all(&folder);
 }
 
 #[test]
 fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
     let folder = test_folder("workspace-ui");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 0).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let ctx = theme::test_context();
     for base in [DEFAULT_BASE, axcenity_avatar::V1_BASE] {
         workspace.set_base(base);
@@ -473,14 +494,22 @@ fn the_views_look_at_the_character_from_where_they_say() {
     assert!(orbit.target.length() < Vec3::new(4.0, 6.0, 4.0).length() + 0.01);
 }
 
-/// Overhaul CO3 and CO12: a character the workspace saves, applied to a
-/// character in a game, is drawn from the same models as the preview (the
-/// preview is the game's applier, so the identity bakes are the same).
+/// Overhaul CO3 and CO12, refinement R2a: a character the workspace saves,
+/// applied to a character in a game, is drawn from the same models as the
+/// preview and puts every corner of every part in the same place, in the
+/// same pose, to 0.2 mm. Both wear the identity live (ADR-0041): no
+/// derived `MeshId` anywhere in either World.
 #[test]
-fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
+fn a_character_file_applied_in_a_game_matches_the_workspaces_preview() {
+    use axcenity_render::glam::Vec3;
     let folder = test_folder("workspace-agrees");
-    let mut workspace = CharacterWorkspace::open_preset(&folder, 2).unwrap();
-    workspace.edit(|description| description.name = "Agrees".to_owned());
+    let mut workspace =
+        CharacterWorkspace::open_new(&folder, &Start::shipped("athletic-male")).unwrap();
+    workspace.edit(|description| {
+        description.name = "Agrees".to_owned();
+        description.parameters.insert("fat".to_owned(), 0.6);
+        description.parameters.insert("nose_length".to_owned(), 0.5);
+    });
     let path = workspace.save().unwrap();
 
     let assets = Assets::new(&folder);
@@ -491,8 +520,19 @@ fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
     let description = Description::from_json(&std::fs::read_to_string(&path).unwrap()).unwrap();
     let applied = applier::apply_description(&mut world, &assets, character, &description).unwrap();
     assert!(applied.problems.is_empty(), "{:?}", applied.problems);
+    let mut animators = axcenity_anim::Animators::new();
+    for _ in 0..20 {
+        workspace.step_by(1.0 / 60.0);
+        animators.update(&mut world, &assets, 1.0 / 60.0);
+    }
 
-    let models = |world: &World, body: InstanceId| -> BTreeMap<String, String> {
+    // Each MeshPart's `MeshId` and its corners where its pose puts them,
+    // in its file's space (metres), by the part's name.
+    let corners = |world: &World,
+                   assets: &Assets,
+                   poses: &axcenity_scene::Poses,
+                   body: InstanceId|
+     -> BTreeMap<String, (String, Vec<Vec3>)> {
         let mut parts = vec![body];
         parts.extend(world.get(body).unwrap().children().iter().copied());
         parts
@@ -500,15 +540,48 @@ fn a_saved_character_applied_in_a_game_matches_the_workspaces_preview() {
             .filter_map(|part| {
                 let instance = world.get(part)?;
                 let mesh = instance.property("MeshId")?.as_str()?.to_owned();
-                Some((instance.name().to_owned(), mesh))
+                assert!(
+                    axcenity_assets::split_derived(&mesh).1.is_none(),
+                    "{} draws a derived model: {mesh}",
+                    instance.name()
+                );
+                let model = assets.model_blocking(&mesh).unwrap();
+                let posed = poses.get(&part).expect("every part is posed");
+                let unfit = model.rig.as_ref().unwrap().fit.inverse();
+                let points = (0..model.primitives.len())
+                    .flat_map(|index| posed.primitive(&model, index, 0).positions.clone())
+                    .map(|corner| unfit.transform_point3(Vec3::from(corner)))
+                    .collect();
+                Some((instance.name().to_owned(), (mesh, points)))
             })
             .collect()
     };
     let preview_body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
-    assert_eq!(
-        models(&workspace.world, preview_body),
-        models(&world, applied.body)
+    let preview = corners(
+        &workspace.world,
+        &workspace.assets,
+        workspace.poses(),
+        preview_body,
     );
+    let game = corners(&world, &assets, animators.poses(), applied.body);
+    assert_eq!(
+        preview.keys().collect::<Vec<_>>(),
+        game.keys().collect::<Vec<_>>()
+    );
+    for (name, (mesh, points)) in &preview {
+        let (game_mesh, game_points) = &game[name];
+        assert_eq!(mesh, game_mesh, "{name}");
+        assert_eq!(points.len(), game_points.len(), "{name}");
+        let worst = points
+            .iter()
+            .zip(game_points)
+            .map(|(a, b)| a.distance(*b))
+            .fold(0.0, f32::max);
+        assert!(worst < 2e-4, "{name}: {worst} m apart");
+    }
+    // The identity is worn: the body is not its plain base.
+    let plain = axcenity_anim::identity_key(&world, applied.body);
+    assert!(plain.is_some(), "the game's body wears an identity");
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -535,12 +608,15 @@ fn the_preview_draws_the_realistic_character() {
     let (width, height) = (640, 720);
     let mut renderer = TextureRenderer::new(&device, &queue, width, height);
     let mut frames = Vec::new();
-    for (name, index) in [("realistic", 0), ("realistic-feminine", 1), ("stylized", 0)] {
-        let mut workspace = CharacterWorkspace::open_preset(&folder, index).unwrap();
-        if name == "stylized" {
-            // A saved stylized character still opens and is drawn.
-            workspace.set_base(axcenity_avatar::V1_BASE);
-        }
+    for (name, start) in [
+        ("realistic", Start::default()),
+        ("realistic-feminine", Start::shipped("female")),
+        (
+            "stylized",
+            Start::Family(axcenity_avatar::V1_BASE.to_owned()),
+        ),
+    ] {
+        let mut workspace = CharacterWorkspace::open_new(&folder, &start).unwrap();
         for _ in 0..10 {
             workspace.step_by(1.0 / 30.0);
         }

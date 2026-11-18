@@ -138,6 +138,10 @@ pub struct Resolved {
     /// What was left out and why (an item the library lacks, one that
     /// doesn't fit the base, a second item in a slot that holds one).
     pub problems: Vec<Problem>,
+    /// The body regions the worn items hide, by ID, in the base's order
+    /// (CO9): a region with a `map_index` is left out of the body drawn
+    /// (`axcenity_assets::RegionHiding`), one with a mask shape sinks.
+    pub hidden_regions: Vec<String>,
 }
 
 /// One mesh of a resolved character.
@@ -467,6 +471,10 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .or_default()
             .extend(own.clone());
     }
+    // Makeup and markings (ADR-0042): draw values beside the slot's own.
+    for (slot, layers) in crate::skin::draw_values(base, &description.skin) {
+        materials.entry(slot).or_default().extend(layers);
+    }
     // The body's weights are what the layers add up to, so the two can't
     // disagree about which items are worn.
     let mut shapes: BTreeMap<String, f32> = BTreeMap::new();
@@ -483,6 +491,12 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         attributes,
         materials,
         problems: problems.into_iter().map(|(_, problem)| problem).collect(),
+        hidden_regions: base
+            .regions
+            .iter()
+            .filter(|region| hidden.contains(&region.id.as_str()))
+            .map(|region| region.id.clone())
+            .collect(),
     })
 }
 

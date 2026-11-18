@@ -55,6 +55,10 @@ pub struct BaseManifest {
     /// Handles on the character that move parameters by dragging (R2).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handles: Vec<Handle>,
+    /// Makeup and markings its skin can draw (R5, ADR-0042), each a mask
+    /// in the model file: what a description's `skin` block turns on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skin_layers: Vec<crate::SkinLayerSpec>,
 }
 
 /// Brief §3.3's three levels of customization. A value a newer version
@@ -135,6 +139,31 @@ pub struct Drive {
     /// A multiplier on the one-to-one feel (1 when unset).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensitivity: Option<f32>,
+    /// The drive on a frame whose own shapes move the anchor otherwise
+    /// (the realistic waist's `<Frame>_Waist_*`); `axis` and `travel` are
+    /// the default frame's, and hold on every frame not listed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frames: Vec<FrameDrive>,
+}
+
+/// A [`Drive`]'s axis and travel on one value of the `frame` parameter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameDrive {
+    pub frame: f32,
+    pub axis: [f32; 3],
+    pub travel: f32,
+}
+
+impl Drive {
+    /// The axis and travel on `frame`: a listed frame's within half a
+    /// frame of it (the nearest), else the drive's own.
+    pub fn on_frame(&self, frame: f32) -> ([f32; 3], f32) {
+        self.frames
+            .iter()
+            .filter(|f| (f.frame - frame).abs() < 0.5)
+            .min_by(|a, b| (a.frame - frame).abs().total_cmp(&(b.frame - frame).abs()))
+            .map_or((self.axis, self.travel), |f| (f.axis, f.travel))
+    }
 }
 
 /// Where the base model's meshes are.
@@ -148,6 +177,12 @@ pub struct BaseModel {
     /// object path. They follow the body's pose and shapes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<String>,
+    /// The body's region map (CO9), relative to the manifest: an image
+    /// over the body's first texture coordinates whose red value at each
+    /// texel is a region's `map_index` (0 where none). What hides a worn
+    /// item's regions and what fitting reads coverage from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regions_map: Option<String>,
 }
 
 /// The skeleton contract the model keeps.
@@ -477,6 +512,11 @@ impl BaseManifest {
         self.handles.iter().find(|h| h.id == id)
     }
 
+    /// The skin layer `id` it offers.
+    pub fn skin_layer(&self, id: &str) -> Option<&crate::SkinLayerSpec> {
+        self.skin_layers.iter().find(|layer| layer.id == id)
+    }
+
     /// The category of `parameter`'s group, if it has one.
     pub fn category_of(&self, parameter: &Parameter) -> Option<Category> {
         self.group(&parameter.group).map(|group| group.category)
@@ -502,6 +542,9 @@ impl BaseManifest {
         not_empty(p, "label", &self.label);
         not_empty(p, "family", &self.family);
         check_path(p, "model.file", &self.model.file);
+        if let Some(map) = &self.model.regions_map {
+            check_path(p, "model.regions_map", map);
+        }
         not_empty(p, "model.body", &self.model.body);
         unique(p, "model.parts", self.model.parts.iter());
         not_empty(p, "skeleton.convention", &self.skeleton.convention);
@@ -558,6 +601,7 @@ impl BaseManifest {
         for (index, slot) in self.materials.iter().enumerate() {
             crate::material::check_slot(p, &format!("materials[{index}]"), slot);
         }
+        crate::skin::check_specs(p, self);
         unique(p, "features", self.features.iter().map(|f| &f.id));
         for (index, feature) in self.features.iter().enumerate() {
             self.check_feature(p, &format!("features[{index}]"), feature);
@@ -729,15 +773,22 @@ impl BaseManifest {
                     format!("names no parameter `{}`", drive.parameter),
                 ));
             }
-            let finite = drive.axis.iter().all(|v| v.is_finite());
-            if !finite || drive.axis.iter().all(|v| *v == 0.0) {
-                p.push(Problem::new(
-                    &at,
-                    "the axis must be a finite, non-zero vector",
-                ));
+            let ends = std::iter::once((drive.axis, drive.travel))
+                .chain(drive.frames.iter().map(|f| (f.axis, f.travel)));
+            for (axis, travel) in ends {
+                let finite = axis.iter().all(|v| v.is_finite());
+                if !finite || axis.iter().all(|v| *v == 0.0) {
+                    p.push(Problem::new(
+                        &at,
+                        "the axis must be a finite, non-zero vector",
+                    ));
+                }
+                if !(travel.is_finite() && travel > 0.0) {
+                    p.push(Problem::new(&at, "the travel must be above 0 metres"));
+                }
             }
-            if !(drive.travel.is_finite() && drive.travel > 0.0) {
-                p.push(Problem::new(&at, "the travel must be above 0 metres"));
+            if drive.frames.iter().any(|f| !f.frame.is_finite()) {
+                p.push(Problem::new(&at, "a drive's frame must be finite"));
             }
             if drive
                 .sensitivity
@@ -754,16 +805,31 @@ impl BaseManifest {
                 }
             }
         }
-        if let Some(mirror) = &handle.mirror
-            && self
-                .handle(mirror)
-                .and_then(|other| other.mirror.as_deref())
-                != Some(handle.id.as_str())
-        {
-            p.push(Problem::new(
-                at,
-                format!("`{}`'s mirror `{mirror}` doesn't name it back", handle.id),
-            ));
+        if let Some(mirror) = &handle.mirror {
+            let other = self.handle(mirror);
+            if *mirror == handle.id {
+                p.push(Problem::new(
+                    at,
+                    format!("`{}` is named as its own mirror", handle.id),
+                ));
+            } else if other.and_then(|other| other.mirror.as_deref()) != Some(handle.id.as_str()) {
+                p.push(Problem::new(
+                    at,
+                    format!("`{}`'s mirror `{mirror}` doesn't name it back", handle.id),
+                ));
+            }
+            // A pair is one feature's left and right.
+            if let Some(other) = other
+                && other.feature != handle.feature
+            {
+                p.push(Problem::new(
+                    at,
+                    format!(
+                        "`{}`'s mirror `{mirror}` is on another feature (`{}`)",
+                        handle.id, other.feature
+                    ),
+                ));
+            }
         }
         unique(p, &format!("{at}.views"), handle.views.iter());
     }

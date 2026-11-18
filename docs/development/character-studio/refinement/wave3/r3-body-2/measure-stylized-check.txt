@@ -1,0 +1,14 @@
+files 2.9
+weights 3.8
+clipping 13.7
+face 34.4
+shapes 34.5
+masculine pairs 435 bodies 1682 with new crossings 112
+feminine pairs 435 bodies 1682 with new crossings 4
+sliders 270.7
+proportions 270.7
+deformation 275.1
+twist 277.5
+wrote measure-stylized.json 277.5 s
+check: passed 
+exit 0

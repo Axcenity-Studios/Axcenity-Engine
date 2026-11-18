@@ -46,7 +46,14 @@ Every character material slot names a shading model (`standard`, `skin`, `eye`, 
 - CO7 measures each model's GPU cost on the reference PC; screen-space SSS is CO17.
 - Revisit if glTF ratifies a subsurface extension the set should map onto.
 
+## Notes
+
+- **2026-11-17 (R5, `r5-skin-shading`): the Skin model is built; the decision stands, two details are settled.** (1) *How the renderer learns a slot's model*: the model file's glTF material `extras` (`axcenity_shading`, and for skin `axcenity_defined_normal`), read by `assets` and drawn by `scene`, rather than an attribute from the applier; the manifest's `shading` remains the value contract (architecture.md §10). (2) *Texture slots*: the slots were not freed by packing; a skin's second (defined) normal map takes the specular map's slot, which skin doesn't read, as a toon ramp does. Skin is pre-integrated diffusion on a blurred normal, a redder penumbra, and two GGX lobes with specular antialiasing (`docs/rendering/skin.md`); screen-space SSS stays CO17. Two Skin values were added (`definition`, `softness`: optional, neutral 0), an addition under this ADR's consequences.
+
+- **2026-11-17 (R5 makeup branch):** makeup and markings ([ADR-0042](ADR-0042-Makeup-And-Markings-Are-Layers-Over-Library-Masks-Drawn-Live-By-The-Skin-Model.md)) are not Skin values: a description's `skin` block resolves to draw values `layer_<id>_<field>` on the slot, and the Skin model draws them from three masks bound in the metalness, emissive and opacity slots, which skin with layers doesn't read.
+
 ## Implementation references
 
 - `crates/avatar/src/material.rs` (`ShadingModel`, `ValueSpec`, `check_values`)
+- `crates/render/src/skin.wgsl`, `crates/render/src/renderer/tests/skin.rs` (the Skin model, R5)
 - Plan: D9, CO7, CO17

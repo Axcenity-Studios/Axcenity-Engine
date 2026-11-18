@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::manifest::{check_version, not_empty};
 use crate::material::{MaterialValues, check_values};
-use crate::{FormatError, ItemManifest, Library, Problem, format_version, pretty};
+use crate::{FormatError, ItemManifest, Library, Problem, Skin, format_version, pretty};
 
 /// The character description's format version. Format 1 was Character
 /// Studio CS2's `Look`; it migrates on load ([`Description::from_json`]).
@@ -33,6 +33,11 @@ pub struct Description {
     /// material slot name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub materials: BTreeMap<String, MaterialValues>,
+    /// Makeup and markings turned on (R5, ADR-0042): layers the base
+    /// offers (`BaseManifest::skin_layers`). Optional: absent, the skin is
+    /// as made.
+    #[serde(default, skip_serializing_if = "Skin::is_empty")]
+    pub skin: Skin,
     /// Fields this version doesn't know, kept as they were: a field a newer
     /// minor addition writes survives a round trip through this version.
     #[serde(flatten)]
@@ -119,6 +124,7 @@ impl Description {
             parameters: BTreeMap::new(),
             items: Vec::new(),
             materials: BTreeMap::new(),
+            skin: Skin::default(),
             extra: BTreeMap::new(),
         }
     }
@@ -282,6 +288,7 @@ impl Description {
                 Some(slot) => p.extend(check_values(&at, slot.shading, values)),
             }
         }
+        crate::skin::check_skin(p, base, &self.skin);
         problems
     }
 

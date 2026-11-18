@@ -35,6 +35,7 @@ import correctives  # noqa: E402
 import eyes as eyelib  # noqa: E402
 import face  # noqa: E402
 import lods  # noqa: E402
+import makeup  # noqa: E402
 import manifests  # noqa: E402
 import parts  # noqa: E402
 import regions  # noqa: E402
@@ -119,6 +120,11 @@ def build(out_dir, texture_size=2048, bakes=True):
     M.P, F.P = [Vector(p) for p in m_face], [Vector(p) for p in f_face]
     if maps:
         face_rest["lid_texels_softened"] = face.soften_lids(body_obj, topo, m_face, eyes_m, eye_radius, maps)
+        # The makeup and marking masks (R5, `makeup.py`), measured on the
+        # face at rest; the lips are the albedo's own lip field.
+        lips = skin.fields(body_obj, source["Masculine"], lm)["lips"]
+        maps["report"]["makeup"] = makeup.masks(body_obj, topo, m_face, M.P, lm, eyes_m, eye_radius, lips,
+                                                texture_size, out_dir)
     eyes = eyelib.eyes(eyes_m, eye_radius, parts.iris_texture(out_dir), out_dir)
     height = max(p.z for p in M.P) - min(p.z for p in M.P)
     bundle = max(p.z for p in source["Masculine"]) - min(p.z for p in source["Masculine"])
@@ -233,11 +239,16 @@ def main(out_dir, texture_size=2048, bakes=True):
         obj.name = name
         obj.data.name = name
     export_glb(os.path.join(out_dir, PARTS_FILE), armature, list(objects.values()))
+    # The skin marked skin, with its defined normal map (R5).
+    skin.mark(os.path.join(out_dir, PARTS_FILE), out_dir)
+    # And its makeup and marking masks (R5, ADR-0042).
+    makeup.mark(os.path.join(out_dir, PARTS_FILE), out_dir)
     with open(os.path.join(out_dir, DATA_FILE), "w", newline="\n") as f:
         json.dump(data, f, indent=1, sort_keys=True)
         f.write("\n")
     manifests.write(out_dir)
     skin.clean_up(out_dir)
+    makeup.clean_up(out_dir)
     for image in ("RealisticIris.png", *face.IMAGES, *jawlib.IMAGES):
         if os.path.exists(os.path.join(out_dir, image)):
             os.remove(os.path.join(out_dir, image))

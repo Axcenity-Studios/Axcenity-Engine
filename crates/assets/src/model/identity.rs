@@ -171,23 +171,46 @@ pub fn derived_mesh_id(base: &str, key: u64) -> String {
 
 /// A `MeshId`'s base model and, for a derived one, its identity's key.
 /// Object names never hold a `#` (they write it as `%23`), so a second one
-/// can only start the identity.
+/// can only start a tag. A model with hidden regions (`#h`, CO9,
+/// [`hidden_mesh_id`](crate::hidden_mesh_id)) is a base of its own: a
+/// derived model can be baked from it (`…#h<key>#i<key>`).
 pub fn split_derived(mesh_id: &str) -> (&str, Option<u64>) {
-    let Some((file, rest)) = mesh_id.split_once('#') else {
-        return (mesh_id, None);
-    };
-    let Some((objects, tag)) = rest.split_once('#') else {
-        return (mesh_id, None);
-    };
-    let base = if objects.is_empty() {
+    match last_tag(mesh_id) {
+        None => (mesh_id, None),
+        Some((_, tag, Some(_))) if tag == crate::hidden::TAG => (mesh_id, None),
+        Some((base, tag, key)) if tag == TAG => (base, key),
+        // A tag that isn't a key names the base.
+        Some((base, _, _)) => (base, None),
+    }
+}
+
+/// A `MeshId`'s last tag past its objects: (everything before it, its
+/// letter, its key when it is one).
+pub(crate) fn last_tag(mesh_id: &str) -> Option<(&str, char, Option<u64>)> {
+    let (file, rest) = mesh_id.split_once('#')?;
+    let (head, last) = rest.rsplit_once('#')?;
+    let base = if head.is_empty() {
         file
     } else {
-        &mesh_id[..file.len() + 1 + objects.len()]
+        &mesh_id[..file.len() + 1 + head.len()]
     };
-    let key = tag
-        .strip_prefix(TAG)
-        .and_then(|hex| u64::from_str_radix(hex, 16).ok());
-    (base, key)
+    let mut chars = last.chars();
+    let tag = chars.next().unwrap_or('\0');
+    let hex = chars.as_str();
+    let key = (hex.len() == 16)
+        .then(|| u64::from_str_radix(hex, 16).ok())
+        .flatten();
+    Some((base, tag, key))
+}
+
+/// A `MeshId` without any of its tags (a derived model's identity, hidden
+/// regions): the file and the objects it picks.
+pub fn strip_tags(mesh_id: &str) -> &str {
+    let mut mesh_id = mesh_id;
+    while let Some((base, _, _)) = last_tag(mesh_id) {
+        mesh_id = base;
+    }
+    mesh_id
 }
 
 impl Rig {
@@ -251,27 +274,154 @@ fn settle(deltas: &[BoneDelta], pose: &mut [super::BoneTransform]) {
     }
 }
 
-impl Model {
-    /// Adds this model's identity to `pose` (one transform per bone of its
-    /// rig), after the clips and before anything that reads where the
-    /// bones are. A model that isn't derived, or whose identity moves no
-    /// bone, changes nothing.
+/// An identity as one model wears it **live** (ADR-0041): what each pose
+/// of the model's own mesh needs so that it is drawn where the model with
+/// the identity baked in ([`Model::bake`]) would be, with no vertex copied.
+/// Made by [`Model::live`]; small (a weight per identity shape, a matrix
+/// per joint), so every character can have its own.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LiveIdentity {
+    /// Each identity shape of the model (by its index in
+    /// [`Model::morph_targets`]) and its weight. A shape the identity
+    /// names is here even at 0, so it can't keep a weight of its own.
+    weights: Vec<(usize, f32)>,
+    /// What every pose adds to its bones after the clips ([`Self::settle`]).
+    deltas: Vec<BoneDelta>,
+    /// One matrix per joint of the model's rig, multiplied into each posed
+    /// joint after the pose ([`Posed::rebind`](super::Posed::rebind)):
+    /// the bind re-seated on the changed skeleton and the surface carried
+    /// by the bones of the layers the model has no shape of. Empty when the
+    /// identity moves no bone.
+    binds: Vec<Mat4>,
+}
+
+impl LiveIdentity {
+    /// True when wearing it changes nothing.
+    pub fn is_empty(&self) -> bool {
+        self.weights.is_empty() && self.deltas.is_empty() && self.binds.is_empty()
+    }
+
+    /// Adds the identity's bone changes to `pose` (one transform per bone
+    /// of the model's rig), after the clips and before anything that reads
+    /// where the bones are: [`Model::settle`] for a live identity.
     pub fn settle(&self, pose: &mut [super::BoneTransform]) {
-        settle(&self.identity_pose, pose);
+        settle(&self.deltas, pose);
     }
 
     /// Whether [`settle`](Self::settle) changes a pose.
     pub fn settles(&self) -> bool {
-        !self.identity_pose.is_empty()
+        !self.deltas.is_empty()
     }
 
-    /// This model with `identity` baked in (see the module docs): its
-    /// identity shapes added into its vertices and dropped from its blend
-    /// shapes, its surface carried by the bones of the layers whose shapes
-    /// it hasn't got, and its bind moved to the changed skeleton. Its key
-    /// is new; its textures and anything else the identity doesn't touch
-    /// are shared with this model.
-    pub fn bake(&self, identity: &Identity) -> Model {
+    /// The identity shapes' weights, by index in the model's
+    /// [`Model::morph_targets`].
+    pub fn weights(&self) -> &[(usize, f32)] {
+        &self.weights
+    }
+
+    /// Puts the identity on `posed` (a pose of the model this was made for,
+    /// its live shapes already set): its identity shapes at their weights,
+    /// and each joint re-seated and carried. Call it last, after the face
+    /// and the correctives have set their shapes.
+    pub fn dress(&self, posed: &mut super::Posed) {
+        if !self.weights.is_empty() {
+            let mut weights = posed.morph_weights().to_vec();
+            let mut changed = false;
+            for &(index, weight) in &self.weights {
+                if let Some(slot) = weights.get_mut(index)
+                    && *slot != weight
+                {
+                    *slot = weight;
+                    changed = true;
+                }
+            }
+            if changed {
+                posed.set_morph_weights(&weights);
+            }
+        }
+        if !self.binds.is_empty() {
+            posed.rebind(&self.binds);
+        }
+    }
+}
+
+/// What an identity does to one model, worked out once and shared by
+/// [`Model::bake`] (which copies it into the vertices) and [`Model::live`]
+/// (which applies it to each pose).
+struct Prepared {
+    /// Each of the model's shapes: how far the identity leans toward it.
+    weights: Vec<f32>,
+    /// Whether the identity names it (an identity shape, even at 0).
+    named: Vec<bool>,
+    /// The rig with each joint's bind re-seated on the changed skeleton
+    /// (the model's own when no bone changes).
+    rig: Option<Arc<Rig>>,
+    /// What every pose adds to its bones after the clips.
+    identity_pose: Vec<BoneDelta>,
+    /// How each joint carries the surface of the layers this model has no
+    /// shape of, in the fitted space its vertices are in; empty when
+    /// nothing is carried.
+    carry: Vec<Mat4>,
+}
+
+impl Model {
+    /// How this model wears `identity` live (ADR-0041; see
+    /// [`LiveIdentity`]): the same result as [`bake`](Self::bake), worked
+    /// out on each pose instead of copied into the vertices.
+    pub fn live(&self, identity: &Identity) -> LiveIdentity {
+        let Prepared {
+            weights,
+            named,
+            rig,
+            identity_pose,
+            carry,
+        } = self.prepare(identity);
+        let weights = named
+            .iter()
+            .enumerate()
+            .filter(|(_, named)| **named)
+            .map(|(index, _)| (index, weights[index]))
+            .collect();
+        // Each joint's matrix, as `Posed` makes it, is
+        // `fit · world · inverse_bind · fit⁻¹`; the bake's is
+        // `fit · world · inverse_bind' · fit⁻¹ · carry` (its bind re-seated,
+        // its vertices carried first). So the bake's is the posed one times
+        // `fit · inverse_bind⁻¹ · inverse_bind' · fit⁻¹ · carry`, which
+        // doesn't depend on the pose: one matrix per joint.
+        let mut binds = Vec::new();
+        if let (Some(base), Some(seated)) = (&self.rig, &rig)
+            && !identity_pose.is_empty()
+        {
+            let unfit = base.fit.inverse();
+            binds = base
+                .joints
+                .iter()
+                .zip(&seated.joints)
+                .enumerate()
+                .map(|(index, (joint, moved))| {
+                    let carried = carry.get(index).copied().unwrap_or(Mat4::IDENTITY);
+                    let bind = base.fit
+                        * joint.inverse_bind.inverse()
+                        * moved.inverse_bind
+                        * unfit
+                        * carried;
+                    if bind.is_finite() {
+                        bind
+                    } else {
+                        Mat4::IDENTITY
+                    }
+                })
+                .collect();
+        }
+        LiveIdentity {
+            weights,
+            deltas: identity_pose,
+            binds,
+        }
+    }
+
+    /// What `identity` does to this model (see [`Prepared`]).
+    fn prepare(&self, identity: &Identity) -> Prepared {
         let has = |name: &str| self.morph_targets.iter().any(|target| target.name == name);
         let index_of = |name: &str| {
             self.morph_targets
@@ -279,25 +429,15 @@ impl Model {
                 .position(|target| target.name == name)
         };
         // Each of this model's shapes: how far the identity leans toward
-        // it, and whether it's baked (named by a layer) or stays live.
+        // it, and whether it's named (an identity shape) or stays live.
         let mut weights = vec![0.0_f32; self.morph_targets.len()];
-        let mut baked = vec![false; self.morph_targets.len()];
+        let mut named = vec![false; self.morph_targets.len()];
         for (name, weight) in identity.layers.iter().flat_map(|layer| &layer.shapes) {
             if let Some(index) = index_of(name) {
-                baked[index] = true;
+                named[index] = true;
                 if weight.is_finite() {
                     weights[index] += weight;
                 }
-            }
-        }
-        // The live shapes keep their order; `renumber` is each one's new
-        // place.
-        let mut renumber = vec![None; self.morph_targets.len()];
-        let mut morph_targets: Vec<MorphTarget> = Vec::new();
-        for (index, target) in self.morph_targets.iter().enumerate() {
-            if !baked[index] {
-                renumber[index] = u16::try_from(morph_targets.len()).ok();
-                morph_targets.push(target.clone());
             }
         }
         // The skeleton's part: what every pose adds (`total`), each
@@ -368,6 +508,52 @@ impl Model {
                     fit: base.fit,
                 }));
                 identity_pose = total;
+            }
+        }
+        Prepared {
+            weights,
+            named,
+            rig,
+            identity_pose,
+            carry,
+        }
+    }
+
+    /// Adds this model's identity to `pose` (one transform per bone of its
+    /// rig), after the clips and before anything that reads where the
+    /// bones are. A model that isn't derived, or whose identity moves no
+    /// bone, changes nothing.
+    pub fn settle(&self, pose: &mut [super::BoneTransform]) {
+        settle(&self.identity_pose, pose);
+    }
+
+    /// Whether [`settle`](Self::settle) changes a pose.
+    pub fn settles(&self) -> bool {
+        !self.identity_pose.is_empty()
+    }
+
+    /// This model with `identity` baked in (see the module docs): its
+    /// identity shapes added into its vertices and dropped from its blend
+    /// shapes, its surface carried by the bones of the layers whose shapes
+    /// it hasn't got, and its bind moved to the changed skeleton. Its key
+    /// is new; its textures and anything else the identity doesn't touch
+    /// are shared with this model.
+    pub fn bake(&self, identity: &Identity) -> Model {
+        let Prepared {
+            weights,
+            named: baked,
+            rig,
+            identity_pose,
+            carry,
+        } = self.prepare(identity);
+        // The live shapes keep their order; `renumber` is each one's new
+        // place.
+        let mut renumber = vec![None; self.morph_targets.len()];
+        let mut morph_targets: Vec<MorphTarget> = Vec::new();
+        for (index, target) in self.morph_targets.iter().enumerate() {
+            if !baked[index] {
+                renumber[index] = u16::try_from(morph_targets.len()).ok();
+                morph_targets.push(target.clone());
             }
         }
         let bake_primitive = |primitive: &Primitive, key: u64| -> Primitive {
@@ -450,6 +636,7 @@ impl Model {
                 normals,
                 uvs: primitive.uvs.clone(),
                 tangents,
+                regions: primitive.regions.clone(),
                 indices: primitive.indices.clone(),
                 material: primitive.material.clone(),
                 joints: primitive.joints.clone(),
@@ -712,6 +899,92 @@ mod tests {
         ));
     }
 
+    /// `model` posed with `identity` worn live (ADR-0041): its own mesh,
+    /// the identity's weights and joint corrections on the pose, `blink`
+    /// on the live `Blink` shape.
+    fn live_corners(model: &Model, identity: &Identity, pose: &[BoneTransform]) -> Vec<Vec3> {
+        let live = model.live(identity);
+        let mut pose = pose.to_vec();
+        live.settle(&mut pose);
+        let mut posed = model.pose(&pose).expect("it has a rig");
+        lean(model, &mut posed, "Blink", 1.0);
+        live.dress(&mut posed);
+        assert_eq!(posed.model_key, model.key(), "still the model's own mesh");
+        posed
+            .primitive(model, 0, 0)
+            .positions
+            .iter()
+            .map(|corner| Vec3::from(*corner))
+            .collect()
+    }
+
+    /// The same, from the model with `identity` baked in.
+    fn baked_corners(model: &Model, identity: &Identity, pose: &[BoneTransform]) -> Vec<Vec3> {
+        let baked = model.bake(identity);
+        let mut pose = pose.to_vec();
+        baked.settle(&mut pose);
+        let mut posed = baked.pose(&pose).expect("it has a rig");
+        lean(&baked, &mut posed, "Blink", 1.0);
+        posed
+            .primitive(&baked, 0, 0)
+            .positions
+            .iter()
+            .map(|corner| Vec3::from(*corner))
+            .collect()
+    }
+
+    fn lean(model: &Model, posed: &mut super::super::Posed, name: &str, weight: f32) {
+        let mut weights = posed.morph_weights().to_vec();
+        if let Some(index) = model.morph_targets.iter().position(|t| t.name == name) {
+            weights[index] = weight;
+        }
+        posed.set_morph_weights(&weights);
+    }
+
+    /// ADR-0041: an identity worn live (the model's own mesh, the
+    /// identity's shape weights and joint corrections set on each pose)
+    /// puts every corner where the bake puts it, at rest and turned: the
+    /// shapes alone, a joint re-seated under a shape, a surface carried
+    /// and scaled by its bone, and both layers at once.
+    #[test]
+    fn an_identity_worn_live_poses_the_mesh_where_its_bake_does() {
+        let base = arm();
+        let identities = [
+            Identity {
+                layers: vec![layer(&[("Wide", 0.5)], &[])],
+            },
+            Identity {
+                layers: vec![layer(&[("Wide", 0.3)], &[("Tip", [0.5, 0.0, 0.0], 1.0)])],
+            },
+            Identity {
+                layers: vec![layer(&[("Frame", 1.0)], &[("Tip", [0.0, 0.25, 0.0], 2.0)])],
+            },
+            Identity {
+                layers: vec![
+                    layer(&[("Wide", 0.7)], &[("Tip", [0.1, 0.0, 0.0], 1.0)]),
+                    layer(&[("Frame", 1.0)], &[("Tip", [0.0, 0.2, 0.0], 1.5)]),
+                ],
+            },
+        ];
+        let rig = base.rig.clone().unwrap();
+        let rest = rig.rest_pose();
+        let mut turned = rest.clone();
+        turned[1].rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+        turned[0].rotation = Quat::from_rotation_y(0.4);
+        for (index, identity) in identities.iter().enumerate() {
+            for pose in [&rest, &turned] {
+                let live = live_corners(&base, identity, pose);
+                let baked = baked_corners(&base, identity, pose);
+                for (a, b) in live.iter().zip(&baked) {
+                    assert!(close(*a, *b), "identity {index}: {live:?} vs {baked:?}");
+                }
+            }
+        }
+        // Nothing to wear changes nothing.
+        let none = base.live(&Identity::default());
+        assert!(none.is_empty() && !none.settles());
+    }
+
     #[test]
     fn the_key_is_the_same_for_the_same_identity_and_differs_otherwise() {
         let one = Identity {
@@ -750,5 +1023,15 @@ mod tests {
         );
         // A tag that isn't a key names the base.
         assert_eq!(split_derived("a.glb#B#nonsense"), ("a.glb#B", None));
+        // A model with hidden regions is a base of its own, and a derived
+        // model can be baked from it.
+        let hidden = "a.glb#B#h00000000000000ff";
+        assert_eq!(split_derived(hidden), (hidden, None));
+        let baked = derived_mesh_id(hidden, 3);
+        assert_eq!(baked, "a.glb#B#h00000000000000ff#i0000000000000003");
+        assert_eq!(split_derived(&baked), (hidden, Some(3)));
+        assert_eq!(strip_tags(&baked), "a.glb#B");
+        assert_eq!(strip_tags("a.glb##h00000000000000ff"), "a.glb");
+        assert_eq!(strip_tags("a.glb#B"), "a.glb#B");
     }
 }

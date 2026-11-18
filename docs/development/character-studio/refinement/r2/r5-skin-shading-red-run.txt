@@ -1,0 +1,139 @@
+r5-skin-shading: red run (tests written first, before the Skin model, the content and the manifest driver).
+Base: refinement-r1-wave1 (6267cb98). Debug, RX 9070 XT. Skin stubbed as Standard, extras parser stubbed, GLB and manifest not rebuilt.
+
+## cargo nextest run -p axcenity-render --no-fail-fast -E 'test(/renderer::tests::skin::/)'
+    thread 'renderer::tests::skin::a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_specular_maps_place' (27128) panicked at crates\render\src\renderer\tests\skin.rs:166:5:
+    assertion `left == right` failed: without a defined map the blend is 0
+        PASS [   6.038s] (2/5) axcenity-render renderer::tests::skin::every_other_material_draws_as_it_did_before_the_skin_model
+    thread 'renderer::tests::skin::light_spreads_past_where_it_ends_on_skin_further_in_red' (24012) panicked at crates\render\src\renderer\tests\skin.rs:239:5:
+    thread 'renderer::tests::skin::a_bumpy_normal_maps_pores_dont_grain_skins_diffuse_light' (9516) panicked at crates\render\src\renderer\tests\skin.rs:301:5:
+    thread 'renderer::tests::skin::the_normal_blend_draws_the_own_map_at_0_and_the_defined_one_at_1' (21364) panicked at crates\render\src\renderer\tests\skin.rs:348:5:
+     Summary [  17.687s] 5 tests run: 1 passed, 4 failed, 376 skipped
+        PASS [   0.017s] ( 1/23) axcenity-scene foliage::tests::what_scatter_rules_place_is_drawn_and_rebuilt_when_it_changes
+        PASS [   0.018s] ( 2/23) axcenity-avatar tests::presets::skin_and_character_presets
+        PASS [   0.021s] ( 3/23) axcenity-assets model::rig::tests::a_pose_skins_each_level_of_detail_only_when_it_is_asked_for
+        PASS [   0.021s] ( 4/23) axcenity-assets rig_definition::tests::the_definition_naming_the_most_of_a_skeletons_bones_fits_it
+        PASS [   0.026s] ( 5/23) axcenity-assets model::test_rig::tests::a_take_poses_the_skin_and_the_rigid_hat
+        PASS [   0.028s] ( 6/23) axcenity-assets rig_definition::tests::a_definition_round_trips_and_refuses_unknown_fields_and_formats
+        PASS [   0.035s] ( 7/23) axcenity-scene skin_tone::tests::melanin_darkens_steadily_and_more_in_blue_than_in_red
+        PASS [   0.039s] ( 8/23) axcenity-scene skin_tone::tests::every_tone_stays_inside_real_albedos
+        FAIL [   0.042s] ( 9/23) axcenity-scene material_values_tests::definition_shows_the_defined_normal_map_unless_softness_hides_it
+    thread 'material_values_tests::definition_shows_the_defined_normal_map_unless_softness_hides_it' (29012) panicked at crates\scene\src\material_values_tests.rs:286:5:
+    assertion `left == right` failed: lean and muscular: the defined map
+        PASS [   0.046s] (10/23) axcenity-scene material_values_tests::melanin_darkens_and_lightens_the_skin_along_a_pigment_curve
+        PASS [   0.048s] (11/23) axcenity-scene material_values_tests::redness_flushes_and_undertone_warms_the_skin
+        FAIL [   0.052s] (12/23) axcenity-assets model::tests::a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map
+    thread 'model::tests::a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map' (36716) panicked at crates\assets\src\model\tests.rs:35:5:
+    assertion `left == right` failed
+        PASS [   0.056s] (13/23) axcenity-assets rig_definition::tests::definitions_are_read_from_the_rigs_folder_and_broken_ones_reported
+        PASS [   0.058s] (14/23) axcenity-scene skin_tone::tests::the_table_tones_reproduce_the_palette
+        PASS [   0.062s] (15/23) axcenity-scene material_values_tests::neutral_values_draw_the_material_exactly_as_authored
+        FAIL [   0.064s] (16/23) axcenity-scene draw_list::tests::a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_map
+    thread 'draw_list::tests::a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_map' (4400) panicked at crates\scene\src\draw_list\tests.rs:687:9:
+        FAIL [   0.067s] (17/23) axcenity-scene material_values_tests::scatter_scale_multiplies_how_far_light_spreads_under_the_skin
+    thread 'material_values_tests::scatter_scale_multiplies_how_far_light_spreads_under_the_skin' (41548) panicked at crates\scene\src\material_values_tests.rs:262:5:
+    assertion `left == right` failed
+        PASS [   0.070s] (18/23) axcenity-scene skin_tone::tests::neutral_values_leave_the_albedo_exactly_as_authored
+        PASS [   0.075s] (19/23) axcenity-scene skin_tone::tests::redness_reddens_and_undertone_warms
+        FAIL [   0.077s] (20/23) axcenity-avatar::realistic_parameters muscle_and_fat_drive_how_much_of_the_skins_definition_shows
+    thread 'muscle_and_fat_drive_how_much_of_the_skins_definition_shows' (13092) panicked at crates\avatar\tests\realistic_parameters.rs:353:39:
+        PASS [   0.078s] (21/23) axcenity-scene material_values_tests::neutral_values_leave_skin_shading_as_the_model_made_it
+        PASS [   0.086s] (22/23) axcenity-scene mesh_cache::tests::an_animated_mesh_part_keeps_its_skin_until_its_pose_changes
+        FAIL [   1.237s] (23/23) axcenity-assets model::tests::the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map
+    thread 'model::tests::the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map' (36500) panicked at crates\assets\src\model\tests.rs:73:5:
+    assertion `left == right` failed
+     Summary [   1.238s] 23 tests run: 17 passed, 6 failed, 475 skipped
+     Summary [  17.687s] 5 tests run: 1 passed, 4 failed, 376 skipped
+
+(every_other_material_draws_as_it_did_before_the_skin_model is a guard: its numbers were measured on this base, so it passes red and must stay green.)
+
+## cargo nextest run -p axcenity-assets -p axcenity-scene -p axcenity-avatar --no-fail-fast -E 'test(/skin|definition|scatter|neutral_values|model_material_marked/)'
+        FAIL [   0.042s] ( 9/23) axcenity-scene material_values_tests::definition_shows_the_defined_normal_map_unless_softness_hides_it
+    thread 'material_values_tests::definition_shows_the_defined_normal_map_unless_softness_hides_it' (29012) panicked at crates\scene\src\material_values_tests.rs:286:5:
+    assertion `left == right` failed: lean and muscular: the defined map
+        FAIL [   0.052s] (12/23) axcenity-assets model::tests::a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map
+    thread 'model::tests::a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map' (36716) panicked at crates\assets\src\model\tests.rs:35:5:
+    assertion `left == right` failed
+        FAIL [   0.064s] (16/23) axcenity-scene draw_list::tests::a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_map
+    thread 'draw_list::tests::a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_map' (4400) panicked at crates\scene\src\draw_list\tests.rs:687:9:
+        FAIL [   0.067s] (17/23) axcenity-scene material_values_tests::scatter_scale_multiplies_how_far_light_spreads_under_the_skin
+    thread 'material_values_tests::scatter_scale_multiplies_how_far_light_spreads_under_the_skin' (41548) panicked at crates\scene\src\material_values_tests.rs:262:5:
+        FAIL [   0.077s] (20/23) axcenity-avatar::realistic_parameters muscle_and_fat_drive_how_much_of_the_skins_definition_shows
+    thread 'muscle_and_fat_drive_how_much_of_the_skins_definition_shows' (13092) panicked at crates\avatar\tests\realistic_parameters.rs:353:39:
+        FAIL [   1.237s] (23/23) axcenity-assets model::tests::the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map
+    thread 'model::tests::the_realistic_skin_is_marked_skin_with_a_smooth_and_a_defined_normal_map' (36500) panicked at crates\assets\src\model\tests.rs:73:5:
+     Summary [   1.238s] 23 tests run: 17 passed, 6 failed, 475 skipped
+
+## cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/skin_value_tests::(scatter|definition|neutral)/)'
+        PASS [  13.514s] (1/3) axcenity-player::bin/axcenity-player skin_value_tests::neutral_skin_and_eye_values_draw_the_same_pixels_as_none
+        FAIL [  13.771s] (2/3) axcenity-player::bin/axcenity-player skin_value_tests::scatter_scale_softens_and_reddens_the_skin
+    thread 'skin_value_tests::scatter_scale_softens_and_reddens_the_skin' (7220) panicked at crates\player\src\skin_value_tests.rs:330:5:
+        FAIL [  13.836s] (3/3) axcenity-player::bin/axcenity-player skin_value_tests::definition_and_softness_show_and_hide_the_defined_normal_map
+    thread 'skin_value_tests::definition_and_softness_show_and_hide_the_defined_normal_map' (32092) panicked at crates\player\src\skin_value_tests.rs:374:9:
+     Summary [  13.837s] 3 tests run: 1 passed, 2 failed, 201 skipped
+error: test run failed
+
+
+== Review fixes (red, before the fixes) ==
+
+-- render: cargo nextest run -p axcenity-render -E "test(/skin::/)" --no-capture
+0.49149108 of the sun through the clouds; red over green lit: open 0.9997653, under clouds 1.099631; where the light ends: open 1.2331918, under clouds 1.3748304
+FAIL [   8.253s] (3/8) axcenity-render renderer::tests::skin::a_crease_sharper_than_skins_smallest_radius_is_no_redder_than_it
+FAIL [  16.193s] (2/8) axcenity-render renderer::tests::skin::a_cloud_shadow_dims_skin_without_reddening_it
+Summary [  75.114s] 8 tests run: 6 passed, 2 failed, 376 skipped
+grain lit: smooth 5.3123937, standard 14.286927, skin 6.9575553; where the light ends: smooth 13.258064, standard 21.154839, skin 13.609677
+lit: open 0.9997653, under clouds 1.099631
+red over green where the light ends: 1 mm 1.7021189, 4 mm 1.3387038
+test renderer::tests::skin::a_cloud_shadow_dims_skin_without_reddening_it ... FAILED
+test renderer::tests::skin::a_crease_sharper_than_skins_smallest_radius_is_no_redder_than_it ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 383 filtered out; finished in 16.04s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 383 filtered out; finished in 8.16s
+
+-- assets: the navel test, first without textures.navel_uv in Realistic.build.json
+the navel's u
+Summary [   1.294s] 2 tests run: 1 passed, 1 failed, 210 skipped
+
+-- assets: then with the navel's place (0.3713, 0.3257) written into it by hand, against the committed maps
+the smooth map flattens the navel at (760, 667): the maps differ by 16.41 on average, 65 at most
+Summary [   1.290s] 1 test run: 0 passed, 1 failed, 211 skipped
+
+-- scene: a SurfaceAppearance on skin
+Summary [   0.011s] 1 test run: 0 passed, 1 failed, 201 skipped
+no defined map
+
+-- render: a groove (concave), added after the first re-captures showed the red patches stayed
+red over green where the light ends in a groove: standard 1, skin 1.0647502
+skin in a groove isn't reddened: 1.0647502
+Summary [   8.483s] 1 test run: 0 passed, 1 failed, 384 skipped
+
+-- render: a normal map's fold (red's blurrier normal unheld), added after the second re-captures still showed red in the ear's fold, the nostril and under the eye
+-- cargo nextest run -p axcenity-render -E "test(red_light_doesnt_fill)" --no-capture
+flat red over green 1; the folded square's reddest 82, 28 pixels darker than half the flat's
+thread 'renderer::tests::skin::red_light_doesnt_fill_a_normal_maps_fold_that_green_leaves_dark' panicked at crates\render\src\renderer\tests\skin.rs:643:5:
+red over green in the fold: 82 (flat 1)
+     Summary [  12.550s] 1 test run: 0 passed, 1 failed, 385 skipped
+
+== Second review: light past the triangles' terminator (red, before the fix) ==
+
+-- render: a normal map leaning 50 degrees toward a sun just behind the square's plane (cosine -0.15): the navel's inner wall in the body's shadowed half
+-- cargo nextest run -p axcenity-render -E "test(a_normal_maps_slope_toward)" --no-capture
+behind the plane: standard 0, skin flat 0, skin leaned 408; in front: skin flat 204, leaned 468.64893
+thread 'renderer::tests::skin::a_normal_maps_slope_toward_a_light_behind_the_surface_stays_dark_on_skin' panicked at crates\render\src\renderer\tests\skin.rs:712:5:
+skin draws the slope as dark as the plain square: 408 vs 0
+     Summary [  15.568s] 1 test run: 0 passed, 1 failed, 386 skipped
+
+-- assets: the navel test's relief check (non-blocking item), the test's place moved sideways by a temporary offset
+at the navel (760, 667) the defined map leans up to 78 steps off flat   (the build's place: passes)
+at the navel (800, 667) the defined map leans up to 35 steps off flat   (40 texels aside: under 50, fails)
+at the navel (720, 667) the defined map leans up to 20 steps off flat
+at the navel (840, 667) the defined map leans up to 25 steps off flat
+at the navel (680, 667) the defined map leans up to 19 steps off flat
+at the navel (880, 667) the defined map leans up to 26 steps off flat
+
+-- render: what the groove test guards (second review's question). Today's code with only the curvature put back to the unsigned original (length(dpdx(n)) + length(dpdy(n))) / (length(dpdx(p)) + length(dpdy(p))), everything else as committed:
+red over green where the light ends in a groove: standard 1, skin 1.0647502
+skin in a groove isn't reddened: 1.0647502
+     Summary [   9.474s] 1 test run: 0 passed, 1 failed, 386 skipped
+-- and with the signed curvature restored:
+red over green where the light ends in a groove: standard 1, skin 1
+        PASS [   9.666s] (1/1) axcenity-render renderer::tests::skin::light_ending_in_a_groove_isnt_reddened_as_on_a_ball

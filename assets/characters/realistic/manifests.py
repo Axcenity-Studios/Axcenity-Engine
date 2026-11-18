@@ -15,7 +15,9 @@ Then rebuild the library's catalogue: python -I assets/characters/catalogue.py
 Every parameter carries its `about` (tooltip), `feature` and `level`
 (R1; the face's come from `faceparams.py`), and the manifest lists the
 body's and the face's `features`, with anchors measured on the model by
-`anchors.py` (numpy). The presets are `presets.py`'s.
+`anchors.py` (numpy), and the `handles` a person drags on the character
+in the viewport (R2), measured by `handles.py`. The presets are
+`presets.py`'s.
 
 Slots, sockets and the proportion sliders are the stylized humanoid's
 (`../humanoid/manifests.py`), read from there, so an item or a script
@@ -51,16 +53,31 @@ GROUPS = [
 ]
 BODY_GROUPS = {gid for gid, _, _ in GROUPS}
 
-# How far a proportion slider goes on this body (CO5). `anim`'s body
-# sliders take 0.5 to 1.5, which the stylized body's manifest offers whole;
-# on this body the ends of that make the skin cross itself (shoulders at
-# half width put the arms through the chest: 282 pairs of triangles), so
-# each slider stops where every pair of sliders at their ends still leaves
-# the body free of new crossings (`measure.py --only sliders`).
-PROPORTION_RANGE = [0.85, 1.15]
-# Hips only get wider: the masculine frame's thighs meet at the crotch, and
-# hips 2% narrower already make the skin cross there on a heavy body.
-PROPORTION_RANGES = {"hip_width": [1.0, 1.15]}
+# How far each proportion slider goes on this body (R3, plan section 0
+# decision 8; CO5 had cut them all to 0.85 to 1.15 and the hips to 1 to
+# 1.15). Each end is where the ranges sweep (`../humanoid/qa/ranges.py`)
+# found the last step that still deforms cleanly on both frames and at the
+# corners of muscle and fat, or the population's 0.5th or 99.5th
+# percentile (ANSUR II), whichever is nearer to 1. What set each end, with
+# the numbers: docs/development/character-studio/refinement/r3/ranges.md,
+# whose table a test holds this one to (`avatar`'s `realistic_ranges`).
+PROPORTION_RANGE = [0.85, 1.15]  # (a proportion the table below doesn't name)
+PROPORTION_RANGES = {
+    "height": [0.82, 1.13],
+    "leg_length": [0.85, 1.125],
+    "arm_length": [0.95, 1.08],
+    "shoulder_width": [0.88, 1.12],
+    "waist_width": [0.8, 1.175],
+    "hip_width": [0.7, 1.2],
+    "head_size": [0.88, 1.12],
+    "hand_size": [0.82, 1.07],
+    "foot_size": [0.96, 1.21],
+}
+# Sliders whose attribute (`anim`'s body slider) starts at 1: below 1 they
+# move no bone and a shape does the work. The hips: `HipWidth` below 1
+# pulls the legs in and the thighs cross; `<Frame>_Hips_Narrow`
+# (`shapes.py`) narrows the surface instead.
+ATTRIBUTE_FROM_ONE = {"hip_width"}
 
 # The underwear (`underwear.py`): object -> (item ID, label, slot, tags).
 GARMENTS = {
@@ -70,6 +87,8 @@ GARMENTS = {
     "Underwear_Bra": ("axcenity/realistic-sports-bra", "Sports bra", "underwear_top", ["underwear"]),
 }
 # The region each one hides: its mask shape sinks the skin under it.
+# The body's region map (`regions.py`'s `MAP_FILE`), beside the model.
+REGIONS_MAP = "RealisticRegions.png"
 GARMENT_REGIONS = {"Underwear_BoxerBriefs": "under_boxer_briefs", "Underwear_Briefs": "under_briefs",
                    "Underwear_Bra": "under_sports_bra"}
 GARMENT_SHADING = {"Underwear": "cloth", "Waistband": "cloth"}
@@ -85,6 +104,51 @@ SHADING = {
     # The face's parts (CO6; eyes.py, lashes.py).
     "Cornea": "eye", "EyeOcclusion": "standard", "TearLine": "standard", "Lashes": "hair", "Brows": "hair",
 }
+
+
+# How much of the skin's defined normal map shows (R5, OPEN-07): muscle
+# brings the definition, fat covers it, and the renderer shows
+# `definition * (1 - softness)` of it, so abdominal lines show only on
+# lean, muscular bodies (`skin.py`).
+SKIN_DRIVERS = {
+    "muscle": {"material": "Skin", "value": "definition", "from": [-0.5, 0.8], "to": [0, 1]},
+    "fat": {"material": "Skin", "value": "softness", "from": [-0.5, 0.5], "to": [0, 1]},
+}
+
+
+# Makeup and markings the skin draws (R5, ADR-0042): each a channel of
+# the masks `makeup.py` bakes into the model file, turned on by a
+# description's `skin` block. The colours, roughness and opacity a new
+# layer starts at; a layer without a colour takes the character's own
+# tone (foundation). IDs are the renderer's (`docs/rendering/skin.md`).
+SKIN_LAYERS = [
+    {"id": "foundation", "label": "Foundation", "kind": "makeup",
+     "about": "Evens the skin's tone over the face and makes it more matte; in the character's own tone unless a "
+              "colour is set.", "roughness": 0.55, "opacity": 0.6},
+    {"id": "blush", "label": "Blush", "kind": "makeup",
+     "about": "Colour on the cheeks, swept up toward the temples.",
+     "colour": "#c85a62", "roughness": 0.5, "opacity": 0.45},
+    {"id": "eyeshadow", "label": "Eyeshadow", "kind": "makeup",
+     "about": "Colour on the upper lids, deepest by the lashes and toward the outer corners.",
+     "colour": "#6e4c58", "roughness": 0.45, "opacity": 0.6},
+    {"id": "eyeliner", "label": "Eyeliner", "kind": "makeup",
+     "about": "A line along the upper lashes with a short wing, and a fainter one under the outer lower lid.",
+     "colour": "#1a1414", "roughness": 0.4, "opacity": 0.9},
+    {"id": "lips", "label": "Lip colour", "kind": "makeup",
+     "about": "Colour on the lips; lower roughness is glossier.",
+     "colour": "#a8434b", "roughness": 0.3, "opacity": 0.6},
+    {"id": "brow_fill", "label": "Brow fill", "kind": "makeup",
+     "about": "Colour on the skin under the brows, so they read fuller.",
+     "colour": "#4a3428", "roughness": 0.6, "opacity": 0.45},
+    {"id": "freckles", "label": "Freckles", "kind": "marking",
+     "about": "Small brown spots where the sun falls: the nose and cheeks, shoulders, upper back and forearms. "
+              "Amount shows more of them; a new seed shows others.", "amount": 0.45, "opacity": 0.75},
+    {"id": "moles", "label": "Moles", "kind": "marking",
+     "about": "A few darker spots over the face and body. Amount shows more of them; a new seed shows others.",
+     "amount": 0.3, "opacity": 0.9},
+    {"id": "scar", "label": "Scar", "kind": "marking",
+     "about": "A healed scar down the left cheek: paler and smoother than the skin round it.", "opacity": 0.8},
+]
 
 
 # What each body parameter does, in a sentence (its tooltip, R1), and the
@@ -211,8 +275,9 @@ def base_manifest(data, parts, folder=HERE):
     ]
     for pid, label, attribute, advanced in shared.PROPORTIONS:
         span = PROPORTION_RANGES.get(pid, PROPORTION_RANGE)
+        drives = [max(span[0], 1), span[1]] if pid in ATTRIBUTE_FROM_ONE else span
         parameter = {"id": pid, "label": label, "group": "proportions", "range": span,
-                     "default": 1, "attributes": [{"attribute": attribute, "from": span}]}
+                     "default": 1, "attributes": [{"attribute": attribute, "from": drives}]}
         if advanced:
             parameter["advanced"] = True
         parameters.append(parameter)
@@ -222,6 +287,9 @@ def base_manifest(data, parts, folder=HERE):
         sys.path.insert(0, HERE)
     import shapes
     parameters += shapes.parameters()
+    for parameter in parameters:
+        if parameter["id"] in SKIN_DRIVERS:
+            parameter["material_values"] = [SKIN_DRIVERS[parameter["id"]]]
     # The face's parameters (CO6; faceparams.py).
     import faceparams
     parameters += faceparams.parameters(data.get("face", {}).get("face_identity", {}))
@@ -231,13 +299,15 @@ def base_manifest(data, parts, folder=HERE):
     parameters = [describe(p) if p["group"] in BODY_GROUPS else p for p in parameters]
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})
-    return {
+    manifest = {
         "format_version": 1,
         "id": BASE_ID,
         "label": "Realistic",
         "family": "realistic",
         "model": {"file": PARTS_FILE, "body": body["path"],
-                  "parts": [parts[name]["path"] for name in FACE_PARTS]},
+                  "parts": [parts[name]["path"] for name in FACE_PARTS],
+                  # The region map hides what a worn item covers (CO9).
+                  "regions_map": REGIONS_MAP},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",
                      "added_bones": data["added_bones"]},
         "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS] + faceparams.groups(),
@@ -253,7 +323,13 @@ def base_manifest(data, parts, folder=HERE):
         "face": {"profile": FACE_PROFILE, "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
         "defaults": {"items": MALE_WEARS},
         "features": features(data, folder),
+        "skin_layers": [dict(layer, material="Skin") for layer in SKIN_LAYERS],
     }
+    # The handles a person drags in the viewport (R2), measured on the
+    # model with the parameters above (`handles.py`).
+    import handles
+    manifest["handles"] = handles.handles(manifest, os.path.join(folder, PARTS_FILE))
+    return manifest
 
 
 def item_manifests(parts):

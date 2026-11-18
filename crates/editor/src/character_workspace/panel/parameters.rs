@@ -4,7 +4,12 @@
 //! face) lists them folded until one is opened or picked. With Symmetry
 //! on, a left and right pair shows as one row while its sides agree; a pair
 //! whose sides differ shows both, so nothing is flattened unseen (audit
-//! D-11).
+//! D-11). A group with left and right pairs has a "Left and right" menu
+//! of the asymmetry tools (R4: mirror a side onto the other, reset a
+//! side) for the pairs it shows, and each paired row a ⇄ menu of the same
+//! tools for its own pair.
+
+use std::collections::BTreeSet;
 
 use axcenity_avatar::{BaseManifest, Description, Parameter};
 use eframe::egui;
@@ -13,8 +18,9 @@ use super::super::intent::Intent;
 use super::super::selection::{
     Level, Selection, parameter_about, parameter_feature, parameter_level,
 };
+use super::super::sides::{self, SideTool, SidesOf};
 use super::super::{Category, symmetric_label, value_of};
-use super::row::{self, Row};
+use super::row::{self, Asked, Row};
 use crate::theme::{self, icons};
 use crate::widgets;
 
@@ -88,14 +94,68 @@ pub(in super::super) fn hidden_changes(
     Some((hidden.len(), needed))
 }
 
-/// Draws `category`'s groups and returns what they ask for.
+/// Each side tool for the pairs `of` names, and whether it would change
+/// anything (`defaults` is the body's default character).
+pub(in super::super) fn side_choices(
+    description: &Description,
+    defaults: &Description,
+    base: &BaseManifest,
+    of: &SidesOf,
+) -> Vec<(SideTool, bool)> {
+    let pairs = sides::pairs(base, of);
+    SideTool::ALL
+        .into_iter()
+        .map(|tool| {
+            (
+                tool,
+                sides::would_change(description, defaults, base, tool, &pairs),
+            )
+        })
+        .collect()
+}
+
+/// The group's "Left and right" menu: the side tools for the pairs of the
+/// feature its rows show at this level.
+fn sides_row(
+    ui: &mut egui::Ui,
+    base: &BaseManifest,
+    description: &Description,
+    defaults: &Description,
+    shown: &[Shown],
+    level: Level,
+) -> Option<Intent> {
+    let feature = shown
+        .iter()
+        .find(|row| row.parameter.mirror.is_some())
+        .map(|row| parameter_feature(row.parameter).to_owned())?;
+    let of = SidesOf::Feature { feature, level };
+    let count = sides::pairs(base, &of).len();
+    if count == 0 {
+        return None;
+    }
+    let tools = side_choices(description, defaults, base, &of);
+    let tip = format!(
+        "Mirror one side onto the other, or reset a side, for the {count} left and right {} \
+         shown here (one undo step)",
+        if count == 1 { "pair" } else { "pairs" }
+    );
+    let tool = super::row::sides_menu(ui, &tools, Some("Left and right"), &tip);
+    ui.add_space(4.0);
+    tool.map(|tool| Intent::Sides { tool, of })
+}
+
+/// Draws `category`'s groups and returns what they ask for. `defaults` is
+/// the body's default character (what a side's reset puts back).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn show(
     ui: &mut egui::Ui,
     base: &BaseManifest,
     description: &Description,
+    defaults: &Description,
     selection: &Selection,
     category: Category,
     symmetry: bool,
+    locks: &BTreeSet<String>,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
@@ -124,8 +184,24 @@ pub(super) fn show(
         }
         any = true;
         let draw = |ui: &mut egui::Ui, intents: &mut Vec<Intent>| {
+            intents.extend(sides_row(
+                ui,
+                base,
+                description,
+                defaults,
+                &shown,
+                selection.level,
+            ));
             for row in &shown {
-                intents.extend(parameter(ui, base, description, row, selection.level));
+                intents.extend(parameter(
+                    ui,
+                    base,
+                    description,
+                    defaults,
+                    row,
+                    selection.level,
+                    locks,
+                ));
             }
         };
         if selection.feature.is_some() {
@@ -180,22 +256,50 @@ pub(super) fn show(
     intents
 }
 
-/// One parameter's row: a slider, or chips for a choice.
+/// The IDs a row's lock covers: the parameter and, on a mirrored row,
+/// its mirror.
+fn lock_ids(shown: &Shown) -> Vec<String> {
+    let parameter = shown.parameter;
+    let mut ids = vec![parameter.id.clone()];
+    if shown.mirrored
+        && let Some(mirror) = &parameter.mirror
+    {
+        ids.push(mirror.clone());
+    }
+    ids
+}
+
+/// One parameter's row: a slider, or chips for a choice; each with a lock
+/// for Randomize, and a paired row with its pair's side tools.
 fn parameter(
     ui: &mut egui::Ui,
     base: &BaseManifest,
     description: &Description,
+    defaults: &Description,
     shown: &Shown,
     level: Level,
+    locks: &BTreeSet<String>,
 ) -> Option<Intent> {
     let parameter = shown.parameter;
     let value = value_of(description, Some(base), &parameter.id);
+    let ids = lock_ids(shown);
+    let locked = ids.iter().all(|id| locks.contains(id));
     if !parameter.choices.is_empty() {
         let picked = parameter.nearest_choice(value).map(|choice| choice.value);
         let palette = theme::palette(ui.ctx());
-        ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
-            .on_hover_text(parameter_about(parameter));
         let mut out = None;
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
+                .on_hover_text(parameter_about(parameter));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(locked) = row::lock_toggle(ui, locked) {
+                    out = Some(Intent::SetLock {
+                        ids: ids.clone(),
+                        locked,
+                    });
+                }
+            });
+        });
         ui.horizontal_wrapped(|ui| {
             for choice in &parameter.choices {
                 if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
@@ -215,7 +319,15 @@ fn parameter(
         parameter.label.clone()
     };
     let about = parameter_about(parameter);
-    let (value, gesture) = row::slider(
+    let tools = parameter.mirror.is_some().then(|| {
+        side_choices(
+            description,
+            defaults,
+            base,
+            &SidesOf::Pair(parameter.id.clone()),
+        )
+    });
+    let asked = row::slider_with_sides(
         ui,
         &Row {
             id: &parameter.id,
@@ -226,8 +338,21 @@ fn parameter(
             range: parameter.range,
             default: parameter.default,
             typed: level == Level::Advanced,
+            locked: Some(locked),
         },
+        tools.as_deref(),
     )?;
+    let (value, gesture) = match asked {
+        Asked::Set(value, gesture) => (value, gesture),
+        Asked::Lock(locked) => return Some(Intent::SetLock { ids, locked }),
+        Asked::Sides(tool) => {
+            return Some(Intent::Sides {
+                tool,
+                of: SidesOf::Pair(parameter.id.clone()),
+            });
+        }
+    };
+
     let id = parameter.id.clone();
     Some(if shown.mirrored {
         Intent::SetMirrored { id, value, gesture }

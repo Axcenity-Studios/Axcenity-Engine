@@ -384,8 +384,8 @@ pub(super) struct InstanceRaw {
     /// Metalness, roughness, alpha cutoff, and studs per texture repeat
     /// (0 keeps the mesh's own coordinates).
     pub(super) surface: [f32; 4],
-    /// Where the item's skin's joints start in the frame's joints, and how
-    /// many it has: 0 for an item that isn't skinned (see `skinning.rs`).
+    /// Where the item's posed corners start in the frame's posed buffer,
+    /// and 1 if it's posed: `[0, 0]` draws it at rest (see `posing.rs`).
     pub(super) skin: [u32; 2],
     /// How the item sways in the wind (see `swayed` in shader.wgsl): the
     /// height of its ground, 1 over its height, its strength (0: still),
@@ -531,6 +531,7 @@ pub(super) struct MapsUniform {
 pub(super) const SHADING_STANDARD: f32 = 0.0;
 pub(super) const SHADING_UNLIT: f32 = 1.0;
 pub(super) const SHADING_TOON: f32 = 2.0;
+pub(super) const SHADING_SKIN: f32 = 3.0;
 
 /// A texture uploaded to the GPU, with a view for each way it's read.
 pub(super) struct GpuTexture {
@@ -1091,6 +1092,11 @@ pub(super) struct ScenePipeline {
     /// Hardware ray tracing's acceleration structures, while something
     /// traces rays (renderer/ray_tracing.rs).
     pub(super) ray_scene: Option<Box<super::ray_tracing::RayScene>>,
+    /// The posing pass (CO8): every animated item morphed and skinned once
+    /// a frame into the posed corners every pass reads.
+    pub(super) posing: super::posing::Posing,
+    /// `posing.generation` when the bindings holding its buffers were made.
+    pub(super) posing_generation: u64,
     /// Ray traced sun shadows' pass and mask, while drawn
     /// (renderer/ray_shadows.rs), and the 4-byte mask bound without them.
     pub(super) ray_shadows: Option<Box<super::ray_shadows::RayShadows>>,

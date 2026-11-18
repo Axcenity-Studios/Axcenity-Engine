@@ -8,7 +8,7 @@ use eframe::egui;
 use eframe::egui_wgpu::RenderState;
 
 use super::EditorApp;
-use crate::character_workspace::{CharacterWorkspace, WorkspaceAction};
+use crate::character_workspace::{CharacterWorkspace, Start, WorkspaceAction};
 use crate::dialog;
 use crate::theme::{self, icons};
 
@@ -20,9 +20,9 @@ impl EditorApp {
         self.characters_folder = folder;
     }
 
-    /// Opens the workspace on the preset at `preset` or on a saved `file`.
-    /// A problem is told on the start screen.
-    pub(super) fn open_character_workspace(&mut self, preset: Option<usize>, file: Option<&Path>) {
+    /// Opens the workspace on a new character from `start` or on a saved
+    /// `file`. A problem is told on the start screen.
+    pub(super) fn open_character_workspace(&mut self, start: Option<Start>, file: Option<&Path>) {
         let Some(folder) = self.characters_folder.clone() else {
             self.start.set_notice(
                 "Character Studio has nowhere to keep its files on this computer.".into(),
@@ -31,7 +31,7 @@ impl EditorApp {
         };
         let opened = match file {
             Some(file) => CharacterWorkspace::open_file(&folder, file),
-            None => CharacterWorkspace::open_preset(&folder, preset.unwrap_or(0)),
+            None => CharacterWorkspace::open_new(&folder, &start.unwrap_or_default()),
         };
         match opened {
             Ok(workspace) => self.character_workspace = Some(Box::new(workspace)),
@@ -41,7 +41,7 @@ impl EditorApp {
 
     /// Opens the workspace on the default character (`--character-studio`).
     pub fn open_character_studio(&mut self) {
-        self.open_character_workspace(Some(0), None);
+        self.open_character_workspace(Some(Start::default()), None);
     }
 
     /// Saves the workspace's character if it has unsaved changes (for
@@ -175,7 +175,7 @@ mod tests {
         assert!(start.iter().any(|text| text == "Debug"), "{start:?}");
 
         // The Athletic preset, from the start page: the realistic body.
-        app.open_character_workspace(Some(2), None);
+        app.open_character_workspace(Some(Start::shipped("athletic-male")), None);
         let workspace = app.character_workspace.as_ref().expect("opened");
         assert_eq!(
             workspace.description().base,
@@ -223,7 +223,7 @@ mod tests {
         let mut app = EditorApp::new(None);
         let folder = crate::character_studio::test_folder("workspace-close");
         app.set_characters_folder(Some(folder.clone()));
-        app.open_character_workspace(Some(0), None);
+        app.open_character_workspace(Some(Start::default()), None);
         assert!(app.unsaved(), "a new character isn't saved");
         let modified = app.modified_documents();
         assert!(
@@ -256,6 +256,40 @@ mod tests {
         let workspace = app.character_workspace.as_ref().unwrap();
         assert!(!workspace.dirty());
         assert!(workspace.file_path().unwrap().is_file());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// Quitting with "Don't Save" removes the studio's recovery file at
+    /// once (`discard_unsaved`), not only when the workspace is dropped:
+    /// the next open must not offer work the person threw away.
+    #[test]
+    fn dont_save_on_quit_removes_the_studio_recovery_file() {
+        let mut app = EditorApp::new(None);
+        let folder = crate::character_studio::test_folder("workspace-dont-save");
+        app.set_characters_folder(Some(folder.clone()));
+        app.open_character_workspace(Some(Start::default()), None);
+        let workspace = app.character_workspace.as_mut().unwrap();
+        workspace.apply(crate::character_workspace::Intent::SetParameter {
+            id: "fat".into(),
+            value: 0.4,
+            gesture: crate::character_workspace::Gesture::Commit,
+        });
+        workspace.autosave_step(std::time::Instant::now());
+        let recovery = folder.join(crate::character_workspace::autosave::RECOVERY_FILE);
+        assert!(recovery.is_file(), "unsaved work is autosaved");
+        app.asking = Some(super::super::Discard::Quit);
+        assert_eq!(
+            app.answer(super::super::Answer::DontSave),
+            Some(super::super::Discard::Quit)
+        );
+        assert!(app.character_workspace.is_some(), "not dropped yet");
+        assert!(!recovery.is_file(), "the recovery file is gone already");
+        // A frame before the window closes doesn't write it again.
+        app.character_workspace
+            .as_mut()
+            .unwrap()
+            .autosave_step(std::time::Instant::now() + std::time::Duration::from_secs(10));
+        assert!(!recovery.is_file());
         let _ = std::fs::remove_dir_all(&folder);
     }
 }

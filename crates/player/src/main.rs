@@ -1559,6 +1559,16 @@ mod bench_tests;
 #[cfg(test)]
 mod character_capture;
 #[cfg(test)]
+mod face_preset_tests;
+#[cfg(test)]
+mod fit_gate_tests;
+#[cfg(test)]
+mod handle_tests;
+#[cfg(test)]
+mod live_identity_bench_tests;
+#[cfg(test)]
+mod makeup_tests;
+#[cfg(test)]
 mod profile_tests;
 #[cfg(test)]
 mod skin_value_tests;

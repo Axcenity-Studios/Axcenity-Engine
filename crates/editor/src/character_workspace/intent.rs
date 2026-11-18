@@ -4,19 +4,25 @@
 //! the workspace. So a walkthrough test drives the studio exactly as the
 //! panels do, and no panel calls another.
 //!
-//! Capture and comparison (brief §12) come with R1's second part, as new
-//! variants here.
+//! Comparison (brief §12), Randomize, presets by ID and the recovery
+//! offer came with R1's second part. Comparison, locks and favourites are
+//! editor state: their intents never change the description or undo.
+//! The asymmetry tools (R4) are edits, one undo step each; the preview's
+//! pose and motion (R9) is editor state, as an expression is.
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
 use std::path::PathBuf;
 
-use axcenity_avatar::MaterialValue;
+use axcenity_avatar::{MaterialValue, PresetKind, SkinLayer};
 
-use super::Category;
 use super::edit::Scope;
+use super::motion::Motion;
+use super::random::RandomScope;
 use super::selection::Level;
+use super::sides::{SideTool, SidesOf};
 use super::stage::{Backdrop, Lighting, ViewPreset};
+use super::{Category, Start};
 
 /// Where a change is in its gesture.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,14 +67,32 @@ pub enum Intent {
         to: Option<MaterialValue>,
         gesture: Gesture,
     },
+    /// Sets makeup layer or marking `id` (`marking`: which list of the
+    /// description's `skin` block) to `to` whole, or with `None` takes it
+    /// out (R5, ADR-0042). Turning a layer off is `to` with `enabled`
+    /// false, which keeps its settings.
+    SetSkinLayer {
+        id: String,
+        marking: bool,
+        to: Option<SkinLayer>,
+        gesture: Gesture,
+    },
     /// Moves the character onto another base model.
     SetBase(String),
     /// Renames the character (one undo step).
     Rename(String),
-    /// Starts again from preset `index` of `presets()`, keeping the name.
-    ApplyPreset(usize),
-    /// A new character from preset `index`, not saved yet.
-    New(usize),
+    /// Applies the preset with this ID (what its kind owns; the name is
+    /// kept), as one undo step.
+    ApplyPreset(String),
+    /// Saves the character as a person's own preset of a kind.
+    SaveAsPreset {
+        kind: PresetKind,
+        name: String,
+    },
+    /// Marks a preset a favourite, or not (editor state).
+    ToggleFavourite(String),
+    /// A new character, not saved yet: a family's default or a preset.
+    New(Start),
     /// Opens a saved character file in place of this one.
     Open(PathBuf),
     Save,
@@ -83,12 +107,71 @@ pub enum Intent {
     PickFeature(Option<String>),
     PickLevel(Level),
     SetSymmetry(bool),
+    /// Turns editing on the character in the viewport on or off (R2): the
+    /// hover highlight, picking by click and the handles. Off, the
+    /// viewport is the camera only (editor state).
+    SetHandles(bool),
+    /// Frames a feature (R2: a feature clicked on the character, when it's
+    /// small on the screen or partly off it).
+    FocusFeature(String),
     FocusView(ViewPreset),
     SetLighting(Lighting),
     SetBackdrop(Backdrop),
     /// Shows a built-in expression on the preview's face (`None`: none).
     /// Preview only: never in the description.
     PreviewExpression(Option<String>),
+    /// Plays a pose or motion on the preview (Still, Idle, Walk, Run, a
+    /// gesture). Preview only: never in the description.
+    PreviewMotion(Motion),
+    /// Mirrors a side onto the other, or resets a side, for a feature's
+    /// left and right pairs or one pair (one undo step).
+    Sides {
+        tool: SideTool,
+        of: SidesOf,
+    },
+    /// Draws the scope again, keeping what's locked (one undo step).
+    Randomize(RandomScope),
+    /// Locks or unlocks parameters for Randomize (editor state).
+    SetLock {
+        ids: Vec<String>,
+        locked: bool,
+    },
+    /// Holds the current character as the next of A, B and C.
+    Capture,
+    /// Shows a held version (`None`: the current character).
+    ShowHeld(Option<usize>),
+    /// A held version beside the current one, or not.
+    SideBySide(bool),
+    /// Makes a held version the character (one undo step).
+    KeepHeld(usize),
+    /// Drops a held version.
+    DiscardHeld(usize),
+    /// The answer to "Recover the unsaved character?".
+    Recover(bool),
     /// Back to the start screen (the editor asks to save first).
     Home,
+}
+
+impl Intent {
+    /// Whether it changes the character (so a held version shown in its
+    /// place gives way to it first: an edit is always seen).
+    pub fn edits(&self) -> bool {
+        matches!(
+            self,
+            Intent::SetParameter { .. }
+                | Intent::SetMirrored { .. }
+                | Intent::Choose { .. }
+                | Intent::Wear { .. }
+                | Intent::SetMaterial { .. }
+                | Intent::SetSkinLayer { .. }
+                | Intent::SetBase(_)
+                | Intent::Rename(_)
+                | Intent::ApplyPreset(_)
+                | Intent::Undo
+                | Intent::Redo
+                | Intent::Reset(_)
+                | Intent::Randomize(_)
+                | Intent::Sides { .. }
+        )
+    }
 }

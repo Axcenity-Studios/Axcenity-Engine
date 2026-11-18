@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Broad",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": 0.3,
+    "frame": 0,
+    "hip_width": 1.05,
+    "muscle": 0.4,
+    "shoulder_width": 1.12
+  },
+  "preset": {
+    "id": "axcenity/stylized-body-broad-masculine",
+    "kind": "body",
+    "about": "A wide, solid frame: wider shoulders and hips.",
+    "tags": [
+      "build",
+      "masculine"
+    ],
+    "order": 40
+  }
+}

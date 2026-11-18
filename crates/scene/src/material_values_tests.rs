@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axcenity_core::{ClassName, Color3, InstanceId, Value, World, material_value_attribute};
-use axcenity_render::{Material, NormalMap, TextureSource};
+use axcenity_render::{Material, NormalMap, Shading, SkinShading, TextureSource};
 
 use crate::material::modulate;
 
@@ -195,4 +195,196 @@ fn the_sclera_tint_multiplies_the_white_of_the_eye() {
         )],
     );
     assert_eq!(tinted.base_color, [1.0, 0.8, 0.8]);
+}
+
+/// The realistic skin as a model marked skin draws it: Skin shading, with
+/// its defined normal map beside its own (smooth) one.
+fn skin_shaded() -> Material {
+    struct Defined;
+    impl TextureSource for Defined {
+        fn key(&self) -> u64 {
+            8
+        }
+        fn size(&self) -> (u32, u32) {
+            (1, 1)
+        }
+        fn rgba(&self) -> &[u8] {
+            &[150, 128, 250, 255]
+        }
+    }
+    Material {
+        shading: Shading::Skin(SkinShading {
+            defined_normal: Some(Arc::new(Defined)),
+            ..SkinShading::default()
+        }),
+        ..skin()
+    }
+}
+
+/// `material`'s skin shading: its scatter and normal blend.
+fn skin_of(material: &Material) -> (f32, f32) {
+    match &material.shading {
+        Shading::Skin(skin) => (skin.scatter, skin.normal_blend),
+        other => panic!("not skin: {other:?}"),
+    }
+}
+
+#[test]
+fn neutral_values_leave_skin_shading_as_the_model_made_it() {
+    let authored = skin_shaded();
+    let neutral = drawn(
+        &authored,
+        "Skin",
+        &[
+            number("Skin", "scatter_scale", 1.0),
+            number("Skin", "definition", 0.0),
+            number("Skin", "softness", 0.0),
+            number("Skin", "detail_strength", 1.0),
+        ],
+    );
+    assert_eq!(skin_of(&neutral), skin_of(&authored));
+    assert_eq!(skin_of(&neutral), (1.0, 0.0));
+    let Shading::Skin(skin) = &neutral.shading else {
+        unreachable!()
+    };
+    assert_eq!(
+        skin.defined_normal.as_ref().map(|map| map.key()),
+        Some(8),
+        "the defined map is kept"
+    );
+}
+
+#[test]
+fn scatter_scale_multiplies_how_far_light_spreads_under_the_skin() {
+    let authored = skin_shaded();
+    let wide = drawn(&authored, "Skin", &[number("Skin", "scatter_scale", 1.6)]);
+    let none = drawn(&authored, "Skin", &[number("Skin", "scatter_scale", 0.0)]);
+    assert_eq!(skin_of(&wide).0, 1.6);
+    assert_eq!(skin_of(&none).0, 0.0);
+    // Held to the value's range (0 to 2).
+    let past = drawn(&authored, "Skin", &[number("Skin", "scatter_scale", 7.0)]);
+    assert_eq!(skin_of(&past).0, 2.0);
+    // A standard material has nothing to scatter: it is left as it is.
+    let standard = drawn(&skin(), "Skin", &[number("Skin", "scatter_scale", 1.6)]);
+    assert!(matches!(standard.shading, Shading::Standard));
+}
+
+#[test]
+fn definition_shows_the_defined_normal_map_unless_softness_hides_it() {
+    let authored = skin_shaded();
+    let blend = |definition: f64, softness: f64| {
+        skin_of(&drawn(
+            &authored,
+            "Skin",
+            &[
+                number("Skin", "definition", definition),
+                number("Skin", "softness", softness),
+            ],
+        ))
+        .1
+    };
+    assert_eq!(blend(1.0, 0.0), 1.0, "lean and muscular: the defined map");
+    assert_eq!(blend(0.0, 0.0), 0.0);
+    assert_eq!(blend(1.0, 1.0), 0.0, "fat covers the definition");
+    assert!((blend(0.8, 0.25) - 0.6).abs() < 1e-6);
+    // Each held to 0 to 1.
+    assert_eq!(blend(3.0, -2.0), 1.0);
+    // Definition alone, softness alone.
+    let alone = drawn(&authored, "Skin", &[number("Skin", "definition", 0.5)]);
+    assert_eq!(skin_of(&alone).1, 0.5);
+    let soft = drawn(&authored, "Skin", &[number("Skin", "softness", 0.5)]);
+    assert_eq!(skin_of(&soft).1, 0.0);
+}
+
+/// The realistic skin with its makeup and marking masks, as a model whose
+/// file names them draws it, before values: every layer off.
+fn skin_with_masks() -> Material {
+    let mut material = skin_shaded();
+    if let Shading::Skin(skin) = &mut material.shading {
+        skin.layers = Some(Box::new(axcenity_render::SkinLayers {
+            masks: std::array::from_fn(|_| Arc::new(Flat) as Arc<dyn TextureSource>),
+            makeup: Default::default(),
+            freckles: Default::default(),
+            moles: Default::default(),
+            scar: 0.0,
+        }));
+    }
+    material
+}
+
+fn layers_of(material: &Material) -> Option<&axcenity_render::SkinLayers> {
+    match &material.shading {
+        Shading::Skin(skin) => skin.layers.as_deref(),
+        other => panic!("not skin: {other:?}"),
+    }
+}
+
+fn colour(
+    material: &'static str,
+    name: &'static str,
+    rgb: [f32; 3],
+) -> (&'static str, &'static str, Value) {
+    (
+        material,
+        name,
+        Value::Color3(Color3::new(rgb[0], rgb[1], rgb[2])),
+    )
+}
+
+#[test]
+fn skin_layers_draw_from_their_values_and_none_on_draws_no_layers() {
+    let authored = skin_with_masks();
+    // No layer on: the masks aren't bound at all (nothing to draw).
+    assert!(layers_of(&drawn(&authored, "Skin", &[])).is_none());
+    let drawn = drawn(
+        &authored,
+        "Skin",
+        &[
+            number("Skin", "layer_blush_opacity", 0.4),
+            colour("Skin", "layer_blush_colour", [0.8, 0.3, 0.3]),
+            number("Skin", "layer_blush_roughness", 0.45),
+            number("Skin", "layer_foundation_opacity", 0.7),
+            number("Skin", "layer_brow_fill_opacity", 0.5),
+            number("Skin", "layer_freckles_opacity", 0.9),
+            number("Skin", "layer_freckles_amount", 0.6),
+            number("Skin", "layer_freckles_seed", 7.0),
+            number("Skin", "layer_moles_opacity", 1.0),
+            number("Skin", "layer_scar_opacity", 0.8),
+            // Another material's values and an unknown layer change nothing.
+            number("Mouth", "layer_lips_opacity", 1.0),
+            number("Skin", "layer_glitter_opacity", 1.0),
+        ],
+    );
+    let layers = layers_of(&drawn).expect("layers on");
+    let blush = layers.makeup[1];
+    assert_eq!(blush.opacity, 0.4);
+    assert_eq!(blush.colour, Some([0.8, 0.3, 0.3]));
+    assert_eq!(blush.roughness, Some(0.45));
+    // Foundation without a colour: the skin's own tone.
+    assert_eq!(layers.makeup[0].colour, None);
+    assert_eq!(layers.makeup[0].opacity, 0.7);
+    assert_eq!(layers.makeup[5].opacity, 0.5, "brow fill");
+    assert_eq!(layers.makeup[4].opacity, 0.0, "lips are the Mouth's here");
+    assert_eq!(layers.freckles.amount, 0.6);
+    assert_eq!(layers.freckles.opacity, 0.9);
+    // The seed's golden-ratio offset: 7 × 0.618… = 4.3262…
+    assert!((layers.freckles.seed - 0.326_237).abs() < 1e-4);
+    // A marking without an amount shows all its spots.
+    assert_eq!(layers.moles.amount, 1.0);
+    assert_eq!(layers.moles.seed, 0.0);
+    assert_eq!(layers.scar, 0.8);
+    // Held to 0 to 1.
+    let past = drawn_one(&authored, number("Skin", "layer_scar_opacity", 3.0));
+    assert_eq!(layers_of(&past).unwrap().scar, 1.0);
+}
+
+fn drawn_one(material: &Material, value: (&'static str, &'static str, Value)) -> Material {
+    drawn(material, "Skin", &[value])
+}
+
+#[test]
+fn skin_without_masks_ignores_layer_values() {
+    let authored = skin_shaded();
+    let drawn = drawn_one(&authored, number("Skin", "layer_blush_opacity", 1.0));
+    assert!(layers_of(&drawn).is_none());
 }

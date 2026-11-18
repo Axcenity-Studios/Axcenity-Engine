@@ -21,16 +21,17 @@ use crate::graphics::{AmbientOcclusion, EffectiveGraphics, ShadowMapSize, Shadow
 use super::culling::{Bounds, CullingBounds, Frustum, ShadowView, Sphere};
 use super::lod::{Draw, OPAQUE};
 use super::parallel::{map_each, map_indexes, map_parts, sort_unstable, worth_sharing};
-use super::skinning::{JointRaw, packed_counts};
+use super::posing::PENDING;
+use super::skinning::JointRaw;
 use super::{
     Batch, CASCADE_SPLIT_BLEND, CONTACT_SHADOW_LENGTH, CONTACT_SHADOW_THICKNESS, FAR_PLANE,
     FrameUniform, InstanceRaw, LIGHT_SCALE, LIGHTS_PER_TILE, LightRaw, MATERIAL_TEXTURES,
     MAX_LIGHTS, MAX_POINT_SHADOWS, MAX_SPOT_SHADOW_DEGREES, MAX_SPOT_SHADOWS, MAX_SUN_SIZE,
     MAX_TILES, MIN_TILE_SIZE, MapsUniform, MaterialKey, MeshKey, NEAR_PLANE, POINT_SHADOW_SPREAD,
-    PointShadow, PostUniform, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT, SHADOW_CASCADES,
-    SHADOW_CASTER_RANGE, SpotShadow,
+    PointShadow, PostUniform, SHADING_SKIN, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT,
+    SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
 };
-use crate::SURFACE_PARAMETERS;
+use crate::{SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, SkinLayers};
 
 /// The camera's view (world to view space) and projection (view to clip
 /// space).
@@ -777,12 +778,16 @@ pub(super) struct DrawPlan {
     pub(super) casters: Vec<Vec<Caster>>,
     /// Items outside the camera's view.
     pub(super) culled: u32,
-    /// Every drawn skin's joints, each skin's after the one before
-    /// (`InstanceRaw::skin` says where an item's start).
+    /// Every drawn skin's joints, each skin's after the one before.
     pub(super) joints: Vec<JointRaw>,
-    /// Where each drawn skin's joints are in `joints` (start and count), by
-    /// the skin's address, for the motion vectors' instances.
-    pub(super) skins: HashMap<*const Skin, [u32; 2]>,
+    /// Where each drawn skin's joints start in `joints`, by the skin's
+    /// address: items posed alike share them.
+    pub(super) skins: HashMap<*const Skin, u32>,
+    /// Each (skin, mesh) pair the plan's instances and casters are posed
+    /// as (CO8, `posing.rs`). Until the frame knows which it poses and
+    /// where, an instance or caster of one holds `[its index here,
+    /// PENDING]` as its `skin`.
+    pub(super) posed: Vec<PoseUse>,
     /// Items in view with levels of detail, by level (see
     /// [`RenderStats::lod_items`](crate::RenderStats::lod_items)).
     pub(super) lod_items: [u32; crate::LOD_LEVELS],
@@ -878,10 +883,22 @@ pub(super) fn plan_draws(
 /// What makes two draws one batch.
 type BatchKind = (SortKey, bool, bool, bool);
 
+/// One (skin, mesh) pair a plan poses: the first draw (index into the
+/// frame's draws) it was seen on, its mesh, and where its skin's joints
+/// start in [`DrawPlan::joints`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct PoseUse {
+    pub(super) draw: u32,
+    pub(super) mesh: MeshKey,
+    pub(super) joints: u32,
+}
+
 /// A skin's joints wanted by an instance or caster of a [`PlanPart`], each
-/// counted from the part's start.
+/// counted from the part's start, drawn with `mesh` by draw `draw`.
 struct SkinUse<'a> {
     skin: &'a Skin,
+    mesh: MeshKey,
+    draw: u32,
     instance: Option<u32>,
     caster: Option<u32>,
 }
@@ -1003,6 +1020,8 @@ fn plan_part<'a>(
         if let Some(skin) = skin {
             part.skins.push(SkinUse {
                 skin,
+                mesh,
+                draw: at,
                 instance: instance_at,
                 caster: caster_at,
             });
@@ -1012,14 +1031,16 @@ fn plan_part<'a>(
 }
 
 /// Puts `parts` together, in order: a batch cut in two by where a share of
-/// the work ended is made whole, and each skin's joints are added once.
+/// the work ended is made whole, each skin's joints are added once, and
+/// each (skin, mesh) pair is listed once.
 fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> DrawPlan {
     let mut plan = DrawPlan::default();
     let mut first_instance = 0;
     let mut last_kind: Option<BatchKind> = None;
     // Where each skin's joints start, by the skin's address: items posed
     // alike share one.
-    let mut skins: HashMap<*const Skin, [u32; 2]> = HashMap::new();
+    let mut skins: HashMap<*const Skin, u32> = HashMap::new();
+    let mut pairs: HashMap<(*const Skin, MeshKey), u32> = HashMap::new();
     let mut seen = seen;
     for mut part in parts {
         plan.culled += part.culled;
@@ -1042,13 +1063,25 @@ fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> Dra
         }
         for used in part.skins {
             let joints = &mut plan.joints;
-            let skin = *skins
+            let first = *skins
                 .entry(std::ptr::from_ref(used.skin))
                 .or_insert_with(|| {
                     let first = joints.len() as u32;
                     joints.extend(JointRaw::of(used.skin));
-                    [first, packed_counts(used.skin)]
+                    first
                 });
+            let posed = &mut plan.posed;
+            let pair = *pairs
+                .entry((std::ptr::from_ref(used.skin), used.mesh))
+                .or_insert_with(|| {
+                    posed.push(PoseUse {
+                        draw: used.draw,
+                        mesh: used.mesh,
+                        joints: first,
+                    });
+                    posed.len() as u32 - 1
+                });
+            let skin = [pair, PENDING];
             if let Some(at) = used.instance {
                 part.instances[at as usize].skin = skin;
             }
@@ -1118,6 +1151,25 @@ pub(super) fn material_textures(
     }
     let material = &item.material;
     let maps = &material.maps;
+    // Skin's makeup and marking masks (ADR-0042) take the metalness,
+    // emissive and opacity maps' places: skin with layers reads none of
+    // them.
+    if let Some(layers) = skin_layers(material) {
+        let [first, second, third] = &layers.masks;
+        return [
+            material.base_color_texture.as_ref(),
+            maps.normal.as_ref().map(|map| &map.texture),
+            Some(first),
+            maps.roughness.as_ref().map(|map| &map.texture),
+            maps.occlusion.as_ref().map(|map| &map.texture),
+            Some(second),
+            Some(third),
+            match &material.shading {
+                Shading::Skin(skin) => skin.defined_normal.as_ref(),
+                _ => None,
+            },
+        ];
+    }
     [
         material.base_color_texture.as_ref(),
         maps.normal.as_ref().map(|map| &map.texture),
@@ -1126,12 +1178,68 @@ pub(super) fn material_textures(
         maps.occlusion.as_ref().map(|map| &map.texture),
         maps.emissive.as_ref(),
         maps.opacity.as_ref().map(|map| &map.texture),
-        // A toon ramp takes the specular map's place.
+        // A toon ramp takes the specular map's place, and so does skin's
+        // defined normal map (skin reads no specular map).
         match &material.shading {
             Shading::Toon(toon) if material.water.is_none() => toon.ramp.as_ref(),
+            Shading::Skin(skin) if material.water.is_none() => skin.defined_normal.as_ref(),
             _ => maps.specular.as_ref(),
         },
     ]
+}
+
+/// A skin material's makeup and markings, when it has them (water and
+/// terrain never do).
+fn skin_layers(material: &Material) -> Option<&SkinLayers> {
+    match &material.shading {
+        Shading::Skin(skin) if material.water.is_none() && material.terrain.is_none() => {
+            skin.layers.as_deref()
+        }
+        _ => None,
+    }
+}
+
+/// Where a skin's makeup and markings ride in its uniform (skin.wgsl's
+/// `skin_layered`): the surface shader's values (skin has none), the toon
+/// values and the specular map's last two (skin reads neither). Returns
+/// (`params`, `toon`, the specular row's z and w).
+///
+/// - `params[0..6]`: each makeup layer's colour in linear light (red
+///   below 0: the skin's own tone) and its opacity;
+/// - `params[6]`, `params[7].xy`: each layer's roughness (below 0: the
+///   skin's own);
+/// - `params[7].zw`: the freckles' amount and opacity;
+/// - `toon`: the moles' amount and opacity, the scar's opacity, the
+///   freckles' seed;
+/// - specular z 1 (the masks are bound), w the moles' seed.
+fn skin_layer_uniform(layers: &SkinLayers) -> ([[f32; 4]; SURFACE_PARAMETERS], [f32; 4], [f32; 2]) {
+    let mut params = [[0.0; 4]; SURFACE_PARAMETERS];
+    let mut roughness = [-1.0; SKIN_MAKEUP_LAYERS];
+    for (index, layer) in layers.makeup.iter().enumerate() {
+        let opacity = layer.opacity.clamp(0.0, 1.0);
+        let colour = match layer.colour {
+            Some(colour) => linear_color(colour.map(|c| c.clamp(0.0, 1.0))),
+            None => Vec3::new(-1.0, 0.0, 0.0),
+        };
+        params[index] = colour.extend(opacity).to_array();
+        roughness[index] = layer.roughness.map_or(-1.0, |r| r.clamp(0.0, 1.0));
+    }
+    let share = |value: f32| value.clamp(0.0, 1.0);
+    let seed = |value: f32| value.rem_euclid(1.0);
+    params[6] = [roughness[0], roughness[1], roughness[2], roughness[3]];
+    params[7] = [
+        roughness[4],
+        roughness[5],
+        share(layers.freckles.amount),
+        share(layers.freckles.opacity),
+    ];
+    let toon = [
+        share(layers.moles.amount),
+        share(layers.moles.opacity),
+        share(layers.scar),
+        seed(layers.freckles.seed),
+    ];
+    (params, toon, [1.0, seed(layers.moles.seed)])
 }
 
 /// [`MapsUniform::shading`] and [`MapsUniform::toon`] for `material`.
@@ -1151,6 +1259,20 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
             [0.0; 4],
         ),
         Shading::Unlit => ([SHADING_UNLIT, 0.0, 0.0, 0.0], [0.0; 4]),
+        // skin.wgsl: the defined normal map's share (none without one),
+        // how far light spreads, and whether that map is BC5.
+        Shading::Skin(skin) => {
+            let defined = skin.defined_normal.as_ref();
+            (
+                [
+                    SHADING_SKIN,
+                    defined.map_or(0.0, |_| skin.normal_blend.clamp(0.0, 1.0)),
+                    skin.scatter.clamp(0.0, 4.0),
+                    f32::from(defined.is_some_and(|map| !map.bc5_levels().is_empty())),
+                ],
+                [0.0; 4],
+            )
+        }
         Shading::Toon(toon) => {
             let steps = if toon.ramp.is_some() {
                 0.0
@@ -1197,8 +1319,16 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
         params = [[0.0; 4]; SURFACE_PARAMETERS];
         params[..3].copy_from_slice(&super::water::water_params(water));
     }
-    let (shading, toon) = shading_uniform(&item.material);
+    let (shading, mut toon) = shading_uniform(&item.material);
     let outline = outline_uniform(&item.material);
+    // Skin's makeup and markings ride where skin reads nothing else.
+    let layered = skin_layers(&item.material).map(skin_layer_uniform);
+    let mut skin_specular = [0.0; 2];
+    if let Some((layer_params, layer_toon, specular)) = layered {
+        params = layer_params;
+        toon = layer_toon;
+        skin_specular = specular;
+    }
     if textures.iter().all(Option::is_none)
         && params == [[0.0; 4]; SURFACE_PARAMETERS]
         && shading == [SHADING_STANDARD, 0.0, 0.0, 0.0]
@@ -1237,7 +1367,8 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
             } else {
                 0.0
             },
-            used(maps.opacity.is_some()),
+            // (Skin's layers take the opacity map's place.)
+            used(maps.opacity.is_some() && layered.is_none()),
         ],
         specular: [
             used(maps.specular.is_some() && shading[0] == SHADING_STANDARD),
@@ -1247,8 +1378,8 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
                     .as_ref()
                     .is_some_and(|map| !map.texture.bc5_levels().is_empty()),
             ),
-            0.0,
-            0.0,
+            skin_specular[0],
+            skin_specular[1],
         ],
         uv_matrix: uv_matrix(&item.material),
         uv_offset: [

@@ -4,7 +4,7 @@ type: system
 status: current
 implementation: partial
 crates: [avatar]
-source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
+source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, crates/avatar/src/skin.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
 docs: [docs/development/character-studio/architecture.md, crates/avatar/CLAUDE.md]
 verified: 2026-11-17
 verified_commit: 5b650d5d
@@ -28,7 +28,7 @@ flowchart LR
   F --> V
   F --> S["resolve (CO3): Resolved<br/>parts, shapes, bones, attributes,<br/>material values, Identity"]
   R --> S
-  S --> A["gameplay apply_description:<br/>derived models, MeshParts,<br/>attributes, HumanoidDescription"]
+  S --> A["gameplay apply_description:<br/>live identity keys, MeshParts,<br/>attributes, HumanoidDescription"]
 ```
 
 - A description holds **values only**: no meshes, no editor state. Its base and items are IDs (`axcenity/tee`) resolved through the library.
@@ -39,16 +39,17 @@ flowchart LR
 
 The refinement's shared contracts (plan section 11.3, [ADR-0040](../Architecture/Architecture-Decisions/ADR-0040-Character-Metadata-Item-Capabilities-And-Presets-Are-Data-In-The-Manifests.md)), all optional fields with no version change:
 
-- **Parameter metadata**: `about` (tooltip), `feature`, `level` (`quick`/`detailed`/`advanced`, with `advanced` written in step; `Parameter::level`), `random`. Groups and slots have `about` and `icon`; material slots `label`, `values` and `role`. Every one of the realistic body's 75 parameters has them, written by its `manifests.py` and `faceparams.py`.
+- **Parameter metadata**: `about` (tooltip), `feature`, `level` (`quick`/`detailed`/`advanced`, with `advanced` written in step; `Parameter::level`), `random`. Groups and slots have `about` and `icon`; material slots `label`, `values` and `role`. Every one of the realistic body's 89 parameters (75 at R1; R4 added 14 face ones) has them, written by its `manifests.py` and `faceparams.py`.
 - **Features and handles**: what a person can point at (`{id, label, category, anchors: [{bone, offset}], radius, regions?}`) and handles that only name parameters. The realistic body has 23 features with anchors measured on the model by `anchors.py`; handles are R2's.
 - **Item capabilities**: an item's own `parameters`, `also_fills`, `requires`, `excludes`, `limitations`, `adjust` for socket items, variant pictures and parameter values; a worn item's `parameters`, `transform` and kept unknown fields. `resolve` gives an item's part its own shape weights (`ResolvedPart::shapes`) and transform, and leaves out what `also_fills`, `excludes` and `requires` forbid; the applier doesn't bake item shapes yet.
+- **Makeup and markings** (R5, [ADR-0042](../Architecture/Architecture-Decisions/ADR-0042-Makeup-And-Markings-Are-Layers-Over-Library-Masks-Drawn-Live-By-The-Skin-Model.md); `skin.rs`): a description's optional `skin` block turns on layers the base manifest's `skin_layers` offers (makeup: colour, opacity, roughness; markings: amount, seed, opacity); `resolve` writes them as `layer_<id>_<field>` material values on the layer's skin slot, which the applier sets live like every other value. The masks are content in the model file (`docs/rendering/skin.md`). `skin` presets carry the block.
 - **Presets**: a format 2 description with a `preset` block, listed in the catalogue's `presets`; `apply_preset` sets only what its kind owns (`body`, `face`, `hair`, `outfit`, `skin`, `character`). The realistic package ships 29 (`realistic/presets/`, written by `presets.py`).
 - **Randomize**: `randomize(&Description, &Scope, locks, seed, &Library)`, deterministic, inside `random`, with the base's constraints and only compatible items.
 
 ## What CO3 built on it
 
 - **`resolve(&Library, &Description)`** (`crates/avatar/src/resolve.rs`) returns `Resolved`, everything the applier needs as plain data: the body and the parts worn (the base model's own parts, then one per worn item in the description's order) as `MeshId`s relative to the library folder, each with how it follows the body (`PartFit::Skinned`, or `Socket` with the socket's name) and its material values (the worn item's over its variant's); the body's shape weights; each changed bone's summed offset and scale; the body slider attributes; the base model's material values (the description's over what parameters drive); and `problems`, the items left out and why (not in the library, doesn't fit the base, a slot that holds one item given two: the later one is worn). The only errors are a base model the library hasn't and one whose model file leads out of the library.
-- **One identity layer per cause.** `Resolved::identity` is an `assets::Identity` with a layer for each parameter (its shape weights and its bone changes together), each corner and each region mask (at 1 when a worn item hides the region, else 0). The bake decides per layer and per model whether a bone change re-seats a surface that has the layer's shape or carries one that hasn't, which is why a parameter's shapes and bones stay in one layer ([ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md)). `Resolved::shapes` is the sum of the layers, so the two can't disagree. A shape named at weight 0 is still an identity shape: it is baked and dropped.
+- **One identity layer per cause.** `Resolved::identity` is an `assets::Identity` with a layer for each parameter (its shape weights and its bone changes together), each corner and each region mask (at 1 when a worn item hides the region, else 0). Each model decides per layer whether a bone change re-seats a surface that has the layer's shape or carries one that hasn't, which is why a parameter's shapes and bones stay in one layer. Since R2a the identity is worn **live** on the base meshes ([ADR-0041](../Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md): `Model::live`, weights and joint corrections on each pose), and the bake of [ADR-0038](../Architecture/Architecture-Decisions/ADR-0038-Identity-Is-Baked-Into-Derived-Models-Named-By-MeshId.md) is an optional optimization (`gameplay::description::bake`). `Resolved::shapes` is the sum of the layers, so the two can't disagree. A shape named at weight 0 is still an identity shape: it holds that weight, live or baked. An item's own parameters (`ResolvedPart::shapes`) are worn live on the item's part as one more layer.
 - **`LIBRARY_FOLDER`** (`assets/characters`) is where a project's library is. `gameplay::description::library` reads it there, and `project::add_character_library` writes the engine's built-in package into it (`crates/project/src/character_library.rs`; `add_default_humanoid` calls it, so it arrives with the default character).
 - The crate still makes no Instances and loads no models. `avatar` names `assets`' `Identity`, `IdentityLayer` and `BoneChange` types, which is inside its allowed dependencies.
 
@@ -58,7 +59,7 @@ The refinement's shared contracts (plan section 11.3, [ADR-0040](../Architecture
 
 ## Performance
 
-Not measured: files are small JSON and resolution is a few loops per parameter. The identity bake arrived with CO3 (`Model::bake` in `assets`); its cost is **Unverified**: not measured yet (CO18 measures characters). Morph cost is CO8.
+Not measured: files are small JSON and resolution is a few loops per parameter. Applying is measured since R2a: a parameter change applies live (no bake) in the times of `docs/development/character-studio/refinement/r2/r2a-live-identity.md`, which also has the frame cost of 1, 10 and 50 distinct characters live and baked. Since CO8 the morph cost is paid once a frame, only for shapes with a weight (`docs/development/character-studio/refinement/wave3/co8-compute-posing.md`).
 
 ## Testing
 

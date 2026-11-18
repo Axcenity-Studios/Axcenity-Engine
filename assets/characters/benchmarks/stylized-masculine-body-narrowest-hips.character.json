@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "stylized-masculine-body-narrowest-hips",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 0,
+    "hip_width": 0.7
+  },
+  "items": [
+    {
+      "id": "axcenity/briefs"
+    },
+    {
+      "id": "axcenity/sports-top"
+    }
+  ]
+}

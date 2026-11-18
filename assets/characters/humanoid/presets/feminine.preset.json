@@ -1,0 +1,31 @@
+{
+  "format_version": 2,
+  "name": "Feminine",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "frame": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/hair-long"
+    },
+    {
+      "id": "axcenity/tee"
+    },
+    {
+      "id": "axcenity/cropped-jacket"
+    },
+    {
+      "id": "axcenity/cargo-pants"
+    },
+    {
+      "id": "axcenity/sneakers"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/stylized-feminine",
+    "kind": "character",
+    "about": "The stylized body at its feminine frame.",
+    "order": 20
+  }
+}

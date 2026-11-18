@@ -22,9 +22,43 @@ pub(crate) struct Derived {
     /// By derived `MeshId`: the base model's key when it was baked, and
     /// the baked model.
     models: HashMap<String, (u64, Arc<Model>)>,
+    /// How many derived models have been baked this run.
+    baked: usize,
+    /// Hidden regions registered (`hidden.rs`), by key, and the models
+    /// made with them, by `MeshId` (with their base model's key).
+    pub(crate) hidings: HashMap<u64, Arc<crate::RegionHiding>>,
+    pub(crate) hidden_models: HashMap<String, (u64, Arc<Model>)>,
 }
 
 impl Assets {
+    /// Remembers `identity` under its key ([`Identity::key`]) so a
+    /// character can wear it live (ADR-0041: hosts write the key on its
+    /// MeshParts and `anim` finds the identity here), and returns the key.
+    /// `None` for an identity that changes nothing. Makes no model.
+    pub fn register_identity(&self, identity: &Arc<Identity>) -> Option<u64> {
+        if identity.is_empty() {
+            return None;
+        }
+        let key = identity.key();
+        self.lock()
+            .derived
+            .identities
+            .entry(key)
+            .or_insert_with(|| Arc::clone(identity));
+        Some(key)
+    }
+
+    /// The identity registered under `key` in this run, if any.
+    pub fn identity(&self, key: u64) -> Option<Arc<Identity>> {
+        self.lock().derived.identities.get(&key).cloned()
+    }
+
+    /// How many derived models (bakes, [`Model::bake`]) this run has made.
+    /// With live identity nothing bakes unless a host asks for a bake.
+    pub fn derived_count(&self) -> usize {
+        self.lock().derived.baked
+    }
+
     /// The `MeshId` of the model at `mesh_id` with `identity` baked in,
     /// remembering `identity` so the model can be made when it's asked
     /// for. An identity that changes nothing gives the base `MeshId`.
@@ -34,11 +68,7 @@ impl Assets {
             return base.to_owned();
         }
         let key = identity.key();
-        self.lock()
-            .derived
-            .identities
-            .entry(key)
-            .or_insert_with(|| Arc::clone(identity));
+        self.register_identity(identity);
         derived_mesh_id(base, key)
     }
 
@@ -68,6 +98,7 @@ impl Assets {
         let model = Arc::new(base.bake(&identity));
         let mut shared = self.lock();
         let derived = &mut shared.derived;
+        derived.baked += 1;
         if derived.models.len() >= KEPT {
             derived
                 .models
@@ -80,11 +111,13 @@ impl Assets {
         model
     }
 
-    /// [`model_slot`](Self::model_slot) for a derived `MeshId`, or `None`
-    /// for any other.
+    /// [`model_slot`](Self::model_slot) for a derived `MeshId` (or one
+    /// with hidden regions, `hidden.rs`), or `None` for any other.
     pub(crate) fn derived_slot(&self, mesh_id: &str) -> Option<Slot<Model>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_slot(mesh_id);
+        };
         Some(match self.model_slot(base) {
             Slot::Ready(model) => Slot::Ready(self.derived_of(mesh_id, key, model)),
             other => other,
@@ -94,7 +127,9 @@ impl Assets {
     /// [`model_ready`](Self::model_ready) for a derived `MeshId`.
     pub(crate) fn derived_ready(&self, mesh_id: &str) -> Option<Option<Arc<Model>>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_ready(mesh_id);
+        };
         Some(
             self.model_ready(base)
                 .map(|model| self.derived_of(mesh_id, key, model)),
@@ -104,7 +139,9 @@ impl Assets {
     /// [`model_blocking`](Self::model_blocking) for a derived `MeshId`.
     pub(crate) fn derived_blocking(&self, mesh_id: &str) -> Option<Option<Arc<Model>>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_blocking(mesh_id);
+        };
         Some(
             self.model_blocking(base)
                 .map(|model| self.derived_of(mesh_id, key, model)),
@@ -156,6 +193,28 @@ mod tests {
         assert_eq!(assets.derive(BODY, &identity(1.0)), id);
         assert_ne!(assets.derive(BODY, &identity(0.5)), id);
         assert!(assets.identity_of(&id).is_some());
+    }
+
+    /// ADR-0041: an identity registered for live wearing is found by its
+    /// key and makes no derived model; only a bake (a derived `MeshId`
+    /// asked for) does, and is counted.
+    #[test]
+    fn a_registered_identity_is_found_by_its_key_and_bakes_nothing() {
+        let assets = Assets::new(examples());
+        let key = assets.register_identity(&identity(1.0)).expect("not empty");
+        assert_eq!(key, identity(1.0).key());
+        assert_eq!(assets.identity(key).as_deref(), Some(&*identity(1.0)));
+        assert_eq!(
+            assets.register_identity(&Arc::new(Identity::default())),
+            None
+        );
+        assert_eq!(assets.derived_count(), 0);
+        let _ = assets.model_blocking(BODY).expect("the humanoid example");
+        assert_eq!(assets.derived_count(), 0, "the base is no bake");
+        let id = assets.derive(BODY, &identity(1.0));
+        let _ = assets.model_blocking(&id).expect("baked");
+        let _ = assets.model_blocking(&id).expect("kept");
+        assert_eq!(assets.derived_count(), 1, "one bake, kept");
     }
 
     #[test]

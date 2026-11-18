@@ -12,11 +12,12 @@
 //!   buffers and BLAS are kept by mesh and by how many items of that mesh
 //!   were bent before it this frame, and reused while that holds.
 //!
-//! Posed (skinned) characters are copied the same way (`ray_skin.wgsl`):
-//! each corner moved by its item's joints, as `pose_corner` in shader.wgsl
-//! moves it, into a BLAS of the item's own, nearest first within
-//! [`POSED_TRIANGLES`]. A character past that budget is left out of the ray
-//! traced scene (its rest pose would cast a T-shaped shadow).
+//! Posed (skinned or morphed) characters get a BLAS of their own too,
+//! built straight from the frame's posed corners (CO8, `posing.rs`): their
+//! joints, identity shapes and expressions as every pass draws them,
+//! nearest first within [`POSED_TRIANGLES`]. A character past that budget
+//! is left out of the ray traced scene (its rest pose would cast a T-shaped
+//! shadow).
 
 use bytemuck::{Pod, Zeroable};
 use glam::Mat4;
@@ -31,7 +32,7 @@ use crate::draw_list::DrawItem;
 /// `docs/research/hardware-ray-tracing.md`).
 pub(super) const BENT_TRIANGLES: u64 = 400_000;
 
-/// The most triangles of posed (skinned) items moved and built into
+/// The most triangles of posed (skinned or morphed) items built into
 /// BLASes in one frame, nearest first: about 0.8 ms on an RX 9070 XT. A
 /// budget of their own, so a windy forest never takes the players' shadows.
 pub(super) const POSED_TRIANGLES: u64 = 300_000;
@@ -86,22 +87,21 @@ pub(super) fn bent_raw(transform: Mat4, sway: [f32; 4], clock: [f32; 4], gpu: &G
     }
 }
 
-/// One posed item's posing. Must match `Pose` in ray_skin.wgsl.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
-pub(super) struct PoseRaw {
-    /// x: how many corners, y: how many f32s each corner of the mesh's
-    /// vertices takes, z: how many joints the item's skin has.
-    counts: [u32; 4],
+/// Where a copy's corners come from.
+enum Corners {
+    /// A swaying item's: bent by `ray_sway.wgsl` into `positions` (three
+    /// f32s a corner) as `uniform` says.
+    Bent {
+        positions: wgpu::Buffer,
+        uniform: wgpu::Buffer,
+        group: wgpu::BindGroup,
+    },
+    /// A posed item's: the frame's posed corners from this one on.
+    Posed { first: u32 },
 }
 
 struct Bent {
-    /// Its bent positions, three f32s a corner.
-    positions: wgpu::Buffer,
-    uniform: wgpu::Buffer,
-    group: wgpu::BindGroup,
-    /// A posed item's joints (each a `mat4x4`), `None` for a swaying one.
-    joints: Option<wgpu::Buffer>,
+    corners: Corners,
     blas: wgpu::Blas,
     size: wgpu::BlasTriangleGeometrySizeDescriptor,
     /// The mesh's version it was made for.
@@ -111,13 +111,11 @@ struct Bent {
     used: bool,
 }
 
-/// The bent copies of swaying items and posed characters, and the passes
-/// that bend and pose them.
+/// The bent copies of swaying items and the BLASes of posed characters,
+/// and the pass that bends swaying items.
 pub(super) struct BentMeshes {
     pipeline: wgpu::ComputePipeline,
     layout: wgpu::BindGroupLayout,
-    /// Made the first time a character is posed.
-    posing: Option<(wgpu::ComputePipeline, wgpu::BindGroupLayout)>,
     bent: FxHashMap<BentKey, Bent>,
 }
 
@@ -191,7 +189,6 @@ impl BentMeshes {
         Self {
             pipeline,
             layout,
-            posing: None,
             bent: FxHashMap::default(),
         }
     }
@@ -214,7 +211,11 @@ impl BentMeshes {
         raw: &BentRaw,
         frame: u64,
     ) {
-        let fresh = |bent: Option<&Bent>| bent.is_none_or(|bent| bent.version != gpu.version);
+        let fresh = |bent: Option<&Bent>| {
+            bent.is_none_or(|bent| {
+                bent.version != gpu.version || matches!(bent.corners, Corners::Posed { .. })
+            })
+        };
         if fresh(self.bent.get(&key)) {
             let positions = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("bent positions"),
@@ -263,10 +264,11 @@ impl BentMeshes {
             self.bent.insert(
                 key,
                 Bent {
-                    positions,
-                    uniform,
-                    group,
-                    joints: None,
+                    corners: Corners::Bent {
+                        positions,
+                        uniform,
+                        group,
+                    },
                     blas,
                     size,
                     version: gpu.version,
@@ -276,100 +278,31 @@ impl BentMeshes {
             );
         }
         let bent = self.bent.get_mut(&key).expect("made above");
-        queue.write_buffer(&bent.uniform, 0, bytemuck::bytes_of(raw));
+        if let Corners::Bent { uniform, .. } = &bent.corners {
+            queue.write_buffer(uniform, 0, bytemuck::bytes_of(raw));
+        }
         bent.last_used = frame;
         bent.used = true;
     }
 
-    /// Poses `gpu` (the mesh of `key`, animated by `skin`) with `joints`
-    /// this frame, making its copy if it has none (or one for an older
-    /// version of the mesh, or with too few joints).
-    #[allow(clippy::too_many_arguments)]
+    /// Builds `key`'s BLAS this frame from the frame's posed corners from
+    /// `first` on (`gpu`'s, posed by `posing.rs`), making it if it has none
+    /// (or one for an older version of the mesh).
     pub(super) fn pose(
         &mut self,
-        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        device: &wgpu::Device,
         key: BentKey,
         gpu: &GpuMesh,
-        skin: &wgpu::Buffer,
         size: wgpu::BlasTriangleGeometrySizeDescriptor,
-        joints: &[[[f32; 4]; 4]],
+        first: u32,
         frame: u64,
     ) {
-        let (_, layout) = self.posing.get_or_insert_with(|| {
-            let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("posed meshes"),
-                entries: &[
-                    uniform_entry(0),
-                    storage_entry(1, true),
-                    storage_entry(2, true),
-                    storage_entry(3, true),
-                    storage_entry(4, false),
-                ],
-            });
-            let pipeline = compute_pipeline(
-                device,
-                "posed meshes",
-                &layout,
-                gpu::RAY_SKIN_SHADER,
-                "cs_pose",
-            );
-            (pipeline, layout)
-        });
-        let joint_bytes = (size_of_val(joints) as u64).max(64);
         let fresh = |bent: Option<&Bent>| {
             bent.is_none_or(|bent| {
-                bent.version != gpu.version
-                    || bent
-                        .joints
-                        .as_ref()
-                        .is_none_or(|buffer| buffer.size() < joint_bytes)
+                bent.version != gpu.version || !matches!(bent.corners, Corners::Posed { .. })
             })
         };
         if fresh(self.bent.get(&key)) {
-            let positions = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("posed positions"),
-                size: (u64::from(gpu.vertex_count) * 12).max(16),
-                usage: wgpu::BufferUsages::STORAGE | super::ray_tracing::blas_input(device),
-                mapped_at_creation: false,
-            });
-            let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("posed item"),
-                size: size_of::<PoseRaw>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            let joint_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("posed joints"),
-                size: joint_bytes.next_power_of_two(),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("posed meshes"),
-                layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: gpu.vertices.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: skin.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: joint_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: positions.as_entire_binding(),
-                    },
-                ],
-            });
             let size = wgpu::BlasTriangleGeometrySizeDescriptor {
                 vertex_format: wgpu::VertexFormat::Float32x3,
                 ..size
@@ -387,10 +320,7 @@ impl BentMeshes {
             self.bent.insert(
                 key,
                 Bent {
-                    positions,
-                    uniform,
-                    group,
-                    joints: Some(joint_buffer),
+                    corners: Corners::Posed { first },
                     blas,
                     size,
                     version: gpu.version,
@@ -400,51 +330,38 @@ impl BentMeshes {
             );
         }
         let bent = self.bent.get_mut(&key).expect("made above");
-        let raw = PoseRaw {
-            counts: [
-                gpu.vertex_count,
-                (size_of::<crate::mesh::Vertex>() / 4) as u32,
-                joints.len() as u32,
-                0,
-            ],
-        };
-        queue.write_buffer(&bent.uniform, 0, bytemuck::bytes_of(&raw));
-        if let Some(buffer) = &bent.joints
-            && !joints.is_empty()
-        {
-            queue.write_buffer(buffer, 0, bytemuck::cast_slice(joints));
-        }
+        bent.corners = Corners::Posed { first };
         bent.last_used = frame;
         bent.used = true;
     }
 
-    /// Records this frame's bending and posing, before the BLASes are built.
+    /// Records this frame's bending, before the BLASes are built (posed
+    /// items were posed by the posing pass, earlier in the frame).
     pub(super) fn record(&self, encoder: &mut wgpu::CommandEncoder) {
-        let used: Vec<&Bent> = self.bent.values().filter(|bent| bent.used).collect();
-        if used.is_empty() {
+        let bent: Vec<(&wgpu::Buffer, &wgpu::BindGroup)> = self
+            .bent
+            .values()
+            .filter(|bent| bent.used)
+            .filter_map(|bent| match &bent.corners {
+                Corners::Bent {
+                    positions, group, ..
+                } => Some((positions, group)),
+                Corners::Posed { .. } => None,
+            })
+            .collect();
+        if bent.is_empty() {
             return;
         }
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("bent meshes"),
             timestamp_writes: None,
         });
-        let bent_pipeline = Some(&self.pipeline);
-        let posed_pipeline = self.posing.as_ref().map(|(pipeline, _)| pipeline);
-        for (pipeline, posed) in [(bent_pipeline, false), (posed_pipeline, true)] {
-            let Some(pipeline) = pipeline else {
-                continue;
-            };
-            let mut set = false;
-            for bent in used.iter().filter(|bent| bent.joints.is_some() == posed) {
-                if !set {
-                    pass.set_pipeline(pipeline);
-                    set = true;
-                }
-                let corners = bent.positions.size() / 12;
-                let groups = corners.div_ceil(64) as u32;
-                pass.set_bind_group(0, &bent.group, &[]);
-                pass.dispatch_workgroups(groups.min(65_535), groups.div_ceil(65_535), 1);
-            }
+        pass.set_pipeline(&self.pipeline);
+        for (positions, group) in bent {
+            let corners = positions.size() / 12;
+            let groups = corners.div_ceil(64) as u32;
+            pass.set_bind_group(0, group, &[]);
+            pass.dispatch_workgroups(groups.min(65_535), groups.div_ceil(65_535), 1);
         }
     }
 
@@ -453,21 +370,27 @@ impl BentMeshes {
         &self.bent[key].blas
     }
 
-    /// What builds `key`'s BLAS from its bent positions and `gpu`'s
-    /// triangles.
+    /// What builds `key`'s BLAS from its bent positions (or, posed, the
+    /// frame's `posed` corners) and `gpu`'s triangles.
     pub(super) fn build_entry<'a>(
         &'a self,
         key: &BentKey,
         gpu: &'a GpuMesh,
+        posed: &'a wgpu::Buffer,
     ) -> wgpu::BlasBuildEntry<'a> {
         let bent = &self.bent[key];
+        // A posed corner's position is its first three words.
+        let (vertex_buffer, first_vertex, vertex_stride) = match &bent.corners {
+            Corners::Bent { positions, .. } => (positions, 0, 12),
+            Corners::Posed { first } => (posed, *first, super::posing::POSED_STRIDE),
+        };
         wgpu::BlasBuildEntry {
             blas: &bent.blas,
             geometry: wgpu::BlasGeometries::TriangleGeometries(vec![wgpu::BlasTriangleGeometry {
                 size: &bent.size,
-                vertex_buffer: &bent.positions,
-                first_vertex: 0,
-                vertex_stride: 12,
+                vertex_buffer,
+                first_vertex,
+                vertex_stride,
                 index_buffer: Some(&gpu.indices),
                 first_index: Some(0),
                 transform_buffer: None,
@@ -495,7 +418,7 @@ impl BentMeshes {
     fn count_used(&self, posed: bool) -> u32 {
         self.bent
             .values()
-            .filter(|bent| bent.used && bent.joints.is_some() == posed)
+            .filter(|bent| bent.used && matches!(bent.corners, Corners::Posed { .. }) == posed)
             .count() as u32
     }
 }

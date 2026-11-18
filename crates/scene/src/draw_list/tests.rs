@@ -669,3 +669,92 @@ fn a_union_draws_its_model_and_not_the_parts_inside_it() {
         assert_eq!(item.material.base_color, [0.0, 1.0, 0.0]);
     }
 }
+
+#[test]
+fn a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_map() {
+    use axcenity_assets::{Image, ModelMaterial, ModelShading};
+    use axcenity_render::Shading;
+    let map = |byte: u8| Arc::new(Image::new(1, 1, vec![byte, 128, 255, 255]));
+    let skin = ModelMaterial {
+        name: "Skin".into(),
+        normal_texture: Some(map(100)),
+        defined_normal_texture: Some(map(160)),
+        shading: ModelShading::Skin,
+        ..ModelMaterial::default()
+    };
+    let drawn = materials::model_material(&skin);
+    let Shading::Skin(shading) = &drawn.shading else {
+        panic!("not skin: {:?}", drawn.shading);
+    };
+    assert_eq!((shading.scatter, shading.normal_blend), (1.0, 0.0));
+    let defined = shading.defined_normal.as_ref().expect("its defined map");
+    assert_eq!(&defined.rgba()[..4], &[160, 128, 255, 255]);
+    assert!(drawn.maps.normal.is_some(), "its own (smooth) map");
+
+    // Unmarked, it is standard, and a stray defined map is left out.
+    let standard = materials::model_material(&ModelMaterial {
+        shading: ModelShading::Standard,
+        ..skin
+    });
+    assert!(matches!(standard.shading, Shading::Standard));
+}
+
+#[test]
+fn a_skin_models_makeup_and_marking_masks_reach_the_renderer_all_off() {
+    use axcenity_assets::{Image, ModelMaterial, ModelShading};
+    use axcenity_render::Shading;
+    let map = |byte: u8| Arc::new(Image::new(1, 1, vec![byte, 128, 255, 255]));
+    let skin = ModelMaterial {
+        name: "Skin".into(),
+        base_color_texture: Some(map(200)),
+        shading: ModelShading::Skin,
+        skin_masks: vec![map(1), map(2), map(3)],
+        ..ModelMaterial::default()
+    };
+    let drawn = materials::model_material(&skin);
+    let Shading::Skin(shading) = &drawn.shading else {
+        panic!("not skin: {:?}", drawn.shading);
+    };
+    let layers = shading.layers.as_ref().expect("its masks");
+    let firsts: Vec<u8> = layers.masks.iter().map(|mask| mask.rgba()[0]).collect();
+    assert_eq!(firsts, [1, 2, 3], "in order");
+    assert!(layers.makeup.iter().all(|layer| layer.opacity == 0.0));
+    assert_eq!((layers.freckles.amount, layers.scar), (0.0, 0.0));
+    // Without masks, none; and an appearance replaces the maps they go
+    // with, so it leaves them out.
+    let bare = materials::model_material(&ModelMaterial {
+        skin_masks: Vec::new(),
+        ..skin.clone()
+    });
+    assert!(matches!(&bare.shading, Shading::Skin(s) if s.layers.is_none()));
+    let mut world = World::new();
+    let appearance = world.create(ClassName::SurfaceAppearance).unwrap();
+    let covered =
+        materials::surface_material(&skin, world.get(appearance).unwrap(), &example_assets());
+    assert!(matches!(&covered.shading, Shading::Skin(s) if s.layers.is_none()));
+}
+
+#[test]
+fn a_surface_appearance_on_skin_leaves_out_the_files_defined_normal_map() {
+    use axcenity_assets::{Image, ModelMaterial, ModelShading};
+    use axcenity_render::Shading;
+    let map = |byte: u8| Arc::new(Image::new(1, 1, vec![byte, 128, 255, 255]));
+    let skin = ModelMaterial {
+        name: "Skin".into(),
+        normal_texture: Some(map(100)),
+        defined_normal_texture: Some(map(160)),
+        shading: ModelShading::Skin,
+        ..ModelMaterial::default()
+    };
+    // An appearance replaces the file's maps (its own normal map or
+    // none): the file's defined map belongs to the file's own, so blending
+    // it into the appearance's would mix two unrelated maps.
+    let mut world = World::new();
+    let appearance = world.create(ClassName::SurfaceAppearance).unwrap();
+    let drawn =
+        materials::surface_material(&skin, world.get(appearance).unwrap(), &example_assets());
+    let Shading::Skin(shading) = &drawn.shading else {
+        panic!("still skin: {:?}", drawn.shading);
+    };
+    assert!(shading.defined_normal.is_none(), "no defined map");
+}

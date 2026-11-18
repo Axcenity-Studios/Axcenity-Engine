@@ -1,14 +1,17 @@
 //! The toolbar (brief §3.1): Home, the character's name and whether it's
-//! saved, New, Open, Save, undo and redo, and Reset with a scope.
-//! Randomize, comparison and viewport settings come with R1's second part.
+//! saved, New (a family or a preset), Open, Save, undo and redo, Reset
+//! with a scope and Randomize with a scope (brief §11), and the switch for
+//! editing on the character (R2: hover, click to select, handles;
+//! `direct.rs`). Comparison is the strip over the viewport (`compare.rs`).
 
-use axcenity_avatar::Library;
+use axcenity_avatar::{Library, PresetKind};
 use eframe::egui;
 
 use super::edit::Scope;
 use super::intent::Intent;
+use super::random::{RandomScope, scope_for};
 use super::selection::Selection;
-use super::{CharacterWorkspace, presets, shelf};
+use super::{CharacterWorkspace, Start, presets, shelf};
 use crate::theme::{self, icons};
 use crate::widgets::{self, Role};
 
@@ -84,17 +87,42 @@ pub(super) fn show(
                     });
             });
             widgets::menu_button(ui, Some(icons::FILE_PLUS), "New", |ui| {
-                for (index, preset) in presets().iter().enumerate() {
-                    if library.base(preset.base).is_none() {
-                        continue;
+                for (label, about, start) in new_choices(library, workspace) {
+                    match start {
+                        None => {
+                            widgets::section_label(ui, &label);
+                        }
+                        Some(start) => {
+                            if ui.button(label).on_hover_text(about).clicked() {
+                                intents.push(Intent::New(start));
+                                ui.close();
+                            }
+                        }
                     }
-                    if ui.button(preset.name).on_hover_text(preset.about).clicked() {
-                        intents.push(Intent::New(index));
+                }
+            });
+            widgets::menu_button(ui, Some(icons::DICE_FIVE), "Randomize", |ui| {
+                for (label, about, scope) in
+                    random_choices(&workspace.selection, workspace, library)
+                {
+                    if ui.button(label).on_hover_text(about).clicked() {
+                        intents.push(Intent::Randomize(scope));
                         ui.close();
                     }
                 }
             });
             ui.add_space(8.0);
+            let on = workspace.direct.on;
+            let tip = if on {
+                "Edit on character is on: hover, click a feature and drag its handles. Click to \
+                 turn it off and only move the camera"
+            } else {
+                "Edit on character is off: the viewport only moves the camera. Click to turn it on"
+            };
+            if widgets::icon_button(ui, icons::CURSOR_CLICK, tip, on).clicked() {
+                intents.push(Intent::SetHandles(!on));
+            }
+            ui.add_space(4.0);
             if ui
                 .add_enabled(
                     workspace.can_redo(),
@@ -145,6 +173,94 @@ fn name_field(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Option<Inten
         }
     }
     None
+}
+
+/// What New offers: for each family (realistic first), a heading
+/// (`None`), then its whole-character presets, or its default character
+/// when it has none.
+pub(super) fn new_choices(
+    library: &Library,
+    workspace: &CharacterWorkspace,
+) -> Vec<(String, String, Option<Start>)> {
+    let mut choices = Vec::new();
+    for base in presets::families(library) {
+        choices.push((base.label.clone(), String::new(), None));
+        let made = presets::of_kind(
+            library,
+            workspace.own_presets(),
+            &base.id,
+            PresetKind::Character,
+        );
+        if made.is_empty() {
+            choices.push((
+                format!("{} character", base.label),
+                format!("The {} body as it's built", base.label.to_lowercase()),
+                Some(Start::Family(base.id.clone())),
+            ));
+        }
+        for listed in made {
+            choices.push((
+                listed.label().to_owned(),
+                listed.info.about.clone(),
+                Some(Start::Preset(listed.id.to_owned())),
+            ));
+        }
+    }
+    choices
+}
+
+/// What Randomize offers for `selection`: everything, the category shown
+/// and the feature picked in it, each saying how many locks it keeps.
+pub(super) fn random_choices(
+    selection: &Selection,
+    workspace: &CharacterWorkspace,
+    library: &Library,
+) -> Vec<(String, String, RandomScope)> {
+    let Some(base) = library.base(&workspace.description().base) else {
+        return Vec::new();
+    };
+    let locked = |scope: &axcenity_avatar::Scope| match workspace.locked_in(base, scope) {
+        0 => String::new(),
+        1 => " 1 locked value is kept.".to_owned(),
+        n => format!(" {n} locked values are kept."),
+    };
+    let feature = selection.feature.as_deref();
+    let mut choices = Vec::new();
+    for (scope, label) in [
+        (RandomScope::Everything, "Everything".to_owned()),
+        (
+            RandomScope::Category,
+            super::nav::label(selection.category).to_owned(),
+        ),
+        (
+            RandomScope::Feature,
+            super::nav::features(
+                base,
+                workspace.description(),
+                selection.category,
+                selection.level,
+            )
+            .into_iter()
+            .find(|found| Some(found.id.as_str()) == feature)
+            .map(|found| found.label)
+            .unwrap_or_default(),
+        ),
+    ] {
+        let Some(reach) = scope_for(scope, selection.category, feature, base) else {
+            continue;
+        };
+        let about = match scope {
+            RandomScope::Everything => "A new character from this one's body",
+            RandomScope::Category => "This category drawn again",
+            RandomScope::Feature => "This feature drawn again",
+        };
+        choices.push((
+            label,
+            format!("{about}, as one undo step.{}", locked(&reach)),
+            scope,
+        ));
+    }
+    choices
 }
 
 /// What Reset offers for `selection`: everything, the category shown, and

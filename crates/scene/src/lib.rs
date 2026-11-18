@@ -12,6 +12,9 @@
 //!   world reads.
 //! - [`part_material_file`] makes a material file from a Part's look.
 //! - [`CameraView`] and [`pick`] find the part under the mouse in the editor.
+//! - [`ray_parts`] and [`ray_model`] find where a ray meets a character's
+//!   skin as it is drawn (posed, skinned, with its live identity), and
+//!   [`corner_drawn`] where a point on it is (Character Studio's handles).
 //! - [`rotation_from_orientation`] and back turn a Part's `Orientation` into
 //!   a rotation, for drawing and for the editor's rotate tool.
 
@@ -43,6 +46,7 @@ mod reload_tests;
 mod retained;
 mod skin_tone;
 mod streaming;
+mod surface_pick;
 mod surfaces;
 mod terrain;
 mod terrain_water;
@@ -71,5 +75,9 @@ pub use pick::{
 };
 pub use preload::{AssetFile, asset_files};
 pub use streaming::Streaming;
+pub use surface_pick::{
+    Corner, MeshHit, PartHit, corner_drawn, corners_drawn, fitted_per_metre, nearest_corner,
+    normals_drawn, placement, ray_model, ray_parts, rest_anchor, to_metres, triangle_hit,
+};
 pub use terrain::{DEFAULT_DETAIL_DISTANCE, TerrainCache, terrain_hit};
 pub use time_of_day::sun_direction;

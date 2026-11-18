@@ -262,8 +262,12 @@ fn skin_surface_and_eye_values_change_the_picture_the_way_they_mean() {
     let smooth = shots(&with(&plain, "Skin", &[("detail_strength", number(0.0))]));
     let smooth = studio(&smooth, "face-front");
     let flattened = change(before, smooth);
+    // (Since R5 the skin's diffuse light doesn't see its pores and the
+    // grain is half as steep, so the detail moves fewer pixels: 1.3% of
+    // this picture, 2% or more before; 1% still catches detail that
+    // does nothing.)
     assert!(
-        flattened.share > 0.02,
+        flattened.share > 0.01,
         "detail 0 changed {}",
         flattened.share
     );
@@ -298,6 +302,113 @@ fn skin_surface_and_eye_values_change_the_picture_the_way_they_mean() {
         whites.before,
         whites.after
     );
+}
+
+/// A benchmark cast member of the realistic family (`<frame>-cast-<name>`).
+fn cast(frame: &str, name: &str) -> Description {
+    let file = repository_library().join(format!(
+        "benchmarks/realistic-{frame}-cast-{name}.character.json"
+    ));
+    Description::from_json(&std::fs::read_to_string(file).unwrap()).unwrap()
+}
+
+#[test]
+fn scatter_scale_softens_and_reddens_the_skin() {
+    let Some((device, queue)) = super::bench_tests::bench_gpu() else {
+        return;
+    };
+    let stage = Stage::new("skin-scatter", &repository_library()).expect("the stage");
+    let plain = realistic();
+    // Large enough that the grain is more than a pixel's change.
+    let settings = Settings {
+        size: (960, 540),
+        ..settings()
+    };
+    let shots = |description: &Description| {
+        capture(&device, &queue, &stage.assets, description, settings).unwrap()
+    };
+    let (width, _) = settings.size;
+    let width = width as usize;
+    let base = shots(&plain);
+    let before = studio(&base, "face-front");
+
+    // No scatter: the diffuse light sees every pore, so the skin is rougher.
+    let none = shots(&with(&plain, "Skin", &[("scatter_scale", number(0.0))]));
+    let none = studio(&none, "face-front");
+    let sharper = change(before, none);
+    assert!(sharper.share > 0.005, "scatter 0 changed {}", sharper.share);
+    let (rough, soft) = (
+        texture(none, width, &sharper.pixels),
+        texture(before, width, &sharper.pixels),
+    );
+    eprintln!(
+        "scatter 0 changed {}: texture {rough} against {soft}",
+        sharper.share
+    );
+    assert!(rough > soft, "scatter 0 isn't rougher");
+    // Twice the scatter: light spreads further, more of it in red.
+    let wide = shots(&with(&plain, "Skin", &[("scatter_scale", number(2.0))]));
+    let spread = change(before, studio(&wide, "face-front"));
+    assert!(spread.share > 0.005, "scatter 2 changed {}", spread.share);
+    let red = |[r, g, _]: [f32; 3]| r / g;
+    assert!(
+        red(spread.after) > red(spread.before),
+        "scatter 2 isn't redder: {:?} to {:?}",
+        spread.before,
+        spread.after
+    );
+}
+
+/// The heavyset body's belly shows no abdominal lines: its fat hides the
+/// skin's defined normal map (`softness`), and asking for the definition
+/// back (`definition` 1, `softness` 0) brings the lines, so the values
+/// are drawn (OPEN-07).
+#[test]
+fn definition_and_softness_show_and_hide_the_defined_normal_map() {
+    let Some((device, queue)) = super::bench_tests::bench_gpu() else {
+        return;
+    };
+    let stage = Stage::new("skin-definition", &repository_library()).expect("the stage");
+    // Large enough that the belly is more than a few pixels.
+    let settings = Settings {
+        size: (960, 540),
+        ..settings()
+    };
+    let shots = |description: &Description| {
+        capture(&device, &queue, &stage.assets, description, settings).unwrap()
+    };
+    let (width, _) = settings.size;
+    let width = width as usize;
+    for frame in ["masculine", "feminine"] {
+        let heavy = cast(frame, "heavyset");
+        let base = shots(&heavy);
+        let before = studio(&base, "front");
+        let defined = shots(&with(
+            &heavy,
+            "Skin",
+            &[("definition", number(1.0)), ("softness", number(0.0))],
+        ));
+        let defined = studio(&defined, "front");
+        let lines = change(before, defined);
+        // (The belly is a small part of this whole-body picture.)
+        assert!(
+            lines.share > 0.0005,
+            "{frame}: the definition changed {}",
+            lines.share
+        );
+        let (relief, plain) = (
+            texture(defined, width, &lines.pixels),
+            texture(before, width, &lines.pixels),
+        );
+        eprintln!(
+            "{frame}: {} of the picture changed; relief {relief} against {plain}",
+            lines.share
+        );
+        assert!(
+            relief > plain,
+            "{frame}: the defined map isn't more defined than the heavy body's"
+        );
+    }
 }
 
 /// The GPU time of the realistic character's frame by pass (the renderer's

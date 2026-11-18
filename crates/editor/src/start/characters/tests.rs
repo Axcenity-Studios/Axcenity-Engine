@@ -127,7 +127,19 @@ fn recent_shows_four_then_show_more_lists_the_rest() {
     );
     assert_eq!(count(&drawn, "Edit"), 10);
     assert_eq!(count(&drawn, "Delete…"), 10);
-    assert_eq!(count(&drawn, "Start from this"), presets().len());
+    // The realistic family's six whole-character presets and the stylized
+    // family's three (both families: plan section 0, decision 7; the
+    // stylized ones are data since wave 3).
+    assert_eq!(count(&drawn, "Start from this"), 9);
+    for name in ["Masculine", "Feminine"] {
+        assert!(
+            drawn
+                .iter()
+                .any(|t| t.starts_with(&format!("label: {name}"))),
+            "{name} in {drawn:?}"
+        );
+    }
+    assert_eq!(count(&drawn, "label: Stylized character"), 0, "{drawn:?}");
 
     start.shelf.more_recent = true;
     let drawn = texts(&mut start, vec2(1400.0, 3000.0));
@@ -183,9 +195,10 @@ fn edit_opens_a_character_and_a_preset_starts_one() {
         start.follow_pick(Pick::Edit(paths[2].clone())),
         Some(StartAction::OpenCharacter(path)) if path == paths[2]
     ));
+    let athletic = Start::Preset("axcenity/realistic-athletic-female".into());
     assert!(matches!(
-        start.follow_pick(Pick::Preset(3)),
-        Some(StartAction::NewCharacter(3))
+        start.follow_pick(Pick::Preset(athletic.clone())),
+        Some(StartAction::NewCharacter(picked)) if picked == athletic
     ));
     let _ = std::fs::remove_dir_all(&folder);
 }
@@ -300,11 +313,16 @@ fn the_character_page_draws_pictures_recent_and_a_pack() {
                 })
                 .unwrap();
         }
-        for index in 0..presets().len() {
+        let library = shelf::library_for(&folder);
+        for listed in presets::all(&library, &Default::default()) {
+            if listed.info.kind != axcenity_avatar::PresetKind::Character {
+                continue;
+            }
+            let subject = Subject::Character(listed.pictured(&library));
             painter
                 .paint_to(&Job {
-                    subject: Subject::Preset(index),
-                    out: thumbnails::preset_picture(&folder, index).unwrap(),
+                    out: thumbnails::preset_picture(&folder, listed.id, &subject),
+                    subject,
                 })
                 .unwrap();
         }

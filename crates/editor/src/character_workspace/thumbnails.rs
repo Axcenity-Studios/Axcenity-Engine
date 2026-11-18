@@ -5,9 +5,10 @@
 //!
 //! They're cached as PNGs in the workspace's folder, `thumbnails/`:
 //! `characters/<file>.<key>.png` for a saved character and
-//! `presets/<index>.<key>.png` for a preset, where the key is a hash of
-//! what's drawn (the file's text, or the preset's data), the picture's
-//! version and the engine's. A changed file has a new key, so it's drawn
+//! `presets/<preset ID>.<key>.png` for a preset (its ID with `/` as `-`),
+//! where the key is a hash of what's drawn (the file's text, or the
+//! character the preset makes), the picture's version and the engine's.
+//! The Presets page's tiles in the workspace come from the same cache. A changed file has a new key, so it's drawn
 //! again; the older pictures of that file are removed when the new one is
 //! written. Deleting a character removes its pictures.
 //!
@@ -21,11 +22,11 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use axcenity_avatar::Description;
+use axcenity_avatar::{Description, Library, PresetKind};
 use axcenity_render::{TextureRenderer, wgpu};
 use eframe::egui;
 
-use super::stage::{self, Backdrop, Lighting, Orbit};
+use super::stage::{self, Backdrop, Lighting, Orbit, ViewPreset};
 use super::{CharacterWorkspace, presets};
 
 /// The pictures' folder, in the workspace's folder.
@@ -73,15 +74,32 @@ pub fn character_picture(folder: &Path, file: &Path, text: &str) -> Option<PathB
     )
 }
 
-/// Where the picture of preset `index` is cached.
-pub fn preset_picture(folder: &Path, index: usize) -> Option<PathBuf> {
-    let preset = presets().into_iter().nth(index)?;
-    Some(
-        folder
-            .join(THUMBNAILS_FOLDER)
-            .join("presets")
-            .join(format!("{index}.{}.png", key(&format!("{preset:?}")))),
-    )
+/// Where the picture of preset `id`, showing `subject`, is cached.
+pub fn preset_picture(folder: &Path, id: &str, subject: &Subject) -> PathBuf {
+    let stem: String = id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let (framing, drawn) = match subject {
+        Subject::Character(description) => ("whole", description),
+        Subject::Body(description) => ("body", description),
+        Subject::Face(description) => ("face", description),
+    };
+    folder.join(THUMBNAILS_FOLDER).join("presets").join(format!(
+        "{stem}.{}.png",
+        key(&format!("{framing}\n{}", drawn.to_json()))
+    ))
+}
+
+/// What the picture of `listed` shows: the character it makes, a face
+/// preset's framed on the face, a body preset's on the body.
+pub fn preset_subject(listed: &presets::Listed, library: &Library) -> Subject {
+    let shown = listed.pictured(library);
+    match listed.info.kind {
+        PresetKind::Face => Subject::Face(shown),
+        PresetKind::Body => Subject::Body(shown),
+        _ => Subject::Character(shown),
+    }
 }
 
 /// Whether `name` is a picture of `stem` (`<stem>.<16 hex digits>.png`).
@@ -134,9 +152,12 @@ pub fn remove_character_pictures(folder: &Path, file: &Path) {
 /// What a picture shows.
 #[derive(Clone, Debug)]
 pub enum Subject {
+    /// A character, the whole body.
     Character(Description),
-    /// A preset, by its index in [`presets`].
-    Preset(usize),
+    /// A body preset's character, framed on the body ([`body_orbit`]).
+    Body(Description),
+    /// A character's face, close up.
+    Face(Description),
 }
 
 /// A picture to draw, and where it goes.
@@ -157,6 +178,29 @@ pub fn picture_orbit() -> Orbit {
     }
 }
 
+/// How a body preset's picture frames the character: from the front and a
+/// little turned, neck to knees, so the build fills the tile's width (a
+/// whole figure is small in a tall picture, and slim, average and athletic
+/// looked alike at a tile's size). The crop is below the chin: a body
+/// preset doesn't change the face, and a frame cut through the mouth read
+/// badly.
+pub fn body_orbit() -> Orbit {
+    Orbit {
+        yaw: 15.0,
+        pitch: 4.0,
+        distance: 5.4,
+        target: axcenity_render::glam::Vec3::new(0.0, 2.8, 0.0),
+    }
+}
+
+/// How a face picture frames the character: the face, a little turned.
+pub fn face_orbit() -> Orbit {
+    let mut orbit = ViewPreset::Face.orbit();
+    orbit.yaw = 18.0;
+    orbit.distance *= 1.15;
+    orbit
+}
+
 /// Draws pictures: a workspace of its own (the preview World and the
 /// library) and a renderer the picture's size.
 pub struct Painter {
@@ -167,11 +211,13 @@ pub struct Painter {
 impl Painter {
     /// A painter for the workspace in `folder`, on `device`.
     pub fn new(folder: &Path, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<Self, String> {
-        let workspace = CharacterWorkspace::open(
+        let mut workspace = CharacterWorkspace::open(
             folder,
             Description::new("Picture", super::DEFAULT_BASE),
             true,
         )?;
+        // It shows characters, never edits one: no recovery file.
+        workspace.autosave.on = false;
         let (width, height) = PICTURE_SIZE;
         Ok(Self {
             workspace,
@@ -181,12 +227,10 @@ impl Painter {
 
     /// The picture of `subject` as rows of RGBA bytes, [`PICTURE_SIZE`].
     pub fn paint(&mut self, subject: &Subject) -> Vec<u8> {
-        let description = match subject {
-            Subject::Character(description) => description.clone(),
-            Subject::Preset(index) => {
-                let preset = presets().into_iter().nth(*index).unwrap_or(presets()[0]);
-                preset.description(preset.name, &self.workspace.library())
-            }
+        let (description, orbit) = match subject {
+            Subject::Character(description) => (description.clone(), picture_orbit()),
+            Subject::Body(description) => (description.clone(), body_orbit()),
+            Subject::Face(description) => (description.clone(), face_orbit()),
         };
         let workspace = &mut self.workspace;
         workspace.show_only(description);
@@ -197,7 +241,7 @@ impl Painter {
         let mut list = axcenity_scene::build_draw_list_posed(
             &workspace.world,
             &workspace.assets,
-            picture_orbit().camera(),
+            orbit.camera(),
             workspace.poses(),
             &mut axcenity_scene::TerrainCache::new(),
         );
@@ -409,6 +453,35 @@ impl Thumbnails {
     pub fn forget(&mut self, out: &Path) {
         self.textures.remove(out);
         self.failed.remove(out);
+    }
+}
+
+impl CharacterWorkspace {
+    /// Asks for the pictures of the presets of the character's base model
+    /// that aren't drawn yet, and loads those that are (the Presets page's
+    /// tiles; a few a frame).
+    pub(super) fn load_preset_pictures(&mut self, ctx: &egui::Context, library: &Library) {
+        let wanted: Vec<(String, Subject)> = presets::all(library, &self.own_presets)
+            .iter()
+            .filter(|listed| listed.preset.base == self.description.base)
+            .filter(|listed| !self.preset_pictures.contains_key(listed.id))
+            .map(|listed| (listed.id.to_owned(), preset_subject(listed, library)))
+            .collect();
+        for (id, subject) in wanted {
+            let out = preset_picture(&self.folder, &id, &subject);
+            self.pictures.request(subject, out.clone());
+            self.preset_pictures.insert(id, (out, None));
+        }
+        for (out, texture) in self.preset_pictures.values_mut() {
+            if texture.is_none() {
+                *texture = self.pictures.texture(ctx, out);
+            }
+        }
+    }
+
+    /// The picture of preset `id`, once it's drawn and loaded.
+    pub(super) fn preset_texture(&self, id: &str) -> Option<&egui::TextureHandle> {
+        self.preset_pictures.get(id)?.1.as_ref()
     }
 }
 

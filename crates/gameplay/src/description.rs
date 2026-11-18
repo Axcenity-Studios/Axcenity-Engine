@@ -6,10 +6,15 @@
 //! character library (`assets/characters/`, [`library`]) and writes the
 //! result onto the character:
 //!
-//! - its `Body` MeshPart draws the base model's body with the description's
-//!   **identity baked in** (a derived model, `assets`' `identity.rs`), and
-//!   so does every part, so characters with the same description share
-//!   their meshes;
+//! - its `Body` MeshPart draws the base model's own body, and every part
+//!   its own base model: one shared mesh each (refinement R2a, ADR-0041).
+//!   The description's **identity** (shape weights and bone changes) is
+//!   worn **live**: it is registered in `Assets` and each MeshPart names it
+//!   by its key ([`axcenity_anim::IDENTITY`]); `anim` puts it on every
+//!   pose. A part's identity is the body's plus its item's own parameters'
+//!   shapes. Changing a parameter changes the key, nothing else. [`bake`]
+//!   turns a character's identity into derived models (ADR-0038's
+//!   mechanism), an optional optimization nothing does by default;
 //! - the **parts** it wears are MeshParts inside the `Body` (the base
 //!   model's eyes, teeth, brows and lashes, then one per item), which
 //!   follow its pose and live shapes (`anim`'s followers); a part on a
@@ -247,16 +252,44 @@ pub fn apply_description(
     let base = library
         .base(&resolved.base)
         .ok_or("the base model is gone")?;
+    // Every MeshPart draws its base model and wears the identity live:
+    // registered here, named by its key on the part.
     let identity = Arc::new(resolved.identity.clone());
-    let mesh_id = |model: &str| assets.derive(&format!("{LIBRARY_FOLDER}/{model}"), &identity);
+    let body_key = assets.register_identity(&identity);
+    let key_of = |part: &ResolvedPart| -> Option<u64> {
+        if part.shapes.is_empty() {
+            return body_key;
+        }
+        // An item's own parameters: a layer of its own, on its part only.
+        let mut own = resolved.identity.clone();
+        own.layers.push(axcenity_assets::IdentityLayer {
+            shapes: part
+                .shapes
+                .iter()
+                .map(|(name, weight)| (name.clone(), *weight))
+                .collect(),
+            bones: Vec::new(),
+        });
+        assets.register_identity(&Arc::new(own))
+    };
+    let mesh_id = |model: &str| format!("{LIBRARY_FOLDER}/{model}");
 
-    // The body: its model, kept where the old one's skeleton stood.
-    let wanted = mesh_id(&resolved.body.model);
+    // The body: its model, kept where the old one's skeleton stood, with
+    // the regions its items cover left out (CO9).
+    let wanted = hidden_body(
+        assets,
+        &library,
+        base,
+        mesh_id(&resolved.body.model),
+        &resolved.hidden_regions,
+    );
     let current = text_property(world, body, "MeshId");
     if current != wanted {
+        // A baked body's derived model has its base's fit: ask the base,
+        // so nothing is baked here.
         let fit = |mesh_id: &str| {
             assets
-                .model_blocking(mesh_id)
+                .model_blocking(axcenity_assets::split_derived(mesh_id).0)
                 .and_then(|model| model.rig.as_ref().map(|rig| rig.fit))
         };
         if let (Some(old), Some(new)) = (fit(&current), fit(&wanted)) {
@@ -264,6 +297,7 @@ pub fn apply_description(
         }
         let _ = world.set_property(body, "MeshId", Value::String(wanted));
     }
+    axcenity_anim::set_identity_key(world, body, body_key);
     set_marker(world, body, &resolved.body);
 
     // Body sliders. One at 1 changes nothing, so it isn't written unless
@@ -361,6 +395,7 @@ pub fn apply_description(
         if text_property(world, instance, "MeshId") != wanted {
             let _ = world.set_property(instance, "MeshId", Value::String(wanted));
         }
+        axcenity_anim::set_identity_key(world, instance, key_of(part));
         if world.get(instance).map(|held| held.name()) != Some(part.name.as_str()) {
             let _ = world.set_name(instance, &part.name);
         }
@@ -418,6 +453,84 @@ pub fn apply_description(
         description: kept,
         problems: resolved.problems,
     })
+}
+
+/// Bakes the identity `character` wears live into its meshes: the
+/// optional optimization of ADR-0041 for a character a game won't change
+/// again (a crowd of NPCs), for an export or for LODs. Each MeshPart the
+/// applier owns (the `Body` and its parts) that wears an identity
+/// ([`axcenity_anim::IDENTITY`]) gets the derived `MeshId` of its base
+/// model with that identity baked in (`Assets::derive`, ADR-0038's
+/// mechanism) and stops wearing it live, so it draws the same and morphs
+/// fewer shapes. Applying a description again makes it live again.
+/// Returns how many MeshParts were baked. Fails, changing nothing, when
+/// the character has no skinned body.
+pub fn bake(world: &mut World, assets: &Assets, character: InstanceId) -> Result<usize, String> {
+    let body = body_of(world, character)
+        .ok_or("the character has no skinned body: a MeshPart named `Body` inside its Model")?;
+    let mut owned = vec![body];
+    owned.extend(children_of(world, body).into_iter().filter(|child| {
+        world
+            .get(*child)
+            .is_some_and(|part| part.attribute(DESCRIPTION_PART).is_some())
+    }));
+    let mut baked = 0;
+    for part in owned {
+        let Some(key) = axcenity_anim::identity_key(world, part) else {
+            continue;
+        };
+        let Some(identity) = assets.identity(key) else {
+            continue;
+        };
+        let mesh_id = text_property(world, part, "MeshId");
+        let derived = assets.derive(&mesh_id, &identity);
+        if derived != mesh_id {
+            let _ = world.set_property(part, "MeshId", Value::String(derived));
+        }
+        axcenity_anim::set_identity_key(world, part, None);
+        baked += 1;
+    }
+    Ok(baked)
+}
+
+/// Whether `character`'s body draws a baked (derived) model ([`bake`]).
+pub fn is_baked(world: &World, character: InstanceId) -> bool {
+    body_of(world, character).is_some_and(|body| {
+        axcenity_assets::split_derived(&text_property(world, body, "MeshId"))
+            .1
+            .is_some()
+    })
+}
+
+/// The body's `MeshId` with the map regions in `hidden` left out (CO9,
+/// `axcenity_assets::RegionHiding`): its base's own when nothing worn
+/// hides a region of the base's region map.
+fn hidden_body(
+    assets: &Assets,
+    library: &Library,
+    base: &axcenity_avatar::BaseManifest,
+    body: String,
+    hidden: &[String],
+) -> String {
+    let indices: Vec<u8> = hidden
+        .iter()
+        .filter_map(|id| base.region(id).and_then(|region| region.map_index))
+        .collect();
+    let map = base
+        .model
+        .regions_map
+        .as_deref()
+        .and_then(|map| library.path_of(&base.id, map));
+    match map {
+        Some(map) if !indices.is_empty() => assets.hide_regions(
+            &body,
+            &Arc::new(axcenity_assets::RegionHiding {
+                map: format!("{LIBRARY_FOLDER}/{map}"),
+                hidden: indices,
+            }),
+        ),
+        _ => body,
+    }
 }
 
 /// How a worn part is told apart from the others: its item, or its model
@@ -592,8 +705,17 @@ impl DescriptionSync {
                 continue;
             }
             let library = library(assets);
+            // A character baked for good (a finished NPC) stays baked
+            // where it's loaded or replicated.
+            let baked = is_baked(world, character);
             let result = description_of(world, description, &library)
-                .and_then(|read| apply_description(world, assets, character, &read));
+                .and_then(|read| apply_description(world, assets, character, &read))
+                .and_then(|_| {
+                    if baked {
+                        bake(world, assets, character)?;
+                    }
+                    Ok(())
+                });
             if let Err(why) = result {
                 let name = world.full_name(description).unwrap_or_default();
                 errors.push(format!(

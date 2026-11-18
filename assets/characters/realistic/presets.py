@@ -68,26 +68,49 @@ FACES = [
     ("angular", "Angular features", "Strong planes: high cheekbones over hollow cheeks, a defined ridge and chin."),
 ]
 # Rows: parameter (a pair's stem gets `_left` and `_right`), then one value
-# per face above, in that order.
+# per face above, in that order. Started from the face README's §3 table
+# (its strengths a first guess); wave 3 (R4's second pass) strengthened
+# them, each toward its sentence and none past 0.7, until every preset
+# changes at least 3% of the face's pixels against the default face in
+# the studio light's front and side pictures on both frames (`player`'s
+# `face_preset_tests`; the lead: square, heart and soft barely differed
+# from the default on the masculine frame, and in profile none reached
+# 3%). The profile is what the chin, the nose, the brow ridge, the
+# forehead's slope and the jaw's angle change. (Review fixes 2: square's
+# brow ridge 0.7 on a forehead tipped back by 0.6 drew a hard band across
+# the forehead, a shelf with a hollow over it in profile; it keeps a
+# moderate ridge, an upright forehead and the chin further forward.
+# `avatar`'s `no_face_preset_puts_a_shelf_on_the_forehead` holds it.)
 FACE_TABLE = [
-    ("forehead_height", [-0.2, 0.2, 0, 0.2, 0.5, -0.2, 0.1, 0, 0]),
-    ("forehead_slope", [0.2, 0, 0, 0.1, 0, 0, 0, 0.3, -0.2]),
-    ("temple_width", [0.3, -0.1, 0.3, 0.5, -0.3, 0.6, -0.6, 0, 0]),
-    ("brow_ridge", [-0.2, 0, 0.2, 0, 0, 0, 0, -0.5, 0.4]),
-    ("cheekbone*", [-0.2, 0.2, 0, 0.5, -0.2, 0.6, -0.4, -0.2, 0.6]),
-    ("cheek_fullness*", [0.6, -0.1, -0.2, -0.2, -0.3, 0.2, -0.3, 0.4, -0.6]),
-    ("jaw_width*", [0.3, -0.3, 0.7, -0.6, -0.3, 0.5, -0.5, -0.2, 0.3]),
-    ("chin_width", [0.4, -0.2, 0.5, -0.6, 0, 0.3, -0.3, 0.1, -0.2]),
-    ("chin_length", [-0.4, 0.1, -0.1, 0.2, 0.6, -0.2, 0.1, -0.1, 0.1]),
-    ("chin_forward", [-0.1, 0, 0.1, 0, 0, 0, 0, -0.2, 0.3]),
-    ("nose_length", [-0.1, 0, 0, 0, 0.4, -0.1, 0.1, -0.1, 0.1]),
-    ("nose_bridge", [0, 0, 0, 0, 0, 0, 0, -0.3, 0.4]),
-    ("nose_tip", [0, 0, 0, 0, 0, 0, 0, 0.2, 0]),
+    ("forehead_height", [-0.2, 0.6, 0, 0.6, 0.7, -0.6, 0.6, 0, 0]),
+    ("forehead_slope", [0.6, 0.2, 0.1, 0.7, -0.4, 0, 0, 0.5, -0.2]),
+    ("temple_width", [0.3, -0.3, 0.5, 0.7, -0.3, 0.6, -0.6, 0, 0]),
+    ("brow_ridge", [-0.2, 0, 0.35, 0, 0, 0, 0, -0.7, 0.6]),
+    ("cheekbone*", [-0.2, 0.7, 0, 0.7, -0.2, 0.6, -0.4, -0.4, 0.7]),
+    ("cheek_fullness*", [0.7, -0.3, -0.6, -0.2, -0.3, 0.6, -0.7, 0.7, -0.7]),
+    ("jaw_width*", [0.3, -0.6, 0.7, -0.6, -0.3, 0.5, -0.5, -0.5, 0.3]),
+    ("chin_width", [0.4, -0.6, 0.7, -0.7, 0, 0.3, -0.3, 0.6, -0.2]),
+    ("chin_length", [-0.6, 0.6, -0.5, 0.6, 0.7, -0.7, 0.6, -0.1, 0.1]),
+    ("chin_forward", [-0.6, 0.3, 0.7, -0.6, 0.7, 0, 0, -0.4, 0.5]),
+    ("nose_length", [-0.1, 0.4, 0, 0, 0.7, -0.5, 0.5, -0.1, 0.1]),
+    ("nose_bridge", [0, 0, 0.5, 0, 0, 0, 0, -0.6, 0.6]),
+    ("nose_tip", [0, 0, 0, 0, 0, 0, 0, 0.4, 0]),
     ("nostril_width*", [0, 0, 0, 0, -0.1, 0.2, -0.2, 0, 0]),
     ("eye_spacing*", [0, 0, 0, 0, 0, 0.3, -0.3, 0, 0]),
     ("mouth_width*", [0, 0, 0.1, -0.1, 0, 0.3, -0.2, 0, 0]),
-    ("upper_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.3, -0.2]),
-    ("lower_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.3, -0.2]),
+    ("upper_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.7, -0.2]),
+    ("lower_lip_fullness", [0.1, 0, 0, 0, 0, 0, 0, 0.7, -0.2]),
+    # R4's controls, where they serve a preset (face README §3: "with the
+    # proposed parameters, add jaw_angle, + for square and angular, - for
+    # round, heart and soft"; the rest by the presets' sentences).
+    ("jaw_angle*", [-0.6, -0.5, 0.7, -0.5, 0, 0.6, -0.5, -0.7, 0.7]),
+    ("nose_width", [0.2, 0, 0, 0, -0.1, 0.6, -0.4, 0, 0]),
+    ("nose_tip_projection", [0, 0, 0, 0, 0.7, 0, 0.5, -0.4, 0.3]),
+    ("nose_tip_rotation", [0, 0, 0, 0, 0, 0, 0, 0.2, -0.1]),
+    ("philtrum_length", [-0.3, 0, 0, 0, 0.7, -0.6, 0.5, 0, 0]),
+    ("lower_lid*", [0.3, 0, 0, 0, 0, 0, 0, 0.7, -0.2]),
+    ("upper_lid_fold*", [0, 0, 0, 0, 0, 0, 0, 0.2, -0.3]),
+    ("eye_corner*", [0, 0, 0, 0.2, 0, 0, 0, 0, 0.3]),
 ]
 
 # The six characters the editor had in code (`presets()`), in its order:

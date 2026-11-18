@@ -5,7 +5,8 @@
 //! motion target follows it: the camera's motion, worked out from the
 //! prepass's depth, with the items that moved since last frame drawn over
 //! it. Each item is known from frame to frame by [`DrawItem::id`]; [`History`]
-//! keeps last frame's camera and each item's transform and joints.
+//! keeps last frame's camera, each item's transform and where its posed
+//! corners were (CO8: `posing.rs` keeps last frame's posed corners aside).
 //!
 //! TAA draws the scene a fraction of a pixel to one side each frame (the
 //! jitter, [`History::jitter`]) and blends it into the frames before, which
@@ -36,7 +37,6 @@ use super::gpu::{shader_module, target_bytes};
 use super::lighting::instance_raw;
 use super::lod::Draw;
 use super::post::fullscreen_pass;
-use super::skinning::{JointRaw, entry_count};
 use super::{DEPTH_FORMAT, FAR_PLANE, HDR_FORMAT, MeshKey, NEAR_PLANE};
 
 /// How far each pixel moved across the screen since last frame, in texture
@@ -100,7 +100,8 @@ pub(super) struct TemporalPasses {
     taa_layout: wgpu::BindGroupLayout,
     tile_layout: wgpu::BindGroupLayout,
     blur_layout: wgpu::BindGroupLayout,
-    /// Group 3 of the moving items' pass: the uniform and last frame's joints.
+    /// Group 3 of the moving items' pass: the uniform and last frame's
+    /// posed corners.
     motion_layout: wgpu::BindGroupLayout,
     motion_group: wgpu::BindGroup,
     camera_motion: wgpu::RenderPipeline,
@@ -113,9 +114,6 @@ pub(super) struct TemporalPasses {
     /// This frame's moved items, and how many fit.
     instances: wgpu::Buffer,
     instance_capacity: usize,
-    /// Last frame's joints, laid out as this frame's are, and how many fit.
-    previous_joints: wgpu::Buffer,
-    joint_capacity: usize,
 }
 
 /// The motion target (two, so last frame's is still there to compare with)
@@ -173,9 +171,12 @@ pub(super) struct History {
     view_proj: Option<Mat4>,
     /// Last frame's clock and wind, as `Frame::clock` has them.
     clock: Option<[f32; 4]>,
-    /// Each item's transform and joints last frame, by its ID.
+    /// Each item's transform last frame, by its ID.
     models: HashMap<u64, Mat4>,
-    joints: HashMap<u64, Vec<JointRaw>>,
+    /// Where each posed item's corners were in last frame's posed corners,
+    /// by its ID and mesh (the two copies of a level-of-detail switch
+    /// share an ID).
+    posed: HashMap<(u64, MeshKey), u32>,
 }
 
 /// What the temporal passes need of the scene's targets.
@@ -189,8 +190,13 @@ pub(super) struct SceneViews<'a> {
 
 impl TemporalPasses {
     /// `item_layouts` are the frame's, an empty one and the skin's, as the
-    /// moving items' pass binds them.
-    pub(super) fn new(device: &wgpu::Device, item_layouts: [&wgpu::BindGroupLayout; 3]) -> Self {
+    /// moving items' pass binds them; `previous` is last frame's posed
+    /// corners (`Posing::previous`).
+    pub(super) fn new(
+        device: &wgpu::Device,
+        item_layouts: [&wgpu::BindGroupLayout; 3],
+        previous: &wgpu::Buffer,
+    ) -> Self {
         let fragment = wgpu::ShaderStages::FRAGMENT;
         let uniform_entry = |visibility| wgpu::BindGroupLayoutEntry {
             binding: 0,
@@ -336,10 +342,8 @@ impl TemporalPasses {
         let motion_blur = fullscreen("motion blur", &blur_layout, "fs_motion_blur", HDR_FORMAT);
         let moving = moving_pipeline(device, item_layouts, &motion_layout);
         let instance_capacity = 16;
-        let joint_capacity = 16;
         let instances = instance_buffer(device, instance_capacity);
-        let previous_joints = joint_buffer(device, joint_capacity);
-        let motion_group = motion_group(device, &motion_layout, &uniform, &previous_joints);
+        let motion_group = motion_group(device, &motion_layout, &uniform, previous);
         Self {
             uniform,
             sampler,
@@ -357,8 +361,6 @@ impl TemporalPasses {
             motion_blur,
             instances,
             instance_capacity,
-            previous_joints,
-            joint_capacity,
         }
     }
 }
@@ -441,20 +443,11 @@ fn instance_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
     })
 }
 
-fn joint_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("last frame's joints"),
-        size: (capacity * size_of::<JointRaw>()) as u64,
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    })
-}
-
 fn motion_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     uniform: &wgpu::Buffer,
-    joints: &wgpu::Buffer,
+    previous: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("moving items"),
@@ -466,7 +459,7 @@ fn motion_group(
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: joints.as_entire_binding(),
+                resource: previous.as_entire_binding(),
             },
         ],
     })
@@ -753,12 +746,10 @@ fn halton(mut index: u64, base: u64) -> f32 {
     result
 }
 
-/// The moved items of a frame, for the motion pass, and last frame's joints
-/// laid out as this frame's.
+/// The moved items of a frame, for the motion pass.
 pub(super) struct Moved {
     /// By mesh, so each mesh's run is drawn at once.
     pub(super) instances: Vec<(MeshKey, MotionInstance)>,
-    pub(super) previous_joints: Vec<JointRaw>,
 }
 
 impl History {
@@ -766,16 +757,15 @@ impl History {
     /// the prepass) with an ID whose transform changed, or that's posed,
     /// and each one the wind sways (a plant's leaves move though it stands
     /// still; one without an ID or new this frame is taken to have stood
-    /// where it is). `joints` and `skins` are this frame's (see
-    /// `DrawPlan`), and `clock` is this frame's `Frame::clock`.
+    /// where it is). `posed` says where an item's skin was posed with a
+    /// mesh this frame (`Posing::offset`), and `clock` is this frame's
+    /// `Frame::clock`.
     pub(super) fn moved(
         &self,
         draws: &[Draw<'_>],
-        joints: &[JointRaw],
-        skins: &HashMap<*const Skin, [u32; 2]>,
+        posed: impl Fn(&Skin, MeshKey) -> Option<u32>,
         clock: [f32; 4],
     ) -> Moved {
-        let mut previous_joints = joints.to_vec();
         let mut instances = Vec::new();
         // Plants move only while there's wind, now or last frame, and the
         // clock moved on.
@@ -794,26 +784,25 @@ impl History {
                 None if sways => &item.transform,
                 None => continue,
             };
-            let skin = item
-                .skin
-                .as_deref()
-                .and_then(|skin| skins.get(&std::ptr::from_ref(skin)).copied());
-            if *previous == item.transform && skin.is_none() && !sways {
+            let mesh = draw.mesh();
+            let now = item.skin.as_deref().and_then(|skin| posed(skin, mesh));
+            if *previous == item.transform && now.is_none() && !sways {
                 continue;
             }
             let Some(raw) = instance_raw(item) else {
                 continue;
             };
-            let skin = skin.unwrap_or([0, 0]);
-            if skin[1] > 0
-                && let Some(before) = self.joints.get(&item.id)
-                && before.len() == entry_count(skin[1])
-            {
-                let start = skin[0] as usize;
-                previous_joints[start..start + before.len()].copy_from_slice(before);
-            }
+            // `previous_corner` in shader.wgsl: 1 for posed now but not
+            // last frame, else 2 more than where it was.
+            let skin = match now {
+                None => [0, 0],
+                Some(now) => match self.posed.get(&(item.id, mesh)) {
+                    Some(&before) => [now, before + 2],
+                    None => [now, 1],
+                },
+            };
             instances.push((
-                draw.mesh(),
+                mesh,
                 MotionInstance {
                     model: raw.model,
                     previous: previous.to_cols_array_2d(),
@@ -824,26 +813,27 @@ impl History {
             ));
         }
         instances.sort_by_key(|(mesh, _)| *mesh);
-        Moved {
-            instances,
-            previous_joints,
-        }
+        Moved { instances }
     }
 
-    /// Keeps this frame's camera (`view_proj`, without the jitter) and
-    /// `list`'s items for the next, and moves on to the other targets.
+    /// Keeps this frame's camera (`view_proj`, without the jitter),
+    /// `list`'s items and where each posed item's corners are (`posed`,
+    /// by ID and mesh) for the next, and moves on to the other targets.
     /// `taa` says whether TAA's history now holds this frame.
-    pub(super) fn finish(&mut self, list: &DrawList, view_proj: Mat4, clock: [f32; 4], taa: bool) {
+    pub(super) fn finish(
+        &mut self,
+        list: &DrawList,
+        (view_proj, clock): (Mat4, [f32; 4]),
+        posed: HashMap<(u64, MeshKey), u32>,
+        taa: bool,
+    ) {
         self.view_proj = Some(view_proj);
         self.clock = Some(clock);
         self.models.clear();
-        self.joints.clear();
         for item in list.items.iter().filter(|item| item.id != 0) {
             self.models.insert(item.id, item.transform);
-            if let Some(skin) = &item.skin {
-                self.joints.insert(item.id, JointRaw::of(skin).collect());
-            }
         }
+        self.posed = posed;
         self.valid = taa;
         self.parity = 1 - self.parity;
         self.frame += 1;
@@ -857,6 +847,12 @@ fn in_prepass(item: &DrawItem) -> bool {
 }
 
 impl TemporalPasses {
+    /// Binds `previous` (`Posing::previous`, made again) as last frame's
+    /// posed corners.
+    pub(super) fn bind_previous(&mut self, device: &wgpu::Device, previous: &wgpu::Buffer) {
+        self.motion_group = motion_group(device, &self.motion_layout, &self.uniform, previous);
+    }
+
     /// Writes this frame's uniform and moved items: the camera's view
     /// `view_proj` (without the jitter) and as drawn (`drawn`, moved by
     /// `jitter` pixels), in a scene of `size` (upscaled by TAA to
@@ -921,23 +917,6 @@ impl TemporalPasses {
             .collect();
         if !instances.is_empty() {
             queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(&instances));
-        }
-        if moved.previous_joints.len() > self.joint_capacity {
-            self.joint_capacity = moved.previous_joints.len().next_power_of_two();
-            self.previous_joints = joint_buffer(device, self.joint_capacity);
-            self.motion_group = motion_group(
-                device,
-                &self.motion_layout,
-                &self.uniform,
-                &self.previous_joints,
-            );
-        }
-        if !moved.previous_joints.is_empty() {
-            queue.write_buffer(
-                &self.previous_joints,
-                0,
-                bytemuck::cast_slice(&moved.previous_joints),
-            );
         }
     }
 

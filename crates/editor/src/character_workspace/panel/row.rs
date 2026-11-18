@@ -1,12 +1,16 @@
 //! A slider row: the label (its tooltip says what the control does), the
 //! value (typed at the Advanced level), a reset to the default when it
-//! differs, and the slider across the panel. A changed row gets the
-//! inspectors' accent bar in the gutter.
+//! differs, a lock for Randomize where the row has one, a left and right
+//! pair's side tools (R4) where it is one, and the slider across the
+//! panel. A changed row gets the inspectors' accent bar in the gutter.
+
+use crate::theme::icons;
 
 use eframe::egui;
 
 use super::super::intent::Gesture;
 use super::super::shell::gesture;
+use super::super::sides::SideTool;
 use crate::theme;
 use crate::widgets;
 
@@ -23,10 +27,102 @@ pub(super) struct Row<'a> {
     pub default: f32,
     /// The value can be typed (Advanced); otherwise it's only shown.
     pub typed: bool,
+    /// Whether Randomize leaves it alone, for a row with a lock.
+    pub locked: Option<bool>,
 }
 
-/// Draws `row`; returns a new value and where it is in its gesture.
-pub(super) fn slider(ui: &mut egui::Ui, row: &Row) -> Option<(f32, Gesture)> {
+/// What a row asks for.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Asked {
+    /// A new value, and where it is in its gesture.
+    Set(f32, Gesture),
+    /// Locked (or unlocked) for Randomize.
+    Lock(bool),
+    /// A side tool for the row's left and right pair.
+    Sides(SideTool),
+}
+
+/// The side tools as a small menu (⇄, with `label` after it where given):
+/// each tool, greyed out where it would change nothing. Returns the tool
+/// picked.
+pub(super) fn sides_menu(
+    ui: &mut egui::Ui,
+    tools: &[(SideTool, bool)],
+    label: Option<&str>,
+    tip: &str,
+) -> Option<SideTool> {
+    use egui::containers::menu;
+    let palette = theme::palette(ui.ctx());
+    let mut picked = None;
+    let text = match label {
+        Some(label) => egui::RichText::new(format!(
+            "{}  {label}  {}",
+            icons::ARROWS_LEFT_RIGHT,
+            icons::CARET_DOWN
+        ))
+        .small()
+        .color(palette.text_secondary),
+        None => egui::RichText::new(icons::ARROWS_LEFT_RIGHT)
+            .size(12.0)
+            .color(palette.text_muted),
+    };
+    let button = egui::Button::new(text).frame(label.is_some());
+    let (response, _) = menu::MenuButton::from_button(button).ui(ui, |ui| {
+        for (tool, enabled) in tools {
+            if ui
+                .add_enabled(*enabled, egui::Button::new(tool.label()))
+                .on_hover_text(tool.about())
+                .on_disabled_hover_text("Nothing to change")
+                .clicked()
+            {
+                picked = Some(*tool);
+                ui.close();
+            }
+        }
+    });
+    response.on_hover_text(tip);
+    picked
+}
+
+/// A lock's small toggle: lit while locked. Returns the new state when
+/// clicked.
+pub(super) fn lock_toggle(ui: &mut egui::Ui, locked: bool) -> Option<bool> {
+    let palette = theme::palette(ui.ctx());
+    let (icon, tip) = if locked {
+        (
+            icons::LOCK_SIMPLE,
+            "Locked: Randomize leaves it alone (click to unlock)",
+        )
+    } else {
+        (
+            icons::LOCK_SIMPLE_OPEN,
+            "Lock it so Randomize leaves it alone",
+        )
+    };
+    let response = ui
+        .add(
+            egui::Button::new(egui::RichText::new(icon).size(12.0).color(if locked {
+                palette.accent
+            } else {
+                palette.text_muted
+            }))
+            .frame(false),
+        )
+        .on_hover_text(tip);
+    response.clicked().then_some(!locked)
+}
+
+/// Draws `row`; returns what it asks for.
+pub(super) fn slider(ui: &mut egui::Ui, row: &Row) -> Option<Asked> {
+    slider_with_sides(ui, row, None)
+}
+
+/// [`slider`], with the side tools of the left and right pair it edits.
+pub(super) fn slider_with_sides(
+    ui: &mut egui::Ui,
+    row: &Row,
+    sides: Option<&[(SideTool, bool)]>,
+) -> Option<Asked> {
     let palette = theme::palette(ui.ctx());
     let [low, high] = row.range;
     let range = low.min(high)..=low.max(high);
@@ -51,7 +147,7 @@ pub(super) fn slider(ui: &mut egui::Ui, row: &Row) -> Option<(f32, Gesture)> {
                             .fixed_decimals(2),
                     );
                     if response.changed() || response.drag_stopped() {
-                        out = Some((value, gesture(&response)));
+                        out = Some(Asked::Set(value, gesture(&response)));
                     }
                 } else {
                     ui.label(
@@ -66,7 +162,18 @@ pub(super) fn slider(ui: &mut egui::Ui, row: &Row) -> Option<(f32, Gesture)> {
                         &format!("Back to the default ({:.2})", row.default),
                     )
                 {
-                    out = Some((row.default, Gesture::Commit));
+                    out = Some(Asked::Set(row.default, Gesture::Commit));
+                }
+                if let Some(locked) = row.locked
+                    && let Some(locked) = lock_toggle(ui, locked)
+                {
+                    out = Some(Asked::Lock(locked));
+                }
+                if let Some(tools) = sides
+                    && let Some(tool) =
+                        sides_menu(ui, tools, None, "Left and right: mirror or reset a side")
+                {
+                    out = Some(Asked::Sides(tool));
                 }
             });
         });
@@ -78,9 +185,9 @@ pub(super) fn slider(ui: &mut egui::Ui, row: &Row) -> Option<(f32, Gesture)> {
         );
         let response = response.on_hover_text(row.about);
         if response.double_clicked() {
-            out = Some((row.default, Gesture::Commit));
+            out = Some(Asked::Set(row.default, Gesture::Commit));
         } else if response.changed() || response.drag_stopped() {
-            out = Some((value, gesture(&response)));
+            out = Some(Asked::Set(value, gesture(&response)));
         }
     });
     if changed {

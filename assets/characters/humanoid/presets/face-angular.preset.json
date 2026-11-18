@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Angular",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "brows_height": -0.2,
+    "cheekbones": 0.6,
+    "chin_forward": 0.3,
+    "jaw_width": 0.5
+  },
+  "preset": {
+    "id": "axcenity/stylized-face-angular",
+    "kind": "face",
+    "about": "High cheekbones, a wide jaw and a chin set forward.",
+    "tags": [
+      "shape"
+    ],
+    "order": 30
+  }
+}

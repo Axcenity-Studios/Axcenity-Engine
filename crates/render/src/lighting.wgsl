@@ -1009,19 +1009,40 @@ struct Arrival {
     visible: f32,
 }
 
+// An `Arrival` with its visibility in parts, for skin (skin.wgsl), which
+// reddens only a shadow's soft edge: `shadow` the shadow map's or the
+// rays', whose edge is a penumbra, and `veil` what clouds and contact
+// shadows let through, which stays grey. `arrival.visible` is the
+// product, worked out as `Arrival`s always were.
+struct ArrivalParts {
+    arrival: Arrival,
+    shadow: f32,
+    veil: f32,
+}
+
 // The sun at `world_position`: its shadow, the clouds' and, for `solid`
 // surfaces (in the prepass) without ray traced shadows, contact shadows.
 fn sun_arrival(world_position: vec3<f32>, geometric: vec3<f32>, pixel: vec2<f32>, solid: bool)
     -> Arrival {
-    var visible = sun_visibility(world_position, geometric, pixel)
-        * cloud_shadow(frame.clouds, world_position, frame.sun_direction.xyz);
+    return sun_arrival_parts(world_position, geometric, pixel, solid).arrival;
+}
+
+// `sun_arrival`, with its visibility in parts.
+fn sun_arrival_parts(world_position: vec3<f32>, geometric: vec3<f32>, pixel: vec2<f32>,
+    solid: bool) -> ArrivalParts {
+    let shadow = sun_visibility(world_position, geometric, pixel);
+    let clouds = cloud_shadow(frame.clouds, world_position, frame.sun_direction.xyz);
+    var contact = 1.0;
     // Not where rays traced the sun: they find what contact shadows look
     // for, and their fixed per-pixel steps only add a speckle.
     if solid && ray_traced_sun(world_position, pixel) < 0.0 {
-        visible *= contact_visibility(world_position, geometric, frame.sun_direction.xyz,
+        contact = contact_visibility(world_position, geometric, frame.sun_direction.xyz,
             frame.contact.y, pixel);
     }
-    return Arrival(frame.sun_direction.xyz, frame.sun_radiance.rgb, visible);
+    // (In this order, as `sun_arrival` always multiplied them.)
+    let visible = shadow * clouds * contact;
+    return ArrivalParts(Arrival(frame.sun_direction.xyz, frame.sun_radiance.rgb, visible),
+        shadow, clouds * contact);
 }
 
 // The point and spot lights listed for `pixel`'s screen tile: where they
@@ -1101,12 +1122,19 @@ fn lamp_slots(lamps: TileLamps, i: u32) -> u32 {
 // outside its cone, nothing arrives (`visible` 0).
 fn lamp_arrival(lamps: TileLamps, i: u32, slot: u32, world_position: vec3<f32>,
     geometric: vec3<f32>, pixel: vec2<f32>, solid: bool) -> Arrival {
+    return lamp_arrival_parts(lamps, i, slot, world_position, geometric, pixel, solid).arrival;
+}
+
+// `lamp_arrival`, with its visibility in parts (`veil` is its contact
+// shadow's).
+fn lamp_arrival_parts(lamps: TileLamps, i: u32, slot: u32, world_position: vec3<f32>,
+    geometric: vec3<f32>, pixel: vec2<f32>, solid: bool) -> ArrivalParts {
     var arrival = Arrival(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0), 0.0);
     let light = lights[tile_lights[lamps.first + 1u + i]];
     let reach = lamp_reach(light, world_position);
     let strength = reach.w;
     if strength <= 0.0 {
-        return arrival;
+        return ArrivalParts(arrival, 0.0, 1.0);
     }
     let to_light = reach.xyz;
     let dist = length(to_light);
@@ -1131,14 +1159,15 @@ fn lamp_arrival(lamps: TileLamps, i: u32, slot: u32, world_position: vec3<f32>,
         visible = lamp_visibility(light, world_position, geometric, to_middle, lamps.rotation);
     }
     // Contact shadows for lamps that cast shadows by maps, up to the lamp.
+    var contact = 1.0;
     if solid && light.shadow.x >= 0.0 && traced < 0.0 {
-        visible *= contact_visibility(world_position, geometric, l, min(frame.contact.y, dist),
+        contact = contact_visibility(world_position, geometric, l, min(frame.contact.y, dist),
             pixel);
     }
     arrival.l = l;
     arrival.radiance = light.radiance_cone.rgb * strength;
-    arrival.visible = visible;
-    return arrival;
+    arrival.visible = visible * contact;
+    return ArrivalParts(arrival, visible, contact);
 }
 
 // `light_surface` for a surface the weather has already changed.

@@ -1,0 +1,127 @@
+R2 direct manipulation (r2-handles): the red run, 2026-11-17.
+The new tests run against the wave 2 manifest (no handles) and a stub of the
+studio's direct manipulation (no handles shown, no hover, no switch), before
+the implementation. Command:
+  cargo nextest run -p axcenity-avatar -p axcenity-player -p axcenity-editor --no-fail-fast -E 'test(/realistic_handles|a_handle_s_mirror|handle_tests/)'
+  cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(realistic_handles)'
+
+        FAIL [   0.026s] (1/9) axcenity-avatar tests::contracts::a_handle_s_mirror_is_another_handle_of_its_feature
+        FAIL [   2.373s] (4/9) axcenity-player::bin/axcenity-player handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+        FAIL [   2.868s] (5/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::symmetry_moves_the_mirror
+        FAIL [   2.882s] (6/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::a_camera_drag_never_changes_the_description
+        FAIL [   2.898s] (7/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::handles_off_leaves_the_camera_only
+        FAIL [   2.915s] (8/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::a_drag_through_each_feature_s_handle_gives_what_its_sliders_give
+        FAIL [   2.962s] (9/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::hover_highlights_and_a_click_selects_and_frames_the_feature
+        PASS [   0.088s] (2/9) axcenity-editor::bin/axcenity-editor character_workspace::handle_tests::handles_are_drawn_for_hover_selection_and_a_drag
+        PASS [   2.354s] (3/9) axcenity-player::bin/axcenity-player handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+     Summary [   2.964s] 9 tests run: 2 passed, 7 failed, 1668 skipped
+    thread 'character_workspace::handle_tests::a_camera_drag_never_changes_the_description'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::a_drag_through_each_feature_s_handle_gives_what_its_sliders_give'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::handles_off_leaves_the_camera_only'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'character_workspace::handle_tests::hover_highlights_and_a_click_selects_and_frames_the_feature'  panicked at crates\editor\src\character_workspace\handle_tests.rs:282:57:
+    thread 'character_workspace::handle_tests::symmetry_moves_the_mirror'  panicked at crates\editor\src\character_workspace\handle_tests.rs:76:32:
+    thread 'handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends'  panicked at crates\player\src\handle_tests.rs:169:5:
+    thread 'tests::contracts::a_handle_s_mirror_is_another_handle_of_its_feature'  panicked at crates\avatar\src\tests\contracts.rs:289:5:
+
+        FAIL [   0.014s] (1/3) axcenity-avatar::realistic_handles the_seven_features_have_handles_in_the_brief_s_order
+        PASS [   0.015s] (2/3) axcenity-avatar::realistic_handles every_handle_drives_its_own_feature_s_parameters_and_pairs_name_each_other
+        PASS [   0.018s] (3/3) axcenity-avatar::realistic_handles drives_have_a_measured_axis_and_travel_and_one_line_each_per_view
+     Summary [   0.018s] 3 tests run: 2 passed, 1 failed, 0 skipped
+    thread 'the_seven_features_have_handles_in_the_brief_s_order' (32596) panicked at crates\avatar\tests\realistic_handles.rs:36:5:
+
+The two that passed: the travel test has no handles to measure in the old
+manifest (its loop is empty), and the snapshot test only draws when
+AXCENITY_SNAPSHOTS is set. The assets region-map and scene ray tests were
+written with their code (Primitive::regions did not exist, so they could not
+compile before it).
+
+Review fixes 1 (2026-11-17)
+===========================
+
+1. The "within 2 mm" test was vacuous: it measured a skin corner against
+   the skin it belongs to. The reviewer showed it passed with the nose tip's
+   anchor moved to LeftFoot. The rewritten tests, run against two mutations
+   of the nose tip's anchor in Realistic.base.json (restored afterwards):
+
+   Anchor moved to bone LeftFoot, offset [0, 0, 0]:
+        FAIL handle_tests::every_handle_s_anchor_is_on_the_skin_at_rest
+             nose_tip: its anchor is 24.04 mm from the nearest skin corner
+        FAIL handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+             nose_tip nose_length: 0.0 mm measured, 6.9 mm in the data
+        FAIL handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+             frame 0 nose_tip nose_length at -1: 24.12 mm (more than 2 mm off the skin)
+     Summary 3 tests run: 0 passed, 3 failed
+
+   Anchor offset moved 5 mm forward, off the nose tip:
+        FAIL handle_tests::every_handle_s_anchor_is_on_the_skin_at_rest
+             nose_tip: its anchor is 4.99 mm from the nearest skin corner
+        PASS handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+        FAIL handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+             frame 0 nose_tip nose_length at -1: 4.99 mm (more than 2 mm off the skin)
+     Summary 3 tests run: 1 passed, 2 failed
+
+   (The first version of the rest check measured in the fitted box, whose
+   axes are scaled apart, and reported the 5 mm move as 21.54 mm; that is
+   what found the scene fix below.)
+
+   scene, written first against the old nearest_corner (distance in the
+   fitted box):
+        FAIL surface_pick::tests::the_nearest_corner_is_nearest_in_the_file_s_metres
+             assertion `left == right` failed: 20 of 55 points found a farther corner
+     Summary 5 tests run: 4 passed, 1 failed
+
+2. The eye-corner handles sat on the cheek. avatar, written first against
+   the old manifest:
+        FAIL realistic_handles the_eye_corner_handles_sit_at_the_eye_s_outer_corner
+             eye_corner_left: -10.1 mm off the eye's height
+     Summary 4 tests run: 3 passed, 1 failed
+
+3. The overlay (jagged outline, broad eye tint, nostril loop) is visual: it
+   was checked on the drawing snapshots before and after
+   (r2-handles/handles-close-ups.jpg), not by a red test.
+
+Also added, passing when first run (they cover behaviour already there):
+editor handle_tests::esc_cancels_a_handle_drag, scene
+surface_pick::tests::a_ray_at_a_turned_head_meets_the_posed_skin.
+
+== Review fixes 2 (second review) ==
+
+1. Handles and tint drawn for hidden skin. editor handle_tests, written
+   first against the overlay with no depth test (first versions of the two
+   tests, which checked handles and tint with 2 points of slack):
+        FAIL handle_tests::handles_on_the_far_side_are_hidden
+             the left jaw angle is behind the cheek
+        FAIL handle_tests::the_overlay_is_drawn_only_where_the_skin_shows
+             jaw in Face at None hovering jaw: 1 of 2 handles and 0 of 151 sampled tint corners behind the skin
+             eyes in Face at Some(70.0) hovering eyes: 1 of 4 handles and 23 of 151 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering waist: 0 of 1 handles and 31 of 157 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering shoulders: 0 of 1 handles and 24 of 152 sampled tint corners behind the skin
+             hips in Front at Some(45.0) hovering hips: 0 of 1 handles and 37 of 160 sampled tint corners behind the skin
+
+   The final tests (handles checked with 6 points of slack, the tint with
+   3; the far-side test also checking every shown handle by exact rays),
+   with the depth test switched off (Depth::hidden always false):
+        FAIL handle_tests::handles_on_the_far_side_are_hidden
+             the left jaw angle is behind the cheek
+        FAIL handle_tests::the_overlay_is_drawn_only_where_the_skin_shows
+             jaw in Face at None hovering jaw: 1 of 2 handles and 0 of 138 sampled tint corners behind the skin
+             eyes in Face at Some(70.0) hovering eyes: 1 of 4 handles and 37 of 155 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering waist: 0 of 1 handles and 31 of 157 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering shoulders: 0 of 1 handles and 22 of 152 sampled tint corners behind the skin
+             hips in Front at Some(45.0) hovering hips: 0 of 1 handles and 34 of 160 sampled tint corners behind the skin
+     Summary 2 tests run: 0 passed, 2 failed
+
+2. The lips' tint covered the muzzle. editor handle_tests, written first:
+        FAIL handle_tests::the_lips_tint_is_the_mouth_not_the_muzzle
+             the lips' tint is 63.8 cm2, 10.0 cm across and 5.8 cm high
+   (after: 31.7 cm2, 8.4 cm across, 3.7 cm high; bounds 35 cm2, 9.0, 4.0)
+
+3. Hovering a handle named another feature (non-blocking). Written after
+   the rule, so its red run takes the rule out and casts the ray as before:
+        FAIL handle_tests::hovering_a_handle_names_its_feature
+             shoulder_left: Some("body"), shoulder_right: Some("body"),
+             hip_left: None, hip_right: None
+
+Also changed: the_jaw_handle_gives_what_its_sliders_give now drags
+jaw_right; jaw_left is behind the cheek in the Face view and no longer
+shown (the full suite's run caught it: "jaw_left is shown").
