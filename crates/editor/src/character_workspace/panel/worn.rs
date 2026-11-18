@@ -65,11 +65,7 @@ pub(super) fn controls(
     let declared = Declared::of(item);
     let groom = item.kind == ItemKind::Groom;
     // Worn whatever its state (ADR-0043), and said so.
-    let title = match item.state() {
-        axcenity_avatar::Quality::Draft => format!("{} (Draft)", item.label),
-        axcenity_avatar::Quality::Legacy => format!("{} (Legacy)", item.label),
-        _ => item.label.clone(),
-    };
+    let title = super::super::browser::marked_label(item);
     widgets::section(theme::icons::SLIDERS_HORIZONTAL, &title)
         .id_salt(&format!("worn item {}", item.id))
         .show(ui, |ui| {

@@ -435,3 +435,55 @@ fn randomize_never_strips_the_modesty_layer() {
         assert!(d.items.iter().any(|w| w.id == "test/briefs"), "seed {seed}");
     }
 }
+
+/// When the modesty slot has Production underwear but none of it can be
+/// worn with what is kept (here it excludes the hair, which a Clothing
+/// randomize keeps), the underwear taken off goes back on.
+#[test]
+fn underwear_that_nothing_can_replace_goes_back_on() {
+    let mut library = fixtures::rich_library();
+    let mut base = library.bases["test/body"].clone();
+    base.slots.push(crate::Slot {
+        id: "underwear".to_owned(),
+        label: "Underwear".to_owned(),
+        category: Category::Clothing,
+        multiple: false,
+        empty_label: None,
+        about: None,
+        icon: None,
+    });
+    library.add_base("test/Body.base.json", base);
+    for (id, quality, excludes) in [
+        ("test/briefs", crate::Quality::Legacy, vec![]),
+        (
+            "test/boxers",
+            crate::Quality::Production,
+            vec!["test/hair".to_owned()],
+        ),
+    ] {
+        let mut under = fixtures::item(fixtures::SKIRT);
+        under.id = id.to_owned();
+        under.slot = "underwear".to_owned();
+        under.layer = Some(0);
+        under.quality = Some(quality);
+        under.excludes = excludes;
+        library.add_item(format!("{id}.item.json"), under);
+    }
+    let none = BTreeSet::new();
+    let mut start = start();
+    start.items.push(WornItem::new("test/hair"));
+    start.items.push(WornItem::new("test/briefs"));
+    for seed in 0..500 {
+        let d = randomize(
+            &start,
+            &Scope::Category(Category::Clothing),
+            &none,
+            seed,
+            &library,
+        );
+        let worn: Vec<&str> = d.items.iter().map(|w| w.id.as_str()).collect();
+        assert!(worn.contains(&"test/hair"), "seed {seed}: {worn:?}");
+        assert!(worn.contains(&"test/briefs"), "seed {seed}: {worn:?}");
+        assert!(!worn.contains(&"test/boxers"), "seed {seed}: {worn:?}");
+    }
+}

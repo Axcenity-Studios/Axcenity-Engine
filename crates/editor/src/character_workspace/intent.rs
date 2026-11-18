@@ -12,7 +12,7 @@
 //! the Expressions page's face controls and face preview (R9).
 //!
 //! The Hair and Clothing browsers (R6, R7; `browser.rs`) add `Browse`
-//! (search, filters, "Show drafts", the tile hovered or picked: editor
+//! (search, filters, "Legacy items", content review, the tile hovered or picked: editor
 //! state, the preview shown in the character's place), `EndPreview`,
 //! item favourites, and the worn item's own controls (`SetItemVariant`,
 //! `SetItemMaterial`, `SetItemParameter`), which are edits. `Wear` stays

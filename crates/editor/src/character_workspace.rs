@@ -1238,7 +1238,9 @@ pub(crate) fn value_of(description: &Description, base: Option<&BaseManifest>, i
     })
 }
 
-/// The items `library` has for `slot` on base model `base`.
+/// The items `library` has for `slot` on base model `base`, in every
+/// content state (the pages list through `browser::slot_choices`).
+#[cfg(test)]
 pub(crate) fn items_for(library: &Library, base: &str, slot: &str) -> Vec<(String, String)> {
     library
         .items

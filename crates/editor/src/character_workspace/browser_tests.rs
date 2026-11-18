@@ -921,6 +921,101 @@ fn production_is_listed_legacy_on_request_and_drafts_only_for_review() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// A realistic workspace whose base has a "Wrist" accessories slot and one
+/// watch for it in `quality`: the shipped bases have no accessories slot
+/// yet (R8), so the Accessories page's states are tested on this one.
+fn accessory_workspace(name: &str, quality: &str) -> (PathBuf, CharacterWorkspace) {
+    let folder = test_folder(name);
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let root = folder.join(LIBRARY_FOLDER);
+    let (library, _, _) = Library::read(&root);
+    let mut base = library.base(DEFAULT_BASE).unwrap().clone();
+    base.slots.push(axcenity_avatar::Slot {
+        id: "wrist".to_owned(),
+        label: "Wrist".to_owned(),
+        category: axcenity_avatar::Category::Accessories,
+        multiple: false,
+        empty_label: None,
+        about: None,
+        icon: None,
+    });
+    let path = library.manifest_path(DEFAULT_BASE).unwrap().to_owned();
+    std::fs::write(root.join(path), base.to_json()).unwrap();
+    // `add_items` rewrites the catalogue, so the base is read again too.
+    add_items(
+        &folder,
+        &[item(
+            "test/watch",
+            "Watch",
+            "accessory",
+            "wrist",
+            &[DEFAULT_BASE],
+            &format!(
+                r#", "quality": "{quality}",
+                   "model": {{ "file": "../realistic/RealisticParts.glb",
+                              "object": "AxcenityRealistic/Underwear_Briefs" }},
+                   "materials": [{{ "name": "Metal", "shading": "standard" }}]"#
+            ),
+        )],
+    );
+    let library = workspace.library();
+    assert!(library.base(DEFAULT_BASE).unwrap().slot("wrist").is_some());
+    assert!(library.item("test/watch").is_some());
+    workspace.apply(Intent::PickCategory(Category::Accessories));
+    (folder, workspace)
+}
+
+/// The Accessories page follows the content states as the browsers do
+/// (ADR-0043): a Legacy accessory only with the "Legacy items" filter, a
+/// Draft only for content review, each marked; one that is worn always
+/// shown, lit and marked; the empty page says what is hidden.
+#[test]
+fn the_accessories_page_follows_the_content_states() {
+    let has = |texts: &[String], text: &str| texts.iter().any(|t| t == text);
+    let watch = |texts: &[String]| texts.iter().any(|t| t.starts_with("Watch"));
+    for (quality, marked, hidden) in [
+        (
+            "legacy",
+            "Watch (Legacy)",
+            "Legacy items: 1 (turn on Legacy items to show them).",
+        ),
+        ("draft", "Watch (Draft)", "Drafts: 1 (content review only)."),
+    ] {
+        let (folder, mut workspace) =
+            accessory_workspace(&format!("accessories-{quality}"), quality);
+        // Hidden by default, and the page says so.
+        let texts = draw(&mut workspace, Vec::new());
+        assert!(!watch(&texts), "{quality}: {texts:?}");
+        assert!(
+            has(&texts, "No production accessories yet"),
+            "{quality}: {texts:?}"
+        );
+        assert!(has(&texts, hidden), "{quality}: {texts:?}");
+        // The Legacy items filter shows a legacy watch, never a draft.
+        assert_eq!(has(&texts, "Legacy items"), quality == "legacy");
+        workspace.apply(Intent::Browse(Browse::ShowLegacy(true)));
+        let texts = draw(&mut workspace, Vec::new());
+        assert_eq!(has(&texts, marked), quality == "legacy", "{texts:?}");
+        // Content review shows a draft watch, never a legacy one alone.
+        workspace.apply(Intent::Browse(Browse::ShowLegacy(false)));
+        workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+        let texts = draw(&mut workspace, Vec::new());
+        assert_eq!(has(&texts, marked), quality == "draft", "{texts:?}");
+        // Worn: always shown, marked, whatever is filtered.
+        workspace.apply(Intent::Browse(Browse::ShowDrafts(false)));
+        workspace.apply(Intent::Wear {
+            slot: "wrist".to_owned(),
+            item: Some("test/watch".to_owned()),
+        });
+        assert!(wears(workspace.description(), "test/watch"));
+        let texts = draw(&mut workspace, Vec::new());
+        assert!(has(&texts, marked), "{quality}: {texts:?}");
+        // Section labels are drawn in capitals.
+        assert!(has(&texts, "WRIST"), "{quality}: {texts:?}");
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+}
+
 /// Drafts are shown for content review from the studio's View menu: off
 /// by default, labelled for reviewing content, never saved in a character.
 #[test]
@@ -1170,6 +1265,11 @@ fn the_realistic_pages_say_what_they_have() {
         texts
             .iter()
             .any(|t| t == "Drafts: 1 (content review only)."),
+        "{texts:?}"
+    );
+    // With no tile to point at, no "Trying on" bar.
+    assert!(
+        !texts.iter().any(|t| t == "Point at a tile to try it on"),
         "{texts:?}"
     );
     workspace.apply(Intent::PickCategory(Category::Clothing));

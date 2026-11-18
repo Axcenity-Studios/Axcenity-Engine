@@ -65,3 +65,24 @@ FAIL [   0.063s] (1/1) axcenity-avatar::content_states every_shipped_item_declar
 Summary [   0.065s] 1 test run: 0 passed, 1 failed, 176 skipped
 FAIL [   0.063s] (1/1) axcenity-avatar::content_states every_shipped_item_declares_its_state
 15 items: "doesn't say its content state: set `quality` to `production`, `legacy` or `draft`" (the twelve stylized items and the three realistic underwear items)
+
+4. Review fixes 1: editor, the Accessories page before it followed the content states
+
+cargo nextest run -p axcenity-editor -p axcenity-avatar --no-fail-fast -E 'test(the_accessories_page_follows_the_content_states) | test(underwear_that_nothing_can_replace_goes_back_on)'
+PASS [   0.012s] (1/2) axcenity-avatar tests::randomizing::underwear_that_nothing_can_replace_goes_back_on
+FAIL [   1.286s] (2/2) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_accessories_page_follows_the_content_states
+Summary [   1.289s] 2 tests run: 1 passed, 1 failed, 1645 skipped
+thread 'character_workspace::browser_tests::the_accessories_page_follows_the_content_states' panicked at crates\editor\src\character_workspace\browser_tests.rs:988:9:
+legacy: [... "Accessories", "Glasses, jewellery, hats and bags.", "WRIST", "None", "Watch", ...]
+(the legacy watch listed by default, unmarked)
+
+The put-back test passes on the existing code: it covers a branch that had no test. With the
+put-back block removed from randomize.rs (restored afterwards) it fails: see the hand-back's
+"Review fixes 1".
+
+5. Review fixes 1 (non-blocking): the "Trying on" bar over a page with no tiles
+
+cargo nextest run -p axcenity-editor -E 'test(the_realistic_pages_say_what_they_have)'
+FAIL [   1.427s] (1/1) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_realistic_pages_say_what_they_have
+panicked at crates\editor\src\character_workspace\browser_tests.rs:1271:5 (the realistic Hair page draws "Point at a tile to try it on" with no tile)
+Summary [   1.430s] 1 test run: 0 passed, 1 failed, 1468 skipped

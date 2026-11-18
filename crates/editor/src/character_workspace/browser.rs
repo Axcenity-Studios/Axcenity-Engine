@@ -547,23 +547,72 @@ pub fn empty_message(
         Shelf::Hair => "hairstyles",
         Shelf::Clothing => "clothes",
     };
+    let sentence = hidden_sentence(listing.hidden_legacy, listing.hidden_drafts)
+        .unwrap_or_else(|| "Nothing in the library fits this body here yet.".to_owned());
+    Some((format!("No production {what} yet"), sentence))
+}
+
+/// What a page with nothing listed says it hides: how many legacy items
+/// and drafts, or `None` when it hides none (the Accessories page says it
+/// too).
+pub fn hidden_sentence(legacy: usize, drafts: usize) -> Option<String> {
     let mut sentence = Vec::new();
-    if listing.hidden_legacy > 0 {
+    if legacy > 0 {
         sentence.push(format!(
-            "Legacy items: {} (turn on Legacy items to show them).",
-            listing.hidden_legacy
+            "Legacy items: {legacy} (turn on Legacy items to show them)."
         ));
     }
-    if listing.hidden_drafts > 0 {
-        sentence.push(format!(
-            "Drafts: {} (content review only).",
-            listing.hidden_drafts
-        ));
+    if drafts > 0 {
+        sentence.push(format!("Drafts: {drafts} (content review only)."));
     }
-    if sentence.is_empty() {
-        sentence.push("Nothing in the library fits this body here yet.".to_owned());
+    (!sentence.is_empty()).then(|| sentence.join(" "))
+}
+
+/// `item`'s label as a chip or a worn item's title says it: marked
+/// "(Legacy)" or "(Draft)" unless it is Production (ADR-0043).
+pub fn marked_label(item: &ItemManifest) -> String {
+    match item.state() {
+        Quality::Production => item.label.clone(),
+        Quality::Legacy => format!("{} (Legacy)", item.label),
+        Quality::Draft | Quality::Other => format!("{} (Draft)", item.label),
     }
-    Some((format!("No production {what} yet"), sentence.join(" ")))
+}
+
+/// What a slot page (Accessories) offers in one slot: the items for the
+/// character's base that `shown` lists, and any worn there whatever its
+/// state, as (ID, marked label); and how many it hides by state.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SlotChoices {
+    pub items: Vec<(String, String)>,
+    pub hidden_legacy: usize,
+    pub hidden_drafts: usize,
+}
+
+/// [`SlotChoices`] for `slot` on `description`'s base: the same content
+/// rule as the browsers' [`list`].
+pub fn slot_choices(
+    library: &Library,
+    description: &Description,
+    slot: &str,
+    shown: Shown,
+) -> SlotChoices {
+    let mut choices = SlotChoices::default();
+    let worn = |id: &str| description.items.iter().any(|w| w.id == id);
+    for item in library
+        .items
+        .values()
+        .filter(|item| item.slot == slot && item.bases.contains(&description.base))
+    {
+        let state = item.state();
+        if shown.shows(state) || worn(&item.id) {
+            choices.items.push((item.id.clone(), marked_label(item)));
+        } else if state == Quality::Legacy {
+            choices.hidden_legacy += 1;
+        } else {
+            choices.hidden_drafts += 1;
+        }
+    }
+    choices
 }
 
 /// `recent` with `id` at the front, once, at most [`MAX_RECENT_ITEMS`].

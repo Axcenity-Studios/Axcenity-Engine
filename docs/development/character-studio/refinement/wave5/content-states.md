@@ -52,7 +52,7 @@ Branch `content-states`, from `refinement-wave5`. Paul's decision 12 of 2026-11-
 
 **Compatibility decision** (plan 11.3: an older engine rejects an unknown enum value). I put Legacy in `quality` as a third value rather than in a second field.
 
-- **Released engines** (up to v0.2.0-alpha.1) predate `quality` and ignore it.
+- **No released engine reads item manifests**: characters arrived after v0.2.0-alpha.1 (that tag has no `avatar` crate; corrected in Review fixes 1).
 - **Development builds from CO9 (2026-11-17) to this change** know only `draft` and `production`. They reject a manifest that says `legacy`. In a project a newer engine wrote, those items drop out with a reported problem, and characters there draw without them.
   - No release carries such a build. Two fields for one fact would have to be reconciled forever.
   - From this change on, an unknown state reads as Draft instead of failing, so a fourth state won't break this engine.
@@ -127,9 +127,9 @@ Studio drawing snapshots (`AXCENITY_SNAPSHOTS`, 1440 by 900; the status line nam
 
   That is the decision's intended effect until the first item passes the review and Paul signs it off.
 - **The realistic underwear is Legacy but is still each body type's default and modesty layer** (worn by the `frame` choice, in every realistic preset). A Production underwear set should replace it; then `presets.py` and the base's `defaults` should name it.
-- **The "Legacy items" filter is shared by both pages** (one switch, like content review). It is not per page and not remembered between sessions. Per-viewer memory could be added if Paul wants it.
+- **The "Legacy items" filter is shared by the Hair, Clothing and Accessories pages** (one switch, like content review). It is not per page and not remembered between sessions. Per-viewer memory could be added if Paul wants it.
 - **The development-build compatibility gap** described under Interfaces.
-- **The "Trying on" bar on an empty page.** On a page with nothing to list (both realistic pages today), the bar ("Point at a tile to try it on", Wear) still draws over the empty state. It could be hidden when a page has no tiles. I left it alone: it is the wave-4 layout rule and outside this task.
+- ~~The "Trying on" bar on an empty page.~~ Fixed in Review fixes 1: a page with no tile draws no bar.
 
 ## What the lead must do at merge
 
@@ -137,3 +137,45 @@ Studio drawing snapshots (`AXCENITY_SNAPSHOTS`, 1440 by 900; the status line nam
 - The licensed-asset intake adds provenance checks in avatar. Keep `check_declared_state` beside them: both are separate functions, and `tests/content_states.rs` is its own file.
 - Any item the content waves add must say its state: the check fails otherwise. An import is `draft`.
 - Promote an item to Production only after the review: change its generator's state, not the manifest by hand.
+
+## Review fixes 1
+
+**Blocking 1: the Accessories page ignored the states.** It now follows the same rule as the browsers.
+- `browser::slot_choices(library, description, slot, Shown)` gives a slot page's chips: the items `Shown` lists, plus any item worn there whatever its state, labelled through `browser::marked_label` ("Watch (Legacy)", "Watch (Draft)"). It also counts the hidden legacy items and drafts. `panel/worn.rs` uses the same `marked_label`.
+- `panel.rs` `slots_page` lists through it. It draws a "Legacy items" chip (the shared switch) where there is legacy content, and the content-review line when drafts are shown.
+- An empty page says what it hides, through `browser::hidden_sentence`, which `empty_message` now shares: for example "No production accessories yet" and "Legacy items: 1 (turn on Legacy items to show them)."
+- The free `items_for`, which ignores the state, is now `#[cfg(test)]` only.
+- Test `browser_tests::the_accessories_page_follows_the_content_states` uses a realistic workspace whose base gets a "Wrist" accessories slot, because no shipped base has one. It runs with the watch Legacy and then Draft, and checks four things:
+  - hidden by default, with an honest empty page;
+  - the Legacy filter shows only the legacy watch;
+  - content review shows only the draft watch;
+  - the watch is always listed and marked while worn.
+- Red run: the legacy watch was listed unmarked as "Watch" (red-run part 4).
+
+**Blocking 2: stale docs.** The reviewer is right. `git ls-tree v0.2.0-alpha.1 crates/` lists no `avatar`, and `git grep ItemManifest v0.2.0-alpha.1` finds nothing. Fixed:
+- ADR-0043, architecture.md's `quality` row, Known-Limitations and this hand-back now say: "No released engine reads character item manifests (characters arrived after v0.2.0-alpha.1)". The development-build gap stays as stated.
+- The old "Show drafts" wording now names the "Legacy items" filter and the View menu's "Show drafts for content review", in:
+  - `wiki/Editor/Specialized-Editors.md`;
+  - `docs/editor/character-studio.md` (the intents sentence, the Accessories sentence and the test list);
+  - `intent.rs`'s module comment.
+- `testing.md` names `randomize_draws_production_items_only`.
+- Two more stale Known-Limitations sentences from wave 4 were corrected: "the Hair page lists it until Show drafts is merged" and "Character Studio doesn't hide drafts yet".
+
+**Non-blocking, done:**
+- New test `tests::randomizing::underwear_that_nothing_can_replace_goes_back_on`. Production boxers exclude the hair, which a Clothing randomize keeps. Over 500 seeds the Legacy briefs go back on and the boxers are never worn. The test passes on the current code. With the put-back branch disabled (`if bare && false`, restored with `git checkout`), it fails at randomizing.rs:480.
+- ADR-0043 now says a later engine's unknown value is not kept if this engine rewrites the manifest. Today nothing does: only `fit::import_garment` writes manifests, always new and `draft`.
+- docs/editor/character-studio.md tells project authors to set `"quality": "production"` on their own items, because an unset state reads as Legacy.
+- The "Trying on" bar is no longer drawn on a page with no tile: no entries, no recently used, no slot filter and nothing picked. `the_realistic_pages_say_what_they_have` now asserts this. It failed first (red-run part 5).
+
+**Non-blocking, left:**
+- The stylized snapshot shows test-fixture Production tiles. Its caption above already says so.
+- The Legacy badge has lower contrast than the Draft badge. The reviewer judged it acceptable.
+
+**Tests run:**
+- `cargo nextest run -p axcenity-avatar -p axcenity-editor --no-fail-fast`: 1636 tests run, 1636 passed (12 slow), 11 skipped, no ABORT.
+- After a last text-only fix to two strings in `slots_page`: `cargo nextest run -p axcenity-editor -p axcenity-player -E 'test(/character_workspace::/) | test(/content_state_tests/)'` ran 153 tests, all passed.
+- `cargo clippy -p axcenity-avatar -p axcenity-editor -p axcenity-player --all-targets -- -D warnings`: clean.
+- `cargo fmt --all`: clean.
+- `python -I scripts/check-wiki.py`: 115 pages, 0 errors, 57 warnings (staleness on untouched pages).
+
+**For the lead:** new crate-private editor helpers: `browser::slot_choices`, `SlotChoices`, `marked_label` and `hidden_sentence`. No new snapshot: the Accessories page has no shipped content to draw.

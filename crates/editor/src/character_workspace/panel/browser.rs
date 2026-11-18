@@ -210,7 +210,13 @@ pub(super) fn page(
     // What is being tried on, and the way to wear it. The bar is always
     // there (a hint when nothing is picked), so picking a tile never moves
     // the tiles under a still pointer: the tile above would be hovered.
-    intents.extend(trying_bar(ui, library, base, state.selected.as_ref()));
+    // A page with no tile at all (nothing listed, no slot filter giving a
+    // "nothing worn" tile) has nothing to point at, so no bar.
+    let no_tiles =
+        listing.entries.is_empty() && listing.recent.is_empty() && filters.slot.is_none();
+    if !no_tiles || state.selected.is_some() {
+        intents.extend(trying_bar(ui, library, base, state.selected.as_ref()));
+    }
 
     // The worn items' own controls (colours, variants, parameters), above
     // the tiles so they're seen without scrolling; each folds away.
