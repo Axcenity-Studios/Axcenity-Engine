@@ -124,7 +124,7 @@ Each pattern: what it is, where it is seen, why it works, how it maps onto the m
 - **What.** Drag to change, Shift for fine steps, click to type, double-click for the default, Esc to cancel a drag.
 - **Seen in.** Blender (U-36). Character Creator's typed values and step arrows (U-17).
 - **Why.** They are the conventions people bring with them. Shift for fine is already the editor's own for turning a part (`gizmo.rs:70`, `:1157`); using it for a handle drag extends it.
-- **Maps to.** `range` and `default`. Typed values at level 3.
+- **Maps to.** `range` and `default`. Typed values at every level (RA1, "Drag feel" in section 3).
 
 ### P13. Pin what must not move
 
@@ -206,7 +206,7 @@ The three levels are **one flat filter**, not three nested screens. Each level s
 | | Quick (1) | Detailed (2) | Advanced (3) |
 |---|---|---|---|
 | **Left navigation** | Categories only | Categories and features | The same, plus a search field over all parameters |
-| **Right panel** | Preset tiles, body type, skin tone, and the few broad sliders (height, muscle, body fat) | Part presets, then every level 2 slider of the feature | Adds level 3 sliders, typed numbers, left and right as two sliders, "changed only" and "favourites" filters |
+| **Right panel** | Preset tiles, body type, skin tone, and the few broad sliders (height, muscle, body fat) | Part presets, then every level 2 slider of the feature | Adds level 3 sliders, left and right as two sliders, "changed only" and "favourites" filters |
 | **Handles** | One per feature: the broad one | All of the feature's handles (two to four) | Adds the sideways-shift directions and per-side handles when Symmetry is off |
 | **Symmetry** | Always on; no toggle shown | Toggle shown | Toggle, plus Left to right, Right to left, Reset side |
 | **Randomize** | Whole character or category | Adds the selected feature | Adds amount and asymmetry |
@@ -266,13 +266,14 @@ Recommended: the third, with the second as an off switch.
 
 ### Drag feel
 
-The numbers in this section and in the steps above (240 points, 12 points, 0.4 s, a quarter of a second, the last tenth of a range, 45 degrees) are proposals to tune by hand. None comes from a source. Only the 6-point click distance is a fact (egui's default).
+**Paul's drag rule of 2026-11-18** (RA1; built in `crates/editor/src/character_workspace/numeric.rs`, the studio's one numeric-drag helper) replaces the proposals that stood here: a handle that kept the skin under the pointer one to one, with a fallback of 240 points for a range that barely shows, and Ctrl to hold a drag to its first direction (never built). Paul's words: a full slider range takes about 100 to 120 points of horizontal drag; Shift about 25%, Ctrl about 2x; exact values can be typed where precision matters; the same rules for body, facial and every other numerical customization control. **The rule is consistency**: the same drag does the same to a slider row, a row's value and a handle. The other numbers in this section and in the steps above (12 points, 0.4 s, a quarter of a second, the last tenth of a range, 45 degrees) are proposals to tune by hand; none comes from a source. The 6-point click distance is egui's default.
 
-- **The handle follows the pointer.** The gain is set per handle so that the surface under the handle stays under the pointer: the parameter's change per point of drag is its range divided by how far the anchor travels on screen across that range. Where the anchor barely moves on screen (a fullness that goes toward the camera), fall back to a fixed distance: the whole range over about 240 points.
-- **Zoom does not change the fallback gain.** A fixed number of points for a range is predictable (brief §3.4). MetaHuman exposes one speed number for the same reason (U-13).
+- **A whole range takes 110 points of drag.** A slider row takes it horizontally, however wide the row (the panel narrows with the window). A handle takes it along the direction its skin moves on the screen in this view, however near the camera is: zoom changes what is seen, not the gain. So the skin under a handle no longer stays under the pointer; on the face's millimetre ranges it moves less than the pointer, on the body's broad ones it can move more. MetaHuman exposes one speed number for the same reason (U-13). A drive's `sensitivity` no longer changes the gain.
+- **Shift is fine, a quarter; Ctrl is coarse, double.** Ctrl is egui's `command`: Ctrl on Windows and Linux, Cmd on macOS (where Ctrl with a click is the right button). Both held: half. A key pressed partway changes the speed from there on, so the value doesn't jump. The studio's Ctrl shortcuts (Z, Y, Shift+Z, S) are keys, not drags, so they don't clash; Shift for fine also matches the editor's turning of a part (`FINE_TURN`, `gizmo.rs:70`).
+- **The drag is relative.** A press on a slider's track doesn't move the value to the pointer (egui's slider did): the value moves by how far the pointer goes, stops at the range's ends while the pointer goes on, and comes back once the pointer is back over the end. A click on the track changes nothing; a double click resets the row. With the track focused (Tab), the arrow keys move it 1/110 of the range a press, with Shift and Ctrl as a drag.
+- **Exact values are typed, on every row at every level** (P12). A click or a double click on the row's value opens it for typing, its text selected; Enter, or clicking away, sets it as one undo step; Esc leaves the value as it was. A value outside the range is set to the nearest end and the row says so under it for 4 seconds ("1.5 is outside 0.800 to 1.175: set to 1.175"); text that isn't a number changes nothing and says so. A comma is read as a decimal point. The value shows two decimals, or three where the range's ends need them. The value itself also drags, by the same rule.
+- **A drag is one undo step, and Esc cancels it** back to where it started, for a row as for a handle.
 - **Two directions at once, with a dead zone.** A handle can drive one parameter sideways and one up and down. The first direction to pass 6 points starts; the second starts only after 12 points along its own axis, so a slightly crooked sideways drag does not also nudge the height.
-- **Ctrl holds the drag to its first direction.** The Sims 4 uses a held key for this (U-02).
-- **Shift is fine control**: a quarter of the gain. The editor already does this for turning a part (`FINE_TURN`, `gizmo.rs:70`); its move and scale handles have no fine mode, so this extends the convention.
 - **Every frame, not every 120 ms.** The slider throttle of 120 ms would make a handle lag behind the pointer. Applying takes about 6 ms in a debug build, so a per-frame apply during a handle drag looks affordable; it has to be measured on the heavier characters before Stage 2 commits to it.
 - **Out is out on both sides.** For a mirrored handle, "out" is away from the body's middle line, so dragging the left handle left and the right handle right both mean wider.
 
@@ -430,7 +431,7 @@ Rules:
 | **Markers that cover what they change** | The result cannot be judged | U-12, U-13 | Hide other handles during a drag |
 | **Randomize that samples evenly** | Most results are extreme | U-01 | Draw around the middle; match items by tag; respect locks |
 | **Randomize or presets that cannot be undone, or that wipe locked work** | Exploration becomes risk | U-11 | One undo step each; locks |
-| **Drag-only editing** | Imprecise, and shuts out people who cannot drag | U-46 | Every handle has a slider; every slider takes a typed number at level 3 and arrow keys at every level |
+| **Drag-only editing** | Imprecise, and shuts out people who cannot drag | U-46 | Every handle has a slider; every slider takes a typed number and arrow keys at every level (RA1) |
 | **Copying another product's look** | Brief §3.1; and their interfaces are their own | — | The editor's own theme and widgets |
 
 ## 8. Legal caution

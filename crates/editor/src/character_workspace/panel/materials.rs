@@ -14,7 +14,6 @@ use eframe::egui;
 
 use super::super::CharacterWorkspace;
 use super::super::intent::{Gesture, Intent};
-use super::super::selection::Level;
 use super::row::{self, Row};
 use crate::color_palette;
 use crate::theme;
@@ -53,7 +52,6 @@ pub(super) fn skin(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
     base: &BaseManifest,
-    level: Level,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
@@ -116,7 +114,6 @@ pub(super) fn skin(
                                 value,
                                 range: [min, max],
                                 default: neutral,
-                                typed: level == Level::Advanced,
                                 // Material values aren't randomized.
                                 locked: None,
                             },
@@ -164,7 +161,7 @@ pub(super) fn skin(
             }
         });
     }
-    intents.extend(makeup(ui, workspace, base, level));
+    intents.extend(makeup(ui, workspace, base));
     ui.add_space(6.0);
     ui.label(
         egui::RichText::new(
@@ -182,12 +179,7 @@ pub(super) fn skin(
 /// roughness (makeup), amount and pattern (markings). Each change asks for
 /// the whole layer ([`Intent::SetSkinLayer`]): one undo step, or one per
 /// slider drag.
-fn makeup(
-    ui: &mut egui::Ui,
-    workspace: &CharacterWorkspace,
-    base: &BaseManifest,
-    level: Level,
-) -> Vec<Intent> {
+fn makeup(ui: &mut egui::Ui, workspace: &CharacterWorkspace, base: &BaseManifest) -> Vec<Intent> {
     let mut intents = Vec::new();
     if base.skin_layers.is_empty() {
         return intents;
@@ -280,7 +272,6 @@ fn makeup(
                                     value,
                                     range: [0.0, 1.0],
                                     default,
-                                    typed: level == Level::Advanced,
                                     locked: None,
                                 },
                             ) {

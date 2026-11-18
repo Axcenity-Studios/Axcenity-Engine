@@ -1,15 +1,17 @@
 //! A slider row: the label (its tooltip says what the control does), the
-//! value (typed at the Advanced level), a reset to the default when it
+//! value (click to type it, at every level), a reset to the default when it
 //! differs, a lock for Randomize where the row has one, a left and right
-//! pair's side tools (R4) where it is one, and the slider across the
-//! panel. A changed row gets the inspectors' accent bar in the gutter.
+//! pair's side tools (R4) where it is one, and the track across the
+//! panel. The track and the value drag and type by the studio's one rule
+//! (`numeric.rs`: 110 points for the whole range, Shift a quarter, Ctrl
+//! double). A changed row gets the inspectors' accent bar in the gutter.
 
 use crate::theme::icons;
 
 use eframe::egui;
 
 use super::super::intent::Gesture;
-use super::super::shell::gesture;
+use super::super::numeric;
 use super::super::sides::SideTool;
 use crate::theme;
 use crate::widgets;
@@ -25,8 +27,6 @@ pub(super) struct Row<'a> {
     pub value: f32,
     pub range: [f32; 2],
     pub default: f32,
-    /// The value can be typed (Advanced); otherwise it's only shown.
-    pub typed: bool,
     /// Whether Randomize leaves it alone, for a row with a lock.
     pub locked: Option<bool>,
 }
@@ -124,10 +124,7 @@ pub(super) fn slider_with_sides(
     sides: Option<&[(SideTool, bool)]>,
 ) -> Option<Asked> {
     let palette = theme::palette(ui.ctx());
-    let [low, high] = row.range;
-    let range = low.min(high)..=low.max(high);
     let changed = (row.value - row.default).abs() > 1.0e-4;
-    let mut value = row.value;
     let mut out = None;
     let top = ui.cursor().min;
     ui.push_id(row.id, |ui| {
@@ -139,22 +136,8 @@ pub(super) fn slider_with_sides(
                     .on_hover_text(row.about);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if row.typed {
-                    let response = ui.add(
-                        egui::DragValue::new(&mut value)
-                            .range(range.clone())
-                            .speed((range.end() - range.start()) / 300.0)
-                            .fixed_decimals(2),
-                    );
-                    if response.changed() || response.drag_stopped() {
-                        out = Some(Asked::Set(value, gesture(&response)));
-                    }
-                } else {
-                    ui.label(
-                        egui::RichText::new(format!("{value:.2}"))
-                            .small()
-                            .color(palette.text_weak),
-                    );
+                if let Some((value, gesture)) = numeric::field(ui, row.id, row.value, row.range) {
+                    out = Some(Asked::Set(value, gesture));
                 }
                 if changed
                     && widgets::reset_button(
@@ -177,18 +160,14 @@ pub(super) fn slider_with_sides(
                 }
             });
         });
-        ui.spacing_mut().slider_width = ui.available_width();
-        let response = ui.add(
-            egui::Slider::new(&mut value, range)
-                .show_value(false)
-                .clamping(egui::SliderClamping::Always),
-        );
+        let (response, asked) = numeric::track(ui, row.id, row.value, row.range, row.about);
         let response = response.on_hover_text(row.about);
         if response.double_clicked() {
             out = Some(Asked::Set(row.default, Gesture::Commit));
-        } else if response.changed() || response.drag_stopped() {
-            out = Some(Asked::Set(value, gesture(&response)));
+        } else if let Some((value, gesture)) = asked {
+            out = Some(Asked::Set(value, gesture));
         }
+        numeric::note(ui, row.id);
     });
     if changed {
         let rect =

@@ -27,12 +27,12 @@
 //!   of it off: the viewport is the camera only.
 //!
 //! A drag means what the view shows (ux patterns P5): each drive works in
-//! the framings its `screen` names, and moves its parameter so the skin
-//! under the handle follows the pointer (its travel projected on the
-//! screen). Where that travel barely shows, the whole range takes
-//! [`FALLBACK`] points. Two drives of one handle are solved together, each
-//! held still until its own part of the drag passes [`DEAD_ZONE`]; Shift is
-//! fine control.
+//! the framings its `screen` names, along the direction its skin moves on
+//! the screen there. How far is the studio's one rule for every numeric
+//! control (RA1, `numeric.rs`): the whole range takes 110 points of drag
+//! along that direction, however near the camera is; Shift a quarter,
+//! Ctrl double. Two drives of one handle are solved together, each held
+//! still until its own part of the drag passes [`DEAD_ZONE`].
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -48,6 +48,7 @@ use eframe::egui::{self, Color32, Pos2, Rect, Stroke};
 
 use self::depth::Depth;
 use super::intent::{Gesture, Intent};
+use super::numeric;
 use super::selection::Level;
 use super::stage::Orbit;
 use super::{Category, CharacterWorkspace};
@@ -57,17 +58,9 @@ use crate::theme;
 const GRAB: f32 = 11.0;
 /// A handle's radius on the screen (points).
 const DOT: f32 = 6.0;
-/// The least a parameter's whole range takes on the screen, in points. The
-/// skin under a handle follows the pointer when its travel shows at least
-/// this long; a smaller one (the face's millimetres, seen whole) takes this
-/// many points for the range, so it isn't a twitch (ux patterns, "Drag
-/// feel"), and zooming in past it gives one to one.
-const FALLBACK: f32 = 240.0;
 /// How far (points) a drive's own part of a drag goes before it moves, so
 /// a sideways drag that wobbles doesn't nudge the height too.
 const DEAD_ZONE: f32 = 8.0;
-/// Shift: a quarter of the gain.
-const FINE: f32 = 0.25;
 /// A feature clicked while smaller than this share of the view's height
 /// (its extent from its middle) is framed; one already well in view isn't.
 const SMALL: f32 = 0.06;
@@ -180,7 +173,10 @@ struct Shown {
 #[derive(Clone, Debug)]
 struct HandleDrag {
     handle: String,
+    /// Where the pointer was last frame.
     from: Pos2,
+    /// The drag so far (points; scaled by Shift and Ctrl as it went).
+    travel: numeric::Travel<Vec2>,
     mirrored: bool,
     drives: Vec<DragDrive>,
     /// For each drive (its index), how much its value changes per point
@@ -1079,6 +1075,17 @@ impl CharacterWorkspace {
         self.direct.shown(id).map(|shown| shown.at)
     }
 
+    /// Handle `id`'s live drives as drawn last frame: each parameter and
+    /// its screen vector (its direction, and its length the points of drag
+    /// per unit of value).
+    #[cfg(test)]
+    pub fn handle_drives_on_screen(&self, id: &str) -> Vec<(String, Vec2)> {
+        self.direct
+            .shown(id)
+            .map(|shown| shown.live.clone())
+            .unwrap_or_default()
+    }
+
     /// Where handle `id`'s point of the skin is on the screen, by last
     /// frame's camera, shown or not (to point at a feature).
     #[cfg(test)]
@@ -1282,7 +1289,7 @@ impl CharacterWorkspace {
         }
         if self.direct.drag.is_some() {
             match (down, at) {
-                (true, Some(at)) => intents.extend(self.handle_drag_to(at, modifiers.shift)),
+                (true, Some(at)) => intents.extend(self.handle_drag_to(at, modifiers)),
                 _ => intents.extend(self.end_handle_drag()),
             }
             return intents;
@@ -1363,6 +1370,7 @@ impl CharacterWorkspace {
         self.direct.drag = Some(HandleDrag {
             handle: shown.id.clone(),
             from: origin,
+            travel: numeric::Travel::default(),
             mirrored: self.symmetry || self.selection.level == Level::Quick,
             drives,
             solve,
@@ -1371,22 +1379,22 @@ impl CharacterWorkspace {
         });
     }
 
-    /// The values for the pointer at `at`, sent as the drag's changes.
-    fn handle_drag_to(&mut self, at: Pos2, fine: bool) -> Vec<Intent> {
+    /// The values for the pointer at `at` with `modifiers` held, sent as
+    /// the drag's changes.
+    fn handle_drag_to(&mut self, at: Pos2, modifiers: egui::Modifiers) -> Vec<Intent> {
         let Some(drag) = &mut self.direct.drag else {
             return Vec::new();
         };
         if drag.cancelled {
             return Vec::new();
         }
-        let moved = at - drag.from;
-        let moved = Vec2::new(moved.x, moved.y);
-        let gain = if fine { FINE } else { 1.0 };
+        let step = at - drag.from;
+        drag.from = at;
+        drag.travel.add(Vec2::new(step.x, step.y), modifiers);
         let mut intents = Vec::new();
         for (drive, solve) in drag.drives.iter_mut().zip(&drag.solve) {
-            let change = solve.dot(moved);
-            // Its own part of the drag, in points.
-            if (change * drive.gain).abs() >= DEAD_ZONE {
+            // Its own part of the drag, in points as the pointer went.
+            if (solve.dot(drag.travel.raw) * drive.gain).abs() >= DEAD_ZONE {
                 drive.engaged = true;
             }
             if !drive.engaged {
@@ -1396,7 +1404,7 @@ impl CharacterWorkspace {
                 drive.range[0].min(drive.range[1]),
                 drive.range[0].max(drive.range[1]),
             );
-            let value = (drive.start + change * gain).clamp(low, high);
+            let value = (drive.start + solve.dot(drag.travel.scaled)).clamp(low, high);
             if value == drive.last {
                 continue;
             }
@@ -1526,17 +1534,15 @@ impl CharacterWorkspace {
                     };
                     let travel =
                         transform.transform_vector3(turn.transform_vector3(drive.travel_on(frame)));
-                    let span = (drive.range[1] - drive.range[0]).abs().max(1e-6);
                     let moved = to_screen(point + travel)
                         .map(|end| Vec2::new(end.x - at.x, end.y - at.y))
                         .unwrap_or(Vec2::ZERO);
-                    // Points per unit of value: the skin's move on the
-                    // screen, at least the fallback's; its own direction,
-                    // or the data's where it doesn't show.
-                    // The projected move gives the direction even when
+                    // The direction: the skin's projected move, even when
                     // it's short; the data's only when it doesn't show at
                     // all, its x turned for a camera on the character's
-                    // left (the data's framings are from its right).
+                    // left (the data's framings are from its right). How
+                    // far: the studio's one rule, the whole range in 110
+                    // points whatever the zoom (`numeric.rs`).
                     let direction = if moved.length() >= 0.01 {
                         moved.normalize()
                     } else {
@@ -1547,7 +1553,7 @@ impl CharacterWorkspace {
                         };
                         Vec2::new(across, -data.y).normalize_or_zero()
                     };
-                    let screen = direction * moved.length().max(FALLBACK) / span;
+                    let screen = direction * numeric::points_per_unit(drive.range);
                     live.push((drive.parameter.clone(), screen));
                     let value = super::value_of(&self.description, base, &drive.parameter);
                     let (low, high) = (
