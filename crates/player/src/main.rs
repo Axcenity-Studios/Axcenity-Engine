@@ -1559,6 +1559,8 @@ mod bench_tests;
 #[cfg(test)]
 mod character_capture;
 #[cfg(test)]
+mod fit_gate_tests;
+#[cfg(test)]
 mod live_identity_bench_tests;
 #[cfg(test)]
 mod profile_tests;

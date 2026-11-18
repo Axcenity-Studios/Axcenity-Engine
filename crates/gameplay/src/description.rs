@@ -274,8 +274,15 @@ pub fn apply_description(
     };
     let mesh_id = |model: &str| format!("{LIBRARY_FOLDER}/{model}");
 
-    // The body: its model, kept where the old one's skeleton stood.
-    let wanted = mesh_id(&resolved.body.model);
+    // The body: its model, kept where the old one's skeleton stood, with
+    // the regions its items cover left out (CO9).
+    let wanted = hidden_body(
+        assets,
+        &library,
+        base,
+        mesh_id(&resolved.body.model),
+        &resolved.hidden_regions,
+    );
     let current = text_property(world, body, "MeshId");
     if current != wanted {
         // A baked body's derived model has its base's fit: ask the base,
@@ -497,6 +504,37 @@ pub fn is_baked(world: &World, character: InstanceId) -> bool {
 
 /// How a worn part is told apart from the others: its item, or its model
 /// for the base's own parts.
+/// The body's `MeshId` with the map regions in `hidden` left out (CO9,
+/// `axcenity_assets::RegionHiding`): its base's own when nothing worn
+/// hides a region of the base's region map.
+fn hidden_body(
+    assets: &Assets,
+    library: &Library,
+    base: &axcenity_avatar::BaseManifest,
+    body: String,
+    hidden: &[String],
+) -> String {
+    let indices: Vec<u8> = hidden
+        .iter()
+        .filter_map(|id| base.region(id).and_then(|region| region.map_index))
+        .collect();
+    let map = base
+        .model
+        .regions_map
+        .as_deref()
+        .and_then(|map| library.path_of(&base.id, map));
+    match map {
+        Some(map) if !indices.is_empty() => assets.hide_regions(
+            &body,
+            &Arc::new(axcenity_assets::RegionHiding {
+                map: format!("{LIBRARY_FOLDER}/{map}"),
+                hidden: indices,
+            }),
+        ),
+        _ => body,
+    }
+}
+
 fn part_key(part: &ResolvedPart) -> String {
     match &part.item {
         Some(item) => item.clone(),

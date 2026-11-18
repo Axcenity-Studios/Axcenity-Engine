@@ -13,7 +13,8 @@
       "AxcenityRealistic/Lashes",
       "AxcenityRealistic/Brows",
       "AxcenityRealistic/LipSeal"
-    ]
+    ],
+    "regions_map": "RealisticRegions.png"
   },
   "skeleton": {
     "convention": "humanoid",

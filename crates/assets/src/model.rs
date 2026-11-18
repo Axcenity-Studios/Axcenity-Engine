@@ -11,6 +11,7 @@ mod collision;
 pub(crate) mod cooked_model;
 mod fbx;
 mod gltf_takes;
+mod hide;
 mod identity;
 mod lod;
 mod lod_cache;
@@ -24,8 +25,10 @@ mod stamped;
 mod test_rig;
 
 pub use collision::is_piece as is_collision_piece;
+pub(crate) use identity::last_tag;
 pub use identity::{
     BoneChange, BoneDelta, Identity, IdentityLayer, LiveIdentity, derived_mesh_id, split_derived,
+    strip_tags,
 };
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
