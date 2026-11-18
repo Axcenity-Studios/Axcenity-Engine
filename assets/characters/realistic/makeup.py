@@ -6,7 +6,8 @@ made per character: a colour, an opacity or a seed is a value, so a
 change re-applies live.
 
 - `RealisticSkin_MakeupA.png`: foundation, blush, eyeshadow, eyeliner.
-- `RealisticSkin_MakeupB.png`: lip colour, brow fill, a scar, (none).
+- `RealisticSkin_MakeupB.png`: lip colour, brow fill, a scar, stubble
+  (R6: the spare channel, ADR-0042).
 - `RealisticSkin_Markings.png`: freckles, the freckles' ranks, moles,
   the moles' ranks.
 
@@ -371,6 +372,55 @@ def scar_mask(tx, face):
     return np.maximum(core, halo) * np.isin(tx.sets, (FS_HEAD, FS_MUZZLE)), float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
 
 
+def stubble_mask(tx, face, lips, seed=SEED + 6):
+    """Stubble's density over the beard's region (R6, ADR-0042's spare
+    channel, mask 2's alpha): the cheeks below a line from the sideburn
+    (in front of the ear, at its middle) to a little above the mouth's
+    corner, the upper lip under the nose, the chin and jaw, and under the
+    jaw onto the neck (3 cm at the front, less toward the ear), each edge
+    soft over about 6 mm, off the lips; times a fine stipple, a follicle
+    every millimetre or so, so shaved hair reads as dots, not a shadow."""
+    X = tx.X
+    skin = np.isin(tx.sets, (FS_HEAD, FS_MUZZLE))
+    mouth = face.stomion
+    nose = face.nose_tip
+    out = np.zeros(len(X))
+    for _, s in SIDES:
+        ear = face.ear_at[s]
+        side = X[:, 0] * s > -0.004
+        # The cheek line, from the sideburn forward and down to above the
+        # mouth's corner; the moustache up to the nose's base in front.
+        t = np.clip((X[:, 1] - ear[1]) / (mouth[1] + 0.012 - ear[1]), 0.0, 1.0)
+        top = ear[2] + 0.002 + t * (mouth[2] + 0.013 - ear[2] - 0.002)
+        under_nose = (np.abs(X[:, 0]) < 0.024) & (X[:, 1] < mouth[1] + 0.012)
+        top = np.where(under_nose, np.maximum(top, nose[2] - 0.016), top)
+        below_line = 1.0 - _step(top - 0.006, top, X[:, 2])
+        in_front = _step(ear[1] + 0.006, ear[1] - 0.004, X[:, 1])
+        # Under the jaw: down the neck 3 cm at the front, 1.2 cm by the ear.
+        chin = face.chin
+        u = np.clip((X[:, 1] - chin[1]) / (ear[1] - chin[1]), 0.0, 1.0)
+        jaw_z = chin[2] + u * (ear[2] - 0.035 - chin[2])
+        low = jaw_z - 0.03 + 0.018 * u
+        above_neck = _step(low - 0.008, low, X[:, 2])
+        out = np.maximum(out, below_line * in_front * above_neck * side)
+    lip = np.clip(tx.field(lips) * 1.6, 0.0, 1.0)
+    region = out * skin * (1.0 - lip)
+    # The stipple: a value per 1.2 mm cell of the rest surface (hashed),
+    # most cells a follicle, smoothed over a texel by the image's filter.
+    cell = np.floor(X / 0.0012).astype(np.int64).astype(np.uint64)
+    h = (cell[:, 0] * np.uint64(0x9E3779B97F4A7C15) + cell[:, 1] * np.uint64(0xC2B2AE3D27D4EB4F)
+         + cell[:, 2] * np.uint64(0x165667B19E3779F9) + np.uint64(seed))
+    # splitmix64's finish, so neighbouring cells don't line up in stripes.
+    h ^= h >> np.uint64(30)
+    h *= np.uint64(0xBF58476D1CE4E5B9)
+    h ^= h >> np.uint64(27)
+    h *= np.uint64(0x94D049BB133111EB)
+    h ^= h >> np.uint64(31)
+    grain = (h >> np.uint64(40)).astype(np.float64) / float(1 << 24)
+    follicle = _step(0.25, 0.6, grain)
+    return region * (0.35 + 0.65 * follicle), region
+
+
 # -- seeded spots ---------------------------------------------------------------------
 
 def sun_field(face, J, P):
@@ -532,8 +582,9 @@ def masks(body, topo, P, PV, lm, eyes, eye_radius, lips, size, out_dir):
         return (np.clip(a, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
 
     a = np.stack([tx.image(makeup[k]) for k in ("foundation", "blush", "eyeshadow", "eyeliner")], axis=2)
+    stubble, stubble_region = stubble_mask(tx, face, lips)
     b = np.stack([tx.image(makeup["lips"]), tx.image(makeup["brow_fill"]), tx.image(scar),
-                  np.zeros((size, size))], axis=2)
+                  tx.image(stubble)], axis=2)
     c = np.stack([freckle_cover, freckle_rank, mole_cover, mole_rank], axis=2)
     digests = {}
     for name, image in zip(FILES, (a, b, c)):
@@ -551,7 +602,8 @@ def masks(body, topo, P, PV, lm, eyes, eye_radius, lips, size, out_dir):
         "moles": len(moles),
         "face_moles": len(face_moles),
         "scar_mm": round(scar_length * 1000.0, 1),
-        "covered_share": {k: round(float((tx.image(v) > 0.5).mean()), 5) for k, v in makeup.items()},
+        "covered_share": dict({k: round(float((tx.image(v) > 0.5).mean()), 5) for k, v in makeup.items()},
+                              stubble=round(float((tx.image(stubble_region) > 0.5).mean()), 5)),
     }
 
 

@@ -2,14 +2,15 @@
 //! old one, deterministic from a seed. Parameters are drawn inside their
 //! `random` share (the middle half of the range when they have none), the
 //! base model's constraints are kept, and items come only from what fits
-//! the base and isn't excluded by what is worn. It lives here, not in the
+//! the base and isn't excluded by what is worn, never an item marked
+//! `draft` (asset-quality.md §5). It lives here, not in the
 //! editor, because games randomize NPCs too (plan section 0, decision 6).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    BaseManifest, Category, Constraint, Description, ItemManifest, Library, WornItem, chosen_slots,
-    wear_choices,
+    BaseManifest, Category, Constraint, Description, ItemManifest, Library, Quality, WornItem,
+    chosen_slots, wear_choices,
 };
 
 /// What Randomize may change.
@@ -248,6 +249,10 @@ fn draw_items(
                 .items
                 .values()
                 .filter(|item| item.slot == *slot && item.bases.contains(&base.id))
+                // Drafts never appear in randomization (asset-quality.md
+                // §5). Only items marked `draft` are left out: an item with
+                // no quality yet (from before the standard) still is drawn.
+                .filter(|item| item.quality != Some(Quality::Draft))
                 .filter(|item| !worn.iter().any(|other| other.id == item.id))
                 .filter(|item| !worn.iter().any(|other| item.conflicts_with(other)))
                 .filter(|item| {

@@ -180,6 +180,23 @@
       ]
     },
     {
+      "id": "axcenity/realistic-hair-short-crop",
+      "manifest": "realistic/items/realistic-hair-short-crop.item.json",
+      "label": "Short textured crop",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "short",
+        "wavy",
+        "crop",
+        "textured"
+      ]
+    },
+    {
       "id": "axcenity/realistic-sports-bra",
       "manifest": "realistic/items/realistic-sports-bra.item.json",
       "label": "Sports bra",

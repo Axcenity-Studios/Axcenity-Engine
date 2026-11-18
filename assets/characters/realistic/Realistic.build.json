@@ -1581,11 +1581,12 @@
     "eyeliner": 0.00027,
     "eyeshadow": 0.00071,
     "foundation": 0.04312,
-    "lips": 0.00104
+    "lips": 0.00104,
+    "stubble": 0.01794
    },
    "digests": {
     "RealisticSkin_MakeupA.png": "63d7b1ac60619476",
-    "RealisticSkin_MakeupB.png": "d7985a51627ea3d0",
+    "RealisticSkin_MakeupB.png": "2fbefe6239ff0e82",
     "RealisticSkin_Markings.png": "042eb90fd919eadd"
    },
    "face_moles": 9,

@@ -308,3 +308,24 @@ fn randomize_keeps_max_sum_and_moves_follow_targets() {
         sound(&d, &library, seed);
     }
 }
+
+/// Drafts never appear in randomization (asset-quality.md §5): an item
+/// marked `draft` is never drawn, while one with no quality yet (every
+/// item before the standard, the stylized family's included) still is.
+#[test]
+fn randomize_never_wears_an_item_marked_draft() {
+    let mut library = fixtures::rich_library();
+    let mut draft = library.item("test/hair").unwrap().clone();
+    draft.id = "test/draft-hair".to_owned();
+    draft.quality = Some(crate::Quality::Draft);
+    library.add_item("test/items/draft-hair.item.json", draft);
+    let none = BTreeSet::new();
+    let mut unmarked = 0;
+    for seed in 0..1000 {
+        let description = randomize(&start(), &Scope::All, &none, seed, &library);
+        let ids: Vec<&str> = description.items.iter().map(|i| i.id.as_str()).collect();
+        assert!(!ids.contains(&"test/draft-hair"), "seed {seed}: {ids:?}");
+        unmarked += usize::from(ids.contains(&"test/hair"));
+    }
+    assert!(unmarked > 0, "an item with no quality is still drawn");
+}

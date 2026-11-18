@@ -1,0 +1,83 @@
+# r6-hair-first red run (2026-11-18): the new tests against the branch before any hair content
+
+## cargo nextest run -p axcenity-avatar --test realistic_hair --no-fail-fast
+        FAIL [   0.172s] (1/5) axcenity-avatar::realistic_hair a_realistic_style_offers_only_the_colour_values_its_atlas_carries
+    thread 'a_realistic_style_offers_only_the_colour_values_its_atlas_carries' (46828) panicked at crates\avatar\tests\realistic_hair.rs:217:5:
+    the realistic family has a hairstyle
+        FAIL [   0.172s] (2/5) axcenity-avatar::realistic_hair the_first_style_is_a_card_groom_for_the_realistic_base_that_follows_the_head
+    thread 'the_first_style_is_a_card_groom_for_the_realistic_base_that_follows_the_head' (8676) panicked at crates\avatar\tests\realistic_hair.rs:52:28:
+    the library has no `axcenity/realistic-hair-short-crop`
+        FAIL [   0.172s] (3/5) axcenity-avatar::realistic_hair it_says_which_frames_and_head_ranges_it_holds_on
+    thread 'it_says_which_frames_and_head_ranges_it_holds_on' (23192) panicked at crates\avatar\tests\realistic_hair.rs:52:28:
+    the library has no `axcenity/realistic-hair-short-crop`
+        FAIL [   0.172s] (4/5) axcenity-avatar::realistic_hair its_model_is_hair_cut_out_two_sided_and_within_the_budgets
+    thread 'its_model_is_hair_cut_out_two_sided_and_within_the_budgets' (45376) panicked at crates\avatar\tests\realistic_hair.rs:52:28:
+    the library has no `axcenity/realistic-hair-short-crop`
+        FAIL [   0.172s] (5/5) axcenity-avatar::realistic_hair its_colour_presets_run_from_black_to_platinum_and_grey
+    thread 'its_colour_presets_run_from_black_to_platinum_and_grey' (42416) panicked at crates\avatar\tests\realistic_hair.rs:52:28:
+    the library has no `axcenity/realistic-hair-short-crop`
+     Summary [   0.173s] 5 tests run: 0 passed, 5 failed, 0 skipped
+        FAIL [   0.172s] (1/5) axcenity-avatar::realistic_hair a_realistic_style_offers_only_the_colour_values_its_atlas_carries
+        FAIL [   0.172s] (2/5) axcenity-avatar::realistic_hair the_first_style_is_a_card_groom_for_the_realistic_base_that_follows_the_head
+        FAIL [   0.172s] (3/5) axcenity-avatar::realistic_hair it_says_which_frames_and_head_ranges_it_holds_on
+        FAIL [   0.172s] (4/5) axcenity-avatar::realistic_hair its_model_is_hair_cut_out_two_sided_and_within_the_budgets
+        FAIL [   0.172s] (5/5) axcenity-avatar::realistic_hair its_colour_presets_run_from_black_to_platinum_and_grey
+
+## cargo nextest run -p axcenity-player -E 'test(/hair_tests::/)' --no-fail-fast
+        FAIL [  21.122s] (1/2) axcenity-player::bin/axcenity-player hair_tests::the_first_hairstyle_draws_on_both_frames
+    test hair_tests::the_first_hairstyle_draws_on_both_frames ... FAILED
+        hair_tests::the_first_hairstyle_draws_on_both_frames
+      left out: items[1]: the library has no item `axcenity/realistic-hair-short-crop`
+    realistic-masculine-cast-average hair-back: 0.0000 of the picture, rows 0 to 0, drawn at level None
+    thread 'hair_tests::the_first_hairstyle_draws_on_both_frames' (20316) panicked at crates\player\src\hair_tests.rs:116:13:
+    realistic-masculine-cast-average: the hair is drawn
+        SLOW [> 30.000s] (───) axcenity-player::bin/axcenity-player hair_tests::the_first_hairstyle_follows_the_heads_width
+        FAIL [  35.476s] (2/2) axcenity-player::bin/axcenity-player hair_tests::the_first_hairstyle_follows_the_heads_width
+    test hair_tests::the_first_hairstyle_follows_the_heads_width ... FAILED
+        hair_tests::the_first_hairstyle_follows_the_heads_width
+      left out: items[1]: the library has no item `axcenity/realistic-hair-short-crop`
+      left out: items[1]: the library has no item `axcenity/realistic-hair-short-crop`
+    hair width from the back: temple_width -1 0 px, 1 0 px
+    thread 'hair_tests::the_first_hairstyle_follows_the_heads_width' (45724) panicked at crates\player\src\hair_tests.rs:179:5:
+    the hair is drawn (0 px)
+     Summary [  35.477s] 2 tests run: 0 passed, 2 failed, 235 skipped
+        FAIL [  21.122s] (1/2) axcenity-player::bin/axcenity-player hair_tests::the_first_hairstyle_draws_on_both_frames
+        FAIL [  35.476s] (2/2) axcenity-player::bin/axcenity-player hair_tests::the_first_hairstyle_follows_the_heads_width
+
+## Stubble (written after the hair, before `makeup.py` filled the spare channel)
+## cargo nextest run -p axcenity-avatar --test realistic_hair -E 'test(/spare_mask/)'
+stubble: chin 0.000, forehead 0.000, crown 0.000
+thread 'the_spare_mask_channel_holds_stubble_over_the_beard_only' panicked at crates\avatar\tests\realistic_hair.rs:386:5:
+the chin has stubble: 0
+        FAIL [   1.982s] (1/1) axcenity-avatar::realistic_hair the_spare_mask_channel_holds_stubble_over_the_beard_only
+
+Review fixes 1 (red run before the fixes)
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(/randomize_never_wears|its_limitations_claim|it_stays_a_draft/)'
+    FAIL tests::randomizing::randomize_never_wears_an_item_marked_draft
+        seed 1: ["test/draft-hair", "test/dress", "test/hood"]
+    PASS realistic_hair it_stays_a_draft_while_a_measured_check_fails
+    FAIL realistic_hair its_limitations_claim_only_what_its_measurements_show
+        a draft doesn't claim it fits: "fits both frames."
+    FAIL realistic_hair randomize_never_wears_a_draft_on_either_realistic_frame
+        masculine seed 0 wears the draft axcenity/realistic-hair-short-crop
+ Summary 4 tests run: 1 passed, 3 failed, 147 skipped
+
+== Review fixes 2: the limitations guard, red against three mutations of the item JSON (each restored with git checkout) ==
+
+Command: cargo nextest run -p axcenity-avatar --test realistic_hair -E 'test(its_limitations_claim_only_what_its_measurements_show)'
+
+1. The reviewer's mutation: the temple_width note given the head_size wording
+   ("no hair vertex more than 1 mm inside the head at either end, on either frame.").
+   The old guard (contains "no hair inside") PASSED this. The new one:
+     temple_width: 3 vertices inside (deepest 7.242 mm), but the note says "measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame."
+     Summary [   0.012s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+2. The temple_width note with no claim but no depth ("at -1, a few vertices sit inside the head by the ear."):
+     temple_width: the note doesn't give the measured depth 7.242 mm: "measured over this range (draft): at -1, a few vertices sit inside the head by the ear."
+     Summary [   0.015s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+3. The frame note's motion clause replaced with "in Idle, Walk and Run no hair vertex goes inside.":
+     frame: 6 vertices inside (deepest 6.436 mm), but the note says "built for both frames; a draft on both. ... in idle, walk and run no hair vertex goes inside."
+     Summary [   0.019s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+On the committed item (unmutated) the test passes.

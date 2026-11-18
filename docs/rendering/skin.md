@@ -33,8 +33,10 @@ The masks' channels (the content contract; the realistic build's `assets/charact
 | Mask | Red | Green | Blue | Alpha |
 |---|---|---|---|---|
 | 1 | foundation | blush | eyeshadow | eyeliner |
-| 2 | lips | brow fill | scar | (none) |
+| 2 | lips | brow fill | scar | stubble (R6; not drawn yet) |
 | 3 | freckles | their ranks | moles | their ranks |
+
+**Stubble** (Character Studio R6, 2026-11-18) takes the spare channel, mask 2's alpha: the density of shaved facial hair over the beard's region (the cheeks below a line from the sideburn to above the mouth's corner, the upper lip, the chin and jaw, under the jaw onto the neck; soft over about 6 mm at each edge, off the lips) times a stipple, a follicle about every 1.2 mm, so it reads as dots, not a shadow (`makeup.py`, `stubble_mask`). It is meant as a marking-kind layer `stubble` with an amount and a colour taken from the hair's melanin, drawn as pigment like the freckles (darkening by the hair's colour where the stipple is) with a slightly higher roughness. **The Skin model doesn't draw it yet**: the uniform's layer slots are full (`skin_layer_uniform`), so it needs RA7's packing (see the R6 hand-back) before the base manifest offers the layer; until then no description can turn it on and the channel changes nothing.
 
 They are bound in the metalness, emissive and opacity maps' places, which skin with layers doesn't read (the item shader is at wgpu's default of 16 sampled textures: no binding is added); the emissive slot is read through its plain view. The layers' values ride in the uniform where skin reads nothing else (`renderer/lighting.rs`, `skin_layer_uniform`): `params[0..6]` each makeup layer's linear colour (red below 0: the skin's own tone) and opacity, `params[6]` and `params[7].xy` their roughness (below 0: the skin's), `params[7].zw` the freckles' amount and opacity, `toon` the moles' amount and opacity, the scar's opacity and the freckles' seed offset, and the specular row's z (1: masks bound) and w (the moles' seed offset).
 
