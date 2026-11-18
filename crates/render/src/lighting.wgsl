@@ -95,7 +95,8 @@ struct Frame {
     // unused.
     ray_reflections: vec4<f32>,
     // x: which of 64 frames this is while TAA is on, 0 otherwise
-    // (`shading_noise`).
+    // (`shading_noise`); y: 1 while TAA is on (hair cards' hashed alpha,
+    // hair.wgsl).
     noise: vec4<f32>,
 }
 

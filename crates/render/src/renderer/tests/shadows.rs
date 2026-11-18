@@ -335,7 +335,7 @@ fn spot_shadows_skip_casters_outside_the_beams_bounds() {
     let views = lighting::casters_in_views(&casters, &[ShadowView::Lamp(beam, everywhere)]);
     // Only the near solid block: the far one is out of reach, the glass is
     // see-through and the sphere casts no shadow.
-    assert_eq!(views[0].groups, [(MeshKey::Block, 0..1)]);
+    assert_eq!(views[0].groups, [((MeshKey::Block, None), 0..1)]);
     assert_eq!(views[0].left_out, 1);
     let instances: Vec<_> = views[0].instances.iter().flatten().collect();
     assert_eq!(instances.len(), 1);

@@ -20,9 +20,10 @@ use crate::theme;
 use crate::widgets;
 
 /// The values the renderer draws today: `scene`'s material values (CO7's
-/// first slice) and the Skin shading model's (R5). The others (the Eye
-/// model's, cloth's and hair's own) are kept in the description and drawn
-/// once their shading model reads them.
+/// first slice), the Skin shading model's (R5) and the Hair and Cloth
+/// models' (CO7, wave 4: on a material its model file marks hair or
+/// cloth). The Eye model's own are kept in the description and drawn once
+/// its shading model reads them.
 pub(in super::super) const DRAWN_TODAY: &[&str] = &[
     "tint",
     "iris_tint",
@@ -35,6 +36,19 @@ pub(in super::super) const DRAWN_TODAY: &[&str] = &[
     "scatter_scale",
     "definition",
     "softness",
+    "dye",
+    "dye_amount",
+    "tip_lightening",
+    "highlight",
+    "root_melanin",
+    "root_length",
+    "streaks",
+    "streak_melanin",
+    "shift_scale",
+    "sheen_tint",
+    "sheen_roughness_scale",
+    "anisotropy_scale",
+    "anisotropy_rotation",
 ];
 
 /// A value's name for people: `roughness_scale` is "Roughness scale".

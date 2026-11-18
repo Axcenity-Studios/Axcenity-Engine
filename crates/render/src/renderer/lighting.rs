@@ -28,10 +28,10 @@ use super::{
     FrameUniform, InstanceRaw, LIGHT_SCALE, LIGHTS_PER_TILE, LightRaw, MATERIAL_TEXTURES,
     MAX_LIGHTS, MAX_POINT_SHADOWS, MAX_SPOT_SHADOW_DEGREES, MAX_SPOT_SHADOWS, MAX_SUN_SIZE,
     MAX_TILES, MIN_TILE_SIZE, MapsUniform, MaterialKey, MeshKey, NEAR_PLANE, POINT_SHADOW_SPREAD,
-    PointShadow, PostUniform, SHADING_SKIN, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT,
-    SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
+    PointShadow, PostUniform, SHADING_CLOTH, SHADING_HAIR, SHADING_SKIN, SHADING_STANDARD,
+    SHADING_TOON, SHADING_UNLIT, SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
 };
-use crate::{SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, SkinLayers};
+use crate::{HairShading, SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, SkinLayers};
 
 /// The camera's view (world to view space) and projection (view to clip
 /// space).
@@ -488,9 +488,9 @@ pub(super) fn cone_bounds(
 pub(super) struct ViewCasters {
     /// Their instances, in pieces (each thread's share).
     pub(super) instances: Vec<Vec<InstanceRaw>>,
-    /// Which casters to draw, grouped by mesh, counting from the view's
-    /// first instance.
-    pub(super) groups: Vec<(MeshKey, Range<u32>)>,
+    /// Which casters to draw, grouped by mesh (and a cut-out's
+    /// material), counting from the view's first instance.
+    pub(super) groups: Vec<(CasterGroup, Range<u32>)>,
     /// How many casters were left out.
     pub(super) left_out: u32,
 }
@@ -509,7 +509,7 @@ pub(super) fn casters_in_views(casters: &[Vec<Caster>], views: &[ShadowView]) ->
         }
         let parts = map_each(casters, share, |casters| {
             let mut instances = Vec::with_capacity(casters.len());
-            let mut groups: Vec<(MeshKey, Range<u32>)> = Vec::new();
+            let mut groups: Vec<(CasterGroup, Range<u32>)> = Vec::new();
             let mut left_out = 0;
             for caster in casters {
                 if !view.touches(caster.sphere) {
@@ -518,11 +518,12 @@ pub(super) fn casters_in_views(casters: &[Vec<Caster>], views: &[ShadowView]) ->
                 }
                 let copy = instances.len() as u32;
                 instances.push(caster.raw);
+                let group = (caster.mesh, caster.cut_out);
                 match groups.last_mut() {
-                    Some((mesh, range)) if *mesh == caster.mesh && range.end == copy => {
+                    Some((last, range)) if *last == group && range.end == copy => {
                         range.end = copy + 1;
                     }
-                    _ => groups.push((caster.mesh, copy..copy + 1)),
+                    _ => groups.push((group, copy..copy + 1)),
                 }
             }
             (instances, groups, left_out)
@@ -760,9 +761,17 @@ impl<'a> FrameUses<'a> {
 #[derive(Clone, Copy)]
 pub(super) struct Caster {
     pub(super) mesh: MeshKey,
+    /// A cut-out's material, as its index in the frame's
+    /// [`FrameUses::materials`]: its shadow is drawn through its texture's
+    /// holes (`fs_shadow_cut_out`). `None` casts the whole mesh.
+    pub(super) cut_out: Option<u32>,
     pub(super) sphere: Sphere,
     pub(super) raw: InstanceRaw,
 }
+
+/// Which casters a shadow view draws together: one mesh, and for a
+/// cut-out its material (see [`Caster::cut_out`]).
+pub(super) type CasterGroup = (MeshKey, Option<u32>);
 
 /// What a frame draws (see [`plan_draws`]).
 #[derive(Default)]
@@ -968,8 +977,30 @@ fn plan_part<'a>(
         let Some(mut raw) = instance_raw_with(item, &mut colors) else {
             continue;
         };
+        // A hair card (a cut-out, no surface shader, terrain or water)
+        // casts its shadow through its texture's holes: many strands, not
+        // a slab. Other cut-outs (leaf cards, fences) cast their whole
+        // mesh, as before CO7: through their holes too, the Shadows pass
+        // of 36,000 leaf cards went from 0.19 to 0.42 ms at 1080p High
+        // (`bench_cut_out_foliage_shadows`). One whose texture is tiled by
+        // its size (`uv_tile`) casts its whole mesh too: `vs_shadow_cut_out`
+        // reads the mesh's own coordinates, so its holes would fall at the
+        // wrong scale (as `ray_cut_outs` leaves tiled items out).
+        let tiled = item.uv_tile.is_finite() && item.uv_tile > 0.0;
+        let cut_out = (key.cut_out
+            && matches!(item.material.shading, Shading::Hair(_))
+            && !tiled
+            && key.shader.is_none()
+            && item.material.terrain.is_none()
+            && item.material.water.is_none())
+        .then_some(key.material);
         let caster_at = caster.then(|| {
-            part.casters.push(Caster { mesh, sphere, raw });
+            part.casters.push(Caster {
+                mesh,
+                cut_out,
+                sphere,
+                raw,
+            });
             (part.casters.len() - 1) as u32
         });
         raw.emissive_fade[3] = draw.fade;
@@ -1170,6 +1201,22 @@ pub(super) fn material_textures(
             },
         ];
     }
+    // A hair card's atlas data takes the metalness map's place (hair isn't
+    // metal) and its flow map the specular map's (hair.wgsl).
+    if let Shading::Hair(hair) = &material.shading
+        && material.water.is_none()
+    {
+        return [
+            material.base_color_texture.as_ref(),
+            maps.normal.as_ref().map(|map| &map.texture),
+            hair.data.as_ref(),
+            maps.roughness.as_ref().map(|map| &map.texture),
+            maps.occlusion.as_ref().map(|map| &map.texture),
+            maps.emissive.as_ref(),
+            maps.opacity.as_ref().map(|map| &map.texture),
+            hair.flow.as_ref(),
+        ];
+    }
     [
         material.base_color_texture.as_ref(),
         maps.normal.as_ref().map(|map| &map.texture),
@@ -1242,6 +1289,38 @@ fn skin_layer_uniform(layers: &SkinLayers) -> ([[f32; 4]; SURFACE_PARAMETERS], [
     (params, toon, [1.0, seed(layers.moles.seed)])
 }
 
+/// Where a hair material's colour values ride in its uniform (hair.wgsl's
+/// `hair_colour`), in the surface shader's place:
+///
+/// - `params[0]`: melanin, redness, tip lightening, the dye's amount;
+/// - `params[1]`: the dye's colour (linear), the root's melanin;
+/// - `params[2]`: the root's length, the streaks' amount and melanin;
+/// - `params[3]`: the tint (linear), applied last.
+fn hair_uniform(hair: &HairShading) -> [[f32; 4]; SURFACE_PARAMETERS] {
+    let mut params = [[0.0; 4]; SURFACE_PARAMETERS];
+    let share = |value: f32| value.clamp(0.0, 1.0);
+    let offset = |value: f32| value.clamp(-1.0, 1.0);
+    params[0] = [
+        offset(hair.melanin),
+        offset(hair.redness),
+        share(hair.tip_lightening),
+        share(hair.dye_amount),
+    ];
+    params[1] = linear_color(hair.dye.map(share))
+        .extend(offset(hair.root_melanin))
+        .to_array();
+    params[2] = [
+        share(hair.root_length),
+        share(hair.streaks),
+        offset(hair.streak_melanin),
+        0.0,
+    ];
+    params[3] = linear_color(hair.tint.map(|c| c.max(0.0)))
+        .extend(0.0)
+        .to_array();
+    params
+}
+
 /// [`MapsUniform::shading`] and [`MapsUniform::toon`] for `material`.
 /// Water draws its own way, as standard.
 fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
@@ -1259,6 +1338,36 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
             [0.0; 4],
         ),
         Shading::Unlit => ([SHADING_UNLIT, 0.0, 0.0, 0.0], [0.0; 4]),
+        // hair.wgsl: which maps are bound (1 the atlas data, 2 the flow)
+        // and 4 for a shell (single-sided, or marked one: `hair_shell`), the cuticle tilt's
+        // scale and the secondary's strength; the colour values ride in
+        // `params` (`hair_uniform`).
+        Shading::Hair(hair) => (
+            [
+                SHADING_HAIR,
+                f32::from(
+                    u8::from(hair.data.is_some())
+                        + 2 * u8::from(hair.flow.is_some())
+                        + 4 * u8::from(!material.double_sided || hair.shell),
+                ),
+                hair.shift.clamp(0.0, 2.0),
+                hair.secondary.clamp(0.0, 2.0),
+            ],
+            [0.0; 4],
+        ),
+        // cloth.wgsl: the sheen's roughness, the anisotropy and its turn;
+        // the sheen's colour (linear) in the toon row.
+        Shading::Cloth(cloth) => (
+            [
+                SHADING_CLOTH,
+                cloth.sheen_roughness.clamp(0.0, 1.0),
+                cloth.anisotropy.clamp(-1.0, 1.0),
+                cloth.anisotropy_rotation,
+            ],
+            linear_color(cloth.sheen_colour.map(|c| c.max(0.0)))
+                .extend(0.0)
+                .to_array(),
+        ),
         // skin.wgsl: the defined normal map's share (none without one),
         // how far light spreads, and whether that map is BC5.
         Shading::Skin(skin) => {
@@ -1321,6 +1430,13 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
     }
     let (shading, mut toon) = shading_uniform(&item.material);
     let outline = outline_uniform(&item.material);
+    // Hair's colour values ride in the surface shader's place.
+    if let Shading::Hair(hair) = &item.material.shading
+        && item.material.water.is_none()
+        && item.material.terrain.is_none()
+    {
+        params = hair_uniform(hair);
+    }
     // Skin's makeup and markings ride where skin reads nothing else.
     let layered = skin_layers(&item.material).map(skin_layer_uniform);
     let mut skin_specular = [0.0; 2];

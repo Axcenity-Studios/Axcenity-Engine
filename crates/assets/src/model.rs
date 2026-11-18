@@ -305,6 +305,8 @@ impl Primitive {
             &material.emissive_texture,
             &material.specular_texture,
             &material.defined_normal_texture,
+            &material.hair_data_texture,
+            &material.hair_flow_texture,
         ]
         .into_iter()
         .flatten()
@@ -429,8 +431,132 @@ fn shading_of(extras: &gltf::json::Extras) -> (ModelShading, Option<usize>) {
             ModelShading::Skin,
             shading.axcenity_defined_normal.map(|texture| texture.index),
         ),
+        Some("hair") => (ModelShading::Hair, None),
+        Some("cloth") => (ModelShading::Cloth, None),
         _ => (ModelShading::Standard, None),
     }
+}
+
+/// The texture indexes of a hair card atlas's data and flow maps
+/// (`axcenity_hair_data: {"index": n}`, `axcenity_hair_flow: {"index":
+/// n}`; their channels are in `docs/rendering/hair.md`), on a material
+/// marked hair; none on any other.
+fn hair_maps_of(extras: &gltf::json::Extras) -> (Option<usize>, Option<usize>) {
+    #[derive(serde::Deserialize)]
+    struct TextureRef {
+        index: usize,
+    }
+    #[derive(serde::Deserialize)]
+    struct Maps {
+        axcenity_hair_data: Option<TextureRef>,
+        axcenity_hair_flow: Option<TextureRef>,
+    }
+    if shading_of(extras).0 != ModelShading::Hair {
+        return (None, None);
+    }
+    extras
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<Maps>(raw.get()).ok())
+        .map_or((None, None), |maps| {
+            (
+                maps.axcenity_hair_data.map(|texture| texture.index),
+                maps.axcenity_hair_flow.map(|texture| texture.index),
+            )
+        })
+}
+
+/// Whether a hair material's `extras` mark it a shell over the head
+/// (`axcenity_hair_shell: true`; `docs/rendering/hair.md`); never on any
+/// other.
+fn hair_shell_of(extras: &gltf::json::Extras) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Shell {
+        axcenity_hair_shell: Option<bool>,
+    }
+    shading_of(extras).0 == ModelShading::Hair
+        && extras
+            .as_ref()
+            .and_then(|raw| serde_json::from_str::<Shell>(raw.get()).ok())
+            .and_then(|shell| shell.axcenity_hair_shell)
+            .unwrap_or(false)
+}
+
+/// What glTF's `KHR_materials_sheen` and `KHR_materials_anisotropy` say
+/// of one material (their factors; their textures aren't read).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct MaterialExtensions {
+    sheen: Option<Sheen>,
+    anisotropy: Option<Anisotropy>,
+}
+
+/// Each material's sheen and anisotropy, by material index, read from the
+/// file's JSON: the `gltf` crate keeps no extension it doesn't know.
+/// Anything unreadable is left out (the material draws without them).
+fn material_extensions(bytes: &[u8]) -> Vec<MaterialExtensions> {
+    #[derive(serde::Deserialize)]
+    struct Root {
+        #[serde(default)]
+        materials: Vec<serde_json::Value>,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SheenJson {
+        #[serde(default)]
+        sheen_color_factor: Option<[f32; 3]>,
+        #[serde(default)]
+        sheen_roughness_factor: Option<f32>,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AnisotropyJson {
+        #[serde(default)]
+        anisotropy_strength: Option<f32>,
+        #[serde(default)]
+        anisotropy_rotation: Option<f32>,
+    }
+    let json: std::borrow::Cow<[u8]> = if bytes.starts_with(b"glTF") {
+        match gltf::Glb::from_slice(bytes) {
+            Ok(glb) => glb.json,
+            Err(_) => return Vec::new(),
+        }
+    } else {
+        std::borrow::Cow::Borrowed(bytes)
+    };
+    let Ok(root) = serde_json::from_slice::<Root>(&json) else {
+        return Vec::new();
+    };
+    let finite = |value: f32| value.is_finite().then_some(value);
+    root.materials
+        .iter()
+        .map(|material| {
+            let extension = |name: &str| material.get("extensions")?.get(name).cloned();
+            let sheen = extension("KHR_materials_sheen")
+                .and_then(|value| serde_json::from_value::<SheenJson>(value).ok())
+                .map(|sheen| Sheen {
+                    colour: sheen
+                        .sheen_color_factor
+                        .filter(|c| c.iter().all(|v| v.is_finite()))
+                        .map_or([0.0; 3], |c| c.map(|v| v.clamp(0.0, 1.0))),
+                    roughness: sheen
+                        .sheen_roughness_factor
+                        .and_then(finite)
+                        .map_or(0.0, |r| r.clamp(0.0, 1.0)),
+                });
+            let anisotropy = extension("KHR_materials_anisotropy")
+                .and_then(|value| serde_json::from_value::<AnisotropyJson>(value).ok())
+                .map(|anisotropy| Anisotropy {
+                    strength: anisotropy
+                        .anisotropy_strength
+                        .and_then(finite)
+                        .map_or(0.0, |v| v.clamp(0.0, 1.0)),
+                    rotation: anisotropy
+                        .anisotropy_rotation
+                        .and_then(finite)
+                        .unwrap_or(0.0),
+                });
+            MaterialExtensions { sheen, anisotropy }
+        })
+        .collect()
 }
 
 /// The texture indexes of a skin's makeup and marking masks
@@ -537,6 +663,44 @@ pub struct ModelMaterial {
     /// ranks, moles and theirs). From glTF `extras`:
     /// `axcenity_skin_masks: [{"index": <texture>}, …]`.
     pub skin_masks: Vec<Arc<Image>>,
+    /// A [`ModelShading::Hair`] material's card atlas data (root to tip,
+    /// a value per strand, the streak mask, the strands' occlusion:
+    /// `docs/rendering/hair.md`), placed like the base colour map. From
+    /// glTF `extras`: `axcenity_hair_data: {"index": <texture>}`.
+    pub hair_data_texture: Option<Arc<Image>>,
+    /// A [`ModelShading::Hair`] material's flow map: the strands'
+    /// direction in tangent space. From glTF `extras`:
+    /// `axcenity_hair_flow: {"index": <texture>}`.
+    pub hair_flow_texture: Option<Arc<Image>>,
+    /// glTF `KHR_materials_sheen`'s factors, drawn by
+    /// [`ModelShading::Cloth`] (a Standard material ignores them).
+    pub sheen: Option<Sheen>,
+    /// glTF `KHR_materials_anisotropy`'s factors, drawn by
+    /// [`ModelShading::Cloth`].
+    pub anisotropy: Option<Anisotropy>,
+    /// A [`ModelShading::Hair`] material that lies over something solid
+    /// (a hair cap, the cards lying on the scalp): its light fades out over
+    /// the head's terminator, by the mesh's outward normal
+    /// (`render::HairShading::shell`). From glTF `extras`:
+    /// `axcenity_hair_shell: true`. A single-sided hair material is one
+    /// anyway.
+    pub hair_shell: bool,
+}
+
+/// glTF `KHR_materials_sheen`: the sheen's colour (linear) and roughness,
+/// each 0 to 1.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Sheen {
+    pub colour: [f32; 3],
+    pub roughness: f32,
+}
+
+/// glTF `KHR_materials_anisotropy`: how much the highlight stretches (0 to
+/// 1) and the direction's turn from the tangent, in radians.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Anisotropy {
+    pub strength: f32,
+    pub rotation: f32,
 }
 
 /// How a [`ModelMaterial`] is lit, as its glTF `extras` say
@@ -548,6 +712,11 @@ pub enum ModelShading {
     Standard,
     /// Skin: light spreads under the surface (`render::SkinShading`).
     Skin,
+    /// Hair cards: lit along the strands (`render::HairShading`).
+    Hair,
+    /// Fabric: a sheen and an optional anisotropic highlight
+    /// (`render::ClothShading`).
+    Cloth,
 }
 
 impl Default for ModelMaterial {
@@ -581,6 +750,11 @@ impl Default for ModelMaterial {
             shading: ModelShading::Standard,
             defined_normal_texture: None,
             skin_masks: Vec::new(),
+            hair_data_texture: None,
+            hair_flow_texture: None,
+            sheen: None,
+            anisotropy: None,
+            hair_shell: false,
         }
     }
 }
@@ -598,6 +772,8 @@ impl ModelMaterial {
             || self.specular_texture.is_some()
             || self.defined_normal_texture.is_some()
             || !self.skin_masks.is_empty()
+            || self.hair_data_texture.is_some()
+            || self.hair_flow_texture.is_some()
     }
 
     /// Takes every texture off, for a mesh with no texture coordinates.
@@ -612,6 +788,8 @@ impl ModelMaterial {
         self.specular_texture = None;
         self.defined_normal_texture = None;
         self.skin_masks.clear();
+        self.hair_data_texture = None;
+        self.hair_flow_texture = None;
     }
 }
 
@@ -1247,6 +1425,7 @@ fn read(
             .textures()
             .map(|texture| texture.source())
             .collect(),
+        extensions: material_extensions(bytes),
     };
     let mut models = Vec::new();
     for pick in picks {
@@ -1570,6 +1749,8 @@ struct Reader<'a> {
     /// Each texture's image, by texture index, for textures a material's
     /// `extras` name (a skin's defined normal map).
     texture_images: Vec<gltf::Image<'a>>,
+    /// Each material's sheen and anisotropy, by material index.
+    extensions: Vec<MaterialExtensions>,
 }
 
 impl Reader<'_> {
@@ -1946,6 +2127,23 @@ impl Reader<'_> {
                 }
             }
         }
+        // A hair card atlas's data and flow maps: placed like the base
+        // colour map, so read only where it is.
+        let (hair_data, hair_flow) = hair_maps_of(material.extras());
+        let mut hair_maps = [None, None];
+        if base_color_texture.is_some() {
+            for (map, index) in hair_maps.iter_mut().zip([hair_data, hair_flow]) {
+                if let Some(source) = index.and_then(|i| self.texture_images.get(i)) {
+                    *map = Some(self.image(&source.clone())?);
+                }
+            }
+        }
+        let [hair_data_texture, hair_flow_texture] = hair_maps;
+        let extensions = material
+            .index()
+            .and_then(|index| self.extensions.get(index))
+            .copied()
+            .unwrap_or_default();
         let material = ModelMaterial {
             name: material.name().unwrap_or_default().to_owned(),
             base_color: pbr.base_color_factor(),
@@ -1988,6 +2186,11 @@ impl Reader<'_> {
             shading,
             defined_normal_texture,
             skin_masks,
+            hair_data_texture,
+            hair_flow_texture,
+            sheen: extensions.sheen,
+            anisotropy: extensions.anisotropy,
+            hair_shell: hair_shell_of(material.extras()),
             ..wind_of(material.extras())
         };
         Ok((material, uv_set))

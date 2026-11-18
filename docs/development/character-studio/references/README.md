@@ -20,6 +20,10 @@ Every index uses the same eight columns: Reference, Source URL, Author or publis
 
 **Known gaps** (from [audit-gaps.md](../refinement/audit-gaps.md)): the face and body indexes are mostly data papers and drawn plates, not consistent photographs from the front, side and three-quarter; there are no pictures of arms raised or joints bent; nose tips and nostril shapes lack data. These are to be filled before R3 and R4 author new shapes (plan section 11.5).
 
+## Sources of the Hair and Cloth shading models (CO7, wave 4)
+
+Code written in this repository (class 5) from published formulas, each cited where it is used (`crates/render/src/hair.wgsl`, `cloth.wgsl`); no code or text was copied. Class 4 (papers and course notes): Karis, "Physically Based Hair Shading in Unreal" (SIGGRAPH 2016; see [hair/README.md](hair/README.md) and notes/hair.md); d'Eon, Francois, Hill, Letteri and Aubry, "An Energy-Conserving Hair Reflectance Model" (2011), for the lobes' shifts; Chiang, Bitterli, Tappan and Burley, "A Practical and Controllable Hair and Fur Model for Production Path Tracing" (2016), for the colour-to-absorption mapping; the eumelanin and pheomelanin absorption coefficients as pbrt v4 gives them (see [materials/README.md](materials/README.md), "Hair"); Estevez and Kulla, "Production Friendly Microfacet Sheen BRDF" (2017), and Neubelt and Pettineo (SIGGRAPH 2013), as glTF's `KHR_materials_sheen` specifies them; Burley (2012) and Heitz (2014) for anisotropic GGX, as Filament documents it. The reference renders are made with Blender (GPL; renders are ours, nothing of it ships). The test card set and cloth swatch are generated in code (`crates/render/src/renderer/tests/card_set.rs`).
+
 ## Licence classes (brief §13.5)
 
 | Class | What | May ship in the engine? |

@@ -10,8 +10,9 @@ use axcenity_core::{
 };
 use axcenity_render::glam::Mat4;
 use axcenity_render::{
-    Channel, ChannelMap, Makeup, Material, NormalMap, Outline, SKIN_MAKEUP_LAYERS,
-    SURFACE_PARAMETERS, Shading, SkinLayers, Spots, SurfaceShader, Sway, TextureMaps, Toon, Water,
+    Channel, ChannelMap, ClothShading, HairShading, Makeup, Material, NormalMap, Outline,
+    SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, Shading, SkinLayers, Spots, SurfaceShader, Sway,
+    TextureMaps, Toon, Water,
 };
 
 use crate::draw_list::{GLOW_BOOST, texture};
@@ -163,12 +164,23 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 ///   `avatar::resolve` writes (`set_skin_layers`). With no layer on the
 ///   masks aren't bound at all.
 ///
+/// - on a material its model file marks hair ([`Shading::Hair`], CO7):
+///   `melanin`, `redness`, `tint`, `dye` and `dye_amount`,
+///   `tip_lightening`, `root_melanin` and `root_length`, `streaks` and
+///   `streak_melanin` move its colour along the pigment curve in the
+///   renderer (`docs/rendering/hair.md`), `highlight` scales its
+///   secondary highlight and `shift_scale` the shift of both;
+/// - on a material its model file marks cloth ([`Shading::Cloth`], CO7):
+///   `sheen_tint` multiplies its sheen's colour, `sheen_roughness_scale`
+///   its sheen's roughness, `anisotropy_scale` its anisotropy, and
+///   `anisotropy_rotation` (degrees, -90 to 90: a stretched highlight
+///   repeats every half turn) turns its direction.
+///
 /// Every value at its neutral setting changes nothing, and a part with no
 /// values is drawn as authored. The rest (`pupil_size`, `limbal_ring`,
-/// `iris_depth`, cloth sheen and hair dye) wait for the renderer's Eye,
-/// Cloth and Hair shading models: until then those materials draw as
-/// Standard. The colour values are drawn by their name whatever the slot:
-/// Hair's `melanin` and `redness` take the skin's curve for now.
+/// `iris_depth`) wait for the renderer's Eye model. On a material its file
+/// doesn't mark hair (the realistic brows and lashes, today), Hair's
+/// `melanin` and `redness` take the skin's curve.
 pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str) {
     let value = |value: &str| instance.attribute(&material_value_attribute(name, value));
     let number = |name: &str| {
@@ -177,6 +189,24 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
             .filter(|number| number.is_finite())
             .map(|number| number as f32)
     };
+    if let Shading::Hair(hair) = &mut material.shading {
+        set_hair(hair, &number, |name| {
+            value(name)
+                .and_then(Value::as_color3)
+                .map(|c| [c.r, c.g, c.b])
+        });
+        if let Some(scale) = number("roughness_scale") {
+            material.roughness = (material.roughness * scale).clamp(0.0, 1.0);
+        }
+        return;
+    }
+    if let Shading::Cloth(cloth) = &mut material.shading {
+        set_cloth(cloth, &number, |name| {
+            value(name)
+                .and_then(Value::as_color3)
+                .map(|c| [c.r, c.g, c.b])
+        });
+    }
     let pigments = [number("melanin"), number("undertone"), number("redness")];
     if pigments.iter().any(Option::is_some) {
         let [melanin, undertone, redness] = pigments.map(|value| value.unwrap_or(0.0));
@@ -223,6 +253,52 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
                 skin.layers = None;
             }
         }
+    }
+}
+
+/// Sets a hair material's values (`avatar`'s Hair model) on its shading:
+/// `number` and `colour` read a value of the material by name. Each one
+/// left unset keeps its neutral setting.
+fn set_hair(
+    hair: &mut HairShading,
+    number: &impl Fn(&str) -> Option<f32>,
+    colour: impl Fn(&str) -> Option<[f32; 3]>,
+) {
+    let offset = |name: &str| number(name).map_or(0.0, |v| v.clamp(-1.0, 1.0));
+    let share = |name: &str, neutral: f32| number(name).map_or(neutral, |v| v.clamp(0.0, 1.0));
+    hair.melanin = offset("melanin");
+    hair.redness = offset("redness");
+    hair.dye = colour("dye").unwrap_or([1.0; 3]);
+    hair.dye_amount = share("dye_amount", 0.0);
+    hair.tip_lightening = share("tip_lightening", 0.0);
+    hair.root_melanin = offset("root_melanin");
+    hair.root_length = share("root_length", HairShading::default().root_length);
+    hair.streaks = share("streaks", 0.0);
+    hair.streak_melanin = offset("streak_melanin");
+    hair.secondary = number("highlight").map_or(1.0, |v| v.clamp(0.0, 2.0));
+    hair.shift = number("shift_scale").map_or(1.0, |v| v.clamp(0.0, 2.0));
+    hair.tint = colour("tint").unwrap_or([1.0; 3]);
+}
+
+/// Sets a cloth material's values (`avatar`'s Cloth model) on its
+/// shading, over what its model file authored. `tint` and
+/// `roughness_scale` are the generic ones, set by [`modulate`].
+fn set_cloth(
+    cloth: &mut ClothShading,
+    number: &impl Fn(&str) -> Option<f32>,
+    colour: impl Fn(&str) -> Option<[f32; 3]>,
+) {
+    if let Some(tint) = colour("sheen_tint") {
+        cloth.sheen_colour = std::array::from_fn(|c| cloth.sheen_colour[c] * tint[c]);
+    }
+    if let Some(scale) = number("sheen_roughness_scale") {
+        cloth.sheen_roughness = (cloth.sheen_roughness * scale.clamp(0.5, 1.5)).clamp(0.0, 1.0);
+    }
+    if let Some(scale) = number("anisotropy_scale") {
+        cloth.anisotropy = (cloth.anisotropy * scale.clamp(0.0, 2.0)).clamp(-1.0, 1.0);
+    }
+    if let Some(degrees) = number("anisotropy_rotation") {
+        cloth.anisotropy_rotation += degrees.clamp(-90.0, 90.0).to_radians();
     }
 }
 

@@ -388,3 +388,149 @@ fn skin_without_masks_ignores_layer_values() {
     let drawn = drawn_one(&authored, number("Skin", "layer_blush_opacity", 1.0));
     assert!(layers_of(&drawn).is_none());
 }
+
+// -- Hair and Cloth (CO7, wave 4) ------------------------------------------
+
+fn hair_shaded() -> Material {
+    Material {
+        base_color: [0.45, 0.3, 0.18],
+        roughness: 0.4,
+        shading: Shading::Hair(axcenity_render::HairShading {
+            data: Some(Arc::new(Flat)),
+            ..Default::default()
+        }),
+        ..Material::default()
+    }
+}
+
+fn hair_of(material: &Material) -> &axcenity_render::HairShading {
+    match &material.shading {
+        Shading::Hair(hair) => hair,
+        other => panic!("not hair: {other:?}"),
+    }
+}
+
+#[test]
+fn hair_values_go_to_the_hair_model_not_the_skin_curve() {
+    let made = hair_shaded();
+    // Neutral: the colour as made, the model's values neutral.
+    let neutral = drawn(&made, "Hair", &[number("Hair", "melanin", 0.0)]);
+    assert_eq!(neutral.base_color, made.base_color);
+    let defaults = axcenity_render::HairShading::default();
+    let hair = hair_of(&neutral);
+    assert_eq!(
+        (
+            hair.melanin,
+            hair.redness,
+            hair.secondary,
+            hair.shift,
+            hair.tint
+        ),
+        (0.0, 0.0, defaults.secondary, defaults.shift, [1.0; 3])
+    );
+    assert!(hair.data.is_some(), "its atlas's data kept");
+    // Every value lands on the model; the base colour stays as made (the
+    // renderer moves it along the pigment curve, live).
+    let red = Value::Color3(Color3::new(1.0, 0.0, 0.0));
+    let blue = Value::Color3(Color3::new(0.0, 0.0, 1.0));
+    let set = drawn(
+        &made,
+        "Hair",
+        &[
+            number("Hair", "melanin", 0.5),
+            number("Hair", "redness", -0.25),
+            ("Hair", "dye", blue),
+            number("Hair", "dye_amount", 0.3),
+            number("Hair", "tip_lightening", 0.4),
+            number("Hair", "root_melanin", 0.7),
+            number("Hair", "root_length", 0.2),
+            number("Hair", "streaks", 0.6),
+            number("Hair", "streak_melanin", -0.8),
+            number("Hair", "highlight", 1.5),
+            number("Hair", "shift_scale", 0.5),
+            ("Hair", "tint", red),
+            number("Hair", "roughness_scale", 1.25),
+        ],
+    );
+    assert_eq!(set.base_color, made.base_color);
+    assert!((set.roughness - 0.5).abs() < 1e-6, "{}", set.roughness);
+    let hair = hair_of(&set);
+    assert_eq!((hair.melanin, hair.redness), (0.5, -0.25));
+    assert_eq!((hair.dye, hair.dye_amount), ([0.0, 0.0, 1.0], 0.3));
+    assert_eq!(hair.tip_lightening, 0.4);
+    assert_eq!((hair.root_melanin, hair.root_length), (0.7, 0.2));
+    assert_eq!((hair.streaks, hair.streak_melanin), (0.6, -0.8));
+    assert_eq!((hair.secondary, hair.shift), (1.5, 0.5));
+    assert_eq!(hair.tint, [1.0, 0.0, 0.0]);
+}
+
+fn cloth_shaded() -> Material {
+    Material {
+        base_color: [0.4, 0.4, 0.5],
+        roughness: 0.8,
+        shading: Shading::Cloth(axcenity_render::ClothShading {
+            sheen_colour: [0.6, 0.6, 0.6],
+            sheen_roughness: 0.5,
+            anisotropy: 0.4,
+            anisotropy_rotation: 0.0,
+        }),
+        ..Material::default()
+    }
+}
+
+fn cloth_of(material: &Material) -> &axcenity_render::ClothShading {
+    match &material.shading {
+        Shading::Cloth(cloth) => cloth,
+        other => panic!("not cloth: {other:?}"),
+    }
+}
+
+#[test]
+fn cloth_values_modulate_the_authored_sheen_and_anisotropy() {
+    let made = cloth_shaded();
+    let neutral = drawn(&made, "Shirt", &[number("Shirt", "anisotropy_scale", 1.0)]);
+    let cloth = cloth_of(&neutral);
+    assert_eq!(
+        (
+            cloth.sheen_colour,
+            cloth.sheen_roughness,
+            cloth.anisotropy,
+            cloth.anisotropy_rotation
+        ),
+        ([0.6; 3], 0.5, 0.4, 0.0)
+    );
+    let set = drawn(
+        &made,
+        "Shirt",
+        &[
+            (
+                "Shirt",
+                "sheen_tint",
+                Value::Color3(Color3::new(1.0, 0.5, 0.0)),
+            ),
+            number("Shirt", "sheen_roughness_scale", 1.5),
+            number("Shirt", "anisotropy_scale", 2.0),
+            number("Shirt", "anisotropy_rotation", 90.0),
+            ("Shirt", "tint", Value::Color3(Color3::new(0.5, 1.0, 1.0))),
+        ],
+    );
+    let cloth = cloth_of(&set);
+    assert_eq!(cloth.sheen_colour, [0.6, 0.3, 0.0]);
+    assert!((cloth.sheen_roughness - 0.75).abs() < 1e-6);
+    assert!((cloth.anisotropy - 0.8).abs() < 1e-6);
+    assert!((cloth.anisotropy_rotation - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
+    // The generic tint still multiplies the base colour.
+    assert!((set.base_color[0] - 0.2).abs() < 1e-6);
+    // An anisotropic lobe repeats every half turn, so the turn is held to
+    // -90 to 90 degrees (review fixes 2).
+    let turned = drawn(
+        &made,
+        "Shirt",
+        &[number("Shirt", "anisotropy_rotation", 135.0)],
+    );
+    assert!(
+        (cloth_of(&turned).anisotropy_rotation - std::f32::consts::FRAC_PI_2).abs() < 1e-6,
+        "{}",
+        cloth_of(&turned).anisotropy_rotation
+    );
+}
