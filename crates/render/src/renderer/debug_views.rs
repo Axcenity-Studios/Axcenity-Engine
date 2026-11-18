@@ -100,6 +100,8 @@ const DEBUG_SHADER: &str = concat!(
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
     include_str!("../skin.wgsl"),
+    include_str!("../hair.wgsl"),
+    include_str!("../cloth.wgsl"),
     include_str!("../surface.wgsl"),
     include_str!("../debug_views.wgsl")
 );

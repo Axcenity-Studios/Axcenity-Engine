@@ -758,3 +758,81 @@ fn a_surface_appearance_on_skin_leaves_out_the_files_defined_normal_map() {
     };
     assert!(shading.defined_normal.is_none(), "no defined map");
 }
+
+#[test]
+fn a_model_material_marked_hair_draws_with_hair_shading_and_its_atlas_maps() {
+    use axcenity_assets::{Image, ModelMaterial, ModelShading};
+    use axcenity_render::Shading;
+    let map = |byte: u8| Arc::new(Image::new(1, 1, vec![byte, 128, 255, 255]));
+    let hair = ModelMaterial {
+        name: "Hair".into(),
+        base_color_texture: Some(map(200)),
+        hair_data_texture: Some(map(10)),
+        hair_flow_texture: Some(map(20)),
+        shading: ModelShading::Hair,
+        alpha_mode: axcenity_assets::AlphaMode::Mask { cutoff: 0.5 },
+        ..ModelMaterial::default()
+    };
+    let drawn = materials::model_material(&hair);
+    let Shading::Hair(shading) = &drawn.shading else {
+        panic!("not hair: {:?}", drawn.shading);
+    };
+    assert_eq!(shading.data.as_ref().map(|t| t.rgba()[0]), Some(10));
+    assert_eq!(shading.flow.as_ref().map(|t| t.rgba()[0]), Some(20));
+    assert_eq!(drawn.alpha_cutoff, 0.5, "a cut-out card");
+    // An appearance replaces the colour map the atlas's maps go with.
+    let mut world = World::new();
+    let appearance = world.create(ClassName::SurfaceAppearance).unwrap();
+    let covered =
+        materials::surface_material(&hair, world.get(appearance).unwrap(), &example_assets());
+    assert!(matches!(&covered.shading, Shading::Hair(h) if h.data.is_none() && h.flow.is_none()));
+}
+
+#[test]
+fn a_model_material_marked_cloth_draws_its_khr_sheen_and_anisotropy() {
+    use axcenity_assets::{Anisotropy, ModelMaterial, ModelShading, Sheen};
+    use axcenity_render::Shading;
+    let cloth = ModelMaterial {
+        name: "Shirt".into(),
+        shading: ModelShading::Cloth,
+        sheen: Some(Sheen {
+            colour: [0.5, 0.25, 1.0],
+            roughness: 0.3,
+        }),
+        anisotropy: Some(Anisotropy {
+            strength: 0.6,
+            rotation: 1.5,
+        }),
+        ..ModelMaterial::default()
+    };
+    let drawn = materials::model_material(&cloth);
+    let Shading::Cloth(shading) = &drawn.shading else {
+        panic!("not cloth: {:?}", drawn.shading);
+    };
+    // The sheen's colour as sRGB, as draw lists take colours.
+    let srgb = materials::srgb([0.5, 0.25, 1.0]);
+    assert_eq!(shading.sheen_colour, srgb);
+    assert_eq!(
+        (
+            shading.sheen_roughness,
+            shading.anisotropy,
+            shading.anisotropy_rotation
+        ),
+        (0.3, 0.6, 1.5)
+    );
+    // No extensions: no sheen, no anisotropy (Standard's light).
+    let plain = materials::model_material(&ModelMaterial {
+        sheen: None,
+        anisotropy: None,
+        ..cloth.clone()
+    });
+    assert!(
+        matches!(&plain.shading, Shading::Cloth(c) if c.sheen_colour == [0.0; 3] && c.anisotropy == 0.0)
+    );
+    // The same file's sheen on a Standard material is ignored.
+    let standard = materials::model_material(&ModelMaterial {
+        shading: ModelShading::Standard,
+        ..cloth
+    });
+    assert!(matches!(standard.shading, Shading::Standard));
+}

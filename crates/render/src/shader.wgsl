@@ -27,12 +27,13 @@ struct Maps {
     uv_matrix: vec4<f32>,
     // xy: added to the texture coordinates after `uv_matrix`.
     uv_offset: vec4<f32>,
-    // How it's lit. x: the model (SHADING_STANDARD, _UNLIT, _TOON or
-    // _SKIN); for toon, y: its bands (0: read its ramp, bound in the
-    // specular map's place), z: softness, w: highlight size; for skin, see
-    // skin.wgsl; for standard, y: a leaf's translucency.
+    // How it's lit. x: the model (SHADING_STANDARD, _UNLIT, _TOON, _SKIN,
+    // _HAIR or _CLOTH); for toon, y: its bands (0: read its ramp, bound in
+    // the specular map's place), z: softness, w: highlight size; for skin,
+    // hair and cloth, see skin.wgsl, hair.wgsl and cloth.wgsl; for
+    // standard, y: a leaf's translucency.
     shading: vec4<f32>,
-    // x: toon's rim light.
+    // x: toon's rim light. Cloth's sheen colour (cloth.wgsl).
     toon: vec4<f32>,
     // The outline's linear color, then its width (0: none) in pixels of a
     // view 1080 pixels tall.
@@ -290,6 +291,66 @@ fn vs_shadow(
     return shadow_cascade * vec4<f32>(world, 1.0);
 }
 
+// A cut-out caster's corner in the shadow pass (`fs_shadow_cut_out`): its
+// texture coordinates, placed as `item_vertex` places them, and what its
+// opacity is cut at.
+struct ShadowCutOut {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    // The item's own opacity and its cutoff.
+    @location(1) @interpolate(flat) cut: vec2<f32>,
+}
+
+// Draws a cut-out caster (a leaf card, a fence, a hair card) into a
+// shadow map, as `vs_shadow` does, with what its fragment needs to leave
+// out its holes. Its texture coordinates aren't tiled by its size: a
+// cut-out drawn that way (`DrawItem::uv_tile`) casts its whole mesh.
+@vertex
+fn vs_shadow_cut_out(
+    @builtin(vertex_index) index: u32,
+    @location(0) position: vec3<f32>,
+    @location(12) uv: vec2<f32>,
+    @location(2) model_0: vec4<f32>,
+    @location(3) model_1: vec4<f32>,
+    @location(4) model_2: vec4<f32>,
+    @location(5) model_3: vec4<f32>,
+    @location(9) base_color: vec4<f32>,
+    @location(11) surface: vec4<f32>,
+    @location(14) skin: vec2<u32>,
+    @location(15) sway: vec4<f32>,
+) -> ShadowCutOut {
+    let model = mat4x4<f32>(model_0, model_1, model_2, model_3);
+    let posed = pose_corner(index, skin, position, vec3<f32>(0.0), vec3<f32>(0.0));
+    let world = swayed((model * vec4<f32>(posed.position, 1.0)).xyz, sway);
+    var out: ShadowCutOut;
+    out.clip_position = shadow_cascade * vec4<f32>(world, 1.0);
+    out.uv = mat2x2<f32>(maps.uv_matrix.xy, maps.uv_matrix.zw) * uv + maps.uv_offset.xy;
+    out.cut = vec2<f32>(base_color.a, surface.z);
+    return out;
+}
+
+// A cut-out caster's pixel of a shadow map: left out where its texture is
+// cut out, so leaves and strands cast their own shapes, not their cards'.
+// A hair card's opacity is hashed against a fixed per-texel pattern over
+// the band round its cutoff (`HAIR_HASH_BAND`, as the scene pass hashes
+// it under TAA), so the shadow map's filter averages a strand's soft
+// fringe into a partial shadow, not a hard slab edge.
+@fragment
+fn fs_shadow_cut_out(in: ShadowCutOut) {
+    let texel = textureSample(base_color_texture, material_sampler, in.uv);
+    let opacity_texel = textureSample(opacity_texture, material_sampler, in.uv);
+    let opacity = in.cut.x * mix(texel.a, map_value(opacity_texel, maps.opacity, maps.invert.w),
+        maps.settings.w);
+    var threshold = in.cut.y;
+    if maps.shading.x == SHADING_HAIR {
+        threshold = clamp(in.cut.y + HAIR_HASH_BAND * (pixel_noise(in.clip_position.xy) - 0.5),
+            0.002, 0.998);
+    }
+    if opacity < threshold {
+        discard;
+    }
+}
+
 // One map's value: the channel picked by `mask`, inverted if `invert` is 1.
 fn map_value(texel: vec4<f32>, mask: vec4<f32>, invert: f32) -> f32 {
     let value = dot(texel, mask);
@@ -459,13 +520,16 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     let shaded = pixel_surface(in, facing);
     let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
     let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
+    let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
     let footprint = skin_footprint(in, shaded.normal, facing);
 
-    // Cut-out materials (leaves, fences) leave holes where the texture is clear.
-    if shaded.opacity < in.surface.z || dithered_out(in.fade, in.clip_position.xy) {
+    // Cut-out materials (leaves, fences) leave holes where the texture is
+    // clear (a hair card's, hashed under TAA: `hair_cut_threshold`).
+    let cut = hair_cut_threshold(in, in.surface.z, data_texel.g);
+    if shaded.opacity < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
-    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, footprint);
+    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
 }
 
 // A cut-out surface, in the scene pass. Its depth was drawn just before
@@ -479,8 +543,9 @@ fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(
     let shaded = pixel_surface(in, facing);
     let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
     let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
+    let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
     let footprint = skin_footprint(in, shaded.normal, facing);
-    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, footprint);
+    return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
 }
 
 // A cut-out surface's opacity at this pixel, as `standard_surface` and
@@ -496,7 +561,9 @@ fn cut_out_opacity(in: VertexOut) -> f32 {
 // per pixel. What it cuts out must match `standard_surface` and `fs_main`.
 @fragment
 fn fs_depth_only(in: VertexOut) -> @location(0) vec4<f32> {
-    if cut_out_opacity(in) < in.surface.z || dithered_out(in.fade, in.clip_position.xy) {
+    let strand = textureSample(metalness_texture, material_sampler, in.uv).g;
+    let cut = hair_cut_threshold(in, in.surface.z, strand);
+    if cut_out_opacity(in) < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
     return vec4<f32>(0.0);
@@ -508,10 +575,16 @@ fn fs_depth_only(in: VertexOut) -> @location(0) vec4<f32> {
 // its samples (alpha to coverage). The cut-off's edge is ramped over one
 // pixel, at the same place as `fs_depth_only`'s, so distant leaves don't thin
 // out. `fs_prefilled` then lights just the samples this left its depth in.
+//
+// A hair card's coverage is its opacity itself, so its soft edges and
+// thin strands cover a graded share of each pixel's samples.
 @fragment
 fn fs_depth_coverage(in: VertexOut) -> @location(0) vec4<f32> {
     let opacity = cut_out_opacity(in);
-    let coverage = (opacity - in.surface.z) / max(fwidth(opacity), 0.0001) + 0.5;
+    var coverage = (opacity - in.surface.z) / max(fwidth(opacity), 0.0001) + 0.5;
+    if maps.shading.x == SHADING_HAIR {
+        coverage = select(opacity, 0.0, opacity < 0.002);
+    }
     if coverage <= 0.0 || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
@@ -520,12 +593,15 @@ fn fs_depth_coverage(in: VertexOut) -> @location(0) vec4<f32> {
 
 // The lit color of a pixel of a surface: `shaded`, its two remaining maps'
 // texels already read, and (for skin) its `footprint`.
+// `data_texel` is the metalness map's texel, which on hair is the card
+// atlas's data (and `specular_texel` its flow).
 fn lit_pixel(
     in: VertexOut,
     facing: f32,
     shaded: Surface,
     occlusion_texel: vec4<f32>,
     specular_texel: vec4<f32>,
+    data_texel: vec4<f32>,
     footprint: SkinFootprint,
 ) -> vec4<f32> {
     let metalness = clamp(shaded.metalness, 0.0, 1.0);
@@ -548,6 +624,12 @@ fn lit_pixel(
             shaded.base_color, occlusion, solid);
     } else if maps.shading.x == SHADING_SKIN {
         color = skin_surface(in, facing, geometric, shaded, roughness, occlusion, solid, footprint);
+    } else if maps.shading.x == SHADING_HAIR {
+        color = hair_surface(in, facing, shaded, roughness, occlusion, solid, data_texel,
+            specular_texel);
+    } else if maps.shading.x == SHADING_CLOTH {
+        color = cloth_surface(in, facing, geometric, shaded, metalness, roughness, occlusion,
+            dielectric, solid);
     } else if maps.shading.y > 0.0 {
         color = lit_leaf(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
             solid, maps.shading.y);
@@ -681,6 +763,8 @@ const SHADING_STANDARD: f32 = 0.0;
 const SHADING_UNLIT: f32 = 1.0;
 const SHADING_TOON: f32 = 2.0;
 const SHADING_SKIN: f32 = 3.0;
+const SHADING_HAIR: f32 = 4.0;
+const SHADING_CLOTH: f32 = 5.0;
 
 // How far round from the camera a toon surface's rim light starts (in
 // 1 - cos of the angle), and how large a highlight of size 1 is (its
@@ -780,7 +864,9 @@ fn dithered_out(fade: f32, pixel: vec2<f32>) -> bool {
 fn fs_prepass(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     let facing = select(-1.0, 1.0, front);
     let shaded = pixel_surface(in, facing);
-    if shaded.opacity < in.surface.z || dithered_out(in.fade, in.clip_position.xy) {
+    let strand = textureSample(metalness_texture, material_sampler, in.uv).g;
+    let cut = hair_cut_threshold(in, in.surface.z, strand);
+    if shaded.opacity < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
     var normal = prepass_normal(normalize(in.normal) * facing);
