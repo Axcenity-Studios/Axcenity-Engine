@@ -421,6 +421,25 @@ pub(crate) fn region_map(library: &Library, root: &Path, base: &BaseManifest) ->
 /// Imports a garment: see the module documentation. Returns what was
 /// written; nothing is written when the garment can't be read or fitted.
 pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
+    import_garment_with(request, ImportOptions::default())
+}
+
+/// How [`import_garment_with`] treats the garment's file.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ImportOptions {
+    /// The file is already in metres and placed on the body (the
+    /// licensed-asset intake places a hat or shoes itself,
+    /// `assets/characters/realistic/import/conform.py`): it isn't aligned
+    /// ([`align`] looks for an even ease, which lifts a brimmed hat off
+    /// the head). The alignment says scale 1 and no offset.
+    pub keep_placement: bool,
+}
+
+/// [`import_garment`] with `options`.
+pub fn import_garment_with(
+    request: &ImportRequest,
+    options: ImportOptions,
+) -> Result<Imported, FitError> {
     let root = &request.library;
     let (library, catalogue, problems) = Library::read(root);
     let mut catalogue = catalogue.ok_or_else(|| {
@@ -442,7 +461,17 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
     if garment.is_empty() {
         return Err(FitError::Empty);
     }
-    let alignment = align(&mut garment, &body);
+    let alignment = if options.keep_placement {
+        Alignment {
+            scale: 1.0,
+            offset: Vec3::ZERO,
+            units: 1.0,
+            spread_before: 0.0,
+            spread_after: 0.0,
+        }
+    } else {
+        align(&mut garment, &body)
+    };
 
     // The layers it is worn over.
     let mut under = Vec::new();

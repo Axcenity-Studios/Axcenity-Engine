@@ -4,9 +4,9 @@ type: system
 status: current
 implementation: partial
 crates: [avatar]
-source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, crates/avatar/src/skin.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
+source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/provenance.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, crates/avatar/src/skin.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
 docs: [docs/development/character-studio/architecture.md, crates/avatar/CLAUDE.md]
-verified: 2026-11-17
+verified: 2026-11-18
 verified_commit: 5b650d5d
 tags: [system/characters, formats]
 ---
@@ -45,6 +45,10 @@ The refinement's shared contracts (plan section 11.3, [ADR-0040](../Architecture
 - **Makeup and markings** (R5, [ADR-0042](../Architecture/Architecture-Decisions/ADR-0042-Makeup-And-Markings-Are-Layers-Over-Library-Masks-Drawn-Live-By-The-Skin-Model.md); `skin.rs`): a description's optional `skin` block turns on layers the base manifest's `skin_layers` offers (makeup: colour, opacity, roughness; markings: amount, seed, opacity); `resolve` writes them as `layer_<id>_<field>` material values on the layer's skin slot, which the applier sets live like every other value. The masks are content in the model file (`docs/rendering/skin.md`). `skin` presets carry the block.
 - **Presets**: a format 2 description with a `preset` block, listed in the catalogue's `presets`; `apply_preset` sets only what its kind owns (`body`, `face`, `hair`, `outfit`, `skin`, `character`). The realistic package ships 29 (`realistic/presets/`, written by `presets.py`).
 - **Randomize**: `randomize(&Description, &Scope, locks, seed, &Library)`, deterministic, inside `random`, with the base's constraints and only compatible items.
+
+## Provenance of imported items (wave 5)
+
+Paul's decision 11 (2026-11-18) makes licensed CC0 and CC BY assets the base of new character content. An item made from one says `source.origin: "imported"` and names a **provenance record** beside its manifest (`*.provenance.json`, `provenance.rs`: source page, author, licence and its page, retrieval date, the files' SHA-256 as downloaded, what was changed, the attribution line, the items it feeds). `check_provenance` fails an imported item without one, under a refused licence (share-alike, non-commercial, no-derivatives, unknown) or under CC BY, MIT or Apache-2.0 without its line, and an item under any licence but CC0 that doesn't say it was imported; `tests/shipped_provenance.rs` holds the repository's library to it. `character_credits` gathers the lines a game carries: `project::pack_game` writes `CREDITS-CHARACTERS.txt` into every game whose library has an imported item, and Build Game writes it beside the game. The intake scripts that make such items are `assets/characters/realistic/import/` (`architecture.md` section 8a).
 
 ## What CO3 built on it
 

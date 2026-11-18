@@ -95,7 +95,7 @@ pub(super) fn gate_library() -> &'static Path {
                 source_info: axcenity_avatar::Source {
                     author: "Axcenity Engine contributors".to_owned(),
                     licence: "CC0-1.0".to_owned(),
-                    url: None,
+                    ..axcenity_avatar::Source::default()
                 },
                 slot: None,
                 layer: None,

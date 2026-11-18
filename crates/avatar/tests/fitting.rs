@@ -98,7 +98,7 @@ fn source() -> Source {
     Source {
         author: "Axcenity Engine contributors".to_owned(),
         licence: "CC0-1.0".to_owned(),
-        url: None,
+        ..Source::default()
     }
 }
 

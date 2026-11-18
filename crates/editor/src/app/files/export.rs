@@ -118,6 +118,14 @@ impl EditorApp {
             self.output
                 .warning(format!("{note} The build uses Axcenity's in its place."));
         }
+        if let Some(credits) = &built.character_credits {
+            let note = crate::build_game::credits_note(credits);
+            if credits.uncleared.is_empty() {
+                self.output.info(note);
+            } else {
+                self.output.warning(note);
+            }
+        }
         if let Some(reason) = &built.unsigned {
             self.output.warning(format!(
                 "The game's app couldn't be signed, so macOS may refuse to open it on \

@@ -55,7 +55,8 @@ pub use coverage::{
 pub use glb::{FittedModel, write_fitted_glb};
 pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides};
 pub use import::{
-    Alignment, ImportRequest, Imported, align, extremes_of, import_garment, pose_states_of,
+    Alignment, ImportOptions, ImportRequest, Imported, align, extremes_of, import_garment,
+    import_garment_with, pose_states_of,
 };
 pub use pose::{
     CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses, skin,

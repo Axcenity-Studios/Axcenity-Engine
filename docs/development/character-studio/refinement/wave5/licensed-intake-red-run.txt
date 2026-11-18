@@ -1,0 +1,66 @@
+Licensed-asset intake (wave 5): the red run, 2026-11-18, before the implementation.
+The tests were written first against stubs (provenance.rs and character_credits.rs returning nothing; the intake's Python modules empty).
+
+== cargo nextest run -p axcenity-avatar -p axcenity-project --no-fail-fast -E 'test(/provenance|credit/)' ==
+FAIL [   0.014s] ( 1/23) axcenity-avatar tests::provenance::the_library_check_reads_each_record_beside_its_item
+FAIL [   0.017s] ( 3/23) axcenity-avatar tests::provenance::an_imported_item_without_a_record_fails
+FAIL [   0.022s] ( 4/23) axcenity-avatar tests::provenance::refused_licences_fail_and_say_why
+FAIL [   0.027s] ( 5/23) axcenity-avatar tests::provenance::credits_list_what_a_game_must_carry_and_thank_the_rest
+FAIL [   0.027s] ( 6/23) axcenity-avatar tests::provenance::a_record_says_where_when_what_and_how_it_changed
+FAIL [   0.030s] ( 7/23) axcenity-avatar tests::provenance::original_work_names_no_record
+FAIL [   0.040s] ( 9/23) axcenity-project character_credits::tests::a_game_whose_character_wears_a_cc_by_item_carries_its_line
+FAIL [   0.046s] (11/23) axcenity-project character_library::tests::an_imported_items_provenance_record_is_copied_with_it
+FAIL [   0.051s] (12/23) axcenity-avatar tests::provenance::an_item_that_isnt_cleared_is_listed_as_such
+FAIL [   0.052s] (13/23) axcenity-avatar tests::provenance::the_record_names_the_item_and_its_licence
+FAIL [   0.055s] (14/23) axcenity-project character_credits::tests::only_the_games_own_items_are_credited
+FAIL [   0.059s] (17/23) axcenity-avatar tests::provenance::an_attribution_licence_needs_its_line
+FAIL [   0.062s] (18/23) axcenity-avatar tests::provenance::a_licence_only_an_import_can_have_needs_a_record
+FAIL [   0.067s] (20/23) axcenity-avatar tests::provenance::licence_terms_follow_the_classes
+FAIL [   0.078s] (21/23) axcenity-project character_credits::tests::a_game_with_only_cc0_items_thanks_them_and_requires_nothing
+FAIL [   0.079s] (22/23) axcenity-avatar tests::provenance::an_item_must_say_where_it_comes_from
+PASS [   0.095s] (23/23) axcenity-avatar::shipped_provenance every_shipped_item_is_original_or_has_its_provenance
+Summary [   0.096s] 23 tests run: 7 passed, 16 failed, 414 skipped
+
+== cargo nextest run -p axcenity-avatar --test shipped_provenance ==
+FAIL axcenity-avatar::shipped_provenance the_intake_scripts_accept_and_refuse_the_same_licences
+PASS axcenity-avatar::shipped_provenance every_shipped_item_is_original_or_has_its_provenance (the shipped items are all original work; the stub found nothing, so this one passes before and after)
+Summary 2 tests run: 1 passed, 1 failed
+
+== cargo nextest run -p axcenity-editor -E 'test(/character_credits|credits_the_imported/)' ==
+FAIL [   0.089s] (2/2) axcenity-editor::bin/axcenity-editor build_game::tests::a_build_credits_the_imported_character_items
+PASS [   0.089s] (1/2) axcenity-editor::bin/axcenity-editor build_game::tests::a_build_without_imported_character_items_has_no_character_credits
+Summary [   0.094s] 2 tests run: 1 passed, 1 failed, 1465 skipped
+
+== python -I assets/characters/realistic/import/test_intake.py (Blender's Python) ==
+ERROR: test_a_t_pose_sleeve_comes_down_to_the_rest_pose (__main__.ConformTest.test_a_t_pose_sleeve_comes_down_to_the_rest_pose)
+ERROR: test_a_copy_lies_on_itself (__main__.DistanceTest.test_a_copy_lies_on_itself)
+ERROR: test_a_closed_cube_is_sound (__main__.GeometryTest.test_a_closed_cube_is_sound)
+ERROR: test_a_flipped_face_is_found (__main__.GeometryTest.test_a_flipped_face_is_found)
+ERROR: test_degenerate_faces_ngons_and_open_edges (__main__.GeometryTest.test_degenerate_faces_ngons_and_open_edges)
+ERROR: test_split_seams_are_welded_before_counting (__main__.GeometryTest.test_split_seams_are_welded_before_counting)
+ERROR: test_three_faces_on_an_edge_is_non_manifold (__main__.GeometryTest.test_three_faces_on_an_edge_is_non_manifold)
+ERROR: test_a_cc0_record_needs_no_line_but_says_what_changed (__main__.ProvenanceTest.test_a_cc0_record_needs_no_line_but_says_what_changed)
+ERROR: test_a_cc_by_record_gets_its_attribution_line (__main__.ProvenanceTest.test_a_cc_by_record_gets_its_attribution_line)
+ERROR: test_a_given_line_is_kept_exactly (__main__.ProvenanceTest.test_a_given_line_is_kept_exactly)
+ERROR: test_a_record_with_holes_says_where (__main__.ProvenanceTest.test_a_record_with_holes_says_where)
+ERROR: test_hashes_every_file_as_downloaded (__main__.ProvenanceTest.test_hashes_every_file_as_downloaded)
+ERROR: test_refuses_share_alike_non_commercial_no_derivatives_and_unknown (__main__.ProvenanceTest.test_refuses_share_alike_non_commercial_no_derivatives_and_unknown)
+ERROR: test_a_hat_comes_down_until_it_sits_its_clearance_off_the_head (__main__.SettleTest.test_a_hat_comes_down_until_it_sits_its_clearance_off_the_head)
+ERROR: test_the_arm_and_the_side_are_kept_apart (__main__.SkinningTest.test_the_arm_and_the_side_are_kept_apart)
+ERROR: test_the_skinning_check_counts_what_breaks_the_rules (__main__.SkinningTest.test_the_skinning_check_counts_what_breaks_the_rules)
+ERROR: test_weights_are_four_at_most_and_normalized (__main__.SkinningTest.test_weights_are_four_at_most_and_normalized)
+ERROR: test_density_overlap_and_stretch_of_a_square_metre (__main__.UvTest.test_density_overlap_and_stretch_of_a_square_metre)
+ERROR: test_overlap_is_found (__main__.UvTest.test_overlap_is_found)
+ERROR: test_stretch_is_measured (__main__.UvTest.test_stretch_is_measured)
+Ran 20 tests in 0.008s
+FAILED (errors=20)
+
+== cargo nextest run -p axcenity-avatar --test intake_placement (added during the proof: the engine's alignment lifted the placed hat 6 cm) ==
+error[E0432]: unresolved imports `axcenity_avatar::fit::ImportOptions`, `axcenity_avatar::fit::import_garment_with`
+error: could not compile `axcenity-avatar` (test "intake_placement") due to 1 previous error
+
+== Green (after the implementation) ==
+cargo nextest run -p axcenity-avatar -p axcenity-project --no-fail-fast: 437 tests run: 437 passed, 2 skipped
+cargo nextest run -p axcenity-editor -E 'test(/build_game|browser|round_trip/)': 67 tests run: 67 passed
+cargo nextest run -p axcenity-player -E 'test(/fit_gate|wardrobe/)': 22 tests run: 22 passed
+python -I assets/characters/realistic/import/test_intake.py: Ran 20 tests, OK

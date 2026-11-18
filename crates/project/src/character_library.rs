@@ -161,7 +161,10 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .map(|model| model.file.as_str())
             .chain(groom.and_then(|groom| groom.strands.as_deref()))
             .chain(item.thumbnail.as_deref())
-            .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()));
+            .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()))
+            // An imported item's provenance record travels with it, so a
+            // game made from the project credits it (decision 11).
+            .chain(item.source.as_ref().and_then(|s| s.provenance.as_deref()));
         for file in files {
             if let Some(path) = shipped.path_of(id, file) {
                 copied |= copy(&path)?;
@@ -443,5 +446,46 @@ mod tests {
                 .is_empty()
         );
         let _ = fs::remove_dir_all(&folder);
+    }
+    /// Paul's decision 11: an imported item's provenance record travels
+    /// with it into a project, so the game's credits can be made there.
+    #[test]
+    fn an_imported_items_provenance_record_is_copied_with_it() {
+        let root = std::env::temp_dir().join(format!(
+            "axcenity-character-packages-provenance-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let shipped = root.join("shipped");
+        fs::create_dir_all(shipped.join("hats")).unwrap();
+        let item = r#"{ "format_version": 1, "id": "imported/hat", "label": "Hat",
+            "kind": "accessory", "slot": "hair", "bases": ["axcenity/realistic"],
+            "model": { "file": "Hat.glb" }, "fit": { "method": "binding" },
+            "source": { "author": "A. Modeller", "licence": "CC0-1.0", "origin": "imported",
+                        "provenance": "Hat.provenance.json" } }"#;
+        fs::write(shipped.join("hats/Hat.item.json"), item).unwrap();
+        fs::write(shipped.join("hats/Hat.glb"), b"model").unwrap();
+        fs::write(
+            shipped.join("hats/Hat.provenance.json"),
+            b"{ \"record\": 1 }",
+        )
+        .unwrap();
+        let mut library = Library::new();
+        library.add_item("hats/Hat.item.json", ItemManifest::from_json(item).unwrap());
+        fs::write(
+            shipped.join("catalogue.json"),
+            Catalogue::of(&library).to_json(),
+        )
+        .unwrap();
+        let project = root.join("project");
+        let added = add_character_packages(&project, &shipped).unwrap();
+        assert_eq!(added, ["imported/hat"]);
+        let copied = project.join(CHARACTER_LIBRARY_PATH).join("hats");
+        assert!(copied.join("Hat.glb").is_file());
+        assert_eq!(
+            fs::read(copied.join("Hat.provenance.json")).unwrap(),
+            fs::read(shipped.join("hats/Hat.provenance.json")).unwrap()
+        );
+        let _ = fs::remove_dir_all(&root);
     }
 }

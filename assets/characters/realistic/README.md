@@ -11,6 +11,7 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
 | `source/` | The vendored source meshes and `extract.py`, which made them; `body_shapes.npz`, MakeHuman's bodies on this topology (CO5, below). |
+| `import/` | The licensed-asset intake (wave 5, decision 11): Blender scripts from a downloaded CC0 or CC BY mesh to a draft item with its provenance record ([import/README.md](import/README.md)) |
 | `qa/thresholds.json` | The limits `measure.py --package realistic --check` holds the build to. |
 
 ## Building

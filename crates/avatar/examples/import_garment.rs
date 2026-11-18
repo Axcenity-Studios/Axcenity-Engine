@@ -5,8 +5,12 @@
 //! cargo run -p axcenity-avatar --release --example import_garment -- \
 //!     <garment.obj|.glb> <library folder> <base ID> <item ID> <label> <folder in the library> \
 //!     [--under <item ID>]... [--slot <slot>] [--layer <0-3>] [--margin <metres>] \
-//!     [--author <name>] [--licence <SPDX ID>]
+//!     [--author <name>] [--licence <SPDX ID>] [--placed]
 //! ```
+//!
+//! `--placed`: the file is already in metres and placed on the body (the
+//! licensed-asset intake places it), so it isn't aligned again
+//! (`ImportOptions::keep_placement`).
 //!
 //! It aligns the garment to the base body, fits it (binding, weights,
 //! the body's identity and corrective shapes, push-out from the body and
@@ -19,10 +23,17 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use axcenity_avatar::Source;
-use axcenity_avatar::fit::{ImportRequest, import_garment};
+use axcenity_avatar::fit::{ImportOptions, ImportRequest, import_garment_with};
 
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let placed = match args.iter().position(|a| a == "--placed") {
+        Some(at) => {
+            args.remove(at);
+            true
+        }
+        None => false,
+    };
     let mut take = |flag: &str| -> Vec<String> {
         let mut found = Vec::new();
         while let Some(at) = args.iter().position(|a| a == flag) {
@@ -50,7 +61,7 @@ fn main() -> ExitCode {
         Ok(positional) => positional,
         Err(_) => {
             eprintln!(
-                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--under <item ID>]... [--slot <slot>] [--layer <n>] [--margin <m>] [--author <name>] [--licence <SPDX>]"
+                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--under <item ID>]... [--slot <slot>] [--layer <n>] [--margin <m>] [--author <name>] [--licence <SPDX>] [--placed]"
             );
             return ExitCode::FAILURE;
         }
@@ -68,7 +79,7 @@ fn main() -> ExitCode {
         source_info: Source {
             author,
             licence,
-            url: None,
+            ..Source::default()
         },
         slot,
         layer,
@@ -77,7 +88,10 @@ fn main() -> ExitCode {
         about: None,
     };
     let started = std::time::Instant::now();
-    match import_garment(&request) {
+    let options = ImportOptions {
+        keep_placement: placed,
+    };
+    match import_garment_with(&request, options) {
         Ok(imported) => {
             println!(
                 "imported `{}` as {} in {:.1} s",

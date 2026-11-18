@@ -1,0 +1,86 @@
+{
+  "about": "The intake's proof (wave 5): Poly Haven's Fishermans Hat (CC0) through every step. Not a library item: the item is written to a scratch library, never committed.",
+  "item": {
+    "id": "intake/fishermans-hat",
+    "label": "Fisherman's hat (intake proof)",
+    "kind": "accessory",
+    "slot": "hair",
+    "object": "Hat_Fishermans",
+    "folder": "intake/fishermans-hat",
+    "about": "A khaki canvas boonie hat with a stitched brim: the licensed-asset intake's proof, a draft.",
+    "tags": [
+      "hat",
+      "intake-proof"
+    ],
+    "materials": {
+      "fishermans_hat": {
+        "label": "Hat",
+        "shading": "standard",
+        "role": "primary"
+      }
+    }
+  },
+  "source": {
+    "asset": "Fishermans Hat",
+    "source_page": "https://polyhaven.com/a/fishermans_hat",
+    "author": "PierreB3D",
+    "licence": "CC0-1.0",
+    "licence_url": "https://polyhaven.com/license",
+    "retrieved": "2026-11-18",
+    "evidence": "The asset's page (polyhaven.com/a/fishermans_hat) gives License: CC0 and Author: PierreB3D; polyhaven.com/license says: 'Our assets are all licensed as CC0 Public Domain' and 'You do not need to give credit or attribution when using them (although it is appreciated).' The API's info record (api.polyhaven.com/info/fishermans_hat) gives authors {PierreB3D: All} and files_hash a1b99c79405e31ff8a3e74b7b0d51783007e4b45.",
+    "model": "fishermans_hat_2k.gltf",
+    "files": [
+      "fishermans_hat_2k.gltf",
+      "fishermans_hat.bin",
+      "textures/fishermans_hat_diff_2k.jpg",
+      "textures/fishermans_hat_nor_gl_2k.jpg",
+      "textures/fishermans_hat_arm_2k.jpg"
+    ]
+  },
+  "load": {
+    "units": "auto"
+  },
+  "topology": {
+    "fix": true
+  },
+  "conform": {
+    "place": {
+      "scale": 1.1,
+      "centre_on": "Head",
+      "body_above": 0.5,
+      "item_above": 0.5,
+      "settle": {
+        "direction": [
+          0,
+          -1,
+          0
+        ],
+        "clearance": 0.004
+      },
+      "rotate": [
+        8,
+        0,
+        0
+      ],
+      "offset": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "weights": {
+    "split": null
+  },
+  "levels": {
+    "ratios": [
+      0.5,
+      0.25
+    ]
+  },
+  "fit": {
+    "under": [],
+    "margin": 0.002,
+    "rigid_bone": "Head"
+  }
+}

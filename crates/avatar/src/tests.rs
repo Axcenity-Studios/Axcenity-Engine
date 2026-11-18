@@ -7,6 +7,7 @@ mod formats;
 mod migration;
 mod models;
 mod presets;
+mod provenance;
 mod randomizing;
 mod resolving;
 mod skin_layers;

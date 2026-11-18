@@ -38,6 +38,10 @@ The crew-neck tee, the joggers and the sneakers (`assets/characters/realistic/cl
 
 No downloaded file is stored in the repository: the build reads the tiles from a folder given on its command line (`clothing/README.md` says where to get them) and the shipped maps are our bakes (class 5 over class 1).
 
+## Imported assets: the provenance rule (decision 11, wave 5)
+
+Since Paul's decision of 2026-11-18 (plan section 0, decision 11) character content starts from licensed assets. Every asset imported into an item has a **provenance record** before any file of it is committed: `<Object>.provenance.json` beside the item's manifest, which names it (`source.origin: "imported"`, `source.provenance`). The record holds the source page, the author, the licence's SPDX ID and version and its page, the retrieval date, the SHA-256 and original name of every file as downloaded, what was changed, the attribution line exactly as the licence asks for it, the item IDs it feeds and the licence evidence quoted from the page (schema: [architecture.md](../architecture.md) section 8a). The intake writes it (`assets/characters/realistic/import/provenance.py`); `crates/avatar/tests/shipped_provenance.rs` fails a shipped item that is imported without one, under a refused licence, or under CC BY, MIT or Apache-2.0 without its line. Classes 1 and 2 below are accepted; share-alike, non-commercial, no-derivatives, custom and unknown licences are refused (a game made with Axcenity ships its assets under its own terms, may be sold, and an imported asset is always changed). A game carries the attributions of the items its library holds (`CREDITS-CHARACTERS.txt`). Original work (class 5) says `"origin": "original"` or leaves it unset, and is released CC0-1.0. The intake's first proof, Poly Haven's [Fishermans Hat](https://polyhaven.com/a/fishermans_hat) (PierreB3D, CC0, checked on its page 2026-11-18), is recorded in [refinement/wave5/licensed-intake.md](../refinement/wave5/licensed-intake.md); it is not in the library.
+
 ## Licence classes (brief §13.5)
 
 | Class | What | May ship in the engine? |
