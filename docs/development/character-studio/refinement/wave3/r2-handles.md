@@ -314,3 +314,168 @@ What is still left after the fix:
 - **New in `scene`:** `to_metres`, `normals_drawn` and `triangle_hit` (now public).
 - **Changed in `scene`:** `nearest_corner` measures in metres.
 - **Snapshots:** in the four snapshots, the right end of the status bar ("Saved in" and the test's temporary folder, which named the local user folder) is painted over with the bar's own colour. Nothing else in them is touched.
+
+## Review fixes 2
+
+The second review (fix-needed) found two blocking problems in the overlay, both in views and features the committed snapshots didn't show. Both are fixed, test first. Three of its non-blocking notes are fixed too. Red runs are appended to [r2-handles-red-run.txt](r2-handles-red-run.txt).
+
+**Pictures:**
+
+- The snapshots now cover all seven features, each selected and hovered in its working view, plus the views where one side is behind the other: the eyes at 45 and 70 degrees, the jaw and the lips at 45, and the shoulders at three-quarter. That is 12 new PNGs, `character-studio-handles-feature-*.png`, beside the four earlier ones, which were retaken.
+- [r2-handles/review-2-before-after.jpg](r2-handles/review-2-before-after.jpg) sets the reviewer's cases before and after. I looked at every snapshot at full size and as enlarged crops.
+
+### 1. Handles and tint were drawn for hidden skin
+
+The overlay is egui's, drawn over the preview, and had no depth. So the far jaw angle's handle sat by the mouth in the default Face view, the far shoulder's tint lay over the chest at three-quarter, and the far eye's handles lay over the nose bridge at 70 degrees.
+
+**The fix** is a CPU depth buffer, in a new module `crates/editor/src/character_workspace/direct/depth.rs`:
+
+- **What it holds:** the character as posed this frame, rasterized into a buffer over the viewport at one texel per 2 points.
+  - It covers the body's primitives (the same posed, live-identity corners the overlay draws from) and every MeshPart it wears.
+  - It keeps the nearest depth of each texel, interpolating 1/depth across each triangle.
+  - It is built only in a frame where something is selected or the pointer is over the viewport.
+- **What it hides:** a point is hidden when it is more than 3 mm (`HIDDEN`) behind the buffer, plus one texel's width at its depth so slanted skin isn't hidden by itself.
+  - **Tint and outline:** a tint triangle with any corner hidden is dropped, along with its outline pieces. Each point is compared with the farthest of the 4 texels round it.
+  - **Handles:** compared with the farthest texel within 3 texels (`HANDLE_SIGHT`, about 6 points). A handle at the skin's own outline, such as the side of the hips from the front, lies a few millimetres behind the skin just inside it, and it still shows.
+  - **A hidden handle** isn't in `shown`, so it can't be grabbed.
+- **What's worn** is rasterized 1.5 cm farther than it is (`WORN`). The hips under the briefs are still the hips, and their handles show on the briefs. But the far side, seen through the skin's opening under clothing, is hidden.
+  - **Why the slack:** the first version, with clothing at full depth, hid the hip handles. They sit on skin under the briefs, which is what the hips test caught.
+
+**Tests** (`handle_tests.rs`), written first:
+
+- `handles_on_the_far_side_are_hidden`:
+  - The far jaw corner (`jaw_left`) is hidden in the Face view, and `jaw_right` is shown.
+  - The far eye's corner is hidden with the face turned 70 degrees either way, and the near eye's corner is shown.
+  - Every shown handle of the seven features, in its working view and turned 45 and −70 degrees, is in sight by exact rays.
+  - A press where the hidden jaw handle would be turns the camera and doesn't edit.
+- `the_overlay_is_drawn_only_where_the_skin_shows`: for six cases, every handle and about 150 of the tint's polygon corners must be in sight.
+  - **The cases:** jaw in the Face view; eyes at 70; shoulders at three-quarter, hovering the waist and hovering the shoulders; waist from the front; hips at 45.
+  - **"In sight"** is an independent check: an exact `scene::ray_model` ray through the point, or through a point 6 points beside it for a handle (3 for the tint), meets nothing more than 1 cm nearer the camera.
+  - **Red:** before the fix it failed in 5 of the 6 cases. For example: the jaw had 1 of its 2 handles behind the skin; the eyes at 70 had 23 of 151 tint corners behind; the shoulders at three-quarter had 31 of 157 behind with the waist hovered.
+- `depth::tests` (4 unit tests): a point behind a surface; the nearer of two surfaces in either order; what's worn hides only what's well behind it; a wider reach lets a point near an outline show.
+
+**Where I departed from the reviewer's expectation, and why.** The reviewer expected `eye_right`'s handles to be hidden at yaw 70. Two things differ:
+
+- **Which eye is far:** the camera at positive yaw is on the character's right, so at 70 degrees the far eye is the left one. The test checks both turns.
+- **The far eye's lid handle still shows at 70 degrees.** That lid peeks past the nose bridge: its lashes show at the bridge's outline in the picture, and the exact rays see its skin. The handle sits at the nose's outline, on that sliver. The far eye's corner handle, which is behind the nose, is hidden. The test asserts what's seen rather than "the far eye's handles are all hidden", so a handle on skin that shows isn't hidden by fiat. Whether a handle on a sliver should hide is a UX call; see open issues.
+
+**Cost:** see Measurements below.
+
+### 2. The lips' tint covered the whole muzzle
+
+**Measured first.** A temporary report measured, for each face feature, how much skin each of its shapes moves strongly (a third of its largest move or more). The broad ones:
+
+| Feature | Shape | Strongly moved skin | The feature's usual (median) |
+|---|---|---|---|
+| Lips | `Face_Mouth_Height` | 68.7 cm², 9.4 × 5.7 cm | 8.9 cm² (the lips' fullness shapes 3.9 and 5.8 cm², the mouth's width 8.7 and 8.9 cm²) |
+| Lips | `Face_Philtrum_Length` | 71.3 cm², 10.3 × 5.1 cm | 8.9 cm² |
+| Jaw | `Face_Jaw_Shift` | 184.2 cm², 13.7 × 11.1 cm | 20.1 cm² |
+
+**On the eyes, nose, brows, cheeks and chin** no shape passes 4 times its feature's median. The nearest are the nose's length and tilt, at 19.7 cm² against 5.3 cm² (3.7 times). The eyes' height, spacing and depth shapes (29 cm²) sit at their median.
+
+**The fix:** a face feature's shape that moves strongly over 4 times the skin its feature's shapes usually do (`BROAD`, against the median) is left out of the tint. Such a shape moves the feature together with its surroundings: it says where the feature is, not what it is. Only `mouth_height`, `philtrum_length` and `jaw_shift` are left out. The lips' tint is then their fullness and width shapes, and `compete` gives the chin its own skin below.
+
+**Measured** (the skin inside the outline at rest; test `the_lips_tint_is_the_mouth_not_the_muzzle`, red first):
+
+| | Area | Across | High |
+|---|---|---|---|
+| Lips before | 63.8 cm² | 10.0 cm | 5.8 cm |
+| Lips after | 31.7 cm² | 8.4 cm | 3.7 cm |
+
+- **The mouth** is 5.5 cm across.
+- **The test's bounds** are 9.0 cm, 4.0 cm and 35 cm², and every face feature still has at least 3 cm².
+- **Other features:** the chin's tint grew from 4.3 to 9.3 cm², because it now keeps the skin under the lower lip. The nose's (19.7 to 21.7 cm²) and the cheeks' (25.1 to 26.9 cm²) changed slightly through `compete`. The eyes', brows', jaw's and ears' are unchanged.
+
+**The eyes' outline at the inner corner** also scribbled into the eye at 45 and 70 degrees. Two causes, both fixed in `tint_mesh`:
+
+- **Rim edges:** where the skin ends with no twin (the lids' margin, the lips' seam), the edge was drawn as outline whenever it lay inside the feature. For a face feature that end is an opening, not the feature's edge, so only a body feature draws it now; there it is a region's border, or skin cut under clothing.
+- **Hollow corners:** `hollows_out` zeroes the eyes' corners (25 corners at the inner and outer canthi, measured), so the 0.5 contour ran round them. A face feature's outline now ends at a triangle that touches an opening or a hollow corner (`PreparedFeature::hollow`). The hollow stays untinted.
+
+**What I saw** (the before-and-after sheet, and each snapshot full size):
+
+- **Lips in the Face view:** before, a mask from under the nostrils to the chin, twice the mouth's width, with a staircase top-left and notches below. After, the mouth with a margin: about 1 cm above the upper lip, clear of the nose, above the chin, and about 1.3 cm past each corner. The outline is smooth, with a shallow bump under the middle of the lower lip, where the chin takes over.
+- **Lips at 45 degrees:** the near half of the mouth with the same margin, and the far corner's handle at the mouth.
+- **Eyes at 45 and 70 degrees:** the outline ends at the inner corner instead of zig-zagging into the eye. Its lower edge still wobbles by a point or two.
+- **Jaw in the Face view:** the far handle is gone. The jaw's own tint is still only a sliver at the near jaw angle; its shapes move the side of the jaw, which faces away.
+- **Shoulders at three-quarter:** the far side's patch over the chest is gone (this row of the sheet hovers the far anchor, which picks Whole body, in both pictures). With the handle hovered, only the near shoulder is tinted and handled.
+- **Waist and hips from the front:** the waist is a band with a handle on each side, and the hips are the region over the briefs with a handle at each side. Both are as before.
+- **Hover (nose), selected (eyes, with the cheeks hovered) and dragging:** as in round 1.
+
+### Non-blocking notes
+
+- **Hover gaps:** fixed. A handle under the pointer now names its own feature, and the ray isn't cast while one is.
+  - **Test:** `hovering_a_handle_names_its_feature` covers every shown handle of the seven features in its working view.
+  - **Red:** with the rule taken out (and the ray cast as before), the shoulders' handles named "body" (Whole body) and the hips' handles at their outline named nothing.
+- **`hover_costs_per_frame`:** fixed. The pointer now moves a point each frame, so the ray is cast every time. The test reports the frame with direct manipulation off, with the eyes selected and the pointer away (depth buffer, handles, tint), and with the pointer moving over the face. Release figures are in Measurements.
+- **Known-Limitations:** it now describes the depth buffer and what's left, not "a fold can show through".
+- **Not changed:**
+  - **The 240-point drag fallback and the 6% framing threshold:** the project owner's call, as before. Both reviews point out that the fallback covers every default framing, so a handle never follows the pointer there.
+  - **The jaw's sliver of tint from the front.**
+  - **`shoulder_width` and `mouth_width` in the side view, and `LIVE`:** a data and feel question for the owner.
+  - **The scene tests' millimetre** (`fitted_per_metre`): harmless, as the reviewer says.
+  - **Untested hiding during a drag:** the other handles and the feature's tint hiding during a drag are still untested.
+  - **The scope notes and the plan's 11.3 wording:** for the lead.
+
+### Measurements (round 2)
+
+**Frame cost** (`hover_costs_per_frame`, release build, the median of 40 frames of the studio's frame without the GPU, run alone):
+
+| State | Frame |
+|---|---|
+| Direct manipulation off | 0.16 ms |
+| Eyes selected, pointer off the character (depth buffer, handles, tint) | 3.56 ms |
+| Pointer moving over the face (a ray every frame, the hovered tint too) | 4.61 ms |
+
+- **The depth buffer, handles and tint** cost about 3.4 ms a frame.
+- **The ray** costs about 1 ms when the pointer moves. This replaces round 1's unmeasured release figure; the debug build's ray was about 20 ms.
+
+**Lips' tint at rest:** 63.8 cm², 10.0 × 5.8 cm before; 31.7 cm², 8.4 × 3.7 cm after. Other features are in section 2.
+
+**Hidden in the tests' views** (exact rays, from `the_overlay_is_drawn_only_where_the_skin_shows` with the depth test off):
+
+- **Handles:** 1 of 2 (jaw, Face view) and 1 of 4 (eyes at 70 degrees).
+- **Tint corners:** 37 of 155 (eyes at 70), 31 of 157 and 22 of 152 (shoulders at three-quarter), 34 of 160 (hips at 45).
+
+With the depth test on, none of them is hidden.
+
+### Files changed in this round
+
+- **Code:**
+  - `crates/editor/src/character_workspace/direct.rs`: the depth test for handles and tint, `BROAD`, the outline at openings and hollows, a handle naming its feature, test accessors.
+  - `crates/editor/src/character_workspace/direct/depth.rs` (new): the depth buffer and its unit tests.
+  - `crates/editor/src/character_workspace/handle_tests.rs`: five new tests, the timing test reworked, and 12 more snapshots.
+- **Docs:**
+  - `docs/editor/character-studio.md`
+  - `docs/development/character-studio/architecture.md` (§15c)
+  - `wiki/Engine-Systems/Characters.md`
+  - `wiki/Roadmap/Known-Limitations.md`
+  - this hand-back
+  - the red-run file
+- **Pictures:** the 16 snapshots under `r2-handles/` (status-bar path painted out, as before) and `review-2-before-after.jpg`.
+- **Not touched:** no data, manifest, scene, player, avatar or render file changed in this round, and no dependency was added.
+
+### Tests run in this round
+
+- **Red runs:** in the red-run file. They are the first versions of the occlusion tests against the old overlay, the final ones with the depth test switched off, the lips test against the old tint, and the hover test with its rule taken out.
+- **Full suites of `editor`, `scene`, `avatar` and `player`** (`--no-fail-fast`): `1872 tests run: 1870 passed (16 slow), 2 failed, 33 skipped`. Two failures:
+  - **`the_jaw_handle_gives_what_its_sliders_give`:** this branch's test. It dragged `jaw_left`, which the Face view now correctly hides ("jaw_left is shown"), so it now drags `jaw_right`.
+  - **`app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`:** the known timing test, at 70.7 s under the shared load.
+- **Rerun:** `cargo nextest run -p axcenity-editor -E 'test(/handle_tests|direct::|closing_the_editor_uploads/)'` gave `25 tests run: 25 passed`. That covers all of this branch's editor handle and overlay tests, the depth unit tests and the collab test alone. `scene`, `avatar` and `player` didn't change in this round and passed in the full run.
+- **Repeat runs:** `the_overlay_is_drawn_only_where_the_skin_shows` passed 3 times of 3, because the idle sway moves the body between runs.
+- **Timing:** `cargo test -p axcenity-editor --release -- --ignored hover_costs --nocapture` passed; its figures are in Measurements.
+- **Lint and format:** `cargo clippy -p axcenity-editor --all-targets -- -D warnings` is clean, and so is `cargo fmt --all --check`. Only `editor` changed in this round.
+- **Wiki:** `python3 -I scripts/check-wiki.py` reports `113 pages, 0 errors, 58 warnings`, all of them staleness warnings.
+
+### For the lead at merge
+
+- **New editor module:** `direct/depth.rs`, editor only. `render` is untouched; the long-term route is still the tint as draw data, depth-tested in `render` (ux patterns section 3, RA7).
+- **Snapshots:** the snapshot test now writes 16 PNGs (about 3.9 MB).
+- **Unchanged from round 1:** the intents (`SetHandles`, `FocusFeature`) and `Primitive::regions` still need approval, and the plan's 11.5 tick, its 11.3 wording and the progress entry are still to do.
+
+### Open issues after round 2
+
+- **Handles on a sliver of skin:** a handle on a sliver of skin that shows past an occluder is drawn. At 70 degrees the far eye's lid handle sits at the nose's outline. Hiding handles whose skin shows only as a sliver would be a UX rule for the owner.
+- **The tint near an occluder:** it stops at whole triangles, so where an arm or the nose crosses it, its edge steps along the mesh by up to a triangle (faint, and with no outline drawn there).
+- **The lips' tint** reaches about 1.3 cm past each corner of the mouth, because the mouth's width shapes move that skin. Its outline has a shallow bump under the middle of the lower lip, where the chin takes over.
+- **The eyes' outline** still wobbles a point or two along its lower edge, and stops short at the corners, which are hollows.
+- **The drag feel** (the 240-point fallback, the 6% framing threshold) is unchanged and still the owner's call.

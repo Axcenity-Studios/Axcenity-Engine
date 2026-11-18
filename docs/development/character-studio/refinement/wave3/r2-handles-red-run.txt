@@ -83,3 +83,45 @@ Review fixes 1 (2026-11-17)
 Also added, passing when first run (they cover behaviour already there):
 editor handle_tests::esc_cancels_a_handle_drag, scene
 surface_pick::tests::a_ray_at_a_turned_head_meets_the_posed_skin.
+
+== Review fixes 2 (second review) ==
+
+1. Handles and tint drawn for hidden skin. editor handle_tests, written
+   first against the overlay with no depth test (first versions of the two
+   tests, which checked handles and tint with 2 points of slack):
+        FAIL handle_tests::handles_on_the_far_side_are_hidden
+             the left jaw angle is behind the cheek
+        FAIL handle_tests::the_overlay_is_drawn_only_where_the_skin_shows
+             jaw in Face at None hovering jaw: 1 of 2 handles and 0 of 151 sampled tint corners behind the skin
+             eyes in Face at Some(70.0) hovering eyes: 1 of 4 handles and 23 of 151 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering waist: 0 of 1 handles and 31 of 157 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering shoulders: 0 of 1 handles and 24 of 152 sampled tint corners behind the skin
+             hips in Front at Some(45.0) hovering hips: 0 of 1 handles and 37 of 160 sampled tint corners behind the skin
+
+   The final tests (handles checked with 6 points of slack, the tint with
+   3; the far-side test also checking every shown handle by exact rays),
+   with the depth test switched off (Depth::hidden always false):
+        FAIL handle_tests::handles_on_the_far_side_are_hidden
+             the left jaw angle is behind the cheek
+        FAIL handle_tests::the_overlay_is_drawn_only_where_the_skin_shows
+             jaw in Face at None hovering jaw: 1 of 2 handles and 0 of 138 sampled tint corners behind the skin
+             eyes in Face at Some(70.0) hovering eyes: 1 of 4 handles and 37 of 155 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering waist: 0 of 1 handles and 31 of 157 sampled tint corners behind the skin
+             shoulders in ThreeQuarter at None hovering shoulders: 0 of 1 handles and 22 of 152 sampled tint corners behind the skin
+             hips in Front at Some(45.0) hovering hips: 0 of 1 handles and 34 of 160 sampled tint corners behind the skin
+     Summary 2 tests run: 0 passed, 2 failed
+
+2. The lips' tint covered the muzzle. editor handle_tests, written first:
+        FAIL handle_tests::the_lips_tint_is_the_mouth_not_the_muzzle
+             the lips' tint is 63.8 cm2, 10.0 cm across and 5.8 cm high
+   (after: 31.7 cm2, 8.4 cm across, 3.7 cm high; bounds 35 cm2, 9.0, 4.0)
+
+3. Hovering a handle named another feature (non-blocking). Written after
+   the rule, so its red run takes the rule out and casts the ray as before:
+        FAIL handle_tests::hovering_a_handle_names_its_feature
+             shoulder_left: Some("body"), shoulder_right: Some("body"),
+             hip_left: None, hip_right: None
+
+Also changed: the_jaw_handle_gives_what_its_sliders_give now drags
+jaw_right; jaw_left is behind the cheek in the Face view and no longer
+shown (the full suite's run caught it: "jaw_left is shown").

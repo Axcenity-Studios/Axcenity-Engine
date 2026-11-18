@@ -22,7 +22,9 @@ use crate::theme;
 const FEATURES: [(&str, &str, ViewPreset, [f32; 2]); 7] = [
     ("nose", "nose_tip", ViewPreset::Face, [0.0, 40.0]),
     ("eyes", "eye_left", ViewPreset::Face, [36.0, 0.0]),
-    ("jaw", "jaw_left", ViewPreset::Face, [40.0, 0.0]),
+    // The right jaw corner: the Face view is turned to the character's
+    // right, so its left jaw angle is behind the cheek (hidden).
+    ("jaw", "jaw_right", ViewPreset::Face, [-40.0, 0.0]),
     ("lips", "mouth_corner_left", ViewPreset::Face, [30.0, 0.0]),
     ("shoulders", "shoulder_left", ViewPreset::Front, [24.0, 0.0]),
     ("waist", "waist_left", ViewPreset::Front, [10.0, 0.0]),
@@ -67,6 +69,13 @@ impl Studio {
         self.workspace
             .apply(Intent::PickFeature(Some(feature.to_owned())));
         self.workspace.apply(Intent::FocusView(view));
+        self.settle();
+    }
+
+    /// Turns the camera to `yaw` degrees round the character (positive:
+    /// toward its right), keeping the rest of the framing.
+    fn turn(&mut self, yaw: f32) {
+        self.workspace.orbit.yaw = yaw;
         self.settle();
     }
 
@@ -420,6 +429,31 @@ fn hover_highlights_and_a_click_selects_and_frames_the_feature() {
     assert_eq!(studio.workspace.direct.hovered, None);
 }
 
+/// With a feature selected in its working view, the pointer on any of its
+/// handles names that feature (a handle on the border of two body regions,
+/// such as a shoulder's, or beside a nostril, is still its feature's), so a
+/// click there never moves the panel to another page.
+#[test]
+fn hovering_a_handle_names_its_feature() {
+    let mut studio = Studio::new("handles-hover-each");
+    let base = studio.workspace.base().unwrap();
+    let mut wrong = Vec::new();
+    for (feature, _, view, _) in FEATURES {
+        studio.select(feature, view);
+        for handle in base.handles.iter().filter(|h| h.feature == feature) {
+            let Some(at) = studio.workspace.handle_on_screen(&handle.id) else {
+                continue;
+            };
+            studio.hover(at);
+            let hovered = studio.workspace.direct.hovered.clone();
+            if hovered.as_deref() != Some(feature) {
+                wrong.push(format!("{}: {hovered:?}", handle.id));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 /// The switch turns direct manipulation off: no highlight, no handles,
 /// and a drag where a handle was turns the camera.
 #[test]
@@ -441,6 +475,129 @@ fn handles_off_leaves_the_camera_only() {
     studio.workspace.focus(ViewPreset::Face);
     studio.settle();
     assert!(studio.workspace.handle_on_screen("eye_left").is_some());
+}
+
+/// A handle is drawn only where its skin can be seen: the far jaw angle
+/// behind the cheek in the default Face view (turned 12 degrees to the
+/// character's right), the far eye's corner behind the nose with the face
+/// turned 70 degrees either way. Every handle of the seven features, in
+/// its working view and turned either way, is drawn only where exact rays
+/// see its skin (within 6 points: a handle at the skin's own outline, such
+/// as the side of the hips from the front, shows). One that isn't drawn
+/// can't be grabbed.
+#[test]
+fn handles_on_the_far_side_are_hidden() {
+    let mut studio = Studio::new("handles-far-side");
+    studio.select("jaw", ViewPreset::Face);
+    assert!(
+        studio.workspace.handle_on_screen("jaw_left").is_none(),
+        "the left jaw angle is behind the cheek"
+    );
+    assert!(studio.workspace.handle_on_screen("jaw_right").is_some());
+    studio.select("eyes", ViewPreset::Face);
+    for (yaw, near, far) in [(70.0, "right", "left"), (-70.0, "left", "right")] {
+        studio.turn(yaw);
+        assert!(
+            studio
+                .workspace
+                .handle_on_screen(&format!("eye_corner_{far}"))
+                .is_none(),
+            "the {far} eye's corner is behind the nose at {yaw} degrees"
+        );
+        assert!(
+            studio
+                .workspace
+                .handle_on_screen(&format!("eye_corner_{near}"))
+                .is_some(),
+            "the near eye's corner shows at {yaw} degrees"
+        );
+    }
+    let base = studio.workspace.base().unwrap();
+    let mut unseen = Vec::new();
+    for (feature, _, view, _) in FEATURES {
+        for yaw in [None, Some(45.0), Some(-70.0)] {
+            studio.select(feature, view);
+            if let Some(yaw) = yaw {
+                studio.turn(yaw);
+            }
+            for handle in base.handles.iter().filter(|h| h.feature == feature) {
+                if studio.workspace.handle_on_screen(&handle.id).is_none() {
+                    continue;
+                }
+                let point = studio.workspace.handle_world(&handle.id).unwrap();
+                if !studio.workspace.in_sight(point, 6.0, 0.01) {
+                    unseen.push(format!("{} in {view:?} at {yaw:?}", handle.id));
+                }
+            }
+        }
+    }
+    assert!(unseen.is_empty(), "drawn behind other skin: {unseen:#?}");
+    // A hidden handle isn't grabbed: a press where it would be turns the
+    // camera.
+    studio.select("jaw", ViewPreset::Face);
+    let before = studio.workspace.description().clone();
+    let hidden = studio.workspace.handle_point("jaw_left").unwrap();
+    studio.drag(hidden, vec2(30.0, 0.0));
+    assert_eq!(studio.workspace.description(), &before);
+}
+
+/// Everything the overlay draws (the handles and the tint of the selected
+/// and the hovered feature) is skin that can be seen, checked with exact
+/// rays against the posed body from the studio's views where far-side
+/// skin lies behind near skin: the jaw from the Face view, the eyes turned
+/// 70 degrees, the shoulders and a hovered waist from three-quarter, the
+/// waist from the front (behind the arms) and the hips turned 45 degrees.
+#[test]
+fn the_overlay_is_drawn_only_where_the_skin_shows() {
+    let cases: [(&str, ViewPreset, Option<f32>, &str); 6] = [
+        ("jaw", ViewPreset::Face, None, "jaw"),
+        ("eyes", ViewPreset::Face, Some(70.0), "eyes"),
+        ("shoulders", ViewPreset::ThreeQuarter, None, "waist"),
+        ("shoulders", ViewPreset::ThreeQuarter, None, "shoulders"),
+        ("waist", ViewPreset::Front, None, "waist"),
+        ("hips", ViewPreset::Front, Some(45.0), "hips"),
+    ];
+    let mut studio = Studio::new("handles-in-sight");
+    let mut faults = Vec::new();
+    for (selected, view, yaw, hovered) in cases {
+        studio.select(selected, view);
+        if let Some(yaw) = yaw {
+            studio.turn(yaw);
+        }
+        if let Some(at) = studio.workspace.anchor_point(hovered, 0) {
+            studio.hover(at);
+        }
+        let shown = studio.workspace.direct.shown_count();
+        let points = studio.workspace.drawn_points();
+        assert!(!points.is_empty(), "{selected}: something is drawn");
+        // Every handle, and about 150 of the tint's corners, spread out.
+        let step = ((points.len() - shown) / 150).max(1);
+        let (mut handles, mut tint) = (0, 0);
+        for (index, point) in points.iter().enumerate() {
+            let handle = index < shown;
+            if !handle && !(index - shown).is_multiple_of(step) {
+                continue;
+            }
+            // A handle shows within 6 points of skin that's seen (at its
+            // own outline), the tint within its buffer's texel and a half.
+            let slack = if handle { 6.0 } else { 3.0 };
+            if !studio.workspace.in_sight(*point, slack, 0.01) {
+                if handle {
+                    handles += 1;
+                } else {
+                    tint += 1;
+                }
+            }
+        }
+        if handles + tint > 0 {
+            faults.push(format!(
+                "{selected} in {view:?} at {yaw:?} hovering {hovered}: {handles} of {shown} \
+                 handles and {tint} of {} sampled tint corners behind the skin",
+                (points.len() - shown).div_ceil(step)
+            ));
+        }
+    }
+    assert!(faults.is_empty(), "{faults:#?}");
 }
 
 /// Drawn for real with `AXCENITY_SNAPSHOTS`: the hovered nose, the eyes
@@ -493,11 +650,59 @@ fn handles_are_drawn_for_hover_selection_and_a_drag() {
     studio.select("hips", ViewPreset::Front);
     let hip = studio.handle("hip_left");
     snap(&mut studio, "body", still(hip));
+
+    // Each of the seven features selected in the view it's worked in and
+    // hovered, and the views where one side is behind the other: the face
+    // turned, the body at three-quarter. Each is a name, the feature, the
+    // view, and the camera's turn and distance if not the view's.
+    type Shot<'a> = (&'a str, &'a str, ViewPreset, Option<f32>, Option<f32>);
+    let views: [Shot; 12] = [
+        ("nose", "nose", ViewPreset::Face, None, None),
+        ("eyes", "eyes", ViewPreset::Face, None, None),
+        ("jaw", "jaw", ViewPreset::Face, None, None),
+        ("lips", "lips", ViewPreset::Face, None, Some(1.6)),
+        ("shoulders", "shoulders", ViewPreset::Front, None, None),
+        ("waist", "waist", ViewPreset::Front, None, None),
+        ("hips", "hips", ViewPreset::Front, None, None),
+        ("eyes-45", "eyes", ViewPreset::Face, Some(45.0), None),
+        ("eyes-70", "eyes", ViewPreset::Face, Some(70.0), None),
+        ("jaw-45", "jaw", ViewPreset::Face, Some(45.0), None),
+        ("lips-45", "lips", ViewPreset::Face, Some(45.0), Some(1.6)),
+        (
+            "shoulders-three-quarter",
+            "shoulders",
+            ViewPreset::ThreeQuarter,
+            None,
+            None,
+        ),
+    ];
+    for (name, feature, view, yaw, distance) in views {
+        studio.select(feature, view);
+        if let Some(yaw) = yaw {
+            studio.workspace.orbit.yaw = yaw;
+        }
+        if let Some(distance) = distance {
+            studio.workspace.orbit.distance = distance;
+        }
+        studio.settle();
+        // The pointer on its first handle that shows (else its anchor).
+        let base = studio.workspace.base().unwrap();
+        let at = base
+            .handles
+            .iter()
+            .filter(|handle| handle.feature == feature)
+            .find_map(|handle| studio.workspace.handle_on_screen(&handle.id))
+            .or_else(|| studio.workspace.anchor_point(feature, 0))
+            .unwrap();
+        snap(&mut studio, &format!("feature-{name}"), still(at));
+    }
 }
 
-/// What hovering costs a frame: the studio's frame (no GPU) with the
-/// pointer off the viewport and over the face, the eyes selected. Ignored;
-/// run it alone in a release build:
+/// What direct manipulation costs a frame: the studio's frame (no GPU)
+/// with it off, with the eyes selected and the pointer off the character
+/// (the depth buffer, the handles and the tint), and with the pointer moving
+/// over the face (a ray cast every frame, the hovered feature's tint too).
+/// Ignored; run it alone in a release build:
 /// `cargo test -p axcenity-editor --release -- --ignored hover_costs --nocapture`.
 #[test]
 #[ignore = "timing: run alone with --release -- --ignored hover_costs"]
@@ -505,18 +710,51 @@ fn hover_costs_per_frame() {
     let mut studio = Studio::new("handles-timing");
     studio.select("eyes", ViewPreset::Face);
     let face = studio.workspace.anchor_point("eyes", 0).unwrap();
-    let mut median = |at: Pos2| {
+    // The median of 40 frames, the pointer at `at(frame)`.
+    let median = |studio: &mut Studio, at: &dyn Fn(usize) -> Pos2| {
         let mut times: Vec<f64> = (0..40)
-            .map(|_| {
+            .map(|frame| {
                 let start = std::time::Instant::now();
-                studio.frame(vec![egui::Event::PointerMoved(at)]);
+                studio.frame(vec![egui::Event::PointerMoved(at(frame))]);
                 start.elapsed().as_secs_f64() * 1000.0
             })
             .collect();
         times.sort_by(f64::total_cmp);
         times[times.len() / 2]
     };
-    let away = median(Pos2::new(5.0, 5.0));
-    let over = median(face);
-    println!("frame, pointer away: {away:.2} ms; over the face: {over:.2} ms");
+    let away = |_| Pos2::new(5.0, 5.0);
+    studio.workspace.apply(Intent::SetHandles(false));
+    let off = median(&mut studio, &away);
+    studio.workspace.apply(Intent::SetHandles(true));
+    let selected = median(&mut studio, &away);
+    // A point or two each frame, so the ray is cast every time.
+    let moving = median(&mut studio, &|frame| face + vec2((frame % 7) as f32, 0.0));
+    println!(
+        "frame: off {off:.2} ms; eyes selected, pointer away {selected:.2} ms; \
+         pointer moving over the face {moving:.2} ms"
+    );
+}
+
+/// A face feature's tint is its own skin: the lips' is the mouth (its
+/// 5.5 cm width with a margin round it), not the muzzle from the nostrils
+/// to the chin (63.8 cm2, 10.0 cm across and 5.8 cm high before the
+/// mouth's height and the philtrum's length, which move the whole muzzle,
+/// were left out of it); and every face feature still has one.
+#[test]
+fn the_lips_tint_is_the_mouth_not_the_muzzle() {
+    let mut studio = Studio::new("handles-lips-tint");
+    studio.settle();
+    let (area, size) = studio.workspace.tint_extent("lips").expect("a tint");
+    assert!(
+        size.x <= 9.0 && size.y <= 4.0 && area <= 35.0,
+        "the lips' tint is {area:.1} cm2, {:.1} cm across and {:.1} cm high",
+        size.x,
+        size.y
+    );
+    for feature in [
+        "nose", "eyes", "brows", "cheeks", "jaw", "chin", "lips", "ears",
+    ] {
+        let (area, _) = studio.workspace.tint_extent(feature).expect("a tint");
+        assert!(area >= 3.0, "{feature}'s tint is {area:.1} cm2");
+    }
 }
