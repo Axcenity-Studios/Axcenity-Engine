@@ -58,7 +58,7 @@ The refinement's shared contracts (plan section 11.3, [ADR-0040](../Architecture
 
 ## Performance
 
-Not measured: files are small JSON and resolution is a few loops per parameter. Applying is measured since R2a: a parameter change applies live (no bake) in the times of `docs/development/character-studio/refinement/r2/r2a-live-identity.md`, which also has the frame cost of 1, 10 and 50 distinct characters live and baked. Morph cost per pass is CO8's.
+Not measured: files are small JSON and resolution is a few loops per parameter. Applying is measured since R2a: a parameter change applies live (no bake) in the times of `docs/development/character-studio/refinement/r2/r2a-live-identity.md`, which also has the frame cost of 1, 10 and 50 distinct characters live and baked. Since CO8 the morph cost is paid once a frame, only for shapes with a weight (`docs/development/character-studio/refinement/wave3/co8-compute-posing.md`).
 
 ## Testing
 

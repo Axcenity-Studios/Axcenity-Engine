@@ -1,31 +1,29 @@
-//! Skinning animated meshes on the GPU.
+//! Animated meshes on the GPU: what they're uploaded with.
 //!
-//! An animated mesh is uploaded once, as it is in its file, with each
-//! corner's joints and weights ([`MeshSource::skin_joints`]) in a storage
-//! buffer of its own (group 2 in shader.wgsl). Each frame, the joints of
-//! every [`Skin`] drawn go into one shared buffer (binding 9 of group 0), and
-//! each item's instance says where its skin's joints start and how many
-//! there are. The vertex shader blends a corner's joints as `assets`'
-//! `Posed` does on the CPU. So items posed differently share one copy of
-//! the mesh, and batch together.
+//! An animated mesh's corners are uploaded once, as they are in its file,
+//! and each corner's joints and weights ([`MeshSource::skin_joints`]) and
+//! its blend shapes (morph targets, facial animation F2, identity shapes,
+//! ADR-0041) are kept ready for the posing arena (`posing.rs`), which takes
+//! them up the first time the mesh is posed. A mesh's shapes are kept shape
+//! by shape, each a range of moves ([`ShapeRange`]: only the corners it
+//! moves), so the pass can walk the moves of the shapes an item uses and
+//! skip the rest.
 //!
-//! Blend shapes (morph targets, facial animation F2) go the same way: a
-//! mesh's shapes are uploaded once, as each corner's range of moves (only
-//! the corners a shape moves; bindings 1 and 2 of group 2), and an item's
-//! shape weights follow its joints in the shared buffer, sixteen to an
-//! entry. The instance's `skin.y` holds the joint count in its low 16 bits
-//! and the shape count in its high 16. The vertex shader morphs a corner
-//! before skinning it, as `Posed` does.
+//! Each frame the joints of every [`Skin`] posed go into one shared buffer
+//! ([`Skinning::joints`]), and `posing.rs` morphs and skins each (skin,
+//! mesh) pair once into the frame's posed buffer, which every pass's
+//! vertex shader reads (CO8). Items posed differently still share one copy
+//! of the mesh, and batch together.
 
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
-use wgpu::util::DeviceExt;
 
 use crate::draw_list::{MeshSource, Skin};
 
-use super::{Bounds, Counted, GpuBytes};
+use super::Bounds;
+use super::posing::ShapeRange;
 
-/// One joint as the GPU reads it. Must match `Joint` in shader.wgsl.
+/// One joint as the GPU reads it. Must match `Joint` in posing.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 pub(super) struct JointRaw {
@@ -34,16 +32,11 @@ pub(super) struct JointRaw {
     pub(super) normal: [[f32; 4]; 3],
 }
 
-/// Shape weights per entry of the joints buffer: those in its `position`.
-const WEIGHTS_PER_ENTRY: usize = 16;
-
 impl JointRaw {
-    /// Each joint of `skin`, then its shape weights, sixteen to an entry
-    /// (column by column of `position`, as `morph_weight` in shader.wgsl
-    /// reads them).
+    /// Each joint of `skin`. Its shape weights reach the posing pass as
+    /// each item's list of active shapes instead (`posing.rs`).
     pub(super) fn of(skin: &Skin) -> impl Iterator<Item = Self> + '_ {
-        let joints = skin
-            .joints()
+        skin.joints()
             .iter()
             .zip(skin.normals())
             .map(|(joint, normal)| Self {
@@ -52,77 +45,41 @@ impl JointRaw {
                     let [x, y, z] = column.to_array();
                     [x, y, z, 0.0]
                 }),
-            });
-        let weights = skin
-            .morph_weights()
-            .chunks(WEIGHTS_PER_ENTRY)
-            .take(usize::from(u16::MAX))
-            .map(|chunk| {
-                let mut position = [[0.0; 4]; 4];
-                for (at, weight) in chunk.iter().enumerate() {
-                    position[at / 4][at % 4] = if weight.is_finite() { *weight } else { 0.0 };
-                }
-                Self {
-                    position,
-                    normal: [[0.0; 4]; 3],
-                }
-            });
-        joints.chain(weights)
+            })
     }
 }
 
-/// `skin`'s counts as an instance's `skin.y`: its joints in the low 16
-/// bits and its shape weights in the high 16. 0 for a skin that neither
-/// skins nor morphs.
-pub(super) fn packed_counts(skin: &Skin) -> u32 {
-    let joints = skin.joints().len().min(0xFFFF) as u32;
-    let weights = skin.morph_weights().len().min(0xFFFF) as u32;
-    joints | (weights << 16)
-}
-
-/// How many entries of the joints buffer an instance's `skin.y` (see
-/// [`packed_counts`]) takes.
-pub(super) fn entry_count(packed: u32) -> usize {
-    let joints = (packed & 0xFFFF) as usize;
-    let weights = (packed >> 16) as usize;
-    joints + weights.div_ceil(WEIGHTS_PER_ENTRY)
-}
-
-/// Where one corner's shape moves are in a mesh's `MorphDelta`s. Must
-/// match the range read by `morph_corner` in shader.wgsl (a `vec2<u32>`).
+/// One corner's move by one shape at weight 1. Must match `Move` in
+/// posing.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct MorphRange {
-    first: u32,
-    count: u32,
-}
-
-/// One corner's move by one shape at weight 1. Must match `MorphDelta` in
-/// shader.wgsl.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct MorphDelta {
+pub(super) struct MoveRaw {
     position: [f32; 3],
-    target: u32,
+    corner: u32,
     normal: [f32; 3],
     _pad: u32,
 }
 
-/// One corner's joints and weights. Must match `SkinCorner` in shader.wgsl.
+/// One corner's joints and weights. Must match `SkinCorner` in
+/// posing.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct SkinCorner {
+pub(super) struct SkinCorner {
     joints: [u32; 4],
     weights: [f32; 4],
 }
 
 /// An animated mesh's joints and weights, and its blend shapes, on the GPU.
 pub(super) struct GpuSkin {
-    pub(super) bind_group: wgpu::BindGroup,
-    /// The corners' joints and weights (`SkinCorner`s), which ray tracing
-    /// also poses its copy of the mesh by (`ray_skin.wgsl`). One unweighted
-    /// corner for a mesh with blend shapes and no joints.
-    pub(super) buffer: wgpu::Buffer,
+    /// Its corners' joints and weights (none for a mesh with blend shapes
+    /// and no joints), and its shapes' moves, shape by shape: what the
+    /// posing arena takes up (`posing.rs`). Kept here so the arena can be
+    /// made again.
+    pub(super) corners: Vec<SkinCorner>,
+    pub(super) moves: Vec<MoveRaw>,
+    /// Its blend shapes, in the mesh's order: where each one's moves are
+    /// and which weight drives it.
+    pub(super) shapes: Vec<ShapeRange>,
     /// Whether the mesh has joints (and not only blend shapes).
     pub(super) jointed: bool,
     /// The box of the corners weighted to each joint, by joint, `None` for
@@ -130,7 +87,6 @@ pub(super) struct GpuSkin {
     /// weighted to nothing, which never move.
     joints: Vec<Option<Bounds>>,
     still: Option<Bounds>,
-    _bytes: Counted,
 }
 
 impl GpuSkin {
@@ -166,31 +122,28 @@ fn corners(Bounds { min, max }: Bounds) -> [Vec3; 8] {
     })
 }
 
-/// The bindings skinning adds to the scene's pipelines.
+/// What animated meshes are uploaded with, and the frame's joints.
 #[derive(Clone)]
 pub(super) struct Skinning {
-    /// Group 2: a mesh's corners' joints and weights.
+    /// Group 2 of the scene's pipelines: empty since CO8 (each pass reads
+    /// its posed corners through the frame's binding 9), kept so every
+    /// pipeline's groups stay where they were.
     pub(super) layout: wgpu::BindGroupLayout,
-    /// What a mesh that isn't animated binds: one corner weighted to
-    /// nothing, which every corner reads.
     pub(super) none: wgpu::BindGroup,
     /// Group 1 of the shadow passes, which bind no material.
     pub(super) empty_layout: wgpu::BindGroupLayout,
     pub(super) empty: wgpu::BindGroup,
-    /// Every drawn skin's joints this frame.
+    /// Every posed skin's joints this frame, read by the posing pass.
     pub(super) joints: wgpu::Buffer,
-    /// What a mesh without blend shapes binds as its shapes (1 and 2).
-    no_ranges: wgpu::Buffer,
-    no_moves: wgpu::Buffer,
 }
 
 /// Binding 9 of group 0 (the frame's and the shadow passes'): the frame's
-/// joints, read by the vertex shader.
-pub(super) const JOINTS_BINDING: u32 = 9;
+/// posed corners (`posing.rs`), read by the vertex shaders.
+pub(super) const POSED_BINDING: u32 = 9;
 
-pub(super) fn joints_entry() -> wgpu::BindGroupLayoutEntry {
+pub(super) fn posed_entry() -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
-        binding: JOINTS_BINDING,
+        binding: POSED_BINDING,
         visibility: wgpu::ShaderStages::VERTEX,
         ty: storage(),
         count: None,
@@ -207,77 +160,52 @@ fn storage() -> wgpu::BindingType {
 
 impl Skinning {
     pub(super) fn new(device: &wgpu::Device) -> Self {
-        // 0: corners' joints and weights; 1: corners' ranges of shape
-        // moves; 2: the moves.
-        let entries = [0, 1, 2].map(|binding| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::VERTEX,
-            ty: storage(),
-            count: None,
-        });
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("skin"),
-            entries: &entries,
-        });
-        let nothing = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("no skin"),
-            contents: bytemuck::bytes_of(&SkinCorner::default()),
-            usage: wgpu::BufferUsages::STORAGE,
-        });
-        let no_ranges = storage_buffer(device, "no morph ranges", &[MorphRange::default()]);
-        let no_moves = storage_buffer(device, "no morphs", &[MorphDelta::default()]);
-        let none = skin_group(device, &layout, [&nothing, &no_ranges, &no_moves]);
-        let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("nothing"),
-            entries: &[],
-        });
-        let empty = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("nothing"),
-            layout: &empty_layout,
-            entries: &[],
-        });
+        let empty_group = |label| {
+            let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some(label),
+                entries: &[],
+            });
+            let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(label),
+                layout: &layout,
+                entries: &[],
+            });
+            (layout, group)
+        };
+        let (layout, none) = empty_group("skin");
+        let (empty_layout, empty) = empty_group("nothing");
         Self {
             layout,
             none,
             empty_layout,
             empty,
             joints: joint_buffer(device, 64),
-            no_ranges,
-            no_moves,
         }
     }
 
     /// Writes this frame's `joints`, first making the buffer bigger if
-    /// they don't fit. True when it was remade, so the bindings holding it
-    /// must be too.
+    /// they don't fit.
     pub(super) fn write_joints(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         joints: &[JointRaw],
-    ) -> bool {
+    ) {
         let needed = size_of_val(joints) as u64;
-        let grew = needed > self.joints.size();
-        if grew {
+        if needed > self.joints.size() {
             let capacity = joints.len().next_power_of_two();
             self.joints = joint_buffer(device, capacity);
         }
         if !joints.is_empty() {
             queue.write_buffer(&self.joints, 0, bytemuck::cast_slice(joints));
         }
-        grew
     }
 
-    /// Uploads `source`'s joints and weights and its blend shapes, or
-    /// `None` if it has neither, or (with a warning) if its joints and
-    /// weights don't fit its corners: it's then drawn as it is, though
-    /// still morphed.
-    pub(super) fn upload(
-        &self,
-        device: &wgpu::Device,
-        bytes: &GpuBytes,
-        source: &dyn MeshSource,
-    ) -> Option<GpuSkin> {
+    /// Gets `source`'s joints and weights and its blend shapes ready for
+    /// the posing arena, or `None` if it has neither, or (with a warning)
+    /// if its joints and weights don't fit its corners: it's then drawn as
+    /// it is, though still morphed.
+    pub(super) fn upload(&self, source: &dyn MeshSource) -> Option<GpuSkin> {
         let positions = source.positions();
         let (joints, weights) = (source.skin_joints(), source.skin_weights());
         let mut jointed = !(joints.is_empty() && weights.is_empty());
@@ -301,22 +229,15 @@ impl Skinning {
                     weights: *weights,
                 })
                 .collect(),
-            false => vec![SkinCorner::default()],
+            false => Vec::new(),
         };
         // How far each corner's shapes can move it, all at weight 1.
-        let reach: Vec<f32> = match &morphs {
-            Some((ranges, moves)) => ranges
-                .iter()
-                .map(|range| {
-                    let first = range.first as usize;
-                    moves[first..first + range.count as usize]
-                        .iter()
-                        .map(|delta| Vec3::from(delta.position).length())
-                        .sum()
-                })
-                .collect(),
-            None => Vec::new(),
-        };
+        let mut reach = vec![0.0f32; positions.len()];
+        if let Some((_, moves)) = &morphs {
+            for one in moves {
+                reach[one.corner as usize] += Vec3::from(one.position).length();
+            }
+        }
         // Each joint's corners' box, and the box of those that never move,
         // each grown by how far their shapes can move them.
         let mut joint_bounds: Vec<Option<Bounds>> = Vec::new();
@@ -336,7 +257,7 @@ impl Skinning {
         };
         for (index, position) in positions.iter().enumerate() {
             let point = Vec3::from(*position);
-            let reach = reach.get(index).copied().unwrap_or(0.0);
+            let reach = reach[index];
             let mut weighted = false;
             if jointed {
                 let corner = corners[index];
@@ -356,97 +277,62 @@ impl Skinning {
                 grow(&mut still, point, reach);
             }
         }
-        let buffer = storage_buffer(device, "skin", &corners);
-        let (ranges, moves) = match &morphs {
-            Some((ranges, moves)) => (
-                storage_buffer(device, "morph ranges", ranges),
-                storage_buffer(device, "morphs", moves),
-            ),
-            None => (self.no_ranges.clone(), self.no_moves.clone()),
-        };
-        let size = buffer.size() + morphs.as_ref().map_or(0, |_| ranges.size() + moves.size());
+        let (shapes, moves) = morphs.unwrap_or_default();
         Some(GpuSkin {
-            bind_group: skin_group(device, &self.layout, [&buffer, &ranges, &moves]),
-            buffer,
+            corners,
+            moves,
+            shapes,
             jointed,
             joints: joint_bounds,
             still,
-            _bytes: bytes.count(size),
         })
     }
 }
 
-/// `source`'s blend shapes as each corner's range of moves and the moves,
-/// or `None` if it has none (or they don't fit its corners).
-fn morph_moves(source: &dyn MeshSource) -> Option<(Vec<MorphRange>, Vec<MorphDelta>)> {
+/// `source`'s blend shapes as each shape's range of moves and the moves,
+/// shape after shape, or `None` if it has none (or they don't fit its
+/// corners).
+fn morph_moves(source: &dyn MeshSource) -> Option<(Vec<ShapeRange>, Vec<MoveRaw>)> {
     let corners = source.positions().len();
-    let mut by_corner: Vec<Vec<MorphDelta>> = vec![Vec::new(); corners];
-    let mut any = false;
+    let mut shapes = Vec::with_capacity(source.morph_count());
+    let mut moves: Vec<MoveRaw> = Vec::new();
     for index in 0..source.morph_count() {
         let Some(morph) = source.morph(index) else {
             continue;
         };
-        let moves = morph.corners.iter().zip(morph.positions).zip(
+        let first = moves.len() as u32;
+        let changes = morph.corners.iter().zip(morph.positions).zip(
             morph
                 .normals
                 .iter()
                 .copied()
                 .chain(std::iter::repeat([0.0; 3])),
         );
-        for ((&corner, position), normal) in moves {
-            let Some(list) = by_corner.get_mut(corner as usize) else {
+        for ((&corner, position), normal) in changes {
+            if corner as usize >= corners {
                 log::warn!(
                     "mesh #{} has a blend shape moving a corner it hasn't got, so it isn't morphed",
                     source.key()
                 );
                 return None;
-            };
-            list.push(MorphDelta {
+            }
+            moves.push(MoveRaw {
                 position: *position,
-                target: u32::from(morph.target),
+                corner,
                 normal,
                 _pad: 0,
             });
-            any = true;
         }
+        shapes.push(ShapeRange {
+            first,
+            count: moves.len() as u32 - first,
+            target: u32::from(morph.target),
+        });
     }
-    if !any {
+    if moves.is_empty() {
         return None;
     }
-    let mut ranges = Vec::with_capacity(corners);
-    let mut moves = Vec::new();
-    for list in by_corner {
-        ranges.push(MorphRange {
-            first: moves.len() as u32,
-            count: list.len() as u32,
-        });
-        moves.extend(list);
-    }
-    Some((ranges, moves))
-}
-
-fn storage_buffer<T: Pod>(device: &wgpu::Device, label: &str, contents: &[T]) -> wgpu::Buffer {
-    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(label),
-        contents: bytemuck::cast_slice(contents),
-        usage: wgpu::BufferUsages::STORAGE,
-    })
-}
-
-fn skin_group(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    buffers: [&wgpu::Buffer; 3],
-) -> wgpu::BindGroup {
-    let entries = [0, 1, 2].map(|binding| wgpu::BindGroupEntry {
-        binding,
-        resource: buffers[binding as usize].as_entire_binding(),
-    });
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("skin"),
-        layout,
-        entries: &entries,
-    })
+    Some((shapes, moves))
 }
 
 fn joint_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {

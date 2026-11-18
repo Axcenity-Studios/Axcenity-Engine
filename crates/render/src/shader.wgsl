@@ -64,84 +64,36 @@ struct VertexIn {
     @builtin(vertex_index) index: u32,
 }
 
-// Animated meshes are posed here, on the GPU (see renderer/skinning.rs).
-// One joint of a skin drawn this frame: where it moves a corner, and how it
-// turns normals. Must match `JointRaw` in renderer/skinning.rs.
-struct Joint {
-    position: mat4x4<f32>,
-    normal: mat3x3<f32>,
-}
+// Animated meshes are posed once a frame, before any pass, by the posing
+// pass (CO8, renderer/posing.rs, posing.wgsl): each skinned or morphed
+// item's corners, leaned toward its blend shapes and moved by its joints,
+// are in `posed_corners`, five words a corner from the first its instance's
+// `skin.x` names.
+@group(0) @binding(9) var<storage, read> posed_corners: array<u32>;
 
-// Every skin's joints this frame. An item's start at `skin.x` of its instance.
-@group(0) @binding(9) var<storage, read> frame_joints: array<Joint>;
+// Words per posed corner. Must match `POSED_WORDS` in posing.wgsl.
+const POSED_WORDS: u32 = 5u;
+// A zero direction. Must match `ZERO_DIRECTION` in posing.wgsl.
+const ZERO_DIRECTION: u32 = 0x80008000u;
 
-// One corner's joints (of its item's skin) and how much each counts. Must
-// match `SkinCorner` in renderer/skinning.rs.
-struct SkinCorner {
-    joints: vec4<u32>,
-    weights: vec4<f32>,
-}
-
-// The mesh's corners' joints and weights: one corner weighted to nothing
-// for a mesh that isn't animated.
-@group(2) @binding(0) var<storage, read> skin_corners: array<SkinCorner>;
-
-// One corner's move by one blend shape at weight 1. Must match `MorphDelta`
-// in renderer/skinning.rs.
-struct MorphDelta {
-    position: vec3<f32>,
-    shape: u32,
-    normal: vec3<f32>,
-}
-
-// Each corner's first move in `morph_deltas` and how many (one empty range
-// for a mesh without blend shapes), and the moves.
-@group(2) @binding(1) var<storage, read> morph_ranges: array<vec2<u32>>;
-@group(2) @binding(2) var<storage, read> morph_deltas: array<MorphDelta>;
-
-// An instance's `skin.y` holds its skin's joints in the low 16 bits and its
-// blend shape weights in the high 16 (renderer/skinning.rs).
-fn skin_joint_count(skin: vec2<u32>) -> u32 {
-    return skin.y & 0xFFFFu;
-}
-
-fn skin_weight_count(skin: vec2<u32>) -> u32 {
-    return skin.y >> 16u;
-}
-
-// Shape weight `shape` of a skin whose weights start at entry `first` of a
-// joints buffer: sixteen to an entry, column by column of its `position`.
-fn weight_in(entry: Joint, shape: u32) -> f32 {
-    let at = shape % 16u;
-    return entry.position[at / 4u][at % 4u];
-}
-
-// Corner `index` leaned toward the item's blend shapes by this frame's
-// weights (after its joints in `frame_joints`), as `Posed::skin` in
-// assets' rig.rs does on the CPU before skinning.
-fn morph_corner(index: u32, skin: vec2<u32>, posed: Posed) -> Posed {
-    let weights = skin_weight_count(skin);
-    if weights == 0u {
-        return posed;
+// A direction from its octahedral word (`octahedral` in posing.wgsl).
+fn from_octahedral(word: u32) -> vec3<f32> {
+    if word == ZERO_DIRECTION {
+        return vec3<f32>(0.0);
     }
-    let first = skin.x + skin_joint_count(skin);
-    let range = morph_ranges[index];
-    var moved = posed;
-    var turned = false;
-    for (var i = range.x; i < range.x + range.y; i += 1u) {
-        let delta = morph_deltas[i];
-        if delta.shape >= weights {
-            continue;
-        }
-        let weight = weight_in(frame_joints[first + delta.shape / 16u], delta.shape);
-        moved.position += delta.position * weight;
-        moved.normal += delta.normal * weight;
-        turned = turned || weight != 0.0;
-    }
-    if turned {
-        moved.normal = unit_or_zero(moved.normal);
-    }
-    return moved;
+    let p = unpack2x16snorm(word);
+    var v = vec3<f32>(p, 1.0 - abs(p.x) - abs(p.y));
+    let t = max(-v.z, 0.0);
+    v.x += select(t, -t, v.x >= 0.0);
+    v.y += select(t, -t, v.y >= 0.0);
+    return normalize(v);
+}
+
+// The position of posed corner `at`.
+fn posed_position(at: u32) -> vec3<f32> {
+    let word = at * POSED_WORDS;
+    return bitcast<vec3<f32>>(vec3<u32>(posed_corners[word], posed_corners[word + 1u],
+        posed_corners[word + 2u]));
 }
 
 struct Posed {
@@ -150,42 +102,17 @@ struct Posed {
     tangent: vec3<f32>,
 }
 
-// Corner `index` moved by the item's `skin` (where its joints start in
-// `frame_joints`, and how many it has; none for an item that isn't
-// animated): each of its joints moves it, blended by their weights, as
-// `Posed::skin` in assets' rig.rs does on the CPU. Joints past the skin's
-// are left out, and a corner weighted to nothing stays where it is.
+// Corner `index` of an item as its `skin` has it: from the posed corners
+// (`skin.y` not 0: posed this frame, from corner `skin.x`), or at rest.
 fn pose_corner(index: u32, skin: vec2<u32>, rest_position: vec3<f32>, rest_normal: vec3<f32>,
     tangent: vec3<f32>) -> Posed {
-    var posed = morph_corner(index, skin, Posed(rest_position, rest_normal, tangent));
-    let joints = skin_joint_count(skin);
-    if joints == 0u {
-        return posed;
+    if skin.y == 0u {
+        return Posed(rest_position, rest_normal, tangent);
     }
-    let position = posed.position;
-    let normal = posed.normal;
-    let corner = skin_corners[index];
-    var matrix = mat4x4<f32>();
-    var normal_matrix = mat3x3<f32>();
-    var total = 0.0;
-    for (var i = 0u; i < 4u; i += 1u) {
-        let weight = corner.weights[i];
-        let joint = corner.joints[i];
-        if weight <= 0.0 || joint >= joints {
-            continue;
-        }
-        let moved = frame_joints[skin.x + joint];
-        matrix += moved.position * weight;
-        normal_matrix += moved.normal * weight;
-        total += weight;
-    }
-    if total <= 1e-6 {
-        return posed;
-    }
-    posed.position = (matrix * vec4<f32>(position, 1.0)).xyz / total;
-    posed.normal = unit_or_zero(normal_matrix * normal);
-    posed.tangent = unit_or_zero((matrix * vec4<f32>(tangent, 0.0)).xyz);
-    return posed;
+    let at = skin.x + index;
+    let word = at * POSED_WORDS;
+    return Posed(posed_position(at), from_octahedral(posed_corners[word + 3u]),
+        from_octahedral(posed_corners[word + 4u]));
 }
 
 fn unit_or_zero(v: vec3<f32>) -> vec3<f32> {
@@ -214,7 +141,8 @@ struct InstanceIn {
     // Metalness, roughness, alpha cutoff, and how many studs one copy of
     // the texture covers (0 keeps the mesh's own coordinates).
     @location(11) surface: vec4<f32>,
-    // Where the item's skin's joints start, and how many (0: not animated).
+    // Where the item's posed corners start, and 1 if it's posed (0: drawn
+    // at rest; see `pose_corner`).
     @location(14) skin: vec2<u32>,
     // How it sways in the wind (see `swayed`); w's whole part is its decal role
     // (`ROLE_CHARACTER`, `ROLE_DECAL`, else 0).
@@ -862,8 +790,8 @@ struct MotionView {
 }
 
 @group(3) @binding(0) var<uniform> motion_view: MotionView;
-// Last frame's joints, where this frame's are in `frame_joints`.
-@group(3) @binding(1) var<storage, read> previous_joints: array<Joint>;
+// Last frame's posed corners (renderer/posing.rs copies them aside).
+@group(3) @binding(1) var<storage, read> previous_corners: array<u32>;
 
 // A moved item: where it is now and where it was. Must match
 // `MotionInstance` in renderer/temporal.rs.
@@ -888,42 +816,20 @@ struct MotionOut {
     @location(2) @interpolate(flat) fade: f32,
 }
 
-// Corner `index` posed by last frame's joints and shape weights
-// (`pose_corner`'s position).
+// Corner `index` where it was last frame: `skin.y` is 0 for an item that
+// isn't posed (at rest), 1 for one posed this frame and not the last (where
+// it is now), else 2 more than its first corner in last frame's posed
+// corners.
 fn previous_corner(index: u32, skin: vec2<u32>, rest: vec3<f32>) -> vec3<f32> {
-    var position = rest;
-    let weights = skin_weight_count(skin);
-    let joints = skin_joint_count(skin);
-    if weights > 0u {
-        let first = skin.x + joints;
-        let range = morph_ranges[index];
-        for (var i = range.x; i < range.x + range.y; i += 1u) {
-            let delta = morph_deltas[i];
-            if delta.shape < weights {
-                position += delta.position
-                    * weight_in(previous_joints[first + delta.shape / 16u], delta.shape);
-            }
-        }
+    if skin.y == 0u {
+        return rest;
     }
-    if joints == 0u {
-        return position;
+    if skin.y == 1u {
+        return posed_position(skin.x + index);
     }
-    let corner = skin_corners[index];
-    var matrix = mat4x4<f32>();
-    var total = 0.0;
-    for (var i = 0u; i < 4u; i += 1u) {
-        let weight = corner.weights[i];
-        let joint = corner.joints[i];
-        if weight <= 0.0 || joint >= joints {
-            continue;
-        }
-        matrix += previous_joints[skin.x + joint].position * weight;
-        total += weight;
-    }
-    if total <= 1e-6 {
-        return position;
-    }
-    return (matrix * vec4<f32>(position, 1.0)).xyz / total;
+    let word = (skin.y - 2u + index) * POSED_WORDS;
+    return bitcast<vec3<f32>>(vec3<u32>(previous_corners[word], previous_corners[word + 1u],
+        previous_corners[word + 2u]));
 }
 
 @vertex

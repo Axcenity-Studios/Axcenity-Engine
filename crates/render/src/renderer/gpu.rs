@@ -13,7 +13,7 @@ use wgpu::util::DeviceExt;
 use crate::draw_list::{MeshSource, TextureSource};
 use crate::mesh::{self, MeshData, Vertex};
 
-use super::skinning::{JOINTS_BINDING, Skinning};
+use super::skinning::{POSED_BINDING, Skinning};
 use super::{
     Bounds, DEPTH_FORMAT, GpuBytes, GpuMaterial, GpuMesh, GpuTexture, InstanceRaw,
     MATERIAL_TEXTURES, MapsUniform, SHADING_TOON, TARGET_DRAW_FORMAT, TARGET_SHOW_FORMAT, Texels,
@@ -167,9 +167,9 @@ pub(super) const RAY_SWAY_SHADER: &str = concat!(
     include_str!("../sway.wgsl"),
     include_str!("../ray_sway.wgsl")
 );
-/// Moves posed characters' corners for their own BLASes (`ray_skin.wgsl`,
-/// renderer/ray_sway.rs).
-pub(super) const RAY_SKIN_SHADER: &str = include_str!("../ray_skin.wgsl");
+/// Morphs and skins each animated item once a frame into the posed
+/// corners every pass reads (`posing.wgsl`, renderer/posing.rs, CO8).
+pub(super) const POSING_SHADER: &str = include_str!("../posing.wgsl");
 /// Ray traced ambient occlusion's pass (`ray_ao.wgsl`, renderer/ray_ao.rs):
 /// ray queries turned on first, then cut-outs' holes.
 pub(super) const RAY_AO_SHADER: &str = concat!(
@@ -429,7 +429,7 @@ pub(super) fn create_shadow_views(
 }
 
 /// The frame's bindings (group 0 in lighting.wgsl): its uniform, lights,
-/// tiles, joints and light probes, the shadow maps, the ambient occlusion,
+/// tiles, posed corners and light probes, the shadow maps, the ambient occlusion,
 /// the environment and probe maps and the prepass's depth, with a sampler
 /// for each kind of map.
 pub(super) fn create_frame_bind_group(
@@ -439,7 +439,7 @@ pub(super) fn create_frame_bind_group(
         frame_buffer,
         light_buffer,
         tile_buffer,
-        joint_buffer,
+        posed_buffer,
         light_probe_buffer,
         ray_shadow_mask,
         ray_reflections,
@@ -481,8 +481,8 @@ pub(super) fn create_frame_bind_group(
                 resource: tile_buffer.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
-                binding: JOINTS_BINDING,
-                resource: joint_buffer.as_entire_binding(),
+                binding: POSED_BINDING,
+                resource: posed_buffer.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 17,
@@ -544,7 +544,8 @@ pub(super) fn create_shadow_pipeline(
     skinning: &Skinning,
 ) -> wgpu::RenderPipeline {
     let shader = shader_module(device, "shadow", SCENE_SHADER);
-    // No material (group 1), but the skin (group 2) moves the corners.
+    // No material (group 1), and group 2 is empty (posed corners are the
+    // frame's binding 9).
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("shadow"),
         bind_group_layouts: &[
@@ -756,7 +757,7 @@ pub(super) fn upload_custom_mesh(
         wgpu::IndexFormat::Uint32,
     );
     mesh.version = source.version();
-    mesh.skin = skinning.upload(device, bytes, source);
+    mesh.skin = skinning.upload(source);
     Some(mesh)
 }
 
@@ -834,9 +835,12 @@ pub(super) fn upload_buffers(
     let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some(name),
         contents: bytemuck::cast_slice(corners),
-        // COPY_DST so a posed mesh's corners can be rewritten in place.
+        // COPY_DST so a posed mesh's corners can be rewritten in place, and
+        // COPY_SRC for the posing arena, which copies an animated mesh's
+        // corners (renderer/posing.rs).
         usage: wgpu::BufferUsages::VERTEX
             | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC
             | MESH_READ
             | super::ray_tracing::blas_input(device),
     });

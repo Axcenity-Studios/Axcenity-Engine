@@ -247,6 +247,25 @@ fn motion_vectors_hold_how_far_moved_parts_posed_meshes_and_the_camera_went() {
         moved.distance(expected) < 0.002,
         "posed: {moved} vs {expected}"
     );
+
+    // A mesh moved by its blend shape alone (joint and transform still)
+    // moves with it too: last frame's posed corners are kept (CO8).
+    let shaped = |x: f32| {
+        // The shape moves the square 30 studs left at weight 1.
+        let mut item = super::skinning::morphed_skinned_square(1.0 - x / 30.0);
+        item.id = 4;
+        item.material.shading = Shading::Unlit;
+        list_of(vec![wall(-10.0), item])
+    };
+    let (before, now) = (shaped(0.0), shaped(0.25));
+    renderer.render(&before).unwrap();
+    renderer.render(&now).unwrap();
+    let motion = read_motion(&renderer);
+    let moved = motion_at(&motion, pixel_of(uv_of(&now, center)));
+    assert!(
+        moved.distance(expected) < 0.002,
+        "shaped: {moved} vs {expected}"
+    );
 }
 
 #[test]

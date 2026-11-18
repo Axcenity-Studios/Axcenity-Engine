@@ -63,6 +63,11 @@
 //! - `AXCENITY_CAPTURE_AA=msaa` (or `fxaa`, `off`) draws with that
 //!   anti-aliasing instead of TAA (R5: the High and Ultra presets' default
 //!   is MSAA 4x, which shows what TAA hides); unset, it is TAA.
+//! - `AXCENITY_CAPTURE_RT=shadows` (or `all`) turns hardware ray traced
+//!   sun shadows on (High, the shadow maps kept for what's past their
+//!   reach), or with `all` ray traced ambient occlusion and reflections
+//!   too, on a GPU with ray queries (CO8: they trace the posed characters).
+//!   Every preset has them off, so unset nothing is ray traced.
 
 use std::path::{Path, PathBuf};
 
@@ -913,6 +918,22 @@ fn anti_aliasing() -> AntiAliasing {
     }
 }
 
+/// Turns on the ray traced effects `AXCENITY_CAPTURE_RT` names
+/// (`shadows` or `all`), none when it's unset.
+fn ray_traced(graphics: &mut GraphicsSettings) {
+    let all = match std::env::var("AXCENITY_CAPTURE_RT").as_deref() {
+        Ok("shadows") => false,
+        Ok("all") => true,
+        _ => return,
+    };
+    graphics.ray_traced_shadows = Some(axcenity_render::RayTracedShadows::High);
+    if all {
+        graphics.ray_traced_ambient_occlusion =
+            Some(axcenity_render::RayTracedAmbientOcclusion::High);
+        graphics.ray_traced_reflections = Some(axcenity_render::RayTracedReflections::High);
+    }
+}
+
 /// Draws `description` from each of `views` under each of `lights`
 /// (lights outermost), as [`capture`] draws every view under every light.
 pub(crate) fn capture_in(
@@ -946,6 +967,7 @@ pub(crate) fn draw_staged(
     let (width, height) = settings.size;
     let mut graphics = GraphicsSettings::preset(Quality::High);
     graphics.anti_aliasing = Some(anti_aliasing());
+    ray_traced(&mut graphics);
     let mut shots = Vec::with_capacity(lights.len() * views.len());
     for lit in lights {
         let light = lit.light;

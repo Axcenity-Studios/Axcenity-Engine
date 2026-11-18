@@ -146,6 +146,17 @@ pub(crate) fn run(
         mb(stats.target_bytes),
         mb(stats.buffer_bytes)
     );
+    let posing = stats.posing;
+    if posing.items > 0 {
+        println!(
+            "  posing (CO8): {} items, {} corners, {} active shapes, {} shape moves, {:.2} MB of posing buffers",
+            posing.items,
+            posing.corners,
+            posing.shapes,
+            posing.moves,
+            mb(posing.bytes)
+        );
+    }
     for &(step, _) in &frames[0].steps {
         let time = best(&|frame| {
             let (_, time) = frame.steps.iter().find(|(name, _)| *name == step)?;

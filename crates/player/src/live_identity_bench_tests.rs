@@ -85,12 +85,70 @@ fn distinct_characters(count: usize, baked: bool) {
     assert!(stage.assets.take_errors().is_empty());
 }
 
+/// `count` default (stylized) characters in the same grid, idling: the
+/// body CO8's "today with 41 shapes" names, for comparison.
+fn stylized_characters(count: usize) {
+    let name = format!("bench_distinct_characters: {count} stylized");
+    let stage =
+        Stage::new(&format!("bench-{count}-stylized"), &repository_library()).expect("the stage");
+    let mut world = World::new();
+    let workspace = world.workspace();
+    for index in 0..count {
+        let (column, row) = ((index % 10) as f32, (index / 10) as f32);
+        let at = Vector3::new(column * 3.0 - 13.5, 0.0, -row * 3.0);
+        let character = axcenity_project::default_character(&mut world, at);
+        world.set_parent(character, Some(workspace)).unwrap();
+    }
+    let mut animators = Animators::new();
+    let camera = camera(Vec3::new(0.0, 9.0, 24.0), Vec3::new(0.0, 2.5, -6.0));
+    let mut cache = TerrainCache::new();
+    run(&name, |steps| {
+        steps.time("Animators::update (posing)", || {
+            animators.update(&mut world, &stage.assets, 1.0 / 60.0)
+        });
+        steps.time("build_draw_list", || {
+            axcenity_scene::build_draw_list_posed(
+                &world,
+                &stage.assets,
+                camera,
+                animators.poses(),
+                &mut cache,
+            )
+        })
+    });
+    assert!(animators.take_errors().is_empty());
+}
+
+/// The counts and modes to run: `AXCENITY_BENCH_COUNTS` (default
+/// `1,10,20,50`) and `AXCENITY_BENCH_MODES` (default `live,baked,stylized`).
+fn bench_plan() -> (Vec<usize>, Vec<String>) {
+    let counts = std::env::var("AXCENITY_BENCH_COUNTS").unwrap_or_else(|_| "1,10,20,50".into());
+    let modes =
+        std::env::var("AXCENITY_BENCH_MODES").unwrap_or_else(|_| "live,baked,stylized".into());
+    (
+        counts
+            .split(',')
+            .filter_map(|count| count.trim().parse().ok())
+            .collect(),
+        modes
+            .split(',')
+            .map(|mode| mode.trim().to_owned())
+            .collect(),
+    )
+}
+
 #[test]
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_distinct_characters() {
-    for count in [1, 10, 50] {
-        for baked in [false, true] {
-            distinct_characters(count, baked);
+    let (counts, modes) = bench_plan();
+    for count in counts {
+        for mode in &modes {
+            match mode.as_str() {
+                "live" => distinct_characters(count, false),
+                "baked" => distinct_characters(count, true),
+                "stylized" => stylized_characters(count),
+                other => panic!("unknown bench mode {other}"),
+            }
         }
     }
 }

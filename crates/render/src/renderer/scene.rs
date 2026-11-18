@@ -59,6 +59,8 @@ impl ScenePipeline {
         let light_probes = light_probes::LightProbes::new(&device);
         let no_ray_shadows = ray_shadows::stand_in(&device);
         let no_ray_reflections = ray_reflections::stand_in(&device);
+        // Every animated item, morphed and skinned once a frame (CO8).
+        let posing = posing::Posing::new(&device);
         let frame_bind_group = create_frame_bind_group(
             &device,
             &frame_layout,
@@ -66,7 +68,7 @@ impl ScenePipeline {
                 &frame_buffer,
                 &light_buffer,
                 &tile_buffer,
-                &skinning.joints,
+                posing.posed(),
                 light_probes.buffer(),
                 &no_ray_shadows,
                 &no_ray_reflections,
@@ -95,7 +97,7 @@ impl ScenePipeline {
         // Binding 5 matches `shadow_cascade` in shader.wgsl. Each pass picks
         // its cascade with an offset into the buffer (a "dynamic offset").
         // Bindings 0 and 9 are the frame's uniform (its wind and clock, for
-        // swaying plants) and joints, as in the frame's group.
+        // swaying plants) and posed corners, as in the frame's group.
         let shadow_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("shadow pass"),
             entries: &[
@@ -119,7 +121,7 @@ impl ScenePipeline {
                     },
                     count: None,
                 },
-                skinning::joints_entry(),
+                skinning::posed_entry(),
             ],
         });
         let shadow_bind_group = create_shadow_bind_group(
@@ -127,7 +129,7 @@ impl ScenePipeline {
             &shadow_layout,
             &frame_buffer,
             &cascade_buffer,
-            &skinning.joints,
+            posing.posed(),
         );
         let shadow_pipeline = create_shadow_pipeline(&device, &shadow_layout, &skinning);
 
@@ -223,6 +225,7 @@ impl ScenePipeline {
         let temporal = temporal::TemporalPasses::new(
             &device,
             [&frame_layout, &skinning.empty_layout, &skinning.layout],
+            posing.previous(),
         );
         let targets_alive = TargetsAlive::default();
         let frame_targets = FrameTargets::new(
@@ -378,6 +381,8 @@ impl ScenePipeline {
             culling_bounds: Vec::new(),
             lods: LodStates::default(),
             ray_scene: None,
+            posing_generation: posing.generation,
+            posing,
             ray_shadows: None,
             no_ray_shadows,
             ray_reflections: None,
@@ -1087,12 +1092,13 @@ impl ScenePipeline {
         let mut seen = std::mem::take(&mut self.culling_bounds);
         seen.clear();
         let DrawPlan {
-            instances,
+            mut instances,
             batches,
             casters,
             culled,
-            joints,
+            mut joints,
             skins,
+            posed,
             lod_items,
         } = {
             let (meshes, custom_meshes) = (&self.meshes, &self.custom_meshes);
@@ -1106,31 +1112,6 @@ impl ScenePipeline {
             )
         };
         self.culling_bounds = seen;
-        // What moved since last frame, for the motion vectors.
-        let moved = self.frame_targets.temporal.as_ref().map(|_| {
-            let moved = self.history.moved(&draws, &joints, &skins, clock);
-            let blur = list
-                .lens
-                .motion_blur
-                .filter(|share| share.is_finite())
-                .map_or(0.0, |share| share.clamp(0.0, 1.0));
-            self.temporal.prepare(
-                (&self.device, &self.queue),
-                &self.history,
-                (view_proj, drawn_view_proj, jitter),
-                (
-                    self.frame_targets.size,
-                    taa_upscales.then_some(self.frame_targets.output),
-                ),
-                (blur, self.graphics.motion_blur),
-                clock,
-                &moved,
-            );
-            moved
-        });
-        let joints_remade = self
-            .skinning
-            .write_joints(&self.device, &self.queue, &joints);
         // Shadow maps cost memory, so one exists only while shadows are on,
         // at the size the graphics settings give.
         let map_size = shadows_drawn(list.shadows, &self.graphics).map(|(_, size)| size);
@@ -1159,7 +1140,62 @@ impl ScenePipeline {
             }
         }
         self.casters_planned = casters.iter().map(Vec::len).sum();
-        let view_casters = casters_in_views(&casters, &shadow_view_list);
+        let mut view_casters = casters_in_views(&casters, &shadow_view_list);
+        // Water reflecting the screen traces rays too, with the GPU (LE5).
+        let water_rays = water_mode.traces_rays(&self.graphics);
+        let traces_rays = self.traces_rays(
+            ray_shadow_uniform.is_some()
+                || ray_ao_uniform.is_some()
+                || ray_gi_batch.is_some()
+                || ray_reflection_uniform.is_some()
+                || water_rays,
+        );
+        // Every animated item drawn in a view, or traced, is posed once
+        // (CO8): its instances and casters get their posed corners.
+        let rays = traces_rays.then(|| {
+            (
+                glam::Vec3::from_slice(&frame_uniform.camera_position[..3]),
+                self.graphics.ray_tracing_distance,
+            )
+        });
+        self.pose_frame(
+            &draws,
+            (&mut instances, &mut view_casters),
+            (&mut joints, &skins, &posed),
+            rays,
+        );
+        let posed_remade = self.posing.generation != self.posing_generation;
+        if posed_remade {
+            self.posing_generation = self.posing.generation;
+            self.temporal
+                .bind_previous(&self.device, self.posing.previous());
+        }
+        // What moved since last frame, for the motion vectors.
+        let moved = self.frame_targets.temporal.as_ref().map(|_| {
+            let posing = &self.posing;
+            let moved = self
+                .history
+                .moved(&draws, |skin, mesh| posing.offset(skin, mesh), clock);
+            let blur = list
+                .lens
+                .motion_blur
+                .filter(|share| share.is_finite())
+                .map_or(0.0, |share| share.clamp(0.0, 1.0));
+            self.temporal.prepare(
+                (&self.device, &self.queue),
+                &self.history,
+                (view_proj, drawn_view_proj, jitter),
+                (
+                    self.frame_targets.size,
+                    taa_upscales.then_some(self.frame_targets.output),
+                ),
+                (blur, self.graphics.motion_blur),
+                clock,
+                &moved,
+            );
+            moved
+        });
+
         let mut instance_count = instances.iter().map(Vec::len).sum::<usize>() as u32;
         let mut pieces: Vec<&[InstanceRaw]> = instances.iter().map(Vec::as_slice).collect();
         let mut casters_by_view = Vec::with_capacity(view_casters.len());
@@ -1342,7 +1378,7 @@ impl ScenePipeline {
             });
             changed = true;
         }
-        if changed || joints_remade {
+        if changed || posed_remade {
             self.bind_frame();
         }
 
@@ -1351,15 +1387,6 @@ impl ScenePipeline {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame"),
             });
-        // Water reflecting the screen traces rays too, with the GPU (LE5).
-        let water_rays = water_mode.traces_rays(&self.graphics);
-        let traces_rays = self.traces_rays(
-            ray_shadow_uniform.is_some()
-                || ray_ao_uniform.is_some()
-                || ray_gi_batch.is_some()
-                || ray_reflection_uniform.is_some()
-                || water_rays,
-        );
         // Times this frame unless the last measurement is still being read.
         let timed = match &mut self.gpu_timer {
             Some(timer) if self.time_gpu => timer.collect(&self.device),
@@ -1370,6 +1397,13 @@ impl ScenePipeline {
             if let Some(timer) = timer {
                 timer.mark(encoder, pass);
             }
+        };
+        // First, every animated item morphed and skinned once (CO8).
+        mark(&mut encoder, FramePass::CharacterPosing);
+        let posed_any = {
+            let (meshes, custom_meshes) = (&self.meshes, &self.custom_meshes);
+            self.posing
+                .record(&mut encoder, |key| gpu_mesh_in(meshes, custom_meshes, key))
         };
         mark(&mut encoder, FramePass::AccelerationStructures);
         let path_traced = self.path_traced();
@@ -1392,7 +1426,7 @@ impl ScenePipeline {
                     || ray_reflection_uniform.is_some(),
                 frame_uniform.clock,
             ),
-            &draws,
+            (&draws, &self.posing),
         );
         // Without ray queries, GI's rays walk a scene built in software.
         if ray_gi_batch.is_some() && self.graphics.ray_traced_gi_in_software {
@@ -2022,6 +2056,7 @@ impl ScenePipeline {
             let prepass = self.frame_targets.occlusion.is_some();
             timer.submitted(
                 [
+                    posed_any,
                     tracing,
                     shadows,
                     prepass,
@@ -2043,9 +2078,21 @@ impl ScenePipeline {
         counts.cascade_triangles = cascade_counts.map(|(_, triangles)| triangles);
         self.counts = counts;
         match &self.frame_targets.temporal {
-            Some(temporal) => self
-                .history
-                .finish(list, view_proj, clock, temporal.has_taa()),
+            Some(temporal) => {
+                // Where each posed item's corners are, for next frame's
+                // motion vectors.
+                let posed = draws
+                    .iter()
+                    .filter(|draw| draw.item.id != 0)
+                    .filter_map(|draw| {
+                        let mesh = draw.mesh();
+                        let offset = self.posing.offset(draw.item.skin.as_deref()?, mesh)?;
+                        Some(((draw.item.id, mesh), offset))
+                    })
+                    .collect();
+                self.history
+                    .finish(list, (view_proj, clock), posed, temporal.has_taa());
+            }
             None => self.history.reset(),
         }
         self.forget_undrawn();
@@ -2159,18 +2206,16 @@ impl ScenePipeline {
         Some(mesh)
     }
 
-    /// The skin binding `mesh` is drawn with: its joints and weights, or
-    /// none for a mesh that isn't animated.
-    pub(super) fn skin_group<'a>(&'a self, mesh: &'a GpuMesh) -> &'a wgpu::BindGroup {
-        mesh.skin
-            .as_ref()
-            .map_or(&self.skinning.none, |skin| &skin.bind_group)
+    /// The group 2 binding `mesh` is drawn with: empty since CO8, as
+    /// every pass reads posed corners through the frame's binding 9.
+    pub(super) fn skin_group<'a>(&'a self, _mesh: &'a GpuMesh) -> &'a wgpu::BindGroup {
+        &self.skinning.none
     }
 
     /// Remakes the frame bindings with the shadow maps, ambient occlusion
     /// and prepass depth alive, binding the empty stand-in for each that
     /// isn't, so a freed map or target isn't kept alive by the bindings,
-    /// and with the frame's joints (the shadow passes' bindings too).
+    /// and with the frame's posed corners (the shadow passes' bindings too).
     /// A bind group of `layout`, which holds only `bindings` of the frame's
     /// (of its uniform 0, lamps 3, sky 10 to 12 and light probes 16): for
     /// compute passes that would pass eight storage buffers a stage with
@@ -2242,7 +2287,7 @@ impl ScenePipeline {
                     &self.frame_buffer,
                     &self.light_buffer,
                     &self.tile_buffer,
-                    &self.skinning.joints,
+                    self.posing.posed(),
                     self.light_probes.buffer(),
                     ray_shadow_mask,
                     ray_reflections,
@@ -2301,7 +2346,7 @@ impl ScenePipeline {
             &self.shadow_layout,
             &self.frame_buffer,
             &self.cascade_buffer,
-            &self.skinning.joints,
+            self.posing.posed(),
         );
     }
 
@@ -2487,6 +2532,7 @@ impl ScenePipeline {
                     }
                     stats
                 }),
+            posing: self.posing.stats(),
             texture_bytes: self.texture_bytes.total(),
             mesh_bytes: self.mesh_bytes.total(),
             target_bytes: self.frame_targets.bytes
@@ -2501,6 +2547,7 @@ impl ScenePipeline {
                 + self.volumetric_fog.as_ref().map_or(0, |fog| fog.bytes())
                 + self.water.copy.as_ref().map_or(0, |copy| copy.bytes),
             buffer_bytes: buffers.iter().map(|buffer| buffer.size()).sum::<u64>()
+                + self.posing.stats().bytes
                 + self.gpu_particles.as_ref().map_or(0, |p| p.bytes())
                 + self
                     .ray_shadows
@@ -2524,6 +2571,19 @@ impl ScenePipeline {
     }
 
     /// The GPU copy of a mesh, or `None` for a caller's mesh that was never uploaded.
+    /// The corners `skin` drawn with `mesh` was posed into last frame
+    /// (CO8), read back: each one's position, normal and tangent.
+    #[cfg(test)]
+    pub(super) fn read_posed(
+        &self,
+        skin: &crate::Skin,
+        mesh: MeshKey,
+    ) -> Option<Vec<[glam::Vec3; 3]>> {
+        let first = self.posing.offset(skin, mesh)?;
+        let count = self.gpu_mesh(mesh)?.vertex_count;
+        Some(self.posing.read((&self.device, &self.queue), first, count))
+    }
+
     pub(super) fn gpu_mesh(&self, key: MeshKey) -> Option<&GpuMesh> {
         gpu_mesh_in(&self.meshes, &self.custom_meshes, key)
     }
@@ -3353,7 +3413,7 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         storage_entry(16),
         storage_entry(17),
         storage_entry(18),
-        skinning::joints_entry(),
+        skinning::posed_entry(),
         wgpu::BindGroupLayoutEntry {
             binding: 6,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -3532,13 +3592,13 @@ pub(super) fn text_bounds(text: &UiText, [dx, dy]: [f32; 2]) -> TextBounds {
 }
 
 /// The shadow passes' bindings: the `frame` uniform, each view's matrix in
-/// `cascades` (picked by a dynamic offset), and the frame's `joints`.
+/// `cascades` (picked by a dynamic offset), and the frame's `posed` corners.
 fn create_shadow_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     frame: &wgpu::Buffer,
     cascades: &wgpu::Buffer,
-    joints: &wgpu::Buffer,
+    posed: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("shadow pass"),
@@ -3557,8 +3617,8 @@ fn create_shadow_bind_group(
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: skinning::JOINTS_BINDING,
-                resource: joints.as_entire_binding(),
+                binding: skinning::POSED_BINDING,
+                resource: posed.as_entire_binding(),
             },
         ],
     })
