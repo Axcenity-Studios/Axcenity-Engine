@@ -36,7 +36,8 @@
 //! Randomize and its locks, `compare.rs` the held versions (before and
 //! after, side by side), `sides.rs` the asymmetry tools (mirror or reset a
 //! side), `motion.rs` the preview's pose and motion (Still, Idle, Walk,
-//! Run, gestures). `stage.rs` is the camera, lighting, backdrop and
+//! Run, gestures), `expressions.rs` the Expressions page's expression,
+//! face controls and face preview (R9). `stage.rs` is the camera, lighting, backdrop and
 //! floor; `shelf.rs` lists the saved characters for the start page and
 //! deletes them.
 
@@ -45,6 +46,7 @@ mod bottom_bar;
 pub mod compare;
 pub mod direct;
 pub mod edit;
+pub mod expressions;
 pub mod intent;
 pub mod motion;
 mod nav;
@@ -61,6 +63,8 @@ mod stage;
 pub mod thumbnails;
 mod toolbar;
 
+#[cfg(test)]
+mod expressions_tests;
 #[cfg(test)]
 mod feature_tests;
 #[cfg(test)]
@@ -94,7 +98,7 @@ use axcenity_avatar::{
     BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, WornItem,
     wear_choice, wear_choices,
 };
-use axcenity_core::{ClassName, InstanceId, Vector3, World};
+use axcenity_core::{InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
 use axcenity_gameplay::description as applier;
 use axcenity_render::glam::Vec3;
@@ -287,6 +291,11 @@ pub struct CharacterWorkspace {
     /// The built-in expression shown on the preview's face: preview only,
     /// never in the description (brief §10).
     pub expression: Option<String>,
+    /// The face controls the Expressions page holds on the preview's face,
+    /// over the expression (R9): preview only, never in the description.
+    pub face_controls: BTreeMap<String, f32>,
+    /// The face preview, while it is on (R9; editor state).
+    pub face_view: Option<expressions::FaceView>,
     /// What the preview's body does (Still, Idle, Walk, Run, a gesture):
     /// preview only, never in the description (brief §10, R9).
     pub motion: Motion,
@@ -403,6 +412,8 @@ impl CharacterWorkspace {
             lighting: Lighting::default(),
             backdrop: Backdrop::default(),
             expression: None,
+            face_controls: BTreeMap::new(),
+            face_view: None,
             motion: Motion::default(),
             preview_clip: None,
             follow: None,
@@ -520,7 +531,9 @@ impl CharacterWorkspace {
         self.description = description;
         self.file = file;
         self.history = History::default();
+        // The page's expression and controls were on the old body's face.
         self.expression = None;
+        self.face_controls.clear();
         self.leaving = false;
         self.asking = None;
         self.autosave.untouched = None;
@@ -528,6 +541,7 @@ impl CharacterWorkspace {
         self.applied = None;
         // Held versions belong to the character they were held of.
         self.clear_comparison();
+        self.sync_preview_face(true);
     }
 
     pub fn description(&self) -> &Description {
@@ -1076,60 +1090,6 @@ impl CharacterWorkspace {
         Some(place.transform_point3(position)).filter(|point| point.is_finite())
     }
 
-    /// Shows `name` (a built-in expression) on the preview's face, or none:
-    /// a FaceControls of the preview's own on the body, as the capture tool
-    /// does. The description is not touched.
-    pub fn preview_expression(&mut self, name: Option<String>) {
-        let name = name.filter(|name| !name.eq_ignore_ascii_case("Neutral"));
-        self.expression = name;
-        let Some(body) = self
-            .character
-            .and_then(|character| applier::body_of(&self.world, character))
-        else {
-            return;
-        };
-        let existing = self.world.get(body).and_then(|body| {
-            body.children().iter().copied().find(|child| {
-                self.world.get(*child).is_some_and(|child| {
-                    child.class() == ClassName::FaceControls && child.name() == PREVIEW_FACE
-                })
-            })
-        });
-        let Some(name) = self.expression.clone() else {
-            if let Some(face) = existing {
-                let _ = self.world.destroy(face);
-            }
-            return;
-        };
-        let face = match existing {
-            Some(face) => face,
-            None => {
-                let Ok(face) = self.world.create(ClassName::FaceControls) else {
-                    return;
-                };
-                let _ = self.world.set_name(face, PREVIEW_FACE);
-                let _ = self.world.set_parent(face, Some(body));
-                face
-            }
-        };
-        if let Some(state) = self.world.face_mut(face) {
-            let order = state.next_order;
-            state.next_order += 1;
-            state.expressions = vec![axcenity_core::face::ExpressionPlay {
-                name,
-                intensity: 1.0,
-                target_intensity: 1.0,
-                presence: 0.0,
-                target_presence: 1.0,
-                transition: None,
-                weight: 1.0,
-                priority: 0,
-                asymmetry: 0.0,
-                order,
-            }];
-        }
-    }
-
     /// The MeshParts the preview's body wears, by name, with the body's own
     /// `MeshId` first.
     #[cfg(test)]
@@ -1180,6 +1140,7 @@ impl CharacterWorkspace {
     pub(crate) fn advance(&mut self, seconds: f64) {
         self.step_by(seconds);
         self.follow_motion(seconds);
+        self.follow_face_preview();
     }
 
     pub(crate) fn step_by(&mut self, seconds: f64) {

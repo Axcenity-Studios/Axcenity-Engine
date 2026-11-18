@@ -1,0 +1,17 @@
+R9 expressions, the red run: the tests written first against stubs (intents, fields and types in place, no behaviour).
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_workspace::expressions_tests::/)'
+(expression_edits_never_change_the_saved_file passes against the stubs by design: it is the guard the implementation must keep; expressions_pages_are_drawn only draws with AXCENITY_SNAPSHOTS.)
+        FAIL (1/6) character_workspace::expressions_tests::the_face_controls_are_grouped_by_feature (ROWS empty: Brows has no rows, expressions_tests.rs:288)
+        PASS [   6.528s] (3/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::expression_edits_never_change_the_saved_file
+        FAIL [   6.713s] (4/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_face_preview_frames_the_face_holds_it_still_and_leaving_restores_the_view
+    thread 'character_workspace::expressions_tests::the_face_preview_frames_the_face_holds_it_still_and_leaving_restores_the_view' (18276) panicked at crates\editor\src\character_workspace\expressions_tests.rs:203:5:
+    assertion failed: workspace.face_view.is_some()
+        FAIL [   7.389s] (5/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::face_controls_move_the_face_over_the_expression_and_neutral_resets_them
+    thread 'character_workspace::expressions_tests::face_controls_move_the_face_over_the_expression_and_neutral_resets_them' (22324) panicked at crates\editor\src\character_workspace\expressions_tests.rs:130:5:
+    assertion `left == right` failed
+        FAIL [   7.942s] (6/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_expressions_page_draws_tiles_groups_and_the_face_preview
+    thread 'character_workspace::expressions_tests::the_expressions_page_draws_tiles_groups_and_the_face_preview' (27424) panicked at crates\editor\src\character_workspace\expressions_tests.rs:350:9:
+     Summary [   7.949s] 6 tests run: 2 passed (1 leaky), 4 failed, 1409 skipped
+        FAIL [   6.713s] (4/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_face_preview_frames_the_face_holds_it_still_and_leaving_restores_the_view
+        FAIL [   7.389s] (5/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::face_controls_move_the_face_over_the_expression_and_neutral_resets_them
+        FAIL [   7.942s] (6/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_expressions_page_draws_tiles_groups_and_the_face_preview

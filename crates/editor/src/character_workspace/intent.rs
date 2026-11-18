@@ -8,7 +8,8 @@
 //! offer came with R1's second part. Comparison, locks and favourites are
 //! editor state: their intents never change the description or undo.
 //! The asymmetry tools (R4) are edits, one undo step each; the preview's
-//! pose and motion (R9) is editor state, as an expression is.
+//! pose and motion (R9) is editor state, as an expression is, and so are
+//! the Expressions page's face controls and face preview (R9).
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
@@ -117,12 +118,32 @@ pub enum Intent {
     FocusView(ViewPreset),
     SetLighting(Lighting),
     SetBackdrop(Backdrop),
-    /// Shows a built-in expression on the preview's face (`None`: none).
+    /// Shows a built-in expression on the preview's face (`None` or
+    /// `Neutral`: none), starting the face controls from its own values.
     /// Preview only: never in the description.
     PreviewExpression(Option<String>),
     /// Plays a pose or motion on the preview (Still, Idle, Walk, Run, a
     /// gesture). Preview only: never in the description.
     PreviewMotion(Motion),
+    /// Holds face control `name` (a standard control, `Jaw_Open`) at
+    /// `value` (0 to 1) on the preview's face, over the expression shown;
+    /// `None` lets the expression's own value show again (R9). Preview
+    /// only: never in the description.
+    PreviewFaceControl {
+        name: String,
+        value: Option<f32>,
+    },
+    /// Turns the face preview on or off (R9): the camera close on the
+    /// face, the body still, blinking and idle motion off, the neutral
+    /// light, the expression held. Off puts back the view, light and
+    /// motion it found (editor state).
+    FacePreview(bool),
+    /// In the face preview: blinking, and idle motion (the face's and the
+    /// body's), each off unless asked for.
+    FacePreviewMotion {
+        blink: bool,
+        idle: bool,
+    },
     /// Mirrors a side onto the other, or resets a side, for a feature's
     /// left and right pairs or one pair (one undo step).
     Sides {

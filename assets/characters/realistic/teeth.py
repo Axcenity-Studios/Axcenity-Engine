@@ -98,7 +98,10 @@ FLOOR = 0.008
 # blocks in each corner of an open mouth against the dark red round
 # them, whatever their colour.
 IN_SHADE = 0.25
-LOWER_IN_SHADE = (0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+# (R9, OPEN-14: the first premolars too. The wide-open mouth's lower lip
+# now keeps its drop out toward the corners, a broad U, and the first
+# premolars stood in it as pale-rimmed blocks each side.)
+LOWER_IN_SHADE = (0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0)
 SHADE_LIT = 0.40
 # The colour at no light, and what the colours are multiplied by toward
 # the dark end.

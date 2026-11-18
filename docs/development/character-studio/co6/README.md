@@ -198,11 +198,11 @@ Judged against reference photographs in 4K engine captures, after the three revi
    - The feminine `Eye_Wide` has a faint lit band above the lid's outer corner.
    - A half blink dips the lid into the clear cornea by up to 0.45 mm (reported). The lid never enters the opaque eyeball.
 4. **Mouth** (details: [round 3's list](#still-short-of-the-photographs-2)).
-   - The closed smile is milder than a real one.
-   - An open mouth's corners are points, and the lower back teeth can be counted at three times the size.
-   - `Jaw_Open` 1 is a bell, not a broad U.
-   - U and WQ show the front teeth, TH shows no tongue, and FV's lower lip does not go under the upper teeth.
-   - A band of dark lining shows under the upper lip in every open mouth.
+   - The closed smile is stronger since R9 (wave 4) but still has no dimple or crease beside the corner.
+   - An open mouth's corners are rounded since R9 (the opening's height 2 mm in from an end is 0.25 to 0.31 of its largest, 0.10 to 0.15 before); the lower back teeth at the sides of a laugh can still be counted at three times the size.
+   - `Jaw_Open` 1 is a broad U since R9 (0.86 of its upper width at three quarters of its height, 0.69 before), with its lower sides straight rather than round.
+   - U and WQ show less of the front teeth since R9 (about half) and TH shows the tongue; FV's lower lip still does not go under the upper teeth (no control does it).
+   - A band of dark lining shows under the upper lip in every open mouth (unchanged by R9).
 5. **Expressions.** Determined and Frustrated are close to a mild Angry.
 6. **Lashes and brows** are blended cards: a fringe and a patch, not hairs. (Brows: since wave 3 drawn hair by hair on a tapering card; see the end.)
 7. **The pupil has no slider.** `Pupil_Size` moves 1.3 mm of the eye, under what a parameter must move the body by.
@@ -735,3 +735,21 @@ The hand-back, with every number and picture: [refinement/wave3/r4-face-2.md](..
 - **The masculine face** (`face.MASCULINE`, new): glabella and the brows' inner ends 1.5 mm forward (the brow ridge's field, within 30 mm of the middle and off the eyes' regions): glabella stands 5.1 mm forward of sellion (3.7 before); the nasofrontal angle is 127.8 degrees (F-30: 138.5 +- 9.3 in men).
 - **Nose**: `nose_tip_projection` 6.75 mm (2.5 SD). `nose_tip_rotation` has a shape for each end (`faceparams.SPLIT`; review fixes 2): the turn's weight eases in with the distance from subnasale, is averaged over the nose above the lip, and the turn is averaged again with subnasale held. The drooped end (`Face_Nose_Tip_Rotation`, 34 degrees, `NOSE_TURNS_DEG`) is held where the thin blue-grey line under the columella (a grazing reflection on the lobule's lower edge, review fixes 1) stays within a level of the neutral face's (4.0 against 3.5, blue-channel ridge); the upturned end (`Face_Nose_Tip_Rotation_Up`, `NOSE_TURNS_UP_DEG`) draws no line and turns further. Measured as the references do (columella point, subnasale, labrale superius; `avatar`'s `the_nose_tip_turns_by_the_references_range`), the ends move the nasolabial angle by -20.0 / +21.3 degrees (masculine, from 111.6) and -22.1 / +22.6 (feminine, from 112.6), about 2.1 to 2.4 SD (the nose README's range +-20, SD 9.6). (Review fixes 1 reported -5.3 / +11.8 degrees from a coarser measure, the lobule's lowest vertex for the columella; on the references' measure that package gave -20.0 / +19.2 and -22.1 / +20.9.)
 - **Presets** (`presets.py`): strengthened toward their sentences until each changes at least 3% of the face's pixels against the default face in front and in profile (`player`'s `face_preset_tests`). Review fixes 2: square's brow ridge 0.7 on a forehead tipped back by 0.6 drew a hard band across the forehead (a shelf with a 0.85 mm hollow over it in the masculine profile); square is now brow ridge 0.35, forehead slope +0.1 and chin forward 0.7 (hollow 0.00 mm; 4.9% and 4.3% of the masculine face crop, front and side), held by `avatar`'s `no_face_preset_puts_a_shelf_on_the_forehead`.
+
+## R9 (wave 4): the open mouth, the smile and the visemes (OPEN-14)
+
+The hand-back, with every number and picture: [refinement/wave4/r9-expressions.md](../refinement/wave4/r9-expressions.md); before-and-after sheets in [refinement/wave4/r9-expressions/](../refinement/wave4/r9-expressions/). Measured by rays from the front on a 0.25 mm grid over the mouth (the opening is what meets no skin within 30 mm of the lips' front; in it, what is seen first), both frames, before and after:
+
+| | Before | After |
+|---|---|---|
+| `Jaw_Open` 1: width at 75% of the opening's height / at 25% (a bell is well under 1) | 0.69, 0.70 | 0.86, 0.86 |
+| `Jaw_Open` 1: the opening's height 2 mm in from each end / its largest (a point is near 0) | 0.10, 0.15 | 0.25, 0.31 |
+| U viseme: teeth seen (mm²) | 108, 100 | 69, 47 |
+| WQ viseme: teeth seen (mm²) | 104, 84 | 52, 34 |
+| TH viseme: tongue seen (mm²) | 33, 12 | 135, 117 |
+
+- **The broad U** (`face.jaw_u`, `JAW_U_*`): `Jaw_Open`'s shape takes the lips toward a share of the jaw's turn falling off by the sixth power of the way to a corner instead of the weights' 2.5th (`rig._jaw` is not changed): the lower lip keeps its drop out toward the corners and turns up steeply into them; the upper lip stays up near its corners (from 0.7 of the way: held up along its middle too, a laugh drew `LipSeal`'s upper flap out through the lip). The corners are no longer the bell's out-turned points.
+- **Teeth**: the lower first premolars are in the mouth's shade too (`teeth.LOWER_IN_SHADE`): with the lower lip lower toward the corners they stood in the U as pale-rimmed blocks.
+- **The smile** (`SMILE_PULL` 14.8 mm, 12.8 before; the cheek 8.6 and 7.8 mm, 7.2 and 6.2; the fold 5.4 mm, 4.2) and Happy's recipe (smile 1, cheek raise 0.75, squint 0.35, corners back 0.5; no brow raise): the corners rise and widen more, the cheeks lift, the eyes narrow a little. Still a closed-lip smile.
+- **Visemes**: `Mouth_Pucker` gathers the lips by 0.40 of their width (0.31) and 7.2 mm forward (5.4); `Mouth_Narrow` draws `LipSeal` back at 0.4 (1.15), so a rounded mouth's small opening shows the lips' inner red; `Jaw_Open` draws it back at 7.2 (8; gone by 5.5 mm of the jaw's parting). The viseme map: U is narrow 0.9, pucker 0.9, open 0.08; WQ narrow 0.95, pucker 0.95, open 0.05; TH the jaw 0.2 in all (0.08 of it named) with the tongue out 0.6; FV the upper lip up 0.45 with no jaw.
+- **Not solved** (each still a defect, not accepted): the lower lip does not tuck under the upper teeth in FV (no control moves the lower lip up and back: it needs a lip-roll control, a change to the standard face controls); the dark band under the upper lip's edge in an open mouth is unchanged (1.5 mm high at the middle, masculine; an attempt to bring the lip's inner side forward to the light did not change it in the pictures and drew the upper flap out in a laugh, so it was withdrawn); U and WQ still show the upper teeth's edges in 23 to 25 mm openings on the masculine frame; the closed smile is stronger but has no dimple or crease; Laughing and Excited still show the lower back teeth at the sides.

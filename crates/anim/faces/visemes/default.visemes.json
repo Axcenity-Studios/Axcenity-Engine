@@ -15,8 +15,7 @@
       "Mouth_Wide": 0.6
     },
     "FV": {
-      "Mouth_Open": 0.1,
-      "Upper_Lip_Raise": 0.35
+      "Upper_Lip_Raise": 0.45
     },
     "KG": {
       "Mouth_Open": 0.4,
@@ -41,18 +40,19 @@
       "Tongue_Up": 0.3
     },
     "TH": {
-      "Mouth_Open": 0.25,
-      "Tongue_Out": 0.5
+      "Jaw_Open": 0.08,
+      "Mouth_Open": 0.3,
+      "Tongue_Out": 0.6
     },
     "U": {
-      "Mouth_Narrow": 0.6,
-      "Mouth_Open": 0.2,
-      "Mouth_Pucker": 0.8
+      "Mouth_Narrow": 0.9,
+      "Mouth_Open": 0.08,
+      "Mouth_Pucker": 0.9
     },
     "WQ": {
-      "Mouth_Narrow": 0.7,
-      "Mouth_Open": 0.15,
-      "Mouth_Pucker": 0.9
+      "Mouth_Narrow": 0.95,
+      "Mouth_Open": 0.05,
+      "Mouth_Pucker": 0.95
     }
   }
 }

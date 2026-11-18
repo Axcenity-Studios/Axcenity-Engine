@@ -714,9 +714,10 @@ mod tests {
         let layer = advance_expressions(&mut state, &project, 0.25, &mut unknown);
         let (value, cover) = at(&layer, "Mouth_Smile_Left");
         assert!((cover - 0.5).abs() < 1e-6, "halfway in, eased: {cover}");
-        assert!((value - 0.8 * 0.5).abs() < 1e-6);
+        // (Happy's smile is 1: R9 made it a full smile.)
+        assert!((value - 1.0 * 0.5).abs() < 1e-6);
         let layer = advance_expressions(&mut state, &project, 0.5, &mut unknown);
-        assert_eq!(at(&layer, "Mouth_Smile_Left"), (0.8, 1.0));
+        assert_eq!(at(&layer, "Mouth_Smile_Left"), (1.0, 1.0));
         assert_eq!(
             at(&layer, "Blink_Left"),
             (0.0, 0.0),
@@ -731,7 +732,7 @@ mod tests {
         assert_eq!(at(&layer, "Mouth_Frown_Left"), (0.6, 1.0));
         assert_eq!(
             at(&layer, "Mouth_Smile_Left"),
-            (0.8, 1.0),
+            (1.0, 1.0),
             "Sad doesn't say"
         );
 
