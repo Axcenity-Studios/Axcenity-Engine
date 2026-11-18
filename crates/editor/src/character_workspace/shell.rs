@@ -222,6 +222,9 @@ impl CharacterWorkspace {
             Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
             Intent::PreviewExpression(name) => self.preview_expression(name),
             Intent::PreviewMotion(motion) => self.preview_motion(motion),
+            Intent::PreviewFaceControl { name, value } => self.preview_face_control(&name, value),
+            Intent::FacePreview(on) => self.face_preview(on),
+            Intent::FacePreviewMotion { blink, idle } => self.face_preview_motion(blink, idle),
             Intent::Sides { tool, of } => self.use_sides(tool, &of),
             Intent::Randomize(scope) => self.randomize(scope),
             Intent::SetLock { ids, locked } => self.set_lock(&ids, locked),
@@ -399,6 +402,12 @@ impl CharacterWorkspace {
             return;
         }
         let was = self.selection.category;
+        if was == Category::Expressions {
+            // An expression, the controls held and the face preview are
+            // the Expressions page's only (the face preview first puts
+            // back the view it found).
+            self.leave_expressions();
+        }
         if category.frames_the_face() && self.view != Some(ViewPreset::Face) {
             self.focus(ViewPreset::Face);
         } else if was.frames_the_face()
@@ -407,11 +416,7 @@ impl CharacterWorkspace {
         {
             self.focus(ViewPreset::FullBody);
         }
-        if was == Category::Expressions && category != Category::Expressions {
-            // An expression is a preview of the Expressions page only.
-            self.preview_expression(None);
-        }
-        // So is a browser tile tried on, of its page.
+        // A browser tile tried on is a preview of its page too.
         self.end_preview();
         self.selection.pick_category(category);
     }

@@ -710,7 +710,7 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
     let controls = compose(&mut world, 0.0);
     assert_eq!(
         at(&controls, "Mouth_Smile_Left"),
-        0.8,
+        1.0,
         "Happy over the base"
     );
 
@@ -732,17 +732,17 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
     assert_eq!(at(&compose(&mut world, 0.0), "Mouth_Smile_Left"), 0.25);
 
     // The eyes blink by themselves within the longest wait between
-    // blinks, and the expression stays on. Happy's squint (0.3, through
-    // the mask) has the lids 0.21 of the way shut already, and the blink
+    // blinks, and the expression stays on. Happy's squint (0.35, through
+    // the mask) has the lids 0.25 of the way shut already, and the blink
     // closes the rest.
     let mut motion = crate::face_play::FaceMotion::new(3);
     let mut closed = 0.0f32;
     for _ in 0..(7.0 / FRAME) as usize {
         let controls = compose_with(&mut world, &mut motion, FRAME);
-        assert!((at(&controls, "Eye_Squint_Left") - 0.3).abs() < 1e-4);
+        assert!((at(&controls, "Eye_Squint_Left") - 0.35).abs() < 1e-4);
         closed = closed.max(at(&controls, "Blink_Left").min(at(&controls, "Blink_Right")));
     }
-    assert!((closed - (1.0 - 0.71 * 0.3)).abs() < 1e-3, "{closed}");
+    assert!((closed - (1.0 - 0.71 * 0.35)).abs() < 1e-3, "{closed}");
     assert_eq!(world.face(face).unwrap().expressions.len(), 1);
 }
 

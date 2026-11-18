@@ -308,9 +308,15 @@ pub fn track(
         .text_style_height(&egui::TextStyle::Body)
         .max(ui.spacing().interact_size.y);
     let size = egui::vec2(ui.available_width(), height);
-    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
-    let response = response.on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
-    let id = response.id;
+    // The track's ID is its row's, not egui's next automatic one: a page
+    // that shows something above the row once its value changes (the
+    // Expressions page) would otherwise give the track a new ID mid-drag,
+    // and egui would drop the drag after its first step.
+    let (_, rect) = ui.allocate_space(size);
+    let id = egui::Id::new(("numeric track", row));
+    let response = ui
+        .interact(rect, id, egui::Sense::click_and_drag())
+        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
     let mut out = drag(ui, &response, id, value, range);
     if response.has_focus() {
         ui.memory_mut(|memory| {

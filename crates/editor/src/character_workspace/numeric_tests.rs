@@ -339,6 +339,29 @@ fn a_face_row_follows_the_same_rule() {
     assert_eq!(studio.undo_depth(), 2);
 }
 
+/// The Expressions page's face controls are the shared rows too: 110
+/// points for a whole range (0 to 1, or -1 to 1 for a two-way row), Shift
+/// a quarter, and none of it is an undo step (the page is a preview).
+#[test]
+fn the_expression_rows_follow_the_same_rule() {
+    use super::expressions::ROWS;
+    let mut studio = Studio::new("numeric-expressions", vec2(1440.0, 1400.0));
+    studio.workspace.apply(Intent::PickCategory(Category::Expressions));
+    studio.settle();
+    let raise = ROWS.iter().find(|row| row.label == "Raise").unwrap();
+    let look = ROWS.iter().find(|row| row.label == "Look down or up").unwrap();
+    let id = |row: &super::expressions::Row| format!("face control {} {}", row.group.label(), row.label);
+    let track = studio.track(&id(raise));
+    studio.drag(track.center(), vec2(22.0, 0.0));
+    let value = studio.workspace.row_value(raise.controls, false);
+    assert!(close(value, 0.2), "a fifth of 0 to 1: {value}");
+    let track = studio.track(&id(look));
+    studio.drag_with(track.center(), vec2(44.0, 0.0), egui::Modifiers::SHIFT);
+    let value = studio.workspace.row_value(look.controls, false);
+    assert!(close(value, 0.2), "a quarter of two fifths of -1 to 1: {value}");
+    assert_eq!(studio.undo_depth(), 0, "the page never edits the description");
+}
+
 /// The Skin page's values and a makeup layer's sliders take the same drag.
 #[test]
 fn skin_values_and_makeup_take_the_same_drag() {

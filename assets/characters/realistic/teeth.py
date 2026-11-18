@@ -86,30 +86,44 @@ ROOT = 0.0015
 KEEL = 0.010
 # Inside the row of lower teeth the gum is kept this far from the keel.
 FLOOR = 0.008
-# Where on the teeth's ramp a tooth's own colours begin: before it is a
-# tooth in the mouth's shade, the dark red that light off the mouth's
-# walls leaves it. The lower back teeth are this (`LOWER_IN_SHADE`: how
-# much of it each lower tooth is, from the central incisor back to the
-# second molar; a tooth is all of it or none: part of the way, its
-# yellow neck's colour came through as olive), lit `SHADE_LIT`. Shade
-# alone could not do it: a vertex's shade is its colour's and its
-# occlusion's at once, and with the occlusion low enough to darken a
-# white tooth the engine drew the lower molars black, a row of black
-# blocks in each corner of an open mouth against the dark red round
-# them, whatever their colour.
+# Where on the teeth's ramp a tooth's own colours end: after them is a
+# tooth in the mouth's shade, enamel dimmed to what light off the
+# mouth's walls leaves it. The lower teeth go over to it from the canine
+# back (`LOWER_SHADE_FROM`: from none of it to all of it between these
+# distances behind the incisors' front, per vertex, so it eases along
+# the row and no tooth stands out from its neighbour), lit `SHADE_LIT`.
+# It is at the ramp's far end, after the thin edge's pale grey, so a
+# tooth part of the way over is a paler or darker grey and never mixes
+# with the yellow neck (which came through as olive). Shade alone could
+# not do it: a vertex's shade is its colour's and its occlusion's at
+# once, and with the occlusion low enough to darken a white tooth the
+# engine drew the lower molars black, a row of black blocks in each
+# corner of an open mouth against the dark red round them, whatever
+# their colour. (Until R9's review the shade's colour was a dark red and
+# whole teeth by rank went over to it: in the broad U of a wide-open
+# mouth the lower premolars then read as a row of dark red, pale-rimmed,
+# decayed teeth beside a white canine. Darker greys, 0.30 at the far
+# end or lit 0.4, read as charcoal teeth, as decayed: what the engine's
+# shadows and occlusion leave of these is dim enough.)
 IN_SHADE = 0.25
-LOWER_IN_SHADE = (0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
-SHADE_LIT = 0.40
+OWN = 1.0 - IN_SHADE
+LOWER_SHADE_FROM = (0.006, 0.034)
+SHADE_LIT = 0.60
 # The colour at no light, and what the colours are multiplied by toward
 # the dark end.
 DARK = (0.050, 0.022, 0.024)
 WARM = (1.0, 0.62, 0.56)
+# A tooth in the mouth's shade (sRGB): enamel dimmed, then darkened, a
+# little warm from the walls (the palette's own warming adds more toward
+# no light): the premolars stand at the first, the molars at the second.
+SHADED_ENAMEL = ((0.88, 0.78, 0.66), (0.74, 0.59, 0.50))
 # material -> (file, the ramp's colours (sRGB) along u)
 PALETTES = {
-    # a tooth in the mouth's own shade (`IN_SHADE`), the neck by the gum,
-    # the enamel, the thin edge
-    "Teeth": ("RealisticTeeth.png", ((0.0, (0.70, 0.29, 0.29)), (IN_SHADE, (0.85, 0.76, 0.58)),
-                                     (0.5 + 0.5 * IN_SHADE, (0.96, 0.94, 0.87)), (1.0, (0.90, 0.92, 0.93)))),
+    # the neck by the gum, the enamel, the thin edge (up to `OWN`), a
+    # tooth in the mouth's own shade
+    "Teeth": ("RealisticTeeth.png", ((0.0, (0.85, 0.76, 0.58)), (0.5 * OWN, (0.96, 0.94, 0.87)),
+                                     (OWN, (0.90, 0.92, 0.93)), (OWN + 0.4 * IN_SHADE, SHADED_ENAMEL[0]),
+                                     (1.0, SHADED_ENAMEL[1]))),
     # the gum's edge, the firm gum by the teeth, the redder lining beyond
     "Gums": ("RealisticGums.png", ((0.0, (0.58, 0.27, 0.29)), (0.35, (0.74, 0.42, 0.42)), (1.0, (0.55, 0.21, 0.25)))),
     # the groove down its middle, its back
@@ -568,14 +582,11 @@ def paint(points, normals, polys, info, ks):
         z = points[idx, 2]
         edge = z.min() if up_of[key] else z.max()
         ramp[idx] += 0.5 * (1.0 - step(0.0004 * ks, 0.0026 * ks, np.abs(z - edge))) * (ramp[idx] / 0.5)
-    # The teeth's own colours begin at `IN_SHADE`; the lower back teeth
-    # go over to the shade's colour, lit evenly.
-    behind = np.zeros(n)
-    for key in mid:
-        if not up_of[key]:
-            behind[np.unique([i for f in faces_of[key] for i in f])] = LOWER_IN_SHADE[min(rank_of[key], len(LOWER_IN_SHADE) - 1)]
+    # The teeth's own colours end at `OWN`; the lower teeth go over to the
+    # shade's colour after them from the canine back, lit evenly.
+    behind = np.where(upper, 0.0, step(LOWER_SHADE_FROM[0], LOWER_SHADE_FROM[1], points[:, 1] / ks))
     teeth = np.nonzero(is_tooth)[0]
-    ramp[teeth] = (IN_SHADE + (1.0 - IN_SHADE) * ramp[teeth]) * (1.0 - behind[teeth])
+    ramp[teeth] = OWN * ramp[teeth] + (1.0 - OWN * ramp[teeth]) * behind[teeth]
     shade[teeth] += behind[teeth] * (SHADE_LIT * (0.7 + 0.3 * inward[teeth]) - shade[teeth])
     gums = np.nonzero(~is_tooth)[0]
     deep = np.interp(points[:, 1] / ks, [d[0] for d in DEPTH_GUMS], [d[1] for d in DEPTH_GUMS]) * np.where(upper, 1.0, 0.85)

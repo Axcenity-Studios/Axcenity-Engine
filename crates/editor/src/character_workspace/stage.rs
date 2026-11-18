@@ -134,6 +134,11 @@ pub enum Lighting {
     Daylight,
     Sunset,
     Night,
+    /// Soft, even, white light for judging a face: the face preview's own,
+    /// chosen on the Expressions page (not in [`Lighting::ALL`]: the
+    /// bottom bar is full at 1440 points wide, so no chip is lit there
+    /// while it's on).
+    Neutral,
 }
 
 impl Lighting {
@@ -150,6 +155,7 @@ impl Lighting {
             Lighting::Daylight => "Daylight",
             Lighting::Sunset => "Sunset",
             Lighting::Night => "Night",
+            Lighting::Neutral => "Neutral",
         }
     }
 
@@ -160,6 +166,7 @@ impl Lighting {
             Lighting::Daylight => 12.5,
             Lighting::Sunset => 18.1,
             Lighting::Night => 21.5,
+            Lighting::Neutral => 14.5,
         }
     }
 }
@@ -238,16 +245,31 @@ pub(super) fn add_floor_at(world: &mut World, x: f32) -> Option<InstanceId> {
 pub(super) fn apply(world: &mut World, lighting: Lighting, backdrop: Backdrop) {
     let light = world.lighting();
     let _ = world.set_property(light, "ClockTime", Value::Number(lighting.clock_time()));
-    let ambient = if lighting == Lighting::Night {
-        0.35
+    let ambient = match lighting {
+        Lighting::Night => 0.35,
+        // More fill and softer shadow edges: the face's forms read
+        // without hard shade across them.
+        Lighting::Neutral => 0.62,
+        _ => 0.5,
+    };
+    // (Neutral's fill is grey; the others lean a little blue, as a sky's.)
+    let blue = if lighting == Lighting::Neutral {
+        1.0
     } else {
-        0.5
+        1.05
     };
     let _ = world.set_property(
         light,
         "Ambient",
-        Value::Color3(Color3::new(ambient, ambient, ambient * 1.05)),
+        Value::Color3(Color3::new(ambient, ambient, ambient * blue)),
     );
+    // The Lighting class's defaults, but Neutral's softer shadows.
+    let softness = if lighting == Lighting::Neutral {
+        0.6
+    } else {
+        0.2
+    };
+    let _ = world.set_property(light, "ShadowSoftness", Value::Number(softness));
     let workspace = world.workspace();
     let floors: Vec<_> = world
         .get(workspace)
