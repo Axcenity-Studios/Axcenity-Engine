@@ -2,7 +2,7 @@
 
 Branch `content-sourcing`, from `refinement-wave5`. Task: decision 11's first step. Find licensed base assets (CC0, CC BY, MIT or Apache-2.0 only) for the four items decision 13 names: a hairstyle, a crew-neck T-shirt, joggers and sneakers. Download the most promising ones where no account is needed, evaluate them in Blender beside the realistic body, score them against decision 13 and [asset-quality.md](../../asset-quality.md) sections 3 and 4, rank them, and say what needs Paul. This is research and evaluation. Nothing in the engine changed.
 
-**In one paragraph.** No base reachable without an account comes close to Production, and none is close for hair or sneakers. Two CC0 garments from BlenderKit are worth starting from: the **Plain T-shirt** (Introspective Mnisi, 2,800 triangles, 4K maps) and the **Grey sweat pants** (the same author, 6,143 triangles, elastic cuffs, a drawcord waistband, back pockets, 2K maps). Both have their own fit, rig and level-of-detail work ahead of them. A third CC0 tee, **Men t-shirt Turbulent sun** (Joachim Bornemann), has the better drape but 21,689 triangles and a printed motif to strip. Every MakeHuman asset I tried (16 of them, CC0 and CC BY) is from an older generation: 400 to 4,000 triangle garments, hair made of shells or flat slabs, sneakers either low-poly or copies of famous designs. The best semi-realistic hair cards and the cleanest game-ready garments are on **Sketchfab under CC BY 4.0**, which needs an account to download. Pocolov Studio's series of about 12 card hairstyles (28k to 34k triangles each) is the strongest hair lead, and MadeByYeshe's Basic T-Shirt (7,202 triangles, Marvelous Designer drape) is the strongest tee lead. **Sneakers are the hardest kind.** Most free sneakers, scanned or modelled, are copies of a branded design, such as the Converse Chuck Taylor, Vans Old Skool, Nike or New Balance. A licence on the mesh does not clear the trade mark or the design. **Recommendation:** start the tee and the joggers from the two BlenderKit CC0 bases now. Ask Paul for a Sketchfab account so the hair can come from Pocolov's set. Treat the sneaker as a model built by hand from a CC0 reference, unless an unbranded CC BY sneaker passes review on its own page.
+**In one paragraph.** No base reachable without an account comes close to Production, and none is close for hair or sneakers. Two CC0 garments from BlenderKit are worth starting from: the **Plain T-shirt** (Introspective Mnisi, 2,800 triangles, 4K maps) and the **Grey sweat pants** (the same author, 6,143 triangles, elastic cuffs, a drawcord waistband, back pockets, 2K maps). Both have their own fit, rig and level-of-detail work ahead of them. A third CC0 tee, **Men t-shirt Turbulent sun** (Joachim Bornemann), has the better drape but 21,689 triangles and a printed motif to strip. Every MakeHuman asset I tried (21 of them, CC0 and CC BY) is from an older generation: 400 to 7,200 triangle garments, hair made of shells or flat slabs, sneakers either low-poly or copies of famous designs. The best semi-realistic hair cards and the cleanest game-ready garments are on **Sketchfab under CC BY 4.0**, which needs an account to download. Pocolov Studio's series of about 12 card hairstyles (28k to 34k triangles each) is the strongest hair lead, and MadeByYeshe's Basic T-Shirt (7,202 triangles, Marvelous Designer drape) is the strongest tee lead. **Sneakers are the hardest kind.** Most free sneakers, scanned or modelled, are copies of a branded design, such as the Converse Chuck Taylor, Vans Old Skool, Nike or New Balance. A licence on the mesh does not clear the trade mark or the design. **Recommendation:** start the tee and the joggers from the two BlenderKit CC0 bases now. Ask Paul for a Sketchfab account so the hair can come from Pocolov's set. Treat the sneaker as a model built by hand from a CC0 reference, unless an unbranded CC BY sneaker passes review on its own page.
 
 ## Files
 
@@ -33,7 +33,7 @@ No code, schema, manifest, test or generated file changed, so there is no red ru
 
 | Source | Licences offered | Account to download? | Usable here? | What I saw |
 |---|---|---|---|---|
-| [MakeHuman community asset packs](https://static.makehumancommunity.org/assets/assetpacks.html) (MakeHuman and MPFB system and community assets) | CC0 or CC BY, per pack and per asset (the pack page's table). CC BY is version 4.0 per the community FAQ | **No** (zip packs from `files2.makehumancommunity.org`; the old per-asset repository pages return 404) | Licence-clean, quality **below the bar** | 16 assets evaluated. Clothes 400 to 4,000 triangles, all quads, made for MakeHuman's base mesh; hair is shells or flat slabs with alpha, one alpha-card curly style. Old-generation look |
+| [MakeHuman community asset packs](https://static.makehumancommunity.org/assets/assetpacks.html) (MakeHuman and MPFB system and community assets) | CC0 or CC BY, per pack and per asset (the pack page's table). CC BY is version 4.0 per the community FAQ | **No** (zip packs from `files2.makehumancommunity.org`; the old per-asset repository pages return 404) | Licence-clean, quality **below the bar** | 21 assets evaluated. Clothes 400 to 7,200 triangles, all quads, made for MakeHuman's base mesh; hair is shells or flat slabs with alpha, one alpha-card curly style. Old-generation look |
 | [BlenderKit](https://www.blendkit.com/docs/licenses/) (now Blendkit) | CC0 and "Royalty Free". RF is refused: no resale "even if modified", and it must not be "directly extractable" from a game | **No for "Free" CC0 assets**: the public search API and the download endpoint work anonymously and give a glTF. **Yes (paid plan)** for CC0 assets not marked Free | **Yes**: the best no-account garments | The two best no-account garment bases (tee, sweat pants). Scanned shoes from one uploader ("Free poly") are all branded designs |
 | [Sketchfab](https://sketchfab.com), CC0 and CC BY downloads | Per model: CC0, CC BY 4.0, also SA, NC, ND (refused). The API states "Author must be credited. Commercial use is allowed." for CC BY | **Yes**: "Downloading a model requires the user to be authenticated with a Sketchfab account" (download API docs); search and metadata are public | **Yes, behind an account** | The best semi-realistic hair cards (Pocolov series) and game-ready garments (Marvelous Designer tees, low-poly joggers). Many re-uploads of game rips and branded sneakers to filter out |
 | [Poly Haven](https://polyhaven.com/license) | CC0 | No | Textures only (already used); no garment, hair or sneaker | 522 models: clothing is only Rubber Boots, Fishermans Hat, Round Spectacles. Fabric scans already feed R7 |
@@ -58,15 +58,19 @@ Measurements are on the file as downloaded. "Pushed" is how many vertices the di
 
 ### Hairstyle (decision 13: actual hair geometry, natural volume, clean silhouette)
 
-**No acceptable candidate is reachable without an account.** All five MakeHuman hairs evaluated are below §4 (`hair.jpg`):
+**No acceptable candidate is reachable without an account.** All nine MakeHuman hairs evaluated are below §4 (`hair.jpg`, in this order):
 
 | Rank | Candidate | Licence | Triangles | What I saw | Verdict |
 |---|---|---|---|---|---|
-| 1 | MakeHuman `punkduck_alpha7_curly` (hair03 pack), punkduck | CC BY 4.0 | 11,304, 1K atlas | Real alpha cards and many strands, but long and curly (not the short or medium cut asked for), ribbon cards visible from the back, 1,024 px atlas, the scalp shows at the parting | Weak base |
-| 2 | `o4saken_chinesebob01` (hair03), punkduck | CC BY 4.0 | 10,108, 2K | Cards, but blocky and patchy; the crown and back read as stacked rectangles | Weak base |
-| 3 | `elvs_short_side_do` (hair02), Elvaerwyn | CC BY 4.0 | 98,660, 1K | A smooth shell ("helmet") with a painted texture. The material file is named `elvs_thejournalist1` and the texture `darkmaggiehair.png`, which may come from other work. Check its provenance before any use | Reference only |
-| 4 | `elvs_grump_hair` (hair02), Elvaerwyn | CC BY 4.0 | 12,332, 2K | Flat slabs fanned round the head; reads as plates in side view | Refused on quality |
-| 5 | `culturalibre_hair_14` (hair03), culturalibre | CC BY 4.0 | 23,489, 1K | Solid shell, black flat texture | Refused on quality |
+| 1 | MakeHuman `culturalibre_hair_02` (hair01 pack), culturalibre | CC0 | 3,460, 2K | The most believable short men's crop of the set: a close cap with a soft alpha fringe and a photo-like texture. Still a shell, not hair geometry, and it has no hairline ramp | Weak base (silhouette) |
+| 2 | MakeHuman system `short02` (system assets), MakeHuman | CC0 | 3,344, 2K | A short men's cut: a shell with a photo texture; reads as a helmet in the side view | Weak base (silhouette) |
+| 3 | MakeHuman `punkduck_alpha7_curly` (hair03 pack), punkduck | CC BY 4.0 | 11,304, 1K atlas | Real alpha cards and many strands, but long and curly (not the short or medium cut asked for), ribbon cards visible from the back, 1,024 px atlas, the scalp shows at the parting | Weak base |
+| 4 | MakeHuman `toigo_blunt_bob` (hair01), MargaretToigo | CC0 | 2,858, 3600 px | A clean blunt-bob silhouette, a closed shell with a painted strand texture: no cards, no volume of its own | Reference only (silhouette) |
+| 5 | `o4saken_chinesebob01` (hair03), punkduck | CC BY 4.0 | 10,108, 2K | Cards, but blocky and patchy; the crown and back read as stacked rectangles | Weak base |
+| 6 | `elvs_short_side_do` (hair02), Elvaerwyn | CC BY 4.0 | 98,660, 1K | A smooth shell ("helmet") with a painted texture. The material file is named `elvs_thejournalist1` and the texture `darkmaggiehair.png`, which may come from other work. Check its provenance before any use | Reference only |
+| 7 | `elvs_grump_hair` (hair02), Elvaerwyn | CC BY 4.0 | 12,332, 2K | Flat slabs fanned round the head; reads as plates in side view | Refused on quality |
+| 8 | `culturalibre_hair_14` (hair03), culturalibre | CC BY 4.0 | 23,489, 1K | Solid shell, black flat texture | Refused on quality |
+| 9 | `cortu_short_messy_hair` (hair01), Cortu | CC0 | 1,092, 512 px | A few broken strips over the scalp; the scalp shows everywhere | Refused on quality |
 
 **Behind a Sketchfab account (CC BY 4.0), the leads.** Ranked from each model's page record and pictures; not downloaded:
 
@@ -85,9 +89,10 @@ Refused on Sketchfab: zHairezt's short styles ("ALL CREDITS TO ZEPETO": game rip
 |---|---|---|---|---|---|---|---|
 | 1 | **BlenderKit [Plain T-shirt](https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/)**, Introspective Mnisi | CC0 | 2,800 (within §3's 6k) | 0.896 | 4K colour, normal, roughness | A real crew neck with a band, clean back with no seam or tear, set-in short sleeves, straight hem. 0 non-manifold edges, 128 open edges (neck, sleeves, hem: no turned thickness). 0.61 m tall. Fits a smaller body: the push-out moved it up to 71 mm | **Good base** |
 | 2 | BlenderKit [Men t-shirt Turbulent sun](https://www.blendkit.com/asset-gallery-detail/263a0760-fcb4-4413-b461-676d8bef9e9b/), Joachim Bornemann | CC0 | 21,689 (3.6x the budget) | 0.936 | 1K colour, normal, ORM | The best drape of the no-account tees, with a rib collar and sleeve hems, but a large printed sun motif front and back, and only 1K maps. 0.70 m long, a man's regular fit | Good base for shape (retopology and a new texture) |
-| 3 | MakeHuman `toigo_basic_tucked_t-shirt` (shirts01), MargaretToigo | CC0 | 2,700 | 1.0 (quads) | 2K colour | Clean quads but cut short to tuck in; flat faceted shading | Weak base |
-| 4 | MakeHuman `elvs_crude_t-shirt_male` (shirts01), Elvaerwyn | CC0 | 2,068 | 1.0 | 1K | As named: crude, short, wide neck, no hems | Refused on quality |
-| 5 | MakeHuman `drednicolson_short-tail_camo_tee` (shirts03), DredNicolson | CC BY 4.0 | 3,746 | 1.0 | 2K | Cropped, camouflage, faceted | Refused on quality |
+| 3 | MakeHuman system `male_casualsuit06`, MakeHuman | CC0 | 7,168 (tee and jeans in one mesh) | 1.0 | 2K colour, normal | A plain white tee over jeans, one mesh; the tee carries the MakeHuman logo front and back; faceted at this resolution | Weak base |
+| 4 | MakeHuman `toigo_basic_tucked_t-shirt` (shirts01), MargaretToigo | CC0 | 2,700 | 1.0 (quads) | 2K colour | Clean quads but cut short to tuck in; flat faceted shading | Weak base |
+| 5 | MakeHuman `elvs_crude_t-shirt_male` (shirts01), Elvaerwyn | CC0 | 2,068 | 1.0 | 1K | As named: crude, short, wide neck, no hems | Refused on quality |
+| 6 | MakeHuman `drednicolson_short-tail_camo_tee` (shirts03), DredNicolson | CC BY 4.0 | 3,746 | 1.0 | 2K | Cropped, camouflage, faceted | Refused on quality |
 
 Behind a Sketchfab account: [Basic T-Shirt](https://sketchfab.com/3d-models/basic-t-shirt-71bdf5940b5d41b8b46628a615e9b0ed) by MadeByYeshe. It has 7,202 faces, was "made in Marvelous Designer, textured in Substance Painter and remeshed in Blender", is game-ready and CC BY, and is the strongest tee lead. [Standard T-shirt](https://sketchfab.com/3d-models/standard-t-shirt-1815c01895bd4538bc0bd05c3394698d) by Badboy17Aiden has 362,067 faces and is a Marvelous drape: a fold reference only. Refused: u-76's "T-shirt LP" is a henley with raglan sleeves, not a crew neck. Hyperrealitystudio's "T-shirt" is a stylized polo. "Casual White Tee And Beige Joggers" is a scan of a person.
 
@@ -115,10 +120,12 @@ Refused: "Dillard, Darren Joggers", because its texture copies the Champion logo
 | Rank | Candidate | Licence | Triangles | What I saw | Verdict |
 |---|---|---|---|---|---|
 | 1 | MakeHuman `punkduck_running_shoes_01` (shoes02), punkduck | CC BY 4.0 | 2,792 a pair, 2K | A plain low runner; low-poly faceted toe; texture with a repeating made-up wordmark; open at the collar (412 open edges). 0.23 m long against our 0.248 m masculine foot | Weak base (silhouette only) |
-| 2 | MakeHuman `punkduck_comfortable_sneakers` (shoes02) | CC BY 4.0 | 1,556 | A slip-on, not a lace-up sneaker; very coarse | Refused on quality |
-| 3 | MakeHuman `punkduck_tennis_shoes` (shoes02) | CC BY 4.0 | 3,340 | Shoe and sock fused into one mesh; boxy | Refused on quality |
-| 4 | MakeHuman `culturalibre_sneakers` (shoes02) | CC BY 4.0 | 9,042, 1K | High-top basketball shoe whose panels follow a famous retro basketball design | Refused: design copy |
-| 5 | MakeHuman `elvs_zombie_killer_sneakers` (shoes02) | CC BY 4.0 | 153,938, 42 non-manifold edges | A Chuck Taylor-style high top (ankle patch, toe cap, stripe) | Refused: design copy |
+| 2 | MakeHuman system `shoes06`, MakeHuman | CC0 | 3,064, 1K | A blue runner with side stripes and the sock fused to it; low-poly toe | Weak base (silhouette only) |
+| – | MakeHuman system `shoes05` | CC0 | 3,064, 1K | A white trainer with three diagonal side stripes | Refused: brand design |
+| 3 | MakeHuman `punkduck_comfortable_sneakers` (shoes02) | CC BY 4.0 | 1,556 | A slip-on, not a lace-up sneaker; very coarse | Refused on quality |
+| 4 | MakeHuman `punkduck_tennis_shoes` (shoes02) | CC BY 4.0 | 3,340 | Shoe and sock fused into one mesh; boxy | Refused on quality |
+| 5 | MakeHuman `culturalibre_sneakers` (shoes02) | CC BY 4.0 | 9,042, 1K | High-top basketball shoe whose panels follow a famous retro basketball design | Refused: design copy |
+| 6 | MakeHuman `elvs_zombie_killer_sneakers` (shoes02) | CC BY 4.0 | 153,938, 42 non-manifold edges | A Chuck Taylor-style high top (ankle patch, toe cap, stripe) | Refused: design copy |
 | – | BlenderKit [Scan shoe11](https://www.blendkit.com/asset-gallery-detail/56a82c29-d8fe-454d-b4d6-8eb44be3e38c/), "Free poly" | CC0 label | 100,000, 8K | The most convincing material of any sneaker here (canvas, rubber toe cap, laces), but a closed solid with no opening (0 open edges), 0.459 quads after join. A low canvas sneaker with the side eyelet vents and toe cap of a Chuck Taylor. The uploader's other scans are Converse, New Balance, Adidas and Nike shoes. BlenderKit's own article says it rejects CC0 re-uploads made for profit, so provenance is doubtful | Reference only (shape and wear) |
 | – | BlenderKit Scan Shoe 7, "Free poly" | CC0 label | 10,000 | A Converse high top with its star patch | Refused: brand. Not in the sheets |
 
@@ -180,6 +187,8 @@ Refused on brand: abazibiz's "sneakers" (Converse star), meerschaumdigital's "Bl
 | | `hair02_ccby.zip` | `c681e5efd37df4007a52253a8d071aedbfe3b614f199d8dae4ae76d5bd7d95c9` |
 | | `hair03_ccby.zip` | `776c277cb6bcebc32907e05fa94d119e48742cdc1c34183996fc3e65e17a2740` |
 | | `shoes02_ccby.zip` | `1b544d87dd8b3d3a9c8317e4f059be456491be979cbc9984fc53f403046f5061` |
+| | `hair01_cc0.zip` | `49445d69848a313ec41a9970f6a0fe4bcf925c9f1c6ef40a76f119c2e07940c9` |
+| | `makehuman_system_assets_cc0.zip` | `b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107` |
 
 Each MakeHuman item extracted into its own folder (`<kind>/mh-<name>/`) has a `<folder>.sha256` beside it, listing every file's hash. No script that came with a download was run. No `.blend` was opened: BlenderKit's glTF files and MakeHuman's OBJ and material text were read as data.
 
@@ -192,7 +201,7 @@ The sheets show renders of these assets. They are ours, but they depict CC BY wo
 - "culturalibre_hair_14" and "culturalibre_sneakers" by culturalibre;
 - "drednicolson_short-tail_camo_tee" by DredNicolson.
 
-All are CC BY 4.0, from the MakeHuman community asset packs. The CC0 items need no credit: they are by Introspective Mnisi, Joachim Bornemann, Gabriel Mensah and "Free poly" (BlenderKit), and by MargaretToigo, Elvaerwyn and Cortu (MakeHuman). The realistic body is ours, built from Blender Studio's CC0 Human Base Meshes.
+All are CC BY 4.0, from the MakeHuman community asset packs. The CC0 items need no credit: they are by Introspective Mnisi, Joachim Bornemann, Gabriel Mensah and "Free poly" (BlenderKit), and by MargaretToigo, Elvaerwyn, Cortu, culturalibre and the MakeHuman project's system assets (MakeHuman). The realistic body is ours, built from Blender Studio's CC0 Human Base Meshes.
 
 ## Open issues
 
@@ -200,8 +209,8 @@ All are CC BY 4.0, from the MakeHuman community asset packs. The CC0 items need 
 - **Sketchfab leads are unverified beyond their API records and pictures.** Each model's own page must be read before download (licence, "textures included", no logo, author is the maker).
 - **BlenderKit's CC0 assets were downloaded without the add-on**, through the same public API it calls. The licensing FAQ puts no condition on CC0. If the lead prefers, re-download through the add-on with an account and compare hashes.
 - **MakeHuman `elvs_*` files** carry names of other works (`thejournalist`, `darkmaggiehair`). The pack table lists Elvaerwyn as author under CC BY. I did not trace further: none of these items is recommended.
-- The MakeHuman system-assets pack (CC0: `short01` to `short04`, `shoes01` to `shoes06`, the casual suits) and `hair01` (CC0) were still downloading (about 160 KB/s) when this report was written. From the pack thumbnails they are the same generation as the items above.
+- The MakeHuman server delivered about 160 KB/s per file, so only the packs above were fetched (about 0.9 GB). The other packs (shirts02, pants02, pants03, shoes01, shoes03) were judged from their thumbnails only. They are the same generation, with no tee, jogger or sneaker better than those evaluated.
 
 ## At merge
 
-Nothing to rebuild. The report and the five JPGs (about 1.6 MB) are the only files. If wave 5 adopts a base, the intake track records its provenance (section 5's hashes) before any file of it is committed.
+Nothing to rebuild. The report and the five JPGs (about 2.0 MB) are the only files. If wave 5 adopts a base, the intake track records its provenance (section 5's hashes) before any file of it is committed.
