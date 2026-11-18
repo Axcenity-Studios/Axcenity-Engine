@@ -1208,3 +1208,122 @@ fn esc_takes_a_try_on_off_while_the_pointer_stays_on_its_tile() {
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// One frame of `workspace` drawn in `ctx` with `events`.
+fn frame_in(
+    ctx: &egui::Context,
+    workspace: &mut CharacterWorkspace,
+    events: Vec<egui::Event>,
+) -> egui::FullOutput {
+    theme::run(ctx, input(events), |ui| {
+        assert_eq!(workspace.ui(ui, None), None);
+    })
+}
+
+/// A press (or release) of the main button at `at`.
+fn button_at(at: egui::Pos2, pressed: bool) -> egui::Event {
+    egui::Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    }
+}
+
+/// Moves to `at`, then clicks there, then draws three frames with the
+/// pointer still: what a person does when they click a tile.
+fn click_and_hold_still(ctx: &egui::Context, workspace: &mut CharacterWorkspace, at: egui::Pos2) {
+    frame_in(ctx, workspace, vec![egui::Event::PointerMoved(at)]);
+    frame_in(ctx, workspace, vec![egui::Event::PointerMoved(at)]);
+    frame_in(ctx, workspace, vec![button_at(at, true)]);
+    frame_in(ctx, workspace, vec![button_at(at, false)]);
+    for _ in 0..3 {
+        frame_in(ctx, workspace, Vec::new());
+    }
+}
+
+/// The hairstyle `description` wears (its `hair` slot).
+fn hair_of(workspace: &CharacterWorkspace, description: &Description) -> Option<String> {
+    let library = workspace.library();
+    description
+        .items
+        .iter()
+        .find(|worn| {
+            library
+                .item(&worn.id)
+                .is_some_and(|item| item.slot == "hair")
+        })
+        .map(|worn| worn.id.clone())
+}
+
+#[test]
+fn clicking_near_a_tiles_top_tries_on_that_tile() {
+    // Review fix 2: picking a tile must not move the grid under a still
+    // pointer, or the tile above it would be previewed in its place.
+    let (folder, mut workspace) = stylized_workspace("browser-click-top");
+    workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+    let ctx = theme::test_context();
+    frame_in(&ctx, &mut workspace, Vec::new());
+    let output = frame_in(&ctx, &mut workspace, Vec::new());
+    let long = text_at(&output, "Long").expect("the Long tile is drawn");
+    let bob = text_at(&output, "Bob").expect("the Bob tile is drawn");
+    assert!(long.y > bob.y + 50.0, "Long is in a lower row than Bob");
+    // A point near the top of Long's tile: a row's pitch above its label
+    // is the label of the row above; the tile starts about 20 points lower.
+    let at = egui::pos2(long.x, long.y - (long.y - bob.y) + 35.0);
+    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
+    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
+    assert_eq!(
+        hair_of(&workspace, workspace.shown()).as_deref(),
+        Some("axcenity/hair-long"),
+        "the point is on the Long tile"
+    );
+    click_and_hold_still(&ctx, &mut workspace, at);
+    assert_eq!(
+        workspace
+            .browser
+            .selected
+            .as_ref()
+            .and_then(|p| p.item.as_deref()),
+        Some("axcenity/hair-long")
+    );
+    assert_eq!(
+        hair_of(&workspace, workspace.shown()).as_deref(),
+        Some("axcenity/hair-long"),
+        "clicked Long, so the character shows Long (hovered: {:?})",
+        workspace.browser.hovered
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn clicking_the_worn_tile_while_trying_one_on_previews_nothing() {
+    // Review fix 2: clicking the worn tile ends the pick (Select(None)); the
+    // tiles must not move under the still pointer and preview another.
+    let (folder, mut workspace) = stylized_workspace("browser-click-worn");
+    workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+    // Bob is worn: its tile is in the first row, with Long below it.
+    workspace.apply(Intent::Wear {
+        slot: "hair".to_owned(),
+        item: Some("axcenity/hair-bob".to_owned()),
+    });
+    let before = workspace.description().clone();
+    let ctx = theme::test_context();
+    frame_in(&ctx, &mut workspace, Vec::new());
+    let output = frame_in(&ctx, &mut workspace, Vec::new());
+    let long = text_at(&output, "Long").expect("the Long tile is drawn");
+    click_and_hold_still(&ctx, &mut workspace, long);
+    assert!(workspace.browser.selected.is_some(), "Long is picked");
+    let output = frame_in(&ctx, &mut workspace, Vec::new());
+    let bob = text_at(&output, "Bob").expect("the worn Bob tile is drawn");
+    assert!(long.y > bob.y + 50.0, "Long is below Bob");
+    click_and_hold_still(&ctx, &mut workspace, bob);
+    assert!(workspace.browser.selected.is_none(), "the pick is over");
+    assert_eq!(
+        *workspace.shown(),
+        before,
+        "nothing is tried on (hovered: {:?})",
+        workspace.browser.hovered
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

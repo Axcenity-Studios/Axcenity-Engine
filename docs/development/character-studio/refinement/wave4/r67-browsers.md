@@ -151,3 +151,34 @@ Tests after the fixes:
 - `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 57 warnings.
 
 No visual change: the pages draw as before, and the sheets still stand.
+
+## Review fixes 2
+
+The second review found one blocking defect, and it was real: picking a tile from the no-bar state made the 52-point "Trying on" bar appear, every tile moved down under the still pointer, and the next frame's Hover tried on the tile **above** the one clicked (click in the top third of Long: the bar said "Trying on Long", the character wore Bob). The reverse happened too: clicking the Worn tile while a bar was open (Select(None)) took the bar away, the tiles moved up, and the tile below was tried on. Two tests reproduce both, written first and seen failing (appended to `r67-browsers-red-run.txt`):
+
+- `clicking_near_a_tiles_top_tries_on_that_tile`: Show drafts on; real pointer events through `workspace.ui` in one egui context; the point is about 15 points below the top of the Long tile (found from the Long and Bob labels; the test first checks a hover there previews Long); move, press, release, three still frames. Red: `left: Some("axcenity/hair-bob")`, `right: Some("axcenity/hair-long")`.
+- `clicking_the_worn_tile_while_trying_one_on_previews_nothing`: Bob is worn (first row, Long below it); click Long, then click the worn Bob tile's label, three still frames; `shown() == description()`. Red: `hovered: Some(axcenity/hair-long)`, the character wore Long. (A first version clicked Swept, which is in the last row with no tile below it, and passed on the old code; the test was moved to Bob so it can fail.)
+
+**Fix, both parts the review suggested:**
+1. **The grid no longer moves on a pick** (`panel/browser.rs`, `trying_bar` now takes `Option<&Pick>`). The bar is always drawn: with nothing picked it says "Point at a tile to try it on" in the muted text colour, with Wear and ✕ greyed (the same widgets, so the same height). Measured on the snapshot: disabled Wear fill (47, 61, 127) against (69, 98, 230) enabled; ✕ (62, 62, 66) against (161, 161, 170); the tiles start at the same y on both.
+2. **A click mutes the tile under the pointer, as Esc does** (`Browser::select`, called by `Browse::Select`). The clicked tile (the one hovered, else the pick) becomes `muted`, so a Hover the panel sends with a still pointer is ignored until the pointer moves (`hover_changed`'s existing rule). This covers any other shift under a still pointer (the worn item's controls appear or go after Wear or Esc). A click is still a new pick, even of a muted tile.
+
+Both tests pass after the fix, and so do the earlier 17 browser tests.
+
+Also from the non-blocking list:
+- `panel/worn.rs`: a `TODO(ux-drag)` on the colour picker (`color_palette::edit_srgb`), whose HSV and value fields are numeric controls too; they are shared with the Skin page, so the rule belongs in `color_palette` and needs an owner.
+- The topic doc and architecture §15c describe the always-drawn bar and the mute after a click.
+- The sheets `hair-drafts-off.jpg`, `hair-drafts-on.jpg`, `hair-preview.jpg`, `hair-search.jpg`, `clothing.jpg` and `clothing-filtered.jpg` are redrawn with the bar (the status line's local path painted over, as before). I looked at all of them at full size and at the bar cropped at 3x: the hint and greyed buttons read as inactive, and the tiles are unchanged. `realistic-clothing-*.jpg` and the 2x tile crops predate this fix (the realistic sheets show no idle bar; the tiles are the same).
+
+Tests after the fixes:
+- Red run, `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'`: 19 run, 17 passed, 2 failed (the two new tests).
+- Same filter widened, `-E 'test(/browser_tests::|shell_tests::|compare|character_workspace::tests::/)'`: 41 run, 41 passed.
+- `cargo nextest run -p axcenity-editor --no-fail-fast`: 1418 run, 1416 passed (9 slow, 1 leaky), 2 failed, 11 skipped, no ABORT lines. The 2 were `app::mcp::tests::the_open_editor_keeps_drawing_while_a_toolbox_download_runs` and `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, the same load failures both reviews saw; rerun alone with `-j 1`: 2 run, 2 passed.
+- `AXCENITY_SNAPSHOTS=<scratch> cargo test -p axcenity-editor --bin axcenity-editor -- the_browsers_are_drawn`: 1 passed (69 s).
+- `cargo clippy -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all`: run.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 57 warnings (none on pages this branch edits).
+
+For the lead at merge (added):
+- **ux-drag merge hazard:** the ux-drag branch removes `Row::typed` from `panel/row.rs`, but `panel/worn.rs` sets `typed: level == Level::Advanced`. The merge has no textual conflict but won't compile: drop that field from `worn.rs` when merging ux-drag, and the item sliders then get the 110-point, Shift and Ctrl rule.
+- `Browse::Select` now goes through `Browser::select`, which sets `muted`; `trying_bar` takes `Option<&Pick>`.
+- Still open (non-blocking, unchanged): no hover throttle, `browser_tiles` not cached, every edit re-keys the tile pictures, Recently used is also filled by Accessories wears, a worn draft is always listed (written in the topic doc; asset-quality.md §5 is not this branch's file), and the other items both reviews listed.

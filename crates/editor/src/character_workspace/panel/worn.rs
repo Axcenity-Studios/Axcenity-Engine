@@ -270,6 +270,11 @@ fn colour_button(
                 values: vec![(COLOUR_VALUE.to_owned(), to)],
                 gesture,
             };
+            // TODO(ux-drag): the colour picker's own HSV and value fields
+            // are numeric controls too (the drag rule: a full range in
+            // 100 to 120 points, Shift about 25%, Ctrl about 2x, typed
+            // values); they are egui's and shared with the Skin page, so
+            // the rule reaches them through `color_palette`, not here.
             if color_palette::edit_srgb(ui, &mut rgb).changed() {
                 let to = (Colour(rgb) != neutral).then_some(MaterialValue::Colour(Colour(rgb)));
                 // The shell closes the step when the pointer is let go.

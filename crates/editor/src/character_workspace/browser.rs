@@ -143,9 +143,10 @@ pub struct Browser {
     /// What the preview shows in the character's place while a tile is
     /// hovered or picked: the character wearing it.
     pub preview: Option<Description>,
-    /// The tile under the pointer when a preview ended (Esc, an edit):
-    /// hovering it doesn't preview it again until the pointer leaves it,
-    /// or the panel, still seeing the pointer there, would bring it back.
+    /// The tile under the pointer when a preview ended (Esc, an edit) or a
+    /// tile was clicked: no Hover is taken until the pointer moves off it,
+    /// or the panel, still seeing the pointer there (or a tile shifted
+    /// under it), would bring a preview back.
     pub muted: Option<Pick>,
 }
 
@@ -183,6 +184,17 @@ impl Browser {
         self.hovered = None;
         self.selected = None;
         self.preview = None;
+    }
+
+    /// A click on a tile: picks `pick` (`None`: the worn tile, ending the
+    /// pick). The clicked tile is muted, as after Esc, so whatever else
+    /// comes under the still pointer (should the tiles shift) isn't
+    /// previewed until the pointer moves. A click is a new pick, even of a
+    /// muted tile.
+    pub fn select(&mut self, pick: Option<Pick>) {
+        let clicked = self.hovered.take().or_else(|| pick.clone());
+        self.muted = clicked.or_else(|| self.muted.take());
+        self.selected = pick;
     }
 
     /// Whether the panel should report `hovered`, the tile under the
@@ -601,12 +613,7 @@ impl CharacterWorkspace {
                     return;
                 }
             }
-            Browse::Select(pick) => {
-                // A click is a new pick, even of the muted tile.
-                self.browser.muted = None;
-                self.browser.selected = pick;
-                self.browser.hovered = None;
-            }
+            Browse::Select(pick) => self.browser.select(pick),
         }
         let library = self.library();
         self.browser.update_preview(&self.description, &library);

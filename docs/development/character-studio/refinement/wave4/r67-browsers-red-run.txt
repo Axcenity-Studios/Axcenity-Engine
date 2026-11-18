@@ -41,3 +41,21 @@ FAIL character_workspace::browser_tests::esc_takes_a_try_on_off_while_the_pointe
   (the pointer stayed on the clicked tile; the next frame's Hover put the preview back)
 
 Summary [8.673s] 17 tests run: 15 passed, 2 failed, 1410 skipped
+
+== Review fixes 2: red run (before the fix) ==
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+        FAIL [   6.078s] (16/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile
+    test character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1423 filtered out; finished in 6.00s
+    thread 'character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile' panicked at crates\editor\src\character_workspace\browser_tests.rs:1282:5:
+      left: Some("axcenity/hair-bob")
+     right: Some("axcenity/hair-long")
+        FAIL [   6.142s] (17/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing
+    test character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1423 filtered out; finished in 6.00s
+    thread 'character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing' panicked at crates\editor\src\character_workspace\browser_tests.rs:1314:5:
+    assertion `left == right` failed: nothing is tried on (hovered: Some(Pick { slot: "hair", item: Some("axcenity/hair-long") }))
+     Summary [   9.047s] 19 tests run: 17 passed, 2 failed, 1410 skipped
+        FAIL [   6.078s] (16/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile
+        FAIL [   6.142s] (17/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing
+(The worn-tile failure's descriptions: shown wears axcenity/hair-long, the description wears axcenity/hair-bob.)

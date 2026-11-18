@@ -194,10 +194,10 @@ pub(super) fn page(
     }
     ui.add_space(4.0);
 
-    // What is being tried on, and the way to wear it.
-    if let Some(pick) = &state.selected {
-        intents.extend(trying_bar(ui, library, base, pick));
-    }
+    // What is being tried on, and the way to wear it. The bar is always
+    // there (a hint when nothing is picked), so picking a tile never moves
+    // the tiles under a still pointer: the tile above would be hovered.
+    intents.extend(trying_bar(ui, library, base, state.selected.as_ref()));
 
     // The worn items' own controls (colours, variants, parameters), above
     // the tiles so they're seen without scrolling; each folds away.
@@ -285,8 +285,8 @@ pub(super) fn page(
         intents.extend(grid(ui, workspace, &slot.id, &tiles, &mut hovered));
         ui.add_space(8.0);
     }
-    // After Esc the tiles can shift under a still pointer (the "Trying
-    // on" bar goes), so a muted tile waits for the pointer to move.
+    // After Esc or a click the tiles can shift under a still pointer (the
+    // worn controls change), so a muted tile waits for the pointer to move.
     let moved = ui.input(|input| input.pointer.delta() != egui::Vec2::ZERO);
     if state.hover_changed(&hovered, moved) {
         intents.push(Intent::Browse(Browse::Hover(hovered)));
@@ -344,11 +344,11 @@ fn trying_bar(
     ui: &mut egui::Ui,
     library: &Library,
     base: &BaseManifest,
-    pick: &Pick,
+    pick: Option<&Pick>,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
-    let label = match &pick.item {
+    let label = pick.map(|pick| match &pick.item {
         Some(id) => library
             .item(id)
             .map_or_else(|| id.clone(), |item| item.label.clone()),
@@ -356,34 +356,51 @@ fn trying_bar(
             .slot(&pick.slot)
             .and_then(|slot| slot.empty_label.clone())
             .unwrap_or_else(|| "Nothing".to_owned()),
-    };
+    });
     egui::Frame::new()
         .fill(palette.inset)
         .corner_radius(theme::radius::CARD)
         .inner_margin(egui::Margin::symmetric(8, 6))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(format!("Trying on {label}")).color(palette.text_strong),
-                )
-                .on_hover_text("Shown on the character only: nothing is changed until you wear it");
+                // The same widgets either way, so the bar keeps its height.
+                match &label {
+                    Some(label) => ui
+                        .label(
+                            egui::RichText::new(format!("Trying on {label}"))
+                                .color(palette.text_strong),
+                        )
+                        .on_hover_text(
+                            "Shown on the character only: nothing is changed until you wear it",
+                        ),
+                    None => ui.label(
+                        egui::RichText::new("Point at a tile to try it on")
+                            .color(palette.text_muted),
+                    ),
+                };
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add(widgets::button(
-                            widgets::Role::Primary,
-                            Some(icons::CHECK),
-                            "Wear",
-                            &palette,
-                        ))
+                    let wear = ui
+                        .add_enabled(
+                            pick.is_some(),
+                            widgets::button(
+                                widgets::Role::Primary,
+                                Some(icons::CHECK),
+                                "Wear",
+                                &palette,
+                            ),
+                        )
                         .on_hover_text("Wear it (you can undo it)")
-                        .clicked()
-                    {
+                        .on_disabled_hover_text("Click a tile first");
+                    if let Some(pick) = pick.filter(|_| wear.clicked()) {
                         intents.push(Intent::Wear {
                             slot: pick.slot.clone(),
                             item: pick.item.clone(),
                         });
                     }
-                    if widgets::icon_button(ui, icons::X, "Put it back (Esc)", false).clicked() {
+                    let back = ui.add_enabled_ui(pick.is_some(), |ui| {
+                        widgets::icon_button(ui, icons::X, "Put it back (Esc)", false)
+                    });
+                    if back.inner.clicked() {
                         intents.push(Intent::EndPreview);
                     }
                 });
