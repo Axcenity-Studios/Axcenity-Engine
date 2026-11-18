@@ -63,8 +63,11 @@ REGIONS = [
 # The short sleeve's band: faces whose every corner is within this share
 # of the upper arm along the bone, plus `SLEEVE_TILT` times how far the
 # face faces in (towards the side, under the arm: 1) or out (on top: -1).
-# Whole faces, so none reaches past a sleeve's hem: a hidden face there
-# would leave a hole in the arm (the fit gate's `hidden_showing`).
+# Whole faces, so none reaches past a sleeve's hem at rest. Whether a
+# garment may hide the band is the import's call: only where its skin
+# stays under the cloth in every fit pose (`avatar::fit::pose_safe_hides`;
+# the fit gate's `holes` checks it), which the test tee's short sleeve,
+# riding up the arm as it swings back, doesn't meet.
 SLEEVE_END = 0.8
 SLEEVE_TILT = 0.1
 # The neck's skin round the neck's joint: within this of the neck's line,

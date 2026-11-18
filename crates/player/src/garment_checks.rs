@@ -16,7 +16,9 @@
 //!   skin near it has.
 //!   No **tearing**: corners made at one place (a seam
 //!   split for its normals or texture) stay within [`TEAR`]. And no hair
-//!   corner goes more than [`HAIR_INSIDE`] inside the head.
+//!   corner goes more than [`HAIR_INSIDE`] inside the head. No **holes**:
+//!   skin a worn item hides stays under the cloth in every frame (the fit
+//!   gate's `holes`).
 //! - [`footwear`]: a shoe on a character in a pose: no covered foot corner
 //!   through the sole or the upper (a corner the shoe covers at rest, whose
 //!   ray out along its normal meets the shoe then, meets no shoe in the
@@ -38,7 +40,10 @@ use axcenity_avatar::{Description, WornItem};
 use axcenity_render::glam::Vec3;
 
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
-use super::fit_gate_tests::{Posed, TEE, benchmarks, gate_library, hem_corners, worn, worn_in};
+use super::fit_gate_tests::{
+    Posed, TEE, benchmarks, gate_library, hem_corners, hidden_triangles, holes, undressed, worn,
+    worn_in,
+};
 
 /// How much more a garment corner may jolt in a frame (its second
 /// difference, metres, at 60 frames a second) than the skin near it does,
@@ -90,6 +95,10 @@ pub(crate) struct MotionReport {
     /// the frames), and the deepest (m, positive inside).
     pub hair_inside: usize,
     pub hair_deepest: f32,
+    /// Hidden skin out from under the cloth (the fit gate's holes, summed
+    /// over the frames), and the farthest (m).
+    pub holes: usize,
+    pub hole_most: f32,
 }
 
 /// A limit an item broke: what (a garment's name and the check, `hair`),
@@ -197,6 +206,17 @@ impl MotionReport {
                     ),
                 );
             }
+        }
+        if self.holes > 0 {
+            add(
+                "holes".to_owned(),
+                self.hole_most,
+                format!(
+                    "{} hidden skin corners out from under the cloth, the farthest {:.2} mm",
+                    self.holes,
+                    self.hole_most * 1000.0
+                ),
+            );
         }
         if self.hair_inside > 0 {
             add(
@@ -330,7 +350,10 @@ pub(crate) fn motion(
     // The seams are found at rest, where corners made at one place are
     // still at one place (a seam already split in the first frame sampled
     // would be two places there, and never be seen to tear).
-    let (_, rest_garments) = worn(assets, description, Stance::Rest);
+    let (rest_body, rest_garments) = worn(assets, description, Stance::Rest);
+    // The skin the worn items hide, checked for holes in every frame.
+    let (bare, _) = worn(assets, &undressed(description), Stance::Rest);
+    let hidden = hidden_triangles(&bare, &rest_body);
     // Per garment: the skin near each corner, its welds and its last two
     // places; the skin's last two places.
     struct Track {
@@ -381,6 +404,14 @@ pub(crate) fn motion(
         skin_last.push(body.positions.clone());
         if skin_last.len() > 2 {
             skin_last.remove(0);
+        }
+        if !hidden.is_empty() {
+            let label = format!("{} {clip}@{frame}", description.name);
+            let (count, most) = holes(&label, &body, &hidden, &garments);
+            report.holes += count;
+            if count > 0 {
+                report.hole_most = report.hole_most.max(most);
+            }
         }
         if !hair.is_empty() {
             let (count, deepest) = hair_in_head(&body, &hair);
@@ -490,8 +521,8 @@ impl FootReport {
 
 /// Which body corners the shoe covers, posed as `body` and `shoe` are: a
 /// ray from the corner out along its normal meets the shoe within 4 cm,
-/// away from its hems (the collar and the opening). `None` for a corner
-/// it doesn't.
+/// away from its hems (the collar and the opening): one flag per corner,
+/// false for a corner it doesn't cover.
 fn foot_cover(body: &Posed, shoe: &Posed) -> Vec<bool> {
     let surface = Surface::new(
         shoe.positions.clone(),
@@ -672,7 +703,7 @@ fn check_motion(stage: &Stage, cast: &[Description], clip: &'static str, records
     for description in cast {
         let report = motion(&stage.assets, description, clip, frames_of(clip));
         println!(
-            "{} {clip}: {} frames; {}; hair inside {} (deepest {:.2} mm)",
+            "{} {clip}: {} frames; {}; hair inside {} (deepest {:.2} mm); holes {} ({:.2} mm)",
             report.character,
             report.frames,
             report
@@ -689,7 +720,9 @@ fn check_motion(stage: &Stage, cast: &[Description], clip: &'static str, records
                 .collect::<Vec<_>>()
                 .join(", "),
             report.hair_inside,
-            report.hair_deepest * 1000.0
+            report.hair_deepest * 1000.0,
+            report.holes,
+            report.hole_most * 1000.0
         );
         assert!(
             !report.garments.is_empty(),
@@ -880,7 +913,7 @@ fn the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head() {
     let (count, deepest) = hair_in_head(&skin, &[hair]);
     assert_eq!(count, 1);
     assert!((deepest - 0.002).abs() < 1e-4, "{deepest}");
-    // A report with a pop and a tear names both.
+    // A report with a pop, a tear, hair in the head and holes names each.
     let report = MotionReport {
         character: "c".to_owned(),
         clip: "Walk".to_owned(),
@@ -894,8 +927,16 @@ fn the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head() {
         }],
         hair_inside: 1,
         hair_deepest: 0.002,
+        holes: 2,
+        hole_most: 0.004,
     };
-    assert_eq!(report.problems().len(), 3, "{:?}", report.problems());
+    let problems = report.problems();
+    assert_eq!(problems.len(), 4, "{problems:?}");
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.what == "holes" && p.amount == 0.004)
+    );
 }
 
 /// A garment that moves with the skin passes a frame; one corner thrown

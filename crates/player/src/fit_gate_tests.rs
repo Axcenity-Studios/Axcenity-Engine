@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use axcenity_assets::{Assets, Model};
-use axcenity_avatar::fit::{ImportRequest, Surface, import_garment};
+use axcenity_avatar::fit::{ImportRequest, Surface, import_garment, outside_cloth};
 use axcenity_avatar::{Catalogue, CatalogueBase, CatalogueItem, Description, Library, WornItem};
 use axcenity_core::{ClassName, InstanceId, Value, World};
 use axcenity_render::glam::{Mat3, Vec3};
@@ -85,7 +85,7 @@ pub(super) fn gate_library() -> &'static Path {
                 std::fs::copy(shipped.join(file), &target).unwrap();
             }
             std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
-            import_garment(&ImportRequest {
+            let imported = import_garment(&ImportRequest {
                 source: tee.clone(),
                 library: made.to_owned(),
                 base: "axcenity/realistic".to_owned(),
@@ -105,6 +105,17 @@ pub(super) fn gate_library() -> &'static Path {
                 finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
             })
             .expect("the test tee imports");
+            // What it hides, and what it covers at rest but leaves drawn
+            // because the skin comes out from under it in a fit pose.
+            println!(
+                "the test tee hides {:?}; not {:?}",
+                imported.manifest.hides,
+                imported
+                    .unhidden
+                    .iter()
+                    .map(|(id, out)| format!("{id} ({:.1} mm out)", out * 1000.0))
+                    .collect::<Vec<_>>()
+            );
         });
         cache.join(&key)
     })
@@ -397,17 +408,34 @@ pub(super) fn covered(under: &Posed, garment: &Posed, reach: f32) -> Vec<bool> {
         .filter(|t| t.iter().all(|v| !hem[*v as usize]))
         .collect();
     let surface = Surface::new(garment.positions.clone(), garment.normals.clone(), inner);
+    let whole = Surface::new(
+        garment.positions.clone(),
+        garment.normals.clone(),
+        garment.triangles.clone(),
+    );
     under
         .positions
         .iter()
         .zip(&under.normals)
         .map(|(p, n)| {
-            surface
-                .closest(*p, reach)
-                .is_some_and(|hit| hit.is_over(*p) && n.dot(hit.normal) > 0.5)
+            surface.closest(*p, reach).is_some_and(|hit| {
+                hit.is_over(*p)
+                    && n.dot(hit.normal) > 0.5
+                    // Skin nearer a hem (or the rim folded under it) than
+                    // the cloth over it by more than `BESIDE_HEM` is
+                    // beside the hem, not under the cloth (review fixes
+                    // 2: the boxer briefs' gusset edge).
+                    && whole
+                        .closest(*p, reach)
+                        .is_none_or(|near| hit.distance <= near.distance + BESIDE_HEM)
+            })
         })
         .collect()
 }
+
+/// How much farther than the garment's nearest point (a hem's, or its
+/// rim's) the cloth over a corner may be for the corner to be under it.
+const BESIDE_HEM: f32 = 0.01;
 
 /// How many of `under`'s covered corners (`covered`, from
 /// [`covered`] at rest) are more than `POKE` outside `garment` in this
@@ -461,6 +489,63 @@ pub(super) fn poke_through(
     (count, worst)
 }
 
+/// The body triangles the worn items hide (review fixes 2): those `bare`
+/// (the body with nothing worn) draws and `dressed` doesn't. Both are the
+/// same body at rest, so they share their corners.
+pub(super) fn hidden_triangles(bare: &Posed, dressed: &Posed) -> Vec<[u32; 3]> {
+    let drawn: std::collections::HashSet<[u32; 3]> = dressed.triangles.iter().copied().collect();
+    bare.triangles
+        .iter()
+        .copied()
+        .filter(|t| !drawn.contains(t))
+        .collect()
+}
+
+/// Holes: how many corners of the body's `hidden` triangles (left out of
+/// the drawing by the worn items, [`hidden_triangles`]) are more than
+/// `POKE` outside every garment in this pose (`avatar::fit::outside_cloth`,
+/// the rule the import hides regions by), and the worst. Hiding a region takes its skin out of [`poke_through`]'s count,
+/// so this is what keeps hiding honest: hidden skin the cloth doesn't
+/// cover in a pose is a hole a player sees through.
+pub(super) fn holes(
+    label: &str,
+    body: &Posed,
+    hidden: &[[u32; 3]],
+    garments: &[Posed],
+) -> (usize, f32) {
+    let surfaces: Vec<Surface> = garments
+        .iter()
+        .filter(|g| !is_footwear(g))
+        .map(|g| Surface::new(g.positions.clone(), g.normals.clone(), g.triangles.clone()))
+        .collect();
+    let mut all = body.triangles.clone();
+    all.extend_from_slice(hidden);
+    let skin = Surface::new(body.positions.clone(), body.normals.clone(), all);
+    let mut corners: Vec<u32> = hidden.iter().flatten().copied().collect();
+    corners.sort_unstable();
+    corners.dedup();
+    let mut count = 0;
+    let mut worst = f32::NEG_INFINITY;
+    for k in corners {
+        let (p, n) = (body.positions[k as usize], body.normals[k as usize]);
+        let out = outside_cloth(&surfaces, &skin, p, n);
+        worst = worst.max(out);
+        if out > POKE {
+            count += 1;
+            if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
+                println!(
+                    "  {label} hole: hidden corner {k} out {:.1} mm at {p} (normal {n})",
+                    out * 1000.0
+                );
+            }
+        }
+    }
+    (count, worst)
+}
+
+/// The name holes are recorded under in the gate.
+pub(super) const HOLES: &str = "hidden skin showing";
+
 /// Layered pairs the gate checks: (the lower layer, the upper one). A
 /// lower layer never comes through the upper one where the upper one
 /// covers it at rest.
@@ -479,11 +564,17 @@ const LAYERS: [(&str, &str); 3] = [
 pub(super) struct Cover {
     body: Vec<(String, Vec<bool>)>,
     layers: Vec<(&'static str, &'static str, Vec<bool>)>,
+    /// The body triangles the worn items hide ([`hidden_triangles`]),
+    /// checked for holes in every pose.
+    hidden: Vec<[u32; 3]>,
 }
 
-pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed]) -> Cover {
+/// `bare` is the same body at rest with nothing worn, to find the skin
+/// the worn items hide.
+pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed], bare: &Posed) -> Cover {
     let find = |name: &str| garments.iter().find(|g| g.name == name);
     Cover {
+        hidden: hidden_triangles(bare, body),
         body: garments
             .iter()
             .filter(|g| !is_footwear(g))
@@ -497,6 +588,13 @@ pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed]) -> Cover {
             })
             .collect(),
     }
+}
+
+/// `description` with nothing worn: its whole body drawn.
+pub(super) fn undressed(description: &Description) -> Description {
+    let mut bare = description.clone();
+    bare.items.clear();
+    bare
 }
 
 /// Shoes are measured by the footwear check (`garment_checks`), which
@@ -611,6 +709,13 @@ fn measure(
         checked += 1;
         fail(&format!("{lower} through {upper}"), count, worst);
     }
+    // Holes: skin the worn items hide that their cloth doesn't cover here.
+    if !cover.hidden.is_empty() {
+        let label = format!("{name} {}", pose_name(stance));
+        let (count, worst) = holes(&label, body, &cover.hidden, garments);
+        checked += 1;
+        fail(HOLES, count, worst);
+    }
     checked
 }
 
@@ -705,7 +810,8 @@ fn gate(stance: Stance, known: &[Known]) {
             "{}: {names:?}",
             description.name
         );
-        let cover = cover_at_rest(&body, &garments);
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let cover = cover_at_rest(&body, &garments, &bare);
         let (body, garments) = if stance == Stance::Rest {
             (body, garments)
         } else {
@@ -730,45 +836,36 @@ fn gate(stance: Stance, known: &[Known]) {
 
 // What the realistic gate still finds (wave 4, CO9 part 2), per garment
 // and pose: open defects of drafts (`refinement/wave4/co9-fit-2.md`), not
-// accepted behaviour, each at or under its wave-3 record. Lower these as
-// items improve; never raise one.
+// accepted behaviour. Lower these as items improve; never raise one to
+// pass an item.
 //
-// - The test tee, with the arms raised: was every body (54) up to 16 mm,
-//   the neck's base rising into a crew neck closed round the neck to cover
-//   the sports bra's straps. The straps now sit on the shoulders, the tee
-//   has an ordinary crew neck, and (review fixes 1) the skin it covers at
-//   the base of the neck is the torso's, which it hides: none. The bra
-//   through it: 4 bodies, 3.9 mm at wave 3; now 2, 3.6 mm.
-// - The test tee in the walk: every body up to 31.4 mm at the wave-3
-//   merge, 37 to 92 skin corners each, at the chest by the armpit and the
-//   inside of the upper arm, where the hanging arm meets the side. Since
-//   review fixes 1 the tee hides the torso and the upper arm under its
-//   sleeve (`regions.py`'s neck cut and `upper_arms_mid`, `avatar`'s
-//   closed creases): 50 bodies, 1 to 9 corners each, up to 23.7 mm, at
-//   the front of the upper arm by the sleeve's end, past the band it
-//   hides. The bra through it is unchanged: 21 bodies, 17.4 mm, at the
-//   front of the armpit and the side band under it.
-// - The boxer briefs on the masculine heavy-soft body: one skin corner by
-//   the gusset's edge, 13.3 mm out (14.6 at wave 3) at rest and 17.9 mm in
-//   the walk, which the underwear's push-out (with the benchmark bodies
-//   among its states now) doesn't reach.
-
-/// The boxer briefs on the masculine heavy-soft body (above).
-fn boxer(pose: &'static str) -> Known {
-    Known {
-        garment: "Underwear_BoxerBriefs",
-        pose,
-        cases: 1,
-        worst: if pose == "Walk@18" { 0.0179 } else { 0.0134 },
-    }
-}
+// - The test tee in the walk: every body (54), up to 30.2 mm (31.4 at the
+//   wave-3 merge), at the front of the armpit and the side under it as
+//   the arm swings back, where the cloth bridging the arm and the side
+//   follows the arm. Review fixes 1 brought this to 50 bodies at 23.7 mm
+//   by hiding the torso and the upper arm under the sleeve; review fixes
+//   2 found that hiding left holes (hidden skin out from under the cloth:
+//   up to 38 mm in the walk on 38 bodies, 45 mm at rest on 25 heavy
+//   ones), so the tee now hides only what stays covered in every fit
+//   pose, the waist, and this record is back at its first wave-4 value.
+//   The bra through it: 21 bodies, 17.4 mm, at the front of the armpit
+//   and the side band under it.
+// - The test tee with the arms raised: 2 bodies, 5.1 mm (every body, 16
+//   mm, at wave 3), at the base of the neck; back at its first wave-4
+//   value for the same reason. The bra through it: 2 bodies, 3.6 mm.
+// - Holes (`HOLES`): none. Every pose of the gate checks them.
+// - The boxer briefs: none. The masculine heavy-soft body's one corner
+//   (13.3 mm at rest, 17.9 mm in the walk) was skin beside the leg
+//   opening at the gusset's edge, nearest the rim folded under the hem
+//   (15 mm away) and counted covered by cloth 34 mm off: `covered` now
+//   leaves skin nearer a hem than the cloth over it (`BESIDE_HEM`) out.
 
 /// The name a lower layer coming through the tee is recorded under.
 const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
 
 #[test]
 fn garments_cover_the_cast_at_rest() {
-    gate(Stance::Rest, &[boxer("rest")]);
+    gate(Stance::Rest, &[]);
 }
 
 /// The walk at its widest swing (the right arm back 43 degrees, the left
@@ -784,8 +881,8 @@ fn garments_cover_the_cast_walking() {
             Known {
                 garment: "TestTee",
                 pose: "Walk@18",
-                cases: 50,
-                worst: 0.0238,
+                cases: 54,
+                worst: 0.0302,
             },
             Known {
                 garment: BRA_THROUGH_TEE,
@@ -793,14 +890,13 @@ fn garments_cover_the_cast_walking() {
                 cases: 21,
                 worst: 0.0174,
             },
-            boxer("Walk@18"),
         ],
     );
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_arms_out() {
-    gate(Stance::Held(HeldPose::TPose), &[boxer("TPose")]);
+    gate(Stance::Held(HeldPose::TPose), &[]);
 }
 
 #[test]
@@ -809,24 +905,29 @@ fn garments_cover_the_cast_with_the_arms_raised() {
         Stance::Held(HeldPose::ArmsRaised),
         &[
             Known {
+                garment: "TestTee",
+                pose: "ArmsRaised",
+                cases: 2,
+                worst: 0.0052,
+            },
+            Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "ArmsRaised",
                 cases: 2,
                 worst: 0.0036,
             },
-            boxer("ArmsRaised"),
         ],
     );
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_elbows_bent() {
-    gate(Stance::Held(HeldPose::ElbowsBent), &[boxer("ElbowsBent")]);
+    gate(Stance::Held(HeldPose::ElbowsBent), &[]);
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_knees_bent() {
-    gate(Stance::Held(HeldPose::KneesBent), &[boxer("KneesBent")]);
+    gate(Stance::Held(HeldPose::KneesBent), &[]);
 }
 
 /// The ratchet: a garment and pose recorded in `known` passes at its
@@ -864,23 +965,93 @@ fn the_gate_holds_garments_to_their_records() {
     }
 }
 
-/// Wearing the tee leaves the regions it covers whole out of the body
-/// drawn (a model with hidden regions, made live), and taking it off puts
-/// them back.
+/// A flat square of cloth (`size` across, `cells` a side, at height `z`,
+/// facing up), named `name`.
+fn sheet(name: &str, size: f32, cells: u32, z: f32) -> Posed {
+    let mut out = Posed {
+        name: name.to_owned(),
+        positions: Vec::new(),
+        normals: Vec::new(),
+        triangles: Vec::new(),
+    };
+    for j in 0..=cells {
+        for i in 0..=cells {
+            let at = |k: u32| (k as f32 / cells as f32 - 0.5) * size;
+            out.positions.push(Vec3::new(at(i), at(j), z));
+            out.normals.push(Vec3::Z);
+        }
+    }
+    let row = cells + 1;
+    for j in 0..cells {
+        for i in 0..cells {
+            let a = j * row + i;
+            out.triangles.push([a, a + 1, a + row + 1]);
+            out.triangles.push([a, a + row + 1, a + row]);
+        }
+    }
+    out
+}
+
+/// Skin under the middle of a sheet of cloth is covered; with a hem's
+/// rim (a strip that is all hem) much nearer it than the cloth over it,
+/// it is beside the hem, not under the cloth (`BESIDE_HEM`).
+#[test]
+fn skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered() {
+    let skin = Posed {
+        name: "Body".to_owned(),
+        positions: vec![Vec3::new(0.0, 0.0, -0.025)],
+        normals: vec![Vec3::Z],
+        triangles: Vec::new(),
+    };
+    let cloth = sheet("Cloth", 0.2, 10, 0.0);
+    assert_eq!(covered(&skin, &cloth, 0.04), [true]);
+    // A small rim 5 mm over the skin, 20 mm under the cloth: one cell,
+    // all of it hem.
+    let mut with_rim = cloth.clone();
+    let rim = sheet("Rim", 0.01, 1, -0.02);
+    let start = with_rim.positions.len() as u32;
+    with_rim.positions.extend(rim.positions);
+    with_rim.normals.extend(rim.normals);
+    with_rim
+        .triangles
+        .extend(rim.triangles.iter().map(|t| t.map(|v| v + start)));
+    assert_eq!(covered(&skin, &with_rim, 0.04), [false]);
+    // The rim 18 mm off, the cloth 25 mm: within `BESIDE_HEM`, covered.
+    let mut far_rim = cloth.clone();
+    let rim = sheet("Rim", 0.01, 1, -0.007);
+    let start = far_rim.positions.len() as u32;
+    far_rim.positions.extend(rim.positions);
+    far_rim.normals.extend(rim.normals);
+    far_rim
+        .triangles
+        .extend(rim.triangles.iter().map(|t| t.map(|v| v + start)));
+    assert_eq!(covered(&skin, &far_rim, 0.04), [true]);
+}
+
+/// Wearing the tee leaves the regions it covers whole, in every fit pose,
+/// out of the body drawn (a model with hidden regions, made live), and
+/// taking it off puts them back.
 #[test]
 fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
     let stage = Stage::new("fit-gate-hiding", gate_library()).expect("the stage");
     let library = Library::read(gate_library()).0;
     let tee = library.item(TEE).unwrap();
-    // The tee covers whole, and hides, the torso (the skin round the
-    // neck a crew neck leaves bare is the neck's), the waist, and the
-    // upper arm to where its sleeve ends: `upper_arms_top` and
-    // `upper_arms_mid`, with the armpit's crease between them (review
-    // fixes 1). Not the rest of the upper arm, nor the neck.
-    for region in ["torso", "waist", "upper_arms_top", "upper_arms_mid"] {
-        assert!(tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
-    }
-    for region in ["neck", "upper_arms_low", "forearms"] {
+    // The tee covers the torso, the waist and the upper arm under its
+    // sleeve (`upper_arms_top`, `upper_arms_mid`) whole at rest, but hides
+    // only the waist (review fixes 2): in the fit's poses the torso's skin
+    // comes out at the front of the armpit and the side under the arm, and
+    // the upper arm's past the sleeve's end as it rides up, so hiding them
+    // left holes (`avatar::fit::pose_safe_hides`). Never the rest of the
+    // upper arm, nor the neck.
+    assert!(tee.hides.contains(&"waist".to_owned()), "{:?}", tee.hides);
+    for region in [
+        "torso",
+        "upper_arms_top",
+        "upper_arms_mid",
+        "neck",
+        "upper_arms_low",
+        "forearms",
+    ] {
         assert!(!tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
     }
     let mut description = bodies()
@@ -896,7 +1067,7 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
         bare.triangles.len(),
         dressed.triangles.len()
     );
-    assert!(hidden >= 2000, "{hidden} triangles hidden");
+    assert!(hidden >= 200, "{hidden} triangles hidden");
     // The corners stay the same: only what is drawn changes.
     assert_eq!(bare.positions.len(), dressed.positions.len());
     description.items.retain(|worn| worn.id != TEE);
@@ -904,15 +1075,16 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
     assert_eq!(again.triangles.len(), bare.triangles.len());
 }
 
-/// The stylized family's own clothes (fitted by their copies of the body's
-/// shapes, ADR-0030's way): an outfit on the stylized cast and body
-/// extremes, measured with the same rule as the realistic items, at rest
-/// and in the T-pose.
+/// The walk at its widest stride.
 const STYLIZED_WALK: Stance = Stance::Clip {
     name: "Walk",
     frames: 18,
 };
 
+/// The stylized family's own clothes (fitted by their copies of the body's
+/// shapes, ADR-0030's way): the underwear alone and an outfit over it on
+/// the stylized cast, measured with the same rule as the realistic items,
+/// at rest, in the walk and in the T-pose.
 #[test]
 fn stylized_clothes_cover_the_stylized_cast() {
     let stage = Stage::new("fit-gate-stylized", &repository_library()).expect("the stage");
@@ -929,28 +1101,26 @@ fn stylized_clothes_cover_the_stylized_cast() {
                 dressed.items.push(WornItem::new(id));
             }
         }
-        let (body, garments) = worn(&stage.assets, &dressed, Stance::Rest);
-        let cover = cover_at_rest(&body, &garments);
-        checked += measure(
-            &description.name,
-            Stance::Rest,
-            &body,
-            &garments,
-            &cover,
-            &mut failures,
-        );
-        // The T-pose, and the walk at its widest stride, where the tee's
-        // hem lies over the cargo pants' waistband (`LAYERS`).
-        for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
-            let (body, garments) = worn(&stage.assets, &dressed, stance);
-            checked += measure(
-                &description.name,
-                stance,
-                &body,
-                &garments,
-                &cover,
-                &mut failures,
-            );
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        // The underwear alone as well as under the outfit (review fixes
+        // 2): the cargo pants hide the hips and thighs, and their mask
+        // shape sinks the skin there, under the briefs too, so dressed the
+        // briefs can't show what they do worn alone.
+        let underwear = description.clone();
+        let outfits = [
+            (format!("{} underwear", description.name), underwear),
+            (description.name.clone(), dressed),
+        ];
+        for (name, outfit) in &outfits {
+            let (body, garments) = worn(&stage.assets, outfit, Stance::Rest);
+            let cover = cover_at_rest(&body, &garments, &bare);
+            checked += measure(name, Stance::Rest, &body, &garments, &cover, &mut failures);
+            // The T-pose, and the walk at its widest stride, where the
+            // tee's hem lies over the cargo pants' waistband (`LAYERS`).
+            for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
+                let (body, garments) = worn(&stage.assets, outfit, stance);
+                checked += measure(name, stance, &body, &garments, &cover, &mut failures);
+            }
         }
     }
     println!(
@@ -966,8 +1136,7 @@ fn stylized_clothes_cover_the_stylized_cast() {
     // through; the cargo pants at the crotch, 2.4 mm (34 mm at wave 3,
     // when the shoes' insides counted). The sports top through the tee
     // (new in wave 4: layered pairs are checked) at the sides of the
-    // chest. The shoes are the footwear check's (`garment_checks`); the
-    // briefs have none.
+    // chest. The shoes are the footwear check's (`garment_checks`).
     let known = [
         ("Shirt_Tee", "rest", 6, 0.0247),
         ("Shirt_Tee", "TPose", 6, 0.0249),
@@ -982,6 +1151,16 @@ fn stylized_clothes_cover_the_stylized_cast() {
         ("Shirt_Tee", "Walk@18", 16, 0.0247),
         ("Underwear_Top", "Walk@18", 1, 0.0053),
         ("Underwear_Top through Shirt_Tee", "Walk@18", 12, 0.0025),
+        // The underwear alone (new in review fixes 2; dressed, the cargo
+        // pants' mask sank the skin under the briefs): the feminine briefs
+        // in the walk, the right buttock's skin 1.2 to 1.9 mm through on
+        // every feminine body (the patch the full-detail capture shows);
+        // the masculine briefs at rest and in the T-pose, one corner by
+        // the front of the crotch 28 mm out, where small notches of skin
+        // show under the hem.
+        ("Underwear_Briefs", "Walk@18", 8, 0.0019),
+        ("Underwear_Briefs", "rest", 4, 0.0280),
+        ("Underwear_Briefs", "TPose", 4, 0.0280),
     ]
     .map(|(garment, pose, cases, worst)| Known {
         garment,

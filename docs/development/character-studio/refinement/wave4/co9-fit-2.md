@@ -258,7 +258,7 @@ The sheets are in-engine captures (release, studio light, 1280 × 720, cropped a
   - I tried widening the band. Hidden faces then reached past the sleeve's hem: a 0.8 band measured by the face's middle and not its corners put corners of hidden faces 20 to 30 mm past the hem at rest, which would be holes. So I made the band whole faces.
   - The bra through the tee is not something hiding can fix (an item can't hide another item's triangles). It is the cause of the visible spot at the feminine heavyset body's armpit.
 - **A check I tried and dropped.** I tried a gate check that hidden skin never shows (a ray from each hidden corner, toward the camera or along its normal, meets nothing drawn). It flagged hundreds of corners that no capture shows, so I removed it rather than ship an unreliable rule.
-- **Captures: no hole in any standard view.** I checked `rf1-tee-rest.jpg`, `rf1-tee-walk.jpg` and `rf1-tee-arms-raised.jpg`: four bodies; front, three-quarter, side and back.
+- **Captures: no hole in any standard view.** I checked `rf1-tee-rest.jpg`, `rf1-tee-walk.jpg` and `rf1-tee-arms-raised.jpg`: four bodies; front, three-quarter, side and back. **Wrong (corrected in review fixes 2):** those sheets were 1280x720 crops at 2x; at 4K the walk shows jagged holes in the arm below the sleeve's end (`rf2-sleeve-holes.jpg`), and the hiding is withdrawn.
 - **Hidden skin seen from below is not checked.** Looking up a sleeve into the armpit, or under a hem, a hole may show. The waist the tee has hidden since wave 3 has the same exposure. This is recorded in Known-Limitations.
 - **For the lead.** A top built on this branch still fails the walk (the sleeve's end and the bra through it), so this needs your formal re-scope before a content track starts on it. Ways forward:
   - a posed fit that pulls the sleeve's front in when the arm swings back;
@@ -274,7 +274,7 @@ The sheets are in-engine captures (release, studio light, 1280 × 720, cropped a
 - **Next step.** Log `push_out`'s `over()` for corner 3727 in the heavy-soft state, in Blender. Records unchanged (13.4 / 17.9 mm).
 
 **3. The stylized clothes: blotches confirmed as levels of detail; the hem traced, not refitted.**
-- **The blotches are the level-of-detail defect.** The capture records the body at level 0 and the underwear at level 1 (`captures.json`). I added `AXCENITY_CAPTURE_FULL_DETAIL=<part>` (the editor's LOD preview, applied to one part in a capture). With the briefs forced to full detail, they show no skin at all, while the sports top at level 1 still shows blotches (`rf1-stylized-lod.jpg`). This is CO18's "character LOD sets switched together". Known-Limitations now says it is confirmed.
+- **The blotches are the level-of-detail defect.** The capture records the body at level 0 and the underwear at level 1 (`captures.json`). I added `AXCENITY_CAPTURE_FULL_DETAIL=<part>` (the editor's LOD preview, applied to one part in a capture). With the briefs forced to full detail, they show no skin at all, while the sports top at level 1 still shows blotches (`rf1-stylized-lod.jpg`). **Wrong for the feminine briefs (corrected in review fixes 2):** at full detail they still show a skin patch on the right buttock in the walk, the briefs' own clearance; only the masculine briefs are clean. This is CO18's "character LOD sets switched together". Known-Limitations now says it is confirmed.
 - **The hem.** The ragged edge is there at rest too, not only in the walk (`rf1-stylized-hem.jpg`). It is the tee's jagged hem band lying over a waistband tucked 3 mm under it.
   - The gate's pair (`Pants_Cargo` through `Shirt_Tee`) finds nothing, because the hem's two rings are left out.
   - With one ring it finds 32 corners up to 16 mm. Those are false cases: the cloth there is the hem's downward-facing edge, and the waistband below it is past the hem. So I kept two rings.
@@ -386,3 +386,156 @@ The feminine half-millimetre tolerance is gone. The apex fold (up to 18.4 mm) an
 - **Rebuild.** Rebuild `RealisticParts.glb`, `RealisticRegions.png`, `Realistic.base.json` and `Realistic.build.json` with `build.py` from this branch: `regions.py` and `manifests.py` changed. Run `python3 -I assets/characters/catalogue.py`; it gives no content change.
 - **Other branches.** One that adds a region, or reads region counts, must use index 15 for `upper_arms_mid`; there is none left after it.
 - **The gate library cache** rebuilds itself.
+
+## Review fixes 2
+
+**In one paragraph.** The second review's main finding was right: hiding the skin the tee covers cut holes in the arm below the sleeve's end in the walk, and most of review fixes 1's walk gain came from no longer drawing the skin, not from a better fit.
+- **Holes are now measured.** The fit gate counts them in every pose, the motion check in every frame of the Idle, Walk and Run.
+- **The import hides only what stays covered in every fit pose** (`avatar::fit::pose_safe_hides`). So the test tee hides only the waist, and the records go back to the first wave-4 values: the walk at 54 bodies and 30.2 mm, the arms raised at 2 bodies and 5.1 mm. **The main goal is still not met; this needs the lead's re-scope.**
+- **The boxer briefs' gusset case is gone.** It was a rule artefact: skin beside the leg opening that the gate counted as covered.
+- **The stylized briefs' skin patch is now found.** The gate measures the underwear alone, and the cases are recorded.
+- **The stylized tee's hem is not fixed.** I traced it further, but the cause is not found.
+
+### Blocking items
+
+**1. The test tee in the walk and the bra through it: not met; needs the lead's re-scope.**
+- **What I tried and measured.**
+  - *Route (a), region hiding: withdrawn* (item 2). Its gain was skin left undrawn where it came out from under the cloth.
+  - *More rounds of the posed fit's following* (`FOLLOW_ROUNDS` from 4 to 16): the walk went from 30.19 to 29.83 mm and the arms raised from 5.13 to 5.09 mm. No real change, so I reverted it. The following has converged; its target is the problem.
+  - *A skin-contact test of the remaining walk cases* (dumps of the 18 cast bodies at Walk@18). Of 506 failing corners more than 5 mm out, only 20 have skin facing them across a crease within 8 mm; on most, a ray out along the normal meets no skin within 20 cm. So these are open places a camera can see, not an arm pressed against the side, and no contact rule could honestly excuse them.
+  - *Where they are.* The front of the armpit and the side under it, on the arm swung back (for example, masculine average: x −0.17, y 1.19, z +0.066 m). The cloth that bridges the arm and the side is bound to the arm and follows it back, leaving the chest's skin outside.
+- **What is left.** Two routes, either beyond one review round:
+  - a garment made with the arms nearer hanging (route 2), with an underarm that doesn't bridge;
+  - a binding that splits the bridging cloth between the arm and the side (cloth proxies or deformer maps, ADR-0035).
+
+  The bra through the tee (21 bodies, 17.4 mm) is in the same place.
+- **For the lead.** Either record these as accepted open defects for this milestone and tell the content track that the first top starts from a failing walk gate, or give one of those routes its own task. The content track can still use everything else here: the gate, the hole check, the motion and footwear helpers, and pose-safe hiding.
+
+**2. The holes at the sleeve end: fixed, and checked from now on.**
+- **The check.**
+  - `fit_gate_tests::hidden_triangles` finds the body triangles the worn items hide (drawn bare, not drawn dressed).
+  - `holes` counts their corners that are more than 1 mm outside every garment in the pose, using `avatar::fit::outside_cloth`:
+    - where the cloth is over the skin, the distance out along the cloth's normal;
+    - where the nearest cloth is beside the skin, past an edge (a sleeve's hem that rode up), the whole distance to it;
+    - nothing where the skin is shut in a crease: its ray out meets the garment from inside within 15 cm, or meets the skin facing back across the crease within 4 cm.
+  - The gate records holes as `hidden skin showing` in every pose. `motion` checks them in every frame (`MotionReport::holes`).
+- **Tuned against what the captures show.**
+  - A first version, with a 5 cm reach and no crease rules, flagged the armpit's apex at rest on every body, where the cloth is 5 to 6 cm away. The rest captures show no hole there, so I added the crease rules.
+  - On the review-fixes-1 import, the check finds holes at the sleeve ends in the walk, exactly where the reviewer's 4K diffs fall. In all:
+    - the walk: 38 bodies, up to 38 mm;
+    - at rest, under the arm on 25 heavy bodies: up to 45 mm. The skin is outside the tee's side there, out of view behind the arm;
+    - with the arms raised: 1 body, 34 mm.
+
+    (These were run before the skin across a crease had to face back. `co9-fit-2-red-run.txt` has them.)
+- **The fix is in the import, not the regions.** Shrinking `upper_arms_mid` alone wouldn't have done it: with only the torso and waist hidden (no upper-arm bands), the walk still had holes on 33 bodies, and the rest case is torso skin.
+  - `avatar::fit::pose_safe_hides` keeps a covered region in `hides` only if none of its corners is more than 1 mm outside the fitted garment. That is checked at rest and in every fit pose (`fit_poses`: arms hanging, T-pose, arms raised, elbows and knees bent, four walk swings), on every pose state (both frames, the build corners, the body presets).
+  - What it drops is reported in `Imported::unhidden`. For the test tee: `torso` 46.7 mm out, `upper_arms_top` 51.4 mm, `upper_arms_mid` 45.3 mm. It keeps only `waist`.
+  - Any garment imported from now on gets this. A content track's top hides only what it truly keeps covered.
+- **Result.**
+  - No holes in any gate pose on all 54 bodies, and none in any frame of the Idle, Walk or Run on the 18 cast bodies.
+  - At 4K, Walk@0.3, the same four bodies and views as the review: the pixel differences between hiding the four regions and hiding only the waist fall at the sleeve ends, as in the review (feminine athletic back 126 and front 17, feminine heavyset back 98 and front 166, masculine average back 35 and front 34, masculine muscular back 48 and front 20 px; threshold 30).
+  - With only the waist hidden, the jagged bites out of the arm's edge below the sleeve are gone, and the edge is smooth (`co9-fit-2/rf2-sleeve-holes.jpg`, 2× crops of the 4K frames, before and after side by side).
+- **The cost, stated plainly.** The tee's records are back at their first wave-4 values: the walk at 54 bodies and 30.2 mm, the arms raised at 2 bodies and 5.1 mm. This raises review fixes 1's records, which is allowed here only because those records were earned by hiding holes.
+- **Unchanged.** `upper_arms_mid` and the neck cut stay in the region map. They are harmless, and a top with longer sleeves may keep them covered.
+
+**3. The stylized briefs: the gate's blind spot is closed; the defect is recorded, not fixed.**
+- **The correction.** Only the masculine briefs are clean at full detail. The feminine briefs show skin on the right buttock in the walk at full detail: about 2.5 cm across at 4K (`co9-fit-2/rf2-stylized.jpg`, first tile). Review fixes 1 was wrong to say they show none.
+- **Why the gate missed it.** The stylized gate dressed every body in the outfit. The cargo pants hide the hips and thighs, and their mask shape sinks the skin there, under the briefs too. Dressed, the briefs couldn't show what they do worn alone.
+- **The fix to the gate.** It now also measures the underwear alone, at rest, in the walk and in the T-pose. It finds:
+  - the feminine briefs in the walk on all 8 feminine bodies: 1 to 3 corners, 1.2 to 1.9 mm, on the back at x −0.02 to −0.07 m, which is the patch in the capture;
+  - the masculine briefs at rest and in the T-pose on 4 bodies: one corner by the front of the crotch, 28 mm out. A 4K capture shows two small notches of skin at the briefs' lower front edge (second tile).
+- **Recorded:** `Underwear_Briefs` Walk@18 (8 bodies, 1.9 mm), rest (4, 28.0 mm) and T-pose (4, 28.0 mm).
+- **A refit I tried.** I widened the briefs' gap from 1.8 to 4 mm in `clothes.py` and rebuilt. The gate got worse: 20 mm in the walk and 27 mm at rest on 5 bodies. I reverted it, and the stylized package is unchanged.
+
+**4. The boxer briefs' gusset: gone. The case was the gate's rule, not the garment.**
+- **The trace in Blender.** I logged `push_out` for that skin corner, body vertex 3664 in the masculine heavy-soft state (muscle −1, fat 1: a build corner, among the push-out states since wave 3). Its skin normal (0.72, 0.69, −0.02) points sideways and back.
+  - The nearest cloth, 15.5 mm away, is a triangle touching the hem: the rim folded under the leg opening's edge.
+  - The nearest cloth push-out may push (2 rings in, or 1) is 34 mm away, past `PUSH_REACH` (3 cm). So `over()` is `None` and nothing is pushed.
+  - With one hem ring in `push_out`, the nearest pushable cloth was still 34 mm away. That is why that attempt changed nothing.
+- **Why the gate counted it.** On the gate's posed garment, the corner's "covered" came from inner cloth 34 mm away, within the 4 cm reach and with a smooth normal just inside the 0.5 dot. The 13.3 mm "out" was then measured against the rim 15 mm away. So it was skin beside the leg opening, past the hem, not under the cloth.
+- **The rule fix.** `covered` now leaves out skin nearer a hem (or the rim folded under it) than the cloth said to cover it, by more than `BESIDE_HEM` (1 cm). It has a synthetic test, red first: `skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered`.
+- **Its effect on the realistic and stylized gates.** It removes exactly the 6 boxer records (rest, walk, T-pose, arms raised, elbows bent, knees bent) and changes no other record by more than the 1 mm slack. The boxer briefs' push-out is unchanged.
+
+**5. The stylized tee's hem: not refitted; traced, cause not found.**
+- **What the 4K captures show** (`co9-fit-2/rf2-stylized.jpg`, second row). Over the cargo pants, a dark, ragged band covers the tee's lower back on both sides, 1 to 2 cm above where the tee's hem lies over the underwear alone (first row, third tile). It is not:
+  - **Lighting:** the outdoor light and ray-traced shadows give the same outline.
+  - **Level of detail:** the cargo pants and the briefs are drawn at full detail.
+  - **The tee-under-jacket layering pass:** a rebuild without it gives the same picture.
+- **What the geometry says.** On the gate's posed meshes, the cargo waistband's skin-facing corners are at least 1.4 mm under the tee at rest. Measured by camera rays, the waistband corners visible from behind are only those below the tee's hem.
+  - In Blender, at build time, the cargo pants are tucked at least 2.5 mm under the tee everywhere it covers them.
+  - So the picture and the posed meshes disagree, and I couldn't find why in this round. It is a lead for whoever takes it: compare the renderer's skinned cargo pants with the gate's CPU posing.
+- **Kept as an open defect** in Known-Limitations, with these findings. The stylized package is unchanged.
+- **A wrong turn, reverted.** I first changed `fit._pulls_under` to tuck along the outer cloth's normal. That looked worse (69 and 81 corners out), but my measure was wrong: it counted the waistband's rolled-in rim, whose normal faces the skin. With the measure corrected, the original pass already gives 0, so I reverted the change.
+
+**6. Known-Limitations: updated.**
+- **The test tee bullet:** the walk at 54 bodies and 30 mm at the front of the armpit and the side under it, and the arms raised at 2 bodies and 5.1 mm. It also tells what hiding did and why it was withdrawn.
+- **The region bullet:** pose-safe hiding and the hole check.
+- **The level-of-detail bullet:** only the masculine briefs are clean at full detail.
+- **The fit-defects bullet:** the stylized briefs cases, the hem findings, and the boxer case removed.
+- `check-wiki` passes.
+
+### From the non-blocking list
+
+- `regions.py`'s comment points at `pose_safe_hides` and the gate's `holes` (it named the removed `hidden_showing`).
+- `foot_cover`'s documentation now says what it returns.
+- **Still open:**
+  - the swing correctives' fade-out (a rule-contract change for the lead);
+  - smoothstep's in-between raises, not measured;
+  - stale records caught by a drop in the body count;
+  - the stylized Idle run;
+  - the toe-box rule;
+  - the pop allowance near fast joints;
+  - fine alignment for garments that lie on the shoulders.
+
+### Visual evidence (review fixes 2)
+
+- **`co9-fit-2/rf2-sleeve-holes.jpg`:** the test tee at Walk@0.3, 4K, studio light, 2× crops.
+  - Masculine average and muscular, feminine athletic and heavyset; front and back.
+  - Each pair: before (the tee hiding torso, waist and both upper-arm bands), then after (waist only).
+  - Before, the back views show jagged, stair-stepped bites out of the arm's edge just below the sleeve, with the sleeve's dark inside showing. After, the edge is smooth skin.
+  - The front views differ only in a few pixels by the wrist.
+- **`co9-fit-2/rf2-stylized.jpg`:**
+  - the feminine briefs at full detail in the walk, from behind: a skin patch about 2.5 cm across on the right buttock;
+  - the masculine briefs at full detail at rest, from the front: two small skin notches at the lower edge of the crotch;
+  - the stylized tee over the underwear alone, from behind: a clean hem; and over the cargo pants: the dark ragged band at the back sides, the same outline under outdoor light and with ray-traced shadows.
+
+### Tests (review fixes 2)
+
+| Run | Result |
+|---|---|
+| Red first (`co9-fit-2-red-run.txt`, "Review fixes 2") | The hole check on the review-fixes-1 import: rest 25 bodies, walk 38, arms raised 1. `skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered` without the rule: `[true]` not `[false]`. The stylized underwear alone: 3 new cases |
+| `cargo nextest run -p axcenity-player -E 'test(/fit_gate_tests::/)'` | 10 passed |
+| `cargo nextest run -p axcenity-avatar --lib -E 'test(hiding::)'` | 2 passed |
+| Full suite | See the hand-back's testsRun |
+
+### Files (review fixes 2)
+
+- **`crates/avatar/src/fit/hiding.rs` (new):**
+  - `outside_cloth`, `pose_safe_hides`, and the constants `HOLE`, `HOLE_REACH` and `CREASE_ACROSS`;
+  - two synthetic tests.
+- **Other avatar changes:**
+  - `fit/mod.rs` exports these;
+  - `fit/coverage.rs` makes `CREASE_REACH` visible to the module;
+  - `fit/import.rs` hides by `pose_safe_hides` and adds `Imported::unhidden`.
+- **`crates/player/src/fit_gate_tests.rs`:**
+  - `hidden_triangles`, `holes`, `HOLES`, `undressed`, and `Cover.hidden`;
+  - `covered`'s `BESIDE_HEM` rule and its test (with `sheet`);
+  - the stylized underwear-alone pass;
+  - records: the tee back to its first wave-4 values, the boxer removed, the stylized briefs added;
+  - the hiding test now expects `waist` only;
+  - the import prints what the tee hides and what it leaves drawn.
+- **`crates/player/src/garment_checks.rs`:** holes in `motion` and `MotionReport`, and the report test.
+- **`assets/characters/realistic/regions.py`:** a comment only. No rebuild is needed: the generated files are unchanged.
+- **Docs:**
+  - `docs/development/character-studio/architecture.md` (the hiding contract), `testing.md`;
+  - `assets/characters/realistic/README.md`;
+  - `wiki/Engine-Systems/Characters.md`, `wiki/Roadmap/Known-Limitations.md`;
+  - this hand-back and `co9-fit-2-red-run.txt`.
+- **Sheets:** `co9-fit-2/rf2-sleeve-holes.jpg` and `co9-fit-2/rf2-stylized.jpg`.
+
+### At merge (review fixes 2)
+
+- **Generated files:** none changed in this round. The gate library cache rebuilds itself; the tee now hides only `waist`.
+- **`Imported` has a new public field, `unhidden`.** A caller that builds `Imported` by hand (none in the repo) must add it.
+- **Content tracks.** An imported top hides only what its cloth keeps covered in every fit pose. Expect `hides` to be smaller than the coverage shares suggest, and read `Imported::unhidden`.
+- **The lead's call:** the re-scope of item 1 (above).

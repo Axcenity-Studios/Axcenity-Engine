@@ -31,6 +31,7 @@
 mod bind;
 mod coverage;
 mod glb;
+mod hiding;
 mod import;
 mod pose;
 mod posed;
@@ -52,6 +53,7 @@ pub use coverage::{
     triangle_regions,
 };
 pub use glb::{FittedModel, write_fitted_glb};
+pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides};
 pub use import::{
     Alignment, ImportRequest, Imported, align, extremes_of, import_garment, pose_states_of,
 };

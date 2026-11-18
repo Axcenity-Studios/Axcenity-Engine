@@ -16,7 +16,7 @@ pub const HIDE_SHARE: f32 = 0.995;
 const COVER_REACH: f32 = 0.08;
 /// How far a ray out of a crease looks for the skin across it or the
 /// garment closing over it ([`closed_creases`]).
-const CREASE_REACH: f32 = 0.15;
+pub(super) const CREASE_REACH: f32 = 0.15;
 
 /// A body's region map: a region index per texel over its first texture
 /// coordinates (0 where no skin is), as `RealisticRegions.png` holds it.

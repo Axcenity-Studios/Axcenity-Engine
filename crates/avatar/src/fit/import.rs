@@ -14,6 +14,7 @@ use glam::Vec3;
 
 use super::coverage::{RegionMap, classify, coverage, hidden_regions, triangle_regions};
 use super::glb::{FittedModel, write_fitted_glb};
+use super::hiding::pose_safe_hides;
 use super::pose::{FinishPose, fit_poses};
 use super::surface::Surface;
 use super::thumbnail::{thumbnail, write_png};
@@ -82,6 +83,11 @@ pub struct Imported {
     pub report: FitReport,
     /// The share of each region it covers, by region ID.
     pub coverage: Vec<(String, f32)>,
+    /// Regions it covers whole at rest but doesn't hide, because their
+    /// skin comes out from under it in a fit pose
+    /// ([`pose_safe_hides`](super::pose_safe_hides)), with the farthest
+    /// it came out (metres).
+    pub unhidden: Vec<(String, f32)>,
 }
 
 fn library_error(message: impl Into<String>) -> FitError {
@@ -482,7 +488,17 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         .ok_or_else(|| library_error(format!("`{}` has no region map", base.id)))?;
     let regions = triangle_regions(&body, &map);
     let covered = coverage(&body, &regions, &surface);
-    let hides = hidden_regions(base, &covered);
+    // Hidden only where the cloth keeps the skin covered in every pose:
+    // hidden skin out from under the cloth is a hole.
+    let (hides, unhidden) = pose_safe_hides(
+        base,
+        &body,
+        &fitted,
+        &regions,
+        hidden_regions(base, &covered),
+        &options.poses,
+        &options.pose_states,
+    );
     let guess = classify(base, &covered);
     let slot = match (&request.slot, &guess) {
         (Some(slot), _) => slot.clone(),
@@ -623,6 +639,7 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         alignment,
         report: fitted.report,
         coverage,
+        unhidden,
     })
 }
 
