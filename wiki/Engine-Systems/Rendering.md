@@ -4,8 +4,8 @@ type: system
 status: current
 implementation: implemented
 crates: [render, render-types]
-source: [crates/render/src/lib.rs, crates/render/src/upscale.wgsl, crates/render/src/renderer.rs, crates/render/src/renderer/scene.rs, crates/render/src/renderer/lighting.rs, crates/render/src/renderer/culling.rs, crates/render/src/renderer/lod.rs, crates/render/src/renderer/gpu.rs, crates/render/src/renderer/parallel.rs, crates/render/src/renderer/texture_budget.rs, crates/render/src/renderer/surface_shaders.rs, crates/render/src/renderer/gpu_timer.rs, crates/render/src/draw_list.rs, crates/render/src/shader.wgsl, crates/render-types/src/graphics.rs]
-docs: [docs/rendering.md, docs/rendering/pipeline.md, docs/rendering/models.md, docs/rendering/shadows.md, docs/rendering/lights.md, docs/rendering/settings.md, docs/rendering/performance.md, docs/rendering/temporal.md, docs/rendering/post.md, crates/render/CLAUDE.md]
+source: [crates/render/src/lib.rs, crates/render/src/renderer/posing.rs, crates/render/src/posing.wgsl, crates/render/src/upscale.wgsl, crates/render/src/renderer.rs, crates/render/src/renderer/scene.rs, crates/render/src/renderer/lighting.rs, crates/render/src/renderer/culling.rs, crates/render/src/renderer/lod.rs, crates/render/src/renderer/gpu.rs, crates/render/src/renderer/parallel.rs, crates/render/src/renderer/texture_budget.rs, crates/render/src/renderer/surface_shaders.rs, crates/render/src/renderer/gpu_timer.rs, crates/render/src/draw_list.rs, crates/render/src/shader.wgsl, crates/render-types/src/graphics.rs]
+docs: [docs/rendering.md, docs/rendering/pipeline.md, docs/rendering/animation.md, docs/rendering/models.md, docs/rendering/shadows.md, docs/rendering/lights.md, docs/rendering/settings.md, docs/rendering/performance.md, docs/rendering/temporal.md, docs/rendering/post.md, crates/render/CLAUDE.md]
 verified: 2026-11-11
 verified_commit: 19c7179d
 tags: [system/rendering, graphics, gpu]
@@ -25,6 +25,8 @@ flowchart TB
   UP --> BUD[fit_texture_budget]
   BUD --> PASSES
   subgraph PASSES["ScenePipeline::draw (passes in fixed order)"]
+    POSE["Character posing (compute, CO8):<br/>morph active shapes + skin once"] --> RT[Ray tracing BLAS/TLAS]
+    RT --> SH
     SH[Shadows: sun cascades, spot, point] --> PRE[Depth + normal prepass]
     PRE --> AO[SSAO / contact shadows]
     AO --> VF[Volumetric fog froxels]
@@ -44,6 +46,7 @@ flowchart TB
 - **Lights**: tiled on the CPU (32 px tiles, up to 64 lights per tile, 1,024 total), not clustered.
 - **Settings**: the machine's `GraphicsSettings` (Low/Medium/High/Ultra plus overrides) are a ceiling on the world's Lighting requests; capabilities lower what the GPU can't do with a note ([ADR-0013](../Architecture/Architecture-Decisions/ADR-0013-Look-Versus-Cost-Settings.md)). Frame targets exist only while used.
 - **Characters** (2026-11-17, CO7's first slice): a character's skin tone values become a per-item base colour ratio in `scene` (render only sees a `Material`); under TAA the shadow filters' and contact shadows' per-pixel noise moves on each frame (`Frame::noise`, `shading_noise`), so a nearby limb's contact shadow no longer shows as hatching; surfaces with a normal map (and only those: `light_surface`'s `bumped`; leaves, water, decals, terrain and surface shaders without a normal map are unchanged) keep `bump_shadowing` of sun and lamp light (bump terminator), so grazing light no longer breaks into speckles as much. Without TAA (the High and Ultra presets' MSAA) the noise stays fixed, so still frames don't flicker, and the limb hatching still shows. GPU time unchanged for the realistic character at 1080p High with TAA (Scene pass 0.617 to 0.618 ms on an RX 9070 XT, `bench_realistic_character`). `docs/rendering/shadows.md`.
+- **Compute posing** (2026-11-17, CO8 / refinement RA7, [ADR-0041](../Architecture/Architecture-Decisions/ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md) decision 2, `docs/rendering/animation.md`): before any pass, a compute pass morphs and skins each animated (skin, mesh) pair a view draws or ray tracing traces **once** into the frame's posed buffer (20 bytes a corner: position, octahedral normal and tangent), walking only the shapes whose weight isn't 0 (fixed-point atomic sums, so frames are deterministic). Every raster pass reads it through frame binding 9 (`pose_corner`), the motion pass reads last frame's copy, and ray tracing builds posed BLASes from it, so ray traced shadows, AO, reflections and GI see identity and expression shapes. Timed as `FramePass::CharacterPosing`; counted in `RenderStats::posing`.
 - **Skin shading** (2026-11-17, R5, `skin.wgsl`, `docs/rendering/skin.md`): `Shading::Skin` for a material a model file marks `"axcenity_shading": "skin"` in its glTF `extras` (the realistic body's `Skin`). Diffuse light is lit by the normal map read blurred (pores never reach it) and spread across the terminator by a table pre-integrated from skin's diffusion profile by the surface's screen-space curvature, red furthest; shadow edges are redder; specular is two GGX lobes with specular antialiasing, so pores don't glitter under TAA or MSAA. A second, defined normal map (`axcenity_defined_normal`) takes the specular map's slot and is blended in by `SkinShading::normal_blend` (`scene`: `definition × (1 − softness)`, which the realistic manifest drives from muscle and fat). Every other material draws the pixels it drew before (a probe test). Cost on the realistic character at 1080p High with TAA: about +0.03 ms in the Scene pass full-body and +0.06 ms face-filling (RX 9070 XT). Not yet: screen-space SSS (CO17), transmission.
 
 ## Source code
@@ -56,6 +59,7 @@ flowchart TB
 | `renderer/scene.rs` | `ScenePipeline`, `draw` (the frame), `schedule_cascades` |
 | `renderer/types.rs` | GPU structs (`InstanceRaw`, `FrameUniform`, `MapsUniform`); must match `shader.wgsl` |
 | `renderer/lighting.rs` | Uniforms, light tiles, shadow views, batches, `casters_in_views` |
+| `renderer/posing.rs`, `posing.wgsl`, `renderer/skinning.rs` | Compute posing (CO8): every animated item morphed (active shapes only) and skinned once a frame into the posed buffer every pass and ray tracing read |
 | `renderer/culling.rs`, `lod.rs`, `parallel.rs` | Frustum culling, LOD with hysteresis and dithered cross-fade, rayon sharing |
 | `renderer/gpu.rs`, `uploads.rs`, `texture_budget.rs` | Uploads (CPU mips for RGBA), background uploads, budget |
 | `renderer/occlusion.rs`, `post.rs`, `temporal.rs`, `lens.rs`, `grading.rs`, `sun_rays.rs` | Prepass and SSAO, post, TAA, depth of field, grading, screen-space sun rays (`SunRaysEffect`) |

@@ -983,7 +983,9 @@ fn stats_time_each_pass_the_frame_draws() {
     for pass in FramePass::ALL {
         let expected = !matches!(
             pass,
-            FramePass::AccelerationStructures
+            // Nothing animated to pose.
+            FramePass::CharacterPosing
+                | FramePass::AccelerationStructures
                 | FramePass::RayTracedShadows
                 | FramePass::RayTracedGi
                 | FramePass::RayTracedReflections

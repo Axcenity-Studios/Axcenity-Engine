@@ -400,6 +400,41 @@ mod sun_shadows {
     }
 
     #[test]
+    fn a_morphed_character_casts_the_ray_traced_shadow_of_its_shapes() {
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        use super::super::skinning::morphed_skinned_square;
+        // The blocker's mesh rests 30 studs to the side, its joint is
+        // still, and only its blend shape (CO8: identity and expression
+        // shapes) moves it between the wall and the sun.
+        let character = |weight: f32| {
+            let mut item = morphed_skinned_square(weight);
+            item.transform = Mat4::from_scale_rotation_translation(
+                Vec3::splat(2.0),
+                glam::Quat::IDENTITY,
+                Vec3::new(4.0, 0.0, -6.0),
+            );
+            item.material = Default::default();
+            item
+        };
+        let mut list = shadowed_wall();
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        renderer.set_graphics(&traced(RayTracedShadows::Low));
+
+        list.items[1] = character(0.0);
+        let lit = middle_of(&mut renderer, &list);
+        list.items[1] = character(1.0);
+        let shaded = middle_of(&mut renderer, &list);
+        let stats = renderer.stats().ray_tracing;
+        assert_eq!((stats.posed, stats.posed_left_out), (1, 0), "{stats:?}");
+        assert!(
+            lit[0] > shaded[0] + 40,
+            "the shape's {shaded:?} should shade the wall, the rest shape's {lit:?} not"
+        );
+    }
+
+    #[test]
     fn soft_ray_traced_shadows_have_soft_edges_and_hard_ones_do_not() {
         let Some((device, queue)) = ray_test_device() else {
             return skipped();

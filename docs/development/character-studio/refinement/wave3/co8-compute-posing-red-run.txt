@@ -1,0 +1,37 @@
+RA7 / CO8 compute posing: the tests written first, run against stubs of the new API
+(posing::active_shapes returning nothing, RenderStats::posing all zero, read_posed returning None,
+DrawPlan::posed empty) on the base branch's renderer, which still morphs and skins in every pass
+and poses the ray tracing copy by its joints only.
+
+Command: cargo nextest run -p axcenity-render --no-fail-fast -E 'test(/skinning::|a_morphed_character|a_posed_character|motion_vectors|moved|posed/)'
+Machine: RX 9070 XT (DX12), debug build, 2026-11-17.
+
+        FAIL [   0.074s] ( 1/11) axcenity-render renderer::tests::skinning::a_shape_at_weight_zero_is_not_posed_at_all
+    renderer::tests::skinning::a_shape_at_weight_zero_is_not_posed_at_all panicked (crates\render\src\renderer\tests\skinning.rs)
+      left: []
+     right: [(0, 3, 0, 0.5), (6, 6, 3, -0.75)]
+        FAIL [   0.080s] ( 2/11) axcenity-render renderer::tests::skinning::a_skins_joints_go_to_the_gpu_without_its_shape_weights
+    renderer::tests::skinning::a_skins_joints_go_to_the_gpu_without_its_shape_weights panicked (crates\render\src\renderer\tests\skinning.rs)
+      left: 5
+     right: 3
+        FAIL [   8.934s] ( 3/11) axcenity-render renderer::tests::ray_tracing::sun_shadows::a_morphed_character_casts_the_ray_traced_shadow_of_its_shapes
+    renderer::tests::ray_tracing::sun_shadows::a_morphed_character_casts_the_ray_traced_shadow_of_its_shapes panicked (crates\render\src\renderer\tests\ray_tracing.rs)
+    the shape's [82, 82, 82, 255] should shade the wall, the rest shape's [82, 82, 82, 255] not
+        PASS [   9.157s] ( 4/11) axcenity-render renderer::tests::ray_tracing::sun_shadows::a_posed_character_casts_a_ray_traced_shadow_where_its_joints_put_it
+        FAIL [  10.578s] ( 5/11) axcenity-render renderer::tests::skinning::items_posed_differently_share_one_mesh_and_batch
+    renderer::tests::skinning::items_posed_differently_share_one_mesh_and_batch panicked (crates\render\src\renderer\tests\skinning.rs)
+      left: 0
+     right: 2
+        PASS [  10.797s] ( 6/11) axcenity-render renderer::tests::skinning::a_shape_moves_a_jointed_mesh_before_its_joints
+        PASS [  11.031s] ( 7/11) axcenity-render renderer::tests::skinning::a_skins_box_holds_each_corner_wherever_its_joints_move_it
+        PASS [  11.401s] ( 8/11) axcenity-render renderer::tests::skinning::a_blend_shape_moves_its_mesh_into_view_by_its_weight
+        PASS [  11.855s] ( 9/11) axcenity-render renderer::tests::skinning::a_skin_moves_its_mesh_into_view_and_is_not_culled_where_it_rested
+        FAIL [  12.257s] (10/11) axcenity-render renderer::tests::skinning::the_posed_buffer_holds_each_corner_where_every_pass_used_to_pose_it
+    renderer::tests::skinning::the_posed_buffer_holds_each_corner_where_every_pass_used_to_pose_it panicked (crates\render\src\renderer\tests\skinning.rs)
+        PASS [   5.510s] (11/11) axcenity-render renderer::tests::temporal::motion_vectors_hold_how_far_moved_parts_posed_meshes_and_the_camera_went
+     Summary [  14.446s] 11 tests run: 6 passed, 5 failed, 380 skipped
+        FAIL [   0.074s] ( 1/11) axcenity-render renderer::tests::skinning::a_shape_at_weight_zero_is_not_posed_at_all
+        FAIL [   0.080s] ( 2/11) axcenity-render renderer::tests::skinning::a_skins_joints_go_to_the_gpu_without_its_shape_weights
+        FAIL [   8.934s] ( 3/11) axcenity-render renderer::tests::ray_tracing::sun_shadows::a_morphed_character_casts_the_ray_traced_shadow_of_its_shapes
+        FAIL [  10.578s] ( 5/11) axcenity-render renderer::tests::skinning::items_posed_differently_share_one_mesh_and_batch
+        FAIL [  12.257s] (10/11) axcenity-render renderer::tests::skinning::the_posed_buffer_holds_each_corner_where_every_pass_used_to_pose_it

@@ -21,7 +21,8 @@ use crate::graphics::{AmbientOcclusion, EffectiveGraphics, ShadowMapSize, Shadow
 use super::culling::{Bounds, CullingBounds, Frustum, ShadowView, Sphere};
 use super::lod::{Draw, OPAQUE};
 use super::parallel::{map_each, map_indexes, map_parts, sort_unstable, worth_sharing};
-use super::skinning::{JointRaw, packed_counts};
+use super::posing::PENDING;
+use super::skinning::JointRaw;
 use super::{
     Batch, CASCADE_SPLIT_BLEND, CONTACT_SHADOW_LENGTH, CONTACT_SHADOW_THICKNESS, FAR_PLANE,
     FrameUniform, InstanceRaw, LIGHT_SCALE, LIGHTS_PER_TILE, LightRaw, MATERIAL_TEXTURES,
@@ -777,12 +778,16 @@ pub(super) struct DrawPlan {
     pub(super) casters: Vec<Vec<Caster>>,
     /// Items outside the camera's view.
     pub(super) culled: u32,
-    /// Every drawn skin's joints, each skin's after the one before
-    /// (`InstanceRaw::skin` says where an item's start).
+    /// Every drawn skin's joints, each skin's after the one before.
     pub(super) joints: Vec<JointRaw>,
-    /// Where each drawn skin's joints are in `joints` (start and count), by
-    /// the skin's address, for the motion vectors' instances.
-    pub(super) skins: HashMap<*const Skin, [u32; 2]>,
+    /// Where each drawn skin's joints start in `joints`, by the skin's
+    /// address: items posed alike share them.
+    pub(super) skins: HashMap<*const Skin, u32>,
+    /// Each (skin, mesh) pair the plan's instances and casters are posed
+    /// as (CO8, `posing.rs`). Until the frame knows which it poses and
+    /// where, an instance or caster of one holds `[its index here,
+    /// PENDING]` as its `skin`.
+    pub(super) posed: Vec<PoseUse>,
     /// Items in view with levels of detail, by level (see
     /// [`RenderStats::lod_items`](crate::RenderStats::lod_items)).
     pub(super) lod_items: [u32; crate::LOD_LEVELS],
@@ -878,10 +883,22 @@ pub(super) fn plan_draws(
 /// What makes two draws one batch.
 type BatchKind = (SortKey, bool, bool, bool);
 
+/// One (skin, mesh) pair a plan poses: the first draw (index into the
+/// frame's draws) it was seen on, its mesh, and where its skin's joints
+/// start in [`DrawPlan::joints`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct PoseUse {
+    pub(super) draw: u32,
+    pub(super) mesh: MeshKey,
+    pub(super) joints: u32,
+}
+
 /// A skin's joints wanted by an instance or caster of a [`PlanPart`], each
-/// counted from the part's start.
+/// counted from the part's start, drawn with `mesh` by draw `draw`.
 struct SkinUse<'a> {
     skin: &'a Skin,
+    mesh: MeshKey,
+    draw: u32,
     instance: Option<u32>,
     caster: Option<u32>,
 }
@@ -1003,6 +1020,8 @@ fn plan_part<'a>(
         if let Some(skin) = skin {
             part.skins.push(SkinUse {
                 skin,
+                mesh,
+                draw: at,
                 instance: instance_at,
                 caster: caster_at,
             });
@@ -1012,14 +1031,16 @@ fn plan_part<'a>(
 }
 
 /// Puts `parts` together, in order: a batch cut in two by where a share of
-/// the work ended is made whole, and each skin's joints are added once.
+/// the work ended is made whole, each skin's joints are added once, and
+/// each (skin, mesh) pair is listed once.
 fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> DrawPlan {
     let mut plan = DrawPlan::default();
     let mut first_instance = 0;
     let mut last_kind: Option<BatchKind> = None;
     // Where each skin's joints start, by the skin's address: items posed
     // alike share one.
-    let mut skins: HashMap<*const Skin, [u32; 2]> = HashMap::new();
+    let mut skins: HashMap<*const Skin, u32> = HashMap::new();
+    let mut pairs: HashMap<(*const Skin, MeshKey), u32> = HashMap::new();
     let mut seen = seen;
     for mut part in parts {
         plan.culled += part.culled;
@@ -1042,13 +1063,25 @@ fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> Dra
         }
         for used in part.skins {
             let joints = &mut plan.joints;
-            let skin = *skins
+            let first = *skins
                 .entry(std::ptr::from_ref(used.skin))
                 .or_insert_with(|| {
                     let first = joints.len() as u32;
                     joints.extend(JointRaw::of(used.skin));
-                    [first, packed_counts(used.skin)]
+                    first
                 });
+            let posed = &mut plan.posed;
+            let pair = *pairs
+                .entry((std::ptr::from_ref(used.skin), used.mesh))
+                .or_insert_with(|| {
+                    posed.push(PoseUse {
+                        draw: used.draw,
+                        mesh: used.mesh,
+                        joints: first,
+                    });
+                    posed.len() as u32 - 1
+                });
+            let skin = [pair, PENDING];
             if let Some(at) = used.instance {
                 part.instances[at as usize].skin = skin;
             }

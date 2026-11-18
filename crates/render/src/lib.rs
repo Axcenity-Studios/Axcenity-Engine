@@ -50,8 +50,8 @@ pub use renderer::DebugView;
 pub use renderer::PATH_TRACED_MOST_PATHS;
 pub use renderer::{
     BakedProbe, CullingBounds, FramePass, LIGHT_PROBE_BAKE_SIZE, LOD_LEVELS, LOD_SCREEN_SIZES,
-    LightProbeBaker, MAX_GPU_PARTICLES, PROBE_BAKE_SIZE, RayTracingStats, RenderStats, Renderer,
-    SHADOW_CASCADE_COUNT, ShaderError, SurfaceShader, TextureRenderer,
+    LightProbeBaker, MAX_GPU_PARTICLES, PROBE_BAKE_SIZE, PosingStats, RayTracingStats, RenderStats,
+    Renderer, SHADOW_CASCADE_COUNT, ShaderError, SurfaceShader, TextureRenderer,
 };
 pub use tone_mapping::ToneMapping;
 pub use water::{DEFAULT_WAVE_VARIATION, WATER_GRID, Water, water_surface};
