@@ -83,6 +83,10 @@ impl CharacterWorkspace {
         if self.selection.category == Category::Presets {
             self.load_preset_pictures(ui.ctx(), &library);
         }
+        if let Some(shelf) = super::browser::Shelf::of(self.selection.category) {
+            let tiles = self.browser_tiles(&library, shelf);
+            self.load_item_pictures(ui.ctx(), tiles);
+        }
         // While a held version is shown in the character's place, editing
         // is off: what's edited is always what's seen.
         let looking = self.comparison.instead().is_some();
@@ -169,6 +173,24 @@ impl CharacterWorkspace {
             Intent::ApplyPreset(id) => self.use_preset(&id),
             Intent::SaveAsPreset { kind, name } => self.save_as_preset(kind, &name),
             Intent::ToggleFavourite(id) => self.toggle_favourite(&id),
+            Intent::ToggleItemFavourite(id) => self.toggle_item_favourite(&id),
+            Intent::Browse(change) => self.browse(change),
+            Intent::EndPreview => self.end_preview(),
+            Intent::SetItemVariant { item, variant } => {
+                self.set_item_variant(&item, variant.as_deref())
+            }
+            Intent::SetItemMaterial {
+                item,
+                slots,
+                values,
+                gesture,
+            } => self.set_item_material(&item, &slots, &values, gesture),
+            Intent::SetItemParameter {
+                item,
+                id,
+                value,
+                gesture,
+            } => self.set_item_parameter(&item, &id, value, gesture),
             Intent::New(_) | Intent::Open(_) if self.dirty() => self.asking = Some(intent),
             Intent::New(start) => self.new_character(&start),
             Intent::Open(file) => {
@@ -325,6 +347,7 @@ impl CharacterWorkspace {
             return Vec::new();
         }
         let dragging = self.dragging();
+        let previewing = self.browser.trying().is_some();
         let intents = ui.input_mut(|input| {
             let mut intents = Vec::new();
             if input.consume_key(
@@ -342,6 +365,9 @@ impl CharacterWorkspace {
             }
             if dragging && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
                 intents.push(Intent::CancelEdit);
+            } else if previewing && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+                // Esc takes a browser tile's preview off the character.
+                intents.push(Intent::EndPreview);
             }
             intents
         });
@@ -385,6 +411,8 @@ impl CharacterWorkspace {
             // An expression is a preview of the Expressions page only.
             self.preview_expression(None);
         }
+        // So is a browser tile tried on, of its page.
+        self.end_preview();
         self.selection.pick_category(category);
     }
 

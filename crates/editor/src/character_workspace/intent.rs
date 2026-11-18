@@ -10,12 +10,20 @@
 //! The asymmetry tools (R4) are edits, one undo step each; the preview's
 //! pose and motion (R9) is editor state, as an expression is.
 //!
+//! The Hair and Clothing browsers (R6, R7; `browser.rs`) add `Browse`
+//! (search, filters, "Show drafts", the tile hovered or picked: editor
+//! state, the preview shown in the character's place), `EndPreview`,
+//! item favourites, and the worn item's own controls (`SetItemVariant`,
+//! `SetItemMaterial`, `SetItemParameter`), which are edits. `Wear` stays
+//! the one way an item goes on: one undo step.
+//!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
 use std::path::PathBuf;
 
 use axcenity_avatar::{MaterialValue, PresetKind, SkinLayer};
 
+use super::browser::Browse;
 use super::edit::Scope;
 use super::motion::Motion;
 use super::random::RandomScope;
@@ -91,6 +99,39 @@ pub enum Intent {
     },
     /// Marks a preset a favourite, or not (editor state).
     ToggleFavourite(String),
+    /// Marks an item (a hairstyle, a garment) a favourite, or not
+    /// (editor state, beside the preset favourites).
+    ToggleItemFavourite(String),
+    /// A browser's search, filters, drafts, or the tile hovered or picked
+    /// (editor state: a tile is previewed on the character, never worn).
+    Browse(Browse),
+    /// Takes a tile's preview off: the character as it is (Esc, leaving
+    /// the page).
+    EndPreview,
+    /// Picks variant `variant` of the worn item `item` (`None`: as made),
+    /// as one undo step. The colours and parameters the variant sets are
+    /// the variant's again.
+    SetItemVariant {
+        item: String,
+        variant: Option<String>,
+    },
+    /// Sets (or with `None` clears) values of the worn item `item`'s
+    /// material slots `slots`, together (a colour role's slots, a hair
+    /// colour's melanin and redness): one undo step, or one per drag.
+    SetItemMaterial {
+        item: String,
+        slots: Vec<String>,
+        values: Vec<(String, Option<MaterialValue>)>,
+        gesture: Gesture,
+    },
+    /// Sets the worn item `item`'s own parameter `id` (a hairstyle's
+    /// length).
+    SetItemParameter {
+        item: String,
+        id: String,
+        value: f32,
+        gesture: Gesture,
+    },
     /// A new character, not saved yet: a family's default or a preset.
     New(Start),
     /// Opens a saved character file in place of this one.
@@ -167,6 +208,9 @@ impl Intent {
                 | Intent::SetMirrored { .. }
                 | Intent::Choose { .. }
                 | Intent::Wear { .. }
+                | Intent::SetItemVariant { .. }
+                | Intent::SetItemMaterial { .. }
+                | Intent::SetItemParameter { .. }
                 | Intent::SetMaterial { .. }
                 | Intent::SetSkinLayer { .. }
                 | Intent::SetBase(_)

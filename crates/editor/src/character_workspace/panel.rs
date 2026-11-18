@@ -3,11 +3,15 @@
 //! detail level (Quick, Detailed, Advanced: brief §3.3) and Symmetry. Every
 //! page returns [`Intent`]s; nothing here changes the workspace.
 
+mod browser;
 mod materials;
 mod parameters;
 mod row;
 #[cfg(test)]
 mod tests;
+mod worn;
+
+pub(super) use browser::none_picture;
 
 #[cfg(test)]
 pub(super) use parameters::{Shown, hidden_changes, rows, side_choices};
@@ -28,8 +32,10 @@ pub(super) fn about(category: Category) -> &'static str {
     match category {
         Category::Body => "Pick the body type, then shape the body. Changes show as you drag.",
         Category::Face => "Shape the face, one feature at a time.",
-        Category::Hair => "Pick a hairstyle.",
-        Category::Clothing => "Dress the character one piece at a time.",
+        Category::Hair => "Pick a hairstyle: point at one to see it on the character.",
+        Category::Clothing => {
+            "Dress the character one piece at a time: point at a piece to see it on."
+        }
         Category::SkinAndMakeup => "The skin's colour and surface.",
         Category::Accessories => "Glasses, jewellery, hats and bags.",
         Category::Expressions => {
@@ -41,11 +47,16 @@ pub(super) fn about(category: Category) -> &'static str {
     }
 }
 
-/// Whether `category`'s page has sliders (and so a level and Symmetry).
+/// Whether `category`'s page has sliders (and so a level and Symmetry;
+/// the browsers' sliders are the worn items' own).
 fn has_sliders(category: Category) -> bool {
     matches!(
         category,
-        Category::Body | Category::Face | Category::SkinAndMakeup
+        Category::Body
+            | Category::Face
+            | Category::SkinAndMakeup
+            | Category::Hair
+            | Category::Clothing
     )
 }
 
@@ -207,9 +218,17 @@ pub(super) fn show(
                     }
                     asked
                 }
-                Category::Hair | Category::Clothing | Category::Accessories => {
-                    slots_page(ui, workspace, library, base, category)
+                Category::Hair => {
+                    browser::page(ui, workspace, library, base, super::browser::Shelf::Hair)
                 }
+                Category::Clothing => browser::page(
+                    ui,
+                    workspace,
+                    library,
+                    base,
+                    super::browser::Shelf::Clothing,
+                ),
+                Category::Accessories => slots_page(ui, workspace, library, base, category),
                 Category::Expressions => expressions_page(ui, workspace),
                 Category::Presets => presets_page(ui, workspace, library),
             });
