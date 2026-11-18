@@ -1,8 +1,9 @@
 //! Pose-driven corrective shapes (Character Studio overhaul, CO5): blend
 //! shapes a body leans on as a bone turns, which put back what skinning
-//! loses at a joint. The realistic base body has four, for its shoulders
+//! loses at a joint. The realistic base body has ten, for its shoulders
 //! (`assets/characters/realistic/correctives.py` makes them and states the
-//! rule in `Realistic.build.json`).
+//! rule in `Realistic.build.json`): raised, level, lowered, and the hanging
+//! arm swung forward and back as a walk swings it.
 //!
 //! **The rule.** A shape's weight is how far its bone has turned from rest
 //! about an axis, from 0 at `start` degrees to 1 at `full` and beyond. The
@@ -36,8 +37,12 @@ pub type Rule = (&'static str, &'static str, [f32; 3], f32, f32);
 /// arm is raised to level (45° up from its rest, which is 45° below
 /// level) and on to 150° from hanging, and as it is lowered to hang (35°
 /// down from rest: about the raise axis reversed, so the rule's form is
-/// the same).
-pub const CORRECTIVES: [Rule; 6] = [
+/// the same); and the hanging arm swung forward (full at 40°) and back
+/// (full at 50°) about the axis across the body, which keeps the skin
+/// where the arm meets the chest or the back from folding out in a walk
+/// (CO9 part 2). A swing has no part about the raise axis, nor a raise
+/// about the swing's, so the two kinds lean independently.
+pub const CORRECTIVES: [Rule; 10] = [
     (
         "Corrective_Shoulder_Level_Left",
         "LeftUpperArm",
@@ -79,6 +84,34 @@ pub const CORRECTIVES: [Rule; 6] = [
         [0.0, -0.37698, 0.92622],
         0.0,
         35.0,
+    ),
+    (
+        "Corrective_Shoulder_Forward_Left",
+        "LeftUpperArm",
+        [0.32884, -0.87444, -0.35668],
+        0.0,
+        40.0,
+    ),
+    (
+        "Corrective_Shoulder_Forward_Right",
+        "RightUpperArm",
+        [0.32888, 0.8747, 0.35601],
+        0.0,
+        40.0,
+    ),
+    (
+        "Corrective_Shoulder_Back_Left",
+        "LeftUpperArm",
+        [-0.32884, 0.87444, 0.35668],
+        0.0,
+        50.0,
+    ),
+    (
+        "Corrective_Shoulder_Back_Right",
+        "RightUpperArm",
+        [-0.32888, -0.8747, -0.35601],
+        0.0,
+        50.0,
     ),
 ];
 
@@ -151,11 +184,25 @@ impl Correctives {
 /// A corrective shape's weight (0 to 1) for a bone whose rotation in its
 /// parent is `posed` and was `rest`: how far it has turned about `axis`
 /// (in the parent's space), from 0 at `start` degrees to 1 at `full`.
+///
+/// The ramp between is smooth (`ramp`): it starts and ends level, so a
+/// joint turning steadily through `start` or `full` (an arm swinging
+/// through hanging, from its Back shape to its Forward one, in every step
+/// of a walk) eases the shape in and out instead of starting it at full
+/// speed, which made cloth carrying a large copy of the shape jolt in that
+/// frame (CO9 part 2, the motion check).
 pub fn weight(rest: Quat, posed: Quat, axis: Vec3, start: f32, full: f32) -> f32 {
     // The bone's turn from rest, in its parent's axes.
     let turn = posed * rest.inverse();
     let angle = twist_angle(turn, axis).to_degrees();
-    ((angle - start) / (full - start)).clamp(0.0, 1.0)
+    ramp((angle - start) / (full - start))
+}
+
+/// `t` clamped to 0 to 1 and eased at both ends (smoothstep): 0, 0.5 and 1
+/// where a straight ramp is, with no change of slope at the ends.
+pub fn ramp(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// Leans `posed` (the skin of `model` in `pose`) on the model's corrective
@@ -208,6 +255,22 @@ mod tests {
         // Past full it stays full; turned the other way it stays out.
         assert_eq!(at(140.0), 1.0);
         assert_eq!(at(-60.0), 0.0);
+    }
+
+    /// The ramp is level at both ends: a joint turning steadily through a
+    /// shape's start or full angle doesn't start or stop the shape at
+    /// speed (the motion check's pops), and it is half way at half way.
+    #[test]
+    fn the_ramp_eases_in_and_out() {
+        assert_eq!(
+            (ramp(-1.0), ramp(0.0), ramp(1.0), ramp(2.0)),
+            (0.0, 0.0, 1.0, 1.0)
+        );
+        assert!((ramp(0.5) - 0.5).abs() < 1e-6);
+        // The slope by each end is near none (a straight ramp's is 1).
+        let slope = |t: f32| (ramp(t + 1e-3) - ramp(t)) / 1e-3;
+        assert!(slope(0.0) < 0.01 && slope(1.0 - 1e-3) < 0.01);
+        assert!((slope(0.5) - 1.5).abs() < 0.01);
     }
 
     #[test]
@@ -310,6 +373,89 @@ mod tests {
         assert!(moved > 0.005, "the cap moves {moved} m");
         assert!((weights_at(17.5).0 - 0.5).abs() < 0.02);
         assert_eq!(weights_at(0.0).0, 0.0);
+    }
+
+    /// An arm hanging as the walk holds it (lowered from the A-pose) and
+    /// swung back, as the walk swings it, leans on its side's Back shape
+    /// as well as its Lowered one, and on neither Forward shape nor the
+    /// other side's; swung forward, on Forward; half way, half. The skin
+    /// moves with them (the fold a linearly skinned swing makes where the
+    /// arm meets the chest or the back, put right: `correctives.py`).
+    #[test]
+    fn a_swung_arm_leans_on_its_swing_correctives() {
+        let model = shipped("Body");
+        let rig = model.rig.clone().unwrap();
+        let arm = rig.bone("LeftUpperArm").unwrap();
+        let elbow = rig.bone("LeftLowerArm").unwrap();
+        let rest = rig.bones[arm].rest.rotation;
+        let rule = |name: &str| {
+            *CORRECTIVES
+                .iter()
+                .find(|rule| rule.0 == name)
+                .unwrap_or_else(|| panic!("no rule for {name}"))
+        };
+        let back = rule("Corrective_Shoulder_Back_Left");
+        let forward = rule("Corrective_Shoulder_Forward_Left");
+        assert_eq!((back.1, forward.1), ("LeftUpperArm", "LeftUpperArm"));
+        // One swing, two ways: the axes are opposite, and across the
+        // lowering axis (so a swing doesn't change how far it is lowered).
+        let axis = Vec3::from(back.2).normalize();
+        assert!(axis.dot(Vec3::from(forward.2).normalize()) < -0.999);
+        assert!(axis.dot(AXIS.normalize()).abs() < 0.05, "{axis}");
+        let hang = turned(rest, -AXIS, 35.0);
+        let lean_at = |swing_axis: Vec3, degrees: f32| {
+            let mut pose = rig.rest_pose();
+            pose[arm].rotation = turned(hang, swing_axis, degrees);
+            let world = rig.world(&pose);
+            let elbow_z = world[elbow].w_axis.z;
+            let posed =
+                crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
+            let plain = model.pose_shaped(&pose, &[]).unwrap();
+            let of = |name: &str| {
+                let index = model
+                    .morph_targets
+                    .iter()
+                    .position(|target| target.name == name)
+                    .unwrap();
+                posed.morph_weights()[index]
+            };
+            let (a, b) = (posed.primitive(&model, 0, 0), plain.primitive(&model, 0, 0));
+            let moved = a
+                .positions
+                .iter()
+                .zip(&b.positions)
+                .map(|(p, q)| Vec3::from(*p).distance(Vec3::from(*q)))
+                .fold(0.0_f32, f32::max);
+            let weights = [
+                "Corrective_Shoulder_Back_Left",
+                "Corrective_Shoulder_Forward_Left",
+                "Corrective_Shoulder_Back_Right",
+                "Corrective_Shoulder_Forward_Right",
+                "Corrective_Shoulder_Lowered_Left",
+            ]
+            .map(of);
+            (weights, elbow_z, moved)
+        };
+        let (_, hanging_z, _) = lean_at(axis, 0.0);
+        // Back is back: the elbow goes behind (the model faces +Z).
+        let ([b, f, br, fr, lowered], z, moved) = lean_at(axis, back.4);
+        assert!(
+            z < hanging_z - 0.05,
+            "the elbow at {z}, hanging {hanging_z}"
+        );
+        assert!((b - 1.0).abs() < 1e-3, "{b}");
+        assert_eq!((f, br, fr), (0.0, 0.0, 0.0));
+        assert!(lowered > 0.99, "{lowered}");
+        assert!(moved > 0.003, "the armpit moves {moved} m");
+        assert!((lean_at(axis, back.4 / 2.0).0[0] - 0.5).abs() < 0.02);
+        let ([b, f, _, fr, _], z, moved) = lean_at(-axis, forward.4);
+        assert!(
+            z > hanging_z + 0.05,
+            "the elbow at {z}, hanging {hanging_z}"
+        );
+        assert!((f - 1.0).abs() < 1e-3, "{f}");
+        assert_eq!((b, fr), (0.0, 0.0));
+        assert!(moved > 0.003, "the armpit moves {moved} m");
     }
 
     /// The pose path leans the shipped body on its shapes: the left arm

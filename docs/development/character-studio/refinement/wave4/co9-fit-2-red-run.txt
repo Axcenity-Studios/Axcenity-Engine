@@ -1,0 +1,99 @@
+CO9 part 2 (wave 4), red run: the new and tightened tests before the implementation (2026-11-18).
+cargo nextest run -p axcenity-anim -p axcenity-avatar -p axcenity-player --no-fail-fast -E 'test(/correctives::|the_fit_poses_lean|the_corrective_rules_are|the_sports_bras_straps|a_baked_body_keeps_only|fit_gate_tests::|garment_checks::/)' --no-capture
+(the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head failed on the test's own geometry, a square wider than NEAR; fixed before the implementation.)
+
+        PASS [   0.008s] ( 3/28) axcenity-anim correctives::tests::a_shape_leans_in_as_its_bone_turns_about_the_axis
+        PASS [   0.010s] ( 5/28) axcenity-anim correctives::tests::a_turn_about_another_axis_doesnt_lean
+        PASS [   0.029s] ( 7/28) axcenity-anim correctives::tests::the_rules_are_the_ones_the_build_states
+        PASS [   0.063s] ( 2/28) axcenity-anim correctives::tests::a_model_without_corrective_shapes_is_left_alone
+        PASS [   0.072s] (20/28) axcenity-player::bin/axcenity-player fit_gate_tests::the_gate_holds_garments_to_their_records
+        FAIL [   0.073s] (27/28) axcenity-player::bin/axcenity-player garment_checks::the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head
+        PASS [   0.293s] ( 9/28) axcenity-avatar::fitting the_corrective_rules_are_the_build_datas
+        FAIL [   1.903s] ( 4/28) axcenity-anim correctives::tests::a_swung_arm_leans_on_its_swing_correctives
+        PASS [   1.958s] ( 1/28) axcenity-anim correctives::tests::a_lowered_arm_leans_on_its_lowered_corrective_only
+        PASS [   2.030s] ( 6/28) axcenity-anim correctives::tests::the_pose_path_leans_the_shipped_body_on_its_correctives
+        PASS [   2.721s] ( 8/28) axcenity-anim correctives::tests::the_shipped_body_has_every_corrective
+        FAIL [   3.079s] (12/28) axcenity-avatar::realistic_parameters a_baked_body_keeps_only_its_live_shapes
+        FAIL [   3.091s] (11/28) axcenity-avatar::fitting the_sports_bras_straps_sit_on_the_shoulders_not_the_neck
+        FAIL [   3.124s] (10/28) axcenity-avatar::fitting the_fit_poses_lean_on_the_shoulder_correctives
+        PASS [   3.667s] (21/28) axcenity-player::bin/axcenity-player fit_gate_tests::wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them
+        FAIL [   5.168s] (19/28) axcenity-player::bin/axcenity-player fit_gate_tests::stylized_clothes_cover_the_stylized_cast
+        FAIL [   7.849s] (14/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_walking
+        FAIL [   8.132s] (17/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_elbows_bent
+        FAIL [   8.376s] (18/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_knees_bent
+        FAIL [   8.554s] (15/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_out
+        FAIL [   9.947s] (16/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_raised
+        PASS [  15.372s] (24/28) axcenity-player::bin/axcenity-player garment_checks::realistic_garments_stay_steady_in_the_walk
+        FAIL [  15.458s] (23/28) axcenity-player::bin/axcenity-player garment_checks::realistic_garments_stay_steady_in_the_run
+        FAIL [  17.281s] (13/28) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_at_rest
+        PASS [  22.441s] (22/28) axcenity-player::bin/axcenity-player garment_checks::realistic_garments_stay_steady_in_the_idle
+        FAIL [  39.346s] (25/28) axcenity-player::bin/axcenity-player garment_checks::stylized_garments_and_hair_stay_steady_in_the_run
+        FAIL [  42.390s] (26/28) axcenity-player::bin/axcenity-player garment_checks::stylized_garments_and_hair_stay_steady_in_the_walk
+        FAIL [  48.884s] (28/28) axcenity-player::bin/axcenity-player garment_checks::the_stylized_sneakers_hold_the_feet
+     Summary [ 271.324s] 28 tests run: 12 passed, 16 failed, 539 skipped
+
+Failure messages:
+thread 'correctives::tests::a_swung_arm_leans_on_its_swing_correctives' (6288) panicked at crates\anim\src\correctives.rs:332:36:
+no rule for Corrective_Shoulder_Back_Left
+thread 'the_fit_poses_lean_on_the_shoulder_correctives' (20092) panicked at crates\avatar\tests\fitting.rs:484:9:
+thread 'the_sports_bras_straps_sit_on_the_shoulders_not_the_neck' (27696) panicked at crates\avatar\tests\fitting.rs:668:9:
+masculine: a bra corner over skin 0.90 weighted to the neck or head
+test the_sports_bras_straps_sit_on_the_shoulders_not_the_neck ... FAILED
+thread 'a_baked_body_keeps_only_its_live_shapes' (36444) panicked at crates\avatar\tests\realistic_parameters.rs:280:5:
+assertion `left == right` failed
+  left: ["Corrective_Shoulder_Level_Left", "Corrective_Shoulder_Level_Right", "Corrective_Shoulder_Lowered_Left", "Corrective_Shoulder_Lowered_Right", "Corrective_Shoulder_Raised_Left", "Corrective_Shoulder_Raised_Right"]
+ right: ["Corrective_Shoulder_Back_Left", "Corrective_Shoulder_Back_Right", "Corrective_Shoulder_Forward_Left", "Corrective_Shoulder_Forward_Right", "Corrective_Shoulder_Level_Left", "Corrective_Shoulder_Level_Right", "Corrective_Shoulder_Lowered_Left", "Corrective_Shoulder_Lowered_Right", "Correcti
+thread 'fit_gate_tests::garments_cover_the_cast_at_rest' (21512) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Underwear_BoxerBriefs rest: 1 bodies failing, worst 14.61 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::garments_cover_the_cast_walking' (26488) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "TestTee Walk@18: 54 bodies failing, worst 31.36 mm (recorded 0, 0.00 mm)",
+    "Underwear_BoxerBriefs Walk@18: 1 bodies failing, worst 17.89 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::garments_cover_the_cast_with_the_arms_out' (11348) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Underwear_BoxerBriefs TPose: 1 bodies failing, worst 14.61 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::garments_cover_the_cast_with_the_arms_raised' (14832) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "TestTee ArmsRaised: 54 bodies failing, worst 16.15 mm (recorded 0, 0.00 mm)",
+    "Underwear_BoxerBriefs ArmsRaised: 1 bodies failing, worst 14.61 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::garments_cover_the_cast_with_the_elbows_bent' (31564) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Underwear_BoxerBriefs ElbowsBent: 1 bodies failing, worst 14.61 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::garments_cover_the_cast_with_the_knees_bent' (27428) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Underwear_BoxerBriefs KneesBent: 1 bodies failing, worst 14.61 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::stylized_clothes_cover_the_stylized_cast' (44696) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Pants_Cargo TPose: 7 bodies failing, worst 2.37 mm (recorded 0, 0.00 mm)",
+    "Pants_Cargo rest: 7 bodies failing, worst 2.37 mm (recorded 0, 0.00 mm)",
+thread 'fit_gate_tests::the_gate_holds_garments_to_their_records' (43296) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Draft rest: 1 bodies failing, worst 6.00 mm (recorded 1, 5.00 mm)",
+thread 'fit_gate_tests::the_gate_holds_garments_to_their_records' (43296) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Draft rest: 2 bodies failing, worst 4.00 mm (recorded 1, 5.00 mm)",
+thread 'fit_gate_tests::the_gate_holds_garments_to_their_records' (43296) panicked at crates\player\src\fit_gate_tests.rs:659:5:
+    "Draft rest: 1 bodies failing, worst 4.00 mm (recorded 0, 0.00 mm)",
+thread 'garment_checks::realistic_garments_stay_steady_in_the_run' (35764) panicked at crates\player\src\garment_checks.rs:540:5:
+    "realistic-feminine-cast-asymmetry Run TestTee: a corner's step changed by 2.56 mm at frame 21",
+    "realistic-feminine-cast-athletic Run TestTee: a corner's step changed by 2.51 mm at frame 21",
+thread 'garment_checks::stylized_garments_and_hair_stay_steady_in_the_run' (7452) panicked at crates\player\src\garment_checks.rs:540:5:
+    "stylized-feminine-cast-athletic Run Pants_Cargo: a corner's step changed by 21.60 mm at frame 37",
+    "stylized-feminine-cast-athletic Run Shoes_Sneakers: a corner's step changed by 4.30 mm at frame 19",
+thread 'garment_checks::stylized_garments_and_hair_stay_steady_in_the_walk' (28212) panicked at crates\player\src\garment_checks.rs:540:5:
+    "stylized-feminine-cast-athletic Walk Pants_Cargo: a corner's step changed by 12.35 mm at frame 23",
+    "stylized-feminine-cast-athletic Walk Shoes_Sneakers: a corner's step changed by 3.54 mm at frame 23",
+thread 'garment_checks::the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head' (36520) panicked at crates\player\src\garment_checks.rs:635:5:
+assertion `left == right` failed
+  left: 0
+ right: 4
+thread 'garment_checks::the_stylized_sneakers_hold_the_feet' (19148) panicked at crates\player\src\garment_checks.rs:607:5:
+    "stylized-feminine-cast-athletic Shoes_Sneakers: the tread from -3.56 to 4.11 mm above the floor",
+    "stylized-feminine-cast-athletic Walk@18 Shoes_Sneakers: 1 foot corners out of the shoe, the farthest 11.97 mm",
+
+== Review fixes 1 (red before the implementation) ==
+cargo nextest run -p axcenity-avatar --lib -E 'test(coverage_)' --no-fail-fast, before coverage::closed_creases:
+        FAIL [   0.037s] (1/2) axcenity-avatar fit::tests::coverage_counts_a_crease_the_garment_closes_over
+    test fit::tests::coverage_counts_a_crease_the_garment_closes_over ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.02s
+    thread 'fit::tests::coverage_counts_a_crease_the_garment_closes_over' (22324) panicked at crates\avatar\src\fit\tests.rs:486:5:
+    Coverage { shares: {1: 1.0, 2: 0.05} }
+        PASS [   0.105s] (2/2) axcenity-avatar fit::tests::coverage_finds_the_regions_a_garment_covers_whole
+     Summary [   0.106s] 2 tests run: 1 passed, 1 failed, 91 skipped
+        FAIL [   0.037s] (1/2) axcenity-avatar fit::tests::coverage_counts_a_crease_the_garment_closes_over
+
+After the region cuts, before the records were lowered (the stale-record rule):
+    "TestTee Walk@18: recorded 30.20 mm, now 23.73 mm: lower the record"
+    "TestTee ArmsRaised: recorded 2 bodies, 5.20 mm, now none: remove the record"

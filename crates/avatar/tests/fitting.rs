@@ -437,9 +437,10 @@ fn a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme() {
     // Recorded, not accepted (`co9-binding.md`, Review fixes 2): with the
     // arms hanging or swung the bra's side band comes out at the tee's
     // armpit, and with them raised its straps at the neck. Lower these as
-    // the fit improves; never raise them.
+    // the fit improves; never raise them. (Wave 4: 58 cases, 19.1 mm to
+    // 51, 18.6 mm, the straps off the neck.)
     assert!(
-        failing.len() <= 58 && worst_posed <= 0.0191,
+        failing.len() <= 51 && worst_posed <= 0.0187,
         "{} cases, {worst_posed} m: {failing:#?}",
         failing.len()
     );
@@ -471,6 +472,21 @@ fn the_fit_poses_lean_on_the_shoulder_correctives() {
         assert!((weight("arms-raised", &shape("Raised")) - 1.0).abs() < 0.02);
         assert!(weight("arms-hanging", &shape("Lowered")) > 0.9);
         assert!(weight("arms-hanging", &shape("Level")) < 0.02);
+        assert!(weight("arms-hanging", &shape("Forward")) < 0.02);
+        assert!(weight("arms-hanging", &shape("Back")) < 0.02);
+        // The walk's swings lean on the swing correctives (the arm that is
+        // ahead on Forward, the one behind on Back), on top of the lowered
+        // shoulder they hang from.
+        let (ahead, behind) = if side == "Left" {
+            ("walk-left-40", "walk-right-40")
+        } else {
+            ("walk-right-40", "walk-left-40")
+        };
+        assert!(weight(ahead, &shape("Forward")) > 0.8, "{side}");
+        assert!(weight(ahead, &shape("Back")) < 0.02, "{side}");
+        assert!(weight(behind, &shape("Back")) > 0.7, "{side}");
+        assert!(weight(behind, &shape("Forward")) < 0.02, "{side}");
+        assert!(weight(behind, &shape("Lowered")) > 0.5, "{side}");
     }
     for pose in ["elbows-bent", "knees-bent"] {
         assert!(
@@ -566,12 +582,19 @@ fn the_extremes_are_every_pair_of_build_parameter_ends_on_both_frames() {
 
 /// A garment made too high and too small (a third-party file made for a
 /// slightly different body) is put back where it fits: its scale and
-/// height found from how evenly it stands off the body.
+/// height found from how evenly it stands off the body. On the wave-3 test
+/// tee (`TestTeeEvenEase.obj`), which stands off the body by about the
+/// same ease everywhere, as the fine fit assumes: the wave-4 tee lies on
+/// the shoulders and its collar on the skin, and is only 13% more even at
+/// its true place than 5% small and 3 cm high, under the 20% and 2 mm the
+/// fine fit needs to move a garment (a limitation, `co9-fit-2.md`).
 #[test]
 fn alignment_puts_a_garment_made_too_high_and_too_small_back_on_the_body() {
     let assets = Assets::new(shipped());
     let body = BodyMesh::from_model(&assets.model_blocking(BODY).unwrap()).unwrap();
-    let source = axcenity_assets::load_model_file(&tee()).unwrap();
+    let even =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/test-tee/TestTeeEvenEase.obj");
+    let source = axcenity_assets::load_model_file(&even).unwrap();
     let mut made = GarmentMesh::from_model(&source);
     let as_made = align(&mut made, &body);
     println!("as made: {as_made:?}");
@@ -603,4 +626,221 @@ fn alignment_puts_a_garment_made_too_high_and_too_small_back_on_the_body() {
         worst * 1000.0
     );
     assert!(mean < 0.008 && worst < 0.015, "{mean} m, {worst} m");
+}
+
+/// The sports bra's straps sit where a sports bra's do: over the top of
+/// the shoulder, between the neck and the shoulder joint, not up the side
+/// of the neck (where they came up to 1.50 m and made a T-shirt's crew
+/// neck close round the neck to cover them). On both frames: no bra
+/// corner lies over skin weighted more than a fifth to the neck or head,
+/// and near its top each strap is at least 1.5 cm out from the neck's
+/// side.
+#[test]
+fn the_sports_bras_straps_sit_on_the_shoulders_not_the_neck() {
+    let assets = Assets::new(shipped());
+    let (body, bra) = body_and(&assets, "Underwear_Bra");
+    let rig = &body.rig;
+    // Each body corner's weight to the neck and head.
+    let neck_weight: Vec<f32> = body
+        .joints
+        .iter()
+        .zip(&body.weights)
+        .map(|(joints, weights)| {
+            joints
+                .iter()
+                .zip(weights)
+                .filter(|(j, _)| {
+                    let bone = &rig.bones[rig.joints[**j as usize].bone].name;
+                    bone == "Neck" || bone == "Head"
+                })
+                .map(|(_, w)| *w)
+                .sum()
+        })
+        .collect();
+    for (frame, weights) in [
+        ("masculine", vec![]),
+        ("feminine", vec![("Frame_Feminine".to_owned(), 1.0)]),
+    ] {
+        let (skin, _) = body.shaped(&weights);
+        let (cloth, _) = bra.shaped(&weights);
+        let on_neck = |p: Vec3| {
+            let nearest = skin
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.distance_squared(p).total_cmp(&b.1.distance_squared(p)))
+                .unwrap()
+                .0;
+            neck_weight[nearest]
+        };
+        let worst = cloth.iter().map(|p| on_neck(*p)).fold(0.0f32, f32::max);
+        assert!(
+            worst <= 0.2,
+            "{frame}: a bra corner over skin {worst:.2} weighted to the neck or head"
+        );
+        let top = cloth.iter().map(|p| p.y).fold(f32::MIN, f32::max);
+        // The neck's half width a little below the top of the straps, and
+        // the straps' inner edge there.
+        let at = top - 0.01;
+        let neck_half = skin
+            .iter()
+            .zip(&neck_weight)
+            .filter(|(p, w)| **w > 0.5 && (p.y - at).abs() < 0.006)
+            .map(|(p, _)| p.x.abs())
+            .fold(0.0f32, f32::max);
+        let strap_inner = cloth
+            .iter()
+            .filter(|p| (p.y - at).abs() < 0.006)
+            .map(|p| p.x.abs())
+            .fold(f32::MAX, f32::min);
+        assert!(
+            strap_inner >= neck_half + 0.015,
+            "{frame}: the straps' inner edge at {strap_inner:.3} m from the middle, the neck {neck_half:.3} m"
+        );
+    }
+}
+
+/// How far each corner of `positions` stands out of the surface its
+/// neighbours make (along its normal, metres; negative: sunk into it).
+/// Corners at one place at rest (`welds`: a seam split for its texture)
+/// are one, with the neighbours of all of them.
+fn bulge(
+    positions: &[Vec3],
+    normals: &[Vec3],
+    triangles: &[[u32; 3]],
+    welds: &[usize],
+) -> Vec<f32> {
+    let mut sum = vec![Vec3::ZERO; positions.len()];
+    let mut count = vec![0.0f32; positions.len()];
+    for t in triangles {
+        for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+            let (a, b) = (welds[a as usize], welds[b as usize]);
+            sum[a] += positions[b];
+            count[a] += 1.0;
+            sum[b] += positions[a];
+            count[b] += 1.0;
+        }
+    }
+    (0..positions.len())
+        .map(|k| {
+            let w = welds[k];
+            if count[w] > 0.0 {
+                (positions[w] - sum[w] / count[w]).dot(normals[w])
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+/// Each corner's first corner at the same place.
+fn welds_of(positions: &[Vec3]) -> Vec<usize> {
+    let mut first = std::collections::HashMap::new();
+    positions
+        .iter()
+        .enumerate()
+        .map(|(k, p)| {
+            *first
+                .entry((*p * 1e5).round().as_ivec3().to_array())
+                .or_insert(k)
+        })
+        .collect()
+}
+
+/// The walk's folds at the shoulder (CO9 part 2): in the fit's walk poses
+/// at their widest (one arm swung forward 30 degrees, the other back 48,
+/// as the starter Walk swings them), the skin round each shoulder (within
+/// 15 cm of the joint, below its top) folds where the arm meets the chest
+/// or the back: a corner stands out of, or sinks into, the surface its
+/// neighbours make, more than it does at rest. The swing correctives
+/// (`Corrective_Shoulder_Forward_*`, `_Back_*`, made on the masculine
+/// frame) take that fold out over the region: on the masculine frame the
+/// 95th percentile of its depth is at most 60% of what it is without them
+/// (measured: 10.6 mm to 4.9 and 5.9).
+///
+/// The rest is held at what the build reaches, as records of open defects
+/// (`refinement/wave4/co9-fit-2.md`, review fixes 1), each a ceiling to
+/// lower and never raise: the feminine frame folds less and the shapes
+/// barely help it (4.2 to 3.2 mm on the left; 4.3 to 4.5 mm on the right,
+/// worse); and the deepest single corner, the armpit's apex pinched
+/// between the hanging arm and the side, which no corrective reaches
+/// (16.0 to 18.4 mm on the masculine left, worse; 14.3 to 17.2 mm
+/// elsewhere).
+#[test]
+fn the_swing_correctives_take_the_walks_fold_out_of_the_armpit() {
+    let assets = Assets::new(shipped());
+    let body = BodyMesh::from_model(&assets.model_blocking(BODY).unwrap()).unwrap();
+    let poses = fit_poses(&body.rig, Some(finish_pose));
+    let world = body.rig.world(&body.rig.rest_pose());
+    let welds = welds_of(&body.positions);
+    for frame in [0.0f32, 1.0] {
+        let state = vec![("Frame_Feminine".to_owned(), frame)];
+        let (rest, rest_normals) = body.shaped(&state);
+        let at_rest = bulge(&rest, &rest_normals, &body.triangles, &welds);
+        let near: Vec<bool> = rest
+            .iter()
+            .map(|p| {
+                ["LeftUpperArm", "RightUpperArm"].iter().any(|bone| {
+                    let joint = world[body.rig.bone(bone).unwrap()].w_axis.truncate();
+                    p.distance(joint) < 0.15 && p.y < joint.y
+                })
+            })
+            .collect();
+        for name in ["walk-left-40", "walk-right-40"] {
+            let pose = poses.iter().find(|p| p.name == name).unwrap();
+            // The fold's depth at each corner of the region: its 95th
+            // percentile and its deepest.
+            let fold = |swing: bool| {
+                let mut weights = state.clone();
+                weights.extend(
+                    pose.correctives
+                        .iter()
+                        .filter(|(shape, _)| {
+                            swing || !(shape.contains("_Forward_") || shape.contains("_Back_"))
+                        })
+                        .cloned(),
+                );
+                let (at, normals) = body.shaped(&weights);
+                let matrices = skin_matrices(&body.rig, &pose.bones);
+                let (posed, posed_normals, _) =
+                    skin(&matrices, &body.joints, &body.weights, &at, &normals);
+                let now = bulge(&posed, &posed_normals, &body.triangles, &welds);
+                let mut depths: Vec<f32> = now
+                    .iter()
+                    .zip(&at_rest)
+                    .zip(&near)
+                    .filter(|(_, near)| **near)
+                    .map(|((a, b), _)| (a - b).abs())
+                    .collect();
+                depths.sort_by(f32::total_cmp);
+                (depths[depths.len() * 95 / 100], *depths.last().unwrap())
+            };
+            let ((without, without_most), (with, with_most)) = (fold(false), fold(true));
+            println!(
+                "frame {frame} {name}: the fold's 95th percentile {:.1} mm without the swing \
+                 correctives, {:.1} mm with (the deepest corner {:.1} and {:.1} mm)",
+                without * 1000.0,
+                with * 1000.0,
+                without_most * 1000.0,
+                with_most * 1000.0
+            );
+            if frame == 0.0 {
+                assert!(
+                    with <= 0.6 * without,
+                    "frame {frame} {name}: {with} m, {without} m without"
+                );
+            }
+            // The records (metres): the 95th percentile and the deepest
+            // corner with the swing correctives, by frame and side.
+            let (most, deepest) = match (frame == 0.0, name) {
+                (true, "walk-left-40") => (0.0049, 0.0184),
+                (true, _) => (0.0059, 0.0143),
+                (false, "walk-left-40") => (0.0032, 0.0172),
+                (false, _) => (0.0045, 0.0165),
+            };
+            assert!(
+                with <= most + 5e-5 && with_most <= deepest + 5e-5,
+                "frame {frame} {name}: {with} m (record {most}), the deepest {with_most} m                  (record {deepest})"
+            );
+        }
+    }
 }

@@ -1060,11 +1060,12 @@ fn the_realistic_bodys_region_map_reaches_every_corner_and_its_simpler_copies() 
     for primitive in &body.primitives {
         for copy in std::iter::once(primitive).chain(&primitive.lods) {
             assert_eq!(copy.regions.len(), copy.positions.len(), "one per corner");
-            assert!(copy.regions.iter().all(|region| (1..=14).contains(region)));
+            assert!(copy.regions.iter().all(|region| (1..=15).contains(region)));
             seen.extend(copy.regions.iter().copied());
         }
     }
-    assert_eq!(seen.len(), 14, "all fourteen regions: {seen:?}");
+    // Fifteen since CO9 part 2's review fixes (`upper_arms_mid`, 15).
+    assert_eq!(seen.len(), 15, "all fifteen regions: {seen:?}");
     // The highest corner is the head's (1), the lowest the feet's (14).
     let full = &body.primitives;
     let corners = || {

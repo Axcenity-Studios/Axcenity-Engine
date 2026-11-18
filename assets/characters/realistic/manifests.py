@@ -203,7 +203,7 @@ BODY_FEATURES = [
      "shapes": ["Masculine_Fat_Chest", "Masculine_Muscle_Chest"]},
     {"id": "arms", "label": "Arms", "about": "Their length, muscle and fat.",
      "shapes": ["Masculine_Fat_Arms", "Masculine_Muscle_Arms"], "paired": True,
-     "regions": ["upper_arms_low", "forearms"]},
+     "regions": ["upper_arms_mid", "upper_arms_low", "forearms"]},
     {"id": "hands", "label": "Hands", "about": "Their size.", "region": "hands", "paired": True,
      "regions": ["hands"]},
     {"id": "abdomen", "label": "Abdomen", "about": "The belly's muscle and fat.",

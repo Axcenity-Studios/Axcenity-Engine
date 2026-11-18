@@ -39,6 +39,18 @@ below rest, as the starter Idle holds it: without it the cap squares off
 and a ridge rises beside the neck, which is how a character stands most
 of the time). Lowering is a turn about the raise axis reversed, so its
 rule has the same form: 0 at rest, full at 35 degrees down.
+
+Two more per side for the walk (CO9 part 2, wave 4):
+`Corrective_Shoulder_Forward_*` and `Corrective_Shoulder_Back_*`, the
+hanging arm swung forward 40 degrees and back 50 about the axis across
+the body (the starter Walk swings it back to 49 and forward to 31). A
+linearly skinned swing folds the skin out where the arm meets the chest
+(swung forward) or the back (swung back), and a T-shirt's armpit, bound to
+the skin before the fold, can't cover it. They are made on top of the
+lowered shoulder the swing hangs from (what the `Lowered` shape already
+gives is taken off), and their rules turn about the axis across the
+body: a swing has no part about the raise axis, so it leaves the
+lowered shape's weight as it was, and a raise none about this one.
 """
 
 import math
@@ -68,7 +80,12 @@ STAGES = [
     ("Level", "shoulder_abd_90", "up", 0.0, 45.0),
     ("Raised", "shoulder_abd_150", "up", 45.0, 105.0),
     ("Lowered", "shoulder_abd_10", "down", 0.0, 35.0),
+    ("Forward", "shoulder_swing_forward_40", "forward", 0.0, 40.0),
+    ("Back", "shoulder_swing_back_50", "back", 0.0, 50.0),
 ]
+# The ways made on top of another way's stages: a swing is from the
+# lowered (hanging) shoulder.
+ON_TOP_OF = {"forward": "down", "back": "down"}
 
 
 def _qa():
@@ -178,9 +195,26 @@ def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
             axis = -axis
         return bone.parent.matrix_local.to_3x3().inverted() @ axis
 
+    def swing_axis(s):
+        """The axis side `s`'s arm swings forward about (across the body),
+        in its parent's rest space: turning about it takes the arm's end
+        to the front (-Y in Blender)."""
+        bone = armature.data.bones[s + "UpperArm"]
+        axis = Vector((1.0, 0.0, 0.0))
+        along = bone.tail_local - bone.head_local
+        if (Matrix.Rotation(math.radians(1.0), 3, axis) @ along).y > along.y:
+            axis = -axis
+        return bone.parent.matrix_local.to_3x3().inverted() @ axis
+
+    def axis_of(s, way):
+        return {"up": raise_axis(s), "down": -raise_axis(s), "forward": swing_axis(s), "back": -swing_axis(s)}[way]
+
     shapes, rules, report = {}, [], {"method": "delta mush", "smoothings": SMOOTHINGS, "region_m": [NEAR, FAR]}
     so_far = {"up": np.zeros_like(rest), "down": np.zeros_like(rest)}
     for name, pose, way, start, full in STAGES:
+        if way not in so_far:
+            # A way made on top of another starts from what that one gives.
+            so_far[way] = so_far[ON_TOP_OF[way]].copy()
         Q.apply_pose(rig, pose)
         posed = evaluated_positions(body)
         delta = (mush.target(posed) - posed) * region[:, None]
@@ -193,7 +227,7 @@ def build(body, armature, weights, P, custom, mirror, lap, tris, log=print):
         for s, d in (("Left", left), ("Right", right)):
             shape = f"Corrective_Shoulder_{name}_{s}"
             shapes[shape] = d
-            axis = raise_axis(s) if way == "up" else -raise_axis(s)
+            axis = axis_of(s, way)
             rules.append({"shape": shape, "bone": s + "UpperArm", "axis": [round(v, 5) for v in axis],
                           "angles": [start, full]})
         moved = np.linalg.norm(delta, axis=1)

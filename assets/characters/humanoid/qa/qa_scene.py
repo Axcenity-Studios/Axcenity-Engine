@@ -464,14 +464,16 @@ class Character:
         in, by the rule `anim`'s `correctives.rs` applies: a shape's
         weight is how far its bone has turned from rest about the rule's
         axis (in the bone's parent's rest space), from 0 at
-        `angles[0]` degrees to 1 at `angles[1]`."""
+        `angles[0]` degrees to 1 at `angles[1]`, eased at both ends."""
         weights = {}
         for rule in self.custom.get("correctives", []):
             name = rule["bone"]
             turn = (self._local(name) @ self._local(name, posed=False).inverted()).to_quaternion()
             angle = math.degrees(twist_angle(turn, Vector(rule["axis"])))
             start, full = rule["angles"]
-            weights[rule["shape"]] = min(1.0, max(0.0, (angle - start) / (full - start)))
+            t = min(1.0, max(0.0, (angle - start) / (full - start)))
+            # Eased at both ends, as `anim`'s `correctives::ramp`.
+            weights[rule["shape"]] = t * t * (3.0 - 2.0 * t)
         self.set_correctives(weights)
         return weights
 
@@ -540,6 +542,23 @@ def _shoulder(ch, target, sides=("Left",)):
         ch.bend(f"{side}UpperArm", (0, 1, 0), abs(turn), toward=UP if turn >= 0 else DOWN)
 
 
+def _swing(ch, deg, sides=("Left",)):
+    """Upper arm hanging as the walk holds it (10 degrees from hanging,
+    `_shoulder`), then swung `deg` degrees forward (negative: back) about
+    the axis across the body, as the starter Walk and Run swing it."""
+    _shoulder(ch, 10, sides)
+    for side in sides:
+        ch.bend(f"{side}UpperArm", (1, 0, 0), abs(deg), toward=FWD if deg >= 0 else BACK)
+
+
+def _raised_swing(ch, abduction, deg, sides=("Left",)):
+    """Upper arm raised `abduction` degrees from hanging (`_shoulder`),
+    then swung `deg` degrees forward about the axis across the body."""
+    _shoulder(ch, abduction, sides)
+    for side in sides:
+        ch.bend(f"{side}UpperArm", (1, 0, 0), abs(deg), toward=FWD if deg >= 0 else BACK)
+
+
 def _wrist(ch, deg, sides=("Left",)):
     for side, s in SIDES:
         if side not in sides:
@@ -590,9 +609,32 @@ POSES = {
 }
 
 
+# The walk's swings (CO9 part 2, wave 4): the hanging arm swung forward
+# and back as the starter Walk swings it (back to 49 degrees, forward to
+# 31; the Run back to 76, forward to 36). The realistic body's swing
+# correctives are made in these (`realistic/correctives.py`). Apart from
+# `POSES` so the baseline sheets keep their rows; `measure.py`'s
+# deformation section measures both.
+#
+# And where else the swing correctives fire (review fixes 1): their rule
+# reads only the turn about the axis across the body, so an arm raised
+# forward (to reach, aim or climb) leans on `Forward` at full weight, and
+# a raised arm swung forward on both `Raised` and `Forward`. The forward
+# raise to level, a raise to 90 swung forward 40, and one in between.
+SWING_POSES = {
+    "shoulder_swing_forward_40": (lambda ch: _swing(ch, 40), ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_swing_back_50": (lambda ch: _swing(ch, -50), ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_flex_90": (lambda ch: _swing(ch, 90), ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_abd_90_swing_forward_40": (lambda ch: _raised_swing(ch, 90, 40),
+                                         ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_abd_60_swing_forward_20": (lambda ch: _raised_swing(ch, 60, 20),
+                                         ("LeftUpperArm", "LeftShoulder", 0.09)),
+}
+
+
 def apply_pose(ch, name):
     ch.pose_reset()
-    POSES[name][0](ch)
+    (POSES.get(name) or SWING_POSES[name])[0](ch)
     ch.drive()
     ch.drive_correctives()
     update()
