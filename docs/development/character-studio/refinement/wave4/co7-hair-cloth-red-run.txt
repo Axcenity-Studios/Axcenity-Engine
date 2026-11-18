@@ -121,3 +121,90 @@ The API (Shading::Hair, Shading::Cloth, HairShading, ClothShading, SHADING_HAIR,
         FAIL [   7.735s] (13/15) axcenity-render renderer::tests::hair::the_primary_highlight_follows_the_strands_direction
         FAIL [   7.846s] (14/15) axcenity-render renderer::tests::hair::the_primary_highlight_lies_toward_the_root_where_the_model_puts_it
         FAIL [   7.850s] (15/15) axcenity-render renderer::tests::hair::the_secondary_highlight_lies_toward_the_tip_tinted_by_the_hairs_colour
+
+
+== Review fixes 1: red run (before the fix) ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_tiled_cut_out_casts/)' --no-fail-fast
+
+    Starting 1 test across 1 binary (419 tests skipped)
+        FAIL (1/1) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+  stdout ───
+
+    running 1 test
+    test renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale ... FAILED
+
+    failures:
+
+    failures:
+        renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 419 filtered out; finished in 9.60s
+
+  stderr ───
+    tiled cut-out: 7 turns, 0..81
+
+    thread 'renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale' (4444) panicked at crates\render\src\renderer\tests\alpha_cards.rs:476:5:
+    holes at the untiled scale (7 turns)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary 1 test run: 0 passed, 1 failed, 419 skipped
+        FAIL (1/1) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+error: test run failed
+
+
+== Review fixes 1: the back-lit hair shell test, red (hair_shell disabled: the shader before the fix) ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_back_lit_hair_shells/)' --no-fail-fast
+
+    Starting 1 test across 1 binary (420 tests skipped)
+        FAIL (1/1) axcenity-render renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+  stdout ───
+    running 1 test
+    test renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator ... FAILED
+    failures:
+    failures:
+        renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 420 filtered out; finished in 5.64s
+  stderr ───
+    Off: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    Msaa4: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    thread 'renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator' (14828) panicked at crates\render\src\renderer\tests\hair.rs:558:5:
+    [
+        "Off: lit 21.073502 rows past the terminator",
+        "Off: a ragged edge (0.48)",
+        "Msaa4: lit 21.073502 rows past the terminator",
+        "Msaa4: a ragged edge (0.48)",
+    ]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+────────────
+     Summary 1 test run: 0 passed, 1 failed, 420 skipped
+        FAIL (1/1) axcenity-render renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+error: test run failed
+
+
+== Review fixes 1: a Standard cut-out casts its whole card (cut-out-aware shadows limited to Hair after the foliage bench), red ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_standard_cut_out_casts_its_whole_card|a_tiled_cut_out|a_striped_hair_cards_shadow/)' --no-fail-fast
+
+    Starting 3 tests across 1 binary (420 tests skipped)
+        PASS (1/3) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+        FAIL (2/3) axcenity-render renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+  stdout ───
+    running 1 test
+    test renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps ... FAILED
+    failures:
+    failures:
+        renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 422 filtered out; finished in 6.81s
+  stderr ───
+    shadow maps, standard: 7 turns, 0..81
+    thread 'renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps' (25312) panicked at crates\render\src\renderer\tests\alpha_cards.rs:472:5:
+    holes in a Standard cut-out's shadow (7 turns)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS (3/3) axcenity-render renderer::tests::alpha_cards::a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps
+────────────
+     Summary 3 tests run: 2 passed, 1 failed, 420 skipped
+        FAIL (2/3) axcenity-render renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+error: test run failed

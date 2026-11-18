@@ -148,6 +148,36 @@ fn hair_and_cloth_evidence() {
             size,
         );
     }
+    // The back-lit ball's self-shadow edge under each anti-aliasing and
+    // with the shadows off (review fixes 1: where its terminator comes from).
+    let backlit = scenes()
+        .into_iter()
+        .find(|(name, _)| *name == "hair-blonde-backlit")
+        .unwrap()
+        .1;
+    for (label, mode, frames, shadows) in [
+        ("off", AntiAliasing::Off, 1, true),
+        ("taa", AntiAliasing::Taa, 40, true),
+        ("no-shadows", AntiAliasing::Msaa4, 1, false),
+    ] {
+        let mut list = backlit.clone();
+        list.shadows.enabled = shadows;
+        let mut renderer = TextureRenderer::new(&device, &queue, size, size);
+        renderer.set_graphics(&GraphicsSettings {
+            anti_aliasing: Some(mode),
+            ambient_occlusion: Some(AmbientOcclusion::Off),
+            ..GraphicsSettings::preset(Quality::High)
+        });
+        for _ in 0..frames {
+            renderer.render(&list).unwrap();
+        }
+        evidence(
+            &format!("engine-hair-blonde-backlit-{label}"),
+            &renderer.read_pixels(),
+            size,
+            size,
+        );
+    }
     // A card of strands over skin under each anti-aliasing, lit from the
     // front, and its striped shadow on a wall.
     let data = hair_data(0x0e71);

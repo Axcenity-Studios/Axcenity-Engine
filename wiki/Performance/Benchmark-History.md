@@ -83,6 +83,16 @@ The pre-#65 Farmhouse row is from the PR's own run and isn't directly comparable
 | 2560×1440 | 1.03–1.07 | 0.99–1.12 | 0.93 | noise / 0.24 |
 | 3840×2160 | 1.90–1.92 | 1.27 | 1.01 | 0.20–0.26 / below noise |
 
+**Cut-out shadows on foliage (CO7 review fixes 1, 2026-11-18, `bench_cut_out_foliage_shadows`)**: 24 trees of 1,500 cut-out leaf cards (36,000) under a low sun with its cascades, 1080p High with TAA, medians of 200 frames; Desktop, pinned to CPUs 0 to 15, five rounds alternating with `main` (`e1658afb`). Casting every cut-out through its holes was dropped for this; only hair cards do (`docs/rendering/shadows.md`).
+
+| Build | Shadows | Prepass | Scene |
+|---|---|---|---|
+| `main` `e1658afb` | 0.190–0.194 | 0.206–0.208 | 1.121–1.132 |
+| Every cut-out through its holes (`fef3f3d2`) | 0.412–0.419 | 0.208–0.209 | 1.119–1.127 |
+| Only hair through its holes (review fixes 1) | 0.188–0.193 | 0.209–0.210 | 1.124–1.130 |
+
+(One `main` round, 0.203 / 0.270 / 1.267, was disturbed and is left out of the ranges.)
+
 **Unexplained**: `bench_10000_parts`'s `build_draw_list` rose from 3.3 to 8–9 ms between the commit that added the render benchmarks and `556b72b`; not bisected ([Known bottlenecks](Known-Bottlenecks.md)).
 
 ## Collaborate on S10k (C11)

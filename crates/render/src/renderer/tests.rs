@@ -21,6 +21,7 @@ mod debug_views;
 mod decals;
 mod environment_maps;
 mod fog;
+mod foliage_shadow_bench;
 mod frame_planning;
 mod frustum_culling;
 mod gpu_particles;

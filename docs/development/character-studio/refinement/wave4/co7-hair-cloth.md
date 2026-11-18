@@ -14,7 +14,7 @@ Branch `co7-hair-cloth` (RA7, milestone CO7's remaining models). The material co
    - Under MSAA, its coverage is its opacity (alpha to coverage, graded).
    - Off and FXAA cut it at the cutoff.
    - The depth prepass cuts with the same threshold, so there is no halo and no sorting.
-3. **Cut-out-aware shadow maps for every cut-out** (defect D11 of the runtime-render audit). A second shadow pipeline reads each cut-out caster's material (`vs_shadow_cut_out`, `fs_shadow_cut_out`, `Caster::cut_out`, `CasterGroup`). Hair hashes its fringe against a fixed per-texel pattern.
+3. **Cut-out-aware shadow maps** (defect D11 of the runtime-render audit). Review fixes 1 limits them to hair cards: other cut-outs cast whole cards again, as on `main` (see below). A second shadow pipeline reads each cut-out caster's material (`vs_shadow_cut_out`, `fs_shadow_cut_out`, `Caster::cut_out`, `CasterGroup`). Hair hashes its fringe against a fixed per-texel pattern.
    - Ray traced shadows and AO already went through cards on posed parts: CO8's posed BLASes are built non-opaque and read the same texture coordinates. Tests now prove it.
 4. **OPEN-19.** It doesn't reproduce in the renderer since CO8. A test now pins it, with two kinds of card (Standard, Hair) and four anti-aliasing settings (Off, MSAA 4×, TAA, TAA with AO), on a skinned, morphed card over skinned, morphed skin.
 5. **Cloth model** (`cloth.wgsl`, `Shading::Cloth`, `render::ClothShading`, `"axcenity_shading": "cloth"`).
@@ -161,7 +161,7 @@ All in `co7-hair-cloth/`:
   - The hashed shadow shows a faint stipple on the skin where the card's opacity is mid-range.
   - Real atlases' fringes are a texel or two wide; the first hairstyle will tell how much of this shows.
 - `taa-ramp-card-four-frames-x4.png`: four consecutive TAA frames of the ramp card's edge, ×4. The gradient is steady; the outermost edge's lone pixels come and go.
-- `shadow-map-stripes.png`: the striped card's shadow in the shadow maps (Standard, Hair, and posed Hair): stripes, not slabs.
+- `shadow-map-stripes.png`: the striped card's shadow in the shadow maps. Since review fixes 1: Standard casts a whole card (a slab, as on `main`); Hair and posed Hair cast stripes. The Standard card itself doesn't show against the wall because both are white and lit alike.
 
 ## Open issues
 
@@ -194,3 +194,103 @@ All in `co7-hair-cloth/`:
   - The content tracks (first hairstyle, first garments) will add files marking materials hair or cloth; nothing of theirs is in this branch.
 - **Generated files:** none regenerated. Nothing here changes a build script or generated asset.
 - **After merge**, rerun the full workspace suite, and the probe guard alone if it aborts again.
+
+## Review fixes 1
+
+The review found three blocking items. All three are fixed, each with a test run red first (the red runs are appended to `co7-hair-cloth-red-run.txt`).
+
+### 1. Tiled cut-outs cast holes at the wrong scale
+
+The reviewer was right. A cut-out whose texture is tiled by its size (`DrawItem::uv_tile` > 0, which is every textured Part) went through the cut-out shadow pipeline. That pipeline reads the mesh's own texture coordinates, so the shadow's holes didn't match what was drawn.
+
+- **Test:** `a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale` (`alpha_cards.rs`). A striped card with `uv_tile` 1 must cast a slab (at most 2 turns). Red: 7 turns.
+- **Fix:** `plan_part` (`renderer/lighting.rs`) leaves tiled items out of the cut-out pipeline, as `ray_cut_outs.rs` does, so they cast their whole mesh as the docs said. Green: slab.
+- After fix 3, the only cut-outs that use that pipeline are hair cards, so the test now uses a hair card. It passes.
+
+### 2. The back-lit hair evidence had a torn shadow edge and a patch at the pole
+
+The reviewer was right on both counts.
+
+**How I found the cause.** I added three variants of the back-lit scene to `hair_and_cloth_evidence`: Off, TAA over 40 frames, and shadows off.
+- With shadows off, the whole front of the ball lit up. So the hair model was lighting strands past the terminator, where no n·l term dims them, and the torn edge was the shadow map's self-shadow edge showing through.
+- TAA averaged the noise but left blocky steps at the size of a shadow-map texel.
+- The grey-blue patch stayed with shadows off, so it is not a shadow problem. It is the test ball's pole: the built-in sphere's meridians (the strand directions) meet there, and no tangent field over a sphere avoids that. Blender's render of the same ball shows its own small dark notch at the pole.
+
+**Fix (`hair.wgsl`, `hair_shell`).** A single-sided hair material is now treated as a shell over something solid, such as a hair cap or this ball. Its sun and lamp light fade over its terminator, from whole at n·l 0.1 to none at n·l -0.05.
+- Double-sided cards are unchanged: a card is a sheet of strands, lit from either side, and light from behind still comes through it (`light_from_behind_comes_through_hair` passes).
+- The material says it is a shell with bit 4 of `MapsUniform::shading.y`, set from `!material.double_sided`. The uniform test pins this (`shading[1]` is 4 for a single-sided hair material without maps).
+- I tried full strength at n·l 0.25 first. Then I narrowed it to 0.1, which matches Blender's rim better (highlight spread down: 5 rows against Blender's 6, compared with 4 at 0.25). The front-lit hair renders don't change: brightest rows 233 and 243, chroma and rim/middle are the same as before.
+
+**Test:** `a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator` (`hair.rs`) draws the evidence scene at 512 px under Off and MSAA 4×. It projects the terminator column by column and leaves out the pole's 32 middle columns, as the test asset's own artefact. It checks two things:
+- how far past the terminator the lit band ends: at most 6 rows. Red: 21.1. Green: 2.6.
+- how much that end moves from one column to the next: under 0.4 rows. Red: 0.48. Green: 0.30.
+
+**What I saw** (`backlit-hair-shell-terminator-x3.png`, the ball's top at 3×; and the new `engine-vs-blender.jpg`):
+- After the fix the rim is a thin, smooth crescent under Off, MSAA and TAA, the same shape as Blender's. The torn band is gone.
+- Remaining differences, unchanged and still open:
+  - The engine's rim is warm gold at the sides, where Blender's is white.
+  - It fades out a little sooner down the sides.
+  - The pole patch is still grey, as the test asset's artefact.
+- Front-lit scenes look the same as before.
+
+### 3. The cut-out shadow cost on foliage wasn't measured
+
+The reviewer was right, and the measurement changed the design.
+
+**The bench.** `bench_cut_out_foliage_shadows` (new file `renderer/tests/foliage_shadow_bench.rs`, ignored, run by hand) is self-contained, so the same file built on `main`.
+- The scene: 24 trees of 1,500 cut-out leaf cards each (36,000 cards), under a low sun with its cascades, at 1080p High with TAA.
+- Method: medians of 200 frames; RX 9070 XT; pinned to CPUs 0 to 15; five rounds alternating with `main` at `e1658afb`.
+
+| Build | Shadows (ms) | Prepass (ms) | Scene (ms) |
+|---|---|---|---|
+| `main` `e1658afb` | 0.190–0.194 | 0.206–0.208 | 1.121–1.132 |
+| Every cut-out through its holes (`fef3f3d2`) | 0.412–0.419 | 0.208–0.209 | 1.119–1.127 |
+| Only hair through its holes (this fix) | 0.188–0.193 | 0.209–0.210 | 1.124–1.130 |
+
+One `main` round (0.203 / 0.270 / 1.267 ms) was disturbed by other work on the machine and is left out of the ranges.
+
+**Why it cost so much, and the change.** Casting every cut-out through its holes multiplied the Shadows pass by 2.2: the cut-out pipeline samples the texture and discards, so it loses early depth rejection in every cascade. That is well over the reviewer's 10–15% bar, and Paul's foliage projects are already GPU-bound. So **only hair cards cast through their holes now** (`plan_part`: `matches!(item.material.shading, Shading::Hair(_))`). Leaf cards and fences cast their whole cards again, exactly as on `main`, which the table confirms.
+- **Test:** `a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps` (red: 7 turns; green: a slab). It replaces the Standard case of the old striped test, which is now `a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps` (Hair, and Hair posed).
+- **Hair's cost** stays small. The same pipeline cost 0.22 ms more on 36,000 cards, so a hairstyle of a few hundred cards adds a few hundredths of a millisecond.
+- **Where it is recorded:** `docs/rendering/shadows.md`, `docs/rendering/hair.md` (Cost), and `wiki/Performance/Benchmark-History.md`. The statements that every cut-out casts through its holes are corrected in the wiki Rendering page, the ADR-0036 note, Known-Limitations and the shader's comments.
+- **For Paul:** whether foliage should be able to opt in to leaf-shaped shadows (a graphics setting, or Ultra only) at that cost. It is not built.
+
+### Non-blocking items
+
+Taken up in the docs:
+- `hair.md`: under MSAA, any opacity above 0.002 covers samples. So an atlas must keep its clear texels exactly 0 and pad its islands. The ramp card's solid line at its left edge comes from the texture wrapping round (repeat sampler).
+- `hair.md` and Known-Limitations: under Off and FXAA, a fringe between 0.2 and 0.5 that isn't drawn still casts a faint stipple.
+- `hair.md`: the hashed shadow pattern is fixed in shadow-map texel space, so it may crawl on moving hair. To check on the first hairstyle in Walk.
+- `cloth.md`: cloth's anisotropy follows Filament's mapping, α(1±a), not `KHR_materials_anisotropy`'s (α_t = mix(α, 1, strength²)), and not Blender's. Garment authors should judge anisotropy in an engine capture.
+
+Left as reported:
+- the OPEN-19 check on real face content, for the face owner before lashes or brows switch to MASK;
+- the extra metalness-slot sample in every material's fragment (the Prepass column above moves by 0.002 ms);
+- the KHR extensions' textures;
+- `DRAWN_TODAY` and the drag rule, which are RA1's when the values are exposed.
+
+The empty stray folder `C:\co7hc_ev` from the first round is still there for Paul to delete.
+
+### Files changed in this round
+
+- `crates/render/src/hair.wgsl`: `hair_shell` and its constants; the shell bit in the header.
+- `crates/render/src/renderer/lighting.rs`: `plan_part` sends only untiled hair cards to the cut-out shadow pipeline; `shading_uniform` sets the shell bit.
+- `crates/render/src/shader.wgsl`: comments only.
+- `crates/render/src/renderer/tests.rs`: registers `foliage_shadow_bench`.
+- `crates/render/src/renderer/tests/foliage_shadow_bench.rs`: new.
+- `crates/render/src/renderer/tests/alpha_cards.rs`: the tiled and Standard-slab tests; the striped test split.
+- `crates/render/src/renderer/tests/hair.rs`: the back-lit shell test; the shell bit in the uniform test.
+- `crates/render/src/renderer/tests/character_models_evidence.rs`: the back-lit variants.
+- Docs: `docs/rendering/hair.md`, `cloth.md`, `shadows.md`. Wiki: `Engine-Systems/Rendering.md`, `Roadmap/Known-Limitations.md`, `Performance/Benchmark-History.md`, the ADR-0036 note.
+- This hand-back, the red-run file, and the evidence: `engine-vs-blender.jpg` and `shadow-map-stripes.png` remade, `backlit-hair-shell-terminator-x3.png` new.
+
+No dependency was added, no shared contract changed, and no generated file was regenerated.
+
+### Tests run
+
+- `cargo nextest run -p axcenity-render -p axcenity-scene -p axcenity-assets -p axcenity-avatar -p axcenity-player --no-fail-fast`: `Summary [ 539.252s] 1223 tests run: 1223 passed (29 slow), 29 skipped`. There are no FAIL or ABORT lines. The run includes `every_example_renders`, `the_same_description_captures_identical_pictures_and_every_view_is_drawn`, the probe guard `every_other_material_draws_as_it_did_before_the_skin_model`, `the_skin_table_is_skins_profile_pre_integrated`, and the four new tests.
+- The red runs: the tiled test (7 turns), the back-lit shell test (21.1 rows, 0.48), and the Standard-slab test (7 turns). All are in `co7-hair-cloth-red-run.txt`.
+- Run by hand: `hair_and_cloth_evidence` (debug), and `bench_cut_out_foliage_shadows` (release, pinned, alternating with `main`, before and after the gate).
+- `cargo clippy -p axcenity-render -p axcenity-scene -p axcenity-assets -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings`: clean.
+- `cargo fmt --all -- --check`: clean.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (staleness on pages this round didn't touch).

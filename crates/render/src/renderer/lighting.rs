@@ -977,9 +977,19 @@ fn plan_part<'a>(
         let Some(mut raw) = instance_raw_with(item, &mut colors) else {
             continue;
         };
-        // A cut-out the standard way (no surface shader, terrain or
-        // water) casts its shadow through its texture's holes.
+        // A hair card (a cut-out, no surface shader, terrain or water)
+        // casts its shadow through its texture's holes: many strands, not
+        // a slab. Other cut-outs (leaf cards, fences) cast their whole
+        // mesh, as before CO7: through their holes too, the Shadows pass
+        // of 36,000 leaf cards went from 0.19 to 0.42 ms at 1080p High
+        // (`bench_cut_out_foliage_shadows`). One whose texture is tiled by
+        // its size (`uv_tile`) casts its whole mesh too: `vs_shadow_cut_out`
+        // reads the mesh's own coordinates, so its holes would fall at the
+        // wrong scale (as `ray_cut_outs` leaves tiled items out).
+        let tiled = item.uv_tile.is_finite() && item.uv_tile > 0.0;
         let cut_out = (key.cut_out
+            && matches!(item.material.shading, Shading::Hair(_))
+            && !tiled
             && key.shader.is_none()
             && item.material.terrain.is_none()
             && item.material.water.is_none())
@@ -1328,13 +1338,18 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
             [0.0; 4],
         ),
         Shading::Unlit => ([SHADING_UNLIT, 0.0, 0.0, 0.0], [0.0; 4]),
-        // hair.wgsl: which maps are bound (1 the atlas data, 2 the flow),
-        // the cuticle tilt's scale and the secondary's strength; the
-        // colour values ride in `params` (`hair_uniform`).
+        // hair.wgsl: which maps are bound (1 the atlas data, 2 the flow)
+        // and 4 for a single-sided shell (`hair_shell`), the cuticle tilt's
+        // scale and the secondary's strength; the colour values ride in
+        // `params` (`hair_uniform`).
         Shading::Hair(hair) => (
             [
                 SHADING_HAIR,
-                f32::from(u8::from(hair.data.is_some()) + 2 * u8::from(hair.flow.is_some())),
+                f32::from(
+                    u8::from(hair.data.is_some())
+                        + 2 * u8::from(hair.flow.is_some())
+                        + 4 * u8::from(!material.double_sided),
+                ),
                 hair.shift.clamp(0.0, 2.0),
                 hair.secondary.clamp(0.0, 2.0),
             ],

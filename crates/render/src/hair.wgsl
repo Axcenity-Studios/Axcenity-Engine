@@ -25,7 +25,8 @@
 //
 // `Maps::shading` for hair: x SHADING_HAIR; y which maps are bound (1 the
 // atlas's data in the metalness map's place, 2 the flow map in the
-// specular map's place); z the cuticle tilt's scale (`shift`); w the
+// specular map's place) and 4 for a shell (a single-sided hair surface,
+// `hair_shell`); z the cuticle tilt's scale (`shift`); w the
 // secondary's strength. `Maps::params` holds the colour values
 // (renderer/lighting.rs, `hair_uniform`).
 
@@ -66,6 +67,11 @@ const HAIR_NO_DATA: vec4<f32> = vec4<f32>(0.5, 0.5, 0.0, 1.0);
 // hashed alpha grades under TAA (`hair_cut_threshold`): 0.2 to 0.8 at
 // glTF's default cutoff of 0.5.
 const HAIR_HASH_BAND: f32 = 0.6;
+// A hair shell's terminator (`hair_shell`): its light is gone where the
+// surface faces this far away from the light (as n·l), and whole where it
+// faces it by this much.
+const HAIR_SHELL_WRAP: f32 = 0.05;
+const HAIR_SHELL_FULL: f32 = 0.1;
 
 fn hair_has_data() -> bool {
     return (u32(maps.shading.y + 0.5) & 1u) != 0u;
@@ -73,6 +79,23 @@ fn hair_has_data() -> bool {
 
 fn hair_has_flow() -> bool {
     return (u32(maps.shading.y + 0.5) & 2u) != 0u;
+}
+
+// How much of a light from `l` reaches a hair pixel of normal `geometric`
+// by the surface's own side. A double-sided card is a sheet of strands lit
+// from either side (light from behind comes through it): all of it. A
+// single-sided hair surface is a shell over something solid (a hair cap
+// over the skull, or a test ball): its light fades out over the solid's
+// terminator, from where the surface faces the light a little to where it
+// faces a little away (light reaching a few strands deep). Without the
+// fade, the strands' light past the terminator, which no n·l dims, showed
+// the shadow map's self-shadow edge there, torn by its filter's per-pixel
+// noise (review fixes 1).
+fn hair_shell(geometric: vec3<f32>, l: vec3<f32>) -> f32 {
+    if (u32(maps.shading.y + 0.5) & 4u) == 0u {
+        return 1.0;
+    }
+    return smoothstep(-HAIR_SHELL_WRAP, HAIR_SHELL_FULL, dot(geometric, l));
 }
 
 // The amounts of eumelanin and pheomelanin whose absorption is nearest
@@ -258,16 +281,18 @@ fn hair_surface(
     let secondary = maps.shading.w;
 
     let sun = sun_arrival(world_position, geometric, pixel, solid);
-    var lit = hair_scatter(t, v, sun.l, colour, roughness, tilt, secondary, sun.visible)
-        * sun.radiance * sun.visible;
+    let sun_visible = sun.visible * hair_shell(geometric, sun.l);
+    var lit = hair_scatter(t, v, sun.l, colour, roughness, tilt, secondary, sun_visible)
+        * sun.radiance * sun_visible;
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {
         let lamp = lamp_arrival(lamps, i, slot, world_position, geometric, pixel, solid);
         slot += lamp_slots(lamps, i);
-        if lamp.visible > 0.0 {
-            lit += hair_scatter(t, v, lamp.l, colour, roughness, tilt, secondary, lamp.visible)
-                * lamp.radiance * lamp.visible;
+        let visible = lamp.visible * hair_shell(geometric, lamp.l);
+        if visible > 0.0 {
+            lit += hair_scatter(t, v, lamp.l, colour, roughness, tilt, secondary, visible)
+                * lamp.radiance * visible;
         }
     }
 

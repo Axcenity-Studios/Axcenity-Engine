@@ -301,7 +301,8 @@ struct ShadowCutOut {
     @location(1) @interpolate(flat) cut: vec2<f32>,
 }
 
-// Draws a cut-out caster (a leaf card, a fence, a hair card) into a
+// Draws a cut-out caster (a hair card: `plan_part` sends no other here,
+// since through their holes foliage's shadows cost twice as much) into a
 // shadow map, as `vs_shadow` does, with what its fragment needs to leave
 // out its holes. Its texture coordinates aren't tiled by its size: a
 // cut-out drawn that way (`DrawItem::uv_tile`) casts its whole mesh.
@@ -330,7 +331,7 @@ fn vs_shadow_cut_out(
 }
 
 // A cut-out caster's pixel of a shadow map: left out where its texture is
-// cut out, so leaves and strands cast their own shapes, not their cards'.
+// cut out, so strands cast their own shapes, not their cards'.
 // A hair card's opacity is hashed against a fixed per-texel pattern over
 // the band round its cutoff (`HAIR_HASH_BAND`, as the scene pass hashes
 // it under TAA), so the shadow map's filter averages a strand's soft

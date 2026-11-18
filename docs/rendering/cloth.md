@@ -9,7 +9,7 @@ A model file says it: a glTF material whose `extras` hold `"axcenity_shading": "
 | Where | What | Notes |
 |---|---|---|
 | `extensions.KHR_materials_sheen` | `sheenColorFactor` (linear RGB) and `sheenRoughnessFactor` (0 to 1) | Blender: Sheen Weight × Sheen Tint, Sheen Roughness. Without it the cloth has no sheen. Its textures (`sheenColorTexture`, `sheenRoughnessTexture`) aren't read yet |
-| `extensions.KHR_materials_anisotropy` | `anisotropyStrength` (0 to 1) and `anisotropyRotation` (radians, from the tangent) | Blender: Anisotropic and its rotation. Its texture isn't read yet |
+| `extensions.KHR_materials_anisotropy` | `anisotropyStrength` (0 to 1) and `anisotropyRotation` (radians, from the tangent) | Blender: Anisotropic and its rotation, but not the same stretch (see Anisotropy below). Its texture isn't read yet |
 | mesh tangents | MikkTSpace | The direction the highlight stretches along is the texture's U, turned by the rotation |
 | everything else | glTF's metallic-roughness material, as Standard reads it | Base colour, normal, roughness, occlusion maps |
 
@@ -36,7 +36,7 @@ The uniform (`MapsUniform`): `shading` = (`SHADING_CLOTH` 5, the sheen's roughne
 
 - **Sheen**: the Charlie distribution (Estevez and Kulla, "Production Friendly Microfacet Sheen BRDF", 2017; its alpha is the sheen roughness squared, as glTF has it) with Neubelt and Pettineo's visibility, as glTF's `KHR_materials_sheen` defines it. Fibres standing off the cloth catch light skimming it: next to nothing head-on, brightest toward the silhouette.
 - **The layer under it**: the material's own diffuse and GGX specular light (Standard's `shade`), dimmed by what the sheen reflects, `1 - max(sheen) × E(n·v)`, where `E` is the sheen's directional albedo, a table integrated from the lobe over the hemisphere (`CLOTH_SHEEN_ALBEDO`, 8 roughnesses by 16 angles; the render test `the_sheen_albedo_table_is_charlies_integrated` recomputes it). So a sheen never adds light that wasn't there; head-on it takes 0.3% (roughness 0.5) to 6% (roughness 1).
-- **Anisotropy**: with any, the specular lobe is anisotropic GGX (Burley 2012, with Heitz's height-correlated visibility, as Filament has it): alpha along the direction `α(1 + a)`, across it `α(1 - a)`; a positive value stretches the highlight along the direction, a negative one across it. The sky's reflection is bent toward the stretched direction. With none the lobe is Standard's own.
+- **Anisotropy**: with any, the specular lobe is anisotropic GGX (Burley 2012, with Heitz's height-correlated visibility, as Filament has it): alpha along the direction `α(1 + a)`, across it `α(1 - a)`; a positive value stretches the highlight along the direction, a negative one across it. The sky's reflection is bent toward the stretched direction. With none the lobe is Standard's own. This is Filament's mapping, not the glTF extension's: `KHR_materials_anisotropy` widens only along the direction, `α_t = mix(α, 1, strength²)` with `α_b = α`, and Blender's Principled BSDF has its own. The strength is passed straight through, so the same number stretches a highlight differently here than in the glTF spec or in Blender: judge a garment's anisotropy in the engine (a capture), not in Blender's viewport.
 - **Sky and ambient light**: the layer under the sheen as Standard lights it, dimmed as above, plus the sheen's albedo times the sky round the normal.
 
 With no sheen and no anisotropy, cloth draws exactly what Standard draws (`sheen_brightens_cloth_at_grazing_angles_and_not_head_on` checks it within 3 of 255).

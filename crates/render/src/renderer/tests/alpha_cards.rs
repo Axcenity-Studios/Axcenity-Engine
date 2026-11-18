@@ -413,38 +413,95 @@ fn stripes_in(pixels: &[u8], size: u32) -> (usize, f32, f32) {
     (turns, low, high)
 }
 
+/// `list`'s frame with the sun's shadow maps at High and no anti-aliasing.
+fn shadow_mapped(device: &wgpu::Device, queue: &wgpu::Queue, list: &DrawList) -> Vec<u8> {
+    let mut renderer = TextureRenderer::new(device, queue, 256, 256);
+    renderer.set_graphics(&GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::High),
+        anti_aliasing: Some(AntiAliasing::Off),
+        ..GraphicsSettings::default()
+    });
+    renderer.render(list).unwrap();
+    renderer.read_pixels()
+}
+
 #[test]
-fn a_striped_cards_shadow_is_striped_in_the_shadow_maps() {
+fn a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps() {
     let Some((device, queue)) = test_device() else {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
     let size = 256;
-    for (hair_model, posed) in [(false, false), (true, false), (true, true)] {
-        let list = striped_shadow(hair_model, posed);
-        let mut renderer = TextureRenderer::new(&device, &queue, size, size);
-        renderer.set_graphics(&GraphicsSettings {
-            shadow_quality: Some(crate::ShadowQuality::High),
-            anti_aliasing: Some(AntiAliasing::Off),
-            ..GraphicsSettings::default()
-        });
-        renderer.render(&list).unwrap();
-        let pixels = renderer.read_pixels();
+    for posed in [false, true] {
+        let pixels = shadow_mapped(&device, &queue, &striped_shadow(true, posed));
         evidence(
-            &format!("shadow-map-stripes-hair-{hair_model}-posed-{posed}"),
+            &format!("shadow-map-stripes-hair-true-posed-{posed}"),
             &pixels,
             size,
             size,
         );
         let (turns, low, high) = stripes_in(&pixels, size);
-        eprintln!("shadow maps, hair {hair_model}, posed {posed}: {turns} turns, {low}..{high}");
+        eprintln!("shadow maps, hair, posed {posed}: {turns} turns, {low}..{high}");
         assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
         // Four strands and three gaps: about seven turns, not a slab's two.
-        assert!(
-            turns >= 6,
-            "hair {hair_model}, posed {posed}: a slab ({turns} turns)"
-        );
+        assert!(turns >= 6, "posed {posed}: a slab ({turns} turns)");
     }
+}
+
+/// A Standard cut-out (a leaf card, a fence) casts its whole card in the
+/// shadow maps, as before CO7. Casting through its holes too more than
+/// doubled the Shadows pass on foliage (`bench_cut_out_foliage_shadows`:
+/// 0.19 to 0.42 ms for 36,000 leaf cards at 1080p High), so only Hair
+/// casts through its holes (review fixes 1).
+#[test]
+fn a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let pixels = shadow_mapped(&device, &queue, &striped_shadow(false, false));
+    evidence(
+        "shadow-map-stripes-hair-false-posed-false",
+        &pixels,
+        256,
+        256,
+    );
+    let (turns, low, high) = stripes_in(&pixels, 256);
+    eprintln!("shadow maps, standard: {turns} turns, {low}..{high}");
+    assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
+    assert!(
+        turns <= 2,
+        "holes in a Standard cut-out's shadow ({turns} turns)"
+    );
+}
+
+/// A cut-out whose texture is tiled by its size (`uv_tile`, every textured
+/// Part) is drawn with the texture repeated every `uv_tile` studs, but the
+/// shadow pass reads the mesh's own coordinates. Until the shadow pass
+/// tiles too, such a cut-out casts its whole mesh (as the ray-traced cut-out
+/// path does), not holes at the wrong scale.
+#[test]
+fn a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let size = 256;
+    let mut list = striped_shadow(true, false);
+    list.items[1].uv_tile = 1.0;
+    let mut renderer = TextureRenderer::new(&device, &queue, size, size);
+    renderer.set_graphics(&GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::High),
+        anti_aliasing: Some(AntiAliasing::Off),
+        ..GraphicsSettings::default()
+    });
+    renderer.render(&list).unwrap();
+    let pixels = renderer.read_pixels();
+    let (turns, low, high) = stripes_in(&pixels, size);
+    eprintln!("tiled cut-out: {turns} turns, {low}..{high}");
+    assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
+    // Into the slab and out of it.
+    assert!(turns <= 2, "holes at the untiled scale ({turns} turns)");
 }
 
 #[test]
