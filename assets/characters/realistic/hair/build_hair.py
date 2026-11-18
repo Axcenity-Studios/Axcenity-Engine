@@ -40,12 +40,10 @@ def manifest(style, follows):
     variants = []
     for vid, label, values in styles.COLOURS + styles.COLOURINGS:
         variants.append({"id": vid, "label": label, "materials": {"Hair": dict(values)}})
-    limitations = [{"note": "Fits both frames.", "parameter": "frame", "range": style["holds"]["frame"]}]
-    for parameter, span in style["holds"].items():
-        if parameter == "frame":
-            continue
-        limitations.append({"note": "Checked over this range: no hair inside the head, no scalp through it.",
-                            "parameter": parameter, "range": span})
+    # Each range's note is what was measured over it (styles.py
+    # `measured`), not a fixed claim: a draft's notes say where it fails.
+    limitations = [{"note": style["measured"][parameter], "parameter": parameter, "range": span}
+                   for parameter, span in style["holds"].items()]
     return {
         "format_version": 1,
         "id": style["item"],

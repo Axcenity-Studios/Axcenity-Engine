@@ -149,7 +149,7 @@ Judged against the references' checklist (references/hair §7):
      Then the base offers `{id: "stubble", kind: "marking", material: "Skin"}` (`manifests.py`'s `SKIN_LAYERS`) and a capture test per layer, like the makeup tests.
   2. **Tangents for hair without a normal map.** `assets` makes tangents only for a material with a normal map and doesn't read glTF `TANGENT`, so such hair is lit along model-space +X (`NO_TANGENT`). This style works round it with a normal map; hair.md now says so.
   3. **The R lobe's width and strength.** Above: on this style the sheen greys brown hair. Tune it against Blender's Principled Hair on these captures.
-- **For the lead (`avatar`):** `avatar::randomize` doesn't leave drafts out (asset-quality §5 says it must, and that a test holds it; no such test exists). With this branch, Randomize on the realistic base can wear this draft. The stylized items have no `quality` at all, so they are drafts too; filtering drafts would drop them from stylized randomization. That is the lead's call. The browsers branch (`r67-browsers`) hides drafts behind "Show drafts".
+- **For the lead (`avatar`; fixed in Review fixes 1 below):** `avatar::randomize` didn't leave drafts out (asset-quality §5 says it must, and that a test holds it; no such test exists). With this branch, Randomize on the realistic base can wear this draft. The stylized items have no `quality` at all, so they are drafts too; filtering drafts would drop them from stylized randomization. That is the lead's call. The browsers branch (`r67-browsers`) hides drafts behind "Show drafts".
 - **The style itself, to reach production:**
   - a hairline built of fine baby-hair cards over a softer band instead of the band carrying it;
   - a whorl made from cards, not a polar cap;
@@ -181,3 +181,53 @@ Judged against the references' checklist (references/hair §7):
 - `cargo nextest run -p axcenity-player --no-fail-fast`: `Summary [ 197.185s] 217 tests run: 216 passed (14 slow), 1 failed, 22 skipped`.
   - The failure was `makeup_tests::blush_changes_the_face_against_bare_skin` ("blush turned off changed the picture", under the parallel load). Alone it passes: `1 passed`. Its means differ in the fourth figure between runs, so it is a determinism flake under load, not this branch.
   - The run includes both `hair_tests`, `every_example_renders` and the capture determinism test. No ABORT lines.
+
+## Review fixes 1
+
+The review found two blocking items. Both are fixed test first; the red run is appended to `r6-hair-first-red-run.txt`.
+
+### 1. Randomize wore the draft (59 of 100 seeds)
+
+- **Fix:** `crates/avatar/src/randomize.rs` `draw_items` leaves out every item marked `quality: "draft"` (asset-quality §5). An item with no `quality` (every item from before the standard, the stylized family's included) is still drawn, so stylized randomization is unchanged. Whether unmarked items count as drafts stays the lead's call; the filter is one line to tighten.
+- **Tests:**
+  - `crates/avatar/src/tests/randomizing.rs` `randomize_never_wears_an_item_marked_draft`: a fixture library with a draft copy of its hair; 1,000 seeds never wear it, and the unmarked hair is still drawn. Red: `seed 1: ["test/draft-hair", "test/dress", "test/hood"]`.
+  - `crates/avatar/tests/realistic_hair.rs` `randomize_never_wears_a_draft_on_either_realistic_frame`: 1,000 seeds from each realistic frame's average cast member, against the shipped library, never wear an item whose quality is `draft`. Red: `masculine seed 0 wears the draft axcenity/realistic-hair-short-crop`.
+- **Studio:** the Hair page still lists the style until `r67-browsers`' "Show drafts" filter is merged; the editor was outside this task. Merge that branch with or before this one.
+
+### 2. The limitations claimed checks the measurements contradict
+
+- **Fix:** `build_hair.py` `manifest()` no longer writes a fixed note. Each range's note is the measurement over it, kept as data in `styles.py` (`measured`, next to `holds`, with a comment to rewrite it whenever the style is re-measured). The regenerated item now says:
+  - frame: "Built for both frames; a draft on both. Front scalp show-through 5.7% (masculine) and 1.7% (feminine) against 2% allowed; in Idle, Walk and Run one card vertex goes up to 6.4 mm inside by the ear."
+  - temple_width: "Measured over this range (draft): at -1, 1 or 2 vertices 6 to 7 mm inside the head by the ear (masculine hero 6.1 mm, feminine gameplay 7.2 mm); none over 1 mm at +1."
+  - head_size, forehead_height, forehead_slope, brow_ridge: "Measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame." (`measurements.json`: every end of these four has `over_1mm` 0 on both frames and all three levels.)
+  - No note claims "no scalp through it" any more.
+- **Tests** (`crates/avatar/tests/realistic_hair.rs`, reading the committed `measurements.json`):
+  - `its_limitations_claim_only_what_its_measurements_show`: no note says "no hair inside" over a parameter with any end that has a vertex over 1 mm inside; no note says "no scalp" while the captured show-through fails; a draft's frame note doesn't start "Fits". Red: `a draft doesn't claim it fits: "fits both frames."` (the temple_width note would have failed next).
+  - `it_stays_a_draft_while_a_measured_check_fails`: the item can't be marked production while any `asset_quality_2` or `asset_quality_4` check in `measurements.json` has `pass: false` (the reviewer's non-blocking item; it passes now, as it should, and guards the flip).
+- **Regenerated:** `python -I assets/characters/realistic/hair/build_hair.py --style short-crop` (bpy python), then `python3 -I assets/characters/catalogue.py`. Only `items/realistic-hair-short-crop.item.json` and `catalogue.json` changed; `ShortCrop.glb` and `ShortCrop.build.json` came out byte-identical (the build is deterministic).
+
+### Non-blocking items taken
+
+- The tag `straight` is now `wavy` (`styles.py`; the captures read as a short wavy crop).
+- `references/hair/README.md` §2.6 has a row for `assets/characters/realistic/hair/` (class 5, CC0-1.0).
+- `makeup.py` `stubble_mask`: the hash expression joined onto one line is split inside parentheses. The expression is the same, so the mask is unchanged and nothing was regenerated.
+- Docs: Known-Limitations and `docs/editor/character-studio.md` say Randomize never draws a draft.
+
+### Non-blocking items left (recorded, not changed)
+
+- The pipeline criterion is **partial**, not met: the groom has a sinusoidal `wave` only, no curl or coil parameter (one style was made).
+- Asymmetric shapes on the hair (`Blink_Left`, `Nose_Sneer_Left`, `Face_Eye_Size_Left`), skin slivers at the whorl's centre, black and dark brown reading grey-brown from the front, and roots and highlights barely reading: for the style's rework, after RA7's sheen tuning.
+- The §1 body-suite poses and the slider extremes in captures, and a named reference side by side: before any production claim.
+- GPU memory (+85 MB uncooked): for RA7 or the lead before more styles exist.
+
+### Found while re-testing: an editor test this branch breaks
+
+- `axcenity-editor` `character_workspace::shell_tests::every_page_is_drawn_with_its_controls` fails, also alone: it expects the realistic Hair page to say "No hairstyles yet", and the page now lists "Bald" and "Short textured crop". This comes from the item added in the first commit, not from these fixes; the earlier runs didn't include the editor. The editor is outside this task, so I didn't change it. **For the lead:** if `r67-browsers`' "Show drafts" filter keeps "No hairstyles yet" with drafts hidden, merging it fixes this; otherwise change the expectation to "Short textured crop" (or to the hidden-drafts text).
+
+### Runs
+
+- Red: `4 tests run: 1 passed, 3 failed, 147 skipped` (above).
+- `cargo nextest run -p axcenity-avatar -p axcenity-assets --no-fail-fast`: `Summary [ 23.258s] 376 tests run: 376 passed, 0 skipped`. No ABORT lines.
+- `cargo nextest run -p axcenity-player --no-fail-fast`: `Summary [ 203.254s] 217 tests run: 217 passed (14 slow), 22 skipped`. No ABORT lines.
+- `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_workspace::/)'`: `105 tests run: 104 passed (1 slow), 1 failed`; the failure is the one above.
+- `cargo clippy -p axcenity-avatar -p axcenity-assets -p axcenity-player --all-targets -- -D warnings`: clean. `cargo fmt --all`: clean.

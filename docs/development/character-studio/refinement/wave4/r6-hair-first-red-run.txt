@@ -50,3 +50,14 @@ stubble: chin 0.000, forehead 0.000, crown 0.000
 thread 'the_spare_mask_channel_holds_stubble_over_the_beard_only' panicked at crates\avatar\tests\realistic_hair.rs:386:5:
 the chin has stubble: 0
         FAIL [   1.982s] (1/1) axcenity-avatar::realistic_hair the_spare_mask_channel_holds_stubble_over_the_beard_only
+
+Review fixes 1 (red run before the fixes)
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(/randomize_never_wears|its_limitations_claim|it_stays_a_draft/)'
+    FAIL tests::randomizing::randomize_never_wears_an_item_marked_draft
+        seed 1: ["test/draft-hair", "test/dress", "test/hood"]
+    PASS realistic_hair it_stays_a_draft_while_a_measured_check_fails
+    FAIL realistic_hair its_limitations_claim_only_what_its_measurements_show
+        a draft doesn't claim it fits: "fits both frames."
+    FAIL realistic_hair randomize_never_wears_a_draft_on_either_realistic_frame
+        masculine seed 0 wears the draft axcenity/realistic-hair-short-crop
+ Summary 4 tests run: 1 passed, 3 failed, 147 skipped

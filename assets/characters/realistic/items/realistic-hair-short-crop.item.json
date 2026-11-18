@@ -189,7 +189,7 @@
   },
   "tags": [
     "short",
-    "straight",
+    "wavy",
     "crop",
     "textured"
   ],
@@ -200,7 +200,7 @@
   "about": "Short and textured: longer on top and pushed forward with a loose, piecey fringe, tapered at the sides and the nape.",
   "limitations": [
     {
-      "note": "Fits both frames.",
+      "note": "Built for both frames; a draft on both. Front scalp show-through 5.7% (masculine) and 1.7% (feminine) against 2% allowed; in Idle, Walk and Run one card vertex goes up to 6.4 mm inside by the ear.",
       "parameter": "frame",
       "range": [
         0.0,
@@ -208,7 +208,7 @@
       ]
     },
     {
-      "note": "Checked over this range: no hair inside the head, no scalp through it.",
+      "note": "Measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame.",
       "parameter": "head_size",
       "range": [
         0.88,
@@ -216,7 +216,7 @@
       ]
     },
     {
-      "note": "Checked over this range: no hair inside the head, no scalp through it.",
+      "note": "Measured over this range (draft): at -1, 1 or 2 vertices 6 to 7 mm inside the head by the ear (masculine hero 6.1 mm, feminine gameplay 7.2 mm); none over 1 mm at +1.",
       "parameter": "temple_width",
       "range": [
         -1.0,
@@ -224,7 +224,7 @@
       ]
     },
     {
-      "note": "Checked over this range: no hair inside the head, no scalp through it.",
+      "note": "Measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame.",
       "parameter": "forehead_height",
       "range": [
         -1.0,
@@ -232,7 +232,7 @@
       ]
     },
     {
-      "note": "Checked over this range: no hair inside the head, no scalp through it.",
+      "note": "Measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame.",
       "parameter": "forehead_slope",
       "range": [
         -1.0,
@@ -240,7 +240,7 @@
       ]
     },
     {
-      "note": "Checked over this range: no hair inside the head, no scalp through it.",
+      "note": "Measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame.",
       "parameter": "brow_ridge",
       "range": [
         -1.0,

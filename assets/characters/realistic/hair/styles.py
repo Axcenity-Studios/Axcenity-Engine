@@ -64,7 +64,9 @@ SHORT_CROP = {
     "label": "Short textured crop",
     "about": ("Short and textured: longer on top and pushed forward with a "
               "loose, piecey fringe, tapered at the sides and the nape."),
-    "tags": ["short", "straight", "crop", "textured"],
+    # Not "straight": its loose wave and flicked tips read as a short
+    # wavy crop in the captures.
+    "tags": ["short", "wavy", "crop", "textured"],
     "seed": 1931,
     # The hairline: elevation (degrees) against azimuth, between which it
     # is interpolated smoothly. The front sits about 6 cm above the brows
@@ -143,6 +145,27 @@ SHORT_CROP = {
         "forehead_height": [-1.0, 1.0],
         "forehead_slope": [-1.0, 1.0],
         "brow_ridge": [-1.0, 1.0],
+    },
+    # What `qa_hair.py` and the captures measured over each range, written
+    # as the item's limitation notes (the browser shows them). They state
+    # the measurement, never a pass the evidence doesn't show
+    # (refinement/wave4/r6-hair-first/measurements.json): rewrite them
+    # whenever the style is re-measured.
+    "measured": {
+        "frame": ("Built for both frames; a draft on both. Front scalp show-through "
+                  "5.7% (masculine) and 1.7% (feminine) against 2% allowed; in Idle, "
+                  "Walk and Run one card vertex goes up to 6.4 mm inside by the ear."),
+        "head_size": ("Measured over this range (draft): no hair vertex more than 1 mm "
+                      "inside the head at either end, on either frame."),
+        "temple_width": ("Measured over this range (draft): at -1, 1 or 2 vertices 6 to "
+                         "7 mm inside the head by the ear (masculine hero 6.1 mm, feminine "
+                         "gameplay 7.2 mm); none over 1 mm at +1."),
+        "forehead_height": ("Measured over this range (draft): no hair vertex more than 1 mm "
+                            "inside the head at either end, on either frame."),
+        "forehead_slope": ("Measured over this range (draft): no hair vertex more than 1 mm "
+                           "inside the head at either end, on either frame."),
+        "brow_ridge": ("Measured over this range (draft): no hair vertex more than 1 mm "
+                       "inside the head at either end, on either frame."),
     },
 }
 

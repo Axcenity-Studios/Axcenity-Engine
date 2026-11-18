@@ -408,7 +408,8 @@ def stubble_mask(tx, face, lips, seed=SEED + 6):
     # The stipple: a value per 1.2 mm cell of the rest surface (hashed),
     # most cells a follicle, smoothed over a texel by the image's filter.
     cell = np.floor(X / 0.0012).astype(np.int64).astype(np.uint64)
-    h = cell[:, 0] * np.uint64(0x9E3779B97F4A7C15) + cell[:, 1] * np.uint64(0xC2B2AE3D27D4EB4F)         + cell[:, 2] * np.uint64(0x165667B19E3779F9) + np.uint64(seed)
+    h = (cell[:, 0] * np.uint64(0x9E3779B97F4A7C15) + cell[:, 1] * np.uint64(0xC2B2AE3D27D4EB4F)
+         + cell[:, 2] * np.uint64(0x165667B19E3779F9) + np.uint64(seed))
     # splitmix64's finish, so neighbouring cells don't line up in stripes.
     h ^= h >> np.uint64(30)
     h *= np.uint64(0xBF58476D1CE4E5B9)

@@ -397,3 +397,112 @@ fn the_spare_mask_channel_holds_stubble_over_the_beard_only() {
         "none above: {forehead}, {crown}"
     );
 }
+
+/// The style's measurements (`qa_hair.py` and the captures), committed
+/// with its evidence.
+fn measurements() -> serde_json::Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../docs/development/character-studio/refinement/wave4/r6-hair-first/measurements.json",
+    );
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+    serde_json::from_str(&text).unwrap()
+}
+
+/// Every check of `asset_quality_2` and `asset_quality_4` that failed.
+fn failed_checks(measured: &serde_json::Value) -> Vec<String> {
+    let mut failed = Vec::new();
+    for section in ["asset_quality_2", "asset_quality_4"] {
+        for (name, check) in measured[section].as_object().unwrap() {
+            if check["pass"] == serde_json::Value::Bool(false) {
+                failed.push(format!("{section}.{name}"));
+            }
+        }
+    }
+    failed
+}
+
+/// A style stays a draft while any measured check fails (asset-quality
+/// §1): nothing may mark it production over its own evidence.
+#[test]
+fn it_stays_a_draft_while_a_measured_check_fails() {
+    let library = library();
+    let item = style(&library);
+    let failed = failed_checks(&measurements());
+    if !failed.is_empty() {
+        assert!(
+            item.is_draft(),
+            "production with failing checks: {failed:?}"
+        );
+    }
+}
+
+/// The limitations the browser shows (plan 11.3) say only what was
+/// measured: no note claims "no hair inside" over a range where a vertex
+/// was measured more than 1 mm inside the head, none claims "no scalp
+/// through" while the captured show-through fails, and the frame row
+/// doesn't say the style fits while it is a draft.
+#[test]
+fn its_limitations_claim_only_what_its_measurements_show() {
+    let library = library();
+    let item = style(&library);
+    let measured = measurements();
+    let quality = &measured["asset_quality_4"];
+    let ends = quality["inside_head"]["rest_and_parameters"]
+        .as_object()
+        .unwrap();
+    for limitation in &item.limitations {
+        let note = limitation.note.to_lowercase();
+        let parameter = limitation.parameter.as_deref().unwrap_or("");
+        // Any end of this parameter, on either frame and at any level,
+        // with a vertex over 1 mm inside.
+        let inside: u64 = ends
+            .iter()
+            .filter(|(key, _)| key.split('/').nth(1).unwrap_or("").starts_with(parameter))
+            .flat_map(|(_, levels)| levels.as_object().unwrap().values())
+            .map(|level| level["over_1mm"].as_u64().unwrap())
+            .sum();
+        assert!(
+            inside == 0 || !note.contains("no hair inside"),
+            "{parameter}: {inside} vertices inside, but the note says {note:?}"
+        );
+        if quality["scalp_show_through_capture"]["pass"] == serde_json::Value::Bool(false) {
+            assert!(
+                !note.contains("no scalp"),
+                "{parameter}: show-through fails, but the note says {note:?}"
+            );
+        }
+        if item.is_draft() && parameter == "frame" {
+            assert!(
+                !note.starts_with("fits"),
+                "a draft doesn't claim it fits: {note:?}"
+            );
+        }
+    }
+}
+
+/// Randomize never wears a draft (asset-quality.md §5) on either
+/// realistic frame: 1,000 seeds from each frame's average cast member.
+#[test]
+fn randomize_never_wears_a_draft_on_either_realistic_frame() {
+    use axcenity_avatar::{Description, Quality, Scope, randomize};
+    let library = library();
+    let none = std::collections::BTreeSet::new();
+    for frame in ["masculine", "feminine"] {
+        let path = root().join(format!(
+            "benchmarks/realistic-{frame}-cast-average.character.json"
+        ));
+        let start = Description::from_json(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        for seed in 0..1000 {
+            let character = randomize(&start, &Scope::All, &none, seed, &library);
+            for worn in &character.items {
+                let item = library.item(&worn.id).unwrap();
+                assert_ne!(
+                    item.quality,
+                    Some(Quality::Draft),
+                    "{frame} seed {seed} wears the draft {}",
+                    worn.id
+                );
+            }
+        }
+    }
+}
