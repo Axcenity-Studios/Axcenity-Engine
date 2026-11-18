@@ -1,9 +1,12 @@
-"""Finds how far each proportion slider of the realistic body can go (R3,
-plan section 0 decision 8): each end is the last step that still deforms
+"""Finds how far each proportion slider of a base body can go (R3, plan
+section 0 decision 8): each end is the last step that still deforms
 cleanly or the population's 0.5th / 99.5th percentile, whichever is
-nearer to 1.
+nearer to 1. The realistic body by default; `--package stylized` holds the
+stylized one to the same checks (R3, wave 3: its own build corners,
+`COMPOSITIONS`; its outline under its armpits, `OUTLINE_SPANS`; no eye
+check; its hips narrowed by its own `<Frame>_Hips_Narrow` since review fixes 1).
 
-    python -I ranges.py [--package realistic] [--out ranges.json] [--only hip_width,height]
+    python -I ranges.py [--package realistic] [--parts FILE] [--out ranges.json] [--only hip_width,height]
                         [--step 0.025] [--hips-by-bone]
 
 For every proportion (`anim`'s nine body sliders), on both frames, the
@@ -25,7 +28,8 @@ of `muscle` and `fat` at their ends. A step fails when, on any of them:
   bulge) may rise `BULGE` past the body's own at 1 (`joint_ceiling`).
 - **Eyes and teeth**: skin in an eyeball, an eyeball's front in the lids'
   flesh or a tooth in the lips' or gums' flesh (`measure.eye_metrics`; on
-  the frame's own body).
+  the frame's own body), more of it than the body at 1 has (the realistic
+  body has none; the stylized body's measure counts its own lids).
 - **Collapse**: the narrowest breadth of a cross-section of the trunk or
   a limb (`SECTIONS`), or a region's skin area (`VOLUMES`), falls below
   `COLLAPSE` of the same body's at 1.
@@ -69,7 +73,11 @@ from mathutils import Matrix, Vector  # noqa: E402
 import measure as M  # noqa: E402
 import qa_scene as Q  # noqa: E402
 
-THRESHOLDS = os.path.join(Q.LIBRARY_DIR, "realistic", "qa", "thresholds.json")
+# Each package's limits (`qa/thresholds.json`): the realistic body's hold its
+# joints; the stylized body's hold its clothing, so its joints keep `KEEP` of
+# their own (`joint_floor`).
+THRESHOLDS = {"realistic": os.path.join(Q.LIBRARY_DIR, "realistic", "qa", "thresholds.json"),
+              "stylized": os.path.join(Q.ASSET_DIR, "qa", "thresholds.json")}
 
 # The sliders: (parameter, attribute).
 SLIDERS = [("height", "BodyHeight"), ("leg_length", "LegLength"), ("arm_length", "ArmLength"),
@@ -77,10 +85,19 @@ SLIDERS = [("height", "BodyHeight"), ("leg_length", "LegLength"), ("arm_length",
            ("head_size", "HeadSize"), ("hand_size", "HandSize"), ("foot_size", "FootSize")]
 # `anim`'s clamp (crates/anim/src/body_shape.rs, RANGE): the sweep never goes past it.
 BOUND = (0.5, 1.5)
-COMPOSITIONS = [("own body", {}), ("slight", {"muscle": -1.0, "fat": -1.0}),
-                ("lean and muscular", {"muscle": 1.0, "fat": -1.0}),
-                ("heavy and soft", {"muscle": -1.0, "fat": 1.0}),
-                ("heavy and muscular", {"muscle": 1.0, "fat": 1.0})]
+# The bodies checked at every step, per package: the frame's own and the
+# corners of its build sliders (the realistic body's `muscle` and `fat`,
+# -1 to 1; the stylized body's `build`, slim -1 to heavy 1, and `muscle`, 0
+# to 1).
+COMPOSITIONS = {
+    "realistic": [("own body", {}), ("slight", {"muscle": -1.0, "fat": -1.0}),
+                  ("lean and muscular", {"muscle": 1.0, "fat": -1.0}),
+                  ("heavy and soft", {"muscle": -1.0, "fat": 1.0}),
+                  ("heavy and muscular", {"muscle": 1.0, "fat": 1.0})],
+    "stylized": [("own body", {}), ("slim", {"build": -1.0}), ("heavy", {"build": 1.0}),
+                 ("slim and muscular", {"build": -1.0, "muscle": 1.0}),
+                 ("heavy and muscular", {"build": 1.0, "muscle": 1.0})],
+}
 # The QA poses each slider bears on (`Q.POSES`): the joints whose bones it
 # moves or scales. Head, hand (beyond the wrist) and foot sizes scale a
 # whole part and move no joint of the trunk or limbs.
@@ -100,6 +117,11 @@ COLLAPSE = 0.7    # a cross-section breadth or region skin area keeps this share
 OUTLINE = 0.05    # the most the trunk's breadth ratio may change from one level to the next
 SLABS = 16        # those levels, over (shares of the hip joints' to the chest joint's height, from the hips):
 OUTLINE_SPAN = (-0.7, 1.45)  # about 15 cm below the hips to 10 cm above the chest, 3 cm apart
+# Per package: the outline stays under the armpits (the realistic body's are
+# at 1.53 to 1.57 of the hips to chest; the stylized body's chest joint sits
+# higher, its armpits at about 1.18, and a level through them measures the
+# arm's join, not the trunk).
+OUTLINE_SPANS = {"realistic": OUTLINE_SPAN, "stylized": (-0.7, 1.1)}
 BULGE = 0.01      # what a step may add to a capped ratio (the lowered shoulder's) past its body's own
 TOUCHING = 0.004  # pairs this close in the body at 1 aren't counted (the sliders pass's 4 mm)
 Z99 = 2.576       # the 99.5th percentile of a normal curve, in SD
@@ -378,6 +400,10 @@ class Body:
         self.sections = sections(ch, rest, ctx)
         self.outline = outline(ch, rest, ctx)
         self.volumes = volumes(rest, ctx)
+        # The eyes and teeth as they sit at 1 (none in flesh on the realistic
+        # body; the stylized body's eye measure counts its own lids as
+        # flesh, so a step is held to no more than its body at 1).
+        self.eyes = eyes_and_teeth(ch, rest) if not values else None
         self.joints = {pose: joint(ch, frame, values, {}, pose, ctx) for pose in poses}
 
 
@@ -423,7 +449,7 @@ def outline(ch, geo, ctx):
     h, _t = heads(ch)
     hip, chest = h["LeftUpperLeg"].z, h["Chest"].z
     span = chest - hip
-    low, high = OUTLINE_SPAN
+    low, high = ctx.get("outline_span", OUTLINE_SPAN)
     edges = ctx["trunk_edges"]
     a, b = geo.co[edges[:, 0]], geo.co[edges[:, 1]]
     out = {}
@@ -440,14 +466,14 @@ def outline(ch, geo, ctx):
     return out
 
 
-def outline_jump(now, then):
+def outline_jump(now, then, span=OUTLINE_SPAN):
     """(the largest change between neighbouring levels of the breadth's
     ratio to the body's at 1, the level halfway between the two)."""
     keys = [k for k in sorted(now) if k in then and now[k] and then[k]]
     ratio = [now[k] / then[k] for k in keys]
     jumps = [(abs(a - b), keys[i]) for i, (a, b) in enumerate(zip(ratio, ratio[1:]))]
     worst = max(jumps, default=(0.0, 0))
-    low, high = OUTLINE_SPAN
+    low, high = span
     return [round(worst[0], 4), round(low + (worst[1] + 0.5) * (high - low) / SLABS, 3)]
 
 
@@ -534,7 +560,7 @@ def setting(pid, attribute, value, by_bone):
 def check_step(ch, label, frame, pid, attribute, value, bodies, limits, ctx, by_bone):
     """Every check of one step on one frame: (failures, details)."""
     failures, details = [], {}
-    for name, values in COMPOSITIONS:
+    for name, values in ctx["compositions"]:
         at_one = bodies[name]
         params, sliders = setting(pid, attribute, value, by_bone)
         geo = look(ch, frame, dict(values, **params), sliders)
@@ -557,18 +583,18 @@ def check_step(ch, label, frame, pid, attribute, value, bodies, limits, ctx, by_
             failures.append(f"{name}: section {worst[1]} at {worst[0]:.2f} of its size at 1")
         if worst_v[0] < COLLAPSE:
             failures.append(f"{name}: {worst_v[1]} skin area at {worst_v[0]:.2f} of its size at 1")
-        jump = outline_jump(outline(ch, geo, ctx), at_one.outline)
+        jump = outline_jump(outline(ch, geo, ctx), at_one.outline, ctx.get("outline_span", OUTLINE_SPAN))
         d["outline_jump"] = jump
         if jump[0] > OUTLINE:
             failures.append(f"{name}: the trunk's outline steps by {jump[0]:.3f} at {jump[1]} of the hips to chest")
         # Joints: the ring area always; the local volume where the package
         # holds it (the shoulder at 90 and lowered: its 150 degree volume is
         # reported, not held: the decision of 2026-11-16 in thresholds.json).
-        if name == "own body":
+        if name == "own body" and ctx.get("eyes", True):
             et = eyes_and_teeth(ch, geo)
             d["eyes_and_teeth"] = et
-            if any(et.values()):
-                failures.append(f"{name}: eyes or teeth in flesh {et}")
+            if any((v or 0) > (at_one.eyes.get(k) or 0) for k, v in et.items()):
+                failures.append(f"{name}: eyes or teeth in flesh {et} (at 1: {at_one.eyes})")
         for pose in POSES[pid]:
             got = joint(ch, frame, dict(values, **params), sliders, pose, ctx)
             d[pose] = got
@@ -618,7 +644,7 @@ def sweep(ch, pid, attribute, step, limits, ctx, frames, by_bone, log):
     out = {"attribute": attribute, "poses": POSES[pid], "frames": {}, "sides": {}}
     bodies, base_dim = {}, {}
     for label, frame in frames:
-        bodies[label] = {name: Body(ch, frame, values, POSES[pid], ctx) for name, values in COMPOSITIONS}
+        bodies[label] = {name: Body(ch, frame, values, POSES[pid], ctx) for name, values in ctx["compositions"]}
         look(ch, frame, {}, {})
         base_dim[label] = dimension(pid, ch, Q.Geo(ch.parts["Body"]), ctx["W"], ctx["masks"])
         lo, hi = population_bounds(pid, label, base_dim[label])
@@ -783,6 +809,8 @@ def report(sweep):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--package", default="realistic", choices=sorted(Q.PACKAGES))
+    ap.add_argument("--parts", default="", help="the parts file (the package's, unless given)")
+    ap.add_argument("--custom", default="", help="its build or customization data (beside it, or the package's)")
     ap.add_argument("--out", default="ranges.json")
     ap.add_argument("--only", default="")
     ap.add_argument("--step", type=float, default=0.025)
@@ -794,33 +822,46 @@ def main():
         print(report(json.load(open(a.report))))
         return
     parts, _, custom = Q.package_paths(a.package)
+    if a.parts:
+        parts = a.parts
+        custom = a.custom or os.path.join(os.path.dirname(parts), os.path.basename(custom))
     Q.reset()
     ch = Q.Character(parts, merge_vertices=True, custom=Q.load_custom(custom))
     ch.show_only(["Body", "Eyes", "Teeth"])
+    # A package without the hips' narrowing shape narrows them by the bone.
+    by_bone = a.hips_by_bone or narrowest(ch) >= 1.0
     # The sweep goes past the manifest's ranges: open them to `anim`'s clamp,
     # so the manifest's rule still sets the shapes (the hips' narrowing).
     for p in ch.manifest["parameters"]:
         if p["group"] == "proportions":
             p["range"] = list(BOUND)
-    limits = json.load(open(THRESHOLDS))
+    limits = json.load(open(THRESHOLDS[a.package]))
     t0 = time.time()
     log = lambda s: print(f"[{time.time() - t0:7.1f}s] {s}", flush=True)  # noqa: E731
     gap = self_check(ch)
     log(f"self-check: bones against anim's rule, {gap:.3f} mm")
     assert gap < 0.1, gap
     ctx = context(ch)
+    ctx["compositions"] = COMPOSITIONS[a.package]
+    ctx["outline_span"] = OUTLINE_SPANS[a.package]
+    # The stylized body's eye measure counts its own lids as flesh (542 and
+    # 410 vertices at rest) and moves by a few as the head scales with the
+    # eyes in it: it holds nothing there, so only the realistic body's eyes
+    # and teeth are checked.
+    ctx["eyes"] = a.package == "realistic"
     frames = [(label, f) for label, f in (("masculine", 0.0), ("feminine", 1.0)) if label in a.frames.split(",")]
     ctx["neutral_known"] = {}
     for label, frame in frames:
         ctx["neutral_known"][label] = M.crossing_pairs(look(ch, frame, {}, {}))
     only = set(filter(None, a.only.split(",")))
     out = {"about": __doc__.split("\n\n")[0], "step": a.step, "keep": KEEP, "collapse": COLLAPSE,
-           "touching_m": TOUCHING, "z": Z99, "compositions": [n for n, _ in COMPOSITIONS],
-           "hips_by_bone": a.hips_by_bone, "self_check_mm": round(gap, 4), "parameters": {}}
+           "touching_m": TOUCHING, "z": Z99, "package": a.package,
+           "compositions": [n for n, _ in ctx["compositions"]],
+           "hips_by_bone": by_bone, "self_check_mm": round(gap, 4), "parameters": {}}
     for pid, attribute in SLIDERS:
         if only and pid not in only:
             continue
-        out["parameters"][pid] = sweep(ch, pid, attribute, a.step, limits, ctx, frames, a.hips_by_bone, log)
+        out["parameters"][pid] = sweep(ch, pid, attribute, a.step, limits, ctx, frames, by_bone, log)
         with open(a.out, "w", newline="\n") as f:
             json.dump(out, f, indent=1)
             f.write("\n")

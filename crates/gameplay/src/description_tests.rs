@@ -101,15 +101,17 @@ fn a_parameter_reads_its_default_and_is_clamped_to_its_range_when_set() {
     // Left out, a parameter is at the manifest's default.
     assert_eq!(parameter(&library, &character, "height"), Ok(1.0));
     assert_eq!(parameter(&library, &character, "build"), Ok(0.0));
-    set_parameter(&library, &mut character, "height", 1.2).unwrap();
-    // As the file says it (1.2), not the nearest 32-bit number.
-    assert_eq!(parameter(&library, &character, "height"), Ok(1.2));
-    assert_eq!(character.parameters["height"], 1.2);
+    // (1.1: inside the stylized body's `height` range, 0.85 to 1.15 since
+    // R3's wave 3.)
+    set_parameter(&library, &mut character, "height", 1.1).unwrap();
+    // As the file says it (1.1), not the nearest 32-bit number.
+    assert_eq!(parameter(&library, &character, "height"), Ok(1.1));
+    assert_eq!(character.parameters["height"], 1.1);
     // Outside its range, the nearest end.
     set_parameter(&library, &mut character, "build", 5.0).unwrap();
     assert_eq!(parameter(&library, &character, "build"), Ok(1.0));
     set_parameter(&library, &mut character, "height", -3.0).unwrap();
-    assert_eq!(parameter(&library, &character, "height"), Ok(0.5));
+    assert_eq!(parameter(&library, &character, "height"), Ok(0.85));
 
     let unknown = parameter(&library, &character, "nose_wide").unwrap_err();
     assert!(unknown.contains("no parameter `nose_wide`"), "{unknown}");
@@ -394,7 +396,7 @@ end
 print(description.Base == "", description.Data == "")
 print(worn())
 print(description:GetParameter("height"), description:GetParameter("build"))
-description:SetParameter("height", 1.2)
+description:SetParameter("height", 1.1)
 description:SetParameter("build", 5)
 print(description:GetParameter("height"), description:GetParameter("build"))
 print(description.Base, description.Data ~= "")
@@ -421,11 +423,11 @@ print(string.find(description.Data, '"iris_tint": "#5a7a9a"', 1, true) ~= nil)
             "hair=axcenity/hair-swept top=axcenity/tee outerwear=axcenity/cropped-jacket \
              bottom=axcenity/cargo-pants shoes=axcenity/sneakers",
             "1 0",
-            "1.2 1",
+            "1.1 1",
             "axcenity/stylized true",
             "hair=axcenity/hair-bob top=axcenity/tee bottom=axcenity/cargo-pants \
              shoes=axcenity/sneakers underwear_top=axcenity/sports-top",
-            "5 1.2",
+            "5 1.1",
             "true",
             "true",
         ]

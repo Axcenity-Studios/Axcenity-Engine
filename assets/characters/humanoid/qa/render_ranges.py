@@ -2,7 +2,7 @@
 by parameters and body sliders as `ranges.py` sets them (`ranges.look`),
 under one hard lamp from the side so steps, notches and creases show.
 
-    python -I render_ranges.py --cases cases.json --out FOLDER [--samples 24]
+    python -I render_ranges.py --cases cases.json --out FOLDER [--samples 24] [--parts FILE] [--aim body]
 
 `cases.json` is a list of {"label", "frame" (0 or 1), "values"
 ({parameter: value}), "sliders" ({attribute: value}), "pose" (a QA pose
@@ -35,10 +35,16 @@ def main():
     ap.add_argument("--samples", type=int, default=24)
     ap.add_argument("--size", type=int, default=520)
     ap.add_argument("--title", default="")
+    ap.add_argument("--package", default="realistic", choices=sorted(Q.PACKAGES))
+    ap.add_argument("--parts", default="", help="another build's parts file (its build data beside it)")
+    ap.add_argument("--aim", default="trunk", choices=["trunk", "body", "head"],
+                    help="frame the trunk (the default), the whole body, or the head and neck")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     cases = json.load(open(a.cases))
     os.makedirs(a.out, exist_ok=True)
-    parts, _, custom = Q.package_paths("realistic")
+    parts, _, custom = Q.package_paths(a.package)
+    if a.parts:
+        parts, custom = a.parts, os.path.join(os.path.dirname(a.parts), os.path.basename(custom))
     Q.reset()
     ch = Q.Character(parts, merge_vertices=True, custom=Q.load_custom(custom))
     for p in ch.manifest["parameters"]:
@@ -52,6 +58,11 @@ def main():
         R.look(ch, case.get("frame", 0.0), case.get("values", {}), case.get("sliders", {}), case.get("pose"))
         h, _ = R.heads(ch)
         aim = Vector((0.0, 0.0, (h["LeftUpperLeg"].z + h["Chest"].z) / 2.0))
+        span = 0.75
+        if a.aim == "body":
+            aim, span = Vector((0.0, 0.0, h["Hips"].z - 0.05)), 1.9
+        elif a.aim == "head":
+            aim, span = Vector((0.0, 0.0, h["Head"].z)), 0.4
         for view in case.get("views", ["front", "three-quarter", "side"]):
             direction, back = VIEWS[view]
             for o in list(bpy.data.objects):
@@ -63,7 +74,7 @@ def main():
                 Q.look_at(lamp, aim)
             path = os.path.join(a.out, f"{case['label']}-{view}.png".replace(" ", "_"))
             # (Inside the cyclorama, whose back wall is 3.2 m behind the figure.)
-            Q.shot(cam, path, aim + Vector(direction) * 2.6, aim, ortho=0.75)
+            Q.shot(cam, path, aim + Vector(direction) * 2.6, aim, ortho=span)
             tiles.append(path)
             labels.append(f"{case['label']}, {view}")
     cols = max(len(c.get("views", ["front", "three-quarter", "side"])) for c in cases)

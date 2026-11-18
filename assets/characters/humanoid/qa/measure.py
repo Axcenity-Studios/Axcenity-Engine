@@ -1035,6 +1035,11 @@ def slider_pairs(ch, touching=0.004):
     manifest = ch.manifest
     ch.show_only(["Body", "Eyes", "Teeth"])
     params = [p for p in manifest["parameters"] if p["id"] != "frame"]
+    # The body's own sliders (groups in the `body` category: build and
+    # proportions), counted apart so a package's body can be held to no
+    # crossings while its face is checked by `face_checks.py` (R3, wave 3).
+    body_groups = {g["id"] for g in manifest.get("groups", []) if g.get("category") == "body"}
+    is_body = {p["id"]: p.get("group") in body_groups for p in params}
 
     def look(frame, values):
         ch.pose_reset()
@@ -1044,7 +1049,13 @@ def slider_pairs(ch, touching=0.004):
             for d in p.get("attributes", []):
                 sliders[d["attribute"]] = Q.span(values.get(p["id"], p.get("default", 0.0)), d.get("from"), d.get("to"))
         if any(abs(v - 1.0) > 1e-6 for v in sliders.values()):
-            ch.set_body_sliders(sliders)
+            # Bones placed exactly as `anim::BodyShape::apply` places them
+            # (`ranges.shaped`, which checks itself against that rule to
+            # 0.03 mm): `set_body_sliders`' full scale inheritance drops a
+            # child's shear under a parent scaled on one axis, which crossed
+            # the stylized body where the engine doesn't (R3, wave 3).
+            import ranges
+            ranges.shaped(ch, sliders, {pb.name: pb.matrix_basis.copy() for pb in ch.arm.pose.bones})
         Q.update()
         return Q.Geo(ch.parts["Body"])
 
@@ -1063,6 +1074,7 @@ def slider_pairs(ch, touching=0.004):
 
         ends = {p["id"]: [e for e in p["range"] if abs(e - p.get("default", 0.0)) > 1e-9] for p in params}
         alone, worst = {}, []
+        body_crossing = 0
         for p in params:
             for e in ends[p["id"]]:
                 geo = look(frame, {p["id"]: e})
@@ -1085,6 +1097,7 @@ def slider_pairs(ch, touching=0.004):
                         n = new(look(frame, {a["id"]: ea, b["id"]: eb}))
                         if n:
                             crossing += 1
+                            body_crossing += is_body[a["id"]] and is_body[b["id"]]
                             worst.append((n, f"{a['id']}={ea:g}, {b['id']}={eb:g}"))
         worst.sort(reverse=True)
         out["frames"][label] = {
@@ -1092,6 +1105,9 @@ def slider_pairs(ch, touching=0.004):
             "bodies_with_new_crossings": crossing, "new_crossings_largest": worst[0][0] if worst else 0,
             "offenders": [{"sliders": s, "new_crossings": n} for n, s in worst[:40]],
             "alone_with_new_crossings": sum(1 for v in alone.values() if v["new_crossings"]),
+            "body_bodies_with_new_crossings": int(body_crossing),
+            "body_alone_with_new_crossings": sum(1 for k, v in alone.items()
+                                                 if v["new_crossings"] and is_body[k.split("=")[0]]),
             "alone_eye_or_teeth_in_flesh": sum(1 for v in alone.values() if v.get("skin_inside_eyeball_verts")
                                                or v.get("front_eye_inside_lid_flesh_verts")
                                                or v.get("teeth_verts_inside_lips_or_gums_flesh")),
@@ -1111,7 +1127,7 @@ def main():
     ap.add_argument("--out", default="measurements.json")
     ap.add_argument("--source-ngons", action="store_true")
     ap.add_argument("--only", default="", help="comma list of sections to run")
-    ap.add_argument("--check", default="", help="thresholds file: exit 1 if a measure is worse")
+    ap.add_argument("--check", default="", help="thresholds file (or several, `,`): exit 1 if a measure is worse")
     ap.add_argument("--strict", action="store_true",
                     help="with --check: also exit 1 when one of the file's `targets` isn't met")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
@@ -1194,7 +1210,15 @@ def main():
         f.write("\n")
     print("wrote", a.out, round(time.time() - t0, 1), "s")
     if a.check:
-        limits = json.load(open(a.check))
+        # One file or several, separated by `,` (the stylized package's
+        # clipping limits and its body's: `thresholds.json,body-thresholds.json`).
+        limits = {}
+        for path in a.check.split(","):
+            for key, value in json.load(open(path)).items():
+                if isinstance(value, dict) and isinstance(limits.get(key), dict):
+                    limits[key] = dict(limits[key], **value)
+                else:
+                    limits[key] = value
         failures = check(out, limits)
         for line in failures:
             print("WORSE:", line)

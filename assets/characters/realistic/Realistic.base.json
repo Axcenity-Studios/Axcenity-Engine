@@ -853,8 +853,8 @@
       "label": "Waist width",
       "group": "proportions",
       "range": [
-        0.775,
-        1.225
+        0.8,
+        1.175
       ],
       "about": "How wide the waist is.",
       "feature": "waist",
@@ -864,8 +864,8 @@
         {
           "attribute": "WaistWidth",
           "from": [
-            0.775,
-            1.225
+            0.8,
+            1.175
           ]
         }
       ]
@@ -3271,6 +3271,90 @@
       ]
     },
     {
+      "shape": "Masculine_Waist_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "waist_width",
+          "from": [
+            1,
+            0.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Waist_Wide",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "waist_width",
+          "from": [
+            1,
+            1.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Masculine_Fat_Over_Muscle",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "shape": "Masculine_Belly_Flat",
       "factors": [
         {
@@ -4062,6 +4146,90 @@
       ]
     },
     {
+      "shape": "Feminine_Waist_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "waist_width",
+          "from": [
+            1,
+            0.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Waist_Wide",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "waist_width",
+          "from": [
+            1,
+            1.5
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Fat_Over_Muscle",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "muscle",
+          "from": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "fat",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "shape": "Feminine_Muscle_Chest",
       "factors": [
         {
@@ -4728,12 +4896,12 @@
           "bone": "Chest",
           "offset": [
             0.0,
-            -0.025,
-            -0.0095
+            -0.0259,
+            -0.0096
           ]
         }
       ],
-      "radius": 0.435
+      "radius": 0.434
     },
     {
       "id": "head",
@@ -4787,21 +4955,21 @@
         {
           "bone": "LeftShoulderHelper",
           "offset": [
-            -0.0376,
-            0.0161,
-            0.0216
+            -0.0373,
+            0.0155,
+            0.0215
           ]
         },
         {
           "bone": "RightShoulderHelper",
           "offset": [
-            0.0357,
-            0.0168,
-            0.0202
+            0.0354,
+            0.0162,
+            0.0201
           ]
         }
       ],
-      "radius": 0.1081,
+      "radius": 0.1085,
       "regions": [
         "upper_arms_top"
       ]
@@ -4818,11 +4986,11 @@
           "offset": [
             0.0001,
             0.1237,
-            0.1034
+            0.1024
           ]
         }
       ],
-      "radius": 0.1452
+      "radius": 0.1462
     },
     {
       "id": "arms",
@@ -4834,16 +5002,16 @@
         {
           "bone": "LeftUpperArm",
           "offset": [
-            0.1974,
-            -0.2009,
+            0.1962,
+            -0.2006,
             0.0091
           ]
         },
         {
           "bone": "RightUpperArm",
           "offset": [
-            -0.1976,
-            -0.2009,
+            -0.1963,
+            -0.2007,
             0.0089
           ]
         }
@@ -4894,12 +5062,12 @@
           "bone": "Chest",
           "offset": [
             0.0,
-            0.0385,
-            0.1037
+            0.0392,
+            0.1028
           ]
         }
       ],
-      "radius": 0.1543
+      "radius": 0.1551
     },
     {
       "id": "waist",
@@ -4933,12 +5101,12 @@
           "bone": "Chest",
           "offset": [
             0.0001,
-            0.0914,
-            -0.0664
+            0.0921,
+            -0.0662
           ]
         }
       ],
-      "radius": 0.1832
+      "radius": 0.1834
     },
     {
       "id": "hips",
@@ -4951,12 +5119,12 @@
           "bone": "Spine",
           "offset": [
             0.0,
-            -0.0101,
-            0.0027
+            -0.0103,
+            0.0028
           ]
         }
       ],
-      "radius": 0.1484,
+      "radius": 0.1485,
       "regions": [
         "hips"
       ]
@@ -4971,21 +5139,21 @@
         {
           "bone": "LeftUpperLegTwist",
           "offset": [
-            0.0229,
-            -0.0572,
-            0.0104
+            0.0216,
+            -0.0599,
+            0.01
           ]
         },
         {
           "bone": "RightUpperLegTwist",
           "offset": [
-            -0.0234,
-            -0.0573,
-            0.0117
+            -0.0221,
+            -0.06,
+            0.0113
           ]
         }
       ],
-      "radius": 0.1819,
+      "radius": 0.182,
       "regions": [
         "thighs_top",
         "thighs_low"
@@ -5002,7 +5170,7 @@
           "bone": "LeftLowerLegTwist",
           "offset": [
             0.006,
-            -0.0037,
+            -0.0035,
             -0.013
           ]
         },
@@ -5010,12 +5178,12 @@
           "bone": "RightLowerLegTwist",
           "offset": [
             -0.0059,
-            -0.0037,
-            -0.013
+            -0.0035,
+            -0.0129
           ]
         }
       ],
-      "radius": 0.1335,
+      "radius": 0.1337,
       "regions": [
         "shins_top",
         "shins_low"

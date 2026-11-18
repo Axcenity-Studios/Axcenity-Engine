@@ -4,8 +4,8 @@
   "base": "axcenity/stylized",
   "parameters": {
     "frame": 1,
-    "height": 0.5,
-    "leg_length": 0.5
+    "height": 0.85,
+    "leg_length": 0.81
   },
   "items": [
     {
