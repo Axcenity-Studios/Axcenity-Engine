@@ -76,7 +76,7 @@ fn fixtures() -> Vec<ItemManifest> {
             "garment",
             "bottom",
             r,
-            r#", "tags": ["denim"]"#,
+            r#", "quality": "draft", "tags": ["denim"]"#,
         ),
         item(
             "test/stylized-top",
@@ -148,11 +148,15 @@ fn realistic(library: &Library) -> Description {
     axcenity_gameplay::description::default_description(library, DEFAULT_BASE)
 }
 
+/// The fixtures' IDs in a listing, in order: the shipped library's own
+/// items (the realistic wardrobe since wave 4) come and go with the
+/// content, so the listing tests look at the fixtures only.
 fn ids(listing: &browser::Listing) -> Vec<String> {
     listing
         .entries
         .iter()
         .map(|entry| entry.item.id.clone())
+        .filter(|id| id.starts_with("test/"))
         .collect()
 }
 
@@ -237,7 +241,21 @@ fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
         &[],
     );
     assert!(!ids(&off).contains(&"test/jeans".to_owned()));
-    assert_eq!(off.hidden_drafts, 1);
+    // The jeans and the shipped realistic drafts (the first garments).
+    let shipped_drafts = browser::list(
+        &library,
+        &description,
+        Shelf::Clothing,
+        &Filters::default(),
+        true,
+        &BTreeSet::new(),
+        &[],
+    )
+    .entries
+    .iter()
+    .filter(|e| !e.item.id.starts_with("test/") && e.draft)
+    .count();
+    assert_eq!(off.hidden_drafts, 1 + shipped_drafts);
     let on = browser::list(
         &library,
         &description,
@@ -256,7 +274,7 @@ fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
     assert!(
         on.entries
             .iter()
-            .filter(|e| e.item.id != "test/jeans")
+            .filter(|e| e.item.id.starts_with("test/") && e.item.id != "test/jeans")
             .all(|e| !e.draft)
     );
     // A draft that is worn is always listed (and still marked).
@@ -326,7 +344,18 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
         &BTreeSet::new(),
         &[],
     );
-    assert_eq!(listing.kinds, ["casual", "cotton", "denim", "hood"]);
+    // (The shipped realistic garments add their own tags.)
+    for tag in ["casual", "cotton", "denim", "hood"] {
+        assert!(
+            listing.kinds.iter().any(|k| k == tag),
+            "{:?}",
+            listing.kinds
+        );
+    }
+    let mut sorted = listing.kinds.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(listing.kinds, sorted, "listed once each, in order");
     // Fits this body: the hoodie is made for up to half the body fat.
     description.parameters.insert("fat".to_owned(), 0.8);
     assert!(!with(Filters::default(), &description).contains(&"test/hoodie".to_owned()));
@@ -580,6 +609,17 @@ fn stylized_items() -> Vec<ItemManifest> {
                                 "default": 0.5 }]"#,
         ),
         item(
+            "test/draft-crop",
+            "Draft crop",
+            "groom",
+            "hair",
+            s,
+            r#", "quality": "draft", "tags": ["short"],
+               "groom": { "mesh": { "file": "../humanoid/HumanoidParts.glb",
+                                    "object": "AxcenityHumanoid/Hair_Crop" } },
+               "materials": [{ "name": "Hair", "shading": "hair", "role": "primary" }]"#,
+        ),
+        item(
             "test/plain-crop",
             "Plain crop",
             "groom",
@@ -710,12 +750,14 @@ fn a_tile_is_previewed_without_committing_until_wear() {
 #[test]
 fn drafts_show_only_with_show_drafts_and_say_draft() {
     let (folder, mut workspace) = stylized_workspace("browser-drafts");
-    // The shipped stylized hairstyles are drafts (no `quality`).
+    // Only an item that says `draft` is one; the shipped stylized
+    // hairstyles (no `quality`, made before the standard) are listed.
     let library = workspace.library();
-    let draft = library.item("axcenity/hair-long").unwrap();
-    assert!(draft.is_draft());
+    assert!(library.item("test/draft-crop").unwrap().is_draft());
+    assert!(!library.item("axcenity/hair-long").unwrap().is_draft());
     let texts = draw(&mut workspace, Vec::new());
-    assert!(!texts.iter().any(|t| t == "Long"), "{texts:?}");
+    assert!(!texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
+    assert!(texts.iter().any(|t| t == "Long"), "{texts:?}");
     assert!(texts.iter().any(|t| t == "Streaked bob"), "{texts:?}");
     assert!(
         texts
@@ -725,11 +767,11 @@ fn drafts_show_only_with_show_drafts_and_say_draft() {
     );
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     let texts = draw(&mut workspace, Vec::new());
-    assert!(texts.iter().any(|t| t == "Long"), "{texts:?}");
+    assert!(texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
     assert!(texts.iter().any(|t| t == "Draft"), "{texts:?}");
     // Turning them off again drops a draft being tried on.
     workspace.apply(Intent::Browse(Browse::Select(Some(pick(
-        "axcenity/hair-long",
+        "test/draft-crop",
     )))));
     assert!(workspace.browser.previewing());
     workspace.apply(Intent::Browse(Browse::ShowDrafts(false)));
@@ -919,7 +961,13 @@ fn the_realistic_pages_say_what_they_have() {
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::PickCategory(Category::Hair));
     let texts = draw(&mut workspace, Vec::new());
-    assert!(texts.iter().any(|t| t == "No hairstyles yet"), "{texts:?}");
+    // Its one hairstyle, the short crop (R6), is a draft.
+    assert!(
+        texts
+            .iter()
+            .any(|t| t == "Everything here is still a draft. Turn on Show drafts to see them."),
+        "{texts:?}"
+    );
     workspace.apply(Intent::PickCategory(Category::Clothing));
     let texts = draw(&mut workspace, Vec::new());
     assert!(

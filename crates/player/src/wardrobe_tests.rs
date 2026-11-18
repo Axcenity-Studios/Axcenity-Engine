@@ -332,6 +332,16 @@ fn the_sneakers_hold_the_feet() {
 // - Every simpler copy, at rest: the joggers' LOD1 and LOD2 (31, 19 mm)
 //   and the tee's (31, 30 mm) cut inside the skin where the full copy
 //   folds over it (the ankles, the waist and the armpits).
+//
+// Re-recorded once at the wave-4 merge, because what the body shows
+// changed, not to pass an item: CO9 part 2's pose-safe hiding (merged
+// after this branch was made) stopped the tee and the joggers hiding the
+// torso and arm regions, which had cut holes in the walk, so skin the
+// hiding took out of the count is counted again. The tee at rest and with
+// the elbows or knees bent 38 -> 51 bodies (28.2 mm unchanged), in the
+// T-pose 24.7 -> 25.8 mm; the joggers with the knees bent 53 -> 54 bodies,
+// 31.1 -> 39.3 mm, in the walk 51 -> 53 bodies. The rule above holds from
+// here.
 
 const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
     Known {
@@ -345,7 +355,7 @@ const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f
 const REST: [Known; 6] = [
     known("Pants_Joggers", "rest", 53, 0.0311),
     known("Pants_Joggers through Shirt_CrewTee", "rest", 54, 0.0185),
-    known("Shirt_CrewTee", "rest", 38, 0.0282),
+    known("Shirt_CrewTee", "rest", 51, 0.0282),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "rest",
@@ -369,7 +379,7 @@ const IDLE: [Known; 6] = [
     known("Underwear_Briefs through Pants_Joggers", "idle", 1, 0.0011),
 ];
 const WALK: [Known; 6] = [
-    known("Pants_Joggers", "Walk@18", 51, 0.0222),
+    known("Pants_Joggers", "Walk@18", 53, 0.0222),
     known("Pants_Joggers through Shirt_CrewTee", "Walk@18", 54, 0.0172),
     known("Shirt_CrewTee", "Walk@18", 54, 0.0345),
     known(
@@ -389,7 +399,7 @@ const WALK: [Known; 6] = [
 const T_POSE: [Known; 6] = [
     known("Pants_Joggers", "TPose", 53, 0.0311),
     known("Pants_Joggers through Shirt_CrewTee", "TPose", 54, 0.0185),
-    known("Shirt_CrewTee", "TPose", 54, 0.0247),
+    known("Shirt_CrewTee", "TPose", 54, 0.0258),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "TPose",
@@ -435,7 +445,7 @@ const ELBOWS_BENT: [Known; 6] = [
         54,
         0.0185,
     ),
-    known("Shirt_CrewTee", "ElbowsBent", 38, 0.0282),
+    known("Shirt_CrewTee", "ElbowsBent", 51, 0.0282),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "ElbowsBent",
@@ -456,14 +466,14 @@ const ELBOWS_BENT: [Known; 6] = [
     ),
 ];
 const KNEES_BENT: [Known; 6] = [
-    known("Pants_Joggers", "KneesBent", 53, 0.0311),
+    known("Pants_Joggers", "KneesBent", 54, 0.0393),
     known(
         "Pants_Joggers through Shirt_CrewTee",
         "KneesBent",
         54,
         0.0185,
     ),
-    known("Shirt_CrewTee", "KneesBent", 38, 0.0282),
+    known("Shirt_CrewTee", "KneesBent", 51, 0.0282),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "KneesBent",
