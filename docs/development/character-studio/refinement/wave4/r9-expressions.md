@@ -37,7 +37,7 @@ Measured by rays from the front on a 0.25 mm grid over the mouth, each frame (ma
 - **Visemes**
   - `Mouth_Pucker` gathers the lips by 0.40 of their width (0.31) and 7.2 mm forward (5.4): `PUCKER_GATHERS`, `PUCKER_FORWARD`.
   - `LipSeal`: `Mouth_Narrow` draws its flaps back at 0.4 (1.15), so a rounded mouth's small opening shows the lips' inner red where the teeth showed. `Jaw_Open` at 7.2 (8): with the broad U a laugh drew the upper flap out through the top of a thinner upper lip (with `nose_width` -1 and two other identity ends, found by `face_checks.py`); at 7.2 it is still gone by 5.5 mm of parting, under the check's 6 mm.
-  - The viseme map (`default.visemes.json`): U narrow 0.9, pucker 0.9, open 0.08 (was 0.6, 0.8, 0.2); WQ narrow 0.95, pucker 0.95, open 0.05 (0.7, 0.9, 0.15; at narrow and pucker 1 two points of the feminine lower incisors were 0.55 mm in the lip, with or without a little opening); TH `Jaw_Open` 0.08, open 0.3, tongue out 0.6 (open 0.25, tongue 0.5: the jaw 0.2 in all); FV the upper lip up 0.45 and no opening (open 0.1, lip 0.35).
+  - The viseme map (`default.visemes.json`): U narrow 0.9, pucker 0.9, open 0.08 (was 0.6, 0.8, 0.2); WQ narrow 0.95, pucker 0.95, open 0.05 (0.7, 0.9, 0.15; at narrow and pucker 1 two points of the feminine lower incisors were 0.55 mm in the lip, with or without a little opening); TH `Jaw_Open` 0.08, open 0.3, tongue out 0.6 (open 0.25, tongue 0.5: the jaw 0.2 in all); Review fixes 2 takes the named `Jaw_Open` out: open 0.3, tongue 0.7; FV the upper lip up 0.45 and no opening (open 0.1, lip 0.35).
   - Teeth seen in U: 108 and 100 mm² before, **69 and 47** after; WQ 104 and 84, **52 and 34**; tongue seen in TH 33 and 12 mm², **135 and 117**.
 - **Withdrawn:** bringing the upper lip's inner side forward with the jaw (to light the dark band) changed nothing in the pictures and, in a laugh, drew `LipSeal`'s upper flap out through the lip on three identity ends; taken out.
 
@@ -116,12 +116,15 @@ The references: [references/face](../../references/face/README.md) has no index 
 
 1. **FV's lower lip doesn't tuck under the upper teeth.** No standard control moves the lower lip up and back (ARKit's `mouthRollLower`); it needs a lip-roll control, which is a change to the standard face controls (`core::face::FACE_CONTROLS`, the profiles, the build's `EXPRESSIONS`): the lead's call.
 2. **The dark band under the upper lip** in every open mouth is unchanged (1.5 mm high at the middle on the masculine frame). The one attempt (the lip's inner side forward) was withdrawn. It probably needs the lining's shading (RA5/RA7: specular occlusion and a lighter inner lip) rather than a shape.
-3. **The broad U's lower sides are straight**, and the lower premolars show along them. A rounder bottom needs the lower lip's own curve (a corrective along the lip), not more of the jaw's turn. (Their dark red, pale-rimmed shade and the dark red premolar beside a white canine in Crying are fixed in Review fixes 1; the teeth themselves still show as a row of shaded teeth.)
-4. **Happy is a closed-lip smile** with a slight point at the middle of the lips' line at full size; no dimple or nasolabial crease (no wrinkle maps). A teeth-showing smile needs `LipSeal`'s flaps to give way to `Upper_Lip_Raise` sooner, which the seal's other cases constrain.
+3. **The lower back teeth in an open mouth:** review 1's broad U showed a column of them up each side. Review fixes 1 recoloured them and Review fixes 2 covers them, so teeth seen are now at or under `main`'s in every open pose measured. A laugh's lower back teeth can still be counted at full size, as on `main`. The masculine `Jaw_Open` 1's ends measure 0.235, just under the review's 0.24, and its `Jaw_Open` 0.5 and Laughing show 0.3% and 0.2% more teeth than `main`.
+4. **Happy is a closed-lip smile** (the point at the middle of the lips' line is fixed in Review fixes 2); no dimple or nasolabial crease (no wrinkle maps). A teeth-showing smile needs `LipSeal`'s flaps to give way to `Upper_Lip_Raise` sooner, which the seal's other cases constrain.
 5. **The masculine U and WQ** still show the upper teeth's edges (23 to 25 mm openings; a real one is about half that).
 6. **No reference photographs of expressions are indexed** (`references/face` has anthropometry and anatomy plates only). The judgements above are against written anatomy and one drawing (L-07), so R9's "Done when" ("reviewed against reference photographs") is **not met** and stays open until licence-compatible expression photographs are indexed. Asked of the lead or RA6: links only, Class 1, 2 or 5, for example Wikimedia Commons CC0 or CC BY photographs of a Duchenne smile, a wide-open mouth and the U, TH and FV mouth shapes; then the captures here are reviewed against them.
 7. The face controls move left and right together (no one-sided preview); the expression tiles have no pictures.
 8. The drag rule: the face sliders take ux-drag's helper only once it is in `panel/row.rs`'s `slider` (the hook above).
+9. **The lower lip's inner rim at full opening** (Review fixes 2): standing higher over the teeth, it faces the camera on the shaded side over a band about 1 mm wide and shows the skin's grain as fine dark dots. It is texture, not geometry: a lip texture's inner rim (RA5).
+10. **The stylized mouth at a small opening** (TH, as on `main`): a slit with the teeth's flat pale front in it, red ends on the feminine frame, and a dark notch in the masculine three-quarter view. That is the stylized package's mouth interior.
+11. **TH's tongue** is a sliver (57 and 36 mm² seen) since Review fixes 2 took the jaw back to the map's share. Getting the tip between the teeth needs the tongue's own `Tongue_Out` shape to come further forward.
 
 ## What the lead must do at merge
 
@@ -130,6 +133,8 @@ The references: [references/face](../../references/face/README.md) has no index 
 - `panel/expressions.rs`'s sliders go through `panel/row.rs`: if ux-drag replaces `row::slider`, check the face rows still call the shared one.
 - `anim`'s two tests now hold Happy's new numbers (smile 1, squint 0.35); a track that changes Happy again must change them too.
 - If another track changes `rig._jaw`, `face.jaw_u`'s formula assumes the weights along the lips are `0.30 u^2.5` and `1 - 0.70 u^2.5`.
+- `face_checks.py --check` reports 2 failures on this build, both of the check's own measures (Review fixes 2, Gates): decide whether to accept them, or to have the check find the closed lips by the mouth's edge rather than by `LipSeal`.
+- Merging ux-drag (Review fixes 2): delete `typed: true` from the `Row { .. }` in `panel/expressions.rs`'s `controls()`, since ux-drag removes the field. The `TODO(ux-drag)` comment's "nothing to change here" is wrong on that point. Then add a test that the face rows follow Paul's rule: about 110 points across the full range, which for a signed row is the whole -1 to 1, with Shift at about 25% and Ctrl at about 2x.
 
 ## Review fixes 1
 
@@ -222,3 +227,125 @@ Gates on this build:
 - `r9-expressions/review-teeth.jpg`, `review-teeth-close.jpg`, `mouth_measure.py` and the four refreshed `page-r9-*.jpg`.
 
 At merge: rebuild as before. Nothing else depends on `LOWER_IN_SHADE`, which is gone.
+
+## Review fixes 2
+
+The second review found three blocking items. All three are fixed below. Three of the review's numeric targets are missed by under 1% (said where they apply), and the TH item is fixed by taking a change back.
+
+### 1. Happy's lips' line came to a point in the middle
+
+The cause, found by probing the build (`face.Face.smile` and the two shapes made from it): the smile's own formula lifts the lips' line as one smooth curve (1.41 mm at the middle, 1.45 at 4.8 mm out, 1.63 at 8.6). Keeping the lips off the teeth and bringing them back together (`Face.shape`, `sealed`) then raised every vertex but the middle one by about 0.5 mm. The smile also pulls the lips back into the incisors, and their middle stands furthest forward. So the middle vertex of each lip lagged its neighbours: the upper lip's by 0.39 mm and the lower lip's by 0.76 mm.
+
+Fix (`face.py`, `Face.smile`, two new constants):
+- The lips' middle goes back only 0.5 of what the pull takes it back. The share rises to all of it by 0.6 of the way to a corner (`SMILE_MIDDLE_BACK`): a smile stretches the lips along the teeth and does not press their middle into them.
+- The lips' middle also rises by up to 0.4 mm, half from each side's shape, within 0.22 of the way to a corner (`SMILE_MIDDLE_RISE`).
+- `SMILE_PULL` and Happy's recipe are unchanged.
+
+Measured with [r9-expressions/lipline.py](r9-expressions/lipline.py) (new, committed): the lips' line is the upper lip's edge ring, seen from the front. "Over the chord" is the middle vertex's height over the line between its two neighbours (negative: it sags, a point). "Turn" is the line's change of direction at the middle vertex and at each neighbour.
+
+| Happy | `main` | Review 1 | Now |
+|---|---|---|---|
+| Masculine: over the chord (mm) | -0.13 | -0.39 | **+0.06** |
+| Masculine: turn at the middle, at its neighbours (degrees) | 2.9, -2.5 | 8.4, -4.6 | **-1.2, -1.0** |
+| Feminine: over the chord (mm) | -0.14 | -0.40 | **+0.05** |
+| Feminine: turn at the middle, at its neighbours (degrees) | 4.4, -2.1 | 12.1, -5.1 | **-1.4, 0.2** |
+
+The closed smile (`Mouth_Smile` both sides at 1) measures the same as Happy. The probe also found that `main`'s smile already had a smaller point (-0.13 and -0.14 mm, measured on `main`'s own build and Happy); it is gone too. Now the middle stands 0.05 to 0.06 mm over its neighbours' chord, and the line turns about 1 degree at each of the three middle vertices, alike: one shallow curve, not a point either way. (With the middle going back 0.3 of the pull, the line was flat to 0.00 mm, but `face_checks.py` found a masculine lip vertex 0.48 mm inside the teeth in the smile; at 0.5 none.)
+
+What I saw ([review2-smile.jpg](r9-expressions/review2-smile.jpg): Happy and the closed smile at 1.6x, front and three-quarter, studio and hard light, `main`, review 1 and now; [review2-smile-middle.jpg](r9-expressions/review2-smile-middle.jpg): the middle at 3x under the hard light):
+- **Review 1:** the dark line between the lips bends down to a V under the philtrum on both frames.
+- **Now:** the line runs level through the middle and curves up toward the corners, with no V on either frame or under either light. It is flatter across the middle 17 mm than `main`'s, which dipped slightly there.
+- The lower lip's red still has its soft central valley, as on `main`. The corners, cheeks and lids are as in review 1.
+- Happy is still a closed-lip smile (open issue 4).
+
+### 2. A column of lower back teeth up each side of an open mouth
+
+Review 1's broad U let the lower lip fall away beside the lower back teeth. Those teeth stand higher than the incisors as the jaw turns, so they showed up each side. The review's targets, measured with the committed `mouth_measure.py`:
+- teeth seen at or under `main`'s at `Jaw_Open` 1 and 0.5, Surprised and Laughing, on both frames;
+- `Jaw_Open` 1's width ratio 0.85 or more and its ends' ratio 0.24 or more.
+
+I searched about 40 variants with a ray-cast copy of `mouth_measure.py` run on `face.py`'s shapes straight from the build. It matched the real measure to within 1% on teeth seen. I rendered the promising ones before choosing:
+- **Bringing the cheek's lining in 14 mm** (`JAW_CHEEK_IN`, 6 before) met every number in the probe. In the engine pictures, though, the lining came out through the lips at both corners as torn dark flaps, with gum showing through the lower lip on the feminine frame. I dropped it.
+- **Narrowing the lower sides** (`JAW_LIP_SIDE_IN`) covered the teeth but stepped the outline in under each corner (a shoulder), and the bell came back.
+- **Kept:** the corners come in 7.5 mm round the opening (`JAW_CORNER_IN`, 2.5 before), and the lower lip stands higher over the lower teeth: 3 mm (`JAW_LIP_UP`, 1.2) and 3.5 mm more between its middle and each corner (`JAW_LIP_SIDE_UP`, 2.5). The opening is now about as wide as it is tall at full opening (masculine 42 x 38 mm, feminine 33 x 38). A wide-open mouth's corners do come in toward the teeth.
+- **The lips' seal shortened with it:** `face_checks.py` found the ends of `LipSeal`'s flaps 0 to 0.3 mm outside the thinner lips near the corners, with 4 to 9 seal vertices in view at `Jaw_Open` 1 and in Laughing. Retracting the flaps further with the jaw (`SEAL_OPENS`, 8.5) made it worse. The flaps now end at 0.72 of the way to a corner (upper) and 0.60 (lower), where both ended at 0.82 (`SEAL_REACH`, `SEAL_REACH_LOWER`, new). The seal-in-view checks now pass everywhere. The shorter flaps change what one identity check leaves out (below, under Gates).
+- `JAW_CORNER_NEAR` (the corner pull's radius, 17 mm, as before) is now a named constant. `face.jaw_u` and the cheek's lining are unchanged.
+
+Masculine, then feminine, `main` > review 1 > now:
+
+| Pose | Teeth seen (mm²) | Width 75%/25% | Ends' height |
+|---|---|---|---|
+| `Jaw_Open` 1 | 179 > 240 > **160**; 165 > 166 > **150** | 0.69 > 0.86 > **0.88**; 0.70 > 0.86 > **0.88** | 0.10 > 0.25 > **0.235**; 0.15 > 0.31 > **0.33** |
+| `Jaw_Open` 0.5 | 156.6 > 208 > **157.1**; 139 > 148 > **129** | 0.81 > 1.04 > 1.01; 0.77 > 1.01 > 1.02 | 0.10 > 0.24 > 0.23; 0.18 > 0.33 > 0.29 |
+| Surprised | 229 > 306 > **220**; 169 > 194 > **151** | | |
+| Laughing | 446.1 > 571 > **446.9**; 359 > 424 > **354** | | |
+| Crying | now **233**; **182** (not measured on `main` or review 1) | | |
+| Excited | 394 > 425 > 409; 336 > 358 > 338 (not a review target; its smile is the stronger one) | | |
+
+Met on the feminine frame. On the masculine frame, three are missed by under 1%:
+- `Jaw_Open` 0.5 shows 157.1 mm² of teeth against `main`'s 156.6 (+0.3%, 8 cells of the 0.25 mm grid);
+- Laughing shows 446.9 against 446.1 (+0.2%);
+- `Jaw_Open` 1's ends measure 0.235 against the review's 0.24 (`main` 0.10).
+
+Every variant I tried that covered the side teeth on the masculine frame measured 0.14 to 0.24 at its ends. The straight-sided U that measured 0.25 is the one that showed the teeth. Masks: [review2-masks.png](r9-expressions/review2-masks.png) (`main`, review 1 and now: `Jaw_Open` 1 and 0.5, Surprised and Laughing, masculine; `Jaw_Open` 1 and Laughing, feminine).
+
+What I saw ([review2-open-studio.jpg](r9-expressions/review2-open-studio.jpg), [review2-open-hard.jpg](r9-expressions/review2-open-hard.jpg): the mouth from the front for `Jaw_Open` 1 and 0.5, Surprised, Laughing, Crying, and Happy with the jaw at 0.35; both frames; `main`, review 1 and now):
+- **`Jaw_Open` 1:** the columns of grey teeth up each side are gone on both frames under both lights (masks: side teeth in the lower half 55 mm² in review 1, none now). The lower lip runs round the bottom of the opening, and only the lower incisors' edges show at the bottom, as on `main`. The opening is a rounded U, narrower than review 1's, with no pointed corners. The ends are folds of dark lining, and no flap stands out.
+  - **New, smaller defect:** on the shaded side (character's right), the lower lip's inner rim now faces the camera over a band about 1 mm wide. It shows the skin's grain there as fine dark dots, at 3x clearly and at 1x faintly on the feminine frame. `main` has a few of the same dots in the same place. It is texture, not geometry, but it is visible, and I report it (open issue 9).
+- **`Jaw_Open` 0.5 and Surprised:** the lower teeth no longer ring the lower rim. A few premolars show at each corner, as on `main`.
+- **Laughing:** the lower back teeth at the sides are back to about `main`'s count. They are fewer and lower than in review 1, but can still be counted at full size (open issue 3, as on `main`).
+- **Crying:** about as in review 1: a few shaded lower teeth along the lower lip, with no red tooth.
+- **Happy with the jaw at 0.35:** fewer grey premolars under the upper row than in review 1.
+- **Three-quarter view:** the lower back teeth show inside the cheek, as in any three-quarter view of an open mouth. There is no torn lining.
+
+### 3. The TH viseme opened a slit on the stylized head
+
+The engine's lip sync moves 0.4 of a viseme's `Mouth_Open` to `Jaw_Open` (`jaw_share`). So in the engine, `main`'s TH was already `Jaw_Open` 0.10 with `Mouth_Open` 0.15. Review 1's named `Jaw_Open` 0.08 took it to 0.20 with `Mouth_Open` 0.18.
+
+I captured the stylized cast average of both frames: old and new U, WQ and FV; `main`'s, review 1's and three candidate TH recipes; front and three-quarter, studio and hard, 2560 x 1440. The sheet is [review2-stylized-visemes.jpg](r9-expressions/review2-stylized-visemes.jpg).
+
+What I saw:
+- **TH on `main`** already opens the stylized mouth to a thin slit with the teeth's flat pale front in it, red at its ends on the feminine frame and a dark notch in the masculine three-quarter view. The review's "old TH leaves the mouth closed" holds for the recipe alone, without the lip sync's jaw share.
+- **Review 1's TH** doubles the slit: a tall pale bar and a black notch, and no tongue.
+- **U, WQ and FV:** the new recipes leave the stylized mouth closed or nearly so, where the old ones showed a sliver of teeth. That is better, not worse.
+
+Chosen: option (a) of the review, with the stylized slit kept to `main`'s:
+- TH is `Mouth_Open` 0.3 and `Tongue_Out` 0.7, with no named `Jaw_Open`. In the engine that is the jaw at 0.12 and the lips at 0.18.
+- On the stylized head it matches `main`'s TH (same slit, same ends). The stylized mouth's interior at a small opening (the flat bar, red ends, notch) is `main`'s and is not changed here (open issue 10).
+- On the realistic head, the tongue seen falls from review 1's 135 and 117 mm² to 57 and 36 (`main` 33 and 12). In [review2-th.jpg](r9-expressions/review2-th.jpg) the tongue is a sliver behind the upper incisors, not a clear tip between the teeth. TH's tongue is open again (open issue 11): getting it out needs the tongue's own shape to come further forward, not more jaw.
+- **Test first:** `anim`'s `lip_sync::tests::the_built_in_map_opens_the_jaw_only_by_its_share` holds the map to opening the jaw only by its share, and TH to keeping its tongue out (0.7 or more). It failed against review 1's map ("TH sets Jaw_Open", in the red-run file) and passes now.
+
+### Non-blocking items
+
+- **ux-drag merge:** `panel/expressions.rs` still builds `Row { typed: true, .. }`. ux-drag removes that field, so the merge must delete it there. Then add a test that the face rows follow Paul's rule, about 110 points across the whole -1 to 1 range of a signed row. Added to "What the lead must do at merge".
+- **Not changed:**
+  - the motion chips stay live in the face preview;
+  - the face preview does not reframe after Randomize or an undo;
+  - the pink flap at the masculine `Jaw_Open` 1 corner, which predates this branch.
+
+### Tests and checks (Review fixes 2)
+
+- `anim`: `the_built_in_map_opens_the_jaw_only_by_its_share` red first (the red-run file), then green. `cargo nextest run -p axcenity-anim --no-fail-fast`: 183 run, 183 passed.
+- `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::/)'`: 112 run, 112 passed (the editor's code is unchanged in this round).
+- `cargo nextest run -p axcenity-avatar`: 140 passed; `-p axcenity-assets`: 221 passed. `axcenity-player` (release) filtered on face, lip, viseme and expression: 16 passed. No ABORT anywhere.
+- `cargo clippy -p axcenity-anim -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all -- --check`: clean. `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors.
+- `measure.py --package realistic --check thresholds.json --only face,sliders` (bpy 5.3) on the committed build: the face section passes; sliders 3,828 pairs on 15,312 bodies a frame, **0 new crossings on both frames**. It exits 1 only on the two shoulder targets `--only` leaves unmeasured, as before.
+- `face_checks.py --package realistic --check` on the committed build: **2 failures, exit 1**, both on the masculine frame. Both are the check's own measures, not new defects of the face. I did not change the QA scripts, so this is for the lead to decide. The evidence, from [teethprobe.py](r9-expressions/teethprobe.py) and [pairprobe.py](r9-expressions/pairprobe.py), both committed:
+  1. `identity_faces/eye_corner_right-1 viseme L: teeth_in_flesh = 1 (to 4.02 mm)`. One tooth vertex, 4.8 mm left of the middle, is "inside" the body by the check's vote of three rays, and 4.02 mm is its distance to the mouth's wall. 21 random rays from the same point all say it is outside. No other identity in the same viseme, and no other pose, counts it. It came and went between near-identical builds (`SMILE_MIDDLE_BACK` 0.3 and 0.5), as a ray grazing an edge does.
+  2. `identity_pairs/philtrum_length-1, mouth_height+1: 4 new pairs of the head's skin triangles cross`. These are the same four triangle pairs, crossing the same way, on `main`'s build and this one: the identity shapes are unchanged. The check leaves out crossings at the closed lips, which it finds as triangles within 8 mm of `LipSeal` (`LIPS_EDGE`); its docstring names this very pair. On `main` the seal's flap ends lie 7.3 to 8.0 mm from them, so they are left out. Here the shorter flaps (`SEAL_REACH`) lie 11.0 to 11.6 mm away, so they count.
+  - Both go away with the seal at its old reach, but then 4 to 9 seal vertices show through the thinner lips at `Jaw_Open` 1 and in Laughing, which is a real failure.
+  - I tried 0.66 for the lower flap, deeper roots near the flaps' ends, gathering the ends in only as the jaw opens, and less corner pull (6 mm). Each left seal vertices in view.
+  - A fix in the check would find the closed lips by the mouth's edge rather than by the seal.
+  - `co6/face_checks.json` and `co6/face-checks-run.txt` are this run's, with the note.
+- Before these, an earlier full run on this branch, with the lips' middle going back 0.3, found the smile's `lips_in_teeth` (one masculine vertex 0.48 mm in the incisors). That is why it is 0.5.
+
+### Files (Review fixes 2)
+
+- `assets/characters/realistic/face.py`: `Face.smile` and `SMILE_MIDDLE_*`; `JAW_CORNER_IN`, `JAW_CORNER_NEAR`, `JAW_LIP_UP`, `JAW_LIP_SIDE_UP`; `lip_seal`, `SEAL_REACH` and `SEAL_REACH_LOWER`.
+- `crates/anim/faces/visemes/default.visemes.json` (TH); `crates/anim/src/lip_sync.rs` (the test).
+- Regenerated: `RealisticParts.glb` and `Realistic.build.json` (`Jaw_Open`'s largest move 20.2 mm, 19.15 before). The base and item manifests had line-ending differences only and are not committed.
+- `co6/face_checks.json` and `co6/face-checks-run.txt`: this build's run.
+- Docs: `co6/README.md` (the R9 section and its summary), `assets/characters/realistic/README.md` (the jaw), `wiki/Roadmap/Known-Limitations.md`, this hand-back, the red run.
+- `r9-expressions/`: `lipline.py`, `teethprobe.py`, `pairprobe.py`, and the sheets `review2-open-studio.jpg`, `review2-open-hard.jpg`, `review2-smile.jpg`, `review2-smile-middle.jpg`, `review2-masks.png`, `review2-stylized-visemes.jpg`, `review2-th.jpg`.
+
+At merge: rebuild as before. A track that changes the lips' resting shape or the teeth should rerun `lipline.py` and `mouth_measure.py`. The smile's middle and the open mouth's teeth are sensitive to the lips-off-teeth pass.

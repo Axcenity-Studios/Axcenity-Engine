@@ -22,3 +22,12 @@ cargo nextest run -p axcenity-editor -E 'test(a_new_or_opened_character_leaves_t
 FAIL character_workspace::expressions_tests::a_new_or_opened_character_leaves_the_face_preview
   panicked at expressions_tests.rs:455:9: the face preview is off
 Summary 1 test run: 0 passed, 1 failed
+
+Review fixes 2 (red run, the test against the viseme map before the fix):
+cargo nextest run -p axcenity-anim -E 'test(the_built_in_map_opens_the_jaw_only_by_its_share)'
+FAIL lip_sync::tests::the_built_in_map_opens_the_jaw_only_by_its_share
+  panicked at crates\anim\src\lip_sync.rs:437:13:
+  TH sets Jaw_Open: {"Jaw_Open": 0.08, "Mouth_Open": 0.3, "Tongue_Out": 0.6}
+Summary 1 test run: 0 passed, 1 failed, 182 skipped
+(The smile's point and the lower back teeth are asset shapes; their before and after are measured by
+r9-expressions/lipline.py and r9-expressions/mouth_measure.py, in the hand-back's Review fixes 2.)

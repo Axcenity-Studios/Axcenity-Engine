@@ -40,9 +40,8 @@
       "Tongue_Up": 0.3
     },
     "TH": {
-      "Jaw_Open": 0.08,
       "Mouth_Open": 0.3,
-      "Tongue_Out": 0.6
+      "Tongue_Out": 0.7
     },
     "U": {
       "Mouth_Narrow": 0.9,
