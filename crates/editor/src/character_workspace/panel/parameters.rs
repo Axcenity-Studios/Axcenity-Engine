@@ -193,15 +193,7 @@ pub(super) fn show(
                 selection.level,
             ));
             for row in &shown {
-                intents.extend(parameter(
-                    ui,
-                    base,
-                    description,
-                    defaults,
-                    row,
-                    selection.level,
-                    locks,
-                ));
+                intents.extend(parameter(ui, base, description, defaults, row, locks));
             }
         };
         if selection.feature.is_some() {
@@ -277,7 +269,6 @@ fn parameter(
     description: &Description,
     defaults: &Description,
     shown: &Shown,
-    level: Level,
     locks: &BTreeSet<String>,
 ) -> Option<Intent> {
     let parameter = shown.parameter;
@@ -337,7 +328,6 @@ fn parameter(
             value,
             range: parameter.range,
             default: parameter.default,
-            typed: level == Level::Advanced,
             locked: Some(locked),
         },
         tools.as_deref(),

@@ -48,6 +48,7 @@ pub mod edit;
 pub mod intent;
 pub mod motion;
 mod nav;
+mod numeric;
 pub mod packs;
 mod panel;
 pub mod presets;
@@ -67,6 +68,8 @@ mod feature_tests;
 mod handle_tests;
 #[cfg(test)]
 mod motion_tests;
+#[cfg(test)]
+mod numeric_tests;
 #[cfg(test)]
 mod polish_tests;
 #[cfg(test)]

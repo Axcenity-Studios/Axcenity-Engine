@@ -188,7 +188,7 @@ pub(super) fn show(
                     asked
                 }
                 Category::SkinAndMakeup => {
-                    let mut asked = materials::skin(ui, workspace, base, selection.level);
+                    let mut asked = materials::skin(ui, workspace, base);
                     if base
                         .groups
                         .iter()

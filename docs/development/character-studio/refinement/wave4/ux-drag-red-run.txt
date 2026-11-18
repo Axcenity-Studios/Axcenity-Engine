@@ -1,0 +1,59 @@
+RA1 drag rule (ux-drag), RED run, 2026-11-18: the tests written before the helper was implemented
+(numeric.rs a stub with todo!() bodies; slider rows still egui's absolute Slider; handles still the 240-point fallback).
+Command: cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/numeric/)'
+
+        PASS [   0.092s] ( 1/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::snapshots_of_a_row_typed_into
+        FAIL [   0.092s] ( 2/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric::tests::typed_values_clamp_to_the_range
+        FAIL [   0.107s] ( 3/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric::tests::a_modifier_pressed_partway_does_not_jump
+        FAIL [   0.107s] ( 4/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric::tests::a_cancelled_drag_commits_nothing
+        FAIL [   0.122s] ( 5/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric::tests::a_number_drag_takes_110_points_for_the_range
+        FAIL [   0.122s] ( 6/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric::tests::the_numbers_are_paul_s
+        FAIL [   4.028s] ( 7/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::skin_values_and_makeup_take_the_same_drag
+        FAIL [   4.076s] ( 8/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::a_typed_value_is_one_undo_step_and_clamps_to_the_range
+        FAIL [   4.091s] ( 9/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::a_face_row_follows_the_same_rule
+        FAIL [   4.107s] (10/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::shift_is_a_quarter_and_ctrl_double_on_a_row
+        FAIL [   4.154s] (11/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::esc_cancels_a_row_drag_back_to_its_start
+        FAIL [   4.216s] (12/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::a_slider_row_takes_110_points_for_its_whole_range_at_any_width
+        FAIL [   4.406s] (13/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::a_handle_drag_is_the_same_at_any_zoom_with_shift_and_ctrl
+        FAIL [   5.255s] (14/14) axcenity-editor::bin/axcenity-editor character_workspace::numeric_tests::every_handle_takes_110_points_for_its_whole_range
+
+"eye_left eye_height_left at 0.5: 240.0 points",
+"eye_left eye_height_left at 1: 240.0 points",
+"eye_left eye_spacing_left at 0.5: 240.0 points",
+"eye_left eye_spacing_left at 1: 240.0 points",
+"hip_left hip_width at 0.5: 240.0 points",
+"hip_left hip_width at 1: 240.0 points",
+"jaw_right jaw_angle_right at 0.5: 240.0 points",
+"jaw_right jaw_angle_right at 1: 240.0 points",
+"jaw_right jaw_width_right at 0.5: 240.0 points",
+"jaw_right jaw_width_right at 1: 240.0 points",
+"mouth_corner_left mouth_height at 0.5: 240.0 points",
+"mouth_corner_left mouth_height at 1: 240.0 points",
+"mouth_corner_left mouth_width_left at 0.5: 240.0 points",
+"mouth_corner_left mouth_width_left at 1: 240.0 points",
+"nose_tip nose_length at 0.5: 240.0 points",
+"nose_tip nose_length at 1: 240.0 points",
+"shoulder_left shoulder_width at 0.5: 240.0 points",
+"shoulder_left shoulder_width at 1: 240.0 points",
+"waist_left waist_width at 0.5: 240.0 points",
+"waist_left waist_width at 1: 240.0 points",
+Skin.melanin's track is drawn
+nose_length's track is drawn
+plain: nose_length moved 0.18333277, not 0.4
+thread 'character_workspace::numeric::tests::a_cancelled_drag_commits_nothing'  panicked at crates\editor\src\character_workspace\numeric.rs:45:9:
+thread 'character_workspace::numeric::tests::a_modifier_pressed_partway_does_not_jump'  panicked at crates\editor\src\character_workspace\numeric.rs:45:9:
+thread 'character_workspace::numeric::tests::a_number_drag_takes_110_points_for_the_range'  panicked at crates\editor\src\character_workspace\numeric.rs:45:9:
+thread 'character_workspace::numeric::tests::the_numbers_are_paul_s'  panicked at crates\editor\src\character_workspace\numeric.rs:20:5:
+thread 'character_workspace::numeric::tests::typed_values_clamp_to_the_range'  panicked at crates\editor\src\character_workspace\numeric.rs:62:5:
+thread 'character_workspace::numeric_tests::a_face_row_follows_the_same_rule'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:82:63:
+thread 'character_workspace::numeric_tests::a_handle_drag_is_the_same_at_any_zoom_with_shift_and_ctrl'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:451:9:
+thread 'character_workspace::numeric_tests::a_slider_row_takes_110_points_for_its_whole_range_at_any_width'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:82:63:
+thread 'character_workspace::numeric_tests::a_typed_value_is_one_undo_step_and_clamps_to_the_range'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:86:63:
+thread 'character_workspace::numeric_tests::esc_cancels_a_row_drag_back_to_its_start'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:82:63:
+thread 'character_workspace::numeric_tests::every_handle_takes_110_points_for_its_whole_range'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:421:5:
+thread 'character_workspace::numeric_tests::shift_is_a_quarter_and_ctrl_double_on_a_row'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:82:63:
+thread 'character_workspace::numeric_tests::skin_values_and_makeup_take_the_same_drag'  panicked at crates\editor\src\character_workspace\numeric_tests.rs:82:63:
+waist_width's track is drawn
+waist_width's value is drawn
+
+     Summary [   5.257s] 14 tests run: 1 passed, 13 failed, 1409 skipped

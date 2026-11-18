@@ -11,7 +11,8 @@ use eframe::egui::{self, Rect, Sense, vec2};
 use eframe::egui_wgpu::RenderState;
 
 use super::compare::{self, OTHER_AT};
-use super::intent::{Gesture, Intent};
+use super::intent::Intent;
+use super::numeric;
 use super::stage::{self, ViewPreset};
 use super::{Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, toolbar};
 use crate::dialog;
@@ -318,7 +319,7 @@ impl CharacterWorkspace {
             return Vec::new();
         }
         let dragging = self.dragging();
-        ui.input_mut(|input| {
+        let intents = ui.input_mut(|input| {
             let mut intents = Vec::new();
             if input.consume_key(
                 egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
@@ -337,7 +338,13 @@ impl CharacterWorkspace {
                 intents.push(Intent::CancelEdit);
             }
             intents
-        })
+        });
+        if intents.contains(&Intent::CancelEdit) {
+            // The key is taken here, before the panel is drawn: the row
+            // whose drag it was is told so (`numeric.rs`).
+            numeric::cancelled_by_shell(ui.ctx());
+        }
+        intents
     }
 
     pub(super) fn save_now(&mut self) {
@@ -547,14 +554,5 @@ impl CharacterWorkspace {
                 );
             });
         });
-    }
-}
-
-/// A slider's gesture from its response: a drag going on, or done.
-pub(super) fn gesture(response: &egui::Response) -> Gesture {
-    if response.dragged() {
-        Gesture::Drag
-    } else {
-        Gesture::Commit
     }
 }

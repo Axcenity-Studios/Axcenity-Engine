@@ -21,7 +21,7 @@ pub enum Level {
     /// Every feature's own sliders.
     #[default]
     Detailed,
-    /// Fine and one-sided controls, numbers typed in.
+    /// Fine and one-sided controls.
     Advanced,
 }
 
@@ -40,7 +40,7 @@ impl Level {
         match self {
             Level::Quick => "Presets, body type and the broad controls",
             Level::Detailed => "Every feature's own sliders",
-            Level::Advanced => "Fine controls, each side on its own, typed numbers",
+            Level::Advanced => "Fine controls, each side on its own",
         }
     }
 
