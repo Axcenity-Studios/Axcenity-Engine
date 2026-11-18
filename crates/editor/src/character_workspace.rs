@@ -36,12 +36,15 @@
 //! Randomize and its locks, `compare.rs` the held versions (before and
 //! after, side by side), `sides.rs` the asymmetry tools (mirror or reset a
 //! side), `motion.rs` the preview's pose and motion (Still, Idle, Walk,
-//! Run, gestures). `stage.rs` is the camera, lighting, backdrop and
+//! Run, gestures), `browser.rs` the Hair and Clothing browsers (search,
+//! filters, favourites, recently used, drafts, a tile previewed on the
+//! character until "Wear"). `stage.rs` is the camera, lighting, backdrop and
 //! floor; `shelf.rs` lists the saved characters for the start page and
 //! deletes them.
 
 pub mod autosave;
 mod bottom_bar;
+pub mod browser;
 pub mod compare;
 pub mod direct;
 pub mod edit;
@@ -61,6 +64,8 @@ mod stage;
 pub mod thumbnails;
 mod toolbar;
 
+#[cfg(test)]
+mod browser_tests;
 #[cfg(test)]
 mod feature_tests;
 #[cfg(test)]
@@ -91,8 +96,8 @@ use axcenity_anim::Animators;
 use axcenity_assets::Assets;
 pub use axcenity_avatar::chosen_slots;
 use axcenity_avatar::{
-    BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, WornItem,
-    wear_choice, wear_choices,
+    BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, wear_choice,
+    wear_choices,
 };
 use axcenity_core::{ClassName, InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
@@ -314,6 +319,13 @@ pub struct CharacterWorkspace {
     own_presets: BTreeMap<String, Description>,
     /// The favourite presets' IDs (editor state, `favourites.json`).
     pub favourites: BTreeSet<String>,
+    /// The browsers' favourite items and the items last worn from them,
+    /// newest first (editor state, beside the preset favourites).
+    pub item_favourites: BTreeSet<String>,
+    pub recent_items: Vec<String>,
+    /// The Hair and Clothing browsers' search, filters and preview
+    /// (editor state, `browser.rs`).
+    pub browser: browser::Browser,
     /// Parameters Randomize leaves alone (editor state).
     pub locks: BTreeSet<String>,
     /// How many times Randomize was pressed: part of its seed.
@@ -337,6 +349,9 @@ pub struct CharacterWorkspace {
     pictures: thumbnails::Thumbnails,
     /// Each preset's picture file and its texture once loaded, by ID.
     preset_pictures: HashMap<String, (PathBuf, Option<eframe::egui::TextureHandle>)>,
+    /// Each browser tile's picture file (the character wearing it) and
+    /// its texture once loaded, by item ID (`""` + slot: nothing worn).
+    item_pictures: HashMap<String, (PathBuf, Option<eframe::egui::TextureHandle>)>,
 }
 
 /// Held while a workspace writes the library into its folder: the start
@@ -385,6 +400,7 @@ impl CharacterWorkspace {
         let (description, fell_back) = adopt(description, &library);
         let mut pictures = thumbnails::Thumbnails::default();
         pictures.set_folder(Some(folder.to_owned()));
+        let (item_favourites, recent_items) = presets::read_item_lists(folder);
         let mut workspace = Self {
             folder: folder.to_owned(),
             assets,
@@ -416,6 +432,9 @@ impl CharacterWorkspace {
             saved_files: Vec::new(),
             own_presets: presets::read_own(folder),
             favourites: presets::read_favourites(folder),
+            item_favourites,
+            recent_items,
+            browser: browser::Browser::default(),
             locks: random::default_locks(),
             rolls: 0,
             comparison: Comparison::default(),
@@ -431,6 +450,7 @@ impl CharacterWorkspace {
             direct: direct::Direct::default(),
             pictures,
             preset_pictures: HashMap::new(),
+            item_pictures: HashMap::new(),
         };
         workspace.build_world();
         Ok(workspace)
@@ -526,6 +546,8 @@ impl CharacterWorkspace {
         self.autosave.untouched = None;
         self.animators.clear();
         self.applied = None;
+        // A tile tried on belongs to the character it was tried on.
+        self.browser.end_preview();
         // Held versions belong to the character they were held of.
         self.clear_comparison();
     }
@@ -735,19 +757,20 @@ impl CharacterWorkspace {
         worn_in(&self.library(), &self.description, slot)
     }
 
-    /// Wears `item` in `slot` (taking off what was there), or nothing.
+    /// Wears `item` in `slot` (taking off what was there and what it
+    /// can't be worn with: [`browser::dressed`]), or nothing, as one undo
+    /// step. A tile's preview ends; the item goes to the front of
+    /// "Recently used".
     pub fn wear(&mut self, slot: &str, item: Option<&str>) {
         let library = self.library();
-        let slot = slot.to_owned();
-        let item = item.map(str::to_owned);
-        self.edit(|description| {
-            description
-                .items
-                .retain(|worn| library.item(&worn.id).is_none_or(|it| it.slot != slot));
-            if let Some(item) = item {
-                description.items.push(WornItem::new(item));
-            }
-        });
+        self.end_preview();
+        self.edit(|description| *description = browser::dressed(description, &library, slot, item));
+        if let Some(item) = item
+            && self.description.items.iter().any(|worn| worn.id == item)
+        {
+            browser::remember(&mut self.recent_items, item);
+            presets::write_item_lists(&self.folder, &self.item_favourites, &self.recent_items);
+        }
     }
 
     /// Picks `value` of a parameter with choices (Male or Female) as one

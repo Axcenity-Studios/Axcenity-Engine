@@ -6,7 +6,7 @@ use axcenity_render::Camera;
 use axcenity_render::glam::Vec3;
 
 /// The character is 5 studs tall, feet at the origin, facing -Z.
-const HEIGHT: f32 = 5.0;
+pub(super) const HEIGHT: f32 = 5.0;
 
 /// Where the camera looks from: turned `yaw` degrees round the character
 /// (0 is in front), `pitch` degrees up, `distance` studs from `target`,

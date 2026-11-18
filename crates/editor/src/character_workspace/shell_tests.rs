@@ -339,7 +339,7 @@ fn every_page_is_drawn_with_its_controls() {
         (
             Category::Clothing,
             Level::Detailed,
-            &["Underwear comes with the body type"],
+            &["which comes with the body type"],
         ),
         (
             Category::SkinAndMakeup,

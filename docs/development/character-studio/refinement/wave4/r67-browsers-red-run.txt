@@ -1,0 +1,28 @@
+r67-browsers red run (2026-11-18): the tests of crates/editor/src/character_workspace/browser_tests.rs
+run against browser.rs with every function returning at once (list empty, dressed unchanged,
+Declared empty, browse and the worn item's setters doing nothing), before the logic was put back.
+Command: cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+(the_browsers_are_drawn passes because it returns at once without AXCENITY_SNAPSHOTS)
+
+        PASS ( 1/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_browsers_are_drawn
+        FAIL ( 2/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::search_matches_every_word_against_name_tags_and_about
+        FAIL ( 3/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::wearing_takes_off_what_conflicts_and_what_its_slots_held
+        FAIL ( 4/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::filters_narrow_by_slot_kind_colour_fit_and_favourites
+        FAIL ( 5/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::every_style_declares_only_what_it_supports
+        FAIL ( 6/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::recently_used_lists_the_items_last_worn_newest_first
+        FAIL ( 7/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::drafts_are_hidden_until_show_drafts_and_marked_when_shown
+        FAIL ( 8/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::only_items_for_this_base_in_a_slot_the_page_takes_are_offered
+        FAIL ( 9/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_realistic_pages_say_what_they_have
+        FAIL (10/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::a_tile_is_previewed_without_committing_until_wear
+        FAIL (11/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::favourites_and_recently_used_are_kept_beside_the_preset_favourites
+        FAIL (12/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_worn_items_controls_are_one_undo_step_each
+        FAIL (13/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_worn_style_shows_only_the_controls_it_declares
+        FAIL (14/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::drafts_show_only_with_show_drafts_and_say_draft
+     Summary 14 tests run: 1 passed, 13 failed, 1409 skipped
+
+Added during the visual review (the underwear tiles of a dressed character looked alike): a clothing
+tile's picture leaves off the garments on layers over the tile's. Red run with browser::pictured
+returning its input unchanged (the hoodie fixture on layer 3; the test fails at "the tee's picture
+leaves the hoodie off"):
+        FAIL (1/1) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::a_clothing_tile_shows_its_item_over_what_is_under_it_only
+     Summary 1 test run: 0 passed, 1 failed, 1424 skipped

@@ -8,7 +8,10 @@
 //! `presets/<preset ID>.<key>.png` for a preset (its ID with `/` as `-`),
 //! where the key is a hash of what's drawn (the file's text, or the
 //! character the preset makes), the picture's version and the engine's.
-//! The Presets page's tiles in the workspace come from the same cache. A changed file has a new key, so it's drawn
+//! The Presets page's tiles in the workspace come from the same cache, and
+//! so do the Hair and Clothing browsers' tiles, `items/<item ID>.<key>.png`:
+//! the character being edited wearing the item (keyed by that character,
+//! so a changed body draws them again). A changed file has a new key, so it's drawn
 //! again; the older pictures of that file are removed when the new one is
 //! written. Deleting a character removes its pictures.
 //!
@@ -84,8 +87,28 @@ pub fn preset_picture(folder: &Path, id: &str, subject: &Subject) -> PathBuf {
         Subject::Character(description) => ("whole", description),
         Subject::Body(description) => ("body", description),
         Subject::Face(description) => ("face", description),
+        Subject::Hair(description) => ("hair", description),
     };
     folder.join(THUMBNAILS_FOLDER).join("presets").join(format!(
+        "{stem}.{}.png",
+        key(&format!("{framing}\n{}", drawn.to_json()))
+    ))
+}
+
+/// Where the picture of a browser tile is cached: `id` (an item's ID, or a
+/// slot's for wearing nothing there) on the character `subject` shows.
+pub fn item_picture(folder: &Path, id: &str, subject: &Subject) -> PathBuf {
+    let stem: String = id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let (framing, drawn) = match subject {
+        Subject::Character(description) => ("whole", description),
+        Subject::Body(description) => ("body", description),
+        Subject::Face(description) => ("face", description),
+        Subject::Hair(description) => ("hair", description),
+    };
+    folder.join(THUMBNAILS_FOLDER).join("items").join(format!(
         "{stem}.{}.png",
         key(&format!("{framing}\n{}", drawn.to_json()))
     ))
@@ -158,6 +181,9 @@ pub enum Subject {
     Body(Description),
     /// A character's face, close up.
     Face(Description),
+    /// A character's head and shoulders, for a hairstyle
+    /// ([`hair_orbit`]).
+    Hair(Description),
 }
 
 /// A picture to draw, and where it goes.
@@ -201,6 +227,18 @@ pub fn face_orbit() -> Orbit {
     orbit
 }
 
+/// How a hairstyle's picture frames the character: the head and
+/// shoulders, turned a third of the way, so the hair's sides and length
+/// show (a face picture cuts the crown and the back off).
+pub fn hair_orbit() -> Orbit {
+    Orbit {
+        yaw: 30.0,
+        pitch: 4.0,
+        distance: 3.6,
+        target: axcenity_render::glam::Vec3::new(0.0, stage::HEIGHT * 0.875, 0.0),
+    }
+}
+
 /// Draws pictures: a workspace of its own (the preview World and the
 /// library) and a renderer the picture's size.
 pub struct Painter {
@@ -231,6 +269,7 @@ impl Painter {
             Subject::Character(description) => (description.clone(), picture_orbit()),
             Subject::Body(description) => (description.clone(), body_orbit()),
             Subject::Face(description) => (description.clone(), face_orbit()),
+            Subject::Hair(description) => (description.clone(), hair_orbit()),
         };
         let workspace = &mut self.workspace;
         workspace.show_only(description);
@@ -477,6 +516,50 @@ impl CharacterWorkspace {
                 *texture = self.pictures.texture(ctx, out);
             }
         }
+    }
+
+    /// Asks for the pictures of the browser tiles `tiles` (an ID, as
+    /// [`item_picture`] takes, and the character wearing it) that aren't
+    /// drawn yet, and loads those that are. A tile whose character changed
+    /// gets its new picture; not while a drag goes on.
+    pub(super) fn load_item_pictures(
+        &mut self,
+        ctx: &egui::Context,
+        tiles: Vec<(String, Subject)>,
+    ) {
+        if self.dragging() {
+            return;
+        }
+        for (id, subject) in tiles {
+            let out = item_picture(&self.folder, &id, &subject);
+            if self
+                .item_pictures
+                .get(&id)
+                .is_some_and(|(at, _)| *at == out)
+            {
+                continue;
+            }
+            self.pictures.request(subject, out.clone());
+            // The old picture stays until the new one is there.
+            let old = self
+                .item_pictures
+                .remove(&id)
+                .and_then(|(_, texture)| texture);
+            self.item_pictures.insert(id, (out, old));
+        }
+        for (out, texture) in self.item_pictures.values_mut() {
+            if self.pictures.pending(out) {
+                continue;
+            }
+            if let Some(loaded) = self.pictures.texture(ctx, out) {
+                *texture = Some(loaded);
+            }
+        }
+    }
+
+    /// The picture of browser tile `id`, once it's drawn and loaded.
+    pub(super) fn item_texture(&self, id: &str) -> Option<&egui::TextureHandle> {
+        self.item_pictures.get(id)?.1.as_ref()
     }
 
     /// The picture of preset `id`, once it's drawn and loaded.
