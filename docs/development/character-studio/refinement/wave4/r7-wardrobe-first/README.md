@@ -1,0 +1,11 @@
+# The first realistic wardrobe: sign-off (asset-quality.md §1)
+
+Paul signs off the first item of each kind before another of that kind is made. These are the first top, bottom and pair of shoes. **All three are drafts**: each fails checks of asset-quality §2 and §3 (the numbers are in [../r7-wardrobe-first.md](../r7-wardrobe-first.md), "Measurements"), so none is offered for production. What is asked is a verdict on the direction (the pattern-drafted, simulated construction, the look of each item) and on what must change before the next round.
+
+| Item | Status | Sheets | Sign-off |
+|---|---|---|---|
+| Crew-neck T-shirt (`axcenity/realistic-crew-tee`; FreeSewing Teagan, cotton jersey, rib neck band) | Draft. Its drape is the best of the three; its hem over the joggers' waistband is torn in the captures. Fails: skin out round the waist over the joggers (38 of 54 bodies at rest, 28 mm), the armpit with the arms raised and in the walk (up to 42 mm), the bra through it (21 bodies), its simpler copies into the skin, the armpit's pop in the run (5.1 mm), UV stretch (51.7% of the jersey within 10%) | `cast-*`, `lights-*`, `suite-*`, `close-tee-*`, `blender-tee-drape.jpg` | Pending (Paul) |
+| Joggers (`axcenity/realistic-joggers`; FreeSewing Paco on Titan, fleece melange, rib waistband and cuffs, drawcord) | Draft. Fails: skin out under the cuffs at the back of the ankle (53 bodies, 31 mm), the drawcord through the tee (every body), the boxers through it (33 bodies, 9 mm), its simpler copies into the skin, UV stretch (39.8% of the fleece) | `cast-*`, `lights-*`, `suite-*`, `close-tee-collar-hem-sleeve-joggers-cuffs.jpg`, `blender-joggers-drape.jpg` | Pending (Paul) |
+| Court sneakers (`axcenity/realistic-sneakers`; white leather upper, lined collar, laces, cupsole) | Draft, and visibly broken after the fit: the sole crumpled and the toes showing at its edge. Fails: the heel and toes out in the walk's stride (up to 11.3 mm), the tread not flat (up to 9.8 mm), UV stretch on the upper (3.4%) | `cast-*`, `suite-*`, `close-sneakers-full-detail.jpg`, `blender-sneakers.jpg` | Pending (Paul) |
+
+What I saw in the pictures, item by item, is in the hand-back's "Visual evidence".

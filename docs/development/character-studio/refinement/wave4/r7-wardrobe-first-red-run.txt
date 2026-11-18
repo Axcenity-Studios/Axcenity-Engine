@@ -1,0 +1,55 @@
+R7 wardrobe-first: red run (2026-11-18), before any item was made.
+Every new test fails because the library has none of the three items (and the motion checks fail because the cast wears none).
+
+## cargo nextest run -p axcenity-avatar --test realistic_wardrobe --no-fail-fast
+        FAIL [   0.282s] (1/7) axcenity-avatar::realistic_wardrobe the_first_garments_are_shipped_as_fitted_built_in_items
+    thread 'the_first_garments_are_shipped_as_fitted_built_in_items'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.282s] (2/7) axcenity-avatar::realistic_wardrobe they_keep_to_their_budgets_with_three_levels_of_their_own
+    thread 'they_keep_to_their_budgets_with_three_levels_of_their_own'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.282s] (3/7) axcenity-avatar::realistic_wardrobe drafts_are_in_no_preset_and_never_drawn_at_random
+    thread 'drafts_are_in_no_preset_and_never_drawn_at_random'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.284s] (4/7) axcenity-avatar::realistic_wardrobe their_materials_have_colour_roles_and_variants
+    thread 'their_materials_have_colour_roles_and_variants'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.284s] (5/7) axcenity-avatar::realistic_wardrobe no_edge_is_a_single_layer
+    thread 'no_edge_is_a_single_layer'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.285s] (6/7) axcenity-avatar::realistic_wardrobe their_texture_coordinates_are_even_dense_and_do_not_overlap
+    thread 'their_texture_coordinates_are_even_dense_and_do_not_overlap'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+        FAIL [   0.286s] (7/7) axcenity-avatar::realistic_wardrobe their_meshes_are_sound
+    thread 'their_meshes_are_sound'  panicked at crates\avatar\tests\realistic_wardrobe.rs:89:28:
+    the library has no `axcenity/realistic-crew-tee`
+     Summary [   0.286s] 7 tests run: 0 passed, 7 failed, 0 skipped
+        FAIL [   0.282s] (1/7) axcenity-avatar::realistic_wardrobe the_first_garments_are_shipped_as_fitted_built_in_items
+        FAIL [   0.282s] (2/7) axcenity-avatar::realistic_wardrobe they_keep_to_their_budgets_with_three_levels_of_their_own
+        FAIL [   0.282s] (3/7) axcenity-avatar::realistic_wardrobe drafts_are_in_no_preset_and_never_drawn_at_random
+        FAIL [   0.284s] (4/7) axcenity-avatar::realistic_wardrobe their_materials_have_colour_roles_and_variants
+        FAIL [   0.284s] (5/7) axcenity-avatar::realistic_wardrobe no_edge_is_a_single_layer
+        FAIL [   0.285s] (6/7) axcenity-avatar::realistic_wardrobe their_texture_coordinates_are_even_dense_and_do_not_overlap
+        FAIL [   0.286s] (7/7) axcenity-avatar::realistic_wardrobe their_meshes_are_sound
+
+## cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/wardrobe_tests::/)'
+(first run: the three motion tests passed, since nothing required the cast to wear the items; they were changed to require it and rerun)
+        FAIL [   3.302s] ( 9/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_levels_of_detail_stay_clear_of_the_body
+        FAIL [   3.550s] ( 1/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_with_the_elbows_bent
+        FAIL [   3.597s] ( 2/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_in_idle
+        FAIL [   3.597s] ( 3/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_walking
+        FAIL [   3.612s] ( 4/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_with_the_knees_bent
+        FAIL [   3.612s] ( 5/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_with_the_arms_raised
+        FAIL [   3.628s] ( 6/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_at_rest
+        FAIL [   3.643s] ( 7/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_sneakers_hold_the_feet
+        FAIL [   3.644s] ( 8/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_covers_the_cast_with_the_arms_out
+        PASS [  11.675s] (10/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_run
+        PASS [  13.893s] (11/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_walk
+        PASS [  17.662s] (12/12) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_idle
+     Summary [  21.260s] 12 tests run: 3 passed, 9 failed, 246 skipped
+
+## rerun of the motion tests after requiring the items
+        FAIL [   3.146s] (1/3) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_run
+        FAIL [   3.164s] (2/3) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_walk
+        FAIL [   3.179s] (3/3) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_idle
+     Summary [   3.183s] 3 tests run: 0 passed, 3 failed, 255 skipped

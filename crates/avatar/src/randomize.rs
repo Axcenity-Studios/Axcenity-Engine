@@ -8,8 +8,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    BaseManifest, Category, Constraint, Description, ItemManifest, Library, WornItem, chosen_slots,
-    wear_choices,
+    BaseManifest, Category, Constraint, Description, ItemManifest, Library, Quality, WornItem,
+    chosen_slots, wear_choices,
 };
 
 /// What Randomize may change.
@@ -248,6 +248,11 @@ fn draw_items(
                 .items
                 .values()
                 .filter(|item| item.slot == *slot && item.bases.contains(&base.id))
+                // A draft is never drawn (asset-quality.md §5). Only an item
+                // that says it is a draft is left out: the items made before
+                // the standard (which leave `quality` unset) are still drawn
+                // until each is reviewed.
+                .filter(|item| item.quality != Some(Quality::Draft))
                 .filter(|item| !worn.iter().any(|other| other.id == item.id))
                 .filter(|item| !worn.iter().any(|other| item.conflicts_with(other)))
                 .filter(|item| {

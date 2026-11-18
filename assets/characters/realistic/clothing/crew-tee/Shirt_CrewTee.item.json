@@ -1,0 +1,127 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic-crew-tee",
+  "label": "Crew-neck T-shirt",
+  "kind": "garment",
+  "slot": "top",
+  "layer": 1,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/realistic"
+  ],
+  "model": {
+    "file": "Shirt_CrewTee.glb",
+    "object": "AxcenityRealistic/Shirt_CrewTee"
+  },
+  "hides": [
+    "torso",
+    "upper_arms_top"
+  ],
+  "materials": [
+    {
+      "name": "Jersey",
+      "shading": "cloth",
+      "label": "Shirt",
+      "role": "primary"
+    },
+    {
+      "name": "Rib",
+      "shading": "cloth",
+      "label": "Neck band",
+      "role": "secondary"
+    }
+  ],
+  "variants": [
+    {
+      "id": "white",
+      "label": "White",
+      "materials": {
+        "Jersey": {
+          "tint": "#ffffff"
+        },
+        "Rib": {
+          "tint": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "heather-grey",
+      "label": "Heather grey",
+      "materials": {
+        "Jersey": {
+          "tint": "#a9a9a6"
+        },
+        "Rib": {
+          "tint": "#a9a9a6"
+        }
+      }
+    },
+    {
+      "id": "navy",
+      "label": "Navy",
+      "materials": {
+        "Jersey": {
+          "tint": "#2b3550"
+        },
+        "Rib": {
+          "tint": "#2b3550"
+        }
+      }
+    },
+    {
+      "id": "black",
+      "label": "Black",
+      "materials": {
+        "Jersey": {
+          "tint": "#262626"
+        },
+        "Rib": {
+          "tint": "#262626"
+        }
+      }
+    },
+    {
+      "id": "olive",
+      "label": "Olive",
+      "materials": {
+        "Jersey": {
+          "tint": "#5d6443"
+        },
+        "Rib": {
+          "tint": "#5d6443"
+        }
+      }
+    },
+    {
+      "id": "ringer",
+      "label": "White with a navy band",
+      "materials": {
+        "Jersey": {
+          "tint": "#ffffff"
+        },
+        "Rib": {
+          "tint": "#2b3550"
+        }
+      }
+    }
+  ],
+  "fit": {
+    "method": "binding",
+    "data": "Shirt_CrewTee.binding.json",
+    "margin": 0.002
+  },
+  "tags": [
+    "tee",
+    "t-shirt",
+    "jersey",
+    "casual"
+  ],
+  "thumbnail": "Shirt_CrewTee.png",
+  "source": {
+    "author": "Axcenity Engine contributors; pattern after FreeSewing's teagan design (MIT); fabric from Poly Haven's Cotton Jersey (CC0)",
+    "licence": "CC0-1.0",
+    "url": "https://codeberg.org/freesewing/freesewing/src/branch/develop/designs/teagan"
+  },
+  "about": "A short-sleeved cotton jersey T-shirt with a rib crew neck, cut from FreeSewing's Teagan.",
+  "quality": "draft"
+}

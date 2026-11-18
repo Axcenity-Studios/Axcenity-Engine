@@ -1574,6 +1574,8 @@ mod makeup_tests;
 mod profile_tests;
 #[cfg(test)]
 mod skin_value_tests;
+#[cfg(test)]
+mod wardrobe_tests;
 
 #[cfg(test)]
 mod gpu_particles_tests;

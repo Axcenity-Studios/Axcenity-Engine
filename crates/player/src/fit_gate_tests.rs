@@ -231,6 +231,19 @@ fn posed(
     animators: &axcenity_anim::Animators,
     part: InstanceId,
 ) -> Posed {
+    posed_at(world, assets, animators, part, 0)
+}
+
+/// `part` as `animators` last posed it, at its level of detail `level`
+/// (0 the full model; a garment's simpler copies are checked for
+/// clearance too: `wardrobe_tests`).
+pub(super) fn posed_at(
+    world: &World,
+    assets: &Assets,
+    animators: &axcenity_anim::Animators,
+    part: InstanceId,
+    level: usize,
+) -> Posed {
     let mesh_id = match world.get(part).and_then(|p| p.property("MeshId")) {
         Some(Value::String(id)) => id.clone(),
         _ => panic!("a MeshPart without a MeshId"),
@@ -248,7 +261,7 @@ fn posed(
     };
     for (index, primitive) in model.primitives.iter().enumerate() {
         let start = out.positions.len() as u32;
-        let moved = pose.primitive(&model, index, 0);
+        let moved = pose.primitive(&model, index, level);
         out.positions.extend(
             moved
                 .positions
@@ -261,9 +274,13 @@ fn posed(
                 .iter()
                 .map(|n| (turn * Vec3::from(*n)).normalize_or_zero()),
         );
+        let indices = if level == 0 {
+            &primitive.indices
+        } else {
+            &primitive.lods[level - 1].indices
+        };
         out.triangles.extend(
-            primitive
-                .indices
+            indices
                 .chunks_exact(3)
                 .map(|t| [t[0] + start, t[1] + start, t[2] + start]),
         );
@@ -464,20 +481,26 @@ pub(super) fn poke_through(
 /// Layered pairs the gate checks: (the lower layer, the upper one). A
 /// lower layer never comes through the upper one where the upper one
 /// covers it at rest.
-const LAYERS: [(&str, &str); 3] = [
+const LAYERS: [(&str, &str); 7] = [
     // The realistic sports bra under the test tee.
     ("Underwear_Bra", "TestTee"),
     // The stylized cargo pants' waistband under the tee's hem, and the
     // sports top under the tee.
     ("Pants_Cargo", "Shirt_Tee"),
     ("Underwear_Top", "Shirt_Tee"),
+    // The first realistic wardrobe (`wardrobe_tests`): the joggers'
+    // waistband under the tee's hem, the underwear under each.
+    ("Pants_Joggers", "Shirt_CrewTee"),
+    ("Underwear_Bra", "Shirt_CrewTee"),
+    ("Underwear_BoxerBriefs", "Pants_Joggers"),
+    ("Underwear_Briefs", "Pants_Joggers"),
 ];
 
 /// The cover each garment of `garments` gives at rest: (garment name,
 /// covered body corners), and for each layered pair worn
 /// ([`LAYERS`]), the lower layer's corners the upper one covers.
 pub(super) struct Cover {
-    body: Vec<(String, Vec<bool>)>,
+    pub body: Vec<(String, Vec<bool>)>,
     layers: Vec<(&'static str, &'static str, Vec<bool>)>,
 }
 
@@ -508,16 +531,16 @@ pub(super) fn is_footwear(garment: &Posed) -> bool {
 
 /// One garment (or a lower layer through an upper one) on one body in one
 /// pose with body vertices more than `POKE` out.
-struct Failure {
-    garment: String,
-    pose: String,
-    body: String,
-    count: usize,
-    worst: f32,
+pub(super) struct Failure {
+    pub garment: String,
+    pub pose: String,
+    pub body: String,
+    pub count: usize,
+    pub worst: f32,
 }
 
 /// A pose's name in the gate's records.
-fn pose_name(stance: Stance) -> String {
+pub(super) fn pose_name(stance: Stance) -> String {
     match stance {
         Stance::Rest => "rest".to_owned(),
         Stance::Idle => "idle".to_owned(),
@@ -568,7 +591,7 @@ fn dump(name: &str, stance: Stance, body: &Posed, garments: &[Posed], cover: &Co
 
 /// Measures every garment of a posed character against the cover it
 /// gives at rest; returns how many checks ran and what failed.
-fn measure(
+pub(super) fn measure(
     name: &str,
     stance: Stance,
     body: &Posed,
@@ -619,16 +642,16 @@ fn measure(
 /// metres. A garment and pose not listed must have none. Lower these as
 /// items improve; never raise them to pass one, and never list a
 /// `production` item.
-struct Known {
-    garment: &'static str,
-    pose: &'static str,
-    cases: usize,
-    worst: f32,
+pub(super) struct Known {
+    pub garment: &'static str,
+    pub pose: &'static str,
+    pub cases: usize,
+    pub worst: f32,
 }
 
 /// Fails on any garment and pose with more failing bodies, or a worse
 /// one, than `known` records (none, when it records nothing).
-fn check(label: &str, failures: &[Failure], known: &[Known]) {
+pub(super) fn check(label: &str, failures: &[Failure], known: &[Known]) {
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<(&str, &str), (usize, f32)> = BTreeMap::new();
     for failure in failures {
