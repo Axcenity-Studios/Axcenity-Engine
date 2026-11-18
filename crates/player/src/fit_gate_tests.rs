@@ -8,8 +8,9 @@
 //! not made from the body) on both frames, over the underwear. The
 //! bodies: the cast of both frames and the body benchmarks' composition
 //! and proportion extremes. The poses: rest, the body suite's four held
-//! poses and a walk frame. Wearing the tee hides the body regions it
-//! covers whole, live.
+//! poses, the arms raised forward, a walk frame and (wave 5, the walking
+//! fit test) the whole stride, every third frame. Wearing the tee hides
+//! the body regions it covers whole, live.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -456,7 +457,9 @@ const BESIDE_HEM: f32 = 0.01;
 
 /// How many of `under`'s covered corners (`covered`, from
 /// [`covered`] at rest) are more than `POKE` outside `garment` in this
-/// pose, and the worst. A corner counts only where it is drawn.
+/// pose, and the worst. A corner counts only where it is drawn. Out is
+/// past the nearest cloth along its normal, unless the garment encloses
+/// the corner ([`enclosed`]).
 pub(super) fn poke_through(
     label: &str,
     under: &Posed,
@@ -474,13 +477,17 @@ pub(super) fn poke_through(
             drawn[*v as usize] = true;
         }
     }
+    // For comparing with the measure before wave 5 (the closest point
+    // alone), `AXCENITY_FIT_GATE_CLOSEST_ONLY=1`: never for a record.
+    let closest_only = std::env::var_os("AXCENITY_FIT_GATE_CLOSEST_ONLY").is_some();
+
     let mut count = 0;
     let mut worst = f32::NEG_INFINITY;
     for (k, (p, n)) in under.positions.iter().zip(&under.normals).enumerate() {
         if !drawn[k] || !covered.get(k).copied().unwrap_or(false) {
             continue;
         }
-        let Some(hit) = surface.closest(*p, 0.05) else {
+        let Some(hit) = surface.closest(*p, POKE_REACH) else {
             continue;
         };
         // The garment's inside (a shoe's lining, a jacket's inner shell)
@@ -488,13 +495,32 @@ pub(super) fn poke_through(
         if n.dot(hit.normal) <= 0.0 {
             continue;
         }
-        let out = hit.signed(*p);
+        let nearest = hit.signed(*p);
+        let out = if nearest > POKE && !closest_only {
+            enclosed(&surface, *p, *n).unwrap_or(nearest)
+        } else {
+            nearest
+        };
         worst = worst.max(out);
         if out > POKE {
             count += 1;
             if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
+                // Where the way out along the normal first meets the
+                // garment, and from which side (`enclosed`).
+                let way_out = surface.cast(*p, *n, POKE_REACH).map_or_else(
+                    || "nothing".to_owned(),
+                    |ray| {
+                        let side = if ray.normal.dot(*n) > 0.0 {
+                            "inside"
+                        } else {
+                            "outside"
+                        };
+                        format!("{:.1} mm, from {side}", ray.distance * 1000.0)
+                    },
+                );
                 println!(
-                    "  {label} {} out {:.1} mm at {p} (corner {k}); cloth {} normal {}",
+                    "  {label} {} through {} out {:.1} mm at {p} (corner {k}); nearest cloth {} normal {}; way out meets {way_out}",
+                    under.name,
                     garment.name,
                     out * 1000.0,
                     hit.point,
@@ -504,6 +530,32 @@ pub(super) fn poke_through(
         }
     }
     (count, worst)
+}
+
+/// How far from a corner the gate looks for the garment over it.
+const POKE_REACH: f32 = 0.05;
+
+/// Where the way out from a corner at `p` along its normal `n` first meets
+/// `garment` (within [`POKE_REACH`]) from the garment's inside, the corner
+/// is enclosed there: how far it is out along that cloth's normal
+/// (negative: inside). `None` where the way out meets the garment from
+/// outside first, or nothing.
+///
+/// The closest point alone can't tell this where a loose garment is
+/// nearer some other part of itself than the cloth over a corner (wave
+/// 5, `refinement/wave5/tee-walk.md`): a sleeve swung beside the chest, 23
+/// mm from the chest's skin with its outside towards it, while the panel
+/// over the chest is 25 mm out along the skin's normal; or the torso's
+/// panel 26 mm beside the arm inside its sleeve, whose cloth is 30 mm off.
+/// The skin there is inside the garment and nothing of it shows; the
+/// closest point took it as 23 and 26 mm through. Skin truly through the
+/// cloth over it is outside that cloth, so its way out meets nothing or
+/// another fold from outside, and it keeps the closest point's measure.
+/// (The same test the gate's holes take as "shut in", `outside_cloth`,
+/// there within 15 cm; here within the 5 cm the closest point is.)
+fn enclosed(garment: &Surface, p: Vec3, n: Vec3) -> Option<f32> {
+    let hit = garment.cast(p, n, POKE_REACH)?;
+    (hit.normal.dot(n) > 0.0).then(|| hit.signed(p))
 }
 
 /// The body triangles the worn items hide (review fixes 2): those `bare`
@@ -857,31 +909,137 @@ fn gate(stance: Stance, known: &[Known]) {
     check(&label, &failures, known);
 }
 
-// What the realistic gate still finds (wave 4, CO9 part 2), per garment
-// and pose: open defects of drafts (`refinement/wave4/co9-fit-2.md`), not
+/// The walk's frames the gate samples (sixtieths of a second from the
+/// clip's start): one whole stride, as `garment_checks::motion` plays it
+/// (frames 2 to 44: each arm swings forward and back once), every third
+/// frame. Split in three, one test each, so each stays well inside the
+/// test runner's two minutes under load.
+pub(super) const WALK_FRAMES: [&[u32]; 3] = [
+    &[2, 5, 8, 11, 14],
+    &[17, 20, 23, 26, 29],
+    &[32, 35, 38, 41, 44],
+];
+
+/// The pose a walk's failures are recorded under: the worst frame of the
+/// stride for each body and garment.
+pub(super) const WALK: &str = "Walk";
+
+/// Plays the walk on `dressed` (one character) and measures the frames
+/// `frames` against `cover` (its cover at rest), as [`measure`] measures
+/// one pose. Each garment's failures on this body are kept once, at the
+/// frame with the worst corner (counted under the pose [`WALK`], with the
+/// frame in the body's name), so a record's body count is bodies, not
+/// frames.
+pub(super) fn measure_walk(
+    assets: &Assets,
+    name: &str,
+    dressed: &Description,
+    cover: &Cover,
+    frames: &[u32],
+    failures: &mut Vec<Failure>,
+) -> usize {
+    use std::collections::BTreeMap;
+    let first = frames.iter().copied().min().unwrap_or(2).max(2);
+    let last = frames.iter().copied().max().unwrap_or(first);
+    let (mut world, mut animators) = stage_world(
+        assets,
+        dressed,
+        Stance::Clip {
+            name: "Walk",
+            frames: first,
+        },
+        &[],
+    )
+    .expect("the walk");
+    let mut checked = 0;
+    let mut worst: BTreeMap<String, Failure> = BTreeMap::new();
+    for frame in first..=last {
+        if frames.contains(&frame) {
+            let (body, garments, _) = worn_in(&world, assets, &animators);
+            let mut here = Vec::new();
+            let stance = Stance::Clip {
+                name: "Walk",
+                frames: frame,
+            };
+            checked += measure(name, stance, &body, &garments, cover, &mut here);
+            for failure in here {
+                let keep = worst
+                    .get(&failure.garment)
+                    .is_none_or(|kept| failure.worst > kept.worst);
+                if keep {
+                    worst.insert(failure.garment.clone(), failure);
+                }
+            }
+        }
+        animators.update(&mut world, assets, 1.0 / 60.0);
+    }
+    for (_, failure) in worst {
+        failures.push(Failure {
+            body: format!("{} ({})", failure.body, failure.pose),
+            pose: WALK.to_owned(),
+            ..failure
+        });
+    }
+    checked
+}
+
+/// Runs the gate through the walk's `frames` ([`WALK_FRAMES`]) on every
+/// body: the walking fit test (Paul's decision 13).
+fn gate_walk(frames: &[u32], known: &[Known]) {
+    let label = format!("{WALK} {frames:?}");
+    let stage =
+        Stage::new(&format!("fit-gate-walk-{}", frames[0]), gate_library()).expect("the stage");
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    let started = std::time::Instant::now();
+    for description in bodies() {
+        let mut dressed = description.clone();
+        dressed.items.push(WornItem::new(TEE));
+        let (body, garments) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let cover = cover_at_rest(&body, &garments, &bare);
+        checked += measure_walk(
+            &stage.assets,
+            &description.name,
+            &dressed,
+            &cover,
+            frames,
+            &mut failures,
+        );
+    }
+    println!(
+        "fit gate {label}: {checked} garment checks in {:.1} s, {} failing",
+        started.elapsed().as_secs_f32(),
+        failures.len()
+    );
+    check(&label, &failures, known);
+}
+
+// What the realistic gate still finds (wave 5, `refinement/wave5/
+// tee-walk.md`), per garment and pose: open defects of drafts, not
 // accepted behaviour. Lower these as items improve; never raise one to
 // pass an item.
 //
-// - The test tee in the walk: every body (54), up to 30.2 mm (31.4 at the
-//   wave-3 merge), at the front of the armpit and the side under it as
-//   the arm swings back, where the cloth bridging the arm and the side
-//   follows the arm. Review fixes 1 brought this to 50 bodies at 23.7 mm
-//   by hiding the torso and the upper arm under the sleeve; review fixes
-//   2 found that hiding left holes (hidden skin out from under the cloth:
-//   up to 38 mm in the walk on 38 bodies, 45 mm at rest on 25 heavy
-//   ones), so the tee now hides only what stays covered in every fit
-//   pose, the waist, and this record is back at its first wave-4 value.
-//   The bra through it: 21 bodies, 17.4 mm, at the front of the armpit
-//   and the side band under it.
-// - The test tee with the arms raised: 2 bodies, 5.1 mm (every body, 16
-//   mm, at wave 3), at the base of the neck; back at its first wave-4
-//   value for the same reason. The bra through it: 2 bodies, 3.6 mm.
+// Wave 5 corrected the measure, not the fit (`enclosed`): skin the
+// garment encloses (its way out along its normal meets the cloth from
+// inside) was counted out when another part of the same loose garment
+// came nearer than the cloth over it. That was 98% of the wave-4 walk
+// cases (2,758 of 2,822 corners at Walk@18). Every record below came
+// down by that alone; the fit is wave 4's.
+//
+// - The test tee in the walk: at Walk@18 16 bodies, 9.7 mm (54 bodies,
+//   30.2 mm, with the closest point alone). Through the whole stride
+//   (`WALK_FRAMES`) 48 to 54 bodies a third, up to 16.5 mm: the arm's
+//   inner skin and the torso's side under the arm, where the hanging arm
+//   closes on the side and the bridge of cloth between them can't fold
+//   into the crease (807 open corners on 51 bodies, 274 shut in the
+//   crease, 187 inside the other limb). The bra through it: 4 bodies,
+//   15.2 mm at Walk@18; 9 to 17 bodies a third, up to 17.0 mm.
+// - Arms forward (new in wave 5): 39 bodies, 9.4 mm, the same places;
+//   the bra 4 bodies, 3.6 mm.
+// - Arms raised: none (2 bodies, 5.1 mm, with the closest point alone).
 // - Holes (`HOLES`): none. Every pose of the gate checks them.
-// - The boxer briefs: none. The masculine heavy-soft body's one corner
-//   (13.3 mm at rest, 17.9 mm in the walk) was skin beside the leg
-//   opening at the gusset's edge, nearest the rim folded under the hem
-//   (15 mm away) and counted covered by cloth 34 mm off: `covered` now
-//   leaves skin nearer a hem than the cloth over it (`BESIDE_HEM`) out.
+// - The boxer briefs: none (`BESIDE_HEM`, wave 4).
 
 /// The name a lower layer coming through the tee is recorded under.
 const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
@@ -904,14 +1062,72 @@ fn garments_cover_the_cast_walking() {
             Known {
                 garment: "TestTee",
                 pose: "Walk@18",
-                cases: 54,
-                worst: 0.0302,
+                cases: 16,
+                worst: 0.0098,
             },
             Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "Walk@18",
-                cases: 21,
-                worst: 0.0174,
+                cases: 4,
+                worst: 0.0152,
+            },
+        ],
+    );
+}
+
+/// The test tee's and the bra's records in a third of the walk.
+const fn walk_records(tee: (usize, f32), bra: (usize, f32)) -> [Known; 2] {
+    [
+        Known {
+            garment: "TestTee",
+            pose: WALK,
+            cases: tee.0,
+            worst: tee.1,
+        },
+        Known {
+            garment: BRA_THROUGH_TEE,
+            pose: WALK,
+            cases: bra.0,
+            worst: bra.1,
+        },
+    ]
+}
+
+/// The walking fit test (Paul's decision 13, wave 5): the whole stride,
+/// every third frame, on every body. A tee passes it only with no record:
+/// the test tee's are open defects (`refinement/wave5/tee-walk.md`).
+#[test]
+fn garments_cover_the_cast_through_the_walk_first_third() {
+    gate_walk(WALK_FRAMES[0], &walk_records((54, 0.0136), (17, 0.0108)));
+}
+
+#[test]
+fn garments_cover_the_cast_through_the_walk_second_third() {
+    gate_walk(WALK_FRAMES[1], &walk_records((48, 0.0166), (9, 0.0171)));
+}
+
+#[test]
+fn garments_cover_the_cast_through_the_walk_last_third() {
+    gate_walk(WALK_FRAMES[2], &walk_records((53, 0.0147), (14, 0.0131)));
+}
+
+/// Arm movement (decision 13): both arms raised forward to level.
+#[test]
+fn garments_cover_the_cast_with_the_arms_forward() {
+    gate(
+        Stance::Held(HeldPose::ArmsForward),
+        &[
+            Known {
+                garment: "TestTee",
+                pose: "ArmsForward",
+                cases: 39,
+                worst: 0.0094,
+            },
+            Known {
+                garment: BRA_THROUGH_TEE,
+                pose: "ArmsForward",
+                cases: 4,
+                worst: 0.0036,
             },
         ],
     );
@@ -924,23 +1140,7 @@ fn garments_cover_the_cast_with_the_arms_out() {
 
 #[test]
 fn garments_cover_the_cast_with_the_arms_raised() {
-    gate(
-        Stance::Held(HeldPose::ArmsRaised),
-        &[
-            Known {
-                garment: "TestTee",
-                pose: "ArmsRaised",
-                cases: 2,
-                worst: 0.0052,
-            },
-            Known {
-                garment: BRA_THROUGH_TEE,
-                pose: "ArmsRaised",
-                cases: 2,
-                worst: 0.0036,
-            },
-        ],
-    );
+    gate(Stance::Held(HeldPose::ArmsRaised), &[]);
 }
 
 #[test]
@@ -1049,6 +1249,67 @@ fn skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered() {
         .triangles
         .extend(rim.triangles.iter().map(|t| t.map(|v| v + start)));
     assert_eq!(covered(&skin, &far_rim, 0.04), [true]);
+}
+
+/// One posed corner (skin, or a lower layer's), drawn.
+fn corner(at: Vec3, normal: Vec3) -> Posed {
+    Posed {
+        name: "Body".to_owned(),
+        positions: vec![at],
+        normals: vec![normal.normalize()],
+        triangles: vec![[0, 0, 0]],
+    }
+}
+
+/// `a` and `b` as one garment.
+fn joined(name: &str, a: &Posed, b: &Posed) -> Posed {
+    let mut out = a.clone();
+    out.name = name.to_owned();
+    let start = out.positions.len() as u32;
+    out.positions.extend(&b.positions);
+    out.normals.extend(&b.normals);
+    out.triangles
+        .extend(b.triangles.iter().map(|t| t.map(|v| v + start)));
+    out
+}
+
+/// Skin a loose garment encloses is inside it, even where another part of
+/// the same garment comes nearer than the cloth over it with its outside
+/// towards the skin (a sleeve swung beside the chest, the torso's panel
+/// beside the arm inside its sleeve: wave 5, `tee-walk.md`); skin through
+/// the cloth over it is out by as much as before, whatever else is near.
+#[test]
+fn skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out() {
+    // The panel 25 mm over the skin, facing out (+Z); a sleeve's wall 12
+    // mm to the side (the plane x = 12 mm, below the panel), its outside
+    // (-X) towards the skin.
+    let panel = sheet("Panel", 0.2, 10, 0.025);
+    let mut wall = sheet("Wall", 0.1, 4, 0.0);
+    for p in &mut wall.positions {
+        *p = Vec3::new(0.012, p.y, -0.0175 + p.x * 0.65);
+    }
+    wall.normals.fill(-Vec3::X);
+    let tee = joined("Tee", &panel, &wall);
+    // Skin under the panel, its normal leaning away from the wall: the
+    // wall is the nearest cloth (12 mm, the skin on its outside), but the
+    // skin's way out along its normal meets the panel from inside.
+    let under = corner(Vec3::ZERO, Vec3::new(-0.3, 0.0, 0.954));
+    let (count, worst) = poke_through("enclosed", &under, &tee, &[true]);
+    assert_eq!(count, 0, "enclosed skin counted out by {worst}");
+    assert!(worst < 0.0, "{worst}");
+    // Skin 5 mm through the panel: out, by 5 mm.
+    let through = corner(Vec3::new(0.0, 0.0, 0.030), Vec3::Z);
+    let (count, worst) = poke_through("through", &through, &tee, &[true]);
+    assert_eq!(count, 1);
+    assert!((worst - 0.005).abs() < 1e-4, "{worst}");
+    // Through it with another fold of the cloth over it facing back: the
+    // way out meets cloth from outside, so it is still out.
+    let mut fold = sheet("Fold", 0.2, 10, 0.05);
+    fold.normals.fill(-Vec3::Z);
+    let folded = joined("Tee", &tee, &fold);
+    let (count, worst) = poke_through("folded", &through, &folded, &[true]);
+    assert_eq!(count, 1);
+    assert!((worst - 0.005).abs() < 1e-4, "{worst}");
 }
 
 /// Wearing the tee leaves the regions it covers whole, in every fit pose,
@@ -1163,17 +1424,20 @@ fn stylized_clothes_cover_the_stylized_cast() {
     let known = [
         ("Shirt_Tee", "rest", 6, 0.0247),
         ("Shirt_Tee", "TPose", 6, 0.0249),
-        ("Pants_Cargo", "rest", 7, 0.0024),
-        ("Pants_Cargo", "TPose", 7, 0.0024),
+        ("Pants_Cargo", "rest", 6, 0.0024),
+        ("Pants_Cargo", "TPose", 6, 0.0024),
         ("Underwear_Top through Shirt_Tee", "rest", 7, 0.0047),
         ("Underwear_Top through Shirt_Tee", "TPose", 8, 0.0082),
-        // The walk (new in review fixes 1): the cargo pants at the crotch
-        // and the inner thighs in the stride, the tee as at rest plus the
-        // armpit, the sports top at the side of the chest.
-        ("Pants_Cargo", "Walk@18", 15, 0.0272),
-        ("Shirt_Tee", "Walk@18", 16, 0.0247),
-        ("Underwear_Top", "Walk@18", 1, 0.0053),
-        ("Underwear_Top through Shirt_Tee", "Walk@18", 12, 0.0025),
+        // The walk (new in review fixes 1): the cargo pants at the crotch,
+        // the tee as at rest plus the armpit, the sports top at the side
+        // of the chest. Lowered in wave 5 by the corrected measure
+        // (`enclosed`), not a refit: the cargo pants 15 bodies at 27.2 mm
+        // to 4 at 1.0, the tee 16 bodies to 8, the sports top alone (1
+        // body, 5.3 mm) to none and through the tee 12 bodies at 2.5 mm to
+        // 2 at 1.6.
+        ("Pants_Cargo", "Walk@18", 4, 0.0011),
+        ("Shirt_Tee", "Walk@18", 8, 0.0247),
+        ("Underwear_Top through Shirt_Tee", "Walk@18", 2, 0.0017),
         // The underwear alone (new in review fixes 2; dressed, the cargo
         // pants' mask sank the skin under the briefs): the feminine briefs
         // in the walk, the right buttock's skin 1.2 to 1.9 mm through on

@@ -20,8 +20,8 @@ use axcenity_core::{ClassName, Value};
 
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
 use super::fit_gate_tests::{
-    Failure, Known, Posed, bodies, check, cover_at_rest, measure, poke_through, pose_name,
-    posed_at, undressed, worn,
+    Failure, Known, Posed, WALK, WALK_FRAMES, bodies, check, cover_at_rest, measure, measure_walk,
+    poke_through, pose_name, posed_at, undressed, worn,
 };
 use super::garment_checks::{Record, check_motion, footwear, stale, unrecorded};
 
@@ -87,6 +87,40 @@ fn wardrobe_gate(stance: Stance, known: &[Known]) {
     check(&label, &failures, known);
 }
 
+/// The gate through the walk's `frames` ([`WALK_FRAMES`]): the walking
+/// fit test (Paul's decision 13), on every realistic cast and body
+/// benchmark dressed in the three.
+fn wardrobe_gate_walk(frames: &[u32], known: &[Known]) {
+    let label = format!("{WALK} {frames:?}");
+    let stage = Stage::new(
+        &format!("wardrobe-gate-walk-{}", frames[0]),
+        &repository_library(),
+    )
+    .expect("the stage");
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    for description in bodies() {
+        let dressed = dressed(&description);
+        let (body, garments) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let cover = cover_at_rest(&body, &garments, &bare);
+        checked += measure_walk(
+            &stage.assets,
+            &description.name,
+            &dressed,
+            &cover,
+            frames,
+            &mut failures,
+        );
+    }
+    failures.retain(ours);
+    println!(
+        "wardrobe gate {label}: {checked} garment checks, {} failing",
+        failures.len()
+    );
+    check(&label, &failures, known);
+}
+
 // What the gate still finds on the three drafts (open defects, not
 // accepted behaviour: `refinement/wave4/r7-wardrobe-first.md`). Lower these
 // as the items improve; never raise one, never list a production item.
@@ -108,8 +142,28 @@ fn the_wardrobe_covers_the_cast_walking() {
             name: "Walk",
             frames: 18,
         },
-        &WALK,
+        &WALK_18,
     );
+}
+
+#[test]
+fn the_wardrobe_covers_the_cast_through_the_walk_first_third() {
+    wardrobe_gate_walk(WALK_FRAMES[0], &WALK_THROUGH_FIRST);
+}
+
+#[test]
+fn the_wardrobe_covers_the_cast_through_the_walk_second_third() {
+    wardrobe_gate_walk(WALK_FRAMES[1], &WALK_THROUGH_SECOND);
+}
+
+#[test]
+fn the_wardrobe_covers_the_cast_through_the_walk_last_third() {
+    wardrobe_gate_walk(WALK_FRAMES[2], &WALK_THROUGH_LAST);
+}
+
+#[test]
+fn the_wardrobe_covers_the_cast_with_the_arms_forward() {
+    wardrobe_gate(Stance::Held(HeldPose::ArmsForward), &ARMS_FORWARD);
 }
 
 #[test]
@@ -342,6 +396,11 @@ fn the_sneakers_hold_the_feet() {
 // T-pose 24.7 -> 25.8 mm; the joggers with the knees bent 53 -> 54 bodies,
 // 31.1 -> 39.3 mm, in the walk 51 -> 53 bodies. The rule above holds from
 // here.
+//
+// Lowered in wave 5 by the gate's corrected measure (`enclosed`: skin the
+// garment encloses is inside it), not a refit: the bra through the tee in
+// Idle 15.8 -> 5.3 mm, the boxer briefs through the joggers in the walk
+// frame 8.9 -> 5.2 mm, the joggers with the knees bent 39.3 -> 31.1 mm.
 
 const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
     Known {
@@ -375,10 +434,10 @@ const IDLE: [Known; 6] = [
         32,
         0.0094,
     ),
-    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0158),
+    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0053),
     known("Underwear_Briefs through Pants_Joggers", "idle", 1, 0.0011),
 ];
-const WALK: [Known; 6] = [
+const WALK_18: [Known; 6] = [
     known("Pants_Joggers", "Walk@18", 53, 0.0222),
     known("Pants_Joggers through Shirt_CrewTee", "Walk@18", 54, 0.0172),
     known("Shirt_CrewTee", "Walk@18", 54, 0.0345),
@@ -386,7 +445,7 @@ const WALK: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "Walk@18",
         33,
-        0.0089,
+        0.0052,
     ),
     known("Underwear_Bra through Shirt_CrewTee", "Walk@18", 21, 0.0055),
     known(
@@ -466,7 +525,7 @@ const ELBOWS_BENT: [Known; 6] = [
     ),
 ];
 const KNEES_BENT: [Known; 6] = [
-    known("Pants_Joggers", "KneesBent", 54, 0.0393),
+    known("Pants_Joggers", "KneesBent", 54, 0.0311),
     known(
         "Pants_Joggers through Shirt_CrewTee",
         "KneesBent",
@@ -491,6 +550,79 @@ const KNEES_BENT: [Known; 6] = [
         "KneesBent",
         1,
         0.0011,
+    ),
+];
+// The walking fit test and the arms forward (wave 5, `refinement/wave5/
+// tee-walk.md`), from their first run: the drafts' open defects. The tee
+// fails the walk on every body, up to 38.7 mm: round the waist as at
+// rest, and in the arm, the armpit and the chest as the test tee; the
+// joggers at the ankle as at rest; the underwear through both as in the
+// walk frame.
+const WALK_THROUGH_FIRST: [Known; 6] = [
+    known("Pants_Joggers", WALK, 53, 0.0283),
+    known("Pants_Joggers through Shirt_CrewTee", WALK, 54, 0.0233),
+    known("Shirt_CrewTee", WALK, 54, 0.0385),
+    known(
+        "Underwear_BoxerBriefs through Pants_Joggers",
+        WALK,
+        33,
+        0.0076,
+    ),
+    known("Underwear_Bra through Shirt_CrewTee", WALK, 21, 0.0055),
+    known("Underwear_Briefs through Pants_Joggers", WALK, 20, 0.0097),
+];
+const WALK_THROUGH_SECOND: [Known; 6] = [
+    known("Pants_Joggers", WALK, 54, 0.0306),
+    known("Pants_Joggers through Shirt_CrewTee", WALK, 54, 0.0172),
+    known("Shirt_CrewTee", WALK, 54, 0.0350),
+    known(
+        "Underwear_BoxerBriefs through Pants_Joggers",
+        WALK,
+        33,
+        0.0055,
+    ),
+    known("Underwear_Bra through Shirt_CrewTee", WALK, 21, 0.0055),
+    known("Underwear_Briefs through Pants_Joggers", WALK, 11, 0.0019),
+];
+const WALK_THROUGH_LAST: [Known; 6] = [
+    known("Pants_Joggers", WALK, 54, 0.0280),
+    known("Pants_Joggers through Shirt_CrewTee", WALK, 54, 0.0243),
+    known("Shirt_CrewTee", WALK, 54, 0.0387),
+    known(
+        "Underwear_BoxerBriefs through Pants_Joggers",
+        WALK,
+        33,
+        0.0070,
+    ),
+    known("Underwear_Bra through Shirt_CrewTee", WALK, 21, 0.0055),
+    known("Underwear_Briefs through Pants_Joggers", WALK, 18, 0.0096),
+];
+const ARMS_FORWARD: [Known; 6] = [
+    known("Pants_Joggers", "ArmsForward", 53, 0.0311),
+    known(
+        "Pants_Joggers through Shirt_CrewTee",
+        "ArmsForward",
+        54,
+        0.0192,
+    ),
+    known("Shirt_CrewTee", "ArmsForward", 54, 0.0407),
+    known(
+        "Underwear_BoxerBriefs through Pants_Joggers",
+        "ArmsForward",
+        33,
+        0.0043,
+    ),
+    known(
+        "Underwear_Bra through Shirt_CrewTee",
+        "ArmsForward",
+        21,
+        0.0060,
+    ),
+    known(
+        "Underwear_Briefs through Pants_Joggers",
+        "ArmsForward",
+        8,
+        0.0013,
     ),
 ];
 const LODS: [Known; 4] = [
