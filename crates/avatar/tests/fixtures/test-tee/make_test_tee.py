@@ -34,21 +34,34 @@ import numpy as np
 from mathutils import Vector
 
 # How far the shirt stands off the body (a loose fit), and at the neck
-# (a crew neck's rib sits close round the neck's base).
+# (a crew neck's rib sits round the neck's base).
 EASE = 0.022
 NECK_EASE = 0.006
 SLEEVE_EASE = 0.014
 # How much wider than the neck the crew neck's opening is at the sides,
-# where it sits on the neck's base (the sports bra's straps come up to
-# the neck there, under it).
-NECK_SIDE = 0.002
+# where it sits on the base of the neck: an ordinary crew neck, which the
+# neck's base doesn't rise into when the arms are raised. (Until wave 4
+# it was 2 mm, close round the neck, to cover the sports bra's straps,
+# which came up the side of the neck; they now sit on the shoulders.)
+NECK_SIDE = 0.014
 # How far down the neck (from its joint) the crew neck's cylinder starts.
 NECK_DROP = 0.08
 # The crew neck's front: a scoop this deep below the neck's sides, and
-# this much narrower than the opening at the sides (where the sports bra's
-# straps come up beside the neck, it stays high).
+# this much narrower than the opening at the sides: a round U down to the
+# hollow at the neck's base.
 NECK_SCOOP = 0.07
-NECK_SCOOP_IN = 0.016
+NECK_SCOOP_IN = 0.004
+# How far over the skin the shirt lies on the top of the shoulders, where
+# it hangs (`drape_shoulders`): over the sports bra's straps (3 mm off the
+# skin, more where a shape pushes them out), with a little room.
+SHOULDER_EASE = 0.014
+# The crew neck's edge lies on the skin (a collar's rib touches the neck's
+# base all round): within `COLLAR_REACH` of the opening the shell comes in
+# to `COLLAR_EASE` over the skin, fading out with the distance.
+COLLAR_EASE = 0.002
+COLLAR_REACH = 0.012
+# Rounds of smoothing the settled edge along its line.
+COLLAR_SMOOTHING = 12
 # The voxel remesh's size: about 6k triangles for the shirt.
 VOXEL = 0.019
 ARM_PARTS = ("UpperArm", "LowerArm", "Hand", "Thumb", "Index", "Middle", "Ring", "Little")
@@ -225,6 +238,118 @@ def mesh_points(obj, key=None):
     return co.reshape(-1, 3) @ world[:3, :3].T + world[:3, 3]
 
 
+def drape_shoulders(tee, P, shoulder):
+    """Lets the shell's top down onto the shoulders, as a shirt hangs on
+    them: the girths' ease is across, so over the top of the shoulder the
+    shell stood up to 2 cm off the skin, and a crew neck's edge stood off
+    the trapezius with a gap under it (the sports bra's straps showed
+    through it from a three-quarter view). Each corner that faces up,
+    between the neck and the shoulder joint, comes down to
+    `SHOULDER_EASE` over the skin straight under it; the share fades out
+    toward the side of the shoulder and where the shell faces sideways,
+    and the moves are smoothed over the shell so it stays one surface.
+    Returns the largest move (m)."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    body = bpy.data.objects["Body"]
+    skin = BVHTree.FromPolygons(P.tolist(), [list(f.vertices) for f in body.data.polygons])
+    me = tee.data
+    co = mesh_points(tee)
+    normals = np.array([tuple(v.normal) for v in me.vertices])
+    reach_x = abs(shoulder[0])
+    move = np.zeros(len(co))
+    # How far each corner can come down before it is within its ease of
+    # the skin straight under it.
+    room = np.zeros(len(co))
+    down = Vector((0.0, 0.0, -1.0))
+    for k, (p, n) in enumerate(zip(co, normals)):
+        if p[2] < shoulder[2] - 0.08:
+            continue
+        hit = skin.ray_cast(Vector(p), down, 0.08)[0]
+        if hit is None:
+            continue
+        room[k] = max(p[2] - (hit.z + SHOULDER_EASE), 0.0)
+        upward = np.clip((n[2] - 0.3) / 0.4, 0.0, 1.0)
+        inward = np.clip((reach_x + 0.04 - abs(p[0])) / 0.04, 0.0, 1.0)
+        move[k] = room[k] * upward * inward
+    # Smoothed over the shell's edges, and never more than a corner has
+    # room for.
+    neighbours = [[] for _ in range(len(co))]
+    for e in me.edges:
+        a, b = e.vertices
+        neighbours[a].append(b)
+        neighbours[b].append(a)
+    for _ in range(6):
+        move = np.array([0.5 * move[k] + 0.5 * np.mean(move[nb]) if nb else move[k]
+                         for k, nb in enumerate(neighbours)])
+        move = np.minimum(move, room)
+    for k, v in enumerate(me.vertices):
+        v.co.z -= move[k]
+    me.update()
+    return float(move.max())
+
+
+def settle_collar(tee, P, neck, neck_a):
+    """Brings the crew neck's edge onto the skin (`COLLAR_EASE`), fading out
+    over `COLLAR_REACH` from the opening: a shell standing off the skin at
+    its neckline leaves a slit between the collar and the neck's base,
+    through which the inside of the shirt (and the sports bra's straps on
+    the far shoulder) shows from a three-quarter view. Returns how many
+    corners moved."""
+    from collections import Counter
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    body = bpy.data.objects["Body"]
+    skin = BVHTree.FromPolygons(P.tolist(), [list(f.vertices) for f in body.data.polygons])
+    me = tee.data
+    co = mesh_points(tee)
+    uses = Counter()
+    for poly in me.polygons:
+        vs = list(poly.vertices)
+        for a, b in zip(vs, vs[1:] + vs[:1]):
+            uses[(min(a, b), max(a, b))] += 1
+    edge = sorted({v for e, n in uses.items() if n == 1 for v in e})
+    # The neck's opening: open edges near the neck (not the hem, nor the
+    # sleeves' ends).
+    on_opening = {v for v in edge if co[v][2] > neck[2] - 0.12 and abs(co[v][0]) < neck_a + 0.03}
+    opening = np.array([co[v] for v in sorted(on_opening)])
+    moved = 0
+    for k, v in enumerate(me.vertices):
+        p = co[k]
+        far = np.linalg.norm(opening - p, axis=1).min()
+        if far >= COLLAR_REACH:
+            continue
+        loc, normal, _, _ = skin.find_nearest(Vector(p), 0.05)
+        if loc is None:
+            continue
+        out = (Vector(p) - loc).dot(normal)
+        if out <= COLLAR_EASE:
+            continue
+        t = 1.0 - far / COLLAR_REACH
+        share = t * t * (3.0 - 2.0 * t)
+        v.co -= Vector(normal) * (out - COLLAR_EASE) * share
+        moved += 1
+    # The edge itself smoothed along its own line (the skin under it is
+    # uneven, and a settled edge took that up as a zigzag), kept its ease
+    # over the skin.
+    ring = {}
+    for (a, b), n in uses.items():
+        if n == 1 and a in on_opening and b in on_opening:
+            ring.setdefault(a, []).append(b)
+            ring.setdefault(b, []).append(a)
+    for _ in range(COLLAR_SMOOTHING):
+        now = {k: me.vertices[k].co.copy() for k in ring}
+        for k, nb in ring.items():
+            mean = sum((now[j] for j in nb), Vector()) / len(nb)
+            co_k = now[k].lerp(mean, 0.5)
+            loc, normal, _, _ = skin.find_nearest(co_k, 0.05)
+            if loc is not None and (co_k - loc).dot(normal) < COLLAR_EASE:
+                co_k = co_k + normal * (COLLAR_EASE - (co_k - loc).dot(normal))
+            me.vertices[k].co = co_k
+    me.update()
+    return moved
+
+
 def check_underarm(tee, armpit, side):
     """The sleeves' hems are below the armpit underneath (a short sleeve
     whose hem is above it leaves the side open when the arm is raised)."""
@@ -247,16 +372,15 @@ def check_covers_the_bra(tee, armpit, side, neck_a):
     """The shirt hides the sports bra on both frames, from every way a
     capture looks at it: a ray from each of the bra's corners off the skin
     toward the camera meets the shirt or the body. On the feminine frame
-    the shirt is moved as the skin under it moves. The straps come up
-    beside the neck and the side band up under the arm: a neckline or an
+    the shirt is moved as the skin under it moves. The straps go over the
+    shoulders and the side band up under the arm: a neckline or an
     armhole that shows them fails here.
 
-    Two places are let off, by a few corners each, and counted: the
-    straps' tops, which come up against the neck's side above its base
-    (where a crew neck sits, so the collar's edge is at their top: what
-    shows is the top 1 cm of the strap, at most 2 mm of it beside the
-    neck), and the side band seen from straight beside the body up the
-    sleeve, past the arm (as up any short sleeve)."""
+    One place is let off, by a few corners, and counted: the side band
+    seen from straight beside the body up the sleeve, past the arm (as up
+    any short sleeve). The straps' tops by the collar are counted apart and
+    let off none (until wave 4 the straps came up the side of the neck,
+    and their top 2 mm showed at a crew neck)."""
     from mathutils import Vector
     from mathutils.bvhtree import BVHTree
     from mathutils.kdtree import KDTree
@@ -322,7 +446,7 @@ def check_covers_the_bra(tee, armpit, side, neck_a):
                     break
         print(f"the sports bra on the {key or 'masculine'} frame: {seen} corners seen; "
               f"{collar} at the straps' tops by the collar, {sleeve_} up a sleeve from the side")
-        if seen or collar > 25 or sleeve_ > 4:
+        if seen or collar or sleeve_ > 4:
             problems.append(f"{seen} of the sports bra's corners show on the {key or 'masculine'} frame")
     return problems
 
@@ -438,6 +562,7 @@ def main():
     smooth.iterations = 4
     bpy.ops.object.modifier_apply(modifier="remesh")
     bpy.ops.object.modifier_apply(modifier="smooth")
+    print(f"the shoulders draped: the shell came down {drape_shoulders(tee, P, shoulder_l):.3f} m at most")
 
     # The neck: a crew neck. An elliptic cylinder along the neck, close
     # round it (its column a little above the joint, the chin left out),
@@ -552,6 +677,7 @@ def main():
     me.update()
     for poly in me.polygons:
         poly.use_smooth = True
+    print(f"the collar's edge settled onto the skin: {settle_collar(tee, P, neck, neck_a)} corners")
     problems = check_underarm(tee, armpit, side) + check_covers_the_bra(tee, armpit, side, neck_a)
     assert args.keep_going or not problems, problems
 

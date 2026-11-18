@@ -729,7 +729,7 @@ def deformation(ch, W, default_path, package="stylized"):
         ch.pose_reset()
         rest = Q.Geo(ch.parts["Body"])
         P = [Vector(p) for p in rest.co]
-        for pose, (_fn, joint) in Q.POSES.items():
+        for pose, (_fn, joint) in {**Q.POSES, **Q.SWING_POSES}.items():
             res = {}
             if pose == "fist":
                 joint = None  # several pivots: the cone volume isn't meaningful
