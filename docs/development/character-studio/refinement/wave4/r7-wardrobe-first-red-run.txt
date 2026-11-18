@@ -53,3 +53,19 @@ Every new test fails because the library has none of the three items (and the mo
         FAIL [   3.164s] (2/3) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_walk
         FAIL [   3.179s] (3/3) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_stays_steady_in_the_idle
      Summary [   3.183s] 3 tests run: 0 passed, 3 failed, 255 skipped
+
+
+== Review fixes 2: red run (2026-11-18) ==
+HEM_THICK raised from 1.8 mm to asset-quality section 3 (2.0 mm) and DENSITY_SHARE from 0.99 to section 2 (all of the area), before any new record:
+cargo nextest run -p axcenity-avatar --test realistic_wardrobe --no-capture -E "test(no_edge_is_a_single_layer) | test(their_texture_coordinates_are_even_dense_and_do_not_overlap)"
+
+axcenity/realistic-crew-tee: 156 open corners, 1 not inside a shell (e.g. [0.1811475, 0.8696158, 0.07381104] at 1.40 mm)
+axcenity/realistic-joggers: 76 open corners, 1 not inside a shell (e.g. [0.13615102, 0.18664995, 0.004124999] at 1.92 mm)
+assertion `left == right` failed: axcenity/realistic-joggers: raw-edge corners not 2.0 to 25 mm inside a shell
+        FAIL [   1.242s] (1/2) axcenity-avatar::realistic_wardrobe no_edge_is_a_single_layer
+axcenity/realistic-joggers Cord: median 1446 px/m, even 96.0%, dense 99.1%
+    "axcenity/realistic-joggers Cord: dense 99.1% < 100%",
+        FAIL [   1.815s] (2/2) axcenity-avatar::realistic_wardrobe their_texture_coordinates_are_even_dense_and_do_not_overlap
+     Summary [   3.058s] 2 tests run: 0 passed, 2 failed, 5 skipped
+        FAIL [   1.242s] (1/2) axcenity-avatar::realistic_wardrobe no_edge_is_a_single_layer
+        FAIL [   1.815s] (2/2) axcenity-avatar::realistic_wardrobe their_texture_coordinates_are_even_dense_and_do_not_overlap

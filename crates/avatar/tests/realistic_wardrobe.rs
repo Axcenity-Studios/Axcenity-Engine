@@ -60,14 +60,15 @@ const GARMENTS: [Garment; 3] = [
 const STRETCH: f32 = 0.10;
 const STRETCH_SHARE: f32 = 0.95;
 const DENSITY: f32 = 800.0;
-/// The share of an item's area that must meet the density: all of it but
-/// slivers (an aglet's tip, a lace's end).
-const DENSITY_SHARE: f32 = 0.99;
+/// The share of a material's area that must meet the density: all of it,
+/// as §2 asks (no allowance for slivers; a material that falls short is a
+/// draft's record).
+const DENSITY_SHARE: f32 = 1.0;
 /// §3 "Construction": a hem turned with at least 2 mm thickness. A raw
-/// edge lies inside the shell it is turned from, at least this far (a
-/// little under 2 mm, for the corners where the turn rounds) and no
-/// farther than a hem's allowance.
-const HEM_THICK: f32 = 0.0018;
+/// edge lies inside the shell it is turned from, at least this far (the
+/// full 2 mm, also where the turn rounds) and no farther than a hem's
+/// allowance.
+const HEM_THICK: f32 = 0.0020;
 const HEM_REACH: f32 = 0.025;
 /// A turned hem's raw edge is this many rings of corners or more from the
 /// shell it lies inside (the fold between).
@@ -373,16 +374,18 @@ const SNEAKERS: &str = "axcenity/realistic-sneakers";
 //   are shorter than its seam (a rectangle in the texture).
 // - The joggers: the waist and cuffs gathered on elastic, and the bands
 //   pushed clear of the belly and the heel, stretch the cloth near them;
-//   the aglets are short tubes.
+//   the aglets are short tubes. The drawcord is a thin tube whose ends,
+//   tapered into the aglets, fall under 8 px/cm (0.9% of its area).
 // - The sneakers: the upper is one ring of quads from the sole to the
 //   collar, laid out by each row's length round and each column's up, which
 //   isn't conformal (rows of very different lengths); the sole's caps are
 //   projected from above, and its side wall is a strip.
-const UV_RECORDS: [UvRecord; 11] = [
+const UV_RECORDS: [UvRecord; 12] = [
     uv(TEE, "Jersey", Some(0.51), Some(0.96)),
     uv(TEE, "Rib", Some(0.045), None),
     uv(JOGGERS, "Fleece", Some(0.39), Some(0.96)),
     uv(JOGGERS, "Rib", Some(0.36), Some(0.92)),
+    uv(JOGGERS, "Cord", None, Some(0.99)),
     uv(JOGGERS, "Aglet", Some(0.65), Some(0.92)),
     uv(SNEAKERS, "Upper", Some(0.03), Some(0.79)),
     uv(SNEAKERS, "Lining", Some(0.045), None),
@@ -392,9 +395,11 @@ const UV_RECORDS: [UvRecord; 11] = [
     uv(SNEAKERS, "Laces", Some(0.75), Some(0.97)),
 ];
 
-/// The tee's hem at the side, where the fit pushes it out over the
-/// joggers' waistband and its turn-up is squeezed to 1.4 mm.
-const THIN_FOLDS: [(&str, usize); 1] = [(TEE, 1)];
+/// Raw-edge corners under §3's 2 mm: the tee's hem at the side, where the
+/// fit pushes it out over the joggers' waistband and its turn-up is
+/// squeezed to 1.4 mm; and one raw-edge corner of a joggers' cuff (at
+/// [0.136, 0.187, 0.004] m in the file), 1.92 mm from the shell.
+const THIN_FOLDS: [(&str, usize); 2] = [(TEE, 1), (JOGGERS, 1)];
 
 fn draft_floor(
     library: &Library,
@@ -702,8 +707,11 @@ fn no_edge_is_a_single_layer() {
         let recorded = THIN_FOLDS.iter().find(|(id, _)| *id == at).map(|(_, n)| *n);
         match recorded {
             None => assert_eq!(
-                bad, 0,
-                "{at}: raw-edge corners not 1.8 to 25 mm inside a shell"
+                bad,
+                0,
+                "{at}: raw-edge corners not {:.1} to {:.0} mm inside a shell",
+                HEM_THICK * 1000.0,
+                HEM_REACH * 1000.0
             ),
             Some(n) => {
                 assert!(item(&library, garment).is_draft(), "{at} is production");
