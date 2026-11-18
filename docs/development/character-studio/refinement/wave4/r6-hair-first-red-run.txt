@@ -61,3 +61,23 @@ cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(/randomize_never_we
     FAIL realistic_hair randomize_never_wears_a_draft_on_either_realistic_frame
         masculine seed 0 wears the draft axcenity/realistic-hair-short-crop
  Summary 4 tests run: 1 passed, 3 failed, 147 skipped
+
+== Review fixes 2: the limitations guard, red against three mutations of the item JSON (each restored with git checkout) ==
+
+Command: cargo nextest run -p axcenity-avatar --test realistic_hair -E 'test(its_limitations_claim_only_what_its_measurements_show)'
+
+1. The reviewer's mutation: the temple_width note given the head_size wording
+   ("no hair vertex more than 1 mm inside the head at either end, on either frame.").
+   The old guard (contains "no hair inside") PASSED this. The new one:
+     temple_width: 3 vertices inside (deepest 7.242 mm), but the note says "measured over this range (draft): no hair vertex more than 1 mm inside the head at either end, on either frame."
+     Summary [   0.012s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+2. The temple_width note with no claim but no depth ("at -1, a few vertices sit inside the head by the ear."):
+     temple_width: the note doesn't give the measured depth 7.242 mm: "measured over this range (draft): at -1, a few vertices sit inside the head by the ear."
+     Summary [   0.015s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+3. The frame note's motion clause replaced with "in Idle, Walk and Run no hair vertex goes inside.":
+     frame: 6 vertices inside (deepest 6.436 mm), but the note says "built for both frames; a draft on both. ... in idle, walk and run no hair vertex goes inside."
+     Summary [   0.019s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+On the committed item (unmutated) the test passes.

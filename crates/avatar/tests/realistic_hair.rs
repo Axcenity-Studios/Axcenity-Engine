@@ -436,9 +436,51 @@ fn it_stays_a_draft_while_a_measured_check_fails() {
     }
 }
 
+/// The worst of some `inside_head` entries (each maps a level, such as
+/// `Hair_ShortCrop_LOD1`, to `over_1mm` and `deepest_mm`): how many
+/// vertices sit over 1 mm inside, and the deepest of those, in mm.
+fn worst_inside<'a>(entries: impl Iterator<Item = &'a serde_json::Value>) -> (u64, f64) {
+    let mut count = 0;
+    let mut deepest: f64 = 0.0;
+    for levels in entries {
+        for level in levels.as_object().unwrap().values() {
+            let over = level["over_1mm"].as_u64().unwrap();
+            if over > 0 {
+                count += over;
+                deepest = deepest.max(level["deepest_mm"].as_f64().unwrap());
+            }
+        }
+    }
+    (count, deepest)
+}
+
+/// Every number written in a note ("6 to 7 mm", "7.2 mm", "5.7%").
+fn numbers_in(note: &str) -> Vec<f64> {
+    note.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .filter_map(|token| token.trim_end_matches('.').parse().ok())
+        .collect()
+}
+
+/// A note that says no hair goes inside the head, in any of the wordings
+/// the build has used ("no hair inside", "no hair vertex more than 1 mm
+/// inside", ...).
+fn claims_none_inside(note: &str) -> bool {
+    [
+        "no hair inside",
+        "no hair vertex",
+        "no vertex",
+        "nothing inside",
+        "none inside",
+    ]
+    .iter()
+    .any(|claim| note.contains(claim))
+}
+
 /// The limitations the browser shows (plan 11.3) say only what was
-/// measured: no note claims "no hair inside" over a range where a vertex
-/// was measured more than 1 mm inside the head, none claims "no scalp
+/// measured. Where a vertex was measured more than 1 mm inside the head
+/// (at a parameter's ends, or in motion for the frame row), the note may
+/// not claim none is, in any wording, and it must give the measured depth
+/// (a number within 1 mm of the deepest). No note claims "no scalp
 /// through" while the captured show-through fails, and the frame row
 /// doesn't say the style fits while it is a draft.
 #[test]
@@ -450,21 +492,33 @@ fn its_limitations_claim_only_what_its_measurements_show() {
     let ends = quality["inside_head"]["rest_and_parameters"]
         .as_object()
         .unwrap();
+    let motion = quality["inside_head"]["motion"].as_object().unwrap();
     for limitation in &item.limitations {
         let note = limitation.note.to_lowercase();
         let parameter = limitation.parameter.as_deref().unwrap_or("");
-        // Any end of this parameter, on either frame and at any level,
-        // with a vertex over 1 mm inside.
-        let inside: u64 = ends
-            .iter()
-            .filter(|(key, _)| key.split('/').nth(1).unwrap_or("").starts_with(parameter))
-            .flat_map(|(_, levels)| levels.as_object().unwrap().values())
-            .map(|level| level["over_1mm"].as_u64().unwrap())
-            .sum();
-        assert!(
-            inside == 0 || !note.contains("no hair inside"),
-            "{parameter}: {inside} vertices inside, but the note says {note:?}"
-        );
+        // The frame row speaks for motion; a parameter row for its ends,
+        // on either frame and at any level. Keys are "frame/what".
+        let (inside, deepest) = if parameter == "frame" {
+            worst_inside(motion.values())
+        } else {
+            worst_inside(
+                ends.iter()
+                    .filter(|(key, _)| {
+                        key.split('/').nth(1).unwrap_or("").split('=').next() == Some(parameter)
+                    })
+                    .map(|(_, levels)| levels),
+            )
+        };
+        if inside > 0 {
+            assert!(
+                !claims_none_inside(&note),
+                "{parameter}: {inside} vertices inside (deepest {deepest} mm), but the note says {note:?}"
+            );
+            assert!(
+                numbers_in(&note).iter().any(|n| (n - deepest).abs() < 1.0),
+                "{parameter}: the note doesn't give the measured depth {deepest} mm: {note:?}"
+            );
+        }
         if quality["scalp_show_through_capture"]["pass"] == serde_json::Value::Bool(false) {
             assert!(
                 !note.contains("no scalp"),

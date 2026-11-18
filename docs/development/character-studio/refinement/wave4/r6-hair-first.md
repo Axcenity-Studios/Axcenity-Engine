@@ -173,6 +173,7 @@ Judged against the references' checklist (references/hair §7):
   - `docs/rendering/hair.md` and `skin.md`;
   - Known-Limitations;
   - `docs/editor/character-studio.md`, which the browsers track edits too.
+- **Don't merge this branch alone.** Merge `r67-browsers` before it or with it, so the Studio hides the draft (asset-quality §5), then update the two editor tests named in "Review fixes 2" below.
 - After merge: the full workspace suite, and `qa_hair.py` on the merged body.
 
 ## Final runs
@@ -231,3 +232,47 @@ The review found two blocking items. Both are fixed test first; the red run is a
 - `cargo nextest run -p axcenity-player --no-fail-fast`: `Summary [ 203.254s] 217 tests run: 217 passed (14 slow), 22 skipped`. No ABORT lines.
 - `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_workspace::/)'`: `105 tests run: 104 passed (1 slow), 1 failed`; the failure is the one above.
 - `cargo clippy -p axcenity-avatar -p axcenity-assets -p axcenity-player --all-targets -- -D warnings`: clean. `cargo fmt --all`: clean.
+
+## Review fixes 2
+
+### 1. The Studio lists the draft on this branch alone (the editor's shell test fails)
+
+The review is right. It is also a merge-order item for the lead, not a code change here: the editor is outside this task, and the fix is the browsers track's "Show drafts" filter. I didn't merge `r67-browsers` into this branch, because that is another specialist's unreviewed work. Instead I checked what the merge will do, from that branch's code (`origin/r67-browsers` at `99f7a1d0`):
+
+- **Merge:** `git merge-tree --write-tree HEAD origin/r67-browsers` gives two conflicts, both in docs: `docs/editor/character-studio.md` and `wiki/Roadmap/Known-Limitations.md`. No code conflicts.
+- **What the realistic Hair page will show.** On that branch the Hair page is `panel/browser.rs`, not `panel.rs`'s chip list:
+  - `browser.rs` `listing()` hides `item.is_draft()` unless "Show drafts" is on, but still counts the item in `offered` (`offered: shown.len() + hidden_drafts`).
+  - So with this item `offered` is 1 and `entries` is empty. The page doesn't take the `nothing_offered` path, which says "No hairstyles yet".
+  - Instead it draws the search field, the filters and "Show drafts (1 hidden)", and the empty state "Nothing to show" with "Everything here is still a draft. Turn on Show drafts to see them."
+  - The draft is hidden by default, which is what asset-quality §5 asks for.
+- **Two editor tests will then need their expectation changed** (I found these from the code; I didn't build the merged tree):
+  - `shell_tests.rs:338`, `(Category::Hair, Level::Detailed, &["No hairstyles yet"])`. Expect "Show drafts (1 hidden)", or "Everything here is still a draft. Turn on Show drafts to see them."
+  - `browser_tests.rs:922`, in `the_realistic_pages_say_what_they_have` (it exists only on `r67-browsers`). It asserts "No hairstyles yet" on the realistic Hair page and needs the same change.
+- **Then** run `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::/)'` on the merged tree.
+
+### 2. The limitations guard only caught the old wording
+
+The review is right. I reproduced the mutation: the old check, `!note.contains("no hair inside")`, passed with the temple_width note given the head_size wording. I rewrote `its_limitations_claim_only_what_its_measurements_show` (`crates/avatar/tests/realistic_hair.rs`) so it doesn't depend on wording:
+
+- For each parameter row it takes the worst entry over 1 mm inside, across both frames and every level, at that parameter's ends. Keys are matched by the exact parameter name before `=`, not by prefix.
+- For the frame row it takes the worst entry from `inside_head.motion` (Idle, Walk and Run). Before, the frame row's motion claim wasn't checked at all.
+- Where any vertex is over 1 mm inside:
+  - the note may not claim that none is, in any wording the build has used ("no hair inside", "no hair vertex", "no vertex", "nothing inside", "none inside");
+  - the note must give the measured depth: some number in it within 1 mm of the deepest.
+- The "no scalp" and "Fits" checks stay as they were.
+
+**Red, three mutations of the item JSON** (each restored with `git checkout`; the full output is in [r6-hair-first-red-run.txt](r6-hair-first-red-run.txt)):
+
+1. The reviewer's mutation fails: `temple_width: 3 vertices inside (deepest 7.242 mm), but the note says "…no hair vertex more than 1 mm inside the head…"`.
+2. A temple note that hides the depth ("a few vertices sit inside the head by the ear") fails: `the note doesn't give the measured depth 7.242 mm`.
+3. The frame note's motion clause turned into "no hair vertex goes inside" fails: `frame: 6 vertices inside (deepest 6.436 mm)`.
+
+On the committed item it passes. No data changed: the notes were already correct, and only the guard was weak.
+
+### Runs
+
+- Red: three mutations, each `1 test run: 0 passed, 1 failed` (above). The old guard passed the first one.
+- `cargo nextest run -p axcenity-avatar -p axcenity-assets -p axcenity-player --no-fail-fast`: `Summary [ 240.468s] 593 tests run: 593 passed (19 slow), 22 skipped`. No FAIL, ABORT or TIMEOUT lines.
+- `cargo clippy -p axcenity-avatar -p axcenity-assets -p axcenity-player --all-targets -- -D warnings`: clean. `cargo fmt --all -- --check`: clean.
+- `python3 -I scripts/check-wiki.py`: 0 errors.
+- Not run: the editor suite on the merged tree with `r67-browsers` (the lead's step above).
