@@ -7,7 +7,9 @@
 //! The renderer draws only some of them until the skin shading model lands
 //! (CO7): the page says which.
 
-use axcenity_avatar::{BaseManifest, Colour, MaterialValue, ShadingModel, ValueKind};
+use axcenity_avatar::{
+    BaseManifest, Colour, MaterialValue, ShadingModel, SkinLayer, SkinLayerKind, ValueKind,
+};
 use eframe::egui;
 
 use super::super::CharacterWorkspace;
@@ -162,6 +164,7 @@ pub(super) fn skin(
             }
         });
     }
+    intents.extend(makeup(ui, workspace, base, level));
     ui.add_space(6.0);
     ui.label(
         egui::RichText::new(
@@ -171,5 +174,161 @@ pub(super) fn skin(
         .small()
         .color(palette.text_weak),
     );
+    intents
+}
+
+/// The base's makeup layers and markings (R5, ADR-0042): each turned on
+/// or off by its check box; when on, its colour (makeup), opacity,
+/// roughness (makeup), amount and pattern (markings). Each change asks for
+/// the whole layer ([`Intent::SetSkinLayer`]): one undo step, or one per
+/// slider drag.
+fn makeup(
+    ui: &mut egui::Ui,
+    workspace: &CharacterWorkspace,
+    base: &BaseManifest,
+    level: Level,
+) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if base.skin_layers.is_empty() {
+        return intents;
+    }
+    let palette = theme::palette(ui.ctx());
+    widgets::section(crate::theme::icons::PAINT_BRUSH, "Makeup and markings")
+        .id_salt("makeup and markings")
+        .show(ui, |ui| {
+            for spec in &base.skin_layers {
+                let marking = match spec.kind {
+                    SkinLayerKind::Makeup => false,
+                    SkinLayerKind::Marking => true,
+                    SkinLayerKind::Other => continue,
+                };
+                let held = workspace.skin_layer(&spec.id).cloned();
+                let set = |layer: SkinLayer, gesture| Intent::SetSkinLayer {
+                    id: spec.id.clone(),
+                    marking,
+                    to: Some(layer),
+                    gesture,
+                };
+                let about = spec.about.as_deref().unwrap_or("");
+                let mut on = held.as_ref().is_some_and(|layer| layer.enabled);
+                let label = egui::RichText::new(&spec.label).color(palette.text_secondary);
+                if ui.checkbox(&mut on, label).on_hover_text(about).changed() {
+                    // Off keeps its settings; on starts from them, or from
+                    // the base's.
+                    let mut layer = held.clone().unwrap_or_else(|| SkinLayer::from_spec(spec));
+                    layer.enabled = on;
+                    intents.push(set(layer, Gesture::Commit));
+                }
+                let Some(layer) = held.filter(|layer| layer.enabled) else {
+                    continue;
+                };
+                ui.indent(&spec.id, |ui| {
+                    if !marking {
+                        let colour = layer.colour.or(spec.colour);
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Colour").color(palette.text_secondary));
+                            if colour.is_none() {
+                                ui.label(
+                                    egui::RichText::new("own tone")
+                                        .small()
+                                        .color(palette.text_muted),
+                                )
+                                .on_hover_text(
+                                    "Without a colour it evens the skin in its own tone.",
+                                );
+                            }
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    let mut rgb = colour.unwrap_or(Colour([200, 160, 140])).0;
+                                    if color_palette::edit_srgb(ui, &mut rgb).changed() {
+                                        let mut changed = layer.clone();
+                                        changed.colour = Some(Colour(rgb));
+                                        // The shell closes the step when the
+                                        // pointer is let go.
+                                        intents.push(set(changed, Gesture::Drag));
+                                    }
+                                    if layer.colour.is_some()
+                                        && widgets::reset_button(
+                                            ui,
+                                            "Back to the layer's own colour",
+                                        )
+                                    {
+                                        let mut changed = layer.clone();
+                                        changed.colour = None;
+                                        intents.push(set(changed, Gesture::Commit));
+                                    }
+                                },
+                            );
+                        });
+                    }
+                    let mut number =
+                        |ui: &mut egui::Ui,
+                         field: &str,
+                         words: [&str; 2],
+                         value: f32,
+                         default: f32,
+                         apply: &dyn Fn(&mut SkinLayer, f32)| {
+                            let id = format!("skin.{}.{field}", spec.id);
+                            if let Some(row::Asked::Set(value, gesture)) = row::slider(
+                                ui,
+                                &Row {
+                                    id: &id,
+                                    label: words[0],
+                                    note: None,
+                                    about: words[1],
+                                    value,
+                                    range: [0.0, 1.0],
+                                    default,
+                                    typed: level == Level::Advanced,
+                                    locked: None,
+                                },
+                            ) {
+                                let mut changed = layer.clone();
+                                apply(&mut changed, value);
+                                intents.push(set(changed, gesture));
+                            }
+                        };
+                    number(
+                        ui,
+                        "opacity",
+                        ["Opacity", "How much of it shows where it is whole."],
+                        layer.opacity,
+                        spec.opacity.unwrap_or(1.0),
+                        &|layer, value| layer.opacity = value,
+                    );
+                    if !marking {
+                        let own = spec.roughness.unwrap_or(0.5);
+                        number(
+                            ui,
+                            "roughness",
+                            ["Roughness", "Glossy (0) to matte (1) where it covers."],
+                            layer.roughness.unwrap_or(own),
+                            own,
+                            &|layer, value| layer.roughness = Some(value),
+                        );
+                    } else if spec.id != "scar" {
+                        number(
+                            ui,
+                            "amount",
+                            ["Amount", "How many of its spots show."],
+                            layer.amount.or(spec.amount).unwrap_or(1.0),
+                            spec.amount.unwrap_or(1.0),
+                            &|layer, value| layer.amount = Some(value),
+                        );
+                        let new = format!("{} New pattern", crate::theme::icons::SHUFFLE);
+                        if ui
+                            .button(new)
+                            .on_hover_text("Other spots: a new seed.")
+                            .clicked()
+                        {
+                            let mut changed = layer.clone();
+                            changed.seed = Some(layer.seed.unwrap_or(0).wrapping_add(1));
+                            intents.push(set(changed, Gesture::Commit));
+                        }
+                    }
+                });
+            }
+        });
     intents
 }

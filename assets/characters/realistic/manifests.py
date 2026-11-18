@@ -112,6 +112,41 @@ SKIN_DRIVERS = {
 }
 
 
+# Makeup and markings the skin draws (R5, ADR-0042): each a channel of
+# the masks `makeup.py` bakes into the model file, turned on by a
+# description's `skin` block. The colours, roughness and opacity a new
+# layer starts at; a layer without a colour takes the character's own
+# tone (foundation). IDs are the renderer's (`docs/rendering/skin.md`).
+SKIN_LAYERS = [
+    {"id": "foundation", "label": "Foundation", "kind": "makeup",
+     "about": "Evens the skin's tone over the face and makes it more matte; in the character's own tone unless a "
+              "colour is set.", "roughness": 0.55, "opacity": 0.6},
+    {"id": "blush", "label": "Blush", "kind": "makeup",
+     "about": "Colour on the cheeks, swept up toward the temples.",
+     "colour": "#c85a62", "roughness": 0.5, "opacity": 0.45},
+    {"id": "eyeshadow", "label": "Eyeshadow", "kind": "makeup",
+     "about": "Colour on the upper lids, deepest by the lashes and toward the outer corners.",
+     "colour": "#6e4c58", "roughness": 0.45, "opacity": 0.6},
+    {"id": "eyeliner", "label": "Eyeliner", "kind": "makeup",
+     "about": "A line along the upper lashes with a short wing, and a fainter one under the outer lower lid.",
+     "colour": "#1a1414", "roughness": 0.4, "opacity": 0.9},
+    {"id": "lips", "label": "Lip colour", "kind": "makeup",
+     "about": "Colour on the lips; lower roughness is glossier.",
+     "colour": "#a8434b", "roughness": 0.3, "opacity": 0.6},
+    {"id": "brow_fill", "label": "Brow fill", "kind": "makeup",
+     "about": "Colour on the skin under the brows, so they read fuller.",
+     "colour": "#4a3428", "roughness": 0.6, "opacity": 0.45},
+    {"id": "freckles", "label": "Freckles", "kind": "marking",
+     "about": "Small brown spots where the sun falls: the nose and cheeks, shoulders, upper back and forearms. "
+              "Amount shows more of them; a new seed shows others.", "amount": 0.45, "opacity": 0.75},
+    {"id": "moles", "label": "Moles", "kind": "marking",
+     "about": "A few darker spots over the face and body. Amount shows more of them; a new seed shows others.",
+     "amount": 0.3, "opacity": 0.9},
+    {"id": "scar", "label": "Scar", "kind": "marking",
+     "about": "A healed scar down the left cheek: paler and smoother than the skin round it.", "opacity": 0.8},
+]
+
+
 # What each body parameter does, in a sentence (its tooltip, R1), and the
 # feature it belongs to. A regional slider's sentence is made from its
 # region's words (`REGION_WORDS`).
@@ -282,6 +317,7 @@ def base_manifest(data, parts, folder=HERE):
         "face": {"profile": FACE_PROFILE, "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
         "defaults": {"items": MALE_WEARS},
         "features": features(data, folder),
+        "skin_layers": [dict(layer, material="Skin") for layer in SKIN_LAYERS],
     }
 
 

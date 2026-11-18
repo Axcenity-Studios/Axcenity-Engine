@@ -291,6 +291,313 @@ fn skin_surface(
     return lit + ambient;
 }
 
+// -- Pores and fine lines ----------------------------------------------------
+//
+// Detail finer than the skin's maps hold (a texel of the realistic face is
+// 0.4 mm, and its baked grain's pores are about 2 mm apart): pores, a
+// rounded pit with a low rim at a jittered point in half the cells of a
+// grid in texture space, and two crossing sets of faint fine lines, the contours of a
+// stretched value noise. Worked out per pixel from the texture
+// coordinates, so they stay on the skin as it moves; their slope is found
+// analytically and tilts the normal by the screen-space change of the
+// position and texture coordinates (Mikkelsen, "Bump Mapping
+// Unparametrized Surfaces on the GPU", 2010, as the scar's relief), which
+// needs no tangents. A pore also darkens the albedo a little (its
+// cavity). Drawn where a cell spans more than about two pixels, fading
+// out to none at about one: smaller, it would alias, and the skin's
+// roughness and its antialiasing (`skin_widened`) stand for it. As strong
+// as the normal map (`Maps::settings.x`, which `detail_strength` scales).
+// Only the full normal gets it: diffuse light's blurred normals don't, as
+// pores are smaller than the distance light travels under skin.
+
+// Cells across texture space: 0.7 mm on the realistic face (a texel of
+// its 2048 maps is 0.4 mm there), so about 100 pores to a square
+// centimetre; 1.6 mm on its body. (0.5 mm cells were under two pixels on
+// a cheek seen close, and faded out.)
+const SKIN_PORE_CELLS: f32 = 1150.0;
+// The share of cells with a pore, a pore's radius (in cells: 0.3 to
+// 0.5 mm across on the face), the deepest one's depth (mm), and how much
+// a pore darkens the albedo at its deepest.
+const SKIN_PORE_SHARE: f32 = 0.5;
+const SKIN_PORE_RADIUS: vec2<f32> = vec2<f32>(0.22, 0.36);
+const SKIN_PORE_DEPTH_MM: f32 = 0.05;
+const SKIN_PORE_CAVITY: f32 = 0.2;
+// A pore's rim stands this share of its depth above the skin, 0.8 to 1.3
+// of its radius out: lit on the side toward a light.
+const SKIN_PORE_RIM: f32 = 0.3;
+// How much pores vary over the skin: their depth and cavity from this
+// share to all of it, by a noise about 25 cells (18 mm on the face) across,
+// so some patches show larger pores than others.
+const SKIN_PORE_PATCHES: f32 = 0.6;
+// Fine lines: their noise's frequency along and across them (per cell),
+// half their width (in the noise's value), and their depth (mm).
+const SKIN_LINE_FREQUENCY: vec2<f32> = vec2<f32>(0.15, 0.5);
+const SKIN_LINE_HALF_WIDTH: f32 = 0.1;
+const SKIN_LINE_DEPTH_MM: f32 = 0.015;
+// Over how many cells to a pixel the detail fades: whole below the
+// first, none above the second.
+const SKIN_PORE_FADE: vec2<f32> = vec2<f32>(0.45, 0.9);
+
+// Two random numbers 0 to 1 for integer cell `c` (pcg2d: Jarzynski and
+// Olano, "Hash Functions for GPU Rendering", JCGT 2020).
+fn skin_hash(c: vec2<i32>) -> vec2<f32> {
+    var v = bitcast<vec2<u32>>(c) * 1664525u + 1013904223u;
+    v.x += v.y * 1664525u;
+    v.y += v.x * 1664525u;
+    v = v ^ (v >> vec2<u32>(16u));
+    v.x += v.y * 1664525u;
+    v.y += v.x * 1664525u;
+    v = v ^ (v >> vec2<u32>(16u));
+    return vec2<f32>(v >> vec2<u32>(8u)) / 16777216.0;
+}
+
+// Value noise (0 to 1) at `p` in x, its slope in y and z: quintic between
+// the lattice's points, so the slope is smooth (Quilez's derivation).
+fn skin_noise(p: vec2<f32>) -> vec3<f32> {
+    let i = vec2<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+    let a = skin_hash(i).x;
+    let b = skin_hash(i + vec2<i32>(1, 0)).x;
+    let c = skin_hash(i + vec2<i32>(0, 1)).x;
+    let d = skin_hash(i + vec2<i32>(1, 1)).x;
+    let k = a - b - c + d;
+    let value = a + (b - a) * u.x + (c - a) * u.y + k * u.x * u.y;
+    return vec3<f32>(value, du * vec2<f32>(b - a + k * u.y, c - a + k * u.x));
+}
+
+// The pores at `p` (in cells): their height in x (0 level, -1 the
+// deepest pit), its slope per cell in y and z, and in w how deep the pits
+// are here (0 to 1, for their cavity: the rims don't count).
+fn skin_pores(p: vec2<f32>) -> vec4<f32> {
+    let cell = vec2<i32>(floor(p));
+    var out = vec4<f32>(0.0);
+    // A pore's point is in the middle 60% of its cell and its rim under
+    // 0.5 of a cell out, so only the eight cells round this one reach it.
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let c = cell + vec2<i32>(i, j);
+            let kind = skin_hash(c + vec2<i32>(7919, 104729));
+            if kind.x > SKIN_PORE_SHARE {
+                continue;
+            }
+            let radius = mix(SKIN_PORE_RADIUS.x, SKIN_PORE_RADIUS.y, kind.y);
+            let d = p - (vec2<f32>(c) + 0.2 + 0.6 * skin_hash(c));
+            let s = length(d) / radius;
+            if s >= 1.3 {
+                continue;
+            }
+            // The larger pores are deeper.
+            let depth = 0.5 + 0.5 * kind.y;
+            if s < 1.0 {
+                // A rounded pit, -(1 - s^2)^2: its walls are steepest a
+                // little inside its edge.
+                let k = 1.0 - s * s;
+                out.x -= depth * k * k;
+                out.w += depth * k * k;
+                out = vec4<f32>(out.x, out.yz + depth * 4.0 * k * d / (radius * radius), out.w);
+            }
+            if s > 0.8 {
+                // A low rim round it, (1 - t^2)^2 across 0.8 to 1.3 of the
+                // radius (t from -1 to 1).
+                let t = (s - 1.05) / 0.25;
+                let m = 1.0 - t * t;
+                let rim = SKIN_PORE_RIM * depth;
+                out.x += rim * m * m;
+                let along = -16.0 * rim * m * t;
+                out = vec4<f32>(out.x, out.yz + along * d / (s * radius * radius), out.w);
+            }
+        }
+    }
+    return out;
+}
+
+// The fine lines at `p` (in cells): their height in x (0 level, -1 a
+// groove's floor, -2 where two cross) and its slope per cell in y and z.
+// Two sets, about 70 degrees apart, as skin's furrows cross.
+fn skin_lines(p: vec2<f32>) -> vec3<f32> {
+    var out = vec3<f32>(0.0);
+    for (var family = 0; family < 2; family++) {
+        let angle = select(-0.55, 0.65, family == 1);
+        let along = vec2<f32>(cos(angle), sin(angle));
+        let across = vec2<f32>(-along.y, along.x);
+        let q = vec2<f32>(dot(p, along), dot(p, across)) * SKIN_LINE_FREQUENCY + f32(family) * 17.3;
+        let noise = skin_noise(q);
+        // A groove where the noise crosses its middle: -(1 - x^2)^2 of how
+        // far from it, in half widths.
+        let e = noise.x - 0.5;
+        let x = abs(e) / SKIN_LINE_HALF_WIDTH;
+        if x >= 1.0 {
+            continue;
+        }
+        let g = 1.0 - x * x;
+        out.x -= g * g;
+        let slope = 4.0 * g * x * sign(e) / SKIN_LINE_HALF_WIDTH;
+        let change = noise.yz * SKIN_LINE_FREQUENCY;
+        out = vec3<f32>(out.x, out.yz + slope * (change.x * along + change.y * across));
+    }
+    return out;
+}
+
+// The normal `n` (at `position`, texture coordinates `uv`) tilted by the
+// pores and fine lines, and in w how much the albedo darkens in a pore.
+fn skin_micro(n: vec3<f32>, position: vec3<f32>, uv: vec2<f32>) -> vec4<f32> {
+    // (Every derivative before anything branches.)
+    let uv_x = dpdx(uv);
+    let uv_y = dpdy(uv);
+    let across = dpdx(position);
+    let down = dpdy(position);
+    let cells = SKIN_PORE_CELLS * sqrt(max(dot(uv_x, uv_x), dot(uv_y, uv_y)));
+    let shown = (1.0 - smoothstep(SKIN_PORE_FADE.x, SKIN_PORE_FADE.y, cells)) * maps.settings.x;
+    let r1 = cross(down, n);
+    let r2 = cross(n, across);
+    let det = dot(across, r1);
+    if shown <= 0.0 || abs(det) < 1e-20 {
+        return vec4<f32>(n, 0.0);
+    }
+    let p = uv * SKIN_PORE_CELLS;
+    let variation = mix(SKIN_PORE_PATCHES, 1.0, skin_noise(p * 0.04 + 41.7).x);
+    let pores = skin_pores(p) * variation;
+    let lines = skin_lines(p);
+    // The height's slope per unit of texture space, in world units.
+    let slope = (pores.yz * SKIN_PORE_DEPTH_MM + lines.yz * SKIN_LINE_DEPTH_MM)
+        * (SKIN_PORE_CELLS / SKIN_MM_PER_UNIT) * shown;
+    // Its gradient over the surface: the surface gradients of u and v
+    // (times `det`), weighted by the slope along each.
+    let gradient = sign(det) * (slope.x * (uv_x.x * r1 + uv_y.x * r2)
+        + slope.y * (uv_x.y * r1 + uv_y.y * r2));
+    let tilted = abs(det) * n - gradient;
+    if dot(tilted, tilted) < 1e-20 {
+        return vec4<f32>(n, 0.0);
+    }
+    return vec4<f32>(normalize(tilted), clamp(pores.w * SKIN_PORE_CAVITY * shown, 0.0, 0.5));
+}
+
+// -- Makeup and markings (ADR-0042) ----------------------------------------
+//
+// Drawn into the albedo and roughness before any light, so skin's
+// diffusion and two specular lobes light them like the skin they are on:
+// markings in the skin (freckles, moles, a scar: pigment, multiplied),
+// then makeup over it from foundation up to brow fill (a thin layer mixed
+// over the skin by its coverage), in the skin references' order
+// (`references/skin/README.md` section 2). A layer keeps part of the
+// skin's own fine variation (pores, mottling, the lips' lines), so it
+// reads as makeup on skin, not paint. Masks (each channel a layer):
+// `a` foundation, blush, eyeshadow, eyeliner; `b` lips, brow fill, scar;
+// `c` freckles, their ranks, moles, their ranks. Values: `Maps::params`,
+// `Maps::toon` and `Maps::specular.w` (renderer/lighting.rs,
+// `skin_layer_uniform`).
+
+// The skin's own tone: its albedo read over about 32 texels (3 cm on the
+// realistic body, 1.3 cm on its face).
+const SKIN_TONE_LEVEL: f32 = 5.0;
+// The scale a layer's kept detail is measured against: about 8 texels.
+const SKIN_DETAIL_LEVEL: f32 = 3.0;
+// How much of the skin's variation shows through: foundation hides most
+// of it (that is what it is for), other makeup is thinner.
+const SKIN_FOUNDATION_DETAIL: f32 = 0.35;
+const SKIN_MAKEUP_DETAIL: f32 = 0.8;
+// What a freckle, a mole and a scar do to the albedo at full opacity:
+// melanin (brown, darker in blue), more of it in a mole; a scar has less
+// pigment and a little more red.
+const SKIN_FRECKLE: vec3<f32> = vec3<f32>(0.62, 0.48, 0.38);
+const SKIN_MOLE: vec3<f32> = vec3<f32>(0.32, 0.22, 0.17);
+const SKIN_SCAR: vec3<f32> = vec3<f32>(1.28, 1.12, 1.12);
+// A scar is smoother than the skin round it.
+const SKIN_SCAR_ROUGHNESS: f32 = 0.32;
+
+// How high a scar stands at full opacity, in world units (a stud is
+// 0.35 m): a healed scar is a little raised, about a fifth of a millimetre.
+const SKIN_SCAR_HEIGHT: f32 = 0.0006;
+
+// `n` tilted by a scar standing `scar` (0 to 1) of `SKIN_SCAR_HEIGHT` out of
+// the skin at `position`, by the screen-space change of both (Mikkelsen,
+// "Bump Mapping Unparametrized Surfaces on the GPU", 2010): no tangents or
+// height map needed, so the mask's own coverage is the height.
+fn skin_scar_relief(n: vec3<f32>, position: vec3<f32>, scar: f32) -> vec3<f32> {
+    let height = scar * SKIN_SCAR_HEIGHT;
+    let across = dpdx(position);
+    let down = dpdy(position);
+    let r1 = cross(down, n);
+    let r2 = cross(n, across);
+    let det = dot(across, r1);
+    let gradient = sign(det) * (dpdx(height) * r1 + dpdy(height) * r2);
+    let tilted = abs(det) * n - gradient;
+    if dot(tilted, tilted) < 1e-20 || abs(det) < 1e-20 {
+        return n;
+    }
+    return normalize(tilted);
+}
+
+// Whether a spot of a marking shows: its `rank` (0 to 1, one per spot)
+// offset by the marking's seed is below its amount, with a soft step so
+// the edge of the amount doesn't flicker.
+fn skin_spot_shown(rank: f32, amount: f32, seed: f32) -> f32 {
+    // (At amount 1 every spot shows: the soft step would fade the last 2%.)
+    if amount >= 1.0 {
+        return 1.0;
+    }
+    let order = fract(rank + seed);
+    return 1.0 - smoothstep(amount - 0.02, amount, order);
+}
+
+// The albedo and roughness (in w) with the makeup and markings over them:
+// `albedo` and `roughness` as the material's maps give them, `tint` the
+// material's colour (its tone), `a`, `b` and `c` the masks' texels.
+fn skin_layered(
+    albedo: vec3<f32>,
+    roughness: f32,
+    tint: vec3<f32>,
+    uv: vec2<f32>,
+    a: vec4<f32>,
+    b: vec4<f32>,
+    c: vec4<f32>,
+) -> vec4<f32> {
+    let own_tone = tint * textureSampleLevel(base_color_texture, material_sampler, uv,
+        SKIN_TONE_LEVEL).rgb;
+    let near = tint * textureSampleLevel(base_color_texture, material_sampler, uv,
+        SKIN_DETAIL_LEVEL).rgb;
+    // The skin's own variation at this texel, against its neighbourhood.
+    let detail = clamp(albedo / max(near, vec3<f32>(1e-4)), vec3<f32>(0.5), vec3<f32>(2.0));
+    var colour = albedo;
+    var rough = roughness;
+
+    // Markings, in the skin. Each spot is a little darker or lighter than
+    // the next (by its rank).
+    let freckle = c.r * skin_spot_shown(c.g, maps.params[7].z, maps.toon.w)
+        * maps.params[7].w * (0.65 + 0.35 * fract(c.g * 7.31 + 0.17));
+    colour *= mix(vec3<f32>(1.0), SKIN_FRECKLE, freckle);
+    let mole = c.b * skin_spot_shown(c.a, maps.toon.x, maps.specular.w) * maps.toon.y;
+    colour *= mix(vec3<f32>(1.0), SKIN_MOLE, mole);
+    let scar = b.b * maps.toon.z;
+    colour *= mix(vec3<f32>(1.0), SKIN_SCAR, scar);
+    rough = mix(rough, SKIN_SCAR_ROUGHNESS, scar);
+
+    // Makeup, foundation first.
+    let masks = array<f32, 6>(a.r, a.g, a.b, a.a, b.r, b.g);
+    let roughness_of = array<f32, 6>(maps.params[6].x, maps.params[6].y, maps.params[6].z,
+        maps.params[6].w, maps.params[7].x, maps.params[7].y);
+    for (var i = 0; i < 6; i++) {
+        let layer = maps.params[i];
+        let cover = masks[i] * layer.a;
+        if cover <= 0.0 {
+            continue;
+        }
+        var pigment = layer.rgb;
+        if layer.r < 0.0 {
+            pigment = own_tone;
+        }
+        let keep = select(SKIN_MAKEUP_DETAIL, SKIN_FOUNDATION_DETAIL, i == 0);
+        pigment *= mix(vec3<f32>(1.0), detail, keep);
+        colour = mix(colour, pigment, cover);
+        if roughness_of[i] >= 0.0 {
+            rough = mix(rough, roughness_of[i], cover);
+        }
+    }
+    return vec4<f32>(colour, rough);
+}
+
 // The pre-integrated table: diffuse light against the cosine of the angle
 // to the light (33 columns, -1 to 1) on a ring of radius 2, 4, 8, 16, 32,
 // 64 and 128 mm (7 rows), red, green and blue. Written by the render

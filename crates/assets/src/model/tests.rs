@@ -57,6 +57,225 @@ fn a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map() {
     assert_eq!(super::shading_of(&None), (ModelShading::Standard, None));
 }
 
+/// A skin names its makeup and marking masks (ADR-0042): three textures,
+/// in order, or none.
+#[test]
+fn a_skins_extras_name_its_three_layer_masks() {
+    let of = |text: &str| {
+        let raw = serde_json::value::RawValue::from_string(text.to_owned()).unwrap();
+        super::skin_masks_of(&Some(raw))
+    };
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin",
+              "axcenity_skin_masks": [{"index": 4}, {"index": 6}, {"index": 5}]}"#),
+        vec![4, 6, 5]
+    );
+    // Two or four: a file this version can't read the layout of.
+    assert!(
+        of(r#"{"axcenity_shading": "skin", "axcenity_skin_masks": [{"index": 4}, {"index": 6}]}"#)
+            .is_empty()
+    );
+    assert!(of(r#"{"axcenity_shading": "skin", "axcenity_skin_masks": 3}"#).is_empty());
+    // Only skin has them.
+    assert!(
+        of(r#"{"axcenity_skin_masks": [{"index": 4}, {"index": 6}, {"index": 5}]}"#).is_empty()
+    );
+    assert!(super::skin_masks_of(&None).is_empty());
+}
+
+/// The realistic skin's masks, as the build writes them (`makeup.py`):
+/// three images the size of its maps, each channel a layer that covers
+/// some of the skin and not all of it, and the spots' channels many
+/// small separate spots.
+#[test]
+fn the_realistic_skin_has_its_makeup_and_marking_masks() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    assert_eq!(skin.skin_masks.len(), 3, "three masks");
+    let albedo = skin.base_color_texture.as_ref().unwrap();
+    // Foundation, blush, eyeshadow, eyeliner; lips, brow fill, scar, (none);
+    // freckles and their ranks, moles and their ranks.
+    let names = [
+        ["foundation", "blush", "eyeshadow", "eyeliner"],
+        ["lips", "brow fill", "scar", ""],
+        ["freckles", "freckle ranks", "moles", "mole ranks"],
+    ];
+    for (mask, names) in skin.skin_masks.iter().zip(names) {
+        assert_eq!((mask.width, mask.height), (albedo.width, albedo.height));
+        let texels = mask.rgba();
+        let count = f64::from(mask.width * mask.height);
+        for (channel, name) in names.iter().enumerate() {
+            let covered = texels
+                .chunks_exact(4)
+                .filter(|texel| texel[channel] > 127)
+                .count() as f64;
+            if name.is_empty() {
+                assert_eq!(covered, 0.0, "the spare channel is empty");
+                continue;
+            }
+            let share = covered / count;
+            assert!(
+                share > 0.00002 && share < 0.25,
+                "{name} covers {share} of the map"
+            );
+        }
+    }
+    // Spots: each freckle and mole is its own small patch.
+    let markings = skin.skin_masks[2].rgba();
+    let (width, height) = (
+        skin.skin_masks[2].width as usize,
+        skin.skin_masks[2].height as usize,
+    );
+    for (channel, least, largest) in [(0, 2000, 60), (2, 40, 300)] {
+        let on: Vec<bool> = markings
+            .chunks_exact(4)
+            .map(|texel| texel[channel] > 127)
+            .collect();
+        let (count, biggest) = patches(&on, width, height);
+        assert!(count >= least, "channel {channel}: {count} spots");
+        assert!(
+            biggest <= largest,
+            "channel {channel}: a spot of {biggest} texels"
+        );
+    }
+}
+
+/// How many 4-connected patches `on` has, and the largest one's texels.
+fn patches(on: &[bool], width: usize, height: usize) -> (usize, usize) {
+    let mut seen = vec![false; on.len()];
+    let (mut count, mut biggest) = (0, 0);
+    for start in 0..on.len() {
+        if !on[start] || seen[start] {
+            continue;
+        }
+        count += 1;
+        let mut size = 0;
+        let mut stack = vec![start];
+        seen[start] = true;
+        while let Some(at) = stack.pop() {
+            size += 1;
+            let (x, y) = (at % width, at / width);
+            let mut neighbours = Vec::with_capacity(4);
+            if x > 0 {
+                neighbours.push(at - 1);
+            }
+            if x + 1 < width {
+                neighbours.push(at + 1);
+            }
+            if y > 0 {
+                neighbours.push(at - width);
+            }
+            if y + 1 < height {
+                neighbours.push(at + width);
+            }
+            for next in neighbours {
+                if on[next] && !seen[next] {
+                    seen[next] = true;
+                    stack.push(next);
+                }
+            }
+        }
+        biggest = biggest.max(size);
+    }
+    (count, biggest)
+}
+
+/// FNV-1a, 64 bits: the build (`makeup.py`, `digest`) records each mask's
+/// bytes by it, so a test can tell the file's masks are the ones measured.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, &byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// The eyeliner's wing continues the lash line out of the eye's outer
+/// corner (R5 review: it rose 60 to 70 degrees, a spike beside the eye).
+/// The build measures each side's wing on the face at rest, in the eye's
+/// own frame (`makeup.py`, `wing_report`): it leaves from the outer corner
+/// of the lid's skin the liner runs along (within 2 mm of where the lids'
+/// margins meet), runs 5 to 7 mm along the skin, and rises 10 to 30
+/// degrees from the line through the eye's corners, on the face's plane
+/// and along the skin. The masks in the model file are the ones measured.
+#[test]
+fn the_eyeliner_wing_continues_the_lash_line_out_of_the_corner() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let makeup = &build["textures"]["makeup"];
+    let wings = makeup["wing"]
+        .as_array()
+        .expect("the build measures the wing");
+    assert_eq!(wings.len(), 2, "a wing each side");
+    for wing in wings {
+        let number = |key: &str| wing[key].as_f64().unwrap_or(f64::NAN);
+        let (rise, along_skin) = (number("rise_degrees"), number("skin_degrees"));
+        let (length, corner) = (number("length_mm"), number("from_corner_mm"));
+        assert!(
+            (10.0..=30.0).contains(&rise),
+            "the wing rises {rise} degrees"
+        );
+        assert!(
+            (0.0..=30.0).contains(&along_skin),
+            "along the skin the wing turns {along_skin} degrees from the corners' line"
+        );
+        assert!(
+            (5.0..=7.0).contains(&length),
+            "the wing is {length} mm long"
+        );
+        assert!(corner <= 2.0, "the wing leaves {corner} mm from the corner");
+    }
+    // The model file's masks are the ones the build measured.
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let gltf = gltf::Gltf::from_slice(&bytes).unwrap();
+    let blob = gltf.blob.as_deref().expect("a binary chunk");
+    let digests = makeup["digests"].as_object().expect("the masks' digests");
+    assert_eq!(digests.len(), 3);
+    for (file, digest) in digests {
+        let stem = file.trim_end_matches(".png");
+        let image = gltf
+            .images()
+            .find(|image| image.name() == Some(stem))
+            .unwrap_or_else(|| panic!("{stem} in the model file"));
+        let gltf::image::Source::View { view, .. } = image.source() else {
+            panic!("{stem} is embedded");
+        };
+        let png = &blob[view.offset()..view.offset() + view.length()];
+        assert_eq!(
+            format!("{:016x}", fnv1a(png)),
+            digest.as_str().unwrap(),
+            "{file} in the model file isn't the mask the build measured"
+        );
+    }
+}
+
+/// The skin's grain reads as pores, not cracks (R5, wave 2's open issue):
+/// the build measures its bump's height on the belly (`skin.py`,
+/// `grain_shape`). Pores, isolated pits in a level surface, give the
+/// height a long low tail: its skewness is strongly negative. Wave 2's
+/// grooves along every cell's edge measured +0.05 (as much low as high).
+#[test]
+fn the_realistic_skins_grain_is_pores_not_a_crackle_network() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let grain = &build["textures"]["grain"];
+    let skew = grain["height_skew"]
+        .as_f64()
+        .expect("the build measures the grain's height");
+    assert!(skew < -1.5, "the grain's height skews {skew}: no pores");
+    let pores = grain["pores_per_cm2"].as_f64().expect("pores per cm2");
+    assert!((0.5..=20.0).contains(&pores), "{pores} pores per cm2");
+}
+
 /// The realistic body's skin, as the build writes it: marked skin, with
 /// its smooth normal map as glTF's own and the defined one beside it.
 #[test]

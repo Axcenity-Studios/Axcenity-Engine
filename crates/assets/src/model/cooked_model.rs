@@ -267,6 +267,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         translucency,
         shading,
         defined_normal_texture,
+        skin_masks,
     } = material;
     out.text(name);
     out.floats(base_color);
@@ -302,6 +303,10 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         ModelShading::Skin => 1,
     });
     images.write(out, defined_normal_texture.as_ref());
+    out.u8(skin_masks.len() as u8);
+    for mask in skin_masks {
+        images.write(out, Some(mask));
+    }
     Some(())
 }
 
@@ -736,6 +741,10 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         _ => return None,
     };
     let defined_normal_texture = image(input)?;
+    let mut skin_masks = Vec::new();
+    for _ in 0..input.u8()? {
+        skin_masks.push(image(input)??);
+    }
     Some(ModelMaterial {
         name,
         base_color,
@@ -763,6 +772,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         translucency,
         shading,
         defined_normal_texture,
+        skin_masks,
     })
 }
 
@@ -879,7 +889,7 @@ mod tests {
         fn describe_primitive(out: &mut String, primitive: &Primitive) {
             let material = &primitive.material;
             out.push_str(&format!(
-                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {} {} {}\n",
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {:?} {} {}\n",
                 primitive.positions,
                 primitive.normals,
                 primitive.uvs,
@@ -905,7 +915,14 @@ mod tests {
                 (material.double_sided, material.sway),
                 material.flutter,
                 (material.translucency, material.shading),
-                image(&material.defined_normal_texture),
+                (
+                    image(&material.defined_normal_texture),
+                    material
+                        .skin_masks
+                        .iter()
+                        .map(|mask| image(&Some(mask.clone())))
+                        .collect::<Vec<_>>()
+                ),
                 primitive.lods.len(),
                 "",
             ));

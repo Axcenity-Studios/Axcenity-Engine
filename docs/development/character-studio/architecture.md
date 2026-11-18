@@ -92,7 +92,8 @@ One character: its base model, parameter values, items and material values. **Va
 | `parameters` | map ID → number | Values by the base manifest's parameter IDs; one left out takes its default; resolution clamps to the range (a check reports values outside it) |
 | `items` | list of `{id, variant?, materials?, parameters?, transform?}` | Worn items, each in its manifest's slot (and its `also_fills` slots); one per slot unless the slot is `multiple`. `variant` names one of the item's variants; `materials` are values over the variant's, by the item's material slot names; `parameters` are values for the item's own parameters (R1), over the variant's; `transform` `{offset, turn, scale}` moves a socket item (metres, degrees about X, Y, Z, a factor; each part optional) inside its `adjust` (R1). Unknown fields of a worn item are kept (`WornItem::extra`) |
 | `materials` | map slot → values | Values for the base model's materials (skin, eyes, brows, lashes, mouth, teeth), see section 10 |
-| anything else | any | Kept as it was (`Description::extra`): room for additive fields such as skin and makeup layers *(CO17)* |
+| `skin` | `{makeup: [SkinLayer], markings: [SkinLayer]}` | R5 ([ADR-0042](../../../wiki/Architecture/Architecture-Decisions/ADR-0042-Makeup-And-Markings-Are-Layers-Over-Library-Masks-Drawn-Live-By-The-Skin-Model.md)), optional: makeup and markings turned on. A `SkinLayer` is `{layer, enabled?, colour?, opacity?, roughness?, amount?, seed?}`: `layer` names one of the base's `skin_layers` (makeup in `makeup`, markings in `markings`, each once); `enabled` false keeps its settings and draws nothing (absent: true); `opacity` 0 to 1 (absent: 1); `colour` `#rrggbb` and `roughness` 0 to 1 over the base's; a marking's `amount` (the share of its spots shown, 0 to 1) and `seed` (a whole number: another seed, other spots). Unknown fields of the block and of a layer are kept (decals, later). An older engine keeps the whole block in `extra` |
+| anything else | any | Kept as it was (`Description::extra`): room for later additive fields |
 
 **Addition A3, field by field:** versioned with migration (`format_version`, section 4); external asset references (`base` and item IDs, resolved through the catalogue); morph configuration referenced (the base manifest owns what each parameter drives; the description holds values only); skeleton and rig metadata (the base manifest's `skeleton`); material references (material slot names) and values; clothing and hair references (`items`); runtime customization parameters (`parameters` and `materials`, which a game changes at runtime and re-applies); no editor state.
 
@@ -121,6 +122,7 @@ Ships beside a base model's glTF file. The stylized one is `assets/characters/hu
 | `defaults` | `{items[]}` | What a new character on this base wears |
 | `features` | `[Feature]` | What a person can point at on the character (R1, below) |
 | `handles` | `[Handle]` | Handles on the character that move parameters (R1 schema, R2 content, below) |
+| `skin_layers` | `[{id, label, kind, material, about?, colour?, roughness?, opacity?, amount?}]` | R5 (ADR-0042): the makeup and markings its skin can draw, each a channel of the masks in the model file (`docs/rendering/skin.md`). `kind` is `makeup` or `marking` (a newer kind reads as `other`: listed, not drawn); `material` a slot with `skin` shading; `colour`, `roughness`, `opacity` and `amount` where a new layer starts. The renderer draws the IDs `foundation`, `blush`, `eyeshadow`, `eyeliner`, `lips`, `brow_fill`, `freckles`, `moles` and `scar`. The realistic base offers all nine (`manifests.py`, `SKIN_LAYERS`) |
 
 **Parameter:**
 
@@ -247,6 +249,8 @@ Each material slot has a **shading model**. Values **modulate** the material's o
 | | `tip_lightening` | 0–1, 0 | Root-to-tip gradient |
 | | `highlight` | 0–2, 1 | Secondary (coloured) highlight strength |
 | | `roughness_scale` | 0.5–1.5, 1 | |
+
+**Makeup and markings (R5, [ADR-0042](../../../wiki/Architecture/Architecture-Decisions/ADR-0042-Makeup-And-Markings-Are-Layers-Over-Library-Masks-Drawn-Live-By-The-Skin-Model.md)):** a description's `skin` block (section 5) resolves to **draw values** on each layer's material, `layer_<id>_opacity`, `_colour`, `_roughness`, and for markings `_amount` and `_seed` (`avatar::skin_layer_value`; the base's settings fill what the layer leaves out; a layer off or at opacity 0 writes none). They are not values of the Skin model (a description can't set them in `materials`); the applier writes them as material value attributes like the rest, so a change re-applies live, with no bake and no texture made per character. The masks are content: three RGBA images in the model file (`extras.axcenity_skin_masks`), drawn by the Skin model (`docs/rendering/skin.md`).
 
 Colours are sRGB `"#rrggbb"`. A value is checked against its slot's model (`check_values`): its name, kind and range. Customization baked for games (MetaHuman's approach) is a CO17/CO18 optimization; the description keeps the values.
 

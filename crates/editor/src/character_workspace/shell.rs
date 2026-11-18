@@ -152,6 +152,12 @@ impl CharacterWorkspace {
                 to,
                 gesture,
             } => self.set_material(&slot, &value, to, gesture),
+            Intent::SetSkinLayer {
+                id,
+                marking,
+                to,
+                gesture,
+            } => self.set_skin_layer(&id, marking, to, gesture),
             Intent::SetBase(base) => self.set_base(&base),
             Intent::Rename(name) => self.rename(&name),
             Intent::ApplyPreset(id) => self.use_preset(&id),

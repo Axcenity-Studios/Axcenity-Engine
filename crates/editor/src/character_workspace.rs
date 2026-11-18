@@ -649,6 +649,40 @@ impl CharacterWorkspace {
         );
     }
 
+    /// Sets makeup layer or marking `id` to `to` (or takes it out), in the
+    /// list `marking` says, as one undo step or part of a drag's.
+    pub fn set_skin_layer(
+        &mut self,
+        id: &str,
+        marking: bool,
+        to: Option<axcenity_avatar::SkinLayer>,
+        gesture: Gesture,
+    ) {
+        let id = id.to_owned();
+        self.transact(
+            |description| {
+                let list = if marking {
+                    &mut description.skin.markings
+                } else {
+                    &mut description.skin.makeup
+                };
+                match to {
+                    Some(layer) => match list.iter_mut().find(|held| held.layer == id) {
+                        Some(held) => *held = layer,
+                        None => list.push(layer),
+                    },
+                    None => list.retain(|held| held.layer != id),
+                }
+            },
+            gesture,
+        );
+    }
+
+    /// Makeup layer or marking `id`, if the description has it.
+    pub fn skin_layer(&self, id: &str) -> Option<&axcenity_avatar::SkinLayer> {
+        self.description.skin.layer(id)
+    }
+
     /// Value `name` of material slot `slot`, if the description sets it.
     pub fn material_value(&self, slot: &str, name: &str) -> Option<MaterialValue> {
         self.description

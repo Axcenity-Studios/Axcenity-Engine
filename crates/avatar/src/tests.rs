@@ -9,6 +9,7 @@ mod models;
 mod presets;
 mod randomizing;
 mod resolving;
+mod skin_layers;
 mod validation;
 
 /// The problems' texts, for assertions that name what they expect.

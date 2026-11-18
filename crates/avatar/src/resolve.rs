@@ -467,6 +467,10 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .or_default()
             .extend(own.clone());
     }
+    // Makeup and markings (ADR-0042): draw values beside the slot's own.
+    for (slot, layers) in crate::skin::draw_values(base, &description.skin) {
+        materials.entry(slot).or_default().extend(layers);
+    }
     // The body's weights are what the layers add up to, so the two can't
     // disagree about which items are worn.
     let mut shapes: BTreeMap<String, f32> = BTreeMap::new();

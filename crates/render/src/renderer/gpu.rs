@@ -16,7 +16,8 @@ use crate::mesh::{self, MeshData, Vertex};
 use super::skinning::{POSED_BINDING, Skinning};
 use super::{
     Bounds, DEPTH_FORMAT, GpuBytes, GpuMaterial, GpuMesh, GpuTexture, InstanceRaw,
-    MATERIAL_TEXTURES, MapsUniform, SHADING_TOON, TARGET_DRAW_FORMAT, TARGET_SHOW_FORMAT, Texels,
+    MATERIAL_TEXTURES, MapsUniform, SHADING_SKIN, SHADING_TOON, TARGET_DRAW_FORMAT,
+    TARGET_SHOW_FORMAT, Texels,
 };
 
 /// The shader for parts and models, and the shadow and sky passes: the
@@ -999,7 +1000,8 @@ fn mip_count(width: u32, height: u32) -> u32 {
 
 /// Binds a material's `textures` (in [`MATERIAL_TEXTURES`] order) and
 /// `maps` for the shader. Colors are read through sRGB views, the rest as
-/// plain values. A toon ramp, in the specular map's place, is colors.
+/// plain values. A toon ramp, in the specular map's place, is colors; a
+/// skin's layer masks, in the emissive map's place, are values.
 pub(super) fn create_material(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -1008,6 +1010,9 @@ pub(super) fn create_material(
     maps: MapsUniform,
 ) -> GpuMaterial {
     let ramp = maps.shading[0] == SHADING_TOON && maps.shading[1] == 0.0;
+    // A skin's makeup and marking masks fill the emissive map's place:
+    // values, not colours.
+    let masks = maps.shading[0] == SHADING_SKIN && maps.specular[2] != 0.0;
     let maps = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("material maps"),
         contents: bytemuck::bytes_of(&maps),
@@ -1044,7 +1049,14 @@ pub(super) fn create_material(
             view(4, &metalness.linear),
             view(5, &roughness.linear),
             view(6, &occlusion.linear),
-            view(7, &emissive.srgb),
+            view(
+                7,
+                if masks {
+                    &emissive.linear
+                } else {
+                    &emissive.srgb
+                },
+            ),
             view(8, &opacity.linear),
             view(
                 9,

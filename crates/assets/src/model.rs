@@ -295,7 +295,8 @@ impl Primitive {
             &material.defined_normal_texture,
         ]
         .into_iter()
-        .flatten();
+        .flatten()
+        .chain(&material.skin_masks);
         let channels = [
             &material.metalness_texture,
             &material.roughness_texture,
@@ -419,6 +420,37 @@ fn shading_of(extras: &gltf::json::Extras) -> (ModelShading, Option<usize>) {
     }
 }
 
+/// The texture indexes of a skin's makeup and marking masks
+/// (`axcenity_skin_masks: [{"index": a}, {"index": b}, {"index": c}]`,
+/// ADR-0042): exactly three on a material marked skin, or none.
+fn skin_masks_of(extras: &gltf::json::Extras) -> Vec<usize> {
+    #[derive(serde::Deserialize)]
+    struct TextureRef {
+        index: usize,
+    }
+    #[derive(serde::Deserialize)]
+    struct Masks {
+        axcenity_skin_masks: Option<Vec<TextureRef>>,
+    }
+    if shading_of(extras).0 != ModelShading::Skin {
+        return Vec::new();
+    }
+    let masks = extras
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<Masks>(raw.get()).ok())
+        .and_then(|masks| masks.axcenity_skin_masks)
+        .unwrap_or_default();
+    if masks.len() == SKIN_MASKS {
+        masks.into_iter().map(|texture| texture.index).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// How many makeup and marking masks a skin has (ADR-0042; their
+/// channels are listed in `docs/rendering/skin.md`).
+pub const SKIN_MASKS: usize = 3;
+
 /// A glTF metallic-roughness material. Colors are linear, as in the file.
 /// The textures all use the primitive's one set of texture coordinates.
 #[derive(Clone, Debug)]
@@ -485,6 +517,13 @@ pub struct ModelMaterial {
     /// `extras`: `axcenity_defined_normal: {"index": <texture>}`, placed
     /// like the normal map.
     pub defined_normal_texture: Option<Arc<Image>>,
+    /// A [`ModelShading::Skin`] material's makeup and marking masks
+    /// (ADR-0042): [`SKIN_MASKS`] images placed like the base colour map,
+    /// or none. Each channel is one layer's coverage (foundation, blush,
+    /// eyeshadow, eyeliner; lips, brow fill, scar; freckles and their
+    /// ranks, moles and theirs). From glTF `extras`:
+    /// `axcenity_skin_masks: [{"index": <texture>}, …]`.
+    pub skin_masks: Vec<Arc<Image>>,
 }
 
 /// How a [`ModelMaterial`] is lit, as its glTF `extras` say
@@ -528,6 +567,7 @@ impl Default for ModelMaterial {
             translucency: 0.0,
             shading: ModelShading::Standard,
             defined_normal_texture: None,
+            skin_masks: Vec::new(),
         }
     }
 }
@@ -544,6 +584,7 @@ impl ModelMaterial {
             || self.opacity_texture.is_some()
             || self.specular_texture.is_some()
             || self.defined_normal_texture.is_some()
+            || !self.skin_masks.is_empty()
     }
 
     /// Takes every texture off, for a mesh with no texture coordinates.
@@ -557,6 +598,7 @@ impl ModelMaterial {
         self.opacity_texture = None;
         self.specular_texture = None;
         self.defined_normal_texture = None;
+        self.skin_masks.clear();
     }
 }
 
@@ -1872,6 +1914,20 @@ impl Reader<'_> {
             Some(source) if normal_texture.is_some() => Some(self.image(&source.clone())?),
             _ => None,
         };
+        // Its makeup and marking masks (ADR-0042): placed like the base
+        // colour map, all three or none.
+        let mut skin_masks = Vec::new();
+        if base_color_texture.is_some() {
+            for index in skin_masks_of(material.extras()) {
+                match self.texture_images.get(index) {
+                    Some(source) => skin_masks.push(self.image(&source.clone())?),
+                    None => {
+                        skin_masks.clear();
+                        break;
+                    }
+                }
+            }
+        }
         let material = ModelMaterial {
             name: material.name().unwrap_or_default().to_owned(),
             base_color: pbr.base_color_factor(),
@@ -1913,6 +1969,7 @@ impl Reader<'_> {
             double_sided: material.double_sided(),
             shading,
             defined_normal_texture,
+            skin_masks,
             ..wind_of(material.extras())
         };
         Ok((material, uv_set))

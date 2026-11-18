@@ -55,6 +55,10 @@ pub struct BaseManifest {
     /// Handles on the character that move parameters by dragging (R2).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handles: Vec<Handle>,
+    /// Makeup and markings its skin can draw (R5, ADR-0042), each a mask
+    /// in the model file: what a description's `skin` block turns on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skin_layers: Vec<crate::SkinLayerSpec>,
 }
 
 /// Brief §3.3's three levels of customization. A value a newer version
@@ -477,6 +481,11 @@ impl BaseManifest {
         self.handles.iter().find(|h| h.id == id)
     }
 
+    /// The skin layer `id` it offers.
+    pub fn skin_layer(&self, id: &str) -> Option<&crate::SkinLayerSpec> {
+        self.skin_layers.iter().find(|layer| layer.id == id)
+    }
+
     /// The category of `parameter`'s group, if it has one.
     pub fn category_of(&self, parameter: &Parameter) -> Option<Category> {
         self.group(&parameter.group).map(|group| group.category)
@@ -558,6 +567,7 @@ impl BaseManifest {
         for (index, slot) in self.materials.iter().enumerate() {
             crate::material::check_slot(p, &format!("materials[{index}]"), slot);
         }
+        crate::skin::check_specs(p, self);
         unique(p, "features", self.features.iter().map(|f| &f.id));
         for (index, feature) in self.features.iter().enumerate() {
             self.check_feature(p, &format!("features[{index}]"), feature);
