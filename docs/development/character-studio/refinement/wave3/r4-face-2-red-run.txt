@@ -1,0 +1,66 @@
+RA2, R4's second pass (wave 3): the red run, against the package as wave 2 left it (refinement-wave2, b39a9ed7).
+
+## cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_second_pass) | binary(realistic_face_controls)' --no-fail-fast
+
+thread 'the_feminine_face_differs_where_the_references_say' (33712) panicked at crates\avatar\tests\realistic_face_second_pass.rs:426:32:
+no face.rest.frames.feminine.zy_zy_mm in the build data
+thread 'the_brows_sit_where_the_references_put_them' (34620) panicked at crates\avatar\tests\realistic_face_second_pass.rs:283:32:
+no brows.masculine.over_inner_corner_mm in the build data
+test the_brow_texture_is_hair_not_a_card ... FAILED
+thread 'the_brow_texture_is_hair_not_a_card' (21792) panicked at crates\avatar\tests\realistic_face_second_pass.rs:126:5:
+the body covers 0.470 of the card
+thread 'the_brows_taper_and_differ_by_frame' (4912) panicked at crates\avatar\tests\realistic_face_second_pass.rs:255:5:
+the feminine brows' card is 870 mm2 against the masculine 934
+thread 'the_masculine_brow_ridge_stands_forward_in_profile' (20788) panicked at crates\avatar\tests\realistic_face_second_pass.rs:398:5:
+masculine glabella 3.7 mm forward of sellion
+thread 'the_frames_faces_differ' (21524) panicked at crates\avatar\tests\realistic_face_controls.rs:205:5:
+the frames' faces differ by 4.50 mm
+
+FAIL [   0.011s] (1/9) axcenity-avatar::realistic_face_second_pass the_feminine_face_differs_where_the_references_say
+FAIL [   0.047s] (5/9) axcenity-avatar::realistic_face_second_pass the_brows_sit_where_the_references_put_them
+FAIL [   0.069s] (6/9) axcenity-avatar::realistic_face_second_pass the_brow_texture_is_hair_not_a_card
+FAIL [   0.087s] (7/9) axcenity-avatar::realistic_face_second_pass the_brows_taper_and_differ_by_frame
+FAIL [   1.520s] (8/9) axcenity-avatar::realistic_face_second_pass the_masculine_brow_ridge_stands_forward_in_profile
+FAIL [   1.573s] (9/9) axcenity-avatar::realistic_face_controls the_frames_faces_differ
+Summary [   1.573s] 9 tests run: 3 passed, 6 failed, 0 skipped
+
+## cargo nextest run -p axcenity-player --release -E 'test(every_face_preset)' --no-capture
+
+frame 0 round face-front: 3.3%
+frame 0 round face-side: 2.2%
+frame 0 oval face-front: 0.7%
+frame 0 oval face-side: 0.1%
+frame 0 square face-front: 2.1%
+frame 0 square face-side: 1.4%
+frame 0 heart face-front: 3.6%
+frame 0 heart face-side: 1.7%
+frame 0 long face-front: 3.2%
+frame 0 long face-side: 1.5%
+frame 0 broad face-front: 6.1%
+frame 0 broad face-side: 1.4%
+frame 0 narrow face-front: 4.2%
+frame 0 narrow face-side: 0.8%
+frame 0 soft face-front: 1.1%
+frame 0 soft face-side: 1.2%
+frame 0 angular face-front: 3.9%
+frame 0 angular face-side: 3.0%
+frame 1 round face-front: 3.5%
+frame 1 round face-side: 2.2%
+frame 1 oval face-front: 1.0%
+frame 1 oval face-side: 0.5%
+frame 1 square face-front: 1.6%
+frame 1 square face-side: 1.2%
+frame 1 heart face-front: 4.1%
+frame 1 heart face-side: 2.1%
+frame 1 long face-front: 3.9%
+frame 1 long face-side: 2.2%
+frame 1 broad face-front: 6.6%
+frame 1 broad face-side: 1.5%
+frame 1 narrow face-front: 4.5%
+frame 1 narrow face-side: 1.1%
+frame 1 soft face-front: 1.1%
+frame 1 soft face-side: 1.3%
+frame 1 angular face-front: 3.5%
+frame 1 angular face-side: 3.0%
+thread 'face_preset_tests::every_face_preset_differs_visibly_from_the_default_face' (24120) panicked at crates\player\src\face_preset_tests.rs:97:5:
+     Summary [  12.667s] 1 test run: 0 passed, 1 failed, 209 skipped

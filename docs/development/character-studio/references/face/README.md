@@ -70,6 +70,8 @@ Evidence: `assets/characters/realistic/faceparams.py:37-54` (paired), `:57-73` (
 | F-26 ArtStation | https://www.artstation.com/ | Individual artists | 2026-11-16 | Whole face | Finished realistic heads and sculpt breakdowns. Good for the quality bar and for how others present feature variation. | Class 4. Each work belongs to its artist. Not opened. | visual guidance |
 | F-27 Blender Studio Human Base Meshes | https://developer.blender.org/docs/release_notes/4.0/asset_bundles/ | Blender Studio | 2026-11-16 | Whole head | The bundle the realistic head is already built from. It also has a planar head (the head as flat planes) and a generic head with shape keys for example head shapes: a ready check for the face-shape presets. | Class 1 on the repository's own record only: CC0 1.0 in [dependencies.md](../../dependencies.md). Not confirmed for this index: the download page (https://www.blender.org/download/demo-files/) refused the fetch in both passes, and the release notes name no licence for the bundle (their footer licence covers the notes' own text). A trade news article says CC0. Open the download page by hand before relying on this row. | actual asset (already vendored) |
 | F-28 Sketchfab | https://sketchfab.com/ | Individual authors | 2026-11-16 | Whole face | Turnable head scans and anatomy models. Good for a feature seen from any angle. | Class 4 by default. Each model has its own licence (some CC0 or CC BY); read it on the model's page before any use. Licence page not opened. | visual guidance |
+| F-29 Racial and sexual differences of eyebrow and eyelid morphology: three-dimensional analysis in young Caucasian and Chinese populations | https://qims.amegroups.org/article/view/132908/html | Gao and others; Quant Imaging Med Surg 15(1):882-897, 2025 | 2026-11-17 | Brows | 3D photographs of 147 adults aged 18 to 30. Caucasian men and women: the brow's lower edge over the inner eye corner 17.4 ± 2.0 and 17.5 ± 2.3 mm, over the outer corner 15.9 ± 2.9 and 18.5 ± 2.9, the lower brow length (a curved path from the first hair to the last) 69.5 ± 5.8 and 61.4 ± 6.1. No thickness figure. Used for the brows (wave 3). | Class 4: CC BY-NC-ND 4.0 (read in the article). Opened. | data |
+| F-30 Unlocking nasal angle anthropometry and nasolabial angle preferences: a key to achieve the perfect rhinoplasty | https://dergipark.org.tr/tr/download/article-file/3745343 | Çavdar Yılmaz and others; Anatomy (Turkish Society of Anatomy and Clinical Anatomy), 2023 | 2026-11-17 | Profile | 142 adults aged 18 to 35 (71 women, 71 men), photogrammetry: the nasofrontal angle (glabella, nasion, the nose's dorsum) is 138.5 ± 9.3° in men and 141.6 ± 8.1° in women. Used for the masculine brow ridge (wave 3). | Class 4: no licence stated in the part read. Opened (PDF). | data |
 
 ## Landmarks
 
@@ -176,7 +178,7 @@ Eye figures (fissure width and height, lid margins, eyeball, cornea, eye protrus
 | Brow width | new | Gap between the brows' inner ends | No data found | — | Low value. If wanted, make it a card parameter like brow length. |
 | Brow arch | `brow_arch_left/right` | Height of the arch over the brow's ends | The outer measure is 4.7 mm higher than the inner on average (F-12) | ±6.4 mm at 60% along the brow (`face.py:323`, `:331`, `:1459`) | Keep. Height and arch both at −1 bring the brow down 11 mm (`face.py:307-309`), about 3.5 SD: hold their sum to about 8 mm in presets and the randomizer. |
 | Brow length | `brow_length_left/right` | Where the brow's tail ends (the card only) | No data found | The tail ends at 0.80 or 1.34 along the brow's line, against 1.08 at rest (`assets/characters/realistic/lashes.py:322-324`) | Keep. |
-| Brow thickness | new | Height of the band of hair | No data found | — | High value, but as a card scale or texture choice, not a skin shape. Belongs with grooming (brief §7.3). |
+| Brow thickness | new | Height of the band of hair | No data found (F-29 has none either) | — | High value, but as a card scale or texture choice, not a skin shape. Belongs with grooming (brief §7.3). |
 | Brow angle | new | Slope from the brow's inner end to its tail | No data found | — | New `brow_tilt`, about ±5° by eye. Medium to high. Make it a turn about the brow's middle: pushing the inner end against the arch bent the brow into a hook (`face.py:1457-1458`). |
 | Brow ridge | `brow_ridge` | Projection at glabella and over the orbits | No data found | ±4.6 mm along the normal (`face.py:1504`) | Keep. |
 
@@ -312,6 +314,8 @@ Eye figures (fissure width and height, lid margins, eyeball, cornea, eye protrus
 
 ## 3. Nine face presets
 
+The shipped presets (`assets/characters/realistic/presets.py`) started from this table and were strengthened in wave 3 (every value still at most 0.7) until each changes at least 3% of the face's pixels against the default face in front and in profile on both frames (`player`'s `face_preset_tests`); the table below is the first guess.
+
 These are **visual starting points**. They are not types of people, and no real face belongs to one. Each is a direction on the existing parameters: a sign and a rough strength on the −1 to 1 scale. A paired name means both sides. Strengths are a first guess to be tuned by eye in the studio against photo references. Parameters not listed stay at 0.
 
 | Parameter | Round | Oval | Square | Heart-shaped | Long | Broad | Narrow | Soft features | Angular features |
@@ -422,6 +426,8 @@ Rules that keep a random face believable:
 **Anatomy.** The brow is hair-bearing skin over the upper rim of the orbit, on a pad of fat that slides over the bone. Its inner end sits about over the inner eye corner, its peak over the outer edge of the iris or just beyond, and its tail ends past the outer eye corner. The frontalis muscle raises it; the muscles round the eye and between the brows lower it. Under it the bone forms the brow ridge, strongest at glabella and over the inner orbit.
 
 **Shapes that vary.** Height above the eye; how arched or straight; the slope from inner end to tail; thickness and density; length of the tail; the gap between the brows; how strongly the bone ridge under them stands out. Height falls with age at the outer end first (F-12: 31.0 mm at ages 20–30 against 27.0 mm at 50–70 over the iris's outer edge).
+
+**By sex** (F-29, young Caucasian adults): the lower edge stands about as high over the inner eye corner in men and women (17.4 and 17.5 mm) and 2.6 mm higher over the outer corner in women (18.5 against 15.9), so women's brows rise more toward the tail; women's are shorter (61.4 against 69.5 mm along the lower edge). The realistic brows follow this since wave 3 (`lashes.BROW_LOOKS`; `avatar`'s `realistic_face_second_pass`).
 
 **Sensible limits.** Height ±5 mm (about 1.7 SD). Height and arch together no more than about 8 mm down, or the brow reaches the lashes. Left against right within 1.3 mm for a natural face. Brow ridge ±4 to 5 mm; more reads as a different skull.
 

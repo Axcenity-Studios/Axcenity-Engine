@@ -21,6 +21,8 @@ from (the vertex order is the bundle's, untouched):
 - The lips are closed (`mouth.Mouth.seal`).
 """
 
+import os
+
 import numpy as np
 
 import lids
@@ -100,21 +102,69 @@ def even(X, mirror, w, other=None):
 # jaw's width against the cheekbones and the nose's width were already
 # feminine. The cranium, the ears and the neck don't move. Metres, or a
 # share for `smaller` and `chin_narrower`.
-FEMININE = {"smaller": 0.05, "chin_narrower": 0.08, "lips_out": 0.0009, "lips_border": 0.0007,
-            "cheeks_out": 0.0010, "malar_out": 0.0018, "forehead_forward": 0.0020, "brows_up": 0.0020,
-            "jaw_corner_in": 0.0030}
+#
+# Wave 3 (R4's second pass; the lead: the feminine face was only a little
+# more its own): measured on the skin (`Face.measures`), the feminine face
+# was still nearly as wide as the masculine (zy-zy 0.98 of it, against the
+# references' 0.94) and its brow ridge stood forward of sellion. So the
+# head below the brows is made narrower (`narrower`, a share of each
+# skin point's distance from the middle: the cheekbones, the jaw and the
+# ears with them, easing off up the cranium and into the neck; the eyes'
+# regions hold, and the mouth and the skin within 2 to 5 cm of its line,
+# so the eyes are larger against the face and the teeth still fit), the
+# chin shorter (`shorter`, a share of each point's depth under the lips'
+# line, on the chin's front: se-me 113.4 against 122.7 mm), the brow
+# ridge back (`ridge_back`, as `Face_Brow_Ridge` moves it), the nose's tip
+# in (`nose_back`: sn-prn 19.8 against 21.1 mm), the cheeks higher and
+# fuller (`malar_up`, `malar_out`), the lips fuller and the forehead
+# rounder. `mouth_smaller` is the share the mouth, its bag and the lips
+# move by as one; it is `smaller` (a larger `smaller`, 6.5%, crossed the
+# mouth's bag with the jaw shifted and the mouth raised, in the sliders
+# check). Each of `narrower` and `shorter` was first wider in reach (the
+# head's inside, the mouth with them) and crossed the same way.
+FEMININE = {"smaller": 0.05, "mouth_smaller": 0.05, "chin_narrower": 0.08, "lips_out": 0.0013,
+            "lips_border": 0.0008, "cheeks_out": 0.0010, "malar_out": 0.0022, "malar_up": 0.0015,
+            "forehead_forward": 0.0025, "brows_up": 0.0, "jaw_corner_in": 0.0030, "narrower": 0.050,
+            "ridge_back": 0.0005, "shorter": 0.05, "nose_back": 0.0010}
+# The masculine frame's face against the bundle's (wave 3, the lead's
+# choice): a moderately heavier brow ridge in profile, glabella forward
+# (`ridge_forward`, metres, as `Face_Brow_Ridge` moves it: about a
+# quarter of its +1). F-30: the nasofrontal angle is 138.5 +- 9.3 degrees
+# in men and 141.6 +- 8.1 in women.
+MASCULINE = {"ridge_forward": 0.0015}
+
+
+def unrigged_face(topo, P, eyes, radius):
+    """A `Face` on positions `P` before the rig is fitted: its jaw's hinge
+    (a bone not fitted yet) in front of and under the ear, where the
+    masculine frame's is."""
+    P = np.asarray(P, dtype=np.float64)
+    face = Face(topo, P, eyes, radius, Jaw(np.zeros(3), np.zeros(len(P))))
+    ear = 0.5 * (face.ear_at[1] + face.ear_at[-1])
+    face.jaw = Jaw(np.array([0.0, ear[1] - 0.018, ear[2] - 0.006]), np.zeros(len(P)))
+    return face
 
 
 def feminine_face(topo, F, eyes_f, radius_f):
     """The offsets that take the bundle's feminine face to the feminine
     frame's (`FEMININE`), on positions `F`."""
-    F = np.asarray(F, dtype=np.float64)
-    face = Face(topo, F, eyes_f, radius_f, Jaw(np.zeros(3), np.zeros(len(F))))
-    # (The jaw's hinge is a bone not fitted yet: in front of and under the
-    # ear, where the masculine frame's is.)
-    ear = 0.5 * (face.ear_at[1] + face.ear_at[-1])
-    face.jaw = Jaw(np.array([0.0, ear[1] - 0.018, ear[2] - 0.006]), np.zeros(len(F)))
-    return face.feminine()
+    return unrigged_face(topo, F, eyes_f, radius_f).feminine()
+
+
+def masculine_face(topo, M, eyes_m, radius_m):
+    """The offsets that take the bundle's masculine face to the masculine
+    frame's (`MASCULINE`), on positions `M`."""
+    face = unrigged_face(topo, M, eyes_m, radius_m)
+    # (Glabella and the brows' inner ends, not over the orbits: moved
+    # there too, the upper lids' surroundings changed, and the coarsest
+    # copy, decimated from them, carried `upper_lid_fold` -1 less than the
+    # 2 mm that is seen.)
+    ridge = face.ridge() * (1.0 - smoothstep(0.012, 0.030, np.abs(face.P[:, 0])))
+    for _, s in SIDES:
+        ridge *= 1.0 - face.eye_region(s)
+    out = ridge[:, None] * face.N * MASCULINE["ridge_forward"]
+    out[~topo.is_head] = 0.0
+    return out
 
 
 def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f, mirror=None):
@@ -128,10 +178,14 @@ def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f, mirror=None):
     M, F = np.array(M, dtype=np.float64), np.array(F, dtype=np.float64)
     report = {}
     feminine = feminine_face(topo, F, eyes_f, radius_f)
+    masculine = masculine_face(topo, M, eyes_m, radius_m)
     if mirror is not None:
         feminine = even(feminine, mirror, topo.is_head.astype(np.float64))
+        masculine = even(masculine, mirror, topo.is_head.astype(np.float64))
     F += feminine
+    M += masculine
     report["feminine_face_moved_mm"] = round(float(np.linalg.norm(feminine, axis=1).max()) * 1000, 2)
+    report["masculine_face_moved_mm"] = round(float(np.linalg.norm(masculine, axis=1).max()) * 1000, 2)
     moved = 0.0
     for _, s in SIDES:
         eye = lids.Eye(topo, M, s, eyes_m[s], radius_m)
@@ -165,6 +219,11 @@ def prepare(topo, M, F, eyes_m, eyes_f, radius_m, radius_f, mirror=None):
             P[:] = even(P, mirror, region)
         rise[name] = round(most * 1000, 2)
     report["lips_closed_by_mm"] = rise
+    # Both faces measured on the skin (wave 3; the references' population
+    # data): what `avatar`'s `realistic_face_second_pass` holds.
+    report["frames"] = {name: unrigged_face(topo, P, centres, radius).measures()
+                        for name, P, centres, radius in (("masculine", M, eyes_m, radius_m),
+                                                         ("feminine", F, eyes_f, radius_f))}
     return M, F, report
 
 
@@ -398,12 +457,20 @@ EAR_OUT_REACH = 0.012
 # r4-face-controls.md) has each end's millimetres against the SD.
 #
 # Nose tip projection: the tip out along the line from subnasale to it
-# (sn-prn 21.1 +- 2.7 mm, men): metres at the tip.
-NOSE_PROJECTS = 0.0065
+# (sn-prn 21.1 +- 2.7 mm, men; 19.8 +- 2.7, women): metres at the tip,
+# 2.5 SD (wave 3; 6.5 mm, 2.4 SD, in wave 2).
+NOSE_PROJECTS = 0.00675
 # Nose tip rotation: the tip and the column under it turned about
 # subnasale, up at +1 (the nasolabial angle, 105 +- 9.6 degrees).
-NOSE_TURNS_DEG = 26.0
+# Wave 3: 31 degrees (26 in wave 2, whose ends were 2.0 to 2.2 SD of the
+# nasolabial angle with no reason to stop there),
+# and the turn eased in over 8 mm above subnasale rather than 4
+# (`NOSE_TURN_EASE`): at -1 the column, turned down against a lip that
+# holds, folded the skin at subnasale into a ridge that caught the light
+# as a thin pale line.
+NOSE_TURNS_DEG = 31.0
 NOSE_TURN_SMOOTH = 3
+NOSE_TURN_EASE = (-0.001, 0.007)
 # Whole-nose width: the nose's skin from the root to the wings spread
 # from the middle by this share of its distance from it.
 NOSE_WIDENS = 0.26
@@ -1736,7 +1803,8 @@ class Face:
         # above it, bent the nose into a hook at +1 and creased it across.
         # The field is then averaged over the nose a few times.
         tip_z = self.nose_tip[2]
-        column = skin * over_lip * (1.0 - smoothstep(0.008, 0.020, np.abs(P[:, 0]))) \
+        eased = smoothstep(sn[2] + NOSE_TURN_EASE[0], sn[2] + NOSE_TURN_EASE[1], P[:, 2])
+        column = skin * eased * (1.0 - smoothstep(0.008, 0.020, np.abs(P[:, 0]))) \
             * (1.0 - smoothstep(tip_z - 0.003, tip_z + 0.006, P[:, 2])) \
             * smoothstep(sn[1] + 0.008, sn[1] + 0.002, P[:, 1])
         r = P - sn
@@ -1745,10 +1813,7 @@ class Face:
         nose = np.where((self.near(self.nose_tip, 0.030) > 0.05) & self.skin)[0]
         put("Face_Nose_Tip_Rotation", self.topo.smooth(turn, NOSE_TURN_SMOOTH, among=nose), teeth=False)
         put("Face_Nose_Width", self.nose_width(sn) * NOSE_WIDENS, teeth=False)
-        glabella = self.on_skin(np.array([0.0, self.nose_tip[1], eye_z + 0.019]))
-        ridge = gauss(P[:, 2] - glabella[2], 0.012) * (1.0 - smoothstep(0.035, 0.06, np.abs(P[:, 0]))) * skin * ~self.lid
-        ridge *= P[:, 1] < glabella[1] + 0.03
-        put("Face_Brow_Ridge", (ridge * 0.0046)[:, None] * N, teeth=False)
+        put("Face_Brow_Ridge", (self.ridge() * 0.0046)[:, None] * N, teeth=False)
         crown = self.crown
         put("Face_Forehead_Height", vec(smoothstep(eye_z + 0.025, crown - 0.01, P[:, 2]) * self.topo.is_head, up * 0.0080), teeth=False)
         front = gauss(P[:, 2] - (eye_z + 0.055), 0.03) * smoothstep(-0.06, -0.11, P[:, 1]) * self.topo.is_head * ~self.lid
@@ -1842,7 +1907,12 @@ class Face:
         # teeth of the same size, and a laughing mouth showed the seal
         # behind the lips.)
         mouth_one = np.maximum(1.0 - smoothstep(0.014, 0.034, self.d_line), self.lining.astype(np.float64))
-        middle = k["smaller"] * (centre - self.stomion) * face[self.mouth.mid]
+        # (And the head's inside round the mouth's bag, off the skin and the
+        # eyes' sockets, goes with the bag.)
+        inside = (~self.skin & ~self.socket & ~self.ear).astype(np.float64)
+        mouth_one = np.maximum(mouth_one, inside * self.near(self.stomion, 0.035))
+        # (By `mouth_smaller`, which may differ from `smaller`.)
+        middle = k["mouth_smaller"] * (centre - self.stomion) * face[self.mouth.mid]
         out = out * (1.0 - mouth_one)[:, None] + vec(mouth_one * face, middle) / max(face[self.mouth.mid], 1e-9)
         # The chin narrower.
         chin = self.near(self.chin + np.array([0.0, 0.008, -0.004]), 0.026) * (1.0 - self.lipness) \
@@ -1867,8 +1937,84 @@ class Face:
         eye_z = self.eye[1].c[2]
         front = gauss(P[:, 2] - (eye_z + 0.055), 0.03) * smoothstep(-0.06, -0.11, P[:, 1]) * self.topo.is_head * ~self.lid
         out += vec(front, back * -k["forehead_forward"])
+        # Wave 3. The head narrower below the brows (the cheekbones, the
+        # jaw and the ears with them), a little up the cranium (head
+        # breadth 146.8 against 153.0 mm), none into the neck; the eyes and
+        # the mouth hold.
+        narrow = (1.0 - 0.6 * smoothstep(eye_z, eye_z + 0.06, P[:, 2])) \
+            * smoothstep(self.chin[2] - 0.035, self.chin[2] - 0.015, P[:, 2]) * self.topo.is_head
+        for _, s in SIDES:
+            narrow *= 1.0 - self.eye_region(s)
+        # (On the skin and the ears only, and off the mouth and the skin
+        # round it out to 5 cm from its line: the head's inside narrowed
+        # under a mouth's bag that holds crossed the bag's floor with the
+        # jaw shifted and the mouth raised.)
+        narrow *= smoothstep(0.020, 0.050, self.d_line) * (self.skin | self.ear)
+        out[:, 0] -= P[:, 0] * narrow * k["narrower"]
+        # A smaller brow ridge, the nose's tip in, the cheeks higher.
+        out -= (self.ridge() * k["ridge_back"])[:, None] * N
+        sn = self.subnasale()
+        over_lip = smoothstep(sn[2] - 0.001, sn[2] + 0.003, P[:, 2])
+        lobule = self.near(self.nose_tip, 0.013) * skin * over_lip
+        out -= vec(lobule, (self.nose_tip - sn) / np.linalg.norm(self.nose_tip - sn) * k["nose_back"])
+        for _, s in SIDES:
+            out += vec(self.near(self.cheek_point(s), 0.024) * skin * ~self.lid, up * k["malar_up"])
+        # The chin shorter: up by its depth under the lips' line, on the
+        # chin's front only (within 1.5 to 3.5 cm of its front), easing off
+        # into the neck; the mouth, its bag and the lips hold. (Moved with
+        # the mouth, the philtrum was shorter and the raised mouth crossed
+        # the nose's base; reaching under the jaw, the skin there rose into
+        # the mouth's bag with the jaw shifted: `measure.py`'s sliders.)
+        lower = np.maximum(self.stomion[2] - P[:, 2], 0.0) * k["shorter"] \
+            * smoothstep(self.chin[1] + 0.035, self.chin[1] + 0.015, P[:, 1]) \
+            * smoothstep(self.chin[2] - 0.035, self.chin[2] - 0.015, P[:, 2]) * self.topo.is_head * ~self.ear
+        out += vec(lower * (1.0 - mouth_one), up)
         out[~self.topo.is_head] = 0.0
         return out
+
+    def ridge(self):
+        """Per vertex, the brow ridge (over glabella and the orbits, off
+        the lids), as a weight: what `Face_Brow_Ridge` moves out."""
+        P = self.P
+        eye_z = self.eye[1].c[2]
+        glabella = self.on_skin(np.array([0.0, self.nose_tip[1], eye_z + 0.019]))
+        ridge = gauss(P[:, 2] - glabella[2], 0.012) * (1.0 - smoothstep(0.035, 0.06, np.abs(P[:, 0]))) \
+            * self.skin * ~self.lid
+        return ridge * (P[:, 1] < glabella[1] + 0.03)
+
+    def measures(self):
+        """The face measured on the skin (millimetres; references/face/
+        README.md's landmarks, found here by plain rules): zy-zy, the
+        widest the face is across the cheekbones in front of the ears;
+        se-me, sellion (the deepest point of the midline between the eyes)
+        to menton (the chin's lowest); go-go, the widest at the jaw's
+        corners; al-al, across the nose's wings; ch-ch, between the mouth's
+        corners; and the distance between the eyes' centres."""
+        P, skin = self.P, self.skin & self.topo.is_head
+        eye_z = 0.5 * (self.eye[1].c[2] + self.eye[-1].c[2])
+        ear_y = 0.5 * (self.ear_at[1][1] + self.ear_at[-1][1])
+        front = skin & (P[:, 1] < ear_y - 0.010)
+
+        def width(rows):
+            return float(P[rows, 0].max() - P[rows, 0].min()) * 1000
+
+        zy = front & (P[:, 2] > eye_z - 0.035) & (P[:, 2] < eye_z - 0.005)
+        mid = np.where(skin & (np.abs(P[:, 0]) < 1e-4))[0]
+        between = mid[(P[mid, 2] > self.nose_tip[2] + 0.010) & (P[mid, 2] < eye_z + 0.020)]
+        sellion = P[between[np.argmax(P[between, 1])]]
+        chin = mid[(P[mid, 1] < self.chin[1] + 0.012) & (P[mid, 2] < self.chin[2] + 0.002)]
+        menton = P[chin[np.argmin(P[chin, 2])]]
+        corner = 0.5 * (self.jaw_landmarks(1)[0] + self.jaw_landmarks(-1)[0])
+        go = skin & (np.abs(P[:, 2] - corner[2]) < 0.005) & (np.abs(P[:, 1] - corner[1]) < 0.012)
+        sn = self.subnasale()
+        al = skin & (P[:, 2] > sn[2]) & (P[:, 2] < sn[2] + 0.012) & (P[:, 1] < sn[1] + 0.006) \
+            & (np.abs(P[:, 0]) < 0.030)
+        return {"zy_zy_mm": round(width(zy), 2),
+                "se_me_mm": round(float(sellion[2] - menton[2]) * 1000, 2),
+                "go_go_mm": round(width(go), 2),
+                "al_al_mm": round(width(al), 2),
+                "ch_ch_mm": round(float(np.linalg.norm(self.corner[1] - self.corner[-1])) * 1000, 2),
+                "eye_centres_mm": round(float(np.linalg.norm(self.eye[1].c - self.eye[-1].c)) * 1000, 2)}
 
     def subnasale(self):
         """Where the nose's column meets the upper lip: the deepest point
@@ -2166,7 +2312,20 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     brow, bound = hair.brows(face, out_dir)
     at = np.array([v.co[:] for v in brow.data.vertices])
     quads = [tuple(p.vertices) for p in brow.data.polygons]
-    hair.add_shapes(brow, {name: hair.follow_bound(face, bound, at, quads, following[name]) for name in order})
+    # (The feminine frame's brows are a card of their own: thinner, more
+    # arched; `lashes.BROW_LOOKS`.)
+    brow_shapes = {name: hair.follow_bound(face, bound, at, quads, following[name]) for name in order
+                   if name != "Frame_Feminine"}
+    brow_shapes = dict(Frame_Feminine=hair.feminine_brows(face, bound, at, quads, frame), **brow_shapes)
+    hair.add_shapes(brow, brow_shapes)
+    # Where the brows' hair lies against each frame's eyes (F-29).
+    from PIL import Image
+    alpha = np.asarray(Image.open(os.path.join(out_dir, "RealisticBrows.png")).convert("RGBA"),
+                       dtype=np.float32)[:, :, 3] / 255.0
+    brow_report = {}
+    for name, X, card in (("masculine", M, at), ("feminine", F, at + brow_shapes["Frame_Feminine"])):
+        corners = {s: (X[face.eye[s].canthus_in], X[face.eye[s].canthus_out]) for _, s in SIDES}
+        brow_report[name] = hair.brow_measures(card, alpha, corners)
     # The brows' length: shapes of the card alone. The body carries them
     # empty, so the manifest can drive them (architecture.md section 14).
     lengths = hair.brow_lengths(face, at)
@@ -2191,6 +2350,7 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
         "face_identity": bones,
         "largest_move_mm": largest,
         "jaw_open_deg": JAW_OPEN_DEG,
+        "brows": brow_report,
         # How much of a blink each control that narrows an eye uses up
         # (at the middle of the eye, the most along it and where that
         # is): the shares the engine holds a blink back by.

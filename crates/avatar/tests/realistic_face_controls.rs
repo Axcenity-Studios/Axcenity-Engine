@@ -159,8 +159,11 @@ fn face_at(library: &Library, model: &Model, frame: f32) -> Vec<[f32; 3]> {
 
 /// M6, the baseline's C1: the two frames had nearly the same face. The
 /// feminine frame's face (its shape's face part, less the move of the head
-/// as a whole) now differs from the masculine one by more than 4 mm
-/// (root mean square over the front of the face; it was 3.1 mm).
+/// as a whole) now differs from the masculine one by more than 4.6 mm
+/// (root mean square over the front of the face; 3.1 mm before R4, 4.5
+/// after it). Wave 3's second pass made the feminine face more its own
+/// where the references say faces differ, held one by one in
+/// `realistic_face_second_pass`; this measure moves little with them.
 #[test]
 fn the_frames_faces_differ() {
     let library = library();
@@ -201,8 +204,9 @@ fn the_frames_faces_differ() {
         .sum::<f32>()
         / n)
         .sqrt();
+    println!("the frames' faces differ by {:.2} mm", rms * 1000.0);
     assert!(
-        rms > 0.0040,
+        rms > 0.0046,
         "the frames' faces differ by {:.2} mm",
         rms * 1000.0
     );

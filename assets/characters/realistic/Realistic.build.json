@@ -68,8 +68,8 @@
  "body_shapes": {
   "frames": {
    "Feminine": {
-    "bony_vertices": 4406,
-    "held_face_vertices": 1909,
+    "bony_vertices": 4394,
+    "held_face_vertices": 1934,
     "kept_apart": {
      "heavy": {
       "crossings_before": 0,
@@ -425,6 +425,28 @@
     0.88
    ]
   },
+  "brows": {
+   "feminine": {
+    "height_mm": [
+     11.81,
+     10.55,
+     4.47
+    ],
+    "length_mm": 40.06,
+    "over_inner_corner_mm": 17.72,
+    "over_outer_corner_mm": 15.81
+   },
+   "masculine": {
+    "height_mm": [
+     14.85,
+     13.78,
+     8.67
+    ],
+    "length_mm": 43.69,
+    "over_inner_corner_mm": 15.4,
+    "over_outer_corner_mm": 13.65
+   }
+  },
   "expressions": [
    "Blink_Left",
    "Blink_Right",
@@ -622,10 +644,10 @@
   "largest_move_mm": {
    "Blink_Left": 10.19,
    "Blink_Right": 10.12,
-   "Brow_Inward_Left": 8.81,
-   "Brow_Inward_Right": 8.81,
-   "Brow_Lower_Left": 8.55,
-   "Brow_Lower_Right": 8.66,
+   "Brow_Inward_Left": 9.26,
+   "Brow_Inward_Right": 9.3,
+   "Brow_Lower_Left": 8.64,
+   "Brow_Lower_Right": 8.72,
    "Brow_Raise_Left": 10.63,
    "Brow_Raise_Right": 10.63,
    "Cheek_Puff": 9.38,
@@ -637,10 +659,10 @@
    "Eye_Squint_Right": 5.23,
    "Eye_Wide_Left": 5.74,
    "Eye_Wide_Right": 5.71,
-   "Face_Brow_Arch_Left": 6.39,
-   "Face_Brow_Arch_Right": 6.38,
-   "Face_Brow_Arch_Up_Left": 6.34,
-   "Face_Brow_Arch_Up_Right": 6.37,
+   "Face_Brow_Arch_Left": 6.37,
+   "Face_Brow_Arch_Right": 6.36,
+   "Face_Brow_Arch_Up_Left": 6.39,
+   "Face_Brow_Arch_Up_Right": 6.4,
    "Face_Brow_Height_Left": 5.5,
    "Face_Brow_Height_Right": 5.5,
    "Face_Brow_Height_Up_Left": 5.47,
@@ -694,16 +716,16 @@
    "Face_Nose_Length": 4.41,
    "Face_Nose_Tilt": 4.42,
    "Face_Nose_Tip": 4.84,
-   "Face_Nose_Tip_Projection": 6.5,
-   "Face_Nose_Tip_Rotation": 6.26,
+   "Face_Nose_Tip_Projection": 6.75,
+   "Face_Nose_Tip_Rotation": 7.34,
    "Face_Nose_Width": 5.17,
    "Face_Nose_Width_Left": 4.41,
    "Face_Nose_Width_Right": 4.41,
    "Face_Philtrum_Length": 5.0,
    "Jaw_Forward": 5.5,
-   "Jaw_Left": 1.7,
+   "Jaw_Left": 1.72,
    "Jaw_Open": 19.15,
-   "Jaw_Right": 1.7,
+   "Jaw_Right": 1.72,
    "Lip_Corner_Pull_Left": 5.24,
    "Lip_Corner_Pull_Right": 5.24,
    "Lower_Lip_Lower": 5.22,
@@ -729,14 +751,33 @@
    "Upper_Lip_Raise_Right": 4.67
   },
   "rest": {
-   "feminine_face_moved_mm": 6.65,
+   "feminine_face_moved_mm": 8.07,
    "feminine_lids_moved_mm": 3.96,
+   "frames": {
+    "feminine": {
+     "al_al_mm": 33.82,
+     "ch_ch_mm": 45.79,
+     "eye_centres_mm": 67.44,
+     "go_go_mm": 113.26,
+     "se_me_mm": 115.46,
+     "zy_zy_mm": 138.67
+    },
+    "masculine": {
+     "al_al_mm": 37.77,
+     "ch_ch_mm": 54.89,
+     "eye_centres_mm": 67.07,
+     "go_go_mm": 128.52,
+     "se_me_mm": 126.5,
+     "zy_zy_mm": 149.3
+    }
+   },
    "lid_texels_softened": 6846,
    "lining_vertices_lifted": 304,
    "lips_closed_by_mm": {
-    "feminine": 2.35,
+    "feminine": 2.3,
     "masculine": 1.99
-   }
+   },
+   "masculine_face_moved_mm": 1.48
   }
  },
  "frame": {
@@ -1377,7 +1418,7 @@
  },
  "teeth": {
   "feminine": {
-   "bag_moved_to_skin_mm": 4.8,
+   "bag_moved_to_skin_mm": 4.7,
    "behind_lips_mm": 2.7,
    "bite_under_lips_mm": 1.6,
    "faces_through_the_body": 0,
@@ -1472,7 +1513,7 @@
   "Underwear_Bra": {
    "shapes": 58,
    "triangles": 2476,
-   "weight_moved_most": 0.122
+   "weight_moved_most": 0.116
   },
   "Underwear_Briefs": {
    "shapes": 42,
