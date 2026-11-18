@@ -82,3 +82,18 @@ assertion `left == right` failed
 thread 'garment_checks::the_stylized_sneakers_hold_the_feet' (19148) panicked at crates\player\src\garment_checks.rs:607:5:
     "stylized-feminine-cast-athletic Shoes_Sneakers: the tread from -3.56 to 4.11 mm above the floor",
     "stylized-feminine-cast-athletic Walk@18 Shoes_Sneakers: 1 foot corners out of the shoe, the farthest 11.97 mm",
+
+== Review fixes 1 (red before the implementation) ==
+cargo nextest run -p axcenity-avatar --lib -E 'test(coverage_)' --no-fail-fast, before coverage::closed_creases:
+        FAIL [   0.037s] (1/2) axcenity-avatar fit::tests::coverage_counts_a_crease_the_garment_closes_over
+    test fit::tests::coverage_counts_a_crease_the_garment_closes_over ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.02s
+    thread 'fit::tests::coverage_counts_a_crease_the_garment_closes_over' (22324) panicked at crates\avatar\src\fit\tests.rs:486:5:
+    Coverage { shares: {1: 1.0, 2: 0.05} }
+        PASS [   0.105s] (2/2) axcenity-avatar fit::tests::coverage_finds_the_regions_a_garment_covers_whole
+     Summary [   0.106s] 2 tests run: 1 passed, 1 failed, 91 skipped
+        FAIL [   0.037s] (1/2) axcenity-avatar fit::tests::coverage_counts_a_crease_the_garment_closes_over
+
+After the region cuts, before the records were lowered (the stale-record rule):
+    "TestTee Walk@18: recorded 30.20 mm, now 23.73 mm: lower the record"
+    "TestTee ArmsRaised: recorded 2 bodies, 5.20 mm, now none: remove the record"

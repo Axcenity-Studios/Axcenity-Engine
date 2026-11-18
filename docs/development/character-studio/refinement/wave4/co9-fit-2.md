@@ -30,7 +30,7 @@ Branch `co9-fit-2`, from `main` after wave 3 (#427). Task: make it possible for 
 
 ## What was built
 
-1. **Swing correctives** (`Corrective_Shoulder_Forward_*` full at 40 degrees, `_Back_*` full at 50):
+1. **Swing correctives** (`Corrective_Shoulder_Forward_*` full at 40 degrees, `_Back_*` full at 50). Partly met (see "Review fixes 1"): the masculine fold is down, but the armpit's apex and the feminine walk-right are not, and the shapes take local volume off a forward raise.
    - **How they are made.** By delta mush in the QA swing poses, as the other shoulder shapes are, on top of `Lowered` (its offsets are taken off).
    - **The rule.** It turns about the axis across the body, in the upper arm's parent's rest space. That axis is at right angles to the raise axis, so a swing doesn't change the lowered shape's weight.
    - **The walk's angles.** I measured them in the engine: the starter Walk swings the upper arm back to 49 degrees and forward to 31, the Run to 76 and 36. The arm hangs 12 to 18 degrees out.
@@ -180,7 +180,7 @@ The sheets are in-engine captures (release, studio light, 1280 × 720, cropped a
   - **Defect, all bodies:** the sleeves are crumpled and faceted.
   - Both are visible defects of the draft. The gate doesn't count them because no skin comes through.
 - **`tee-walk.jpg`** (the walk at 0.3 s, a running stride):
-  - No skin or bra shows through at this size. The gate's walk cases are in the crease between the hanging arm and the chest, which the arm hides in these views.
+  - **Corrected in review fixes 1:** this said no skin or bra shows. That was wrong. On the feminine heavyset body, side view, a dark spot shows through the tee at the back of the armpit crease. Zoomed 6x on the review-fixes capture, it is still there: a black patch about 3 px across at 1280 × 720, which is the sports bra coming through the tee (`rf1-armpit-crops.jpg`, first tile). It matches the gate's open "bra through the tee" walk record (21 bodies, 17.4 mm).
   - **Defect:** the collar's front edge is visibly wavy, in scallops of a few millimetres.
   - **Defect:** a soft ridge runs across the chest below the collar on every body.
 - **`tee-neck-rest.jpg`** (4× crop of the neck at rest): the crew neck sits at the base of the neck, with a few millimetres of waviness along the edge on every body.
@@ -226,3 +226,163 @@ The sheets are in-engine captures (release, studio light, 1280 × 720, cropped a
 - **`TestTee.obj` is remade.** The gate library cache (`target/<profile>/fit-gate/`) rebuilds itself.
 - **Records:** the gate's `Known`, `garment_checks`' `Record`s and `fitting.rs`'s posed ceiling are this branch's measurements. Lower them as items improve.
 - **Content specialists:** call `garment_checks::motion` and `footwear` on new items with no records. A production item must have none.
+
+## Review fixes 1
+
+**In one paragraph.** The test tee still doesn't pass the walk, so **the main goal is still not met**, but the failure is much smaller.
+- **What changed.** The tee now hides the skin it covers at the armpit: the torso and the upper arm under its sleeve. Two new region cuts and a coverage rule for creases make that possible.
+- **The walk.** The tee fails on 50 of the 54 bodies, at up to 23.7 mm, with 1 to 9 skin corners each. Before, it failed on every body, at up to 30.2 mm, with 31 to 92 corners each. What is left is skin at the front of the upper arm by the sleeve's end. The bra still comes through the tee on 21 bodies (17.4 mm).
+- **Arms raised.** The tee now passes.
+- **Not fixed:** the boxer briefs' gusset and the stylized tee's hem. I traced both and give the evidence below.
+- **Also done:** the stylized underwear blotches are confirmed as the level-of-detail defect; the checks now have synthetic tests; the swing correctives are measured where else they fire, and that costs volume; the overclaims in this hand-back are corrected.
+- **For the lead:** a content track can't build a top that passes the walk on this branch yet. That needs the lead's re-scope (item 1 below).
+
+### Blocking items
+
+**1. The test tee in the walk (route (a), region hiding): partly done, still failing.**
+- **What was built:**
+  - **`regions.py`, the neck.** The trunk's skin round the neck, above the neck's joint and within 8.8 cm of its line, is now the `neck`'s. That is the skin a crew neck leaves bare. The `torso` used to run up the neck, which is why no top could hide it.
+  - **`regions.py`, the upper arm.** It has a third band, `upper_arms_mid` (map index 15, the last the second texture coordinates hold). It holds the faces a short sleeve keeps covered: every corner of the face within 0.8 of the bone on the sides, 0.9 underneath and 0.7 on top. `manifests.py` adds the band to the `arms` feature.
+  - **`avatar::fit::coverage`, creases.** Coverage counts a crease the garment closes over (`closed_creases`): a patch of uncovered triangles counts when each one's ray out along its normal meets the skin across the crease or the garment from inside, within 15 cm. That is the armpit under a sleeve, which no cloth lies along. A patch under a hole in the garment doesn't count.
+  - **The result.** The imported tee hides `torso`, `waist`, `upper_arms_top` and `upper_arms_mid` (2,000+ triangles; before, only `waist`, 256).
+- **The gate, wave 4 → now:**
+
+  | Case | Wave 4 | Now |
+  |---|---|---|
+  | Test tee, walk | 54 bodies, 30.2 mm (31 to 92 corners each) | 50, 23.7 mm (1 to 9 corners each) |
+  | Test tee, arms raised | 2, 5.1 mm | 0 (record removed) |
+  | Bra through tee, walk | 21, 17.4 mm | 21, 17.4 mm |
+  | Bra through tee, arms raised | 2, 3.6 mm | 2, 3.6 mm |
+
+- **What is left in the walk.** Skin at the front of the upper arm, just inside the sleeve's end, comes out when the arm swings back: the sleeve rides along the arm.
+  - I tried widening the band. Hidden faces then reached past the sleeve's hem: a 0.8 band measured by the face's middle and not its corners put corners of hidden faces 20 to 30 mm past the hem at rest, which would be holes. So I made the band whole faces.
+  - The bra through the tee is not something hiding can fix (an item can't hide another item's triangles). It is the cause of the visible spot at the feminine heavyset body's armpit.
+- **A check I tried and dropped.** I tried a gate check that hidden skin never shows (a ray from each hidden corner, toward the camera or along its normal, meets nothing drawn). It flagged hundreds of corners that no capture shows, so I removed it rather than ship an unreliable rule.
+- **Captures: no hole in any standard view.** I checked `rf1-tee-rest.jpg`, `rf1-tee-walk.jpg` and `rf1-tee-arms-raised.jpg`: four bodies; front, three-quarter, side and back.
+- **Hidden skin seen from below is not checked.** Looking up a sleeve into the armpit, or under a hem, a hole may show. The waist the tee has hidden since wave 3 has the same exposure. This is recorded in Known-Limitations.
+- **For the lead.** A top built on this branch still fails the walk (the sleeve's end and the bra through it), so this needs your formal re-scope before a content track starts on it. Ways forward:
+  - a posed fit that pulls the sleeve's front in when the arm swings back;
+  - cloth proxies or deformer maps (ADR-0035);
+  - a ruling on whether skin past a sleeve that rides up is a fit failure: it is outside the cloth, not through it.
+
+**2. The boxer briefs' gusset: not fixed; traced.**
+- **The corner.** It is corner 3727, at (−2.6, 75.2, −4.4) cm on the masculine heavy-soft body, 13.3 mm below the gusset's underside (the cloth's normal points down).
+- **The reviewer's hypothesis, tested.** The hypothesis was that `push_out`'s hem band differs from the gate's: the gate's band is two rings from the open edge, which is the rim folded under the skin, so one cloth ring; `push_out`'s is two cloth rings. I set `push_out` to one ring, rebuilt and ran the gate: the case is unchanged, 13.38 mm at rest and 17.94 mm in the walk. I reverted it.
+- **What the trace shows.** `push_out` never reaches this corner, whatever the ring.
+  - The same corner is about 13 mm below the cloth on every masculine body. On those bodies the gate counts it as beside the leg opening.
+  - So it is skin just past the leg opening at the gusset's edge, which the gate's rest test happens to count as covered on one body.
+- **Next step.** Log `push_out`'s `over()` for corner 3727 in the heavy-soft state, in Blender. Records unchanged (13.4 / 17.9 mm).
+
+**3. The stylized clothes: blotches confirmed as levels of detail; the hem traced, not refitted.**
+- **The blotches are the level-of-detail defect.** The capture records the body at level 0 and the underwear at level 1 (`captures.json`). I added `AXCENITY_CAPTURE_FULL_DETAIL=<part>` (the editor's LOD preview, applied to one part in a capture). With the briefs forced to full detail, they show no skin at all, while the sports top at level 1 still shows blotches (`rf1-stylized-lod.jpg`). This is CO18's "character LOD sets switched together". Known-Limitations now says it is confirmed.
+- **The hem.** The ragged edge is there at rest too, not only in the walk (`rf1-stylized-hem.jpg`). It is the tee's jagged hem band lying over a waistband tucked 3 mm under it.
+  - The gate's pair (`Pants_Cargo` through `Shirt_Tee`) finds nothing, because the hem's two rings are left out.
+  - With one ring it finds 32 corners up to 16 mm. Those are false cases: the cloth there is the hem's downward-facing edge, and the waistband below it is past the hem. So I kept two rings.
+  - I tried a fix: the waistband takes the tee's skin weights where the tee covers it (`fit.follow_layer_weights`), with a stylized rebuild. The capture didn't change, so I reverted it and the stylized package is unchanged.
+  - The stylized gate now runs the walk as well (`STYLIZED_WALK`), with records:
+
+    | Item, walk | Bodies | Worst |
+    |---|---|---|
+    | Cargo pants | 15 | 27.2 mm |
+    | Tee | 16 | 24.7 mm |
+    | Sports top | 1 | 5.2 mm |
+    | Sports top through the tee | 12 | 2.5 mm |
+
+  - Not refitted: an open issue.
+
+**4. Synthetic tests for the checks: done.**
+- **What I factored out.** `motion()`'s frame-by-frame comparison is now `step` (jolt against the skin near it, then tears). `footwear()`'s comparison is now `foot_report`.
+- **The synthetic tests:**
+  - `a_frame_with_a_corner_thrown_out_of_line_is_a_pop_and_a_split_seam_a_tear`: steady motion with the skin speeding up gives no pop; a corner thrown 1 cm in one frame is a pop; a weld split 1 mm is a tear.
+  - `the_footwear_check_finds_a_foot_through_the_sole_and_a_tread_off_flat`: a box shoe with a foot inside passes; the foot 5 mm through the sole gives 45 corners at 5.0 mm; a tread raised 5 mm at the front is a tread problem.
+- **Recorded defects must still be found.** `garment_checks::stale` and the gate's `check` now fail when a record is no longer earned: the defect is gone (remove the record), or it is more than 1 mm under the record (lower it). Tests: `a_record_no_longer_earned_is_stale`, and new cases in `the_gate_holds_garments_to_their_records`.
+  - This check caught the tee's arms-raised record when that case disappeared.
+  - The sneaker test asserts its recorded through and tread defects are still found.
+- **From the non-blocking list:**
+  - welds are found at rest;
+  - hair inside the head is looked for 15 cm deep (was 5).
+
+**5. Where the swing correctives fire, measured.**
+- **New poses in `qa_scene.SWING_POSES`:** the arm raised forward to level (`shoulder_flex_90`), raised to 90 and swung forward 40, and raised to 60 and swung forward 20.
+- **`measure.py --only deformation`, with the build data's swing rules removed (`--custom`) and with them (masculine / feminine):**
+
+  | Pose | Ring area without → with | Local volume without → with |
+  |---|---|---|
+  | Swing forward 40 | 0.900 → 0.908 / 0.967 → 0.939 | 1.025 → 0.989 / 0.980 → 0.931 |
+  | Swing back 50 | 0.909 → 0.963 / 0.954 → 0.974 | 0.969 → 0.972 / 0.944 → 0.923 |
+  | Forward raise to level | 0.869 → 0.868 / 0.965 → 0.941 | 0.967 → 0.917 / 0.915 → 0.845 |
+  | Raised 90, swung forward 40 | 1.030 → 1.024 / 1.006 → 0.987 | 0.890 → 0.874 / 0.912 → 0.897 |
+  | Raised 60, swung forward 20 | 1.010 → 1.008 / 1.009 → 0.996 | 0.969 → 0.956 / 0.972 → 0.952 |
+
+- **What it shows.** Flexion doesn't bulge: the ring area is unchanged on the masculine frame. The shapes do take local volume off a forward raise (5 and 8%) and off the feminine frame in its own swing pose.
+- **Why I didn't gate them.** Gating by the `Lowered` weight wouldn't help, because a forward raise keeps the arm lowered. The fix is a rule that fades out past full (a third angle). That changes the rule contract in `anim`, `avatar::fit`, the build data and `qa_scene`, so I left it for the lead to decide. It is recorded as an open issue.
+- **What holds them.** `thresholds.json` holds all three new poses at what the build reaches less about 0.01. That stops them getting worse; it doesn't accept them.
+- **The full run.** `measure.py --only deformation,twist,sliders --check`: 0 new slider crossings, and every deformation and twist limit holds. The two shoulder-at-90-degree volume targets were already not met.
+
+**6. The visible poke: corrected.** "Visual evidence" above now reports the spot at the feminine heavyset body's armpit; the zoom is `rf1-armpit-crops.jpg`. `rf1-tee-walk.jpg` crops the torso and armpits of all four bodies from four views in the walk.
+
+**7. Item 1's acceptance: corrected to partly met.** `the_swing_correctives_take_the_walks_fold_out_of_the_armpit` now holds each frame's and side's 95th percentile and deepest corner at their current values, as records to lower:
+- 4.9 / 18.4, 5.9 / 14.3, 3.2 / 17.2 and 4.5 / 16.5 mm;
+- the masculine 95th percentile still at most 60% of its value without the shapes.
+
+The feminine half-millimetre tolerance is gone. The apex fold (up to 18.4 mm) and the feminine walk-right (4.3 to 4.5 mm, worse) are open defects.
+
+### Files (review fixes 1)
+
+- **Body regions:**
+  - `assets/characters/realistic/regions.py`: the neck cut and `upper_arms_mid`.
+  - `assets/characters/realistic/manifests.py`: `arms` lists `upper_arms_mid`.
+- **Regenerated by `build.py`:** `RealisticParts.glb`, `RealisticRegions.png`, `Realistic.base.json` (regions, and feature anchors that move with them) and `Realistic.build.json`. The item manifests and `catalogue.json` changed only in line endings and are not committed.
+- **Rust:**
+  - `crates/avatar/src/fit/coverage.rs`: `closed_creases`.
+  - `crates/avatar/src/fit/tests.rs`: `coverage_counts_a_crease_the_garment_closes_over`.
+  - `crates/avatar/tests/fitting.rs`: the fold records.
+  - `crates/assets/src/model/tests.rs`: 15 regions.
+  - `crates/player/src/fit_gate_tests.rs`: stale records, the stylized walk, the tee's hides, records.
+  - `crates/player/src/garment_checks.rs`: `step`, `foot_report`, `stale`, welds at rest, `HEAD_REACH`, synthetic tests.
+  - `crates/player/src/character_capture.rs`: `AXCENITY_CAPTURE_FULL_DETAIL`.
+- **QA:**
+  - `assets/characters/humanoid/qa/qa_scene.py`: three swing poses.
+  - `assets/characters/realistic/qa/thresholds.json`: their limits.
+- **Docs:**
+  - `docs/development/character-studio/architecture.md`, `testing.md`;
+  - `assets/characters/realistic/README.md`;
+  - `wiki/Engine-Systems/Characters.md`, `wiki/Roadmap/Known-Limitations.md`.
+- **Sheets:** `co9-fit-2/rf1-*.jpg`.
+
+### Tests (review fixes 1)
+
+- **Red first.** `coverage_counts_a_crease_the_garment_closes_over` failed before `closed_creases` (crease share 0.05; `co9-fit-2-red-run.txt`, "Review fixes 1"). After the regions changed, the gate's walk and arms-raised tests failed on their now-stale records, then passed once the records were lowered or removed.
+- **Not red first.** The synthetic `step` and `foot_report` tests were written against the factored-out code and passed at once; they test what was already there.
+- **Runs:**
+
+  | Run | Result |
+  |---|---|
+  | `cargo nextest run -p axcenity-anim -p axcenity-avatar -p axcenity-player -p axcenity-assets -p axcenity-gameplay -p axcenity-project --no-fail-fast` | 1059 run: 1058 passed, 1 failed, then fixed: `assets` `the_realistic_bodys_region_map_reaches_every_corner_and_its_simpler_copies`, which held 14 regions, now 15. No ABORT lines |
+  | Makeup tests | Three failed in one full player run under load and passed rerun at two threads (23/23) |
+  | `cargo clippy -p axcenity-avatar -p axcenity-anim -p axcenity-player --all-targets -- -D warnings` | clean |
+  | `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::/)'` (the base manifest's regions and features changed) | 105 passed |
+  | `python3 -I scripts/check-wiki.py` | 114 pages, 0 errors |
+  | `measure.py --package realistic --only deformation,twist --check` (final build) | every limit holds; only the two old targets aren't met |
+  | `--only deformation,twist,sliders` (earlier build: same shapes, regions only) | 0 new crossings |
+
+### Open issues (review fixes 1)
+
+1. **The test tee in the walk.** 50 bodies, 23.7 mm, at the sleeve's front end; the bra through it on 21 (17.4 mm). Needs the lead's re-scope: see item 1.
+2. **Holes seen from below.** Hidden skin isn't checked from below (up a sleeve, under a hem). There is no reliable check; the standard views show no hole.
+3. **Every map index is used** (15 of 15).
+4. **The boxer gusset.** Corner 3727, 13.3 / 17.9 mm; `push_out` doesn't reach it with either hem band.
+5. **The stylized tee's hem** is jagged over the waistband at rest and in the walk. The gate doesn't measure it, and it is not refitted. The stylized walk records are new.
+6. **The swing correctives take local volume off a forward raise** (masculine 0.967 to 0.917, feminine 0.915 to 0.845) and off the feminine frame's own swing. The proposed fix is a fade-out angle in the rule: a contract change for the lead.
+7. **Still from the review's non-blocking list:**
+   - the toe-box rule;
+   - the stylized Idle motion run;
+   - the pop allowance near fast joints;
+   - fine alignment for garments that lie on the shoulders;
+   - a controlled before and after of the same tee with and without the swing shapes.
+
+### At merge (review fixes 1)
+
+- **Rebuild.** Rebuild `RealisticParts.glb`, `RealisticRegions.png`, `Realistic.base.json` and `Realistic.build.json` with `build.py` from this branch: `regions.py` and `manifests.py` changed. Run `python3 -I assets/characters/catalogue.py`; it gives no content change.
+- **Other branches.** One that adds a region, or reads region counts, must use index 15 for `upper_arms_mid`; there is none left after it.
+- **The gate library cache** rebuilds itself.

@@ -551,6 +551,14 @@ def _swing(ch, deg, sides=("Left",)):
         ch.bend(f"{side}UpperArm", (1, 0, 0), abs(deg), toward=FWD if deg >= 0 else BACK)
 
 
+def _raised_swing(ch, abduction, deg, sides=("Left",)):
+    """Upper arm raised `abduction` degrees from hanging (`_shoulder`),
+    then swung `deg` degrees forward about the axis across the body."""
+    _shoulder(ch, abduction, sides)
+    for side in sides:
+        ch.bend(f"{side}UpperArm", (1, 0, 0), abs(deg), toward=FWD if deg >= 0 else BACK)
+
+
 def _wrist(ch, deg, sides=("Left",)):
     for side, s in SIDES:
         if side not in sides:
@@ -607,9 +615,20 @@ POSES = {
 # correctives are made in these (`realistic/correctives.py`). Apart from
 # `POSES` so the baseline sheets keep their rows; `measure.py`'s
 # deformation section measures both.
+#
+# And where else the swing correctives fire (review fixes 1): their rule
+# reads only the turn about the axis across the body, so an arm raised
+# forward (to reach, aim or climb) leans on `Forward` at full weight, and
+# a raised arm swung forward on both `Raised` and `Forward`. The forward
+# raise to level, a raise to 90 swung forward 40, and one in between.
 SWING_POSES = {
     "shoulder_swing_forward_40": (lambda ch: _swing(ch, 40), ("LeftUpperArm", "LeftShoulder", 0.09)),
     "shoulder_swing_back_50": (lambda ch: _swing(ch, -50), ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_flex_90": (lambda ch: _swing(ch, 90), ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_abd_90_swing_forward_40": (lambda ch: _raised_swing(ch, 90, 40),
+                                         ("LeftUpperArm", "LeftShoulder", 0.09)),
+    "shoulder_abd_60_swing_forward_20": (lambda ch: _raised_swing(ch, 60, 20),
+                                         ("LeftUpperArm", "LeftShoulder", 0.09)),
 }
 
 

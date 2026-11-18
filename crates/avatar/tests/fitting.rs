@@ -755,11 +755,16 @@ fn welds_of(positions: &[Vec3]) -> Vec<usize> {
 /// (`Corrective_Shoulder_Forward_*`, `_Back_*`, made on the masculine
 /// frame) take that fold out over the region: on the masculine frame the
 /// 95th percentile of its depth is at most 60% of what it is without them
-/// (measured: 10.6 mm to 4.9 and 5.9); the feminine frame folds less (4.2
-/// and 4.3 mm without) and they make it no worse there by more than half a
-/// millimetre. (The deepest single corner, the armpit's apex pinched
-/// between the hanging arm and the side, 14 to 18 mm, is reported, not
-/// held: the swing shapes don't reach it, `co9-fit-2.md`.)
+/// (measured: 10.6 mm to 4.9 and 5.9).
+///
+/// The rest is held at what the build reaches, as records of open defects
+/// (`refinement/wave4/co9-fit-2.md`, review fixes 1), each a ceiling to
+/// lower and never raise: the feminine frame folds less and the shapes
+/// barely help it (4.2 to 3.2 mm on the left; 4.3 to 4.5 mm on the right,
+/// worse); and the deepest single corner, the armpit's apex pinched
+/// between the hanging arm and the side, which no corrective reaches
+/// (16.0 to 18.4 mm on the masculine left, worse; 14.3 to 17.2 mm
+/// elsewhere).
 #[test]
 fn the_swing_correctives_take_the_walks_fold_out_of_the_armpit() {
     let assets = Assets::new(shipped());
@@ -818,12 +823,24 @@ fn the_swing_correctives_take_the_walks_fold_out_of_the_armpit() {
                 without_most * 1000.0,
                 with_most * 1000.0
             );
-            let held = if frame == 0.0 {
-                with <= 0.6 * without
-            } else {
-                with <= without + 0.0005
+            if frame == 0.0 {
+                assert!(
+                    with <= 0.6 * without,
+                    "frame {frame} {name}: {with} m, {without} m without"
+                );
+            }
+            // The records (metres): the 95th percentile and the deepest
+            // corner with the swing correctives, by frame and side.
+            let (most, deepest) = match (frame == 0.0, name) {
+                (true, "walk-left-40") => (0.0049, 0.0184),
+                (true, _) => (0.0059, 0.0143),
+                (false, "walk-left-40") => (0.0032, 0.0172),
+                (false, _) => (0.0045, 0.0165),
             };
-            assert!(held, "frame {frame} {name}: {with} m, {without} m without");
+            assert!(
+                with <= most + 5e-5 && with_most <= deepest + 5e-5,
+                "frame {frame} {name}: {with} m (record {most}), the deepest {with_most} m                  (record {deepest})"
+            );
         }
     }
 }

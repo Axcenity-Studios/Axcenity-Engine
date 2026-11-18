@@ -115,7 +115,7 @@ The engine lights a mouth's inside like the face, so its shade is baked (`teeth.
 
 ## Body regions
 
-Fourteen regions, so clothing can hide the skin it covers (ADR-0035): `head`, `neck`, `torso`, `waist`, `hips`, `upper_arms_top`, `upper_arms_low`, `forearms`, `hands`, `thighs_top`, `thighs_low`, `shins_top`, `shins_low`, `feet`, with `map_index` 1 to 14 in the manifest. A triangle belongs to one region. The index is stored twice:
+Fifteen regions, so clothing can hide the skin it covers (ADR-0035): `head`, `neck`, `torso`, `waist`, `hips`, `upper_arms_top`, `upper_arms_low`, `forearms`, `hands`, `thighs_top`, `thighs_low`, `shins_top`, `shins_low`, `feet` and `upper_arms_mid`, with `map_index` 1 to 15 in the manifest (15 is the last the second texture coordinates hold). A triangle belongs to one region. Two cuts follow where garments end (CO9 part 2, review fixes 1): the `neck` takes the trunk's skin round the neck above its joint (within `NECK_ROUND`, 8.8 cm, of its line: the skin a crew neck leaves bare), so a top can cover the `torso` whole; and the upper arm has three bands, `upper_arms_top` to halfway along the bone, `upper_arms_mid` the faces a short sleeve keeps covered (every corner within `SLEEVE_END + SLEEVE_TILT × facing in`, 0.8 of the bone on the sides, 0.9 underneath, 0.7 on top), and `upper_arms_low` to the elbow. The imported test tee hides `torso`, `waist`, `upper_arms_top` and `upper_arms_mid`. The index is stored twice:
 
 - `RealisticRegions.png`: 1024 px, 8-bit grey, laid out by `TEXCOORD_0`; a texel's value is its region's index (0 outside the islands).
 - `TEXCOORD_1` on `Body` and its copies: every corner of a triangle has `u = (index + 0.5) / 16`, `v = 0.5`.

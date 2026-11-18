@@ -1417,13 +1417,13 @@
    "id": "neck",
    "label": "Neck",
    "map_index": 2,
-   "triangles": 256
+   "triangles": 300
   },
   {
    "id": "torso",
    "label": "Torso",
    "map_index": 3,
-   "triangles": 1408
+   "triangles": 1364
   },
   {
    "id": "waist",
@@ -1447,7 +1447,7 @@
    "id": "upper_arms_low",
    "label": "Upper arms (low)",
    "map_index": 7,
-   "triangles": 676
+   "triangles": 336
   },
   {
    "id": "forearms",
@@ -1490,6 +1490,12 @@
    "label": "Feet",
    "map_index": 14,
    "triangles": 4280
+  },
+  {
+   "id": "upper_arms_mid",
+   "label": "Upper arms (middle)",
+   "map_index": 15,
+   "triangles": 340
   }
  ],
  "regions_map": {

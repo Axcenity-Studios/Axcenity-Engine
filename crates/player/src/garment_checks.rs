@@ -56,6 +56,9 @@ pub(crate) const NEAR: f32 = 0.10;
 pub(crate) const TEAR: f32 = 0.0002;
 /// The deepest a hair corner may be inside the head (§4 "Motion").
 pub(crate) const HAIR_INSIDE: f32 = 0.001;
+/// How far from the head's skin a hair corner is looked for: far enough
+/// to find one deep inside the head (about 20 cm across).
+const HEAD_REACH: f32 = 0.15;
 /// How far from flat the sole's tread may be at rest, and from the floor.
 pub(crate) const SOLE_FLAT: f32 = 0.002;
 /// The deepest a foot corner may be outside its shoe (as the fit gate's
@@ -120,6 +123,43 @@ pub(crate) fn unrecorded(problems: &[Problem], records: &[Record]) -> Vec<String
         .map(|p| p.line.clone())
         .collect()
 }
+
+/// Records no longer earned: one whose defect no problem shows any more
+/// (remove it), or that the worst problem it allows is now more than
+/// [`SLACK`] under (lower it). Records are ceilings that follow the item
+/// down, and a check that stopped finding a recorded defect is caught.
+pub(crate) fn stale(problems: &[Problem], records: &[Record]) -> Vec<String> {
+    records
+        .iter()
+        .filter_map(|r| {
+            let worst = problems
+                .iter()
+                .filter(|p| p.what == r.what && p.case == r.case)
+                .map(|p| p.amount)
+                .reduce(f32::max);
+            match worst {
+                None => Some(format!(
+                    "{} in {}: recorded {:.2} mm, now none: remove the record",
+                    r.what,
+                    r.case,
+                    r.most * 1000.0
+                )),
+                Some(worst) if worst < r.most - SLACK => Some(format!(
+                    "{} in {}: recorded {:.2} mm, now {:.2} mm: lower the record",
+                    r.what,
+                    r.case,
+                    r.most * 1000.0,
+                    worst * 1000.0
+                )),
+                Some(_) => None,
+            }
+        })
+        .collect()
+}
+
+/// How far under its record a defect may fall before the record must come
+/// down to it.
+pub(crate) const SLACK: f32 = 0.001;
 
 impl MotionReport {
     /// Each limit broken.
@@ -225,6 +265,43 @@ fn welds(mesh: &Posed) -> Vec<Vec<usize>> {
     groups.into_values().filter(|g| g.len() > 1).collect()
 }
 
+/// One frame of a garment against the skin under it, into `out`: each
+/// corner's jolt over its last two places (`last`) and `now`, against
+/// [`LEVER`] times the most the skin near it (`near`, by corner) jolted
+/// (`skin_jolts`; none in the first two frames), and how far apart the
+/// corners of each weld group are now.
+fn step(
+    out: &mut GarmentMotion,
+    frame: u32,
+    skin_jolts: Option<&[f32]>,
+    near: &[Vec<u32>],
+    last: &[Vec<Vec3>],
+    now: &[Vec3],
+    welds: &[Vec<usize>],
+) {
+    if let (Some(skin), [a, b]) = (skin_jolts, last) {
+        let cloth = jolts(a, b, now);
+        for (k, (jolt, near)) in cloth.iter().zip(near).enumerate() {
+            let skin_most = near
+                .iter()
+                .map(|k| skin[*k as usize])
+                .fold(0.0f32, f32::max);
+            let past = jolt - LEVER * skin_most;
+            if past > out.pop_most {
+                out.pop_most = past;
+                out.pop_frame = frame;
+                out.pop_at = now[k];
+            }
+        }
+    }
+    for group in welds {
+        let a = now[group[0]];
+        for k in &group[1..] {
+            out.tear_most = out.tear_most.max(a.distance(now[*k]));
+        }
+    }
+}
+
 /// Plays `clip` (a starter clip, `Walk`, `Run`, `Idle`) on `description`
 /// and samples `frames` (sixtieths of a second from its start, at least
 /// 2): see the module's notes.
@@ -250,6 +327,10 @@ pub(crate) fn motion(
         clip: clip.to_owned(),
         ..MotionReport::default()
     };
+    // The seams are found at rest, where corners made at one place are
+    // still at one place (a seam already split in the first frame sampled
+    // would be two places there, and never be seen to tear).
+    let (_, rest_garments) = worn(assets, description, Stance::Rest);
     // Per garment: the skin near each corner, its welds and its last two
     // places; the skin's last two places.
     struct Track {
@@ -263,9 +344,15 @@ pub(crate) fn motion(
         let (body, garments, hair) = worn_in(&world, assets, &animators);
         if tracks.is_empty() {
             for garment in &garments {
+                let rest = rest_garments
+                    .iter()
+                    .find(|g| {
+                        g.name == garment.name && g.positions.len() == garment.positions.len()
+                    })
+                    .unwrap_or(garment);
                 tracks.push(Track {
                     near: near_skin(&body, garment),
-                    welds: welds(garment),
+                    welds: welds(rest),
                     last: Vec::new(),
                 });
                 report.garments.push(GarmentMotion {
@@ -277,30 +364,18 @@ pub(crate) fn motion(
         let skin_jolts =
             (skin_last.len() == 2).then(|| jolts(&skin_last[0], &skin_last[1], &body.positions));
         for ((garment, track), out) in garments.iter().zip(&mut tracks).zip(&mut report.garments) {
-            if let (Some(skin), [a, b]) = (&skin_jolts, track.last.as_slice()) {
-                let cloth = jolts(a, b, &garment.positions);
-                for (k, (jolt, near)) in cloth.iter().zip(&track.near).enumerate() {
-                    let skin_most = near
-                        .iter()
-                        .map(|k| skin[*k as usize])
-                        .fold(0.0f32, f32::max);
-                    let past = jolt - LEVER * skin_most;
-                    if past > out.pop_most {
-                        out.pop_most = past;
-                        out.pop_frame = frame;
-                        out.pop_at = garment.positions[k];
-                    }
-                }
-            }
+            step(
+                out,
+                frame,
+                skin_jolts.as_deref(),
+                &track.near,
+                &track.last,
+                &garment.positions,
+                &track.welds,
+            );
             track.last.push(garment.positions.clone());
             if track.last.len() > 2 {
                 track.last.remove(0);
-            }
-            for group in &track.welds {
-                let a = garment.positions[group[0]];
-                for k in &group[1..] {
-                    out.tear_most = out.tear_most.max(a.distance(garment.positions[*k]));
-                }
             }
         }
         skin_last.push(body.positions.clone());
@@ -341,7 +416,7 @@ fn hair_in_head(body: &Posed, hair: &[Posed]) -> (usize, f32) {
             if p.y < from {
                 continue;
             }
-            let Some(hit) = surface.closest(*p, 0.05) else {
+            let Some(hit) = surface.closest(*p, HEAD_REACH) else {
                 continue;
             };
             let inside = -hit.signed(*p);
@@ -464,66 +539,78 @@ pub(crate) fn footwear(
         Stance::Clip { name, frames } => format!("{name}@{frames}"),
         Stance::Idle => "idle".to_owned(),
     };
-    let mut out = Vec::new();
-    for (shoe_rest, shoe) in garments_rest
+    garments_rest
         .iter()
         .zip(&garments)
         .filter(|(g, _)| g.name.starts_with("Shoes_"))
-    {
-        let covered = foot_cover(&body_rest, shoe_rest);
-        let still = foot_cover(&body, shoe);
-        let surface = Surface::new(
-            shoe.positions.clone(),
-            shoe.normals.clone(),
-            shoe.triangles.clone(),
-        );
-        let mut report = FootReport {
-            character: description.name.clone(),
-            pose: pose.clone(),
-            shoe: shoe.name.clone(),
-            covered: covered.iter().filter(|c| **c).count(),
-            ..FootReport::default()
-        };
-        for (k, p) in body.positions.iter().enumerate() {
-            if !covered[k] || still[k] {
-                continue;
-            }
-            // Out of the shoe: how far from it.
-            let far = surface.closest(*p, 0.05).map_or(0.05, |hit| hit.distance);
-            if far > FOOT_OUT {
-                report.through += 1;
-                report.through_most = report.through_most.max(far);
-            }
+        .map(|(shoe_rest, shoe)| {
+            foot_report(&description.name, &pose, &body_rest, shoe_rest, &body, shoe)
+        })
+        .collect()
+}
+
+/// The footwear check of one shoe: `body_rest` and `shoe_rest` at rest,
+/// `body` and `shoe` in the pose named `pose` (`rest` for rest itself).
+fn foot_report(
+    character: &str,
+    pose: &str,
+    body_rest: &Posed,
+    shoe_rest: &Posed,
+    body: &Posed,
+    shoe: &Posed,
+) -> FootReport {
+    let covered = foot_cover(body_rest, shoe_rest);
+    let still = foot_cover(body, shoe);
+    let surface = Surface::new(
+        shoe.positions.clone(),
+        shoe.normals.clone(),
+        shoe.triangles.clone(),
+    );
+    let mut report = FootReport {
+        character: character.to_owned(),
+        pose: pose.to_owned(),
+        shoe: shoe.name.clone(),
+        covered: covered.iter().filter(|c| **c).count(),
+        ..FootReport::default()
+    };
+    for (k, p) in body.positions.iter().enumerate() {
+        if !covered[k] || still[k] {
+            continue;
         }
-        // The tread: the shoe's faces that face the floor (within 25
-        // degrees of straight down) under the foot, at rest.
-        let mut low = f32::MAX;
-        let mut high = f32::MIN;
-        let lowest = shoe_rest
-            .positions
-            .iter()
-            .map(|p| p.y)
-            .fold(f32::MAX, f32::min);
-        for t in &shoe_rest.triangles {
-            let [a, b, c] = t.map(|v| shoe_rest.positions[v as usize]);
-            let n = (b - a).cross(c - a).normalize_or_zero();
-            // The tread is the bottom: faces down and within 1 cm of the
-            // lowest point (not the inner floor above it, nor a toe cap's
-            // underside that curves up).
-            if n.y < -0.9 && [a, b, c].iter().all(|p| p.y < lowest + 0.01) {
-                for p in [a, b, c] {
-                    low = low.min(p.y);
-                    high = high.max(p.y);
-                }
-            }
+        // Out of the shoe: how far from it.
+        let far = surface.closest(*p, 0.05).map_or(0.05, |hit| hit.distance);
+        if far > FOOT_OUT {
+            report.through += 1;
+            report.through_most = report.through_most.max(far);
         }
-        if low <= high {
-            report.tread_low = low;
-            report.tread_high = high;
-        }
-        out.push(report);
     }
-    out
+    // The tread: the shoe's faces that face the floor (within 25 degrees
+    // of straight down) under the foot, at rest.
+    let mut low = f32::MAX;
+    let mut high = f32::MIN;
+    let lowest = shoe_rest
+        .positions
+        .iter()
+        .map(|p| p.y)
+        .fold(f32::MAX, f32::min);
+    for t in &shoe_rest.triangles {
+        let [a, b, c] = t.map(|v| shoe_rest.positions[v as usize]);
+        let n = (b - a).cross(c - a).normalize_or_zero();
+        // The tread is the bottom: faces down and within 1 cm of the
+        // lowest point (not the inner floor above it, nor a toe cap's
+        // underside that curves up).
+        if n.y < -0.9 && [a, b, c].iter().all(|p| p.y < lowest + 0.01) {
+            for p in [a, b, c] {
+                low = low.min(p.y);
+                high = high.max(p.y);
+            }
+        }
+    }
+    if low <= high {
+        report.tread_low = low;
+        report.tread_high = high;
+    }
+    report
 }
 
 /// The realistic cast (both frames) in the test tee over the underwear.
@@ -613,6 +700,8 @@ fn check_motion(stage: &Stage, cast: &[Description], clip: &'static str, records
     }
     let left = unrecorded(&problems, records);
     assert!(left.is_empty(), "{left:#?}");
+    let old = stale(&problems, records);
+    assert!(old.is_empty(), "{old:#?}");
 }
 
 // What the motion and footwear checks still find (wave 4, CO9 part 2), as
@@ -744,6 +833,10 @@ fn the_stylized_sneakers_hold_the_feet() {
     }
     let left = unrecorded(&problems, &SNEAKER_RECORDS);
     assert!(left.is_empty(), "{left:#?}");
+    // The recorded defects are still found: a check that stopped finding
+    // them would pass any shoe.
+    let old = stale(&problems, &SNEAKER_RECORDS);
+    assert!(old.is_empty(), "{old:#?}");
 }
 
 /// The checks catch what they are for: a garment corner moved 1 cm for
@@ -803,4 +896,206 @@ fn the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head() {
         hair_deepest: 0.002,
     };
     assert_eq!(report.problems().len(), 3, "{:?}", report.problems());
+}
+
+/// A garment that moves with the skin passes a frame; one corner thrown
+/// 1 cm out of line for one frame is a pop; corners made at one place
+/// coming 1 mm apart are a tear (`step`, the frame-by-frame core of
+/// [`motion`]).
+#[test]
+fn a_frame_with_a_corner_thrown_out_of_line_is_a_pop_and_a_split_seam_a_tear() {
+    // Skin and cloth both speeding up the same way: they jolt alike.
+    let speeding = |k: f32| Vec3::new(0.01 * k + 0.002 * k * k, 0.0, 0.0);
+    let skin_jolts = jolts(&[speeding(0.0)], &[speeding(1.0)], &[speeding(2.0)]);
+    let near = vec![vec![0u32]; 3];
+    // Three cloth corners; the last two made at one place.
+    let cloth = |k: f32| {
+        let at = speeding(k);
+        vec![
+            at + Vec3::Y * 0.01,
+            at + Vec3::Z * 0.01,
+            at + Vec3::Z * 0.01,
+        ]
+    };
+    let welds = vec![vec![1usize, 2]];
+    let mut steady = GarmentMotion::default();
+    step(
+        &mut steady,
+        2,
+        Some(&skin_jolts),
+        &near,
+        &[cloth(0.0), cloth(1.0)],
+        &cloth(2.0),
+        &welds,
+    );
+    assert!(steady.pop_most <= 1e-6, "{steady:?}");
+    assert!(steady.tear_most <= 1e-6, "{steady:?}");
+    // The first corner thrown 1 cm out of line in the middle frame: its
+    // jolt over the next frame is 2 cm the skin doesn't have.
+    let mut thrown = cloth(1.0);
+    thrown[0] += Vec3::X * 0.01;
+    let mut popped = GarmentMotion::default();
+    step(
+        &mut popped,
+        2,
+        Some(&skin_jolts),
+        &near,
+        &[cloth(0.0), thrown],
+        &cloth(2.0),
+        &welds,
+    );
+    assert!(popped.pop_most > POP, "{popped:?}");
+    assert_eq!(popped.pop_frame, 2);
+    // The welded corners 1 mm apart now.
+    let mut split = cloth(2.0);
+    split[2] += Vec3::Y * 0.001;
+    let mut torn = GarmentMotion::default();
+    step(
+        &mut torn,
+        2,
+        Some(&skin_jolts),
+        &near,
+        &[cloth(0.0), cloth(1.0)],
+        &split,
+        &welds,
+    );
+    assert!(torn.tear_most > TEAR, "{torn:?}");
+    let report = MotionReport {
+        character: "c".to_owned(),
+        clip: "Walk".to_owned(),
+        frames: 3,
+        garments: vec![
+            GarmentMotion {
+                name: "Popped".to_owned(),
+                ..popped
+            },
+            GarmentMotion {
+                name: "Torn".to_owned(),
+                ..torn
+            },
+            GarmentMotion {
+                name: "Steady".to_owned(),
+                ..steady
+            },
+        ],
+        ..MotionReport::default()
+    };
+    let what: Vec<String> = report.problems().into_iter().map(|p| p.what).collect();
+    assert_eq!(what, ["Popped pop", "Torn tear"]);
+}
+
+/// A box shoe (outside faces out, 10 × 8 × 24 cm, its sole on the floor;
+/// the bottom raised by `tilt` at its front) as one closed mesh.
+fn box_shoe(tilt: f32) -> Posed {
+    let (x, y, z) = (0.05, 0.08, 0.12);
+    let mut positions = Vec::new();
+    for k in 0..8 {
+        let at = Vec3::new(
+            if k & 1 == 0 { -x } else { x },
+            if k & 2 == 0 { 0.0 } else { y },
+            if k & 4 == 0 { -z } else { z },
+        );
+        // The front of the sole raised: a tread that isn't flat.
+        let raised = if at.y == 0.0 && at.z > 0.0 { tilt } else { 0.0 };
+        positions.push(at + Vec3::Y * raised);
+    }
+    // Each side's corners counter-clockwise seen from outside.
+    let quads = [
+        [0, 1, 5, 4], // bottom (-Y)
+        [2, 6, 7, 3], // top (+Y)
+        [0, 2, 3, 1], // back (-Z)
+        [4, 5, 7, 6], // front (+Z)
+        [0, 4, 6, 2], // left (-X)
+        [1, 3, 7, 5], // right (+X)
+    ];
+    let triangles: Vec<[u32; 3]> = quads
+        .iter()
+        .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
+        .collect();
+    let normals = axcenity_avatar::fit::vertex_normals(&positions, &triangles);
+    Posed {
+        name: "Shoes_Box".to_owned(),
+        positions,
+        normals,
+        triangles,
+    }
+}
+
+/// A foot inside [`box_shoe`]: a sole patch 1 cm over the floor facing
+/// down and an instep patch 2 cm under the box's top facing up, `drop`
+/// lower.
+fn box_foot(drop: f32) -> Posed {
+    let mut positions = Vec::new();
+    let mut normals = Vec::new();
+    let mut triangles = Vec::new();
+    for (y, normal) in [(0.01, -Vec3::Y), (0.06, Vec3::Y)] {
+        let first = positions.len() as u32;
+        for i in 0..5 {
+            for j in 0..9 {
+                positions.push(Vec3::new(
+                    -0.03 + 0.015 * i as f32,
+                    y - drop,
+                    -0.08 + 0.02 * j as f32,
+                ));
+                normals.push(normal);
+            }
+        }
+        for i in 0..4u32 {
+            for j in 0..8u32 {
+                let a = first + i * 9 + j;
+                triangles.push([a, a + 1, a + 9]);
+                triangles.push([a + 1, a + 10, a + 9]);
+            }
+        }
+    }
+    Posed {
+        name: "Body".to_owned(),
+        positions,
+        normals,
+        triangles,
+    }
+}
+
+/// The footwear check finds a foot pushed 5 mm through the sole, and a
+/// tread 5 mm off flat at rest; a foot inside a flat shoe passes.
+#[test]
+fn the_footwear_check_finds_a_foot_through_the_sole_and_a_tread_off_flat() {
+    let (foot, shoe) = (box_foot(0.0), box_shoe(0.0));
+    let fits = foot_report("c", "rest", &foot, &shoe, &foot, &shoe);
+    assert_eq!(fits.covered, foot.positions.len(), "{fits:?}");
+    assert!(fits.problems().is_empty(), "{:?}", fits.problems());
+    // The foot 1.5 cm lower in a pose: its sole 5 mm under the shoe's.
+    let through = foot_report("c", "Walk@18", &foot, &shoe, &box_foot(0.015), &shoe);
+    assert_eq!(through.through, 45, "{through:?}");
+    assert!((through.through_most - 0.005).abs() < 1e-4, "{through:?}");
+    let what: Vec<String> = through.problems().into_iter().map(|p| p.what).collect();
+    assert_eq!(what, ["Shoes_Box through"]);
+    // The tread's front 5 mm up at rest.
+    let tilted = box_shoe(0.005);
+    let tread = foot_report("c", "rest", &foot, &tilted, &foot, &tilted);
+    assert!(
+        (tread.tread_high - tread.tread_low - 0.005).abs() < 1e-4,
+        "{tread:?}"
+    );
+    let what: Vec<String> = tread.problems().into_iter().map(|p| p.what).collect();
+    assert_eq!(what, ["Shoes_Box tread"]);
+}
+
+/// A record whose defect is gone, or which is well over it, is stale.
+#[test]
+fn a_record_no_longer_earned_is_stale() {
+    let problem = |amount| Problem {
+        what: "Draft pop".to_owned(),
+        case: "Walk".to_owned(),
+        amount,
+        line: String::new(),
+    };
+    let records = [Record {
+        what: "Draft pop",
+        case: "Walk",
+        most: 0.005,
+    }];
+    assert!(stale(&[problem(0.0045)], &records).is_empty());
+    assert_eq!(stale(&[problem(0.003)], &records).len(), 1);
+    assert_eq!(stale(&[], &records).len(), 1);
 }

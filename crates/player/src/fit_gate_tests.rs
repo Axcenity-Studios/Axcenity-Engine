@@ -449,7 +449,7 @@ pub(super) fn poke_through(
             count += 1;
             if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
                 println!(
-                    "  {label} {} out {:.1} mm at {p}; cloth {} normal {}",
+                    "  {label} {} out {:.1} mm at {p} (corner {k}); cloth {} normal {}",
                     garment.name,
                     out * 1000.0,
                     hit.point,
@@ -661,6 +661,30 @@ fn check(label: &str, failures: &[Failure], known: &[Known]) {
             ));
         }
     }
+    // A record no longer earned: its defect is gone (remove it), or is
+    // now more than `SLACK` under it (lower it). Records follow an item
+    // down, and a gate that stopped finding a recorded case is caught.
+    for k in known {
+        match groups.get(&(k.garment, k.pose)) {
+            None => problems.push(format!(
+                "{} {}: recorded {} bodies, {:.2} mm, now none: remove the record",
+                k.garment,
+                k.pose,
+                k.cases,
+                k.worst * 1000.0
+            )),
+            Some((_, worst)) if *worst < k.worst - super::garment_checks::SLACK => {
+                problems.push(format!(
+                    "{} {}: recorded {:.2} mm, now {:.2} mm: lower the record",
+                    k.garment,
+                    k.pose,
+                    k.worst * 1000.0,
+                    worst * 1000.0
+                ))
+            }
+            Some(_) => {}
+        }
+    }
     assert!(problems.is_empty(), "{label}: {problems:#?}");
 }
 
@@ -711,18 +735,19 @@ fn gate(stance: Stance, known: &[Known]) {
 //
 // - The test tee, with the arms raised: was every body (54) up to 16 mm,
 //   the neck's base rising into a crew neck closed round the neck to cover
-//   the sports bra's straps. The straps now sit on the shoulders and the
-//   tee has an ordinary crew neck: two bodies, 5.1 mm (the bra through
-//   it: 4 bodies, 3.9 mm at wave 3; now 2, 3.6 mm).
-// - The test tee in the walk: still every body, up to 30 mm (31.4 at the
-//   wave-3 merge), and the bra through it on 21 (17.4 mm). The skin that
-//   comes out is the chest at the front of the armpit and the inside of
-//   the upper arm, where the arm hangs against the side and the tee's
-//   underarm, made with the arm at 45 degrees, can't fold into the
-//   crease. The swing correctives take the body's own fold out (the 95th
-//   percentile of its depth 10.6 to 4.9 mm on the masculine frame,
-//   `avatar` `the_swing_correctives_take_the_walks_fold_out_of_the_armpit`),
-//   but not this: the arms hanging alone, with no swing, fail the same.
+//   the sports bra's straps. The straps now sit on the shoulders, the tee
+//   has an ordinary crew neck, and (review fixes 1) the skin it covers at
+//   the base of the neck is the torso's, which it hides: none. The bra
+//   through it: 4 bodies, 3.9 mm at wave 3; now 2, 3.6 mm.
+// - The test tee in the walk: every body up to 31.4 mm at the wave-3
+//   merge, 37 to 92 skin corners each, at the chest by the armpit and the
+//   inside of the upper arm, where the hanging arm meets the side. Since
+//   review fixes 1 the tee hides the torso and the upper arm under its
+//   sleeve (`regions.py`'s neck cut and `upper_arms_mid`, `avatar`'s
+//   closed creases): 50 bodies, 1 to 9 corners each, up to 23.7 mm, at
+//   the front of the upper arm by the sleeve's end, past the band it
+//   hides. The bra through it is unchanged: 21 bodies, 17.4 mm, at the
+//   front of the armpit and the side band under it.
 // - The boxer briefs on the masculine heavy-soft body: one skin corner by
 //   the gusset's edge, 13.3 mm out (14.6 at wave 3) at rest and 17.9 mm in
 //   the walk, which the underwear's push-out (with the benchmark bodies
@@ -759,8 +784,8 @@ fn garments_cover_the_cast_walking() {
             Known {
                 garment: "TestTee",
                 pose: "Walk@18",
-                cases: 54,
-                worst: 0.0302,
+                cases: 50,
+                worst: 0.0238,
             },
             Known {
                 garment: BRA_THROUGH_TEE,
@@ -784,12 +809,6 @@ fn garments_cover_the_cast_with_the_arms_raised() {
         Stance::Held(HeldPose::ArmsRaised),
         &[
             Known {
-                garment: "TestTee",
-                pose: "ArmsRaised",
-                cases: 2,
-                worst: 0.0052,
-            },
-            Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "ArmsRaised",
                 cases: 2,
@@ -810,8 +829,9 @@ fn garments_cover_the_cast_with_the_knees_bent() {
     gate(Stance::Held(HeldPose::KneesBent), &[boxer("KneesBent")]);
 }
 
-/// The ratchet: a garment and pose recorded in `known` passes at or under
-/// its record and fails past it; one not recorded fails on any case.
+/// The ratchet: a garment and pose recorded in `known` passes at its
+/// record and fails past it, or when its defect is gone or well under the
+/// record (the record must come down); one not recorded fails on any case.
 #[test]
 fn the_gate_holds_garments_to_their_records() {
     let failure = |count, worst| Failure {
@@ -827,12 +847,14 @@ fn the_gate_holds_garments_to_their_records() {
         cases: 1,
         worst: 0.005,
     }];
-    check("at its record", &[failure(3, 0.004)], &known);
+    check("at its record", &[failure(3, 0.0045)], &known);
     for (label, failures, known) in [
+        ("gone", vec![], &known[..]),
+        ("well under", vec![failure(1, 0.003)], &known[..]),
         ("worse", vec![failure(1, 0.006)], &known[..]),
         (
             "more bodies",
-            vec![failure(1, 0.004), failure(1, 0.004)],
+            vec![failure(1, 0.0045), failure(1, 0.0045)],
             &known[..],
         ),
         ("not recorded", vec![failure(1, 0.004)], &[]),
@@ -850,9 +872,17 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
     let stage = Stage::new("fit-gate-hiding", gate_library()).expect("the stage");
     let library = Library::read(gate_library()).0;
     let tee = library.item(TEE).unwrap();
-    // The realistic `torso` region runs up the neck, past a crew neck:
-    // the tee hides the waist, which it covers whole.
-    assert!(tee.hides.contains(&"waist".to_owned()), "{:?}", tee.hides);
+    // The tee covers whole, and hides, the torso (the skin round the
+    // neck a crew neck leaves bare is the neck's), the waist, and the
+    // upper arm to where its sleeve ends: `upper_arms_top` and
+    // `upper_arms_mid`, with the armpit's crease between them (review
+    // fixes 1). Not the rest of the upper arm, nor the neck.
+    for region in ["torso", "waist", "upper_arms_top", "upper_arms_mid"] {
+        assert!(tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
+    }
+    for region in ["neck", "upper_arms_low", "forearms"] {
+        assert!(!tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
+    }
     let mut description = bodies()
         .into_iter()
         .find(|d| d.name == "realistic-masculine-cast-average")
@@ -866,7 +896,7 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
         bare.triangles.len(),
         dressed.triangles.len()
     );
-    assert!(hidden >= 200, "{hidden} triangles hidden");
+    assert!(hidden >= 2000, "{hidden} triangles hidden");
     // The corners stay the same: only what is drawn changes.
     assert_eq!(bare.positions.len(), dressed.positions.len());
     description.items.retain(|worn| worn.id != TEE);
@@ -878,6 +908,11 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
 /// shapes, ADR-0030's way): an outfit on the stylized cast and body
 /// extremes, measured with the same rule as the realistic items, at rest
 /// and in the T-pose.
+const STYLIZED_WALK: Stance = Stance::Clip {
+    name: "Walk",
+    frames: 18,
+};
+
 #[test]
 fn stylized_clothes_cover_the_stylized_cast() {
     let stage = Stage::new("fit-gate-stylized", &repository_library()).expect("the stage");
@@ -904,15 +939,19 @@ fn stylized_clothes_cover_the_stylized_cast() {
             &cover,
             &mut failures,
         );
-        let (body, garments) = worn(&stage.assets, &dressed, Stance::Held(HeldPose::TPose));
-        checked += measure(
-            &description.name,
-            Stance::Held(HeldPose::TPose),
-            &body,
-            &garments,
-            &cover,
-            &mut failures,
-        );
+        // The T-pose, and the walk at its widest stride, where the tee's
+        // hem lies over the cargo pants' waistband (`LAYERS`).
+        for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
+            let (body, garments) = worn(&stage.assets, &dressed, stance);
+            checked += measure(
+                &description.name,
+                stance,
+                &body,
+                &garments,
+                &cover,
+                &mut failures,
+            );
+        }
     }
     println!(
         "stylized: {checked} garment checks, {} failing",
@@ -936,6 +975,13 @@ fn stylized_clothes_cover_the_stylized_cast() {
         ("Pants_Cargo", "TPose", 7, 0.0024),
         ("Underwear_Top through Shirt_Tee", "rest", 7, 0.0047),
         ("Underwear_Top through Shirt_Tee", "TPose", 8, 0.0082),
+        // The walk (new in review fixes 1): the cargo pants at the crotch
+        // and the inner thighs in the stride, the tee as at rest plus the
+        // armpit, the sports top at the side of the chest.
+        ("Pants_Cargo", "Walk@18", 15, 0.0272),
+        ("Shirt_Tee", "Walk@18", 16, 0.0247),
+        ("Underwear_Top", "Walk@18", 1, 0.0053),
+        ("Underwear_Top through Shirt_Tee", "Walk@18", 12, 0.0025),
     ]
     .map(|(garment, pose, cases, worst)| Known {
         garment,
