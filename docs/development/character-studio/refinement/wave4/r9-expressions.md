@@ -349,3 +349,79 @@ Chosen: option (a) of the review, with the stylized slit kept to `main`'s:
 - `r9-expressions/`: `lipline.py`, `teethprobe.py`, `pairprobe.py`, and the sheets `review2-open-studio.jpg`, `review2-open-hard.jpg`, `review2-smile.jpg`, `review2-smile-middle.jpg`, `review2-masks.png`, `review2-stylized-visemes.jpg`, `review2-th.jpg`.
 
 At merge: rebuild as before. A track that changes the lips' resting shape or the teeth should rerun `lipline.py` and `mouth_measure.py`. The smile's middle and the open mouth's teeth are sensitive to the lips-off-teeth pass.
+
+## Lead's face-gate follow-up
+
+After the merge, `face_checks.py --check` failed with the two items under "Tests and checks (Review fixes 2)". I measured both again with independent methods instead of taking the hand-back's word. Both are errors in the check, not in the face. **Neither is the cause the hand-back gave for the second one.** I fixed the check's two wrong measures. No limit, margin or exclusion was loosened, and no face shape changed. The probes, their output and the renders are in [face-gate/](face-gate/).
+
+### 1. The tooth "in the flesh" (`eye_corner_right-1`, viseme L, masculine)
+
+The vertex is tooth vertex 373, at (4.78, -143.81, 1554.92) mm: the edge of a lower incisor, 4.02 mm behind the lower lip's inner surface.
+
+| Method | Says |
+|---|---|
+| `face_checks`' three-ray vote (as it was) | inside (2 of 3 rays odd) |
+| Parity of 201 evenly spread rays | 0 of 201 odd: **outside** |
+| Generalized winding number over the closed body (the solid angle of all its triangles) | 0.000: **outside** |
+| Signed distance to the nearest face, signed by angle-weighted pseudo-normals (`pseudo_normals.py`) | +4.02 mm: **outside** |
+
+Why the vote went wrong ([tooth_probe.json](face-gate/tooth_probe.json)):
+- Ray 1 hit triangle 14530 at 10.858 mm and again at 10.859 mm, then triangle 14504.
+- Ray 2 hit triangle 20933 at 90.315 mm and again at 90.317 mm.
+- Each ray starts again 1 micrometre past a hit. At a grazing angle that restart lands within float rounding of the triangle just crossed, and the tree reports the same triangle again. Each double count flipped one ray's parity, so 2 of the 3 rays voted "inside".
+- Without the repeats, the three rays cross 2, 4 and 2 times: all outside.
+
+What it looks like ([face-gate/tooth.jpg](face-gate/tooth.jpg)):
+- Front and three-quarter: the lips are whole and nothing comes through them.
+- The cut through the plane of the vertex (flat colours; red is where the cut looks into a closed part): the marker sits on the incisor's edge, in the air of the mouth, clear of the lip's red section.
+- Looking out from the vertex toward the nearest skin: the lower lip's inner side faces the camera with its front faces, and no back faces are seen. A camera inside flesh would see only back faces.
+
+**Fix** (`Piece.inside`): a hit on the same triangle as the hit before it is not counted. A ray crosses a flat triangle only once. The rays, the vote and the 0.5 mm margin are unchanged.
+
+**Checked against the winding number** ([inside_probe.py](face-gate/inside_probe.py), [inside_probe.json](face-gate/inside_probe.json)):
+- 130 poses on each frame: rest, the 48 controls, the visemes, the expressions, and the `eye_corner_right` -1, `philtrum_length` -1 and `jaw_angle` +1 faces.
+- Points: every tooth and gum vertex within 20 mm of the body, and every `LipSeal` vertex. The winding number was computed for every point either test calls inside, and for 1 in 10 of the rest: 132,595 points.
+- The old test disagreed with the winding number once (this vertex). The fixed test disagreed **0 times**.
+
+**It still catches a real tooth in the lip.** A shape key on `Teeth` moved one tooth vertex until its posed position lay 2 mm past the nearest surface of the lip:
+- At rest: the incisor vertex nearest the upper lip went to 1.68 mm from the lip's surface (winding number 1.0). `teeth_in_flesh` = 1 (to 1.68 mm), and `failures()` reports it.
+- In the failing pose: the vertex went to 2.0 mm (winding number 1.0). `teeth_in_flesh` = 1 (to 2.0 mm), and it is reported.
+
+### 2. The four pairs (`philtrum_length` -1 with `mouth_height` +1, masculine)
+
+Measured on this build and on `main`'s package (its `RealisticParts.glb`, `Realistic.base.json` and `Realistic.build.json` taken from git), with no exclusion ([pair_probe.py](face-gate/pair_probe.py); [merged](face-gate/pair_probe_merged.json), [main](face-gate/pair_probe_main.json)):
+- **The same four pairs on both packages**, crossing at the same points to 0.01 mm: triangles 8524 and 8525 against 14094, and 10419 and 10420 against 14589. These are the two corners of the closed mouth (x = ±27.5 mm), within 0.6 to 1.7 mm of the lips' inner edge.
+- **R9's mouth change did not make them.** The identity shapes are the same on both packages.
+- **They are not new.** The same triangles cross by 0.026 to 0.032 mm in every pose ([pair_depth.py](face-gate/pair_depth.py), in double precision): at rest, with each end alone, and with both ends together. It is the closed corners' own contact.
+- **The hand-back's cause was not the real one.** The check found the head's triangles as those above a line 20 mm under the `Head` bone, taken in each pose ([neck_line.py](face-gate/neck_line.py)). On the masculine frame that line is at z = 1565.55 mm, 5 mm *above* the mouth's corners (1560.0 to 1560.7 mm).
+  - At rest, and with either end alone, the corners lie below the line, so the check never measured them.
+  - The two ends together lift the corners 9.5 mm, over the line. The resting contact then appeared in a pose's set but in neither the rest set nor the "alone" set, and was counted as new.
+  - The `LipSeal` exclusion had hidden that on `main`, and R9's shorter flaps stopped hiding it.
+  - The same line kept the whole lower lip, chin and jaw out of the check on the masculine frame.
+- What it looks like ([face-gate/corner.jpg](face-gate/corner.jpg), the character's right corner at 500 mm lens, front and three-quarter, at rest on the left and with both ends on the right): the corners look the same. Nothing shows through.
+
+**Fix** (`head_triangles`, `head_crossings`, `measure`): the head's triangles are chosen once per frame, at the frame's rest, as those wholly above the base of the neck (the `Neck` bone's head). The same triangles are then compared in every pose.
+- This is stricter: 6,410 triangles where there were 4,720 (masculine), and 6,393 where there were 5,139 (feminine). Every triangle the old line ever took is still in.
+- **The only pairs it now treats as the face's own** (crossing at rest) that it did not before are these four, on both packages and frames ([rest_pairs.py](face-gate/rest_pairs.py)). Each is a 0.03 mm contact at a closed corner that is there at rest.
+- The closed-lips exclusion (`LIPS_EDGE` of `LipSeal`) is unchanged. These four no longer reach it, so there was no reason to change what it finds.
+- `identity_pairs` with the fix, all 3,388 poses on each frame, on this build and on `main`'s package: **0 required offenders** on either. The same six reported (not held) entries as before on the masculine frame (`eye_corner` with the older brow, brow-ridge and cheekbone ends; 1 to 4 pairs each). Nothing on the feminine frame. The 2,944 triangles now added found nothing new.
+
+### Gates (lead's follow-up)
+
+- `face_checks.py --package realistic --check` on the merged build, with both fixes: **0 failures, exit 0** (2 before). `co6/face_checks.json` and `co6/face-checks-run.txt` are this run.
+  - Of the held measures, only the one tooth vertex changed (`teeth_in_flesh` 1 to 0). Every other held count is as before, `seal_in_view` and `eyeball_in_lid` among them (they also use the inside test).
+  - Of the reported measures, `self_crossing` changed. The masculine head's resting pairs went from 1 to 11. The 10 more are skin against skin and skin against lining at the two closed corners, which the old line left out. Poses that part the lips now read up to -10 (Cheek_Puff, the jaw controls), because they undo that contact. The feminine frame changed in one pose (`Jaw_Open`, 0 to 1).
+- `measure.py --package realistic --only face,sliders --check assets/characters/realistic/qa/thresholds.json` on the same build (it does not use `face_checks.py`): the face section passes. Sliders: 3,828 pairs on 15,312 bodies a frame, **0 new crossings on both frames**, and no parameter alone with new crossings or with an eye or tooth in the flesh. It exits 1 only on the two shoulder targets that `--only` leaves unmeasured, as before.
+- No face shape, build file or manifest changed, so nothing was rebuilt.
+- The specialist's `r9-expressions/pairprobe.py` calls `head_crossings` the old way and no longer runs. [face-gate/pair_probe.py](face-gate/pair_probe.py) is its replacement: it keeps the old line explicitly, so it reproduces the failure.
+
+### Files (lead's follow-up)
+
+- `assets/characters/humanoid/qa/face_checks.py`: `Piece.inside` (a repeat hit on the same triangle is not counted); `head_triangles` (new), `head_crossings`, `identity_pairs`, `measure` and `main` (the head's triangles are chosen at the frame's rest, above the `Neck` bone); docstrings.
+- `co6/face_checks.json`, `co6/face-checks-run.txt`, `co6/README.md`.
+- `face-gate/`, all bpy-python scripts that take the repository and a package folder:
+  - `tooth_probe.py`: the vertex the old vote flagged, against 201 rays, the winding number and the pseudo-normal sign.
+  - `inside_probe.py`: the old and the fixed vote against the winding number over 260 poses, and the tooth pushed 2 mm into the lip.
+  - `pair_probe.py`, `pair_depth.py`, `neck_line.py`, `rest_pairs.py`: the four pairs, how deep they cross, where the line was, and what the rest-chosen head newly treats as the face's own.
+  - `render_probe.py`: the close-ups.
+  - Their outputs (`*.json`) and the sheets `tooth.jpg` and `corner.jpg`.

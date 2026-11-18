@@ -1,0 +1,67 @@
+{
+ "poses": 260,
+ "points": 132595,
+ "old_vs_winding_disagree": [
+  [
+   "masculine",
+   "identity_faces/eye_corner_right-1 viseme L",
+   "teeth",
+   [
+    4.78,
+    -143.81,
+    1554.92
+   ],
+   0.0,
+   true
+  ]
+ ],
+ "new_vs_winding_disagree": [],
+ "pushed_tooth": [
+  {
+   "pose": "rest",
+   "vertex_mm": [
+    -1.94,
+    -147.41,
+    1559.27
+   ],
+   "to_lip_mm": 1.57,
+   "moved_to_mm": [
+    -2.0,
+    -149.84,
+    1556.65
+   ],
+   "miss_mm": 0.0,
+   "winding_at_target": 1.0,
+   "depth_mm": 1.685,
+   "teeth_in_flesh": 1,
+   "teeth_in_flesh_max_mm": 1.68,
+   "old_test_count": 1,
+   "failures": [
+    "masculine/identity_faces/pushed: teeth_in_flesh = 1 (to 1.68 mm)"
+   ]
+  },
+  {
+   "pose": "the failing pose",
+   "vertex_mm": [
+    -0.0,
+    -144.23,
+    1548.35
+   ],
+   "to_lip_mm": 2.21,
+   "moved_to_mm": [
+    0.36,
+    -148.33,
+    1547.46
+   ],
+   "miss_mm": 0.0,
+   "winding_at_target": 1.0,
+   "depth_mm": 2.0,
+   "teeth_in_flesh": 1,
+   "teeth_in_flesh_max_mm": 2.0,
+   "old_test_count": 2,
+   "failures": [
+    "masculine/identity_faces/pushed: teeth_in_flesh = 1 (to 2.0 mm)"
+   ]
+  }
+ ]
+}

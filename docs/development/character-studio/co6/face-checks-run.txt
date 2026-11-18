@@ -1,14 +1,9 @@
-masculine: identity_pairs 3388 poses, 7 with new crossings
+masculine: identity_pairs 3388 poses, 6 with new crossings
 feminine: identity_pairs 3388 poses, 0 with new crossings
 masculine: at rest open [9.53, 9.42] mm; full blink open [0.0, 0.0] mm, 0 rays bare
 feminine: at rest open [9.4, 9.3] mm; full blink open [0.0, 0.0] mm, 0 rays bare
-2 failures:
-  masculine/identity_faces/eye_corner_right-1 viseme L: teeth_in_flesh = 1 (to 4.02 mm)
-  masculine/identity_pairs/philtrum_length-1, mouth_height+1: 4 new pairs of the head's skin triangles cross
-exit 1
-(R9 review 2: both failures are the check's own measures, not the face. The tooth vertex is
-"inside" by face_checks' three-ray vote; 21 random rays from it all say outside
-(teethprobe in the hand-back). The four crossing pairs are the same triangles, crossing the same way,
-on main and on this build (identity shapes unchanged); main's check leaves them out as at the
-closed lips because LipSeal's flap ends lie 7.3 to 8.0 mm from them (LIPS_EDGE 8 mm), this
-build's shorter flaps 11.0 to 11.6 mm. See r9-expressions.md, Review fixes 2.)
+0 failures
+exit 0
+(Wave 4, lead's face-gate follow-up: the check's inside test no longer counts a ray's
+repeat hit on the triangle it just crossed, and the head's triangles are chosen once per frame,
+at rest, above the base of the neck. See refinement/wave4/r9-expressions.md, Lead's face-gate follow-up.)

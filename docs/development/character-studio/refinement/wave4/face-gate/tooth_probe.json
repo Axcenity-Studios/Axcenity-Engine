@@ -1,0 +1,108 @@
+{
+ "flagged": [
+  {
+   "pose": "identity_faces/eye_corner_right-1 viseme L",
+   "tooth_vertex": 373,
+   "at_mm": [
+    4.78,
+    -143.81,
+    1554.92
+   ],
+   "sunk_mm_by_check": 4.019,
+   "nearest_mm": 4.019,
+   "nearest_point_mm": [
+    4.85,
+    -147.42,
+    1553.15
+   ],
+   "check_three_rays": [
+    {
+     "dir": [
+      0.31,
+      -0.931,
+      0.19
+     ],
+     "crossings": 3,
+     "hits_mm": [
+      [
+       10.858,
+       14530
+      ],
+      [
+       10.859,
+       14530
+      ],
+      [
+       11.034,
+       14504
+      ]
+     ]
+    },
+    {
+     "dir": [
+      -0.42,
+      0.37,
+      0.829
+     ],
+     "crossings": 5,
+     "hits_mm": [
+      [
+       47.932,
+       21162
+      ],
+      [
+       90.315,
+       20933
+      ],
+      [
+       90.317,
+       20933
+      ],
+      [
+       90.539,
+       22062
+      ],
+      [
+       173.879,
+       9827
+      ]
+     ]
+    },
+    {
+     "dir": [
+      0.771,
+      0.21,
+      -0.601
+     ],
+     "crossings": 2,
+     "hits_mm": [
+      [
+       16.449,
+       21616
+      ],
+      [
+       28.21,
+       14431
+      ]
+     ]
+    }
+   ],
+   "odd_of_201_rays": 0,
+   "winding_number": 0.0,
+   "pseudo_normal_signed_mm": 4.019
+  }
+ ],
+ "sampled": 300,
+ "all_teeth_winding_vs_vote": {
+  "agree": 299,
+  "disagree": 1,
+  "disagreements": [
+   [
+    373,
+    0.0,
+    true,
+    4.02
+   ]
+  ]
+ }
+}
