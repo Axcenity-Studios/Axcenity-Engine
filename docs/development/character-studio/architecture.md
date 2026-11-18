@@ -437,14 +437,18 @@ ClassName::HumanoidDescription { Base, Data };  material_value_attribute(materia
 ```rust
 BodyMesh::from_model(&Model) -> Result<BodyMesh, FitError>        // a skinned model in its file space, its shapes
 GarmentMesh::from_model(&Model);  Surface::new(positions, normals, triangles).closest(point, within) -> Option<Hit>
-bind(&Surface, &[Vec3]) -> Binding;  place(&Binding, positions, normals, triangles) -> Vec<Vec3>
+bind(&Surface, &[Vec3], &[Vec3]) -> Binding                         // garment points and their normals (empty: closest points)
+place(&Binding, positions, normals, triangles) -> Vec<Vec3>
 carried_shapes(&BaseManifest, &BodyMesh) -> Vec<String>          // identity (parameters, corners) + Corrective_*, no Mask_*
 fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds }) -> Result<Fitted, FitError>
+    // weights from the skin under each corner (both sides of a crease), the bound point's where none; normals turned with the push-out
 Fitted { garment, joints, weights, shapes: Vec<CarriedShape>, binding, report: FitReport { layers: Vec<LayerOffset>, inside_most, .. } }
 triangle_regions(&BodyMesh, &RegionMap) -> Vec<u8>;  coverage(&BodyMesh, &regions, &Surface) -> Coverage
 hidden_regions(&BaseManifest, &Coverage) -> Vec<String>;  classify(&BaseManifest, &Coverage) -> Option<SlotGuess>
 write_fitted_glb(&FittedModel) -> Vec<u8>;  thumbnail(&GarmentMesh, size) -> rgba
-extremes_of(&BaseManifest, &Library) -> Vec<Vec<(shape, weight)>>  // build ends, muscle×fat ends, body presets, both frames
+extremes_of(&BaseManifest, &Library) -> Vec<Vec<(shape, weight)>>  // the sliders check's pairs of build ends, and body presets, both frames
+extremes_near(&BodyMesh, &GarmentMesh, &extremes) -> extremes        // only the shapes that reach the garment; duplicates dropped
+align(&mut GarmentMesh, &BodyMesh) -> Alignment { scale, offset, units, spread_before, spread_after }   // units, rough place, fine fit
 import_garment(&ImportRequest) -> Result<Imported, FitError>     // align, fit, classify, thumbnail, write, list in the catalogue
 // assets (region hiding)
 RegionHiding { map, hidden };  Assets::hide_regions(mesh_id, &Arc<RegionHiding>) -> String;  Assets::hiding_of(mesh_id)

@@ -465,8 +465,127 @@ fn alignment_brings_a_garment_in_centimetres_and_off_centre_onto_the_body() {
     let mut moved = original.clone();
     moved.transform(100.0, Vec3::new(4.0, 0.0, -7.0));
     let alignment = align(&mut moved, &body);
-    assert_eq!(alignment.scale, 0.01);
+    assert!((alignment.scale - 0.01).abs() < 1e-6, "{alignment:?}");
     for (a, b) in moved.positions().iter().zip(original.positions()) {
         assert!(a.distance(b) < 1e-3, "{a} against {b}");
     }
+}
+
+/// A ring round the tube's foot, `height` tall and a little wider than
+/// the tube: what a pair of shoes (or socks) is to a body.
+fn foot_ring(height: f32) -> GarmentMesh {
+    let mut garment = sleeve(0.17, false);
+    for piece in &mut garment.pieces {
+        for p in &mut piece.positions {
+            // 0.3..0.7 m down to 0..height.
+            p.y = (p.y - 0.3) / 0.4 * height;
+        }
+    }
+    garment
+}
+
+#[test]
+fn a_vertex_far_from_the_body_is_bound_to_its_closest_point() {
+    let body = tube_body();
+    let surface = body.surface(&[]);
+    // A long coat's hem or a cape stands well off the body: half a metre
+    // out from the tube's side, and a metre and a half below its foot.
+    let far = [Vec3::new(RADIUS + 0.5, 0.5, 0.0), Vec3::new(0.0, -1.5, 0.0)];
+    let binding = bind(&surface, &far, &[]);
+    let placed = place(&binding, &body.positions, &body.normals, &body.triangles);
+    for (a, b) in placed.iter().zip(&far) {
+        assert!(a.distance(*b) < 1e-4, "{a} against {b}");
+    }
+    let hit = surface.closest(far[0], f32::MAX).expect("a closest point");
+    assert!((hit.distance - 0.5).abs() < 2e-3, "{hit:?}");
+    assert!(surface.closest(far[1], f32::INFINITY).is_some());
+}
+
+#[test]
+fn alignment_finds_the_units_of_short_garments() {
+    let body = tube_body();
+    // Shoes 12 cm tall, socks 30 cm tall: in centimetres, millimetres and
+    // inches.
+    for (height, scale) in [
+        (0.12, 0.01),
+        (0.12, 0.001),
+        (0.30, 0.001),
+        (0.30, 0.01),
+        (0.12, 0.0254),
+        (0.30, 1.0),
+    ] {
+        let original = foot_ring(height);
+        let mut moved = original.clone();
+        moved.transform(1.0 / scale, Vec3::ZERO);
+        let alignment = align(&mut moved, &body);
+        assert!(
+            (alignment.scale - scale).abs() < 1e-6 * scale.max(1.0) + 0.02 * scale,
+            "{height} m made in units of {scale} m: scaled by {}",
+            alignment.scale
+        );
+        for (a, b) in moved.positions().iter().zip(original.positions()) {
+            assert!(a.distance(b) < 0.01, "{a} against {b}");
+        }
+    }
+}
+
+#[test]
+fn corners_moved_by_the_push_out_take_the_normals_of_where_they_are() {
+    let body = tube_body();
+    let mut dented = sleeve(0.153, true);
+    // A dent 1.5 cm deep (into the 0.15 m tube), with normals that agree
+    // with its shape: tilted round its edges.
+    for p in &mut dented.pieces[0].positions {
+        let across = Vec3::new(p.x, 0.0, p.z);
+        if across.length() < 0.15 {
+            *p = across.normalize() * 0.135 + Vec3::Y * p.y;
+        }
+    }
+    let triangles = dented.triangles();
+    let normals = vertex_normals(&dented.positions(), &triangles);
+    dented.pieces[0].normals = normals.clone();
+    let fitted = fit_garment(&body, &dented, &options()).unwrap();
+    let now = vertex_normals(&fitted.garment.positions(), &triangles);
+    let moved: Vec<usize> = dented
+        .positions()
+        .iter()
+        .zip(fitted.garment.positions())
+        .enumerate()
+        .filter(|(_, (a, b))| a.distance(*b) > 0.001)
+        .map(|(k, _)| k)
+        .collect();
+    assert!(!moved.is_empty());
+    let mut changed = 0;
+    for &k in &moved {
+        let written = fitted.garment.pieces[0].normals[k];
+        assert!(
+            written.angle_between(now[k]) < 5f32.to_radians(),
+            "corner {k}: written {written}, its surface's {}",
+            now[k]
+        );
+        if normals[k].angle_between(now[k]) > 10f32.to_radians() {
+            changed += 1;
+        }
+    }
+    // The dent's edges really were tilted, so the test sees a change.
+    assert!(changed > 0, "no normal had to change");
+    // Corners nothing moved, with nothing moved round them, keep the
+    // normals they came with.
+    let before = dented.positions();
+    let after = fitted.garment.positions();
+    let moved_at: Vec<Vec3> = before
+        .iter()
+        .zip(&after)
+        .filter(|(a, b)| a.distance(**b) > 1e-7)
+        .map(|(a, _)| *a)
+        .collect();
+    let mut kept = 0;
+    for (k, p) in before.iter().enumerate() {
+        if moved_at.iter().all(|m| m.distance(*p) > 0.05) {
+            let written = fitted.garment.pieces[0].normals[k];
+            assert!(written.distance(normals[k]) < 1e-4, "corner {k}");
+            kept += 1;
+        }
+    }
+    assert!(kept > 100, "{kept}");
 }

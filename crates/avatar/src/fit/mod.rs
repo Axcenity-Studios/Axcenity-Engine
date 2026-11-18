@@ -54,7 +54,7 @@ pub use import::{Alignment, ImportRequest, Imported, align, extremes_of, import_
 pub use surface::{Hit, Surface, closest_on_triangle, vertex_normals};
 pub use thumbnail::{thumbnail, write_png};
 pub use transfer::{
-    FitOptions, FitReport, Fitted, Layer, LayerOffset, carried_shapes, fit_garment,
+    FitOptions, FitReport, Fitted, Layer, LayerOffset, carried_shapes, extremes_near, fit_garment,
     transfer_weights,
 };
 
@@ -387,6 +387,17 @@ impl GarmentMesh {
         for piece in &mut self.pieces {
             let count = piece.positions.len();
             piece.positions.copy_from_slice(&positions[at..at + count]);
+            at += count;
+        }
+    }
+
+    /// Sets every piece's normals from `normals` (as
+    /// [`normals`](Self::normals) orders them).
+    pub fn set_normals(&mut self, normals: &[Vec3]) {
+        let mut at = 0;
+        for piece in &mut self.pieces {
+            let count = piece.positions.len();
+            piece.normals = normals[at..at + count].to_vec();
             at += count;
         }
     }

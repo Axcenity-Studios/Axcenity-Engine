@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use glam::{Mat3, Vec3};
+use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::bind::{BIND_REACH, Binding, bind, frames};
@@ -236,6 +236,83 @@ pub fn transfer_weights(body: &BodyMesh, binding: &Binding) -> (Vec<[u16; 4]>, V
     (joints, weights)
 }
 
+/// Skin weights from the skin under the garment: each body corner near
+/// the garment casts a ray out along its normal, and the garment corners
+/// of the triangle it meets (within 10 cm) take its weights, by how near
+/// they are to where it meets. A corner that no skin reaches keeps the
+/// weights it had (`joints` and `weights`, from its bound point).
+///
+/// Where the garment bridges a crease (a T-shirt's underarm between the
+/// arm and the side), its own inward ray meets one side or the other, and
+/// it would follow that limb alone; the skin of both sides faces it, so it
+/// takes both, as the skin there does.
+fn projected_weights(
+    body: &BodyMesh,
+    near: &[[u32; 3]],
+    positions: &[Vec3],
+    normals: &[Vec3],
+    triangles: &[[u32; 3]],
+    joints: &[[u16; 4]],
+    weights: &[[f32; 4]],
+) -> (Vec<[u16; 4]>, Vec<[f32; 4]>) {
+    let garment = Surface::new(positions.to_vec(), normals.to_vec(), triangles.to_vec());
+    let mut corners: BTreeSet<u32> = BTreeSet::new();
+    for t in near {
+        corners.extend(t.iter().copied());
+    }
+    let mut mixes: Vec<BTreeMap<u16, f32>> = vec![BTreeMap::new(); positions.len()];
+    for corner in corners {
+        let c = corner as usize;
+        let out = body.normals[c];
+        if out == Vec3::ZERO {
+            continue;
+        }
+        let Some(hit) = garment.cast(body.positions[c], out, 0.10) else {
+            continue;
+        };
+        // Only the garment's side that faces away from the skin: a ray
+        // that meets the garment from outside is another limb's.
+        let triangle = triangles[hit.triangle as usize];
+        if hit.normal.dot(out) <= 0.0 {
+            continue;
+        }
+        for (k, share) in triangle.iter().zip(hit.bary.to_array()) {
+            if share <= 0.0 {
+                continue;
+            }
+            let mix = &mut mixes[*k as usize];
+            for (joint, weight) in body.joints[c].iter().zip(body.weights[c]) {
+                if weight > 0.0 {
+                    *mix.entry(*joint).or_default() += weight * share;
+                }
+            }
+        }
+    }
+    let mut out_joints = joints.to_vec();
+    let mut out_weights = weights.to_vec();
+    for (k, mix) in mixes.into_iter().enumerate() {
+        let mut sorted: Vec<(u16, f32)> = mix.into_iter().collect();
+        let total: f32 = sorted.iter().map(|(_, w)| w).sum();
+        // Less than a quarter of a corner's worth of skin: too little to go
+        // by.
+        if total < 0.25 {
+            continue;
+        }
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        sorted.truncate(4);
+        let kept: f32 = sorted.iter().map(|(_, w)| w).sum();
+        let mut j = [0u16; 4];
+        let mut w = [0.0f32; 4];
+        for (i, (joint, weight)) in sorted.into_iter().enumerate() {
+            j[i] = joint;
+            w[i] = weight / kept;
+        }
+        out_joints[k] = j;
+        out_weights[k] = w;
+    }
+    (out_joints, out_weights)
+}
+
 /// The surfaces a garment is pushed out of in one state: the body (near
 /// the garment) and each lower layer.
 struct Obstacles {
@@ -288,37 +365,47 @@ pub fn fit_garment(
     let mut binding = bind(&full, &rest, &rest_normals);
     let rest_frames = frames(&binding, &body.positions, &body.normals, &body.triangles);
 
-    // 3. Skin weights.
+    // 3. Skin weights: the skin's under each corner (see
+    // `projected_weights`), or the bound point's where no skin is.
     let (joints, weights) = transfer_weights(body, &binding);
+    let (joints, weights) = projected_weights(
+        body,
+        &near,
+        &rest,
+        &rest_normals,
+        &triangles,
+        &joints,
+        &weights,
+    );
     // Smoothed over the garment, so where neighbouring corners were bound
     // to different limbs (a sleeve meeting the torso) the cloth stretches
     // over a few corners instead of tearing at one edge.
     let (joints, weights) = welds.smooth_weights(&joints, &weights, WEIGHT_ROUNDS);
 
-    // 4. Every carried shape, pushed out at its full weight.
-    let mut shapes = Vec::new();
-    let mut moving = 0;
-    for name in &options.shapes {
-        let Some(index) = body.shape_index(name) else {
-            continue;
-        };
+    // 4. Every carried shape, pushed out at its full weight (each on its
+    // own, so they are worked out side by side).
+    let carried: Vec<(usize, &String)> = options
+        .shapes
+        .iter()
+        .filter_map(|name| Some((body.shape_index(name)?, name)))
+        .collect();
+    let worked = par_map(&carried, |&(index, name)| {
         let weights = [(name.clone(), 1.0)];
         let (positions, normals) = body.shaped(&weights);
         let shaped_frames = frames(&binding, &positions, &normals, &body.triangles);
         let mut offsets = Vec::with_capacity(count);
-        let mut turned = Vec::with_capacity(count);
+        let mut turns = Vec::with_capacity(count);
         for (k, bound) in binding.vertices.iter().enumerate() {
             let (point, axes) = shaped_frames[k];
             let (_, rest_axes) = rest_frames[k];
             offsets.push(point + axes * Vec3::from(bound.local) - rest[k]);
-            // The frame's turn, applied to the garment's own normal.
-            let turn: Mat3 = axes * rest_axes.transpose();
-            turned.push(turn * rest_normals[k] - rest_normals[k]);
+            // How the frame turns: the garment's normal turns with it.
+            turns.push(axes * rest_axes.transpose());
         }
         let moves =
             body.shapes[index].reach() > LEAST && offsets.iter().any(|o| o.length() > LEAST);
+        let mut pushes = Vec::new();
         if moves {
-            moving += 1;
             let state = obstacles(body, &near, &options.under, &weights);
             for _ in 0..options.rounds.max(1) {
                 let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
@@ -326,33 +413,53 @@ pub fn fit_garment(
                 if need.iter().all(|n| *n == Vec3::ZERO) {
                     break;
                 }
-                record(&mut layers, &need, &by, true);
                 for (o, a) in offsets.iter_mut().zip(welds.spread(&need)) {
                     *o += a;
                 }
+                pushes.push((need, by));
             }
         } else {
             offsets.iter_mut().for_each(|o| *o = Vec3::ZERO);
-            turned.iter_mut().for_each(|t| *t = Vec3::ZERO);
+            turns.clear();
+        }
+        (name.clone(), offsets, turns, pushes)
+    });
+    let mut shapes = Vec::new();
+    let mut shape_turns = Vec::new();
+    let mut moving = 0;
+    for (name, offsets, turns, pushes) in worked {
+        if !turns.is_empty() {
+            moving += 1;
+        }
+        for (need, by) in &pushes {
+            record(&mut layers, need, by, true);
         }
         shapes.push(CarriedShape {
-            name: name.clone(),
+            name,
             offsets,
-            normals: turned,
+            normals: Vec::new(),
         });
+        shape_turns.push(turns);
     }
 
     // 5. The extremes: what is still inside at one lifts the rest there,
-    // checked again after each lift.
+    // checked again after each lift. A lift only moves the garment out, so
+    // each round after the first checks again only the extremes that
+    // lifted (step 6 checks them all once more).
     let mut lifted = vec![0.0f32; count];
     let mut lifting = 0;
+    let mut checking: Vec<&Vec<(String, f32)>> = options.extremes.iter().collect();
     for round in 0..options.rounds.max(1) {
         let mut lift = vec![Vec3::ZERO; count];
         let mut any = 0;
-        for extreme in &options.extremes {
-            let need = extreme_need(body, &near, options, &rest, &shapes, extreme);
+        let wanted = par_map(&checking, |extreme| {
+            extreme_need(body, &near, options, &rest, &shapes, extreme)
+        });
+        let mut again = Vec::new();
+        for (need, extreme) in wanted.into_iter().zip(checking) {
             if need.iter().any(|n| *n != Vec3::ZERO) {
                 any += 1;
+                again.push(extreme);
                 for (l, n) in lift.iter_mut().zip(&need) {
                     if n.length() > l.length() {
                         *l = *n;
@@ -363,6 +470,7 @@ pub fn fit_garment(
         if round == 0 {
             lifting = any;
         }
+        checking = again;
         if any == 0 {
             break;
         }
@@ -404,16 +512,45 @@ pub fn fit_garment(
             &now,
         ));
     }
-    for extreme in &options.extremes {
+    let deepest_at = par_map(&options.extremes, |extreme| {
         let now = garment_at(&rest, &shapes, extreme);
-        inside_most = inside_most.max(deepest(
-            &obstacles(body, &near, &options.under, extreme),
-            &now,
-        ));
+        deepest(&obstacles(body, &near, &options.under, extreme), &now)
+    });
+    inside_most = deepest_at.into_iter().fold(inside_most, f32::max);
+
+    // 7. Normals. Each of the garment's own normals is turned as far as
+    // its surface turned where the push-out and the lift moved it (from the
+    // welded surface's normal as it came to the one now): a corner nothing
+    // moved keeps its normal exactly, hard edges and all.
+    let made = welds.normals(&garment.positions(), &triangles);
+    let now = welds.normals(&rest, &triangles);
+    let fitted_normals: Vec<Vec3> = rest_normals
+        .iter()
+        .zip(made.iter().zip(&now))
+        .map(|(n, (was, is))| {
+            if was.distance_squared(*is) < 1e-12 || *was == Vec3::ZERO || *is == Vec3::ZERO {
+                *n
+            } else {
+                (Quat::from_rotation_arc(*was, *is) * *n).normalize_or_zero()
+            }
+        })
+        .collect();
+    // Each shape turns those normals with the body's frame.
+    for (shape, turns) in shapes.iter_mut().zip(&shape_turns) {
+        shape.normals = if turns.is_empty() {
+            vec![Vec3::ZERO; count]
+        } else {
+            turns
+                .iter()
+                .zip(&fitted_normals)
+                .map(|(turn, n)| *turn * *n - *n)
+                .collect()
+        };
     }
 
     let mut fitted_garment = garment.clone();
     fitted_garment.set_positions(&rest);
+    fitted_garment.set_normals(&fitted_normals);
     let farthest = binding
         .vertices
         .iter()
@@ -445,6 +582,49 @@ pub fn fit_garment(
         binding,
         report,
     })
+}
+
+/// `extremes` as fitting `garment` needs them: each with only the weights
+/// of the body shapes that move the body near the garment (within 10 cm of
+/// its box; the others can't reach it, nor move what it is bound to), the
+/// ones that become the same or rest left out.
+pub fn extremes_near(
+    body: &BodyMesh,
+    garment: &GarmentMesh,
+    extremes: &[Vec<(String, f32)>],
+) -> Vec<Vec<(String, f32)>> {
+    let mut near = vec![false; body.positions.len()];
+    for triangle in near_triangles(body, garment) {
+        for v in triangle {
+            near[v as usize] = true;
+        }
+    }
+    let reaching: BTreeSet<&str> = body
+        .shapes
+        .iter()
+        .filter(|shape| {
+            shape
+                .corners
+                .iter()
+                .zip(&shape.offsets)
+                .any(|(corner, offset)| near[*corner as usize] && offset.length() > LEAST)
+        })
+        .map(|shape| shape.name.as_str())
+        .collect();
+    let mut out: Vec<Vec<(String, f32)>> = extremes
+        .iter()
+        .map(|extreme| {
+            extreme
+                .iter()
+                .filter(|(name, _)| reaching.contains(name.as_str()))
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .filter(|extreme| !extreme.is_empty())
+        .collect();
+    out.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+    out.dedup();
+    out
 }
 
 /// The garment's corners with `weights` of its carried shapes.
@@ -625,6 +805,28 @@ impl Welds {
         Welds { group, neighbours }
     }
 
+    /// Smooth normals of `positions` over `triangles`, the same for welded
+    /// corners (a seam between pieces or texture islands doesn't show).
+    fn normals(&self, positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<Vec3> {
+        let mut sums = vec![Vec3::ZERO; self.neighbours.len()];
+        for &[a, b, c] in triangles {
+            let (pa, pb, pc) = (
+                positions[a as usize],
+                positions[b as usize],
+                positions[c as usize],
+            );
+            // Twice the area: bigger triangles count for more.
+            let face = (pb - pa).cross(pc - pa);
+            for v in [a, b, c] {
+                sums[self.group[v as usize]] += face;
+            }
+        }
+        self.group
+            .iter()
+            .map(|g| sums[*g].normalize_or_zero())
+            .collect()
+    }
+
     /// Skin weights (per corner) made the same for welded corners and
     /// each round mixed half and half with the mean of the neighbours',
     /// the four largest kept, adding up to 1.
@@ -715,4 +917,27 @@ impl Welds {
         }
         self.group.iter().map(|g| amount[*g]).collect()
     }
+}
+
+/// `each` of `items`, worked out on several threads (the machine's, at most
+/// eight), in order.
+fn par_map<T: Sync, R: Send>(items: &[T], each: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .clamp(1, 8);
+    if threads == 1 || items.len() < 2 {
+        return items.iter().map(&each).collect();
+    }
+    let chunk = items.len().div_ceil(threads);
+    let each = &each;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = items
+            .chunks(chunk)
+            .map(|part| scope.spawn(move || part.iter().map(each).collect::<Vec<R>>()))
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| handle.join().expect("a fitting thread panicked"))
+            .collect()
+    })
 }

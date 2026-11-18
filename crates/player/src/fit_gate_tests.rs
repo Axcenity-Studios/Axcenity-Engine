@@ -29,12 +29,14 @@ const POKE: f32 = 0.001;
 const TEE: &str = "imported/test-tee";
 
 /// A library of the realistic base, its underwear and the test tee
-/// imported over the sports bra, made once per test process.
+/// imported over the sports bra. It is made once per build of the tests
+/// and shared by every test process: kept under the target folder
+/// (`target/<profile>/fit-gate/<key>`), keyed by this test binary, the
+/// tee's file and the shipped files it is made from, and made by one
+/// process while the others wait. Older ones are removed.
 fn gate_library() -> &'static Path {
     static LIBRARY: OnceLock<PathBuf> = OnceLock::new();
     LIBRARY.get_or_init(|| {
-        let root = std::env::temp_dir().join(format!("axcenity-fit-gate-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
         let shipped = repository_library();
         let (library, _, problems) = Library::read(&shipped);
         assert!(problems.is_empty(), "{problems:?}");
@@ -60,34 +62,128 @@ fn gate_library() -> &'static Path {
                 catalogue.items.push(CatalogueItem::of(path, item));
             }
         }
-        for file in files {
-            let target = root.join(&file);
-            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-            std::fs::copy(shipped.join(&file), &target).unwrap();
-        }
-        std::fs::write(root.join("catalogue.json"), catalogue.to_json()).unwrap();
-        import_garment(&ImportRequest {
-            source: Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../avatar/tests/fixtures/test-tee/TestTee.obj"),
-            library: root.clone(),
-            base: "axcenity/realistic".to_owned(),
-            id: TEE.to_owned(),
-            label: "Test tee".to_owned(),
-            folder: "imported/test-tee".to_owned(),
-            source_info: axcenity_avatar::Source {
-                author: "Axcenity Engine contributors".to_owned(),
-                licence: "CC0-1.0".to_owned(),
-                url: None,
-            },
-            slot: None,
-            layer: None,
-            margin: 0.002,
-            under: vec!["axcenity/realistic-sports-bra".to_owned()],
-            about: None,
-        })
-        .expect("the test tee imports");
-        root
+        files.sort();
+        let tee = tee_source();
+        let key = {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            let exe = std::env::current_exe().unwrap();
+            let made = std::fs::metadata(&exe).unwrap();
+            (made.len(), made.modified().ok()).hash(&mut hasher);
+            std::fs::read(&tee).unwrap().hash(&mut hasher);
+            for file in &files {
+                file.hash(&mut hasher);
+                std::fs::read(shipped.join(file)).unwrap().hash(&mut hasher);
+            }
+            format!("{:016x}", hasher.finish())
+        };
+        let cache = gate_cache();
+        shared_once(&cache, &key, |made| {
+            for file in &files {
+                let target = made.join(file);
+                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+                std::fs::copy(shipped.join(file), &target).unwrap();
+            }
+            std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
+            import_garment(&ImportRequest {
+                source: tee.clone(),
+                library: made.to_owned(),
+                base: "axcenity/realistic".to_owned(),
+                id: TEE.to_owned(),
+                label: "Test tee".to_owned(),
+                folder: "imported/test-tee".to_owned(),
+                source_info: axcenity_avatar::Source {
+                    author: "Axcenity Engine contributors".to_owned(),
+                    licence: "CC0-1.0".to_owned(),
+                    url: None,
+                },
+                slot: None,
+                layer: None,
+                margin: 0.002,
+                under: vec!["axcenity/realistic-sports-bra".to_owned()],
+                about: None,
+            })
+            .expect("the test tee imports");
+        });
+        cache.join(&key)
     })
+}
+
+fn tee_source() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee/TestTee.obj")
+}
+
+/// Where the gate's libraries are kept: beside this test binary's
+/// profile folder (`target/debug/fit-gate`), not the system's temporary
+/// folder, which nothing cleans.
+fn gate_cache() -> PathBuf {
+    let exe = std::env::current_exe().unwrap();
+    // target/<profile>/deps/<binary>
+    let profile = exe.parent().and_then(Path::parent).unwrap();
+    profile.join("fit-gate")
+}
+
+/// Makes `cache/key` once with `make` (given an empty folder to fill),
+/// shared by every process that asks: the first takes a lock file and
+/// makes it in a folder of its own, then renames that into place; the
+/// others wait for it. A lock older than ten minutes is a crashed
+/// process's and is taken over. Folders of other keys more than an hour
+/// old (earlier builds) are removed.
+fn shared_once(cache: &Path, key: &str, make: impl FnOnce(&Path)) {
+    use std::time::{Duration, SystemTime};
+    let age = |path: &Path| {
+        std::fs::metadata(path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|m| SystemTime::now().duration_since(m).ok())
+            .unwrap_or_default()
+    };
+    std::fs::create_dir_all(cache).unwrap();
+    let done = cache.join(key);
+    let lock = cache.join(format!("{key}.lock"));
+    let started = std::time::Instant::now();
+    let mut make = Some(make);
+    while !done.is_dir() {
+        let taken = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock)
+            .is_ok();
+        if taken {
+            let making = cache.join(format!("{key}.{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&making);
+            std::fs::create_dir_all(&making).unwrap();
+            (make.take().expect("made once"))(&making);
+            if std::fs::rename(&making, &done).is_err() {
+                // Another process (past a stale lock) finished first.
+                let _ = std::fs::remove_dir_all(&making);
+            }
+            let _ = std::fs::remove_file(&lock);
+            break;
+        }
+        if age(&lock) > Duration::from_secs(600) {
+            let _ = std::fs::remove_file(&lock);
+            continue;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(600),
+            "waited ten minutes for {}",
+            done.display()
+        );
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    for entry in std::fs::read_dir(cache).into_iter().flatten().flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with(key) || age(&path) < Duration::from_secs(3600) {
+            continue;
+        }
+        if path.is_dir() {
+            let _ = std::fs::remove_dir_all(path);
+        } else {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 }
 
 /// The benchmark descriptions of the gate: the cast of both frames and
@@ -287,7 +383,7 @@ fn covered(under: &Posed, garment: &Posed, reach: f32) -> Vec<bool> {
 /// How many of `under`'s covered corners (`covered`, from
 /// [`covered`] at rest) are more than `POKE` outside `garment` in this
 /// pose, and the worst. A corner counts only where it is drawn.
-fn poke_through(under: &Posed, garment: &Posed, covered: &[bool]) -> (usize, f32) {
+fn poke_through(label: &str, under: &Posed, garment: &Posed, covered: &[bool]) -> (usize, f32) {
     let surface = Surface::new(
         garment.positions.clone(),
         garment.normals.clone(),
@@ -319,7 +415,7 @@ fn poke_through(under: &Posed, garment: &Posed, covered: &[bool]) -> (usize, f32
             count += 1;
             if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
                 println!(
-                    "  {} out {:.1} mm at {p}; cloth {} normal {}",
+                    "  {label} {} out {:.1} mm at {p}; cloth {} normal {}",
                     garment.name,
                     out * 1000.0,
                     hit.point,
@@ -352,6 +448,69 @@ fn cover_at_rest(body: &Posed, garments: &[Posed]) -> Cover {
     }
 }
 
+/// One garment (or a lower layer through an upper one) on one body in one
+/// pose with body vertices more than `POKE` out.
+struct Failure {
+    garment: String,
+    pose: String,
+    body: String,
+    count: usize,
+    worst: f32,
+}
+
+/// A pose's name in the gate's records.
+fn pose_name(stance: Stance) -> String {
+    match stance {
+        Stance::Rest => "rest".to_owned(),
+        Stance::Idle => "idle".to_owned(),
+        Stance::Clip { name, frames } => format!("{name}@{frames}"),
+        Stance::Held(pose) => format!("{pose:?}"),
+    }
+}
+
+/// The name a lower layer coming through the tee is recorded under.
+const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
+
+/// For looking at a case: with `AXCENITY_FIT_GATE_DUMP` set to a folder,
+/// writes the posed body (its covered corners marked) and garments of the
+/// bodies whose names contain `AXCENITY_FIT_GATE_DUMP_ONLY` as OBJ files.
+fn dump(name: &str, stance: Stance, body: &Posed, garments: &[Posed], cover: &Cover) {
+    use std::fmt::Write;
+    let Some(folder) = std::env::var_os("AXCENITY_FIT_GATE_DUMP") else {
+        return;
+    };
+    let only = std::env::var("AXCENITY_FIT_GATE_DUMP_ONLY").unwrap_or_default();
+    if !name.contains(&only) {
+        return;
+    }
+    let folder = PathBuf::from(folder);
+    let _ = std::fs::create_dir_all(&folder);
+    let write = |mesh: &Posed, file: String, marks: Option<&[bool]>| {
+        let mut text = String::new();
+        for (k, p) in mesh.positions.iter().enumerate() {
+            // A covered corner is coloured red.
+            let red = marks.is_some_and(|m| m.get(k).copied().unwrap_or(false));
+            let colour = if red { "1 0 0" } else { "0.8 0.8 0.8" };
+            let _ = writeln!(text, "v {} {} {} {colour}", p.x, p.y, p.z);
+        }
+        for t in &mesh.triangles {
+            let _ = writeln!(text, "f {} {} {}", t[0] + 1, t[1] + 1, t[2] + 1);
+        }
+        let _ = std::fs::write(folder.join(file), text);
+    };
+    let pose = pose_name(stance);
+    let mut any = vec![false; body.positions.len()];
+    for (_, covered) in &cover.body {
+        for (a, c) in any.iter_mut().zip(covered) {
+            *a |= *c;
+        }
+    }
+    write(body, format!("{name}-{pose}-body.obj"), Some(&any));
+    for garment in garments {
+        write(garment, format!("{name}-{pose}-{}.obj", garment.name), None);
+    }
+}
+
 /// Measures every garment of a posed character against the cover it
 /// gives at rest; returns how many checks ran and what failed.
 fn measure(
@@ -360,25 +519,29 @@ fn measure(
     body: &Posed,
     garments: &[Posed],
     cover: &Cover,
-    failures: &mut Vec<(String, f32)>,
+    failures: &mut Vec<Failure>,
 ) -> usize {
+    dump(name, stance, body, garments, cover);
     let mut checked = 0;
+    let mut fail = |garment: &str, count: usize, worst: f32| {
+        if count > 0 {
+            failures.push(Failure {
+                garment: garment.to_owned(),
+                pose: pose_name(stance),
+                body: name.to_owned(),
+                count,
+                worst,
+            });
+        }
+    };
     for garment in garments {
         let Some((_, covered)) = cover.body.iter().find(|(n, _)| *n == garment.name) else {
             continue;
         };
-        let (count, worst) = poke_through(body, garment, covered);
+        let label = format!("{name} {}", pose_name(stance));
+        let (count, worst) = poke_through(&label, body, garment, covered);
         checked += 1;
-        if count > 0 {
-            failures.push((
-                format!(
-                    "{name} {stance:?} {}: {count} body vertices out, worst {:.2} mm",
-                    garment.name,
-                    worst * 1000.0
-                ),
-                worst,
-            ));
-        }
+        fail(&garment.name, count, worst);
     }
     // The tee over the sports bra: the lower layer never comes through
     // the upper one.
@@ -387,51 +550,67 @@ fn measure(
         garments.iter().find(|g| g.name == "Underwear_Bra"),
         &cover.bra_under_tee,
     ) {
-        let (count, worst) = poke_through(bra, tee, covered);
+        let label = format!("{name} {}", pose_name(stance));
+        let (count, worst) = poke_through(&label, bra, tee, covered);
         checked += 1;
-        if count > 0 {
-            failures.push((
-                format!(
-                    "{name} {stance:?} the bra through the tee: {count} vertices, worst {:.2} mm",
-                    worst * 1000.0
-                ),
-                worst,
-            ));
-        }
+        fail(BRA_THROUGH_TEE, count, worst);
     }
     checked
 }
 
-/// What the gate found failing when it was written (CO9, 2026-11-17),
-/// as (how many failing cases, the worst a body or lower layer is out, in
-/// metres). Every garment it measures is a **draft** (the underwear has
-/// no `quality`, the test tee is an import), so none counts toward a
-/// milestone; the failures are recorded defects
-/// (`docs/development/character-studio/refinement/wave3/co9-binding.md`),
-/// not accepted behaviour. The gate fails when there are more or worse;
-/// when there are fewer, lower these. A `production` item must have none.
+/// A recorded defect of a draft garment the gate still finds, per garment
+/// and pose: at most `cases` bodies failing, none worse than `worst`
+/// metres. A garment and pose not listed must have none. Lower these as
+/// items improve; never raise them to pass one, and never list a
+/// `production` item.
 struct Known {
+    garment: &'static str,
+    pose: &'static str,
     cases: usize,
     worst: f32,
 }
 
-fn check(label: &str, failures: &[(String, f32)], known: Known) {
-    let worst = failures.iter().map(|(_, w)| *w).fold(0.0, f32::max);
-    for (line, _) in failures {
-        println!("  {line}");
+/// Fails on any garment and pose with more failing bodies, or a worse
+/// one, than `known` records (none, when it records nothing).
+fn check(label: &str, failures: &[Failure], known: &[Known]) {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<(&str, &str), (usize, f32)> = BTreeMap::new();
+    for failure in failures {
+        println!(
+            "  {} {} {}: {} vertices out, worst {:.2} mm",
+            failure.body,
+            failure.pose,
+            failure.garment,
+            failure.count,
+            failure.worst * 1000.0
+        );
+        let group = groups
+            .entry((failure.garment.as_str(), failure.pose.as_str()))
+            .or_default();
+        group.0 += 1;
+        group.1 = group.1.max(failure.worst);
     }
-    assert!(
-        failures.len() <= known.cases && worst <= known.worst + 1e-4,
-        "{label}: {} failing cases (known {}), worst {:.2} mm (known {:.2} mm)",
-        failures.len(),
-        known.cases,
-        worst * 1000.0,
-        known.worst * 1000.0
-    );
+    let mut problems = Vec::new();
+    for ((garment, pose), (cases, worst)) in &groups {
+        let allowed = known
+            .iter()
+            .find(|k| k.garment == *garment && k.pose == *pose)
+            .map_or((0, 0.0), |k| (k.cases, k.worst));
+        if *cases > allowed.0 || *worst > allowed.1 + 1e-4 {
+            problems.push(format!(
+                "{garment} {pose}: {cases} bodies failing, worst {:.2} mm (recorded {}, {:.2} mm)",
+                worst * 1000.0,
+                allowed.0,
+                allowed.1 * 1000.0
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "{label}: {problems:#?}");
 }
 
-/// Runs the gate for `stances` and reports every case.
-fn gate(stances: &[Stance], label: &str, known: Known) {
+/// Runs the gate for `stance` on every body and reports every case.
+fn gate(stance: Stance, known: &[Known]) {
+    let label = pose_name(stance);
     let stage = Stage::new(&format!("fit-gate-{label}"), gate_library()).expect("the stage");
     let mut failures = Vec::new();
     let mut checked = 0;
@@ -447,75 +626,154 @@ fn gate(stances: &[Stance], label: &str, known: Known) {
             description.name
         );
         let cover = cover_at_rest(&body, &garments);
-        for &stance in stances {
-            let (body, garments) = if stance == Stance::Rest {
-                (body.clone(), garments.clone())
-            } else {
-                worn(&stage.assets, &dressed, stance)
-            };
-            checked += measure(
-                &description.name,
-                stance,
-                &body,
-                &garments,
-                &cover,
-                &mut failures,
-            );
-        }
+        let (body, garments) = if stance == Stance::Rest {
+            (body, garments)
+        } else {
+            worn(&stage.assets, &dressed, stance)
+        };
+        checked += measure(
+            &description.name,
+            stance,
+            &body,
+            &garments,
+            &cover,
+            &mut failures,
+        );
     }
     println!(
         "fit gate {label}: {checked} garment checks in {:.1} s, {} failing",
         started.elapsed().as_secs_f32(),
         failures.len()
     );
-    check(label, &failures, known);
+    check(&label, &failures, known);
 }
 
+// What the realistic gate still finds (review fixes 1, 2026-11-17), per
+// garment and pose. Every item here is a draft; each is an open defect in
+// `docs/development/character-studio/refinement/wave3/co9-binding.md`,
+// not accepted behaviour. The test tee fits at rest, in the T-pose and
+// with the elbows or knees bent (nothing recorded); the briefs fit in
+// every pose.
+
+/// The boxer briefs on the masculine heavy-soft body: the skin under the
+/// gusset hangs below it (body vertices 1 to 4 cm under the cloth at that
+/// composition; one is in the covered region). The gusset is narrower
+/// than two rings from each leg opening, so the build's push-out
+/// (`underwear.py`, `push_out`) doesn't reach it.
+const BOXER_GUSSET: f32 = 0.0143;
+
 #[test]
-fn garments_cover_the_cast_at_rest_and_walking() {
+fn garments_cover_the_cast_at_rest() {
     gate(
+        Stance::Rest,
+        &[Known {
+            garment: "Underwear_BoxerBriefs",
+            pose: "rest",
+            cases: 1,
+            worst: BOXER_GUSSET,
+        }],
+    );
+}
+
+/// The walk: the tee where the arm swings back across the front of the
+/// armpit and at the hem over the hip as the thigh comes forward, and the
+/// bra through it there, are linear skinning's limits for a garment
+/// standing off the skin (`co9-binding.md`, Review fixes 1).
+#[test]
+fn garments_cover_the_cast_walking() {
+    gate(
+        Stance::Clip {
+            name: "Walk",
+            frames: 18,
+        },
         &[
-            Stance::Rest,
-            Stance::Clip {
-                name: "Walk",
-                frames: 18,
+            Known {
+                garment: "TestTee",
+                pose: "Walk@18",
+                cases: 33,
+                worst: 0.0125,
+            },
+            Known {
+                garment: BRA_THROUGH_TEE,
+                pose: "Walk@18",
+                cases: 12,
+                worst: 0.0113,
+            },
+            Known {
+                garment: "Underwear_BoxerBriefs",
+                pose: "Walk@18",
+                cases: 1,
+                worst: 0.0172,
             },
         ],
-        "rest-walk",
-        Known {
-            cases: 67,
-            worst: 0.0283,
-        },
     );
 }
 
 #[test]
-fn garments_cover_the_cast_with_the_arms_out_and_raised() {
+fn garments_cover_the_cast_with_the_arms_out() {
     gate(
+        Stance::Held(HeldPose::TPose),
+        &[Known {
+            garment: "Underwear_BoxerBriefs",
+            pose: "TPose",
+            cases: 1,
+            worst: BOXER_GUSSET,
+        }],
+    );
+}
+
+/// Arms raised: the tee's underarm opens as the sleeve rises with the arm
+/// (the bra shows at the side) and the trapezius rises into its neckline.
+#[test]
+fn garments_cover_the_cast_with_the_arms_raised() {
+    gate(
+        Stance::Held(HeldPose::ArmsRaised),
         &[
-            Stance::Held(HeldPose::TPose),
-            Stance::Held(HeldPose::ArmsRaised),
+            Known {
+                garment: "TestTee",
+                pose: "ArmsRaised",
+                cases: 25,
+                worst: 0.0098,
+            },
+            Known {
+                garment: BRA_THROUGH_TEE,
+                pose: "ArmsRaised",
+                cases: 2,
+                worst: 0.0053,
+            },
+            Known {
+                garment: "Underwear_BoxerBriefs",
+                pose: "ArmsRaised",
+                cases: 1,
+                worst: BOXER_GUSSET,
+            },
         ],
-        "arms",
-        Known {
-            cases: 63,
-            worst: 0.0182,
-        },
     );
 }
 
 #[test]
-fn garments_cover_the_cast_with_the_elbows_and_knees_bent() {
+fn garments_cover_the_cast_with_the_elbows_bent() {
     gate(
-        &[
-            Stance::Held(HeldPose::ElbowsBent),
-            Stance::Held(HeldPose::KneesBent),
-        ],
-        "bent",
-        Known {
-            cases: 10,
-            worst: 0.0196,
-        },
+        Stance::Held(HeldPose::ElbowsBent),
+        &[Known {
+            garment: "Underwear_BoxerBriefs",
+            pose: "ElbowsBent",
+            cases: 1,
+            worst: BOXER_GUSSET,
+        }],
+    );
+}
+
+#[test]
+fn garments_cover_the_cast_with_the_knees_bent() {
+    gate(
+        Stance::Held(HeldPose::KneesBent),
+        &[Known {
+            garment: "Underwear_BoxerBriefs",
+            pose: "KneesBent",
+            cases: 1,
+            worst: BOXER_GUSSET,
+        }],
     );
 }
 
@@ -595,14 +853,27 @@ fn stylized_clothes_cover_the_stylized_cast() {
         "stylized: {checked} garment checks, {} failing",
         failures.len()
     );
-    // The stylized clothes are fitted by ADR-0030's shape copies; what
-    // this finds is recorded in the CO9 hand-back.
-    check(
-        "stylized",
-        &failures,
-        Known {
-            cases: 67,
-            worst: 0.0339,
-        },
-    );
+    // The stylized clothes are fitted by ADR-0030's shape copies. What this
+    // finds is not seen in close captures of the cast (`co9-binding.md`,
+    // Review fixes 1): the sneakers' cases are the foot over the shoe's
+    // inner floor, which faces it from below; the tee's are at the top of
+    // the back and the shoulders, the cargo pants' under the buttocks.
+    // Recorded, per garment and pose, as open defects of drafts.
+    let known = [
+        ("Shoes_Sneakers", "rest", 16, 0.0339),
+        ("Shoes_Sneakers", "TPose", 16, 0.0339),
+        ("Shirt_Tee", "rest", 7, 0.0247),
+        ("Shirt_Tee", "TPose", 8, 0.0249),
+        ("Pants_Cargo", "rest", 7, 0.0339),
+        ("Pants_Cargo", "TPose", 7, 0.0339),
+        ("Underwear_Briefs", "rest", 3, 0.0176),
+        ("Underwear_Briefs", "TPose", 3, 0.0176),
+    ]
+    .map(|(garment, pose, cases, worst)| Known {
+        garment,
+        pose,
+        cases,
+        worst,
+    });
+    check("stylized", &failures, &known);
 }

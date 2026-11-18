@@ -16,7 +16,7 @@ use super::coverage::{RegionMap, classify, coverage, hidden_regions, triangle_re
 use super::glb::{FittedModel, write_fitted_glb};
 use super::surface::Surface;
 use super::thumbnail::{thumbnail, write_png};
-use super::transfer::{FitOptions, FitReport, Layer, carried_shapes, fit_garment};
+use super::transfer::{FitOptions, FitReport, Layer, carried_shapes, extremes_near, fit_garment};
 use super::{BodyMesh, FitError, GarmentMesh, is_mask_shape};
 use crate::{
     BaseManifest, CatalogueItem, ContentTier, Description, Fit, ItemKind, ItemManifest, Library,
@@ -57,6 +57,13 @@ pub struct ImportRequest {
 pub struct Alignment {
     pub scale: f32,
     pub offset: Vec3,
+    /// The file's units in metres (1, 0.01, 0.001 or 0.0254): part of
+    /// `scale`.
+    pub units: f32,
+    /// How unevenly it stood off the body before the fine fit and after
+    /// it (metres; see [`align`]).
+    pub spread_before: f32,
+    pub spread_after: f32,
 }
 
 /// What an import made.
@@ -75,53 +82,197 @@ fn library_error(message: impl Into<String>) -> FitError {
     FitError::Library(message.into())
 }
 
-/// Aligns `garment` to `body`: its units to the body's (a file in
-/// centimetres or millimetres is scaled down), and centred on the body
-/// across and front to back over the heights it spans. Its height is
-/// kept: it is made in the body's rest pose.
+/// The units a garment's file may be in, in metres.
+const UNITS: [f32; 4] = [1.0, 0.01, 0.001, 0.0254];
+/// The fine fit's bounds: the scale within this share of its size, and
+/// the offset within these distances (up and down; across and front to
+/// back).
+const FINE_SCALE: f32 = 0.08;
+const FINE_UP: f32 = 0.06;
+const FINE_ACROSS: f32 = 0.03;
+/// The fine fit is taken only when it stands the garment off the body this
+/// much more evenly: a share of the spread before, and at least this much
+/// (metres).
+const FINE_GAIN: f32 = 0.8;
+const FINE_GAIN_LEAST: f32 = 0.002;
+/// How many of the garment's corners the fine fit measures.
+const FINE_SAMPLES: usize = 400;
+
+/// Aligns `garment` to `body`, in three steps:
+///
+/// 1. **Units.** Of metres, centimetres, millimetres and inches, the one
+///    that makes it no taller than the body and closest to the body's
+///    width and depth over the heights it spans.
+/// 2. **Rough place.** Centred on the body across and front to back over
+///    the heights it spans, unless it stood off the body more evenly where
+///    it came (a garment already placed). Its height is kept: a garment's
+///    file is in the body's rest pose, standing on the same floor.
+/// 3. **Fine fit (bounding landmarks).** A garment made for the body
+///    stands off it by about the same ease everywhere: its scale (within
+///    8%, about its middle) and offset (within 6 cm up or down and 3 cm
+///    across or front to back) are searched for the place where its
+///    distance from the skin is most even (the root mean square distance
+///    from the median) and nothing is inside the skin. It is taken when it
+///    is at least 20% and 2 mm more even than before, so a garment already
+///    in place stays where it is. (It can't tell a size a little bigger
+///    from a more even ease: a tee with more ease over the torso than round
+///    the sleeves comes back about 2% too big.)
 pub fn align(garment: &mut GarmentMesh, body: &BodyMesh) -> Alignment {
-    let (body_lo, body_hi) = body
-        .positions
-        .iter()
-        .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(lo, hi), p| {
-            (lo.min(*p), hi.max(*p))
-        });
     let (lo, hi) = garment.bounds();
-    let tall = (hi.y - lo.y).max(1e-6);
-    let body_tall = (body_hi.y - body_lo.y).max(1e-6);
-    let scale = match tall / body_tall {
-        r if r > 200.0 => 0.001,
-        r if r > 20.0 => 0.01,
-        _ => 1.0,
-    };
-    let (lo, hi) = (lo * scale, hi * scale);
-    // The body's middle, across and front to back, at the garment's
-    // heights.
-    let band: Vec<&Vec3> = body
-        .positions
-        .iter()
-        .filter(|p| p.y >= lo.y && p.y <= hi.y)
-        .collect();
-    let (band_lo, band_hi) = if band.is_empty() {
-        (body_lo, body_hi)
-    } else {
-        band.iter()
-            .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(a, b), p| {
-                (a.min(**p), b.max(**p))
-            })
-    };
-    let body_middle = (band_lo + band_hi) / 2.0;
+    let units = units_of(lo, hi, body);
+    garment.transform(units, Vec3::ZERO);
+    let (lo, hi) = (lo * units, hi * units);
+    let (band_lo, band_hi) = band(body, lo.y, hi.y);
     let middle = (lo + hi) / 2.0;
-    let offset = Vec3::new(body_middle.x - middle.x, 0.0, body_middle.z - middle.z);
+    let mut centred = (band_lo + band_hi) / 2.0 - middle;
+    centred.y = 0.0;
+
+    let surface = body.surface(&[]);
+    let positions = garment.positions();
+    let step = (positions.len() / FINE_SAMPLES).max(1);
+    let samples: Vec<Vec3> = positions.iter().step_by(step).copied().collect();
+    // Every candidate is a scale about the garment's middle as it came and
+    // a shift: p -> middle + (p - middle) * scale + shift.
+    let spread = |scale: f32, shift: Vec3| unevenness(&surface, &samples, middle, scale, shift);
+    let as_came = spread(1.0, Vec3::ZERO);
+    let rough = spread(1.0, centred);
+    let (before, start) = if rough < as_came {
+        (rough, centred)
+    } else {
+        (as_came, Vec3::ZERO)
+    };
+
+    // Scale and height on a coarse grid, then each of scale, across, up
+    // and front to back nudged by halving steps while that helps.
+    let mut best = (before, 1.0f32, start);
+    for k in -4..=4 {
+        for j in -6..=6 {
+            let scale = 1.0 + FINE_SCALE * k as f32 / 4.0;
+            let shift = start + Vec3::Y * (FINE_UP * j as f32 / 6.0);
+            let value = spread(scale, shift);
+            if value < best.0 {
+                best = (value, scale, shift);
+            }
+        }
+    }
+    let lowest = Vec3::new(-FINE_ACROSS, -FINE_UP, -FINE_ACROSS) + start;
+    let highest = Vec3::new(FINE_ACROSS, FINE_UP, FINE_ACROSS) + start;
+    let mut steps = [0.01f32, 0.01, 0.01, 0.01];
+    while steps.iter().any(|s| *s > 0.002) {
+        for (axis, step) in steps.iter_mut().enumerate() {
+            if *step <= 0.002 {
+                continue;
+            }
+            let mut moved = false;
+            for sign in [-1.0f32, 1.0] {
+                let (_, mut scale, mut shift) = best;
+                if axis == 0 {
+                    scale = (scale + sign * *step).clamp(1.0 - FINE_SCALE, 1.0 + FINE_SCALE);
+                } else {
+                    shift[axis - 1] += sign * *step;
+                    shift = shift.clamp(lowest, highest);
+                }
+                let value = spread(scale, shift);
+                if value < best.0 {
+                    best = (value, scale, shift);
+                    moved = true;
+                    break;
+                }
+            }
+            if !moved {
+                *step /= 2.0;
+            }
+        }
+    }
+    let (mut after, mut scale, mut shift) = best;
+    if after > FINE_GAIN * before || before - after < FINE_GAIN_LEAST {
+        (after, scale, shift) = (before, 1.0, start);
+    }
+    let offset = middle * (1.0 - scale) + shift;
     garment.transform(scale, offset);
-    Alignment { scale, offset }
+    Alignment {
+        scale: units * scale,
+        offset,
+        units,
+        spread_before: before,
+        spread_after: after,
+    }
 }
 
-/// The combinations of `base`'s body shape weights a garment must clear:
-/// each build parameter (overall and by region) at either end, the
-/// overall muscle and fat ends together, and every body preset, each on
-/// both frames (when the base has a `frame` parameter). Mask shapes are
-/// left out.
+/// The body's box over the heights `low` to `high` (its whole box when it
+/// has nothing there).
+fn band(body: &BodyMesh, low: f32, high: f32) -> (Vec3, Vec3) {
+    let fold = |inside: &dyn Fn(&Vec3) -> bool| {
+        body.positions
+            .iter()
+            .filter(|p| inside(p))
+            .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(lo, hi), p| {
+                (lo.min(*p), hi.max(*p))
+            })
+    };
+    let (lo, hi) = fold(&|p| p.y >= low && p.y <= high);
+    if lo.x.is_finite() {
+        (lo, hi)
+    } else {
+        fold(&|_| true)
+    }
+}
+
+/// The units a garment whose box is `lo` to `hi` is in: see [`align`].
+fn units_of(lo: Vec3, hi: Vec3, body: &BodyMesh) -> f32 {
+    let (body_lo, body_hi) = band(body, f32::NEG_INFINITY, f32::INFINITY);
+    let tallest = (body_hi.y - body_lo.y) * 1.15;
+    let size = (hi - lo).max(Vec3::splat(1e-6));
+    let mut best = (f32::INFINITY, 1.0);
+    for units in UNITS {
+        if size.y * units > tallest {
+            continue;
+        }
+        let (band_lo, band_hi) = band(body, lo.y * units, hi.y * units);
+        let band_size = (band_hi - band_lo).max(Vec3::splat(1e-6));
+        let misfit =
+            (size.x * units / band_size.x).ln().abs() + (size.z * units / band_size.z).ln().abs();
+        if misfit < best.0 {
+            best = (misfit, units);
+        }
+    }
+    best.1
+}
+
+/// How unevenly `samples`, scaled by `scale` about `centre` and moved by
+/// `shift`, stand off `surface`: the root mean square distance of their
+/// clearances from the median, plus three times how far they are inside it on average,
+/// plus 5 cm for each share of them not over the skin (farther than 12 cm
+/// from it, or beside it: a part sunk into the body or pulled off it).
+fn unevenness(surface: &Surface, samples: &[Vec3], centre: Vec3, scale: f32, shift: Vec3) -> f32 {
+    let mut clearances: Vec<f32> = samples
+        .iter()
+        .filter_map(|p| {
+            let p = centre + (*p - centre) * scale + shift;
+            let hit = surface.closest(p, 0.12)?;
+            hit.is_over(p).then(|| hit.signed(p))
+        })
+        .collect();
+    if clearances.is_empty() {
+        return f32::INFINITY;
+    }
+    let off = 1.0 - clearances.len() as f32 / samples.len() as f32;
+    clearances.sort_by(f32::total_cmp);
+    let median = clearances[clearances.len() / 2];
+    let count = clearances.len() as f32;
+    let spread = (clearances.iter().map(|c| (c - median).powi(2)).sum::<f32>() / count).sqrt();
+    let inside = clearances.iter().map(|c| (-c).max(0.0)).sum::<f32>() / count;
+    spread + 3.0 * inside + 0.05 * off
+}
+
+/// The combinations of `base`'s body shape weights a garment must clear,
+/// as the sliders check (`assets/characters/humanoid/qa/measure.py`,
+/// `slider_pairs`) pairs the body's parameters: on both frames (when the
+/// base has a `frame` parameter), each build parameter (overall and by
+/// region) at either end alone, and with every other build parameter at
+/// either end; and every body preset on both frames. Mask shapes are left
+/// out. For one garment, [`extremes_near`](super::extremes_near) keeps
+/// what can reach it.
 pub fn extremes_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f32)>> {
     let frames: Vec<Option<f32>> = match base.parameter("frame") {
         Some(frame) => vec![Some(frame.range[0]), Some(frame.range[1])],
@@ -135,27 +286,23 @@ pub fn extremes_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f
         .collect();
     let mut sets: Vec<Vec<(String, f32)>> = Vec::new();
     for frame in &frames {
-        let start = || {
+        let at = |values: &[(&str, f32)]| {
             let mut description = Description::new("extreme", &base.id);
             if let Some(frame) = frame {
                 description.parameters.insert("frame".to_owned(), *frame);
             }
-            description
-        };
-        for parameter in &build {
-            for end in parameter.range {
-                let mut description = start();
-                description.parameters.insert(parameter.id.clone(), end);
-                sets.push(weights_of(base, &description, library));
+            for (id, value) in values {
+                description.parameters.insert((*id).to_owned(), *value);
             }
-        }
-        if let (Some(muscle), Some(fat)) = (base.parameter("muscle"), base.parameter("fat")) {
-            for m in muscle.range {
-                for f in fat.range {
-                    let mut description = start();
-                    description.parameters.insert("muscle".to_owned(), m);
-                    description.parameters.insert("fat".to_owned(), f);
-                    sets.push(weights_of(base, &description, library));
+            weights_of(base, &description, library)
+        };
+        for (i, a) in build.iter().enumerate() {
+            for end_a in a.range {
+                sets.push(at(&[(a.id.as_str(), end_a)]));
+                for b in &build[i + 1..] {
+                    for end_b in b.range {
+                        sets.push(at(&[(a.id.as_str(), end_a), (b.id.as_str(), end_b)]));
+                    }
                 }
             }
         }
@@ -165,7 +312,7 @@ pub fn extremes_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f
             {
                 continue;
             }
-            let mut description = start();
+            let mut description = Description::new("extreme", &base.id);
             description.parameters.extend(preset.parameters.clone());
             if let Some(frame) = frame {
                 description.parameters.insert("frame".to_owned(), *frame);
@@ -265,7 +412,7 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         margin: request.margin,
         shapes: carried_shapes(base, &body),
         under,
-        extremes: extremes_of(base, &library),
+        extremes: extremes_near(&body, &garment, &extremes_of(base, &library)),
         ..FitOptions::default()
     };
     let fitted = fit_garment(&body, &garment, &options)?;
@@ -393,12 +540,13 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
     write(&manifest_name, manifest.to_json().as_bytes())?;
     let manifest_path = format!("{}/{manifest_name}", request.folder.trim_end_matches('/'));
 
-    // Listed in the catalogue, replacing an earlier import of the same ID.
-    catalogue.items.retain(|entry| entry.id != manifest.id);
-    catalogue
-        .items
-        .push(CatalogueItem::of(&manifest_path, &manifest));
-    catalogue.items.sort_by(|a, b| a.id.cmp(&b.id));
+    // Listed in the catalogue: in place of an earlier import of the same
+    // ID, or at the end (the catalogue's own order is kept).
+    let entry = CatalogueItem::of(&manifest_path, &manifest);
+    match catalogue.items.iter_mut().find(|e| e.id == manifest.id) {
+        Some(earlier) => *earlier = entry,
+        None => catalogue.items.push(entry),
+    }
     std::fs::write(root.join("catalogue.json"), catalogue.to_json()).map_err(|err| {
         FitError::Write {
             path: "catalogue.json".to_owned(),

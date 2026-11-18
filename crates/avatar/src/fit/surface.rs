@@ -88,23 +88,44 @@ impl Surface {
         let home = grid.cell_of(query);
         let mut best: Option<(f32, u32, Vec3)> = None;
         // Rings beyond the grid can hold nothing, so the search ends there.
-        let far = grid.counts.iter().copied().max().unwrap_or(0) + 1;
-        let reach = ((within / grid.cell).ceil() as i32 + 1).min(far.max(1));
+        // (A point outside the grid has the cell it is clamped to as its
+        // home; every cell is still within the grid's size of that.)
+        let far = grid.counts.iter().copied().max().unwrap_or(0).max(1) + 1;
+        // `within` may be huge or infinite: clamp it to the grid before
+        // making it a ring count (a float past `i32::MAX` saturates, and
+        // adding to it overflows).
+        let rings = (within / grid.cell).ceil();
+        let reach = if rings.is_finite() && rings < far as f32 {
+            rings as i32 + 1
+        } else {
+            far
+        };
+        // Nothing farther than `within` is wanted: a cell farther than that,
+        // or than the best so far, is passed over.
+        let limit_sq = if within.is_finite() {
+            within * within
+        } else {
+            f32::INFINITY
+        };
         for ring in 0..=reach {
-            if let Some((distance_sq, _, _)) = best {
-                // Everything in ring `ring` is at least `(ring - 1)` cells
-                // away.
-                let nearest = (ring - 1).max(0) as f32 * grid.cell;
-                if nearest * nearest > distance_sq {
-                    break;
-                }
+            let bound = best.map_or(limit_sq, |(distance_sq, _, _)| distance_sq.min(limit_sq));
+            // Everything in ring `ring` is at least `(ring - 1)` cells away.
+            let nearest = (ring - 1).max(0) as f32 * grid.cell;
+            if nearest * nearest > bound {
+                break;
             }
-            grid.each_in_ring(home, ring, |triangle| {
-                let [a, b, c] = self.corners(triangle);
-                let (point, bary) = closest_on_triangle(query, a, b, c);
-                let distance_sq = point.distance_squared(query);
-                if best.is_none_or(|(best, _, _)| distance_sq < best) {
-                    best = Some((distance_sq, triangle, bary));
+            grid.each_cell_in_ring(home, ring, |cell| {
+                let bound = best.map_or(limit_sq, |(distance_sq, _, _)| distance_sq.min(limit_sq));
+                if grid.distance_sq_to_cell(cell, query) > bound {
+                    return;
+                }
+                for &triangle in grid.triangles_in(cell) {
+                    let [a, b, c] = self.corners(triangle);
+                    let (point, bary) = closest_on_triangle(query, a, b, c);
+                    let distance_sq = point.distance_squared(query);
+                    if best.is_none_or(|(best, _, _)| distance_sq < best) {
+                        best = Some((distance_sq, triangle, bary));
+                    }
                 }
             });
         }
@@ -280,10 +301,9 @@ impl Grid {
         (z as usize * self.counts[1] as usize + y as usize) * self.counts[0] as usize + x as usize
     }
 
-    /// Calls `each` with every triangle of the cells exactly `ring` cells
-    /// (in the largest axis) from `home`. A triangle in several of them
-    /// may come more than once.
-    fn each_in_ring(&self, home: [i32; 3], ring: i32, mut each: impl FnMut(u32)) {
+    /// Calls `each` with every cell exactly `ring` cells (in the largest
+    /// axis) from `home`.
+    fn each_cell_in_ring(&self, home: [i32; 3], ring: i32, mut each: impl FnMut([i32; 3])) {
         let lo = home.map(|v| v - ring);
         let hi = home.map(|v| v + ring);
         for z in lo[2].max(0)..=hi[2].min(self.counts[2] - 1) {
@@ -292,17 +312,27 @@ impl Grid {
                     let on_ring = (x - home[0]).abs() == ring
                         || (y - home[1]).abs() == ring
                         || (z - home[2]).abs() == ring;
-                    if !on_ring {
-                        continue;
-                    }
-                    let cell = self.index([x, y, z]);
-                    let (start, end) = (self.starts[cell] as usize, self.starts[cell + 1] as usize);
-                    for &triangle in &self.items[start..end] {
-                        each(triangle);
+                    if on_ring {
+                        each([x, y, z]);
                     }
                 }
             }
         }
+    }
+
+    /// The triangles in a cell (a triangle is in every cell its box
+    /// touches).
+    fn triangles_in(&self, cell: [i32; 3]) -> &[u32] {
+        let index = self.index(cell);
+        &self.items[self.starts[index] as usize..self.starts[index + 1] as usize]
+    }
+
+    /// How far `point` is from a cell's box, squared (0 inside it).
+    fn distance_sq_to_cell(&self, cell: [i32; 3], point: Vec3) -> f32 {
+        let lo = self.min + Vec3::new(cell[0] as f32, cell[1] as f32, cell[2] as f32) * self.cell;
+        let hi = lo + Vec3::splat(self.cell);
+        let outside = (lo - point).max(point - hi).max(Vec3::ZERO);
+        outside.length_squared()
     }
 }
 

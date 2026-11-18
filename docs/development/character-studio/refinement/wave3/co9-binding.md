@@ -159,3 +159,189 @@ What I saw:
 - `ItemManifest.quality`, `BaseModel.regions_map` and `Resolved.hidden_regions` are contract additions in `avatar`. A parallel branch may add `quality` too; keep one.
 - `crates/assets/src/derived.rs` and `model/identity.rs` (`split_derived`) changed. Check them against CO8's branch if it touches derived models.
 - The gate's ratchet numbers (`Known` in `fit_gate_tests.rs`) are this branch's. Lower them when an item improves; never raise them to pass one.
+
+## Review fixes 1 (2026-11-17)
+
+The review found seven blocking problems. Six are fixed. One is only part fixed, and I couldn't get the test tee to 0 in two poses. The red run is appended to `co9-binding-red-run.txt`.
+
+**In one paragraph.** The test tee was broken at the source, as the review said. Its girths took in arm skin and grew flanges to ±0.31 m. It is remade from the body's cross-sections and now has a T-shirt's shape, clean cut edges and a crew neck. At rest it imports with a 0.6 mm push, `inside_most` is 0, and the gate finds nothing at rest, in the T-pose or with the elbows or knees bent. With the arms raised (25 of 54 bodies, up to 9.7 mm) and in the walk (33, up to 12.5 mm) it still fails. You can see it with the arms raised: the underarm opens beside the sleeve.
+
+The other fixes:
+- binding a far vertex no longer panics;
+- alignment finds units for short garments and fits scale and height;
+- extremes are the sliders check's pairs;
+- normals follow the push-out;
+- the gate is cached once per build, cleans up after itself and runs in 3 to 15 s a test;
+- ceilings are recorded per garment and pose.
+
+The realistic briefs now pass. The boxer briefs still fail on one body. I measured the stylized clothes and looked at close captures, but didn't change them.
+
+### Each blocking item
+
+1. **The test garment was malformed.** Fixed in `make_test_tee.py`:
+   - each girth is the convex outline of the body's cross-section at that height, made the same on both sides, 22 mm out;
+   - below the armpit it is the trunk only, out to the first gap of 3 cm (the armpit is the highest height where that gap exists: 1.217 m);
+   - above the armpit it reaches 5 cm past the trunk's side to cover the arm's root;
+   - the sleeves are tubes sized by the upper arm's girth at eight steps;
+   - the hem and the sleeve ends are cut by planes (`bisect_plane`), so the edges are straight;
+   - the crew neck is cut by an upright cylinder round the neck (a boolean, then the cylinder's faces deleted);
+   - an assertion stops the script if any girth is wider than the trunk at the armpit plus the arm's root.
+
+   Result: 3,222 vertices and 6,097 triangles. `test-tee-source-renders.png` shows the OBJ on the body from the front, three-quarter, side and back: a T-shirt silhouette, no flanges, the most the body comes out is the armpit fold, and the import pushes 0.6 mm at most.
+
+   **Normals:** `fit_garment` now turns each source normal by the rotation of its welded surface's normal from before the push-out to after it (step 7). Corners that didn't move keep their normals exactly, hard edges included, and the shapes' normal changes are made from the new normals. Tested by `corners_moved_by_the_push_out_take_the_normals_of_where_they_are` (within 5°).
+2. **The import's fit and the loosened thresholds.**
+   - The import test now asserts `inside_most <= 1e-4` (measured: 0.0) and a push from the body under 1 cm (measured 0.6 mm).
+   - The gate's records are per garment and pose (`Known { garment, pose, cases, worst }`). Anything not recorded must have no failing case.
+   - **The tee's 0:** at rest, in the T-pose and with the elbows and knees bent.
+   - **Still recorded:** with the arms raised (25 bodies, 9.73 mm) and in the walk (33 bodies, 12.5 mm); the bra through the tee with the arms raised (2, 5.3 mm) and in the walk (12, 11.2 mm).
+   - **What I did in the core:**
+     - **Weights from both sides of a crease** (`projected_weights`). Each body corner near the garment casts a ray out along its normal, and the garment triangle it meets takes the corner's weights. A garment corner no skin reaches keeps its bound point's weights. This brought the arms-raised result from 27 bodies at 14.3 mm to 25 at 9.7 mm, and the walk from 50 at 18.6 mm to 33 at 12.5 mm.
+     - **Pose push-out** (tried, then taken out). The garment was posed in the gate's own poses (joints taken from the stage) at the frame ends, checked from the cloth's side and from the skin's side, and pushed out either by lifting its rest or through its copies of the shoulder correctives, on the matching side. A debug test confirmed that this posing matched the player's to 0.00 mm. It did not bring the gate down:
+       - lifting the rest: 47 to 53 bodies with the arms raised;
+       - corrective routing: 51;
+       - checking from the skin's side as well: the iteration diverged (`inside_most` 34 mm).
+
+       Adding ease didn't help either: 30 mm round the torso gave 52 bodies at 25 mm in the walk. The pose code is not in this commit.
+   - **What the pictures show** (`crops-arms-raised-*.jpg`): with the arms raised, the sleeve rises with the arm and the side under it opens, showing skin and the bra on all six cast bodies. Linear skinning of cloth that stands off the skin can't stretch the underarm. That needs a solved pose corrective, cloth proxies or a pattern-made garment.
+3. **`bind` panicked on far vertices.** `Surface::closest` now turns `within` into a ring count only when it is finite and smaller than the grid. Otherwise it searches the whole grid. A point outside the grid has its clamped cell as home, and every cell is within the grid's size of it. Cells farther than the best hit so far, or than `within`, are passed over (a cell-box distance test), which also made the import about 4 times faster. Tested by `a_vertex_far_from_the_body_is_bound_to_its_closest_point`: points 0.5 m and 1.5 m away, the round trip within 0.1 mm. The red run shows the old panic at `surface.rs:92`.
+4. **Alignment** (`align`) now works in three steps:
+   1. **Units:** of metres, centimetres, millimetres and inches, the one that makes the garment no taller than 1.15 times the body and closest to the body's width and depth at those heights.
+   2. **Rough place:** centred across and front to back, unless it stood off the body more evenly where it came.
+   3. **Fine fit by bounding landmarks:** scale within 8% about its middle, height within 6 cm, across and front to back within 3 cm. It searches for the place where the distance from the skin is most even (RMS from the median, plus three times the depth inside, plus 5 cm for each share of samples off the skin). The fit is taken only when it is at least 20% and 2 mm more even.
+
+   `Alignment` reports `units`, `spread_before` and `spread_after`. Tests:
+   - shoes 12 cm and socks 30 cm tall, in centimetres, millimetres and inches, all come back within 1 cm;
+   - the tee as made is left alone;
+   - the tee at 0.95 scale and 3 cm too high comes back with scale 1.070 (the true value is 1/0.95 = 1.053), 5.0 mm off on average and 8.1 mm at worst.
+
+   The fit can't tell a size a little bigger from a more even ease (the tee has more ease round the torso than round the sleeves), so the test allows 2.5%.
+5. **The extremes** (`extremes_of`) are now the sliders check's pairs for the build. On both frames, each of the 18 build and build-region parameters is taken at either end alone, and with every other one at either end, plus the body presets: 1,324 states. `extremes_near` keeps only the shapes that move the body within 10 cm of the garment's box and drops duplicates: 1,025 states for the tee. That pruning is exact, because the shapes it removes move neither the obstacles nor the bound triangles.
+
+   The extremes and the final check run on up to 8 threads (`par_map`). Rounds after the first check again only the extremes that lifted.
+
+   The layered test checks all 1,324 states unpruned: the tee stays at least 4.74 mm over the bra. The test `the_extremes_are_every_pair_of_build_parameter_ends_on_both_frames` checks every pair.
+
+   The tee now has 2 cm of ease, so the bra pushes nothing at rest. The old "the bra pushed" assertion depended on the malformed tee and is removed. The tube test still covers a layer pushed out over another.
+6. **Shipped items with fit failures.**
+   - **Realistic underwear.** `underwear.py` now runs `push_out` after carrying the shapes:
+     - margin 2 mm;
+     - each shape at full weight and the build's four muscle and fat corners (heavy-soft among them), on both frames;
+     - two checks: cloth vertices inside the skin, and skin under the cloth (two rings in from the hems) that comes up between cloth vertices;
+     - each push spread over 4 rings and shared among the state's shapes by weight;
+     - the rim follows its hem.
+
+     Result: the briefs pass in every pose (they were 18 mm on the feminine heavy-soft body). The bra is unchanged at the gate.
+
+     **Not fixed:** the boxer briefs on the masculine heavy-soft body. There the skin under the gusset hangs 1 to 4 cm below it (measured on the built model), and one of those vertices is covered: 14.2 mm, 17.1 mm in the walk. The gusset is narrower than two rings from each leg opening. When I checked the whole cloth there, the bra's push grew to 2.9 cm and it came through the tee by 23 mm, so I took that out.
+
+     `RealisticParts.glb` and `Realistic.build.json` are rebuilt; the build data adds `shapes_pushed` and `push_most`. `crops-bare.jpg` shows the underwear clean at rest and in the walk on four cast bodies.
+   - **Stylized clothes.** Measured and looked at, not changed (`stylized-feet.png`, `stylized-back-side.png`, the average cast at 1920 × 1080):
+     - **Sneakers:** their cases are foot vertices over the shoe's inner floor, which faces up under them. No foot shows outside the shoe.
+     - **Tee and cargo pants:** no skin shows through.
+     - **A real defect:** the stylized tee's back hem crumples into the cargo pants' waistband.
+
+     Refitting them means changing the stylized build and its manifests, which belong to that family's owner. The records are per garment and pose, at the numbers measured (sneakers 16 bodies, 34 mm; tee 7 or 8, 25 mm; cargo 7, 34 mm; stylized briefs 3, 18 mm).
+7. **Gate temp files and timing.**
+   - The gate library is now made once per build of the tests, under `target/<profile>/fit-gate/<key>`. The key is a hash of the test binary, the tee's file and the shipped files.
+   - One process takes a lock file and builds the library in a folder of its own, then renames it into place; the others wait. A lock older than 10 minutes is taken over. Folders of other keys older than an hour are removed.
+   - The scratch libraries in `fitting.rs` are removed on drop, even when a test fails.
+   - The 54 leaked `axcenity-fit-*` folders (2.7 GB) are deleted from this machine's temp folder.
+   - The gate is split into six tests, one per pose: 3 to 15 s each, 68 s for all eight with the import, against 60 to 105 s each before.
+   - The import of the tee takes 7.5 s (it was 34 to 58 s).
+
+### Non-blocking items done
+
+- `hidden_body` and `part_key` have their own doc comments again (`gameplay/src/description.rs`).
+- `architecture.md` section 16 lists `bind(&Surface, &[Vec3], &[Vec3])`, `extremes_near` and `align`.
+- `import_garment` replaces an earlier entry in place or appends a new one; it no longer sorts the catalogue.
+- Before and after sheets: the first round's sheets are in `co9-binding/before/`.
+
+**Not done:**
+- `hidden_of` still decodes the region map on the calling thread the first time.
+- The tee has 6,097 triangles, a little over the proposed 6k budget for a top. It is a draft.
+
+### Interfaces changed
+
+- `Alignment` gains `units`, `spread_before` and `spread_after`.
+- `extremes_of` returns pairs.
+- New: `extremes_near` and `GarmentMesh::set_normals`.
+- `fit_garment` takes weights from the skin under each corner.
+
+No contract (manifest schema) changed.
+
+### Tests
+
+| Run | Result |
+|---|---|
+| `cargo nextest run -p axcenity-assets -p axcenity-avatar -p axcenity-anim -p axcenity-gameplay -p axcenity-project -p axcenity-player --no-fail-fast` | 988 tests run: 988 passed (5 slow), 21 skipped |
+| `cargo nextest run -p axcenity-player -E 'test(/fit_gate_tests/)'` | 8 passed in 68 s |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | done |
+| `python3 -I scripts/check-wiki.py` | 113 pages, 0 errors |
+
+The gate's 8 tests: rest 6.8 s, walk 8.2 s, T-pose 8.7 s, arms raised 8.6 s, elbows 10.0 s, knees 8.2 s, stylized 5.5 s, hiding 3.0 s.
+
+New tests:
+- in `avatar` `fit::tests`:
+  - `a_vertex_far_from_the_body_is_bound_to_its_closest_point`;
+  - `alignment_finds_the_units_of_short_garments`;
+  - `corners_moved_by_the_push_out_take_the_normals_of_where_they_are`;
+- in `avatar` `tests/fitting.rs`:
+  - `the_extremes_are_every_pair_of_build_parameter_ends_on_both_frames`;
+  - `alignment_puts_a_garment_made_too_high_and_too_small_back_on_the_body`.
+
+**Measurements from the import** (`a_garment_not_made_from_the_body_imports_as_a_fitted_draft`):
+- **The import:** 7.5 s; slot `top`; it hides `waist` (256 of 22,184 triangles).
+- **Shapes:** 127 carried, 56 move the tee.
+- **Push-out at rest:** 8 corners, 0.6 mm at most; at the shapes' full weight, 3.2 mm at most.
+- **Extremes:** 1,025 checked, 549 lifting by 0.5 mm at most.
+- **`inside_most`:** 0.
+- **Coverage:**
+  - torso 0.89;
+  - waist 1.0;
+  - hips 0.88;
+  - upper arms 0.85.
+
+**The underwear agreement test now** (the underwear's own shapes against the transfer):
+- boxer briefs: 88.3% within 1 mm;
+- briefs: 90.1%;
+- bra: 90.4%.
+
+### Visual evidence (`co9-binding/`)
+
+- **Sheets:** `tee-*-body.jpg` (six cast bodies) and `bare-*-body.jpg` (four). Body suite, studio and hard light, front, three-quarter and side, at 60% size.
+- **Crops:**
+  - `crops-rest.jpg`: rest, front;
+  - `crops-rest-side.jpg`: rest, side;
+  - `crops-arms-raised-side.jpg` and `crops-arms-raised-three-quarter.jpg`: arms raised;
+  - `crops-walk-side.jpg` and `crops-walk-three-quarter.jpg`: the walk;
+  - `crops-bare.jpg`: the underwear at rest and in the walk.
+- **The tee itself:** `test-tee-source-renders.png` (the OBJ) and `test-tee-thumbnail.png`.
+- **The stylized outfit:** `stylized-feet.png` and `stylized-back-side.png`.
+
+What I saw:
+- **The tee at rest.** It reads as a T-shirt on every cast body: straight hem, round crew neck, short sleeves, with the bust and belly carried. The faceted look is gone. The thumbnail shows a T-shirt; it has faint horizontal banding from the lofted girths.
+- **The tee from the side, feminine bodies.** The black band of the bra shows in the armhole under the arm: the underarm opening is about 3 cm at rest.
+- **The tee's neckline.** On the feminine bodies the top edge of the sports bra shows above the crew neck in front.
+- **Arms raised.** On all six, the side under the arm opens from the sleeve down about 6 cm, with skin and, on the feminine bodies, the bra showing. This is the defect still recorded.
+- **The walk.** No skin shows through at crop size. The gate's cases are under the arm and at the hip front.
+- **Elbows and knees bent.** Clean.
+- **The underwear.** Clean in every pose.
+- **The capture tool.** The knees-bent row still floats, and "walk" is a running stride. Both are the capture tool's, as before.
+
+### Open issues (added)
+
+1. **The test tee in two poses.** With the arms raised and in the walk it still fails the gate (recorded per pose). A garment standing off the skin, skinned linearly, can't follow the underarm's stretch.
+   - What I tried: pose push-out, by lifting the rest or through its corrective shape copies. It doesn't converge.
+   - What would fix it: a solved pose corrective (fitting the cloth to the posed body and storing the difference in the corrective it leans on, with a solver rather than a push), cloth proxies, or a pattern-made test garment with a real armhole (FreeSewing).
+2. **Boxer briefs on the masculine heavy-soft body.** 14 mm at the gusset, which the build's push-out doesn't reach. A wider or deeper gusset for heavy bodies in `underwear.py` would fix it; that is a change to the underwear's shape.
+3. **Stylized clothes.** They are recorded, not refitted. The gate's shoe cases are an artefact of shoes with an inner floor; a gate rule that understands closed shoes (ray parity or a sole mask) would remove them. The tee's hem crumpling into the waistband is a real layering defect.
+4. **The sports bra at a crew neck.** Its top edge shows above the tee's neckline on the feminine frame. Either a higher neckline or a lower bra neckline.
+5. **Alignment's size bias.** About 2% bigger for a garment whose ease isn't even.
+
+### At merge (added)
+
+- **Rebuilt:** `RealisticParts.glb` and `Realistic.build.json`, by `build.py` with the bpy Python; the only changes are the underwear's shapes and their report. `Realistic.base.json`, the region map and the item manifests came out the same apart from line endings, which I didn't commit. The lead rebuilds the realistic package at merge as usual; keep `underwear.py`'s `push_out`.
+- **The gate's records** (`Known`, per garment and pose in `fit_gate_tests.rs`) are this branch's. Lower them as items improve.
+- **Cache:** the gate library cache is `target/<profile>/fit-gate/`; deleting it is safe.

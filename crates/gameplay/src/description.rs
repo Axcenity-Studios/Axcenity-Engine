@@ -502,8 +502,6 @@ pub fn is_baked(world: &World, character: InstanceId) -> bool {
     })
 }
 
-/// How a worn part is told apart from the others: its item, or its model
-/// for the base's own parts.
 /// The body's `MeshId` with the map regions in `hidden` left out (CO9,
 /// `axcenity_assets::RegionHiding`): its base's own when nothing worn
 /// hides a region of the base's region map.
@@ -535,6 +533,8 @@ fn hidden_body(
     }
 }
 
+/// How a worn part is told apart from the others: its item, or its model
+/// for the base's own parts.
 fn part_key(part: &ResolvedPart) -> String {
     match &part.item {
         Some(item) => item.clone(),
