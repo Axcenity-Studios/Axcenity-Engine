@@ -380,7 +380,7 @@ impl EditorApp {
             self.layer_view = crate::layers::LayerView::load(&project.folder);
         }
         self.layer_sets = Default::default();
-        self.animation = AnimationStudio::default();
+        *self.animation = AnimationStudio::default();
         self.behavior = BehaviorTreeStudio::default();
         self.dialogues = crate::dialogue_editor::DialogueStudio::default();
         self.data_tables = DataTableStudio::default();
@@ -1337,7 +1337,7 @@ impl EditorApp {
     pub(super) fn finish_closing_project(&mut self) {
         // Saved or let go by now: nothing to recover.
         self.autorecover_done();
-        self.animation = AnimationStudio::default();
+        *self.animation = AnimationStudio::default();
         self.layer_view = Default::default();
         self.asset_check.clear();
         // The session was this project's (or ended for good with it).

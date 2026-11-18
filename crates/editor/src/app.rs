@@ -464,7 +464,9 @@ pub struct EditorApp {
     /// the asset directory and the asset key and package it came from.
     toolbox_imports: HashMap<PathBuf, (String, String)>,
     /// The Animation panel's clips, open clip and preview.
-    animation: AnimationStudio,
+    // Boxed: at 47 KB it was a quarter of `EditorApp`, which debug-build
+    // tests copy on the stack (two editors in the team tests overflowed it).
+    animation: Box<AnimationStudio>,
     /// The Behavior Tree tab and the trees open in it.
     behavior: BehaviorTreeStudio,
     /// The Dialogue tab and the dialogues open in it (Phase 77).
@@ -1116,7 +1118,7 @@ impl EditorApp {
             version_explorer: Default::default(),
             updates: Default::default(),
             toolbox_imports: HashMap::new(),
-            animation: AnimationStudio::default(),
+            animation: Box::default(),
             behavior: BehaviorTreeStudio::default(),
             dialogues: DialogueStudio::default(),
             data_tables: DataTableStudio::default(),

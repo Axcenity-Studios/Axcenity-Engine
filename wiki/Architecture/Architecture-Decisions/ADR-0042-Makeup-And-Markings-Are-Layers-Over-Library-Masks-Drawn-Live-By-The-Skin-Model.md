@@ -2,7 +2,7 @@
 title: "ADR-0042: Makeup and markings are layers a description turns on over masks in the model file, drawn live by the Skin model; decals are placed in the rest pose later"
 type: adr
 adr: 42
-adr_status: Proposed
+adr_status: Accepted
 date: 2026-11-17
 supersedes:
 superseded_by:
@@ -14,7 +14,7 @@ tags: [adr, characters, rendering, assets]
 
 # ADR-0042: Makeup and markings are layers a description turns on over masks in the model file, drawn live by the Skin model; decals are placed in the rest pose later
 
-- **Status:** Proposed (the lead delegated the decision to the R5 makeup track, Character Studio refinement wave 3, 2026-11-17; built in the same change).
+- **Status:** Accepted by the lead at the wave-3 merge (2026-11-17). The lead delegated the proposal to the R5 makeup track (Character Studio refinement wave 3), which built it in the same change; plan row 290 now records the departure in decision 1. Decals (decision 6) are not built.
 - **Date:** 2026-11-17
 - **Affected systems:** Character Data (`avatar`: the description's `skin` block, the base manifest's `skin_layers`, `resolve`), Assets (glTF `extras.axcenity_skin_masks`), `scene` (the material translation), `render` (the Skin model's layers), the realistic build (`makeup.py`), Character Studio (the Skin page's Makeup and markings).
 
