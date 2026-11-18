@@ -145,6 +145,21 @@ impl CharacterWorkspace {
         }
     }
 
+    /// "Don't Save": the work is thrown away, so the recovery file this
+    /// workspace wrote goes now, and the same work isn't written again in
+    /// the frames before the window closes (only a further change would
+    /// be).
+    pub fn discard_recovery(&mut self) {
+        // A crash's file still offered isn't this work: it stays offered.
+        if !self.autosave.on || self.recovery.is_some() {
+            return;
+        }
+        if self.autosave.written.is_some() {
+            remove_recovery(&self.folder);
+        }
+        self.autosave.written = Some(self.description.clone());
+    }
+
     /// The answer to "Recover the unsaved character?": `true` takes the
     /// recovered character up (unsaved, to its own file if it had one),
     /// `false` throws it away.

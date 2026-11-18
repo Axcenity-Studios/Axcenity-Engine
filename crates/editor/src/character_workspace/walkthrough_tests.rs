@@ -346,6 +346,8 @@ fn a_skin_value_is_undoable_and_reaches_the_preview_without_a_rebake() {
 /// new stylized character; a body preset and a face preset; the face
 /// randomized with the nose locked; A held, a change, compared, B kept;
 /// saved and reopened the same; and the work recovered after a crash.
+/// Since wave 3: one eye made different and mirrored back with the
+/// asymmetry tools (one step), and a walk previewed, which nothing saves.
 #[test]
 fn the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery() {
     use super::random::RandomScope;
@@ -431,6 +433,41 @@ fn the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery() {
     workspace.apply(Intent::KeepHeld(1));
     assert_eq!(workspace.description(), &b);
 
+    // R4: the left eye made bigger on its own, then the eyes mirrored left
+    // to right: one undo step, Symmetry still on.
+    workspace.apply(Intent::PickCategory(Category::Face));
+    workspace.apply(Intent::SetSymmetry(false));
+    workspace.apply(set("eye_size_left", 0.35, Gesture::Commit));
+    workspace.apply(Intent::SetSymmetry(true));
+    assert_ne!(
+        workspace.parameter("eye_size_left"),
+        workspace.parameter("eye_size_right")
+    );
+    let uneven = workspace.description().clone();
+    workspace.apply(Intent::Sides {
+        tool: super::sides::SideTool::MirrorLeftToRight,
+        of: super::sides::SidesOf::Feature {
+            feature: "eyes".into(),
+            level: Level::Detailed,
+        },
+    });
+    assert_eq!(workspace.parameter("eye_size_right"), 0.35);
+    workspace.apply(Intent::Undo);
+    assert_eq!(workspace.description(), &uneven, "one step");
+    workspace.apply(Intent::Redo);
+    let mirrored_eyes = workspace.description().clone();
+
+    // R9: a walk previewed on the Expressions page, with a smile: the
+    // character doesn't change and nothing of it is saved.
+    workspace.apply(Intent::PickCategory(Category::Expressions));
+    workspace.apply(Intent::PreviewMotion(Motion::Walk));
+    workspace.apply(Intent::PreviewExpression(Some("Happy".into())));
+    for _ in 0..15 {
+        workspace.advance(1.0 / 30.0);
+    }
+    assert_eq!(workspace.description(), &mirrored_eyes);
+    assert_eq!(workspace.motion, Motion::Walk);
+
     // Save, reopen: the same character; the held versions aren't in it.
     workspace.apply(Intent::Rename("Heart".into()));
     workspace.apply(Intent::Save);
@@ -439,7 +476,14 @@ fn the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery() {
     let reopened = CharacterWorkspace::open_file(&folder, &path).unwrap();
     assert_eq!(reopened.description(), workspace.description());
     assert!(reopened.comparison.held.is_empty());
+    // Neither the walk nor the smile went into the file.
+    assert_eq!(reopened.motion, Motion::Idle);
+    assert_eq!(reopened.expression, None);
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(!text.contains("Walk") && !text.contains("Happy"), "{text}");
+    assert_eq!(reopened.parameter("eye_size_right"), 0.35);
     drop(reopened);
+
     let toon_again = CharacterWorkspace::open_file(&folder, &toon).unwrap();
     assert_eq!(toon_again.description().base, axcenity_avatar::V1_BASE);
     assert_eq!(toon_again.parameter("nose_width"), 0.5);

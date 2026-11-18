@@ -95,14 +95,40 @@ impl CharacterWorkspace {
 
     /// Shows held state `index` (or, with `None`, the current character).
     pub fn show_held(&mut self, index: Option<usize>) {
+        let was = self.comparison.instead();
         self.comparison.showing = index.filter(|i| *i < self.comparison.held.len());
+        self.say_what_is_shown(was);
         self.refresh_previews();
     }
 
     /// Side by side on or off.
     pub fn set_side_by_side(&mut self, on: bool) {
+        let was = self.comparison.beside();
         self.comparison.side_by_side = on && !self.comparison.held.is_empty();
+        self.say_what_is_shown(was);
         self.refresh_previews();
+    }
+
+    /// The status line says what the preview shows now, in place of the
+    /// hint left from holding ("Held as A…"); `was` is the held version
+    /// shown before, if one was.
+    fn say_what_is_shown(&mut self, was: Option<usize>) {
+        let comparison = &self.comparison;
+        self.notice = if let Some(index) = comparison.beside() {
+            let letter = Comparison::letter(index);
+            Some(format!(
+                "Side by side: {letter} beside the current character, one camera for both."
+            ))
+        } else if let Some(index) = comparison.instead() {
+            let letter = Comparison::letter(index);
+            Some(format!(
+                "Showing {letter} (held). Editing is off until you go back to Current."
+            ))
+        } else if was.is_some() {
+            Some("Showing the current character.".to_owned())
+        } else {
+            self.notice.take()
+        };
     }
 
     /// Makes held state `index` the character, as one undo step; the name
@@ -122,6 +148,7 @@ impl CharacterWorkspace {
         if index >= self.comparison.held.len() {
             return;
         }
+        let was = (self.comparison.instead(), self.comparison.beside());
         self.comparison.held.remove(index);
         let comparison = &mut self.comparison;
         comparison.showing = match comparison.showing {
@@ -132,12 +159,24 @@ impl CharacterWorkspace {
         if comparison.held.is_empty() {
             comparison.side_by_side = false;
         }
+        if was.0 == Some(index) || was.1 == Some(index) {
+            // What the status line said is shown is gone.
+            self.say_what_is_shown(Some(index));
+        }
         self.refresh_previews();
     }
 
-    /// Drops every held state (another character was started).
+    /// Drops every held state (another character was started), and a
+    /// status line about them.
     pub(super) fn clear_comparison(&mut self) {
         self.comparison = Comparison::default();
+        if self.notice.as_deref().is_some_and(|notice| {
+            ["Showing ", "Side by side:", "Held as "]
+                .iter()
+                .any(|start| notice.starts_with(start))
+        }) {
+            self.notice = None;
+        }
         self.refresh_previews();
     }
 
@@ -173,6 +212,8 @@ impl CharacterWorkspace {
                 self.other_floor = stage::add_floor_at(&mut self.world, OTHER_AT.x);
                 self.other = Some(other);
                 self.other_applied = None;
+                // It moves as the current one does (Walk, a gesture).
+                self.pose_previews();
                 other
             }
         };

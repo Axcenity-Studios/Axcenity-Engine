@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Slim",
+  "base": "axcenity/stylized",
+  "parameters": {
+    "build": -0.6,
+    "frame": 1,
+    "hip_width": 0.96
+  },
+  "preset": {
+    "id": "axcenity/stylized-body-slim-feminine",
+    "kind": "body",
+    "about": "A small frame with little muscle or fat.",
+    "tags": [
+      "build",
+      "feminine"
+    ],
+    "order": 10
+  }
+}

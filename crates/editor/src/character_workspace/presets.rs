@@ -154,27 +154,47 @@ pub fn find<'a>(
 
 /// Whether a body preset suits `description`'s body type: one tagged with
 /// a choice's label ("male", "female") suits that choice only; one tagged
-/// with none suits every body.
+/// with none suits every body. A base whose frame is a slider, not a
+/// choice (the stylized family's masculine-to-feminine `frame`), has body
+/// presets made for each end, each naming the frame: one suits a
+/// character whose frame is within half the slider's span of it, so a
+/// feminine character isn't offered the masculine builds (applying one
+/// would move its frame).
 pub fn suits(listed: &Listed, description: &Description, base: &BaseManifest) -> bool {
-    base.parameters
+    let frame_fits = base
+        .parameters
         .iter()
-        .filter(|parameter| !parameter.choices.is_empty())
+        .filter(|parameter| parameter.choices.is_empty())
+        .filter(|parameter| parameter.group == "frame")
         .all(|parameter| {
-            let tagged: Vec<_> = parameter
-                .choices
-                .iter()
-                .filter(|choice| {
-                    listed
-                        .info
-                        .tags
-                        .iter()
-                        .any(|tag| tag.eq_ignore_ascii_case(&choice.label))
-                })
-                .collect();
+            let Some(wanted) = listed.preset.parameters.get(&parameter.id) else {
+                return true;
+            };
+            let [low, high] = parameter.range;
             let value = value_of(description, Some(base), &parameter.id);
-            let picked = parameter.nearest_choice(value).map(|choice| choice.value);
-            tagged.is_empty() || tagged.iter().any(|choice| Some(choice.value) == picked)
-        })
+            (value - wanted).abs() <= (high - low).abs() * 0.5
+        });
+    frame_fits
+        && base
+            .parameters
+            .iter()
+            .filter(|parameter| !parameter.choices.is_empty())
+            .all(|parameter| {
+                let tagged: Vec<_> = parameter
+                    .choices
+                    .iter()
+                    .filter(|choice| {
+                        listed
+                            .info
+                            .tags
+                            .iter()
+                            .any(|tag| tag.eq_ignore_ascii_case(&choice.label))
+                    })
+                    .collect();
+                let value = value_of(description, Some(base), &parameter.id);
+                let picked = parameter.nearest_choice(value).map(|choice| choice.value);
+                tagged.is_empty() || tagged.iter().any(|choice| Some(choice.value) == picked)
+            })
 }
 
 /// The bases in the order New and the Body page offer them: the realistic

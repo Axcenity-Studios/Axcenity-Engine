@@ -7,6 +7,8 @@
 //! Comparison (brief §12), Randomize, presets by ID and the recovery
 //! offer came with R1's second part. Comparison, locks and favourites are
 //! editor state: their intents never change the description or undo.
+//! The asymmetry tools (R4) are edits, one undo step each; the preview's
+//! pose and motion (R9) is editor state, as an expression is.
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
@@ -15,8 +17,10 @@ use std::path::PathBuf;
 use axcenity_avatar::{MaterialValue, PresetKind, SkinLayer};
 
 use super::edit::Scope;
+use super::motion::Motion;
 use super::random::RandomScope;
 use super::selection::Level;
+use super::sides::{SideTool, SidesOf};
 use super::stage::{Backdrop, Lighting, ViewPreset};
 use super::{Category, Start};
 
@@ -116,6 +120,15 @@ pub enum Intent {
     /// Shows a built-in expression on the preview's face (`None`: none).
     /// Preview only: never in the description.
     PreviewExpression(Option<String>),
+    /// Plays a pose or motion on the preview (Still, Idle, Walk, Run, a
+    /// gesture). Preview only: never in the description.
+    PreviewMotion(Motion),
+    /// Mirrors a side onto the other, or resets a side, for a feature's
+    /// left and right pairs or one pair (one undo step).
+    Sides {
+        tool: SideTool,
+        of: SidesOf,
+    },
     /// Draws the scope again, keeping what's locked (one undo step).
     Randomize(RandomScope),
     /// Locks or unlocks parameters for Randomize (editor state).
@@ -158,6 +171,7 @@ impl Intent {
                 | Intent::Redo
                 | Intent::Reset(_)
                 | Intent::Randomize(_)
+                | Intent::Sides { .. }
         )
     }
 }

@@ -9,10 +9,14 @@ mod row;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(super) use parameters::{Shown, hidden_changes, rows, side_choices};
+
 use axcenity_avatar::{BaseManifest, Library, PresetKind, matches_preset};
 use eframe::egui::{self, Sense, vec2};
 
 use super::intent::Intent;
+use super::motion::Motion;
 use super::presets::{self, Listed};
 use super::selection::Level;
 use super::{Category, CharacterWorkspace, chosen_slots, items_for, worn_in};
@@ -29,7 +33,7 @@ pub(super) fn about(category: Category) -> &'static str {
         Category::SkinAndMakeup => "The skin's colour and surface.",
         Category::Accessories => "Glasses, jewellery, hats and bags.",
         Category::Expressions => {
-            "See the face move. A preview only: never saved with the character."
+            "See the face and body move. A preview only: never saved with the character."
         }
         Category::Presets => {
             "Start from a ready-made character, body or face; save your own; star favourites."
@@ -135,6 +139,13 @@ pub(super) fn show(
     };
     // Quick always moves both sides together.
     let symmetry = workspace.symmetry || selection.level == Level::Quick;
+    // What a side's reset puts back (the asymmetry tools), for the pages
+    // with sliders.
+    let defaults = if has_sliders(category) {
+        axcenity_gameplay::description::default_description(library, &base.id)
+    } else {
+        workspace.description().clone()
+    };
     egui::ScrollArea::vertical()
         .id_salt("character workspace panel")
         .auto_shrink(false)
@@ -151,6 +162,7 @@ pub(super) fn show(
                         ui,
                         base,
                         description,
+                        &defaults,
                         selection,
                         category,
                         symmetry,
@@ -167,6 +179,7 @@ pub(super) fn show(
                         ui,
                         base,
                         description,
+                        &defaults,
                         selection,
                         category,
                         symmetry,
@@ -185,6 +198,7 @@ pub(super) fn show(
                             ui,
                             base,
                             description,
+                            &defaults,
                             selection,
                             category,
                             symmetry,
@@ -364,11 +378,41 @@ fn slots_page(
     intents
 }
 
+/// The preview's pose and motion as chips (R9): Still, Idle, Walk, Run
+/// and the gestures. Preview only, like an expression.
+pub(super) fn motion_chips(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    ui.horizontal_wrapped(|ui| {
+        for motion in Motion::all() {
+            let on = workspace.motion == motion;
+            if widgets::chip(ui, motion.label(), on)
+                .on_hover_text(motion.about())
+                .clicked()
+                && !on
+            {
+                intents.push(Intent::PreviewMotion(motion));
+            }
+        }
+    });
+    intents
+}
+
 /// The built-in expressions as chips: a click shows one on the preview's
-/// face; the description never changes (brief §10).
+/// face; the description never changes (brief §10). Above them, the
+/// body's pose and motion, which the expression shows on top of.
 fn expressions_page(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
+    widgets::section_label(ui, "Pose and motion");
+    intents.extend(motion_chips(ui, workspace));
+    ui.label(
+        egui::RichText::new(
+            "Walk and Run play at their own pace, in place. The camera follows the head.",
+        )
+        .small()
+        .color(palette.text_weak),
+    );
+    ui.add_space(8.0);
     widgets::section_label(ui, "Built-in expressions");
     ui.horizontal_wrapped(|ui| {
         for name in axcenity_anim::BUILT_IN_EXPRESSIONS {
@@ -386,8 +430,8 @@ fn expressions_page(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<In
     ui.add_space(8.0);
     ui.label(
         egui::RichText::new(
-            "Shown on the preview only. Expressions are made and edited in the Game \
-             Editor's face tab.",
+            "Shown on the preview only, over the pose or motion. Expressions are made and \
+             edited in the Game Editor's face tab.",
         )
         .small()
         .color(palette.text_weak),

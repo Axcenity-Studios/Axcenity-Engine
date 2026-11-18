@@ -194,6 +194,8 @@ impl CharacterWorkspace {
             Intent::SetLighting(lighting) => self.lighting = lighting,
             Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
             Intent::PreviewExpression(name) => self.preview_expression(name),
+            Intent::PreviewMotion(motion) => self.preview_motion(motion),
+            Intent::Sides { tool, of } => self.use_sides(tool, &of),
             Intent::Randomize(scope) => self.randomize(scope),
             Intent::SetLock { ids, locked } => self.set_lock(&ids, locked),
             Intent::Capture => self.capture(),
