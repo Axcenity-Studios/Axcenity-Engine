@@ -427,24 +427,36 @@
   },
   "brows": {
    "feminine": {
-    "height_mm": [
-     11.81,
-     10.55,
-     4.47
+    "dense_length_mm": 49.34,
+    "hair_height_mm": [
+     7.35,
+     6.34,
+     1.74
     ],
-    "length_mm": 40.06,
-    "over_inner_corner_mm": 17.72,
-    "over_outer_corner_mm": 15.81
+    "height_mm": [
+     11.88,
+     11.15,
+     5.41
+    ],
+    "length_mm": 51.4,
+    "over_inner_corner_mm": 17.24,
+    "over_outer_corner_mm": 14.95
    },
    "masculine": {
-    "height_mm": [
-     14.85,
-     13.78,
-     8.67
+    "dense_length_mm": 56.44,
+    "hair_height_mm": [
+     9.67,
+     10.04,
+     2.48
     ],
-    "length_mm": 43.69,
-    "over_inner_corner_mm": 15.4,
-    "over_outer_corner_mm": 13.65
+    "height_mm": [
+     16.89,
+     15.56,
+     7.56
+    ],
+    "length_mm": 59.23,
+    "over_inner_corner_mm": 16.1,
+    "over_outer_corner_mm": 11.18
    }
   },
   "expressions": [
@@ -717,7 +729,7 @@
    "Face_Nose_Tilt": 4.42,
    "Face_Nose_Tip": 4.84,
    "Face_Nose_Tip_Projection": 6.75,
-   "Face_Nose_Tip_Rotation": 7.34,
+   "Face_Nose_Tip_Rotation": 5.52,
    "Face_Nose_Width": 5.17,
    "Face_Nose_Width_Left": 4.41,
    "Face_Nose_Width_Right": 4.41,

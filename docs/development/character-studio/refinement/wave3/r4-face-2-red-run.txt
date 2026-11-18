@@ -64,3 +64,32 @@ frame 1 angular face-front: 3.5%
 frame 1 angular face-side: 3.0%
 thread 'face_preset_tests::every_face_preset_differs_visibly_from_the_default_face' (24120) panicked at crates\player\src\face_preset_tests.rs:97:5:
      Summary [  12.667s] 1 test run: 0 passed, 1 failed, 209 skipped
+
+# Review fixes 1: red runs (tests written first; package and texture not yet changed)
+
+## Against the branch's package as the first pass left it (4de12bef)
+## cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_second_pass)' --no-fail-fast
+
+    thread 'the_brows_sit_where_the_references_put_them' panicked at crates\avatar\tests\realistic_face_second_pass.rs:371:9:
+    masculine brows: 43.7 mm long (F-29 69.5 +- 5.8)
+    thread 'the_brow_texture_is_hair_not_a_card' panicked at crates\avatar\tests\realistic_face_second_pass.rs:164:5:
+    the hair reaches the card's edge (0.84)
+        PASS (3/5) the_brows_taper_and_differ_by_frame   (the first pass's card does taper)
+     Summary [   1.171s] 5 tests run: 3 passed, 2 failed, 0 skipped
+
+(The card-edge check found hair drawn up to the card's inner end and
+tail columns: alpha 0.80 and 0.84 there.)
+
+## The new taper check against wave 2's package (refinement-wave2, b39a9ed7: RealisticParts.glb, Realistic.base.json, Realistic.build.json put back for the run)
+## cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_second_pass)' --no-fail-fast --no-capture
+
+frame 0 left: card 14.7 mm high at its head, 15.0 at its tail
+thread 'the_brows_taper_and_differ_by_frame' panicked at crates\avatar\tests\realistic_face_second_pass.rs:299:13:
+frame 0: the card's tail is 15.0 mm high against 14.7 mm at its head
+thread 'the_brow_texture_is_hair_not_a_card' panicked at crates\avatar\tests\realistic_face_second_pass.rs:129:5:
+the body covers 0.470 of the card
+thread 'the_brows_sit_where_the_references_put_them' panicked: no brows.masculine.over_inner_corner_mm in the build data
+     Summary [   1.268s] 5 tests run: 0 passed, 5 failed, 0 skipped
+
+(The first pass's front-view column check passed on this same square-ended
+card; the per-segment height across the card's own line fails it.)

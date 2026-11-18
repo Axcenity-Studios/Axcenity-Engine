@@ -427,7 +427,7 @@ Rules that keep a random face believable:
 
 **Shapes that vary.** Height above the eye; how arched or straight; the slope from inner end to tail; thickness and density; length of the tail; the gap between the brows; how strongly the bone ridge under them stands out. Height falls with age at the outer end first (F-12: 31.0 mm at ages 20–30 against 27.0 mm at 50–70 over the iris's outer edge).
 
-**By sex** (F-29, young Caucasian adults): the lower edge stands about as high over the inner eye corner in men and women (17.4 and 17.5 mm) and 2.6 mm higher over the outer corner in women (18.5 against 15.9), so women's brows rise more toward the tail; women's are shorter (61.4 against 69.5 mm along the lower edge). The realistic brows follow this since wave 3 (`lashes.BROW_LOOKS`; `avatar`'s `realistic_face_second_pass`).
+**By sex** (F-29, young Caucasian adults): the lower edge stands about as high over the inner eye corner in men and women (17.4 and 17.5 mm) and 2.6 mm higher over the outer corner in women (18.5 against 15.9), so women's brows rise more toward the tail; women's are shorter (61.4 against 69.5 mm along the lower edge). F-29 gives no thickness; F-12's upper edge over the inner eye corner (women, 26.4 mm) less F-29's lower edge there (17.5) puts a woman's brow about 8.9 mm high at its head, a rough figure from two populations. The realistic brows follow this since wave 3 (`lashes.BROW_LOOKS`; `avatar`'s `realistic_face_second_pass`).
 
 **Sensible limits.** Height ±5 mm (about 1.7 SD). Height and arch together no more than about 8 mm down, or the brow reaches the lashes. Left against right within 1.3 mm for a natural face. Brow ridge ±4 to 5 mm; more reads as a different skull.
 

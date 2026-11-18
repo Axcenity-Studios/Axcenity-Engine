@@ -120,20 +120,20 @@ fn the_brow_texture_is_hair_not_a_card() {
         tail < 0.30 * body,
         "the tail doesn't thin out: {tail:.3} against {body:.3}"
     );
-    // Not a solid band: the densest part covers at most two fifths of the
-    // card (wave 2's covered 0.47, nearly all of it solid), and at least
-    // a quarter of the covered texels are part-covered (single hairs,
-    // soft edges; wave 2's 7%). (The red run asked for a third and 35%:
-    // in the engine a brow that sparse read as no brow at face distance,
-    // 0.24 of the card; these are what a brow that reads needs.)
-    assert!(body < 0.40, "the body covers {body:.3} of the card");
+    // Not a solid band: at least a fifth of the covered texels are
+    // part-covered (single hairs, soft edges; wave 2's solid band 7%), and
+    // the densest part covers under half the card. (Review fixes 1: the
+    // first pass's sparser brow, 0.34 of the card and 32% part-covered,
+    // read as a faint line at face distance; these bounds are set from
+    // the denser brow that reads in the engine, 0.44 and 24%.)
+    assert!(body < 0.50, "the body covers {body:.3} of the card");
     let covered: Vec<f64> = (0..w * h)
         .map(|i| f64::from(rgba[i * 4 + 3]) / 255.0)
         .filter(|&a| a > 0.05)
         .collect();
     let partial = covered.iter().filter(|&&a| a < 0.5).count() as f64 / covered.len() as f64;
     assert!(
-        partial > 0.25,
+        partial > 0.20,
         "only {:.0}% of the covered texels are part-covered",
         partial * 100.0
     );
@@ -149,6 +149,22 @@ fn the_brow_texture_is_hair_not_a_card() {
     let most = rows.iter().cloned().fold(0.0, f64::max);
     let first = |level: f64| rows.iter().position(|&r| r > level * most).unwrap();
     let last = |level: f64| h - 1 - rows.iter().rev().position(|&r| r > level * most).unwrap();
+    // The body's core reads as hair at face distance: the densest rows
+    // cover most of the card there (the first pass's 0.24 to 0.34 drew a
+    // faint line the review could barely see).
+    assert!(
+        most > 0.7,
+        "the body's densest rows cover only {most:.2} of the card"
+    );
+    // No card edge: nothing drawn on the card's border texels.
+    let border = (0..w)
+        .flat_map(|x| [alpha(x, 0), alpha(x, 1), alpha(x, h - 2), alpha(x, h - 1)])
+        .chain((0..h).flat_map(|y| [alpha(0, y), alpha(w - 1, y)]))
+        .fold(0.0, f64::max);
+    assert!(
+        border < 0.1,
+        "the hair reaches the card's edge ({border:.2})"
+    );
     let upper = (first(0.9) - first(0.1)) as f64 / h as f64;
     let lower = (last(0.1) - last(0.9)) as f64 / h as f64;
     assert!(
@@ -200,6 +216,29 @@ fn brow_columns(points: &[[f32; 3]], left: bool) -> Vec<(f32, f32)> {
         .collect()
 }
 
+/// The card's height across its own line at each of its segments, from the
+/// inner end to the tail (metres): the distance between its lower-edge
+/// and upper-edge vertices (the texture's v 0 and 1) at each u, on one
+/// side (`left`: the body's left, +x).
+fn card_heights(points: &[[f32; 3]], uvs: &[[f32; 2]], left: bool) -> Vec<f32> {
+    let mut by_u: std::collections::BTreeMap<i64, Vec<(f32, [f32; 3])>> = Default::default();
+    for (p, uv) in points.iter().zip(uvs) {
+        if (p[0] > 0.0) == left {
+            // (u runs in steps of a segment; v from one edge to the other.)
+            let key = (uv[0] * 1000.0).round() as i64;
+            by_u.entry(key).or_default().push((uv[1], *p));
+        }
+    }
+    by_u.values()
+        .map(|column| {
+            let low = column.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1;
+            let high = column.iter().max_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1;
+            ((high[0] - low[0]).powi(2) + (high[1] - low[1]).powi(2) + (high[2] - low[2]).powi(2))
+                .sqrt()
+        })
+        .collect()
+}
+
 /// How far the middle of the brow's card rises over the straight line
 /// between its two ends (front view), in metres.
 fn arch(columns: &[(f32, f32)]) -> f32 {
@@ -239,19 +278,31 @@ fn the_brows_taper_and_differ_by_frame() {
     let model = object(&library, BROWS);
     let (m, tris) = posed(&library, &model, 0.0);
     let (f, _) = posed(&library, &model, 1.0);
+    let uvs = &model.primitives[0].uvs;
+    assert_eq!(model.primitives.len(), 1, "the brows are one card");
     let mut arches = [0.0f32; 2];
     for (k, points) in [&m, &f].into_iter().enumerate() {
         for left in [true, false] {
-            let columns = brow_columns(points, left);
-            let thickest = columns.iter().map(|c| c.0).fold(0.0, f32::max);
-            let tail = columns[columns.len() - 1].0;
-            assert!(
-                tail < 0.6 * thickest,
-                "frame {k}: the card's tail is {:.1} mm high against {:.1} mm at its thickest",
-                tail * 1000.0,
-                thickest * 1000.0
+            // The card's height across its own line at each segment (the
+            // review of the first pass: a front view's columns let the
+            // foreshortening round the temple pass for a taper, and
+            // wave 2's square-ended card passed).
+            let heights = card_heights(points, uvs, left);
+            let head = heights[1];
+            let tail = heights[heights.len() - 1];
+            println!(
+                "frame {k} {}: card {:.1} mm high at its head, {:.1} at its tail",
+                if left { "left" } else { "right" },
+                head * 1000.0,
+                tail * 1000.0
             );
-            arches[k] += 0.5 * arch(&columns);
+            assert!(
+                tail < 0.6 * head,
+                "frame {k}: the card's tail is {:.1} mm high against {:.1} mm at its head",
+                tail * 1000.0,
+                head * 1000.0
+            );
+            arches[k] += 0.5 * arch(&brow_columns(points, left));
         }
     }
     let (am, af) = (area(&m, &tris), area(&f, &tris));
@@ -281,13 +332,17 @@ fn the_brows_taper_and_differ_by_frame() {
 /// SD of F-29's young Caucasian adults: the lower edge over the inner eye
 /// corner (men 17.4 +- 2.0 mm, women 17.5 +- 2.3) and over the outer one
 /// (men 15.9 +- 2.9, women 18.5 +- 2.9), the feminine at least 1.5 mm
-/// higher over the outer corner than the masculine. The length: F-29's
-/// lower brow length (men 69.5 +- 5.8, women 61.4 +- 6.1) is a path on
-/// 3D photographs from the first hair to the last; the build's is the
-/// lower edge of the hair dense enough to read (columns with 15% of the
-/// most), so only the ratio is held: the feminine 0.80 to 0.96 of the
-/// masculine (F-29: 0.88). The absolute shortfall is the hand-back's
-/// open issue.
+/// higher over the outer corner than the masculine. The length, as F-29
+/// measures it (a path along the hair's lower edge from the first hair to
+/// the last; the build's columns with 4% of the most hair), within two SD
+/// of F-29 (men 69.5 +- 5.8, women 61.4 +- 6.1), the feminine 0.80 to
+/// 0.96 of the masculine (F-29: 0.88). The hair's height across the brow
+/// (where a column's coverage is over 30% of its most): F-29 has no
+/// thickness, but F-12's upper edge over the inner eye corner (women
+/// 26.4 +- 3.1 mm) less F-29's lower edge there (17.5) puts a woman's
+/// brow about 8.9 mm high at its head; the feminine head within 3 mm of
+/// that, the masculine brow fuller (at least 1.15 times as high at its
+/// head and in its body), both thinning to the tail.
 #[test]
 fn the_brows_sit_where_the_references_put_them() {
     let data = build_data();
@@ -311,11 +366,48 @@ fn the_brows_sit_where_the_references_put_them() {
     }
     let rise = get("feminine", "over_outer_corner_mm") - get("masculine", "over_outer_corner_mm");
     assert!(rise >= 1.5, "the feminine tail is only {rise:.1} mm higher");
+    for (frame, (mean, sd)) in [("masculine", (69.5, 5.8)), ("feminine", (61.4, 6.1))] {
+        let value = get(frame, "length_mm");
+        assert!(
+            (value - mean).abs() <= 2.0 * sd,
+            "{frame} brows: {value:.1} mm long (F-29 {mean} +- {sd})"
+        );
+    }
     let ratio = get("feminine", "length_mm") / get("masculine", "length_mm");
     assert!(
         (0.80..=0.96).contains(&ratio),
         "the feminine brow is {ratio:.2} of the masculine's length"
     );
+    let tall = |frame: &str| -> Vec<f64> {
+        brows[frame]["hair_height_mm"]
+            .as_array()
+            .unwrap_or_else(|| panic!("no brows.{frame}.hair_height_mm in the build data"))
+            .iter()
+            .map(|v| v.as_f64().unwrap())
+            .collect()
+    };
+    let (m, f) = (tall("masculine"), tall("feminine"));
+    println!("hair height (head, body, tail): masculine {m:?}, feminine {f:?} mm");
+    assert!(
+        (f[0] - 8.9).abs() <= 3.0,
+        "the feminine brow's hair is {:.1} mm high at its head (about 8.9)",
+        f[0]
+    );
+    for k in 0..2 {
+        assert!(
+            m[k] >= 1.15 * f[k],
+            "the masculine brow is not fuller: {:.1} mm against {:.1} ({})",
+            m[k],
+            f[k],
+            ["head", "body"][k]
+        );
+    }
+    for (frame, t) in [("masculine", &m), ("feminine", &f)] {
+        assert!(
+            t[2] < 0.7 * t[0],
+            "the {frame} brow's hair doesn't thin to the tail: {t:?}"
+        );
+    }
 }
 
 /// The face's midline profile (front-most point per millimetre of height),

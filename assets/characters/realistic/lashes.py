@@ -135,8 +135,21 @@ def hair_colour(eumelanin, pheomelanin=0.0):
 # (the herringbone of a real brow). Density, by `brow_density`: sparse at
 # the inner end, densest over the first half, thinning to the tail, and
 # falling off softly to the band's edges, where single hairs stand alone.
+# Review fixes 1 (wave 3): the first pass's brow (6,000 hairs fading along
+# their length, roots spread wide in a narrow band) read as a faint thin
+# line at face distance. The body is now denser and more opaque, not
+# wider-spread: more hairs, each near-opaque over its first half, roots
+# held closer to the band's middle (`BROW_ACROSS`) in a wider band
+# (`BROW_BAND`), the density kept up further toward the tail
+# (`BROW_FALL_FROM`). The roots keep off the card's ends and edges
+# (`BROW_KEEP_OFF`), and the alpha fades to nothing at them, so no hair
+# is cut by the card's border.
 BROW_BAND_MIDDLE = 0.47
-BROW_HAIRS = 6000
+BROW_BAND = 0.30
+BROW_ACROSS = 0.45
+BROW_FALL_FROM = 0.75
+BROW_HAIRS = 9000
+BROW_KEEP_OFF = 0.03
 BROW_TEXTURE = (1024, 256)
 
 
@@ -144,16 +157,18 @@ def brow_band(u):
     """The roots' half-width (a share of the card's height) at `u`: a
     rounded head, the full body, a tail drawn to a point."""
     head = 0.55 + 0.45 * min(1.0, max(0.0, u) / 0.14) ** 0.6
-    tail = (1.0 - min(1.0, max(0.0, u - 0.50) / 0.55)) ** 0.85
-    return 0.26 * head * max(tail, 0.04)
+    tail = (1.0 - min(1.0, max(0.0, u - 0.55) / 0.47)) ** 0.85
+    return BROW_BAND * head * max(tail, 0.04)
 
 
 def brow_density(u):
     """How densely the hair grows at `u`, 0 to 1."""
     if u < 0.0 or u > 1.0:
         return 0.0
-    rise = 0.35 + 0.65 * min(1.0, u / 0.20)
-    fall = 1.0 - max(0.0, u - 0.62) / 0.45
+    # (Sparse at the very head, so its hairs don't stand in a straight
+    # line at the card's inner end.)
+    rise = 0.12 + 0.88 * min(1.0, max(0.0, u - BROW_KEEP_OFF) / 0.22) ** 0.8
+    fall = 1.0 - max(0.0, u - BROW_FALL_FROM) / (1.0 - BROW_KEEP_OFF - BROW_FALL_FROM)
     return rise * max(fall, 0.0) ** 1.3
 
 
@@ -172,13 +187,13 @@ def brow_texture(out_dir):
     paint, cut, mark = ImageDraw.Draw(colour), ImageDraw.Draw(mask), ImageDraw.Draw(hit)
     drawn = 0
     while drawn < BROW_HAIRS:
-        u = rng.uniform(-0.02, 1.0)
+        u = rng.uniform(BROW_KEEP_OFF, 1.0 - BROW_KEEP_OFF)
         if rng.uniform() > brow_density(u):
             continue
         band = brow_band(u)
         # Roots across the band: most near the middle, a few out at its
         # edges (a soft edge, single hairs).
-        across = float(np.clip(rng.normal(0.0, 0.55), -1.6, 1.6))
+        across = float(np.clip(rng.normal(0.0, BROW_ACROSS), -1.4, 1.4))
         if abs(across) > 1.0 and rng.uniform() > 0.35:
             continue
         v = BROW_BAND_MIDDLE + across * band
@@ -204,9 +219,10 @@ def brow_texture(out_dir):
             turn = a + bend * t
             # (Image rows run down: up on the card is minus y.)
             at = (last[0] + math.cos(turn) * length / steps, last[1] - math.sin(turn) * length / steps)
-            # Thick at the root, a point at the tip, darker at the root.
+            # Thick at the root, a point at the tip; near-opaque over its
+            # first half, fading to the tip.
             width = max(1, int(round(scale * (1.15 - 0.75 * t))))
-            strength = int(255 * (0.95 - 0.35 * t))
+            strength = int(255 * (1.0 - 0.6 * max(0.0, t - 0.5) / 0.5))
             paint.line([last, at], fill=rgb, width=width)
             cut.line([last, at], fill=strength, width=width)
             mark.line([last, at], fill=255, width=width)
@@ -216,6 +232,10 @@ def brow_texture(out_dir):
     # filtered edges don't darken toward black.)
     alpha = np.asarray(mask.filter(ImageFilter.GaussianBlur(scale * 0.35)).resize(size, Image.LANCZOS),
                        dtype=np.float32) / 255.0
+    # (Faded to nothing at the card's border: a hair cut there would draw
+    # the card's edge.)
+    ramp = lambda n, k: np.clip(np.minimum(np.arange(n), n - 1 - np.arange(n)) / k, 0.0, 1.0)
+    alpha *= ramp(size[1], 0.05 * size[1])[:, None] * ramp(size[0], BROW_KEEP_OFF * size[0])[None, :]
     rgb = np.asarray(colour.resize(size, Image.BOX), dtype=np.float32)
     cover = np.asarray(hit.resize(size, Image.BOX), dtype=np.float32)[:, :, None] / 255.0
     plain = (np.power(hair_colour(BROW_EUMELANIN, BROW_PHEOMELANIN), 1 / 2.2) * 255).astype(np.float32)
@@ -422,9 +442,17 @@ def follow_lashes(face, points, roots, shape, lids=True):
 # parameter (`Face_Brow_Length_*`): drawn in, or carried on down the
 # temple.
 BROW_START = -0.20
-BROW_END = 1.38
-BROW_END_SHORT = 1.06
-BROW_END_LONG = 1.60
+BROW_END = 2.30
+BROW_END_SHORT = 1.98
+BROW_END_LONG = 2.52
+# Past its tail (1) the brow's line is carried on with less of its bend
+# (`BROW_TAIL_BEND` of it) and less of its fall (`BROW_TAIL_FALL`): the
+# brow line's own curve, a parabola through the inner end, the arch and
+# the tail, turns down steeply past the tail, and the first pass's card,
+# ended at 1.38 on it, fell about 9 mm toward the eye's outer corner and
+# was 26 mm short of F-29's mean length (review fixes 1).
+BROW_TAIL_BEND = 0.3
+BROW_TAIL_FALL = 0.55
 # Each frame's brows (wave 3, R4's second pass; references/face/README.md,
 # F-29): the card's half-height at its head (`half`, metres) and the share
 # of it left at the tail (`tail`); where the tail ends along the brow's
@@ -438,9 +466,29 @@ BROW_END_LONG = 1.60
 # women, about the same over the inner one). The feminine card is the
 # brows' `Frame_Feminine` shape's own part, beside the skin's move.
 BROW_LOOKS = {
-    "masculine": {"half": 0.0080, "tail": 0.50, "end": BROW_END, "arch": -0.0006, "tail_up": 0.0, "drop": 0.0},
-    "feminine": {"half": 0.0072, "tail": 0.38, "end": 1.26, "arch": 0.0016, "tail_up": 0.0018, "drop": 0.0025},
+    "masculine": {"half": 0.0092, "tail": 0.45, "end": BROW_END, "arch": -0.0012, "tail_up": 0.0010, "drop": -0.0015},
+    "feminine": {"half": 0.0072, "tail": 0.46, "end": 2.12, "arch": 0.0020, "tail_up": 0.0028, "drop": 0.0025},
 }
+
+
+def brow_path(face, s, count, start, end):
+    """`count` + 1 points of side `s`'s brow line from `start` to `end`
+    of the way along it (`Face.brow_curve` up to the tail, 1; past it
+    carried on along its tangent there, with `BROW_TAIL_BEND` of its
+    bend and `BROW_TAIL_FALL` of any fall toward the eye)."""
+    a, b, c = face.brow_line(s)
+    ctrl = 2.0 * b - 0.5 * (a + c)
+    up = face.eye[s].up / np.linalg.norm(face.eye[s].up)
+    out = []
+    for t in np.linspace(start, end, count + 1):
+        if t <= 1.0:
+            out.append((1 - t) ** 2 * a + 2 * (1 - t) * t * ctrl + t ** 2 * c)
+            continue
+        e = t - 1.0
+        step = 2.0 * (c - ctrl) * e + (a - 2.0 * ctrl + c) * BROW_TAIL_BEND * e * e
+        fall = min(0.0, float(step @ up))
+        out.append(c + step - up * fall * (1.0 - BROW_TAIL_FALL))
+    return np.array(out)
 
 
 def _look_at(look, u):
@@ -481,7 +529,7 @@ def _brow_card(face, tree, tris, ends, look=None):
     rows = np.linspace(-1.0, 1.0, BROW_ROWS)
     for _, s in SIDES:
         # From a little before the inner end to a little past the tail.
-        curve = face.brow_curve(s, BROW_SEGMENTS, BROW_START, ends.get(s, look["end"]))
+        curve = brow_path(face, s, BROW_SEGMENTS, BROW_START, ends.get(s, look["end"]))
         base = len(pts)
         for k, at in enumerate(curve):
             ahead = curve[min(k + 1, BROW_SEGMENTS)] - curve[max(k - 1, 0)]
@@ -546,40 +594,64 @@ def brow_measures(card, alpha, corners):
     """Where the brows' hair lies against the eyes, as F-29 measures it
     (metres): the lower edge of the hair (where a column of the texture
     first reaches 30% of its own most, coming up from the card's lower
-    edge, in columns holding hair) over the inner and the outer eye
-    corner (`corners[s]`: (inner, outer) positions), its length along
-    that edge, and the card's height at its head, its arch and its tail.
-    `card` is the card's vertices on a frame, `alpha` the texture's alpha
-    (rows from the card's upper edge down, as the image is). The mean of
-    the two sides."""
+    edge) over the inner and the outer eye corner (`corners[s]`: (inner,
+    outer) positions); the length of that edge from the first hair to the
+    last (`length_mm`: columns holding at least 4% of the most hair, as
+    F-29 traces the path to the last sparse hair; `dense_length_mm`, the
+    first pass's measure, columns with 15%); the hair's height across the
+    brow at its head, its body and its tail (`hair_height_mm`, u 0.15,
+    0.5 and 0.85 along the card: where the column's coverage is over 30%
+    of its most); and the card's height at its head, its arch and its
+    tail (`height_mm`). `card` is the card's vertices on a frame, `alpha`
+    the texture's alpha (rows from the card's upper edge down, as the
+    image is). The mean of the two sides."""
     h, w = alpha.shape
     per_side = (BROW_SEGMENTS + 1) * BROW_ROWS
     vs = np.linspace(0.0, 1.0, BROW_ROWS)
     window = max(2, int(0.015 * w))
-    profiles = []
-    for j in range(BROW_SEGMENTS + 1):
-        x = int(round(j / BROW_SEGMENTS * (w - 1)))
+
+    def profile(u):
+        x = int(round(u * (w - 1)))
         # Rows from the card's lower edge (v 0) up.
-        profiles.append(alpha[::-1, max(0, x - window):x + window + 1].mean(axis=1))
+        return alpha[::-1, max(0, x - window):x + window + 1].mean(axis=1)
+
+    def at(rows, u, v):
+        """The card's point at (u, v), between its vertices."""
+        f = u * BROW_SEGMENTS
+        j = min(int(f), BROW_SEGMENTS - 1)
+        line = rows[j] + (f - j) * (rows[j + 1] - rows[j])
+        return np.array([np.interp(v, vs, line[:, c]) for c in range(3)])
+
+    us = np.linspace(0.0, 1.0, 4 * BROW_SEGMENTS + 1)
+    profiles = [profile(u) for u in us]
     most = max(float(p.max()) for p in profiles)
-    out = {"over_inner_corner_mm": [], "over_outer_corner_mm": [], "length_mm": [], "height_mm": []}
+    # The lower edge's v per column (evened over three columns: single
+    # hairs make it jump).
+    lows = np.array([float(np.argmax(p >= 0.3 * p.max())) / (h - 1) if p.max() > 0 else 0.0 for p in profiles])
+    lows = np.convolve(np.pad(lows, 1, mode="edge"), np.ones(3) / 3.0, mode="valid")
+    out = {key: [] for key in ("over_inner_corner_mm", "over_outer_corner_mm", "length_mm",
+                               "dense_length_mm", "hair_height_mm", "height_mm")}
     for k, (_, s) in enumerate(SIDES):
         rows = card[k * per_side:(k + 1) * per_side].reshape(BROW_SEGMENTS + 1, BROW_ROWS, 3)
-        edge = []
-        for j, profile in enumerate(profiles):
-            if profile.max() < 0.15 * most:
-                continue
-            v = float(np.argmax(profile >= 0.3 * profile.max())) / (h - 1)
-            edge.append(np.array([np.interp(v, vs, rows[j, :, c]) for c in range(3)]))
-        edge = np.array(edge)
+        edge = {share: np.array([at(rows, u, v) for u, v, p in zip(us, lows, profiles) if p.max() >= share * most])
+                for share in (0.04, 0.15)}
         for key, corner in zip(("over_inner_corner_mm", "over_outer_corner_mm"), corners[s]):
-            j = int(np.argmin(np.abs(np.abs(edge[:, 0]) - abs(float(corner[0])))))
-            out[key].append(float(edge[j, 2] - corner[2]))
-        out["length_mm"].append(float(np.linalg.norm(np.diff(edge, axis=0), axis=1).sum()))
-        tall = np.linalg.norm(rows[:, -1] - rows[:, 0], axis=1)
-        out["height_mm"].append([float(tall[1]), float(tall[int(0.62 * BROW_SEGMENTS)]), float(tall[-2])])
-    report = {key: round(float(np.mean(v)) * 1000, 2) for key, v in out.items() if key != "height_mm"}
-    report["height_mm"] = [round(float(x) * 1000, 2) for x in np.mean(out["height_mm"], axis=0)]
+            line = edge[0.15]
+            j = int(np.argmin(np.abs(np.abs(line[:, 0]) - abs(float(corner[0])))))
+            out[key].append(float(line[j, 2] - corner[2]))
+        out["length_mm"].append(float(np.linalg.norm(np.diff(edge[0.04], axis=0), axis=1).sum()))
+        out["dense_length_mm"].append(float(np.linalg.norm(np.diff(edge[0.15], axis=0), axis=1).sum()))
+        tall = []
+        for u in (0.15, 0.5, 0.85):
+            p = profile(u)
+            on = np.where(p >= 0.3 * p.max())[0]
+            tall.append(float(np.linalg.norm(at(rows, u, on[-1] / (h - 1)) - at(rows, u, on[0] / (h - 1)))))
+        out["hair_height_mm"].append(tall)
+        heights = np.linalg.norm(rows[:, -1] - rows[:, 0], axis=1)
+        out["height_mm"].append([float(heights[1]), float(heights[int(0.62 * BROW_SEGMENTS)]), float(heights[-1])])
+    report = {key: round(float(np.mean(v)) * 1000, 2) for key, v in out.items() if not isinstance(v[0], list)}
+    for key in ("hair_height_mm", "height_mm"):
+        report[key] = [round(float(x) * 1000, 2) for x in np.mean(out[key], axis=0)]
     return report
 
 

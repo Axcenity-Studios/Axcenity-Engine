@@ -4201,7 +4201,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -4225,7 +4225,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19229,7 +19229,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Angry": {
-     "bare_rays": 2702,
+     "bare_rays": 2704,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19253,7 +19253,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Confused": {
-     "bare_rays": 4133,
+     "bare_rays": 4135,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19301,7 +19301,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Determined": {
-     "bare_rays": 3251,
+     "bare_rays": 3252,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19325,7 +19325,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Disgusted": {
-     "bare_rays": 2497,
+     "bare_rays": 2498,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 4,
@@ -19349,7 +19349,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Excited": {
-     "bare_rays": 4486,
+     "bare_rays": 4488,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19373,7 +19373,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Fearful": {
-     "bare_rays": 6613,
+     "bare_rays": 6617,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19397,7 +19397,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Frustrated": {
-     "bare_rays": 3173,
+     "bare_rays": 3175,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19421,7 +19421,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Happy": {
-     "bare_rays": 2856,
+     "bare_rays": 2858,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 4,
@@ -19469,7 +19469,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Neutral": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19493,7 +19493,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Sad": {
-     "bare_rays": 3882,
+     "bare_rays": 3885,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19517,7 +19517,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Sleepy": {
-     "bare_rays": 1592,
+     "bare_rays": 1593,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19541,7 +19541,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Surprised": {
-     "bare_rays": 6560,
+     "bare_rays": 6563,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19565,7 +19565,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Worried": {
-     "bare_rays": 5110,
+     "bare_rays": 5114,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19589,7 +19589,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme AI": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19613,7 +19613,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme E": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19637,7 +19637,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme FV": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19661,7 +19661,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme KG": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19685,7 +19685,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme L": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19709,7 +19709,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme MBP": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19733,7 +19733,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme O": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19757,7 +19757,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme Silence": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19781,7 +19781,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme TDN": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19805,7 +19805,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme TH": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19829,7 +19829,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme U": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19853,7 +19853,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme WQ": {
-     "bare_rays": 4641,
+     "bare_rays": 4645,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19877,7 +19877,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Angry": {
-     "bare_rays": 2702,
+     "bare_rays": 2701,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19901,7 +19901,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Confused": {
-     "bare_rays": 4133,
+     "bare_rays": 4130,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19925,7 +19925,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Crying": {
-     "bare_rays": 750,
+     "bare_rays": 749,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19949,7 +19949,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Determined": {
-     "bare_rays": 3251,
+     "bare_rays": 3249,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -19973,7 +19973,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Disgusted": {
-     "bare_rays": 2497,
+     "bare_rays": 2496,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 4,
@@ -19997,7 +19997,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Excited": {
-     "bare_rays": 4486,
+     "bare_rays": 4485,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20021,7 +20021,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Fearful": {
-     "bare_rays": 6613,
+     "bare_rays": 6606,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20045,7 +20045,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Frustrated": {
-     "bare_rays": 3173,
+     "bare_rays": 3172,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20069,7 +20069,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Happy": {
-     "bare_rays": 2856,
+     "bare_rays": 2855,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 4,
@@ -20117,7 +20117,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Neutral": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20141,7 +20141,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Sad": {
-     "bare_rays": 3882,
+     "bare_rays": 3879,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20165,7 +20165,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Sleepy": {
-     "bare_rays": 1592,
+     "bare_rays": 1591,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20189,7 +20189,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Surprised": {
-     "bare_rays": 6560,
+     "bare_rays": 6553,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20213,7 +20213,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Worried": {
-     "bare_rays": 5110,
+     "bare_rays": 5106,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20237,7 +20237,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme AI": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20261,7 +20261,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme E": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20285,7 +20285,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme FV": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20309,7 +20309,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme KG": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20333,7 +20333,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme L": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20357,7 +20357,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme MBP": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20381,7 +20381,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme O": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20405,7 +20405,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme Silence": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20429,7 +20429,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme TDN": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20453,7 +20453,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme TH": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20477,7 +20477,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme U": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -20501,7 +20501,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme WQ": {
-     "bare_rays": 4641,
+     "bare_rays": 4637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -30492,7 +30492,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -30516,7 +30516,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45520,7 +45520,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Angry": {
-     "bare_rays": 2756,
+     "bare_rays": 2757,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45544,7 +45544,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Confused": {
-     "bare_rays": 4195,
+     "bare_rays": 4198,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45592,7 +45592,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Determined": {
-     "bare_rays": 3306,
+     "bare_rays": 3310,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45616,7 +45616,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Disgusted": {
-     "bare_rays": 2543,
+     "bare_rays": 2545,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 4,
@@ -45664,7 +45664,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Fearful": {
-     "bare_rays": 6689,
+     "bare_rays": 6692,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45688,7 +45688,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Frustrated": {
-     "bare_rays": 3227,
+     "bare_rays": 3231,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45760,7 +45760,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Neutral": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45784,7 +45784,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Sad": {
-     "bare_rays": 3949,
+     "bare_rays": 3951,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45808,7 +45808,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Sleepy": {
-     "bare_rays": 1630,
+     "bare_rays": 1631,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45832,7 +45832,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Surprised": {
-     "bare_rays": 6635,
+     "bare_rays": 6637,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45856,7 +45856,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 Worried": {
-     "bare_rays": 5185,
+     "bare_rays": 5187,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45880,7 +45880,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme AI": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45904,7 +45904,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme E": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45928,7 +45928,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme FV": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45952,7 +45952,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme KG": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -45976,7 +45976,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme L": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46000,7 +46000,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme MBP": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46024,7 +46024,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme O": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46048,7 +46048,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme Silence": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46072,7 +46072,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme TDN": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46096,7 +46096,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme TH": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46120,7 +46120,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme U": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46144,7 +46144,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation+1 viseme WQ": {
-     "bare_rays": 4713,
+     "bare_rays": 4714,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46168,7 +46168,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Angry": {
-     "bare_rays": 2756,
+     "bare_rays": 2754,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46312,7 +46312,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Fearful": {
-     "bare_rays": 6689,
+     "bare_rays": 6687,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46408,7 +46408,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Neutral": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46480,7 +46480,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Surprised": {
-     "bare_rays": 6635,
+     "bare_rays": 6634,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46504,7 +46504,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 Worried": {
-     "bare_rays": 5185,
+     "bare_rays": 5184,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46528,7 +46528,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme AI": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46552,7 +46552,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme E": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46576,7 +46576,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme FV": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46600,7 +46600,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme KG": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46624,7 +46624,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme L": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46648,7 +46648,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme MBP": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46672,7 +46672,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme O": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46696,7 +46696,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme Silence": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46720,7 +46720,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme TDN": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46744,7 +46744,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme TH": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46768,7 +46768,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme U": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,
@@ -46792,7 +46792,7 @@
      "tongue_in_flesh_max_mm": 0.0
     },
     "nose_tip_rotation-1 viseme WQ": {
-     "bare_rays": 4713,
+     "bare_rays": 4712,
      "eyeball_in_lid": 0,
      "eyeball_in_lid_max_mm": 0.0,
      "lid_in_cornea": 0,

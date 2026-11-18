@@ -462,15 +462,22 @@ EAR_OUT_REACH = 0.012
 NOSE_PROJECTS = 0.00675
 # Nose tip rotation: the tip and the column under it turned about
 # subnasale, up at +1 (the nasolabial angle, 105 +- 9.6 degrees).
-# Wave 3: 31 degrees (26 in wave 2, whose ends were 2.0 to 2.2 SD of the
-# nasolabial angle with no reason to stop there),
-# and the turn eased in over 8 mm above subnasale rather than 4
-# (`NOSE_TURN_EASE`): at -1 the column, turned down against a lip that
-# holds, folded the skin at subnasale into a ridge that caught the light
-# as a thin pale line.
-NOSE_TURNS_DEG = 31.0
-NOSE_TURN_SMOOTH = 3
-NOSE_TURN_EASE = (-0.001, 0.007)
+# Wave 3, review fixes 1: at -1 a thin blue-grey line showed under the
+# columella (the lobule's lower edge, turned down to subnasale's height
+# and seen edge-on, reflecting the backdrop). The turn's weight now eases
+# in with the distance from subnasale (`NOSE_TURN_EASE`, metres; it was
+# the height above it, which sheared the column against the lobule), is
+# averaged over the nose above the lip (`NOSE_TURN_SMOOTH` rounds), and
+# the turn itself is averaged again with subnasale held
+# (`NOSE_TURN_ROUND` rounds), which rounds the lobule's lower edge. The
+# line still grows with the tip's drop: the end is set where it stays
+# within a level of the neutral face's (wave 3's hand-back, "Review fixes
+# 1"): the tip turns about 9.5 degrees about subnasale either way (14 in
+# the first pass, which drew the line).
+NOSE_TURNS_DEG = 34.0
+NOSE_TURN_SMOOTH = 4
+NOSE_TURN_ROUND = 10
+NOSE_TURN_EASE = (0.002, 0.009)
 # Whole-nose width: the nose's skin from the root to the wings spread
 # from the middle by this share of its distance from it.
 NOSE_WIDENS = 0.26
@@ -1801,17 +1808,21 @@ class Face:
         # not at all, and the turn eases off over the tip itself, so the
         # dorsum holds: turning the tip whole, with the dorsum easing off
         # above it, bent the nose into a hook at +1 and creased it across.
-        # The field is then averaged over the nose a few times.
+        # The weight and then the turn are averaged over the nose above the
+        # lip (`NOSE_TURN_SMOOTH`, `NOSE_TURN_ROUND`; subnasale held).
         tip_z = self.nose_tip[2]
-        eased = smoothstep(sn[2] + NOSE_TURN_EASE[0], sn[2] + NOSE_TURN_EASE[1], P[:, 2])
+        r = P - sn
+        eased = smoothstep(sn[2] - 0.001, sn[2] + 0.001, P[:, 2]) \
+            * smoothstep(NOSE_TURN_EASE[0], NOSE_TURN_EASE[1], np.linalg.norm(r, axis=1))
         column = skin * eased * (1.0 - smoothstep(0.008, 0.020, np.abs(P[:, 0]))) \
             * (1.0 - smoothstep(tip_z - 0.003, tip_z + 0.006, P[:, 2])) \
             * smoothstep(sn[1] + 0.008, sn[1] + 0.002, P[:, 1])
-        r = P - sn
+        nose = np.where((self.near(self.nose_tip, 0.030) > 0.05) & self.skin & (P[:, 2] > sn[2] - 0.001))[0]
+        column = self.topo.smooth(column, NOSE_TURN_SMOOTH, among=nose)
         tangent = np.stack([np.zeros(len(P)), r[:, 2], -r[:, 1]], axis=1)
         turn = tangent * (column * np.sin(np.radians(NOSE_TURNS_DEG)))[:, None]
-        nose = np.where((self.near(self.nose_tip, 0.030) > 0.05) & self.skin)[0]
-        put("Face_Nose_Tip_Rotation", self.topo.smooth(turn, NOSE_TURN_SMOOTH, among=nose), teeth=False)
+        pivot = np.where(np.linalg.norm(r, axis=1) < NOSE_TURN_EASE[0] + 0.001)[0]
+        put("Face_Nose_Tip_Rotation", self.topo.smooth(turn, NOSE_TURN_ROUND, keep=pivot, among=nose), teeth=False)
         put("Face_Nose_Width", self.nose_width(sn) * NOSE_WIDENS, teeth=False)
         put("Face_Brow_Ridge", (self.ridge() * 0.0046)[:, None] * N, teeth=False)
         crown = self.crown
