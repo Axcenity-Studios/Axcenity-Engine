@@ -2,7 +2,9 @@
 
 Paul's decision of 2026-11-17 (plan section 0, decision 10): hair and clothing must be **production-quality assets that visually belong alongside the character models**. "Clean and well made" is not the bar. A generated or imported asset is a **draft** until it passes every requirement below on the benchmark cast, in the engine, and in review.
 
-An item manifest records it as `quality: "draft"` or `"production"` (plan 11.3). Character Studio hides drafts unless "Show drafts" is on. Drafts never appear in default outfits, presets or randomization, and a test holds that.
+Every item is in one of three **content states** (Paul's decision of 2026-11-18, plan section 0, decision 12; section 5 below): **Production** (passed this standard and the review, available by default), **Legacy** (older items kept for compatibility and optional use: the stylized family's items made before this standard), **Draft** (incomplete: never in normal character creation). Randomize draws Production only. Legacy is hidden by default and shown through an optional content filter. A character that wears a Legacy or Draft item still loads and draws it.
+
+**How items are made** (decision 11): licensed assets (CC0, CC BY) are the base, Blender and manual modelling refine them, Blender scripts automate import, fitting, rigging, validation and export, and procedural generation only supports variations and repetitive work (section 6).
 
 Numbers marked *(proposed)* are starting limits, set from the stylized items' measurements and the references. They are tightened as items improve and are **never loosened to pass an item** (plan section 6).
 
@@ -13,6 +15,7 @@ Numbers marked *(proposed)* are starting limits, set from the stylized items' me
 | Automated geometry checks | The Blender harness (`measure.py`, the fit checks) and `avatar`'s manifest checks, per section 3 | `measurements.json`, the check output |
 | In-engine capture matrix | `capture_characters` with the benchmark **cast** (plan 11.6) of **both frames**, at least **five body types each** (average, slim, athletic, heavyset, muscular, plus the slider extremes the item supports), in **six views** (front, three-quarter, side, back, face, face-front), under **studio, hard, warm and outdoor** light, in the **rest pose, Idle and a walk frame**, and in the body suite's poses (T-pose, arms raised, elbows and knees bent) | Contact sheets in the milestone's folder |
 | Close review | Full-size single pictures cropped to the item's edges (hairline, hems, collars, cuffs, soles), at 3840 × 2160 where detail matters | Crops beside the sheets |
+| Required views and motions (decision 13) | Front, side and rear; the neutral standing pose; the walk (a top passes the **walking** fit test, not only the static one); arm movement with shoulder deformation (arms raised, arms forward, the walk's swing). No visible clipping, tearing or mesh separation in any of them | Sheets per view and motion; the fit gate's walk run |
 | Sign-off | The lead reviews every item. Paul signs off the first item of each kind (the first hairstyle, the first top, bottom, shoe and accessory) before more of that kind are made | A line per item in the milestone's README |
 
 An item passes only when **every** check of its kind passes **and** the review finds no visible defect. A defect seen in a picture fails the item even if every number passes.
@@ -29,7 +32,7 @@ An item passes only when **every** check of its kind passes **and** the review f
 | Clipping | No body or under-layer through the item in any capture of the matrix | Section 3 numbers and the review |
 | Fit across bodies | Holds on every cast body and at every body parameter's ends the item declares it supports | Section 3 numbers |
 | LODs | Each LOD keeps the silhouette and stays clear of the body (no skin through a simpler garment: audit §3.10) | LOD sheet; fit check per LOD |
-| Licence | Class 1, 2 or 5 only, recorded in `source` and in [references/README.md](references/README.md) | Manifest check |
+| Licence | Class 1, 2 or 5 only ([references/README.md](references/README.md)): CC0 or public domain; CC BY 3.0 or 4.0, MIT or Apache-2.0 with the attribution recorded; original work. **No** share-alike, non-commercial or no-derivatives licence. An imported asset has a **provenance record** (source page, author, licence and version, the licence's page, retrieval date, hashes of the files as downloaded, what was changed, the attribution line) before any file of it is committed; a game built with Axcenity carries the attributions of the items it ships | Manifest and provenance check |
 | Performance | GPU time per character within the tier budget (plan section 7) on the reference PC, checked on the minimum class | `FramePass` timers, crowd scene |
 
 ## 3. Clothing
@@ -60,11 +63,26 @@ An item passes only when **every** check of its kind passes **and** the review f
 | Motion | 0 hair vertices more than 1 mm inside the head in sampled frames of Idle, Walk and Run; spring-boned parts settle without jitter | Motion check (`player` `garment_checks::motion`) |
 | Budgets (plan section 7) | Cards up to 40k triangles at hero LOD, 25k at gameplay LOD0, 3k at crowd LOD; strands optional (section 0, decision 3) | Counts; GPU timers |
 
-## 5. What a draft may and may not do
+## 5. Content states: what each may and may not do
 
-| | Draft | Production |
-|---|---|---|
-| Listed in Character Studio | Only with "Show drafts" on, marked "Draft" | Yes |
-| In default outfits, presets, randomization | No (a test holds this) | Yes |
-| Shipped in the library | Yes, so it can be reviewed and improved | Yes |
-| Counted toward a milestone's "Done when" | No | Yes |
+| | Draft | Legacy | Production |
+|---|---|---|---|
+| Listed in Character Studio | Not in normal character creation; only for content review, marked "Draft" | Only with the Legacy content filter on, marked "Legacy" | Yes |
+| In randomization | No (a test holds this) | No | Yes |
+| In default outfits and presets | No | Only presets kept for compatibility | Yes |
+| Loads and draws when a saved character wears it | Yes | Yes | Yes |
+| Shipped in the library | Yes, so it can be reviewed and improved | Yes | Yes |
+| Counted toward a milestone's "Done when" | No | No | Yes |
+
+An item moves to Production only by passing every check of its kind and the review (section 1); the first of each kind also needs Paul's sign-off.
+
+## 6. How production items are made (decision 11)
+
+| Method | Responsibility |
+|---|---|
+| CC0 / CC BY assets | The base: clothing, footwear, hairstyles, reference meshes |
+| Blender and manual modelling | Refinement, topology, fitting, styling, final polish |
+| Blender scripts | Import, retopology help, fitting, rigging, validation, export |
+| Procedural generation | Variations, adjustments, repetitive tasks |
+
+The wave-4 pipelines (the hair groom and card bake, the FreeSewing ports and drape, the fit) stay as tools for the last two rows; they are no longer the route to a Production item. No batch of items is made until the first of its kind passes.
