@@ -6,8 +6,8 @@ implementation: implemented
 crates: [editor, mesh_edit, anim, blocks, ui]
 source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/scatter_pane.rs, crates/editor/src/app/scatter_pane.rs, crates/editor/src/effect_editor.rs]
 docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/editor/scatter.md, docs/research/usability/usability-audit.md]
-verified: 2026-11-16
-verified_commit: fbfacacb
+verified: 2026-11-18
+verified_commit: 0046d549
 tags: [system/editor, tools]
 ---
 
@@ -32,7 +32,7 @@ The editor's tabs beyond the Scene, Explorer and Properties. Each is a module (o
 
 ## Character Studio
 
-A workspace of its own, opened from the start screen's Character Studio page with no project ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)): body, face, hair, clothing, skin and makeup, accessories, expressions (preview only) and presets, at three detail levels, on either family (realistic, the default, or stylized), with presets from the library by kind (and a person's own, and favourites), Randomize with scopes and locks, held versions to compare (before and after, side by side, kept or discarded outside undo), asymmetry tools for left and right pairs (mirror or reset a side, one undo step), a pose and motion preview (Still, Idle, Walk, Run, gestures; editor state like an expression) and autosave with a recovery offer,
+A workspace of its own, opened from the start screen's Character Studio page with no project ([ADR-0031](../Architecture/Architecture-Decisions/ADR-0031-Character-Studio-Is-A-Workspace-Of-Its-Own.md)): body, face, hair, clothing, skin and makeup, accessories, expressions (preview only) and presets, at three detail levels, on either family (realistic, the default, or stylized), with presets from the library by kind (and a person's own, and favourites), Randomize with scopes and locks, held versions to compare (before and after, side by side, kept or discarded outside undo), asymmetry tools for left and right pairs (mirror or reset a side, one undo step), a pose and motion preview (Still, Idle, Walk, Run, gestures; editor state like an expression), Hair and Clothing browsers (picture tiles of the character wearing each item, search, slot categories, filters, favourites, recently used, drafts only with "Show drafts", a tile previewed on the character until Wear, and the worn item's declared colours, variants and parameters) and autosave with a recovery offer,
  with camera, lighting and backdrop in a bar under a live preview of the default humanoid, posed by the engine's `Animators` in a World of its own (`crates/editor/src/character_workspace.rs`; each area returns `Intent`s that only `character_workspace/shell.rs` applies). The face tools stay a Game Editor tab for placed characters (`crates/editor/src/character_studio.rs`). Its start page (`crates/editor/src/start/characters.rs`) shows Recent, every saved character and preset as a card with a picture (the workspace's preview rendered offscreen on a background thread on the editor's GPU device, cached as PNGs keyed by a hash of the file) and an overview, Edit and Delete, and character packs (plain versioned JSON; exported as one `.characterpack.json`; Add to Project writes their characters to the project's `assets/characters/descriptions/`). Behaviour: `docs/editor/character-studio.md`.
 
 ## Model Studio

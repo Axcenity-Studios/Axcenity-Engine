@@ -8,7 +8,15 @@
 //! offer came with R1's second part. Comparison, locks and favourites are
 //! editor state: their intents never change the description or undo.
 //! The asymmetry tools (R4) are edits, one undo step each; the preview's
-//! pose and motion (R9) is editor state, as an expression is.
+//! pose and motion (R9) is editor state, as an expression is, and so are
+//! the Expressions page's face controls and face preview (R9).
+//!
+//! The Hair and Clothing browsers (R6, R7; `browser.rs`) add `Browse`
+//! (search, filters, "Show drafts", the tile hovered or picked: editor
+//! state, the preview shown in the character's place), `EndPreview`,
+//! item favourites, and the worn item's own controls (`SetItemVariant`,
+//! `SetItemMaterial`, `SetItemParameter`), which are edits. `Wear` stays
+//! the one way an item goes on: one undo step.
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
@@ -16,6 +24,7 @@ use std::path::PathBuf;
 
 use axcenity_avatar::{MaterialValue, PresetKind, SkinLayer};
 
+use super::browser::Browse;
 use super::edit::Scope;
 use super::motion::Motion;
 use super::random::RandomScope;
@@ -91,6 +100,39 @@ pub enum Intent {
     },
     /// Marks a preset a favourite, or not (editor state).
     ToggleFavourite(String),
+    /// Marks an item (a hairstyle, a garment) a favourite, or not
+    /// (editor state, beside the preset favourites).
+    ToggleItemFavourite(String),
+    /// A browser's search, filters, drafts, or the tile hovered or picked
+    /// (editor state: a tile is previewed on the character, never worn).
+    Browse(Browse),
+    /// Takes a tile's preview off: the character as it is (Esc, leaving
+    /// the page).
+    EndPreview,
+    /// Picks variant `variant` of the worn item `item` (`None`: as made),
+    /// as one undo step. The colours and parameters the variant sets are
+    /// the variant's again.
+    SetItemVariant {
+        item: String,
+        variant: Option<String>,
+    },
+    /// Sets (or with `None` clears) values of the worn item `item`'s
+    /// material slots `slots`, together (a colour role's slots, a hair
+    /// colour's melanin and redness): one undo step, or one per drag.
+    SetItemMaterial {
+        item: String,
+        slots: Vec<String>,
+        values: Vec<(String, Option<MaterialValue>)>,
+        gesture: Gesture,
+    },
+    /// Sets the worn item `item`'s own parameter `id` (a hairstyle's
+    /// length).
+    SetItemParameter {
+        item: String,
+        id: String,
+        value: f32,
+        gesture: Gesture,
+    },
     /// A new character, not saved yet: a family's default or a preset.
     New(Start),
     /// Opens a saved character file in place of this one.
@@ -117,12 +159,32 @@ pub enum Intent {
     FocusView(ViewPreset),
     SetLighting(Lighting),
     SetBackdrop(Backdrop),
-    /// Shows a built-in expression on the preview's face (`None`: none).
+    /// Shows a built-in expression on the preview's face (`None` or
+    /// `Neutral`: none), starting the face controls from its own values.
     /// Preview only: never in the description.
     PreviewExpression(Option<String>),
     /// Plays a pose or motion on the preview (Still, Idle, Walk, Run, a
     /// gesture). Preview only: never in the description.
     PreviewMotion(Motion),
+    /// Holds face control `name` (a standard control, `Jaw_Open`) at
+    /// `value` (0 to 1) on the preview's face, over the expression shown;
+    /// `None` lets the expression's own value show again (R9). Preview
+    /// only: never in the description.
+    PreviewFaceControl {
+        name: String,
+        value: Option<f32>,
+    },
+    /// Turns the face preview on or off (R9): the camera close on the
+    /// face, the body still, blinking and idle motion off, the neutral
+    /// light, the expression held. Off puts back the view, light and
+    /// motion it found (editor state).
+    FacePreview(bool),
+    /// In the face preview: blinking, and idle motion (the face's and the
+    /// body's), each off unless asked for.
+    FacePreviewMotion {
+        blink: bool,
+        idle: bool,
+    },
     /// Mirrors a side onto the other, or resets a side, for a feature's
     /// left and right pairs or one pair (one undo step).
     Sides {
@@ -150,6 +212,11 @@ pub enum Intent {
     Recover(bool),
     /// Back to the start screen (the editor asks to save first).
     Home,
+    /// Back to the Game Editor, the edited character applied to the game
+    /// character the workspace was opened on (the round trip, `game.rs`).
+    Done,
+    /// Back to the Game Editor, the game character left as it was.
+    Cancel,
 }
 
 impl Intent {
@@ -162,6 +229,9 @@ impl Intent {
                 | Intent::SetMirrored { .. }
                 | Intent::Choose { .. }
                 | Intent::Wear { .. }
+                | Intent::SetItemVariant { .. }
+                | Intent::SetItemMaterial { .. }
+                | Intent::SetItemParameter { .. }
                 | Intent::SetMaterial { .. }
                 | Intent::SetSkinLayer { .. }
                 | Intent::SetBase(_)

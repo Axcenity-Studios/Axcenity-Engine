@@ -556,7 +556,10 @@ JAW_FORWARD = 0.0055
 JAW_GLIDE = 0.019
 # The lower lip stands this much higher than the turn leaves it: it
 # covers the lower teeth, whose tips the turn alone raises over it.
-JAW_LIP_UP = 0.0012
+# (R9 review 2: 3 mm, was 1.2. With the broad U (`JAW_U_*`) the lower
+# teeth's tips stood over the lip round the whole lower rim of an open
+# mouth: a ring of teeth in Surprised and at `Jaw_Open` 0.5.)
+JAW_LIP_UP = 0.0030
 JAW_LIP_BACK = 0.0020
 # How much of `JAW_LIP_UP` each loop of the lower lip takes (by loop from
 # the fold behind the lip: `mouth.Mouth.lower`).
@@ -569,8 +572,8 @@ LIP_RISES = {1: 0.8, 2: 1.0, 3: 1.0, 4: 0.9, 5: 0.65, 6: 0.35, 7: 0.12}
 # they drop less than the lip in front of them and stand over its rim:
 # seen from the front, a row of teeth climbing each side of the open
 # mouth inside the lip. A lip is stretched from its corner down round the
-# teeth and hides them.
-JAW_LIP_SIDE_UP = 0.0025
+# teeth and hides them. (R9 review 2: 3.5 mm, was 2.5.)
+JAW_LIP_SIDE_UP = 0.0035
 JAW_LIP_SIDE_IN = 0.0010
 JAW_LIP_SIDES = (0.30, 0.70, 0.90)
 # Behind each corner the cheek's lining comes in against the lower back
@@ -585,21 +588,77 @@ JAW_CHEEK_IN = 0.0060
 JAW_CHEEK_NEAR = 0.009
 JAW_CHEEK_LINE = (0.003, 0.026, -0.014)
 # The mouth's corners come in round the opening by this much, and
-# forward along the teeth by this much.
-JAW_CORNER_IN = 0.0025
+# forward along the teeth by this much, the skin and lining within
+# `JAW_CORNER_NEAR` of a corner with them (a Gaussian's radius).
+# (R9 review 2: 7.5 mm, was 2.5. With the broad U (`JAW_U_*`) the lower
+# lip falls away beside the lower back teeth, and seen from the front a
+# column of them climbed each side of the opening: 240 mm2 of teeth at
+# `Jaw_Open` 1 on the masculine frame, 179 before the U. A wide-open
+# mouth's corners come in toward the teeth, so it is about as wide as it
+# is tall; with that and the lower lip higher (`JAW_LIP_UP`,
+# `JAW_LIP_SIDE_UP`) the U is kept and the teeth seen are no more than
+# before it (`r9-expressions.md`, Review fixes 2). The cheek's lining
+# brought further in as well, 14 mm, came out through the lips at the
+# corners. The lips' seal ends nearer the middle with it: `SEAL_REACH`.)
+JAW_CORNER_IN = 0.0075
 JAW_CORNER_FORWARD = 0.0025
+JAW_CORNER_NEAR = 0.017
 # The upper lip is drawn up off the upper teeth as the jaw opens (its
 # edge by this much, the skin above it less by loop: the lip thins), so
 # the upper row shows as an arc and not under a curtain.
 JAW_UPPER_LIP_UP = 0.0038
 UPPER_LIP_RISES = {0: 1.0, 1: 0.8, 2: 0.5, 3: 0.25, 4: 0.1}
 UPPER_LINING_RISES = {1: 1.0, 2: 0.9, 3: 0.6, 4: 0.3}
+# The open mouth's outline (R9, OPEN-14). The jaw's weights along the lips
+# (`rig._jaw`: `0.30 * u ** 2.5` above, `1 - 0.70 * u ** 2.5` below, `u`
+# from the middle to a corner) make the wide-open mouth a bell, wide at
+# the top and narrowing to the chin, with the corners as points. The
+# shape takes the lips toward a share of the jaw's turn falling off by a
+# higher power of the way (`JAW_U_LOWER`, `JAW_U_UPPER`): the lower lip
+# keeps nearly all of the drop out toward the corners and turns up
+# steeply into them, the upper lip stays up until close to them, so the
+# opening is a broad U whose ends are rounded. `JAW_U_REACH`: how far
+# off the lips' line that holds (a Gaussian's radius, metres).
+JAW_U_LOWER = 6.0
+JAW_U_UPPER = 6.0
+JAW_U_REACH = 0.016
+# The upper lip's part of it begins this far along toward a corner and is
+# whole by the second.
+JAW_U_UPPER_FROM = (0.70, 0.90)
 # A smile: where along a lip (0 the middle, 1 the corner) its own share
 # of the corner's pull begins to give way to the skin's, and where the
 # skin's has all of it (`Face.smile`).
 SMILE_LIPS_OWN = (0.45, 0.95)
+# How far a smile pulls its corner (metres), how far it pushes the cheek
+# out and up ahead of the pull, and how deep the fold from the nose's
+# wing sinks (R9, OPEN-14: at 12.8, 7.2 and 6.2, and 4.2 mm Happy read as
+# a mild closed smile against the references, the cheeks and the fold
+# rising less than a smile's do).
+SMILE_PULL = 0.0148
+SMILE_CHEEK = (0.0086, 0.0078)
+SMILE_FOLD = 0.0054
 # The power of the way to the corner a lip's own share rises by.
 SMILE_LIPS_CURVE = 2.6
+# The middle of the lips in a smile (R9 review 2). Kept off the teeth and
+# brought back together, the two lips' middle vertices rose 0.4 and 0.8
+# mm less than their neighbours either side, so the lips' line came to a
+# point under the nose (`lipline.py` beside the hand-back: the middle
+# vertex 0.39 mm under the chord of its neighbours, the line turning 8.4
+# degrees there and back 4.6 at each neighbour). The lips' middle goes
+# back `SMILE_MIDDLE_BACK[0]` of what the pull takes it back, all of it
+# again by `[1]` of the way to a corner (a smile stretches the lips
+# along the teeth; it does not press their middle into them), and rises
+# by up to `SMILE_MIDDLE_RISE[0]` (metres, half from each side's shape)
+# within `[1]` of the way to a corner.
+SMILE_MIDDLE_BACK = (0.5, 0.6)
+SMILE_MIDDLE_RISE = (0.0004, 0.22)
+# `Mouth_Pucker` draws the lips toward the middle by this share of their
+# width and forward by this much (R9, OPEN-14: at 0.31 and 5.4 mm the U
+# and WQ visemes were an opening 20 mm wide with the upper front teeth
+# filling it, where a real one is a smaller ring of lips well forward of
+# the teeth).
+PUCKER_GATHERS = 0.40
+PUCKER_FORWARD = 0.0072
 # `Mouth_Narrow` parts the lips in the middle: all of its parting out to
 # the first of these of the way to a corner, none of it from the second.
 NARROW_PARTS = (0.30, 0.75)
@@ -1166,18 +1225,25 @@ class Face:
         theirs = self.lipness * (1.0 - smoothstep(SMILE_LIPS_OWN[0], SMILE_LIPS_OWN[1], along))
         w = round_corner + (own - round_corner) * theirs
         w[self.lid | self.socket] = 0.0
-        move = w[:, None] * pull * (0.0128 * amount)
+        move = w[:, None] * pull * (SMILE_PULL * amount)
         # The upper lip lifts a little with it.
         # The cheek, pushed up and out ahead of the corner.
         bulge_at = self.on_skin(c + pull * 0.027 + np.array([0.0, 0.0, 0.004]))
         cheek = self.near(bulge_at, 0.019) * self.side(s) * self.skin * ~self.lid
-        move += (cheek * 0.0072 * amount)[:, None] * self.N + (cheek * 0.0062 * amount)[:, None] * np.array([0.0, 0.0, 1.0])
+        move += (cheek * SMILE_CHEEK[0] * amount)[:, None] * self.N + (cheek * SMILE_CHEEK[1] * amount)[:, None] * np.array([0.0, 0.0, 1.0])
         # The fold between the nose's wing and the corner sinks.
         wing = self.on_skin(self.nose_tip + np.array([s * 0.021, 0.018, -0.006]))
         low = self.on_skin(c + np.array([s * 0.009, -0.004, 0.004]))
         knee = self.on_skin(0.5 * (wing + low) + np.array([s * 0.004, 0.0, 0.0]))
         fold_d, _, _ = polyline_nearest(P, np.array([wing, knee, low]))
-        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * 0.0042 * amount)[:, None] * self.N
+        move -= (gauss(fold_d, 0.0045) * self.skin * (1.0 - self.lipness) * SMILE_FOLD * amount)[:, None] * self.N
+        # The lips' middle: less of the pull back, and a little rise
+        # (`SMILE_MIDDLE_*`), so the lips' line stays one curve there.
+        way = np.abs(self.u)
+        keep = SMILE_MIDDLE_BACK[0] + (1.0 - SMILE_MIDDLE_BACK[0]) * smoothstep(0.0, SMILE_MIDDLE_BACK[1], way)
+        move[:, 1] *= 1.0 - self.lipness * (1.0 - keep)
+        rise = (1.0 - np.clip(way / SMILE_MIDDLE_RISE[1], 0.0, 1.0) ** 2) ** 2
+        move[:, 2] += 0.5 * rise * self.lipness * (self.skin | self.lining) * SMILE_MIDDLE_RISE[0] * amount
         slide = np.where(self.skin, 1.0 - np.clip(self.lipness * 1.6, 0.0, 1.0), 0.0) * 0.85
         return P + move, slide
 
@@ -1443,7 +1509,7 @@ class Face:
         middle = 1.0 - smoothstep(NARROW_PARTS[0], NARROW_PARTS[1], np.abs(self.u))
         narrow = gather(0.20, 0.0032, 0.0042) + vec(ul * middle, up * 0.0012) + vec(ll * middle, up * -0.0020)
         S["Mouth_Narrow"] = self._moved(narrow, slide=None)
-        pucker = gather(0.31, 0.0054, 0.0056) + (lips * self.skin * 0.0009)[:, None] * N
+        pucker = gather(PUCKER_GATHERS, PUCKER_FORWARD, 0.0060) + (lips * self.skin * 0.0009)[:, None] * N
         S["Mouth_Pucker"] = self._moved(pucker, slide=None, sealed=True)
         for side, s in SIDES:
             mouth_w = gauss(self.d_line, 0.028) * (self.skin | self.lining)
@@ -1483,7 +1549,11 @@ class Face:
         P = self.P
         posed = self.jaw.pose(P, JAW_OPEN_DEG)
         X = posed.copy()
-        held = self.jaw.w * self.topo.is_head
+        # The broad U (`JAW_U_*`): a further share of the jaw's turn, the
+        # skin posed as if weighted by the weights it should have had.
+        more = self.jaw_u()
+        X += more[:, None] * (self.jaw.rigid(P, JAW_OPEN_DEG) - P)
+        held = (self.jaw.w + more) * self.topo.is_head
         X[:, 1] -= JAW_GLIDE * held
         # The lower lip, by its loops from the fold behind it over its
         # top to the fold above the chin; nothing at the corners.
@@ -1509,7 +1579,7 @@ class Face:
         X[:, 2] += JAW_UPPER_LIP_UP * lift * self.corner_taper(0.6)
         for _, s in SIDES:
             corner = X[self.mouth.corner[s]].copy()
-            w = gauss(np.linalg.norm(X - corner, axis=1), 0.017) * (self.skin | self.lining)
+            w = gauss(np.linalg.norm(X - corner, axis=1), JAW_CORNER_NEAR) * (self.skin | self.lining)
             X[:, 0] -= s * JAW_CORNER_IN * w
             X[:, 1] -= JAW_CORNER_FORWARD * w
         for _, s in SIDES:
@@ -1522,6 +1592,21 @@ class Face:
         hollow = share * smoothstep(0.024, 0.04, np.abs(P[:, 0])) * self.skin * (1.0 - self.lipness)
         X -= (hollow * 0.0022)[:, None] * self.N
         return self.shape(X, open_deg=JAW_OPEN_DEG)
+
+    def jaw_u(self):
+        """Per vertex, the share of the jaw's turn `Jaw_Open` adds to (or,
+        on the upper lip near its corners, takes from) what the weights
+        give, so the wide-open mouth is a broad U with rounded ends
+        (`JAW_U_*`). Kept inside 0 to 1 with the weight."""
+        u = np.clip(np.abs(self.u), 0.0, 1.0)
+        near = gauss(self.d_line, JAW_U_REACH) * (self.skin | self.lining) * self.topo.is_head
+        near[self.lid | self.socket] = 0.0
+        lower = 0.70 * (u ** 2.5 - u ** JAW_U_LOWER)
+        # (The upper lip only near its corners: held up along its middle
+        # too, a laugh drew `LipSeal`'s upper flap out through the lip.)
+        upper = 0.30 * (u ** JAW_U_UPPER - u ** 2.5) * smoothstep(JAW_U_UPPER_FROM[0], JAW_U_UPPER_FROM[1], u)
+        more = np.where(self.lower_side, lower, np.where(self.upper_side, upper, 0.0)) * near
+        return np.clip(more, -self.jaw.w, 1.0 - self.jaw.w)
 
     def clear_with(self, shape, other, parts=(1.0, 0.6), most=0.002):
         """The jaw's shape with what it takes to keep the lips off the
@@ -2155,8 +2240,15 @@ SEAL_STANDS = 0.0012
 # a flap further into the face at full opening than a lip is deep (a
 # laugh takes the upper one 15 mm in as it is). (The left and right
 # controls take their own side's.)
-SEAL_OPENS = {"Jaw_Open": 8.0, "Mouth_Open": 2.6, "Upper_Lip_Raise": 1.55, "Lower_Lip_Lower": 1.75, "Nose_Sneer": 0.85,
-              "Mouth_Narrow": 1.15}
+# `Mouth_Narrow` draws them back slowly (R9, OPEN-14; 1.15 before): a
+# rounded mouth (the U and WQ visemes) is a small opening, and a flap
+# left in it is the lips' inner red there, where the teeth showed. And
+# `Jaw_Open` 7.2 (8 before): with the broad U (`JAW_U_*`) a laugh drew
+# the upper flap so far back that its end came out through the top of a
+# thinner upper lip (with `nose_width` -1); at 7.2 it is gone by 5.5 mm
+# of the jaw's parting, still under `face_checks.py`'s 6 mm.
+SEAL_OPENS = {"Jaw_Open": 7.2, "Mouth_Open": 2.6, "Upper_Lip_Raise": 1.55, "Lower_Lip_Lower": 1.75, "Nose_Sneer": 0.85,
+              "Mouth_Narrow": 0.4}
 # Where in the gums' palette the flaps are: the lining's red at the
 # shade the lining has just inside the lips (`skin.INNER_LIP`), so a flap
 # that shows beside an opening mouth is the lip's own inner side and not
@@ -2165,9 +2257,15 @@ SEAL_PLACE = (1.0, 0.55)
 # A flap's root is this far inside its lip (metres), and the flaps end
 # this far of the way from the middle to a corner (the lips are one skin
 # there and part by nothing; nearer the corner a flap's end came out
-# through the cheek's lining where an open jaw draws that in).
+# through the cheek's lining where an open jaw draws that in). The lower
+# flap ends nearer the middle (`SEAL_REACH_LOWER`). (R9 review 2: 0.72
+# and 0.60, both 0.82 before. With the corners drawn 7.5 mm in round an
+# open mouth (`JAW_CORNER_IN`) the lips near them are thinner, and the
+# flaps' ends came out through them: 4 to 9 vertices in view at `Jaw_Open`
+# 1 and in a laugh, `face_checks.py`.)
 SEAL_ROOT = 0.0006
-SEAL_REACH = 0.82
+SEAL_REACH = 0.72
+SEAL_REACH_LOWER = 0.60
 
 
 def _flesh_axis(face, loop, skin_loop, lining_loop, lean):
@@ -2202,12 +2300,12 @@ def lip_seal(face, F, shapes, jaw_w):
     import teeth as jawlib
     from common import new_object, shade_smooth
     M, lips = face.P, face.mouth
-    reach = SEAL_REACH * lips.half
     points, bound, free, faces = [], [], [], []
     upper, lower = lips.under[1], lips.lower[mouth.CREST - 1]
-    flaps = ((upper, _flesh_axis(face, upper, lips.upper[3], lips.under[4], 0.45), SEAL_HANGS),
-             (lower, _flesh_axis(face, lower, lips.lower[7], lips.floor, 0.6), SEAL_STANDS))
-    for flap, (loop, axis, tall) in enumerate(flaps):
+    flaps = ((upper, _flesh_axis(face, upper, lips.upper[3], lips.under[4], 0.45), SEAL_HANGS, SEAL_REACH),
+             (lower, _flesh_axis(face, lower, lips.lower[7], lips.floor, 0.6), SEAL_STANDS, SEAL_REACH_LOWER))
+    for flap, (loop, axis, tall, share) in enumerate(flaps):
+        reach = share * lips.half
         chain = [int(i) for i in sorted(loop, key=lambda i: M[i][0]) if abs(M[i][0]) < reach]
         first = len(points)
         for i in chain:

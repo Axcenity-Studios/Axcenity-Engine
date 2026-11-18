@@ -36,18 +36,25 @@
 //! Randomize and its locks, `compare.rs` the held versions (before and
 //! after, side by side), `sides.rs` the asymmetry tools (mirror or reset a
 //! side), `motion.rs` the preview's pose and motion (Still, Idle, Walk,
-//! Run, gestures). `stage.rs` is the camera, lighting, backdrop and
+//! Run, gestures), `browser.rs` the Hair and Clothing browsers (search,
+//! filters, favourites, recently used, drafts, a tile previewed on the
+//! character until "Wear"), `expressions.rs` the Expressions page's
+//! expression, face controls and face preview (R9). `stage.rs` is the camera, lighting, backdrop and
 //! floor; `shelf.rs` lists the saved characters for the start page and
 //! deletes them.
 
 pub mod autosave;
 mod bottom_bar;
+pub mod browser;
 pub mod compare;
 pub mod direct;
 pub mod edit;
+pub mod expressions;
+pub mod game;
 pub mod intent;
 pub mod motion;
 mod nav;
+mod numeric;
 pub mod packs;
 mod panel;
 pub mod presets;
@@ -62,11 +69,17 @@ pub mod thumbnails;
 mod toolbar;
 
 #[cfg(test)]
+mod browser_tests;
+#[cfg(test)]
+mod expressions_tests;
+#[cfg(test)]
 mod feature_tests;
 #[cfg(test)]
 mod handle_tests;
 #[cfg(test)]
 mod motion_tests;
+#[cfg(test)]
+mod numeric_tests;
 #[cfg(test)]
 mod polish_tests;
 #[cfg(test)]
@@ -91,10 +104,10 @@ use axcenity_anim::Animators;
 use axcenity_assets::Assets;
 pub use axcenity_avatar::chosen_slots;
 use axcenity_avatar::{
-    BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, WornItem,
-    wear_choice, wear_choices,
+    BaseManifest, Description, Library, MaterialValue, Parameter, PresetKind, wear_choice,
+    wear_choices,
 };
-use axcenity_core::{ClassName, InstanceId, Vector3, World};
+use axcenity_core::{InstanceId, Vector3, World};
 use axcenity_editor_tools::preview::Canvas;
 use axcenity_gameplay::description as applier;
 use axcenity_render::glam::Vec3;
@@ -129,18 +142,11 @@ pub const CHARACTERS_FOLDER: &str = "characters";
 /// editor has it beside itself; a build from source under the engine's
 /// folder), then in the source tree a debug build came from.
 pub fn find_character_library() -> Option<PathBuf> {
-    let mut roots = Vec::new();
-    if let Ok(folder) = std::env::current_dir() {
-        roots.push(folder);
-    }
-    if let Ok(program) = std::env::current_exe() {
-        roots.extend(program.ancestors().skip(1).map(Path::to_path_buf));
-    }
-    roots.extend(crate::rebuild::EngineSource::find().map(|source| source.workspace));
-    roots
-        .into_iter()
-        .map(|root| root.join(axcenity_avatar::LIBRARY_FOLDER))
-        .find(|folder| folder.join("catalogue.json").is_file())
+    axcenity_project::shipped_character_library().or_else(|| {
+        crate::rebuild::EngineSource::find()
+            .map(|source| source.workspace.join(axcenity_avatar::LIBRARY_FOLDER))
+            .filter(|folder| folder.join("catalogue.json").is_file())
+    })
 }
 
 /// What a new character starts from: a base model's default character (a
@@ -287,6 +293,11 @@ pub struct CharacterWorkspace {
     /// The built-in expression shown on the preview's face: preview only,
     /// never in the description (brief §10).
     pub expression: Option<String>,
+    /// The face controls the Expressions page holds on the preview's face,
+    /// over the expression (R9): preview only, never in the description.
+    pub face_controls: BTreeMap<String, f32>,
+    /// The face preview, while it is on (R9; editor state).
+    pub face_view: Option<expressions::FaceView>,
     /// What the preview's body does (Still, Idle, Walk, Run, a gesture):
     /// preview only, never in the description (brief §10, R9).
     pub motion: Motion,
@@ -314,6 +325,13 @@ pub struct CharacterWorkspace {
     own_presets: BTreeMap<String, Description>,
     /// The favourite presets' IDs (editor state, `favourites.json`).
     pub favourites: BTreeSet<String>,
+    /// The browsers' favourite items and the items last worn from them,
+    /// newest first (editor state, beside the preset favourites).
+    pub item_favourites: BTreeSet<String>,
+    pub recent_items: Vec<String>,
+    /// The Hair and Clothing browsers' search, filters and preview
+    /// (editor state, `browser.rs`).
+    pub browser: browser::Browser,
     /// Parameters Randomize leaves alone (editor state).
     pub locks: BTreeSet<String>,
     /// How many times Randomize was pressed: part of its seed.
@@ -333,10 +351,16 @@ pub struct CharacterWorkspace {
     /// Hover, selection and handles on the character in the viewport
     /// (R2, `direct.rs`; editor state).
     pub direct: direct::Direct,
+    /// The game character it was opened on from the Game Editor, which
+    /// Done applies the description to (the round trip, `game.rs`).
+    game: Option<game::GameLink>,
     /// The presets' pictures (the Presets page's tiles).
     pictures: thumbnails::Thumbnails,
     /// Each preset's picture file and its texture once loaded, by ID.
     preset_pictures: HashMap<String, (PathBuf, Option<eframe::egui::TextureHandle>)>,
+    /// Each browser tile's picture file (the character wearing it) and
+    /// its texture once loaded, by item ID (`""` + slot: nothing worn).
+    item_pictures: HashMap<String, (PathBuf, Option<eframe::egui::TextureHandle>)>,
 }
 
 /// Held while a workspace writes the library into its folder: the start
@@ -385,6 +409,7 @@ impl CharacterWorkspace {
         let (description, fell_back) = adopt(description, &library);
         let mut pictures = thumbnails::Thumbnails::default();
         pictures.set_folder(Some(folder.to_owned()));
+        let (item_favourites, recent_items) = presets::read_item_lists(folder);
         let mut workspace = Self {
             folder: folder.to_owned(),
             assets,
@@ -403,6 +428,8 @@ impl CharacterWorkspace {
             lighting: Lighting::default(),
             backdrop: Backdrop::default(),
             expression: None,
+            face_controls: BTreeMap::new(),
+            face_view: None,
             motion: Motion::default(),
             preview_clip: None,
             follow: None,
@@ -416,6 +443,9 @@ impl CharacterWorkspace {
             saved_files: Vec::new(),
             own_presets: presets::read_own(folder),
             favourites: presets::read_favourites(folder),
+            item_favourites,
+            recent_items,
+            browser: browser::Browser::default(),
             locks: random::default_locks(),
             rolls: 0,
             comparison: Comparison::default(),
@@ -429,8 +459,10 @@ impl CharacterWorkspace {
             },
             recovery: autosave::read_recovery(folder),
             direct: direct::Direct::default(),
+            game: None,
             pictures,
             preset_pictures: HashMap::new(),
+            item_pictures: HashMap::new(),
         };
         workspace.build_world();
         Ok(workspace)
@@ -516,18 +548,25 @@ impl CharacterWorkspace {
     /// Edits `description` from scratch: a fresh undo, saved when `file`
     /// holds it.
     fn start_over(&mut self, description: Description, file: Option<PathBuf>) {
+        // The page's expression, controls and face preview were on the old
+        // body's face: leave them first, which also puts back the light,
+        // camera and motion the face preview found (its framing was the
+        // old character's head).
+        self.leave_expressions();
         self.saved = file.is_some().then(|| description.clone());
         self.description = description;
         self.file = file;
         self.history = History::default();
-        self.expression = None;
         self.leaving = false;
         self.asking = None;
         self.autosave.untouched = None;
         self.animators.clear();
         self.applied = None;
+        // A tile tried on belongs to the character it was tried on.
+        self.browser.end_preview();
         // Held versions belong to the character they were held of.
         self.clear_comparison();
+        self.sync_preview_face(true);
     }
 
     pub fn description(&self) -> &Description {
@@ -563,16 +602,23 @@ impl CharacterWorkspace {
     /// Changes the description as one undo step and shows it. A drag that
     /// was open is closed first.
     pub fn edit(&mut self, change: impl FnOnce(&mut Description)) {
+        // A tile tried on gives way to any change of the character.
+        let previewing = self.drop_preview();
         self.history.commit(&self.description);
         let before = self.description.clone();
         let mut changed = before.clone();
         change(&mut changed);
         let library = self.library();
         self.description = tidy(changed, &library);
-        if edit::same_character(&before, &self.description, library.base(&before.base)) {
-            // A change of nothing makes no step and keeps redo (audit D-05).
-            self.description = before;
-        } else if self.history.record(before, &self.description) {
+        let recorded =
+            if edit::same_character(&before, &self.description, library.base(&before.base)) {
+                // A change of nothing makes no step and keeps redo (audit D-05).
+                self.description = before;
+                false
+            } else {
+                self.history.record(before, &self.description)
+            };
+        if recorded || previewing {
             self.refresh();
         }
     }
@@ -580,6 +626,7 @@ impl CharacterWorkspace {
     /// A change that is part of a gesture: a drag's changes are one undo
     /// step, closed by its [`Gesture::Commit`]; nothing changed, no step.
     pub fn transact(&mut self, change: impl FnOnce(&mut Description), gesture: Gesture) {
+        self.drop_preview();
         self.history.begin(&self.description);
         let mut changed = self.description.clone();
         change(&mut changed);
@@ -605,8 +652,11 @@ impl CharacterWorkspace {
 
     /// Ends a drag going back to where it started.
     pub fn cancel_edit(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(start) = self.history.cancel() {
             self.description = start;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
@@ -735,19 +785,20 @@ impl CharacterWorkspace {
         worn_in(&self.library(), &self.description, slot)
     }
 
-    /// Wears `item` in `slot` (taking off what was there), or nothing.
+    /// Wears `item` in `slot` (taking off what was there and what it
+    /// can't be worn with: [`browser::dressed`]), or nothing, as one undo
+    /// step. A tile's preview ends; the item goes to the front of
+    /// "Recently used".
     pub fn wear(&mut self, slot: &str, item: Option<&str>) {
         let library = self.library();
-        let slot = slot.to_owned();
-        let item = item.map(str::to_owned);
-        self.edit(|description| {
-            description
-                .items
-                .retain(|worn| library.item(&worn.id).is_none_or(|it| it.slot != slot));
-            if let Some(item) = item {
-                description.items.push(WornItem::new(item));
-            }
-        });
+        // `edit` ends a tile's preview (one apply, not two).
+        self.edit(|description| *description = browser::dressed(description, &library, slot, item));
+        if let Some(item) = item
+            && self.description.items.iter().any(|worn| worn.id == item)
+        {
+            browser::remember(&mut self.recent_items, item);
+            presets::write_item_lists(&self.folder, &self.item_favourites, &self.recent_items);
+        }
     }
 
     /// Picks `value` of a parameter with choices (Male or Female) as one
@@ -856,15 +907,21 @@ impl CharacterWorkspace {
     }
 
     pub fn undo(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(before) = self.history.undo(self.description.clone()) {
             self.description = before;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
 
     pub fn redo(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(after) = self.history.redo(self.description.clone()) {
             self.description = after;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
@@ -945,9 +1002,13 @@ impl CharacterWorkspace {
         }
         self.file = Some(path.clone());
         self.saved = Some(self.description.clone());
-        // Saved: nothing left to recover.
+        // Saved: nothing left to recover. A workspace that doesn't
+        // autosave (a game's character, the start page's painter) never
+        // wrote the recovery file: one there is another session's.
         self.autosave.written = None;
-        autosave::remove_recovery(&self.folder);
+        if self.autosave.on {
+            autosave::remove_recovery(&self.folder);
+        }
         recent::remember(&self.folder, &path);
         self.saved_files.push(path.clone());
         Ok(match renamed_from {
@@ -979,6 +1040,7 @@ impl CharacterWorkspace {
     /// pictures): its undo is left alone.
     pub(crate) fn show_only(&mut self, description: Description) {
         let library = self.library();
+        self.browser.end_preview();
         self.description = adopt(description, &library).0;
         self.animators.clear();
         self.applied = None;
@@ -1076,60 +1138,6 @@ impl CharacterWorkspace {
         Some(place.transform_point3(position)).filter(|point| point.is_finite())
     }
 
-    /// Shows `name` (a built-in expression) on the preview's face, or none:
-    /// a FaceControls of the preview's own on the body, as the capture tool
-    /// does. The description is not touched.
-    pub fn preview_expression(&mut self, name: Option<String>) {
-        let name = name.filter(|name| !name.eq_ignore_ascii_case("Neutral"));
-        self.expression = name;
-        let Some(body) = self
-            .character
-            .and_then(|character| applier::body_of(&self.world, character))
-        else {
-            return;
-        };
-        let existing = self.world.get(body).and_then(|body| {
-            body.children().iter().copied().find(|child| {
-                self.world.get(*child).is_some_and(|child| {
-                    child.class() == ClassName::FaceControls && child.name() == PREVIEW_FACE
-                })
-            })
-        });
-        let Some(name) = self.expression.clone() else {
-            if let Some(face) = existing {
-                let _ = self.world.destroy(face);
-            }
-            return;
-        };
-        let face = match existing {
-            Some(face) => face,
-            None => {
-                let Ok(face) = self.world.create(ClassName::FaceControls) else {
-                    return;
-                };
-                let _ = self.world.set_name(face, PREVIEW_FACE);
-                let _ = self.world.set_parent(face, Some(body));
-                face
-            }
-        };
-        if let Some(state) = self.world.face_mut(face) {
-            let order = state.next_order;
-            state.next_order += 1;
-            state.expressions = vec![axcenity_core::face::ExpressionPlay {
-                name,
-                intensity: 1.0,
-                target_intensity: 1.0,
-                presence: 0.0,
-                target_presence: 1.0,
-                transition: None,
-                weight: 1.0,
-                priority: 0,
-                asymmetry: 0.0,
-                order,
-            }];
-        }
-    }
-
     /// The MeshParts the preview's body wears, by name, with the body's own
     /// `MeshId` first.
     #[cfg(test)]
@@ -1180,6 +1188,7 @@ impl CharacterWorkspace {
     pub(crate) fn advance(&mut self, seconds: f64) {
         self.step_by(seconds);
         self.follow_motion(seconds);
+        self.follow_face_preview();
     }
 
     pub(crate) fn step_by(&mut self, seconds: f64) {

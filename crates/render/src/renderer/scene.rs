@@ -131,7 +131,7 @@ impl ScenePipeline {
             &cascade_buffer,
             posing.posed(),
         );
-        let shadow_pipeline = create_shadow_pipeline(&device, &shadow_layout, &skinning);
+        let shadow_pipeline = create_shadow_pipeline(&device, &shadow_layout, &skinning, None);
 
         // Bindings 0 and 3–9 are the textures (see `material_bindings`).
         let texture_entry = |binding| wgpu::BindGroupLayoutEntry {
@@ -169,6 +169,9 @@ impl ScenePipeline {
             label: Some("material"),
             entries: &entries,
         });
+        // Cut-out casters' shadows, through their texture's holes.
+        let shadow_cut_out_pipeline =
+            create_shadow_pipeline(&device, &shadow_layout, &skinning, Some(&material_layout));
         // glTF's default: smooth, blending between mipmap levels, and
         // repeating past the edges.
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -346,6 +349,7 @@ impl ScenePipeline {
             no_prepass_depth_view,
             shadow_sampler,
             shadow_pipeline,
+            shadow_cut_out_pipeline,
             cascade_buffer,
             shadow_layout,
             shadow_bind_group,
@@ -740,6 +744,8 @@ impl ScenePipeline {
         frame_uniform.view_proj = drawn_view_proj.to_cols_array_2d();
         frame_uniform.inv_view_proj = drawn_view_proj.inverse().to_cols_array_2d();
         frame_uniform.noise[0] = self.shading_noise_step();
+        // Hair cards' hashed alpha (hair.wgsl) only while TAA averages it.
+        frame_uniform.noise[1] = f32::from(u8::from(self.taa_on()));
         (frame_uniform.environment, frame_uniform.sky_light) = self.environment.uniform();
         let sky_colors = [
             &mut frame_uniform.sky_top,
@@ -1203,9 +1209,9 @@ impl ScenePipeline {
             let groups: Vec<_> = view
                 .groups
                 .iter()
-                .map(|(mesh, range)| {
+                .map(|(group, range)| {
                     (
-                        *mesh,
+                        *group,
                         range.start + instance_count..range.end + instance_count,
                     )
                 })
@@ -1549,11 +1555,33 @@ impl ScenePipeline {
             pass.set_bind_group(0, &self.shadow_bind_group, &[offset]);
             pass.set_bind_group(1, &self.skinning.empty, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            // Which caster group's pipeline and material are bound: a
+            // cut-out's are its own, every other caster's the plain ones.
+            let mut bound: Option<u32> = None;
             // See-through items, and parts with `CastShadow` off, cast no shadow.
-            for (mesh, instances) in casters {
+            for ((mesh, cut_out), instances) in casters {
                 let Some(mesh) = self.gpu_mesh(*mesh) else {
                     continue;
                 };
+                if *cut_out != bound {
+                    match cut_out {
+                        Some(material) => {
+                            let gpu = uses
+                                .materials
+                                .get(*material as usize)
+                                .and_then(|key| self.materials.get(key))
+                                .and_then(|cached| cached.gpu.as_ref())
+                                .unwrap_or(&self.plain_material);
+                            pass.set_pipeline(&self.shadow_cut_out_pipeline);
+                            pass.set_bind_group(1, &gpu.bind_group, &[]);
+                        }
+                        None => {
+                            pass.set_pipeline(&self.shadow_pipeline);
+                            pass.set_bind_group(1, &self.skinning.empty, &[]);
+                        }
+                    }
+                    bound = *cut_out;
+                }
                 pass.set_bind_group(2, self.skin_group(mesh), &[]);
                 pass.set_vertex_buffer(0, mesh.vertices.slice(..));
                 pass.set_index_buffer(mesh.indices.slice(..), mesh.index_format);
@@ -2388,16 +2416,19 @@ impl ScenePipeline {
     /// Without TAA it's 0: nothing would average a moving turn, so it
     /// would flicker, and a still scene draws the same pixels every frame.
     pub(super) fn shading_noise_step(&self) -> f32 {
-        let taa = self
-            .frame_targets
-            .temporal
-            .as_ref()
-            .is_some_and(|temporal| temporal.has_taa());
-        if taa {
+        if self.taa_on() {
             (self.history.frame_index() % 64) as f32
         } else {
             0.0
         }
+    }
+
+    /// Whether TAA blends this frame with the last ones.
+    fn taa_on(&self) -> bool {
+        self.frame_targets
+            .temporal
+            .as_ref()
+            .is_some_and(|temporal| temporal.has_taa())
     }
 
     /// How many sets of scene targets are alive: 1, unless one leaked.

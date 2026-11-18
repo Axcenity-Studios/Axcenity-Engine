@@ -1,0 +1,190 @@
+# Hand-back: R10, the Game Editor round trip, OPEN-21, OPEN-22 and R10's tests (`r10-roundtrip`)
+
+Branch `r10-roundtrip` from `main` (waves 1 to 3, PR #427). RA1 with the lead's part delegated: plan 11.5 R10's remaining work (brief §11, §12, §15, §18 Stage 10 "Complete Game Editor integration"), CO13, MAP-S10-08, OPEN-21 and OPEN-22. RED run: [r10-roundtrip-red-run.txt](r10-roundtrip-red-run.txt).
+
+## What it does
+
+1. **The round trip** (MAP-S10-08). The Explorer's right-click menu on a character, its body or one of its parts offers **Edit in Character Studio** (`character_workspace/game.rs`'s `editable_character`: a Model with a Humanoid and a skinned body that keeps a description, or that draws one of the engine's character models; an imported character isn't offered, since Done would put the engine's body in place of its own). The studio opens on the character's description (the kept one; for a character made before descriptions, the stylized default character named after it) in place of the Game Editor's panels. Its toolbar shows **Cancel** in Home's place and **Done** beside Save; Save still saves a copy into the studio's characters. Done gives the project's library what the character wears (from the studio's library: both families and a person's own items), applies the description with the Character Runtime's applier and records it as **one undo step**, "Edit <name> in Character Studio" (`History::record_world`). Play shows it because the description is kept in the character. If applying fails the studio stays open and says why. While a game's character is open, the studio's autosave is off and its recovery file is left alone. The title is "<character> - Character Studio - <project>".
+2. **OPEN-21: edit mode shows described characters** (`app/edit_characters.rs`). Each edit frame (never during Play) the editor steps a `DescriptionSync` of its own with no game system: it applies the kept descriptions this run hasn't applied, which registers the identity in the editor's `Assets` and puts on the parts. It then poses the described characters **at rest** (the A-pose, the studio's Still) with the identity worn live (ADR-0041). Each character is copied into a World of its own, its Animators are emptied (no state machine; Animations, IKControls, Ragdolls and FaceControls removed), `anim`'s Animators pose it at `dt` 0, and the poses are mapped back to the editor's Instances for the viewport (`ViewportScene::poses` in edit mode). The parts that follow the body are placed on it as Play places them. Posing runs again only when a described character's Instances change (a hash of their revisions) or a model is still loading. What edit mode applies or places is done `World::unrecorded`, so Collaborate doesn't send it. For a world saved after its description was applied this changes nothing in the world, so nothing becomes unsaved (tested).
+3. **OPEN-22: both families in every project, the realistic body the default game character** (decision 7; `crates/project/src/game_character.rs`):
+   - `add_default_game_character(project, shipped)` writes the built-in stylized package, copies the engine's shipped packages (`add_both_character_libraries`; the folder is found by `shipped_character_library`: the working folder, then a folder above the program), then writes the `Character` prefab as the realistic character (`described_character`: the default humanoid's Model with a `HumanoidDescription` named `HumanoidDescription` in its Humanoid, `Base` `axcenity/realistic`, `Data` the family's default character from `game_character_description`).
+   - New projects from the character templates (`create_project_from`) and the editor's Insert > Character use it. Insert > Character also applies the description at once, in the insert's undo step, named like the instance.
+   - Without the shipped folder the prefab stays the stylized character. Files already there are kept, so an older project keeps its prefab and its characters and only gains the realistic family. The stylized family stays selectable in the studio (New, the Body page's Family chips).
+   - The editor's `find_character_library` now asks `project::shipped_character_library` first, then a debug build's source tree.
+4. **R10's Done-when tests.** Insert, edit, return, play (below). Randomize on both shipped families over every scope, with locks: see "Tests". What existed: `shipped_library.rs`'s `a_thousand_random_characters_on_each_shipped_base_are_sound` (1,000 seeds per base, `Scope::All` only, one parameter lock, realistic only) and `avatar`'s unit tests in `tests/randomizing.rs` (fixtures, every scope, locks). What was missing and is added: every scope on the shipped libraries, both families, presets as starting points, a different lock set each seed, and slot locks.
+5. **Save and open polish found while doing this:**
+   - **The studio's Ctrl+Z, Ctrl+Shift+Z and Ctrl+S were taken by the Game Editor first.** `EditorApp::frame` consumed Ctrl+S (`self.save()`) and ran the Game Editor's shortcuts (Ctrl+Z, Ctrl+Y, Delete, tools…) before the workspace drew. Over a project this would have undone or saved the game's world. While the workspace is open the Game Editor's save and shortcuts are now skipped. Tested with a project (`the_studios_keys_reach_it_inside_the_editor`). By reading the code, the same consumption happened with no project open, so the studio's Ctrl+Z and Ctrl+S were dead in the real app (the studio's own tests drive `Intent`s, so they never saw it). The gate covers that case too, but I didn't write a no-project test.
+   - **Save could delete another session's recovery file.** `save_reporting` always removed `recovery/character.json`, even in a workspace that never autosaves (the start page's painter, and now a game's character). It now removes the file only when the workspace autosaves.
+   - The round trip never reads, offers or writes the studio's recovery file (`cancel_leaves_the_game_character_as_it_was` checks the file never appears).
+
+## Interfaces
+
+- `axcenity_project`: `DEFAULT_GAME_BASE`, `KEPT_DESCRIPTION`, `shipped_character_library()`, `add_both_character_libraries(project, shipped) -> Library`, `game_character_description(&Library) -> Option<Description>`, `described_character(world, position, &Description) -> InstanceId`, `add_default_game_character(project, shipped) -> &'static str`. `add_default_humanoid` is unchanged (the studio folder and the capture stage still use it).
+- Editor: `character_workspace::game::{GameLink, editable_character, game_description}`, `CharacterWorkspace::open_for_game`, `CharacterWorkspace::game()`; `Intent::Done`, `Intent::Cancel` (in `intent.rs`, a lead contract file: two variants added, nothing changed); `WorkspaceAction::Done`, `WorkspaceAction::Cancel`; `explorer::Action::EditInCharacterStudio`.
+- No change to `avatar`'s schemas, the description format or any enum in a file. `architecture.md` §15 and §16 describe the default game character and edit mode.
+
+## Files changed
+
+- New: `crates/project/src/game_character.rs`, `crates/editor/src/app/character_round_trip.rs`, `crates/editor/src/app/edit_characters.rs`, `crates/editor/src/app/round_trip_tests.rs`, `crates/editor/src/character_workspace/game.rs`.
+- Changed:
+  - Project: `crates/project/src/{lib.rs, templates.rs}`.
+  - Editor: `crates/editor/src/{app.rs, explorer.rs, character_workspace.rs}`, `crates/editor/src/app/{character_workspace.rs, session.rs, tree_ops.rs, chrome/panes.rs}`, `crates/editor/src/character_workspace/{intent.rs, shell.rs, toolbar.rs}`.
+  - Tests: `crates/avatar/tests/shipped_library.rs` (a test added), `crates/player/src/default_humanoid_tests.rs` (see "Tests changed").
+  - `Cargo.toml` (dev profile, see "Measurements").
+  - Docs: `docs/editor/character-studio.md`, `docs/development/character-studio/architecture.md`, `wiki/Engine-Systems/Characters.md`, `wiki/Roadmap/Known-Limitations.md`, `crates/editor/CLAUDE.md`, `crates/project/CLAUDE.md`.
+- No dependency added. No generated file regenerated (none touched).
+
+## Tests written and run
+
+- `axcenity-project` `game_character::tests` (5):
+  - the engine's library is found from a test;
+  - a new project has both families and a realistic described `Character` prefab that validates;
+  - without the shipped library the prefab stays stylized;
+  - an older project keeps its prefab byte for byte and gains the realistic family;
+  - a described character keeps its description in its Humanoid.
+- `axcenity-editor` `app::round_trip_tests` (8):
+  - Insert > Character is realistic with both families, applied, one undo step;
+  - an older project (hello-character) keeps its character's whole tree and its prefab and gains the realistic family;
+  - **insert, edit, return, play**: Edit in Character Studio from the Explorer's test; Done and Cancel drawn and no Game Editor menus; `fat` 0.8 in the studio; Done; one step labelled "Edit Character in Character Studio"; undo and redo; Play: the game's kept description has `fat` 0.8, the body's `Identity` key is the resolved identity's, and its pose is morphed;
+  - Cancel changes nothing, adds no step and leaves the studio's recovery file alone;
+  - a character without a description opens on the stylized family named after itself, and an imported one isn't offered;
+  - OPEN-21: a saved described character reopened in a new run is unregistered before a frame; after one edit frame its identity is registered, the body is posed with its shapes, every part follows, the world isn't unsaved, and a second frame doesn't pose again;
+  - OPEN-21 drawn on the GPU (below);
+  - the studio's keys inside the editor.
+- `axcenity-avatar` `shipped_library::every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks`:
+  - For each family, 1,000 seeds spread over everything, each of the six categories, every feature and a parameter list.
+  - Starting points: the family's default character and each of its presets.
+  - Locks: about one parameter in seven and one slot, different each seed.
+  - Every character validates and resolves with no problem; locked parameters and the locked slot never change; All, Body and Face draw something new.
+- Summary lines:
+  - RED: `13 tests run: 2 passed, 11 failed` (the file explains each).
+  - GREEN, after the changes: `cargo nextest run -p axcenity-editor -p axcenity-project -p axcenity-avatar -p axcenity-gameplay -p axcenity-player -p axcenity-testing --no-fail-fast`: `Summary [ 206.933s] 2081 tests run: 2081 passed (18 slow), 31 skipped`, `every_example_renders` among them (38 s). No ABORT lines.
+  - After the last edit (edit mode's changes made unrecorded): `113 tests run: 113 passed` (round trip and the workspace's tests).
+  - `cargo clippy -p axcenity-editor -p axcenity-project -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings`: clean. `cargo fmt --all` run. `python3 -I scripts/check-wiki.py`: `114 pages, 0 errors, 58 warnings` (the warnings were there before).
+- The earlier full run had two failures that weren't mine:
+  - `axcenity-testing tests::tests_leave_the_project_files_alone_even_when_they_save_and_destroy` failed under load and passes alone (6.5 s).
+  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved` (hello-part, no character) failed twice: "Auto" checkpoint found where "Closing" was expected. It passed in the final run (79 s). It is a timing test on a project my change doesn't touch.
+
+### Tests changed deliberately (they depended on the stylized default)
+
+- `player`'s `default_humanoid_tests` (`Game::new`, 7 tests failed: parts following the body, sockets, body sliders, an item's own parameters as live weights, `Players:CreateHumanoidModelFromDescription`, a script-changed description). These tests are about the **stylized default humanoid** (its `HUMANOID_PARTS`, sockets and sliders) and built their game from the Baseplate template's starter character. That character now wears the realistic description. `Game::new` now takes the kept description out of the starter character, which leaves the stylized default character underneath, as these tests had before. They test what they always tested; the realistic default is tested by the new tests.
+- `every_example_renders`: no change needed (examples carry their own files and don't use the templates).
+
+## Measurements
+
+- **Game tests got slower with the realistic default, so two crates are optimized in debug builds.** The editor's `every_genre_templates_tests_pass_in_the_tests_panel_as_on_the_command_line` timed out at nextest's 120 s. Run alone with no limit it took **269.7 s**: each game test spawns the realistic character, which reads the 40 MB `RealisticParts.glb` (181 shapes) and poses it in unoptimized `assets` and `anim`. With `[profile.dev.package.axcenity-assets]` and `axcenity-anim` at `opt-level = 3` (`Cargo.toml`, beside the existing per-package lines) it took **51.6 s** alone and 79.7 s in the full run. Every debug build and test reading or posing a model benefits. The cost is that those two crates compile optimized in dev builds. The lead may prefer another remedy, such as a model cache shared across a test run's games; see "At merge".
+- Insert > Character in a debug build: about 2 to 3 s the first time in a run, before the profile change. It reads both bodies' models, because the applier refits from the stylized body's skeleton to the realistic one's. This is in the round-trip tests' times: 2.5 to 3.5 s each, project creation included.
+- A new project now copies the realistic package, 40.4 MB, into `assets/characters/realistic/`.
+
+## Visual evidence and what I saw
+
+Sheet: [r10-roundtrip/edit-mode-before-now-play.jpg](r10-roundtrip/edit-mode-before-now-play.jpg) (each frame also on its own beside it). The test `edit_mode_draws_the_described_character` makes a project, inserts the character, sets `fat` 0.8 and `muscle` 0.3 in the studio, presses Done, saves, then reopens the project in a new run. It renders the character offscreen from the front three-quarter (480 × 640):
+
+- **Before** (the editor as it drew before this change, no edit-mode step): the base realistic body, lean, at its bind pose. Its parts are heaped at its feet as a torn, inside-out tangle of black, white and red surfaces, because nothing placed them. The underwear isn't on the body. This is OPEN-21 as reported, and worse: the parts aren't only unshaped, they're misplaced.
+- **Now** (edit mode): the heavy body with a belly, fuller face, arms and thighs, wearing the black boxer briefs at the waist. It stands in the A-pose and casts a shadow on the baseplate. 17.9% of the frame's pixels differ from Before (a channel moving by more than 15).
+- **Play** (0.5 s in, idling): the same body, face and briefs in the Idle pose. It differs from edit mode by 11.9%, all of it pose (arms down, weight shift). Cropped faces side by side (edit, play) show the same face: eyes, brows and the fuller cheeks and jaw are identical. The skin and briefs shade the same.
+- Honestly: the A-pose is the rest pose, not a natural standing pose. A scene full of edit-mode characters will look like a fitting room until Play. Posing at Idle's first frame would read more natural but would load clips in edit mode; I left that for the lead's call.
+
+## Open issues
+
+- **Randomize draws draft items.** Plan 11.3 says drafts never enter defaults, presets or randomization. `avatar::randomize` doesn't look at `quality`, and every stylized item has none, so all count as drafts by the contract. Filtering drafts would leave the stylized family with nothing to wear when randomized. Not changed here: the lead's contract call.
+- **A slot a parameter's choices fill can't be locked** (the realistic underwear follows the frame): by contract. The studio offers no slot locks; the new test leaves those slots out.
+- Edit mode poses only described characters, and only at rest: no Idle, no expression, and accessories on sockets aren't placed (only Play's Animators place sockets). A character without a description still draws its unposed model, as before.
+- An older project's players stay stylized: its `Character` prefab is never rewritten (decision: "existing projects keep what they use"). A person who wants the realistic players must replace the prefab, for example by inserting a character, editing it and saving it as the prefab. No one-click way yet.
+- **Cancel discards the studio's changes without asking.**
+- Collaborate: edit mode's parts are made unrecorded (local IDs). A later recorded Done on the same character edits those parts, and I haven't tested how a session sends edits to Instances with local IDs.
+- The studio's Ctrl+Z and Ctrl+S with no project: fixed by the same gate, untested (see "What it does", item 5).
+- Not in this task and still open in R10: "comparison complete" and user presets and favourites beyond R1's.
+- `audit-plan-status.md`'s rows OPEN-21, OPEN-22 and MAP-S10-08 still say missing or partial; I didn't edit the audit, which is the lead's record.
+
+## For the lead at merge
+
+- Generated files: none touched or regenerated.
+- `Cargo.toml`'s two new `[profile.dev.package.*]` entries: keep them, or replace them with your remedy for the game tests' time. Without them, `every_genre_templates_tests_pass_in_the_tests_panel_as_on_the_command_line` times out under nextest.
+- `intent.rs` gained `Intent::Done` and `Intent::Cancel`; `shell.rs` maps them to new `WorkspaceAction`s. Other branches that add `Intent` variants will conflict there, in one line each.
+- `CharacterWorkspace` gained one field (`game`) and its line in `open`'s struct literal: a one-line conflict with any branch that adds a field.
+- Tracks that create projects from templates in their tests now get the realistic starter character. A test about the stylized default humanoid should take the kept description out, as `player`'s `default_humanoid_tests` now does.
+- `progress.md` and the audit rows (OPEN-21, OPEN-22, MAP-S10-08) are yours to update.
+
+## Review fixes 1
+
+All three blocking items are fixed.
+
+1. **OPEN-21 came back after reopening a project in the same run.** `EditCharacters` (its `DescriptionSync`, poses and stamp) outlived the world and `Assets` it belonged to. A reopened world reuses the same Instance IDs, so its description counted as already worn and the identity was never registered in the new `Assets`. The fix is in `EditorApp::replace_world` (`app/session.rs`): it now resets `*self.edit_characters`. Every path that replaces the world goes through `replace_world`: opening a project (after its new `Assets` are set), closing one, a file-watch reload, and the three team paths. The only other places that set `self.assets` (`open_loaded` and `finish_closing_project`) both call `replace_world` afterwards.
+   - Test first: `round_trip_tests::a_described_character_shows_its_identity_after_reopening_in_the_same_run`. It saves a character with fat 0.8 and opens the project. One edit frame wears the identity. It then calls `app.open(&folder)` again, runs a frame, and checks that the identity is in the new `Assets` and that the body is posed with its shapes. RED: it failed with "second open in the same run: the identity is worn in the new Assets" (appended to `r10-roundtrip-red-run.txt`). GREEN after the fix.
+2. **Space runs in user-visible strings.** I restored the `\` line continuations in `tree_ops.rs` (the existing "Added the default humanoid…" Output message and the new realistic-family message) and in `explorer.rs` (the Edit in Character Studio tooltip). The reviewer's check, `git diff main -U0 -- '*.rs' | grep -E '"[^"]*[a-z,;.)]          +[a-z(`]'`, now prints nothing. The same grep over the whole crate still finds four strings that are **already broken on main** and were not changed here: `app/solid.rs:96` and `:99` (the Group as Mesh and Ungroup Mesh tooltips), and `explorer.rs:764` and `:1481`. They belong to another owner, so I left them for the lead.
+3. **Stale topic docs.** `docs/project/templates.md` now says the character templates get `project::add_default_game_character`: both families in `assets/characters/` (the realistic package is about 40 MB), and the `Character` prefab is the realistic described character, or the stylized one only when the shipped library isn't found. It links `docs/editor/character-studio.md`. `docs/scripting/api-character.md` now says Insert ▸ Character places the realistic described character, applied in the same undo step (decision 7). The page points to Edit in Character Studio and notes that the stylized family stays selectable. Its StarterCharacter bullet no longer calls the prefab "the default humanoid". `docs/editor/character-studio.md` lists the new test.
+
+Tests run:
+- `cargo nextest run -p axcenity-editor -p axcenity-project --no-fail-fast`: `Summary [119.156s] 1655 tests run: 1655 passed (13 slow), 11 skipped`. No FAIL or ABORT lines.
+- `cargo clippy -p axcenity-editor -p axcenity-project --all-targets -- -D warnings`: clean.
+- `cargo fmt --all`.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all there before).
+
+I didn't act on the non-blocking items: the draft default outfit, Done copying the whole studio library, the single entry point, edit-mode cost, Quit with the studio open, Collaborate IDs, the opt-level profile entries, and the order of the shipped-library lookup. They stay as open issues for the lead.
+
+## Review fixes 2
+
+Both blocking items are fixed. Tests were written first; the red run is appended to `r10-roundtrip-red-run.txt`.
+
+1. **Edit mode stopped showing a described character after a recorded step put back its unshown state with the same `Data`** (Revert all on a placed copy; an undo to a whole-world snapshot taken before edit mode showed it).
+   - Cause: `DescriptionSync` remembers each description by its Instance ID and its `(Base, Data)`. A recorded step that removes what applying put on, but leaves `Base` and `Data` alone, looks already applied to it.
+   - Fix: `gameplay` gains `DescriptionSync::forget(description)`, an additive change recorded in `architecture.md`. `EditCharacters` (`app/edit_characters.rs`) keeps what each character showed after its last step. That record, `Showing`, holds the body, the body's `MeshId` and `Identity` attribute, and the body's `DescriptionPart` children. Before each step, a character whose showing changed is forgotten, so the step applies it again. A description that couldn't be applied shows the same each frame, so its error is still said only once.
+   - I chose this over the suggested check (identity key missing or not registered, or MeshId outside the library). That check would retry a failing description every frame. It would also miss a step that keeps the body but takes away the parts.
+   - One consequence, now documented: changing what the applier owns by hand (the body's `MeshId`, a description part) doesn't stick while the character keeps a description. Play has always done the same.
+2. **An untouched placed copy of the described `Character` prefab showed false overrides.** They were the Body's `MeshId`, `Position` and `Size`, its attributes, and seven added parts.
+   - I chose neither of the reviewer's options as written, but a variant of (a) done in memory. Edit mode shows a copy's **source** the same way it shows the copy: applied and posed at rest, in memory, never written to the file.
+   - That shown source is set on the copy's prefab link with `World::set_prefab`, which is not recorded, sent or saved.
+   - A shown source is made once per source `Arc`, and kept while a copy or an undo step holds it. A source whose models are still loading is tried again next frame.
+   - Why not (a), writing the file applied:
+     - it would cover only prefabs the editor writes, not projects made by `create_project_from` (tests, tools);
+     - edit mode's posed placement of the parts (`Size`, `Position`, `Orientation`) would still show as overrides, unless the editor also posed the character when writing the file.
+   - Why not (b), filtering the diff:
+     - it would teach `core`'s prefab diff about `gameplay`'s `DescriptionPart`;
+     - it can't ignore the Body's `Position`. That is a real placement override when a copy is moved, and the applier's refit also changes it.
+   - The result:
+     - A copy nobody changed has no overrides. Properties marks no Body property, and the Prefab menu offers nothing.
+     - Revert all puts back the shown prefab.
+     - Saving writes only the person's changes. The file stays free of derived values, and the copy is shown again on reopening.
+     - Apply to prefab now writes the copy as shown, so the prefab file then holds the applied character. A prefab made from a shown character already did this. It is noted in `docs/editor/character-studio.md`.
+
+New tests in `app/round_trip_tests.rs`:
+- `a_placed_described_prefab_copy_has_no_overrides_from_edit_mode`:
+  - It places the prefab as the asset browser does, saves, and shows it.
+  - The overrides equal `placement_only()`.
+  - The Body's own overrides (`prefab::place(..).here()`) have no properties, attributes or added children.
+  - The world is not unsaved.
+  - After a rename, a save and a reopen, the copy is shown again, and its overrides are still at most placement and the name.
+- `revert_all_on_a_placed_described_copy_keeps_it_shown` is the reviewer's repro. After Revert all, the body draws the library's model, its identity is registered, its parts are on and it is posed.
+- `undo_and_redo_of_placing_a_described_copy_keep_it_shown` covers undo and redo of a placement, which is a tree step.
+  - It **passed before the fix**. Undo takes the copy out of the Workspace, so the sync drops it, and redo puts it back to be applied again.
+  - The whole-world path the reviewer reasoned about is the next test.
+- `a_whole_world_undo_to_before_it_was_shown_shows_it_again` records a whole-world step whose "before" was taken before edit mode showed the copy. Undo puts back the unshown copy (the test checks this), and the copy is shown again. Redo also leaves it shown.
+
+Test runs:
+- RED: `4 tests run: 1 passed, 3 failed`. Revert all and the whole-world undo each left `assets/models/Humanoid/Humanoid.glb`. The overrides test listed the Body overrides above.
+- GREEN: `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/round_trip_tests::/)'` gives `13 tests run: 13 passed`.
+- `cargo nextest run -p axcenity-editor -p axcenity-gameplay -p axcenity-project --no-fail-fast` gives `Summary [106.177s] 1702 tests run: 1700 passed (10 slow), 2 failed, 11 skipped`. There were no ABORT or TIMEOUT lines. The two failures:
+  - `app::tests::the_view_mode_changes_the_viewport_at_once_and_lit_comes_back`, GPU timing ("lit comes back");
+  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, the known load-timing test on hello-part, which has no character.
+  - Rerun alone: `2 tests run: 2 passed`.
+- `cargo clippy -p axcenity-editor -p axcenity-gameplay -p axcenity-project --all-targets -- -D warnings`: clean.
+- `cargo fmt --all`.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all there before).
+- The grep for runs of spaces over the diff prints nothing.
+
+Docs:
+- `docs/editor/character-studio.md`: edit mode under recorded steps, placed prefab copies, and the new tests.
+- `docs/development/character-studio/architecture.md`: `DescriptionSync::forget`, and how edit mode handles recorded steps and prefab copies.
+
+Still open for the lead (non-blocking, not done):
+- The default outfit is a draft item. It needs an asset-quality exemption, or the briefs must reach production quality.
+- `GameLink` stores a bare `InstanceId` across `replace_world`.
+- No test drives Done through the toolbar.
+- Cancel and Quit don't ask before discarding.
+- Done copies the whole studio library.
+- Edit-mode cost isn't measured. It now also includes one cloned, applied and posed source per prefab source that holds a described character. That source is made once, or each frame while its models load.
+- The dev-profile opt-levels.
+- Collaborate IDs for parts made in edit mode.
+
+Merge note: `EditCharacters::step` now finds the described characters before applying, and `pose` became the free function `pose_at_rest`.

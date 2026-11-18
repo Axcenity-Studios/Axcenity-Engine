@@ -141,9 +141,22 @@ impl Game {
         )
         .unwrap();
         let mut world = axcenity_project::load(&folder).unwrap().world;
-        axcenity_project::load_starter_character(&folder, &mut world)
+        let starter = axcenity_project::load_starter_character(&folder, &mut world)
             .unwrap()
             .expect("the template names the Character prefab");
+        // These tests are about the stylized default humanoid (its parts,
+        // sockets and sliders). Since R10 a new project's players wear the
+        // realistic description (decision 7, OPEN-22): taking it out gives
+        // the stylized default character underneath, as before.
+        let humanoid = world.find_first_child(starter, "Humanoid").unwrap();
+        let kept: Vec<InstanceId> = world.get(humanoid).unwrap().children().to_vec();
+        for id in kept {
+            if world.get(id).map(|i| i.class())
+                == Some(axcenity_core::ClassName::HumanoidDescription)
+            {
+                world.destroy(id).unwrap();
+            }
+        }
         let assets = Assets::new(&folder);
         let mut scripts = axcenity_sim::script_runtime();
         scripts.set_assets(assets.clone());

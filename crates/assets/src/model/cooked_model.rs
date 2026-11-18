@@ -22,8 +22,9 @@ use glam::{Mat4, Quat, Vec3};
 
 use super::stamped::Cache;
 use super::{
-    AlphaMode, Bone, BoneTransform, Channel, ChannelTexture, Image, ImageOrigin, Joint, Model,
-    ModelMaterial, ModelShading, MorphTarget, Primitive, PrimitiveMorph, Rig, new_key,
+    AlphaMode, Anisotropy, Bone, BoneTransform, Channel, ChannelTexture, Image, ImageOrigin, Joint,
+    Model, ModelMaterial, ModelShading, MorphTarget, Primitive, PrimitiveMorph, Rig, Sheen,
+    new_key,
 };
 use crate::cooked::{self, SourceStamp, content_hash};
 
@@ -271,6 +272,11 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         shading,
         defined_normal_texture,
         skin_masks,
+        hair_data_texture,
+        hair_flow_texture,
+        sheen,
+        anisotropy,
+        hair_shell,
     } = material;
     out.text(name);
     out.floats(base_color);
@@ -304,12 +310,32 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
     out.u8(match shading {
         ModelShading::Standard => 0,
         ModelShading::Skin => 1,
+        ModelShading::Hair => 2,
+        ModelShading::Cloth => 3,
     });
     images.write(out, defined_normal_texture.as_ref());
     out.u8(skin_masks.len() as u8);
     for mask in skin_masks {
         images.write(out, Some(mask));
     }
+    images.write(out, hair_data_texture.as_ref());
+    images.write(out, hair_flow_texture.as_ref());
+    match sheen {
+        Some(sheen) => {
+            out.u8(1);
+            out.floats(&sheen.colour);
+            out.floats(&[sheen.roughness]);
+        }
+        None => out.u8(0),
+    }
+    match anisotropy {
+        Some(anisotropy) => {
+            out.u8(1);
+            out.floats(&[anisotropy.strength, anisotropy.rotation]);
+        }
+        None => out.u8(0),
+    }
+    out.u8(u8::from(*hair_shell));
     Some(())
 }
 
@@ -745,6 +771,8 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     let shading = match input.u8()? {
         0 => ModelShading::Standard,
         1 => ModelShading::Skin,
+        2 => ModelShading::Hair,
+        3 => ModelShading::Cloth,
         _ => return None,
     };
     let defined_normal_texture = image(input)?;
@@ -752,6 +780,24 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     for _ in 0..input.u8()? {
         skin_masks.push(image(input)??);
     }
+    let hair_data_texture = image(input)?;
+    let hair_flow_texture = image(input)?;
+    let sheen = match input.u8()? {
+        0 => None,
+        _ => {
+            let colour = input.floats()?;
+            let [roughness] = input.floats()?;
+            Some(Sheen { colour, roughness })
+        }
+    };
+    let anisotropy = match input.u8()? {
+        0 => None,
+        _ => {
+            let [strength, rotation] = input.floats()?;
+            Some(Anisotropy { strength, rotation })
+        }
+    };
+    let hair_shell = input.bool()?;
     Some(ModelMaterial {
         name,
         base_color,
@@ -780,6 +826,11 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         shading,
         defined_normal_texture,
         skin_masks,
+        hair_data_texture,
+        hair_flow_texture,
+        sheen,
+        anisotropy,
+        hair_shell,
     })
 }
 
@@ -930,7 +981,12 @@ mod tests {
                         .skin_masks
                         .iter()
                         .map(|mask| image(&Some(mask.clone())))
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>(),
+                    image(&material.hair_data_texture),
+                    image(&material.hair_flow_texture),
+                    material.sheen,
+                    material.anisotropy,
+                    material.hair_shell,
                 ),
                 primitive.lods.len(),
                 "",
@@ -975,6 +1031,55 @@ mod tests {
             let again = cooked.model_blocking(model).unwrap();
             assert_eq!(describe(&again), describe(first), "{model}");
             assert_ne!(again.key(), first.key());
+        }
+        let _ = fs::remove_dir_all(project);
+    }
+
+    #[test]
+    fn a_cooked_model_keeps_its_hair_and_cloth_materials() {
+        let project = std::env::temp_dir().join(format!(
+            "axcenity-cooked-model-hair-cloth-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&project);
+        let folder = project.join("assets/models");
+        fs::create_dir_all(&folder).unwrap();
+        let cloth = crate::model::tests::pyramid_with(
+            r#"{"axcenity_shading": "cloth"}"#,
+            r#"{"KHR_materials_sheen": {"sheenColorFactor": [0.5, 0.25, 1.0],
+                                        "sheenRoughnessFactor": 0.3},
+                "KHR_materials_anisotropy": {"anisotropyStrength": 0.6}}"#,
+        );
+        let hair = crate::model::tests::pyramid_with(
+            r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 0},
+                "axcenity_hair_flow": {"index": 0}, "axcenity_hair_shell": true}"#,
+            "",
+        );
+        // Its texture as a file of its own: a model with embedded maps
+        // isn't kept until they're cooked.
+        let external = |text: String| {
+            let mut file: serde_json::Value = serde_json::from_str(&text).unwrap();
+            let uri = file["images"][0]["uri"].as_str().unwrap().to_owned();
+            fs::write(
+                folder.join("pyramid.png"),
+                crate::model::data_uri(&uri).unwrap(),
+            )
+            .unwrap();
+            file["images"][0] = serde_json::json!({ "uri": "pyramid.png" });
+            file.to_string()
+        };
+        fs::write(folder.join("cloth.gltf"), external(cloth)).unwrap();
+        fs::write(folder.join("hair.gltf"), external(hair)).unwrap();
+        for model in ["assets/models/cloth.gltf", "assets/models/hair.gltf"] {
+            let first = Assets::new(&project).model_blocking(model).unwrap();
+            assert!(read(&project, model, "").is_some(), "{model}");
+            let again = Assets::new(&project).model_blocking(model).unwrap();
+            assert_eq!(describe(&again), describe(&first), "{model}");
+            // The hair is marked a shell over the head, and stays one.
+            let shell = model.ends_with("hair.gltf");
+            for primitive in &again.primitives {
+                assert_eq!(primitive.material.hair_shell, shell, "{model}");
+            }
         }
         let _ = fs::remove_dir_all(project);
     }

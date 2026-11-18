@@ -1,0 +1,184 @@
+{
+ "rest_pairs": 1,
+ "mouth_height+1_pairs": 1,
+ "philtrum-1_pairs": 1,
+ "both_pairs": 5,
+ "new": [
+  {
+   "pair": [
+    8524,
+    14094
+   ],
+   "centre_rest_mm": [
+    -28.05,
+    -141.05,
+    1560.65
+   ],
+   "rest_gap_mm": 0.1,
+   "to_seal_mm": [
+    7.26,
+    7.3
+   ],
+   "to_lips_inner_edge_mm": [
+    0.86,
+    1.14
+   ],
+   "crossing_points_posed_mm": [
+    [
+     -27.43,
+     -140.19,
+     1570.2
+    ],
+    [
+     -27.49,
+     -140.19,
+     1570.2
+    ],
+    [
+     -27.55,
+     -140.2,
+     1570.19
+    ],
+    [
+     -27.41,
+     -140.18,
+     1570.21
+    ]
+   ],
+   "in_alone_mouth_height": false,
+   "in_alone_philtrum": false
+  },
+  {
+   "pair": [
+    8525,
+    14094
+   ],
+   "centre_rest_mm": [
+    -28.45,
+    -141.13,
+    1560.59
+   ],
+   "rest_gap_mm": 0.1,
+   "to_seal_mm": [
+    7.95,
+    7.3
+   ],
+   "to_lips_inner_edge_mm": [
+    1.69,
+    1.14
+   ],
+   "crossing_points_posed_mm": [
+    [
+     -27.49,
+     -140.19,
+     1570.2
+    ],
+    [
+     -27.59,
+     -140.22,
+     1570.18
+    ],
+    [
+     -27.6,
+     -140.23,
+     1570.18
+    ],
+    [
+     -27.4,
+     -140.16,
+     1570.21
+    ]
+   ],
+   "in_alone_mouth_height": false,
+   "in_alone_philtrum": false
+  },
+  {
+   "pair": [
+    10419,
+    14589
+   ],
+   "centre_rest_mm": [
+    28.21,
+    -140.96,
+    1560.72
+   ],
+   "rest_gap_mm": 0.1,
+   "to_seal_mm": [
+    7.95,
+    6.98
+   ],
+   "to_lips_inner_edge_mm": [
+    1.69,
+    0.58
+   ],
+   "crossing_points_posed_mm": [
+    [
+     27.59,
+     -140.23,
+     1570.18
+    ],
+    [
+     27.5,
+     -140.2,
+     1570.2
+    ],
+    [
+     27.6,
+     -140.23,
+     1570.18
+    ],
+    [
+     27.31,
+     -140.15,
+     1570.24
+    ]
+   ],
+   "in_alone_mouth_height": false,
+   "in_alone_philtrum": false
+  },
+  {
+   "pair": [
+    10420,
+    14589
+   ],
+   "centre_rest_mm": [
+    27.8,
+    -140.89,
+    1560.77
+   ],
+   "rest_gap_mm": 0.1,
+   "to_seal_mm": [
+    7.26,
+    6.98
+   ],
+   "to_lips_inner_edge_mm": [
+    0.86,
+    0.58
+   ],
+   "crossing_points_posed_mm": [
+    [
+     27.5,
+     -140.2,
+     1570.2
+    ],
+    [
+     27.42,
+     -140.22,
+     1570.22
+    ],
+    [
+     27.55,
+     -140.2,
+     1570.19
+    ],
+    [
+     27.2,
+     -140.25,
+     1570.25
+    ]
+   ],
+   "in_alone_mouth_height": false,
+   "in_alone_philtrum": false
+  }
+ ]
+}

@@ -1,0 +1,257 @@
+CO7 hair and cloth (wave 4): the red run, before the Hair and Cloth models, hashed alpha and cut-out-aware shadow maps were built.
+Command: cargo nextest run -p axcenity-render --no-fail-fast -E 'test(/tests::(hair|cloth|alpha_cards)::/)'
+The API (Shading::Hair, Shading::Cloth, HairShading, ClothShading, SHADING_HAIR, SHADING_CLOTH) existed as stubs drawn as Standard.
+
+        FAIL [   0.090s] ( 1/15) axcenity-render renderer::tests::cloth::a_cloth_materials_sheen_and_anisotropy_ride_its_uniform
+    test renderer::tests::cloth::a_cloth_materials_sheen_and_anisotropy_ride_its_uniform ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 0.00s
+    thread 'renderer::tests::cloth::a_cloth_materials_sheen_and_anisotropy_ride_its_uniform' (30988) panicked at crates\render\src\renderer\tests\cloth.rs:41:5:
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [   8.249s] ( 2/15) axcenity-render renderer::tests::alpha_cards::a_clear_card_on_a_posed_part_casts_no_ray_traced_shadow_or_occlusion
+        FAIL [   0.081s] ( 3/15) axcenity-render renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places
+    test renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 0.00s
+    thread 'renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places' (15376) panicked at crates\render\src\renderer\tests\hair.rs:128:5:
+    assertion `left == right` failed: data in the metalness place
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   8.829s] ( 4/15) axcenity-render renderer::tests::alpha_cards::under_msaa_a_hair_cards_coverage_is_graded
+    test renderer::tests::alpha_cards::under_msaa_a_hair_cards_coverage_is_graded ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 8.68s
+    thread 'renderer::tests::alpha_cards::under_msaa_a_hair_cards_coverage_is_graded' (40980) panicked at crates\render\src\renderer\tests\alpha_cards.rs:143:5:
+    graded over 2 pixels: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 73.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 151.0, 152.0, 152.0, 153.0, 153.0, 153.0, 154.0, 154.0, 154.0, 155.0, 155.0, 155.0, 155.0, 156.0, 156.0, 156.0, 156.0, 156.0, 156.0, 156.0, 156.0, 155.0, 155.0, 155.0, 155.0, 155.0, 154.0, 154.0, 154.0, 154.0, 153.0, 153.0, 152.0, 152.0, 152.0, 152.0, 151.0, 151.0, 150.0, 150.0, 150.0, 149.0, 149.0, 149.0, 148.0, 107.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   9.626s] ( 5/15) axcenity-render renderer::tests::alpha_cards::a_striped_cards_shadow_is_striped_in_the_shadow_maps
+    test renderer::tests::alpha_cards::a_striped_cards_shadow_is_striped_in_the_shadow_maps ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 9.43s
+    shadow maps, hair false, posed false: 1 turns, 0..80
+    thread 'renderer::tests::alpha_cards::a_striped_cards_shadow_is_striped_in_the_shadow_maps' (34328) panicked at crates\render\src\renderer\tests\alpha_cards.rs:391:9:
+    hair false, posed false: a slab (1 turns)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   9.736s] ( 6/15) axcenity-render renderer::tests::cloth::anisotropy_stretches_the_highlight_along_its_direction
+    test renderer::tests::cloth::anisotropy_stretches_the_highlight_along_its_direction ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 9.43s
+    isotropic: 3.1 across, 3.1 down
+    along U: 3.1 across, 3.1 down
+    thread 'renderer::tests::cloth::anisotropy_stretches_the_highlight_along_its_direction' (26668) panicked at crates\render\src\renderer\tests\cloth.rs:140:5:
+    stretched along the tangent: 3.140526 vs 3.140526
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   9.745s] ( 7/15) axcenity-render renderer::tests::cloth::sheen_brightens_cloth_at_grazing_angles_and_not_head_on
+    test renderer::tests::cloth::sheen_brightens_cloth_at_grazing_angles_and_not_head_on ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 9.37s
+    sheen's light from the middle out: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    thread 'renderer::tests::cloth::sheen_brightens_cloth_at_grazing_angles_and_not_head_on' (33820) panicked at crates\render\src\renderer\tests\cloth.rs:94:5:
+    brighter at grazing angles: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   9.922s] ( 8/15) axcenity-render renderer::tests::alpha_cards::a_hair_card_under_taa_holds_still_with_soft_edges
+    test renderer::tests::alpha_cards::a_hair_card_under_taa_holds_still_with_soft_edges ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 9.45s
+    middle row, averaged: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 126.0, 126.0, 127.0, 127.0, 128.0, 128.0, 129.0, 129.0, 130.0, 130.0, 130.0, 130.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 131.0, 130.0, 130.0, 130.0, 130.0, 129.0, 129.0, 128.0, 128.0, 128.0, 127.0, 127.0, 126.0, 126.0, 125.0, 125.0, 124.0, 124.0, 124.0, 123.0, 123.0, 122.0, 122.0, 93.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    thread 'renderer::tests::alpha_cards::a_hair_card_under_taa_holds_still_with_soft_edges' (46328) panicked at crates\render\src\renderer\tests\alpha_cards.rs:117:5:
+    a soft edge over 1 pixels: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 125.66665, 126.04167, 126.66665, 127.0, 127.66665, 128.0, 129.0, 129.0, 129.66666, 130.0, 130.16667, 130.33334, 130.66666, 130.66666, 131.0, 131.33334, 131.33334, 131.33334, 131.33334, 131.16667, 131.0, 130.66666, 130.66666, 130.33334, 130.20834, 130.0, 129.66666, 129.0, 129.0, 128.33334, 128.0, 127.66665, 127.0, 126.66665, 126.12501, 125.66665, 125.0, 125.0, 124.33335, 123.79166, 123.66665, 122.66665, 122.66665, 122.0, 121.66665, 92.83333, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS [  10.217s] ( 9/15) axcenity-render renderer::tests::alpha_cards::a_striped_cards_ray_traced_shadow_is_striped_on_a_posed_part_too
+        PASS [  12.675s] (10/15) axcenity-render renderer::tests::alpha_cards::a_cut_out_card_on_a_skinned_morphed_part_shows_the_skin_behind_it
+        FAIL [   7.568s] (11/15) axcenity-render renderer::tests::hair::light_from_behind_comes_through_hair
+    test renderer::tests::hair::light_from_behind_comes_through_hair ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 7.39s
+    lit from behind: standard [0.0, 0.0, 0.0], hair [0.0, 0.0, 0.0]
+    thread 'renderer::tests::hair::light_from_behind_comes_through_hair' (39468) panicked at crates\render\src\renderer\tests\hair.rs:306:5:
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   8.015s] (12/15) axcenity-render renderer::tests::hair::melanin_redness_the_root_and_tip_and_streaks_change_the_pixels_live
+    test renderer::tests::hair::melanin_redness_the_root_and_tip_and_streaks_change_the_pixels_live ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 7.84s
+    thread 'renderer::tests::hair::melanin_redness_the_root_and_tip_and_streaks_change_the_pixels_live' (31396) panicked at crates\render\src\renderer\tests\hair.rs:347:9:
+    melanin darkens: [117.0, 91.0, 72.0] vs [117.0, 91.0, 72.0]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   7.735s] (13/15) axcenity-render renderer::tests::hair::the_primary_highlight_follows_the_strands_direction
+    test renderer::tests::hair::the_primary_highlight_follows_the_strands_direction ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 7.52s
+    strands down: spread 3.1 across, 3.0 down
+    thread 'renderer::tests::hair::the_primary_highlight_follows_the_strands_direction' (26052) panicked at crates\render\src\renderer\tests\hair.rs:274:5:
+    a band across the ball: 3.0557683 vs 2.9648602
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   7.846s] (14/15) axcenity-render renderer::tests::hair::the_primary_highlight_lies_toward_the_root_where_the_model_puts_it
+    test renderer::tests::hair::the_primary_highlight_lies_toward_the_root_where_the_model_puts_it ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 7.65s
+    shift 0: row 123.00, the model's 121.54 (3.88°)
+    shift 1: row 123.00, the model's 115.52 (7.52°)
+    thread 'renderer::tests::hair::the_primary_highlight_lies_toward_the_root_where_the_model_puts_it' (34196) panicked at crates\render\src\renderer\tests\hair.rs:175:9:
+    shift 1: the primary is at row 123.00; the model puts it at 115.52
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   7.850s] (15/15) axcenity-render renderer::tests::hair::the_secondary_highlight_lies_toward_the_tip_tinted_by_the_hairs_colour
+    test renderer::tests::hair::the_secondary_highlight_lies_toward_the_tip_tinted_by_the_hairs_colour ... FAILED
+    failures:
+    failures:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 415 filtered out; finished in 7.61s
+    secondary: row 197.50, the model's 127.62 (0.23°)
+    thread 'renderer::tests::hair::the_secondary_highlight_lies_toward_the_tip_tinted_by_the_hairs_colour' (45544) panicked at crates\render\src\renderer\tests\hair.rs:220:5:
+    the secondary is at row 197.50; the model puts it at 127.62
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        FAIL [   0.090s] ( 1/15) axcenity-render renderer::tests::cloth::a_cloth_materials_sheen_and_anisotropy_ride_its_uniform
+        FAIL [   0.081s] ( 3/15) axcenity-render renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places
+        FAIL [   8.829s] ( 4/15) axcenity-render renderer::tests::alpha_cards::under_msaa_a_hair_cards_coverage_is_graded
+        FAIL [   9.626s] ( 5/15) axcenity-render renderer::tests::alpha_cards::a_striped_cards_shadow_is_striped_in_the_shadow_maps
+        FAIL [   9.736s] ( 6/15) axcenity-render renderer::tests::cloth::anisotropy_stretches_the_highlight_along_its_direction
+        FAIL [   9.745s] ( 7/15) axcenity-render renderer::tests::cloth::sheen_brightens_cloth_at_grazing_angles_and_not_head_on
+        FAIL [   9.922s] ( 8/15) axcenity-render renderer::tests::alpha_cards::a_hair_card_under_taa_holds_still_with_soft_edges
+        FAIL [   7.568s] (11/15) axcenity-render renderer::tests::hair::light_from_behind_comes_through_hair
+        FAIL [   8.015s] (12/15) axcenity-render renderer::tests::hair::melanin_redness_the_root_and_tip_and_streaks_change_the_pixels_live
+        FAIL [   7.735s] (13/15) axcenity-render renderer::tests::hair::the_primary_highlight_follows_the_strands_direction
+        FAIL [   7.846s] (14/15) axcenity-render renderer::tests::hair::the_primary_highlight_lies_toward_the_root_where_the_model_puts_it
+        FAIL [   7.850s] (15/15) axcenity-render renderer::tests::hair::the_secondary_highlight_lies_toward_the_tip_tinted_by_the_hairs_colour
+
+
+== Review fixes 1: red run (before the fix) ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_tiled_cut_out_casts/)' --no-fail-fast
+
+    Starting 1 test across 1 binary (419 tests skipped)
+        FAIL (1/1) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+  stdout ───
+
+    running 1 test
+    test renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale ... FAILED
+
+    failures:
+
+    failures:
+        renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 419 filtered out; finished in 9.60s
+
+  stderr ───
+    tiled cut-out: 7 turns, 0..81
+
+    thread 'renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale' (4444) panicked at crates\render\src\renderer\tests\alpha_cards.rs:476:5:
+    holes at the untiled scale (7 turns)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary 1 test run: 0 passed, 1 failed, 419 skipped
+        FAIL (1/1) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+error: test run failed
+
+
+== Review fixes 1: the back-lit hair shell test, red (hair_shell disabled: the shader before the fix) ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_back_lit_hair_shells/)' --no-fail-fast
+
+    Starting 1 test across 1 binary (420 tests skipped)
+        FAIL (1/1) axcenity-render renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+  stdout ───
+    running 1 test
+    test renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator ... FAILED
+    failures:
+    failures:
+        renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 420 filtered out; finished in 5.64s
+  stderr ───
+    Off: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    Msaa4: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    thread 'renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator' (14828) panicked at crates\render\src\renderer\tests\hair.rs:558:5:
+    [
+        "Off: lit 21.073502 rows past the terminator",
+        "Off: a ragged edge (0.48)",
+        "Msaa4: lit 21.073502 rows past the terminator",
+        "Msaa4: a ragged edge (0.48)",
+    ]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+────────────
+     Summary 1 test run: 0 passed, 1 failed, 420 skipped
+        FAIL (1/1) axcenity-render renderer::tests::hair::a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator
+error: test run failed
+
+
+== Review fixes 1: a Standard cut-out casts its whole card (cut-out-aware shadows limited to Hair after the foliage bench), red ==
+
+cargo nextest run -p axcenity-render -E 'test(/a_standard_cut_out_casts_its_whole_card|a_tiled_cut_out|a_striped_hair_cards_shadow/)' --no-fail-fast
+
+    Starting 3 tests across 1 binary (420 tests skipped)
+        PASS (1/3) axcenity-render renderer::tests::alpha_cards::a_tiled_cut_out_casts_its_whole_mesh_not_holes_at_the_wrong_scale
+        FAIL (2/3) axcenity-render renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+  stdout ───
+    running 1 test
+    test renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps ... FAILED
+    failures:
+    failures:
+        renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 422 filtered out; finished in 6.81s
+  stderr ───
+    shadow maps, standard: 7 turns, 0..81
+    thread 'renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps' (25312) panicked at crates\render\src\renderer\tests\alpha_cards.rs:472:5:
+    holes in a Standard cut-out's shadow (7 turns)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        PASS (3/3) axcenity-render renderer::tests::alpha_cards::a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps
+────────────
+     Summary 3 tests run: 2 passed, 1 failed, 420 skipped
+        FAIL (2/3) axcenity-render renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
+error: test run failed
+
+== Review fixes 2: double-sided hair over a head (red) ==
+HairShading::shell added as a stub (not yet in the uniform or the shader).
+cargo nextest run -p axcenity-render -E 'test(/tests::hair::/)' --no-fail-fast
+
+        FAIL (1/8) axcenity-render renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places
+  stderr ───
+    assertion `left == right` failed
+      left: 0.0
+     right: 4.0
+        FAIL (8/8) axcenity-render renderer::tests::hair::back_lit_double_sided_hair_over_a_head_ends_smoothly_at_its_terminator
+  stderr ───
+    Off: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    Msaa4: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    panicked at crates\render\src\renderer\tests\hair.rs:537:5:
+    [
+        "Off: lit 21.073502 rows past the terminator",
+        "Off: a ragged edge (0.48)",
+        "Msaa4: lit 21.073502 rows past the terminator",
+        "Msaa4: a ragged edge (0.48)",
+    ]
+────────────
+     Summary 8 tests run: 6 passed, 2 failed, 416 skipped
+
+== Review fixes 2: the axcenity_hair_shell extras flag (red) ==
+ModelMaterial::hair_shell added as a stub (never read, not cooked, not passed to the renderer).
+cargo nextest run -p axcenity-assets -p axcenity-scene -E 'test(/hair/)' --no-fail-fast
+
+        PASS (1/5) axcenity-scene material_values_tests::hair_values_go_to_the_hair_model_not_the_skin_curve
+        FAIL (2/5) axcenity-assets model::tests::a_gltf_materials_extras_mark_it_hair_or_cloth_and_name_a_hair_atlas_s_maps
+    panicked at crates\assets\src\model\tests.rs:1119:5
+        FAIL (3/5) axcenity-assets model::tests::a_hair_cards_data_and_flow_maps_are_read_where_its_colour_map_is
+    panicked at crates\assets\src\model\tests.rs:1217:5
+        FAIL (4/5) axcenity-scene draw_list::tests::a_model_material_marked_hair_draws_with_hair_shading_and_its_atlas_maps
+    panicked at crates\scene\src\draw_list\tests.rs:789:5
+        FAIL (5/5) axcenity-assets model::cooked_model::tests::a_cooked_model_keeps_its_hair_and_cloth_materials
+    panicked at crates\assets\src\model\cooked_model.rs:1079:17
+     Summary 5 tests run: 1 passed, 4 failed, 434 skipped
+
+== Review fixes 2: anisotropy_rotation held to -90..90 degrees (red) ==
+cargo nextest run -p axcenity-avatar -p axcenity-scene -E 'test(/cloth|shading_model|values/)' --no-fail-fast
+
+        FAIL ( 5/21) axcenity-avatar material::tests::hair_and_cloth_have_the_values_their_shading_models_draw
+    panicked at crates\avatar\src\material.rs:544:9   (120 degrees was accepted)
+        FAIL ( 9/21) axcenity-scene material_values_tests::cloth_values_modulate_the_authored_sheen_and_anisotropy
+    panicked at crates\scene\src\material_values_tests.rs:531:5   (135 degrees turned the lobe by 135, not 90)
+     Summary 21 tests run: 19 passed, 2 failed, 334 skipped

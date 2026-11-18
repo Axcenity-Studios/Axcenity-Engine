@@ -1563,6 +1563,10 @@ mod face_preset_tests;
 #[cfg(test)]
 mod fit_gate_tests;
 #[cfg(test)]
+mod garment_checks;
+#[cfg(test)]
+mod hair_tests;
+#[cfg(test)]
 mod handle_tests;
 #[cfg(test)]
 mod live_identity_bench_tests;
@@ -1572,6 +1576,8 @@ mod makeup_tests;
 mod profile_tests;
 #[cfg(test)]
 mod skin_value_tests;
+#[cfg(test)]
+mod wardrobe_tests;
 
 #[cfg(test)]
 mod gpu_particles_tests;

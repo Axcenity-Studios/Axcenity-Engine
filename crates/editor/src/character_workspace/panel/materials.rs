@@ -14,16 +14,16 @@ use eframe::egui;
 
 use super::super::CharacterWorkspace;
 use super::super::intent::{Gesture, Intent};
-use super::super::selection::Level;
 use super::row::{self, Row};
 use crate::color_palette;
 use crate::theme;
 use crate::widgets;
 
 /// The values the renderer draws today: `scene`'s material values (CO7's
-/// first slice) and the Skin shading model's (R5). The others (the Eye
-/// model's, cloth's and hair's own) are kept in the description and drawn
-/// once their shading model reads them.
+/// first slice), the Skin shading model's (R5) and the Hair and Cloth
+/// models' (CO7, wave 4: on a material its model file marks hair or
+/// cloth). The Eye model's own are kept in the description and drawn once
+/// its shading model reads them.
 pub(in super::super) const DRAWN_TODAY: &[&str] = &[
     "tint",
     "iris_tint",
@@ -36,6 +36,19 @@ pub(in super::super) const DRAWN_TODAY: &[&str] = &[
     "scatter_scale",
     "definition",
     "softness",
+    "dye",
+    "dye_amount",
+    "tip_lightening",
+    "highlight",
+    "root_melanin",
+    "root_length",
+    "streaks",
+    "streak_melanin",
+    "shift_scale",
+    "sheen_tint",
+    "sheen_roughness_scale",
+    "anisotropy_scale",
+    "anisotropy_rotation",
 ];
 
 /// A value's name for people: `roughness_scale` is "Roughness scale".
@@ -53,7 +66,6 @@ pub(super) fn skin(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
     base: &BaseManifest,
-    level: Level,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
@@ -116,7 +128,6 @@ pub(super) fn skin(
                                 value,
                                 range: [min, max],
                                 default: neutral,
-                                typed: level == Level::Advanced,
                                 // Material values aren't randomized.
                                 locked: None,
                             },
@@ -164,7 +175,7 @@ pub(super) fn skin(
             }
         });
     }
-    intents.extend(makeup(ui, workspace, base, level));
+    intents.extend(makeup(ui, workspace, base));
     ui.add_space(6.0);
     ui.label(
         egui::RichText::new(
@@ -182,12 +193,7 @@ pub(super) fn skin(
 /// roughness (makeup), amount and pattern (markings). Each change asks for
 /// the whole layer ([`Intent::SetSkinLayer`]): one undo step, or one per
 /// slider drag.
-fn makeup(
-    ui: &mut egui::Ui,
-    workspace: &CharacterWorkspace,
-    base: &BaseManifest,
-    level: Level,
-) -> Vec<Intent> {
+fn makeup(ui: &mut egui::Ui, workspace: &CharacterWorkspace, base: &BaseManifest) -> Vec<Intent> {
     let mut intents = Vec::new();
     if base.skin_layers.is_empty() {
         return intents;
@@ -280,7 +286,6 @@ fn makeup(
                                     value,
                                     range: [0.0, 1.0],
                                     default,
-                                    typed: level == Level::Advanced,
                                     locked: None,
                                 },
                             ) {

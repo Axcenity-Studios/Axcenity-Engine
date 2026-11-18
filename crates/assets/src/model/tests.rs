@@ -104,7 +104,8 @@ fn the_realistic_skin_has_its_makeup_and_marking_masks() {
     // freckles and their ranks, moles and their ranks.
     let names = [
         ["foundation", "blush", "eyeshadow", "eyeliner"],
-        ["lips", "brow fill", "scar", ""],
+        // Stubble's density fills the spare channel since R6.
+        ["lips", "brow fill", "scar", "stubble"],
         ["freckles", "freckle ranks", "moles", "mole ranks"],
     ];
     for (mask, names) in skin.skin_masks.iter().zip(names) {
@@ -116,10 +117,6 @@ fn the_realistic_skin_has_its_makeup_and_marking_masks() {
                 .chunks_exact(4)
                 .filter(|texel| texel[channel] > 127)
                 .count() as f64;
-            if name.is_empty() {
-                assert_eq!(covered, 0.0, "the spare channel is empty");
-                continue;
-            }
             let share = covered / count;
             assert!(
                 share > 0.00002 && share < 0.25,
@@ -1060,11 +1057,12 @@ fn the_realistic_bodys_region_map_reaches_every_corner_and_its_simpler_copies() 
     for primitive in &body.primitives {
         for copy in std::iter::once(primitive).chain(&primitive.lods) {
             assert_eq!(copy.regions.len(), copy.positions.len(), "one per corner");
-            assert!(copy.regions.iter().all(|region| (1..=14).contains(region)));
+            assert!(copy.regions.iter().all(|region| (1..=15).contains(region)));
             seen.extend(copy.regions.iter().copied());
         }
     }
-    assert_eq!(seen.len(), 14, "all fourteen regions: {seen:?}");
+    // Fifteen since CO9 part 2's review fixes (`upper_arms_mid`, 15).
+    assert_eq!(seen.len(), 15, "all fifteen regions: {seen:?}");
     // The highest corner is the head's (1), the lowest the feet's (14).
     let full = &body.primitives;
     let corners = || {
@@ -1088,4 +1086,142 @@ fn only_a_region_map_in_the_second_coordinates_gives_regions() {
     assert!(region_map([[0.13, 0.71], cell(3.0)].into_iter(), 2).is_empty());
     assert!(region_map([cell(1.0), [0.1, 0.5]].into_iter(), 2).is_empty());
     assert!(region_map([cell(1.0)].into_iter(), 2).is_empty(), "too few");
+}
+
+/// Hair and cloth (CO7): a glTF material's `extras` mark it, and a hair
+/// card atlas names its data and flow maps there.
+#[test]
+fn a_gltf_materials_extras_mark_it_hair_or_cloth_and_name_a_hair_atlas_s_maps() {
+    let raw = |text: &str| Some(serde_json::value::RawValue::from_string(text.to_owned()).unwrap());
+    assert_eq!(
+        super::shading_of(&raw(r#"{"axcenity_shading": "hair"}"#)),
+        (ModelShading::Hair, None)
+    );
+    assert_eq!(
+        super::shading_of(&raw(r#"{"axcenity_shading": "cloth"}"#)),
+        (ModelShading::Cloth, None)
+    );
+    assert_eq!(
+        super::hair_maps_of(&raw(
+            r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 2},
+                "axcenity_hair_flow": {"index": 5}}"#
+        )),
+        (Some(2), Some(5))
+    );
+    // Only hair has them.
+    assert_eq!(
+        super::hair_maps_of(&raw(r#"{"axcenity_hair_data": {"index": 2}}"#)),
+        (None, None)
+    );
+    // A shell over the head (review fixes 2), hair only.
+    assert!(super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": true}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": false}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair"}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_hair_shell": true}"#
+    )));
+    assert!(!super::hair_shell_of(&None));
+}
+
+/// The example pyramid with its one material given `extras` and
+/// `extensions` (JSON objects, or empty for none).
+pub(super) fn pyramid_with(extras: &str, extensions: &str) -> String {
+    let mut file: serde_json::Value = serde_json::from_slice(&example_bytes()).unwrap();
+    let material = &mut file["materials"][0];
+    if !extras.is_empty() {
+        material["extras"] = serde_json::from_str(extras).unwrap();
+    }
+    if !extensions.is_empty() {
+        material["extensions"] = serde_json::from_str(extensions).unwrap();
+        file["extensionsUsed"] =
+            serde_json::json!(["KHR_materials_sheen", "KHR_materials_anisotropy"]);
+    }
+    file.to_string()
+}
+
+#[test]
+fn a_cloths_sheen_and_anisotropy_are_read_from_khr_extensions() {
+    let file = pyramid_with(
+        r#"{"axcenity_shading": "cloth"}"#,
+        r#"{"KHR_materials_sheen": {"sheenColorFactor": [0.5, 0.25, 1.0],
+                                    "sheenRoughnessFactor": 0.3},
+            "KHR_materials_anisotropy": {"anisotropyStrength": 0.6,
+                                         "anisotropyRotation": 1.5}}"#,
+    );
+    let model = load_model(file.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    let material = &model.primitives[0].material;
+    assert_eq!(material.shading, ModelShading::Cloth);
+    assert_eq!(
+        material.sheen,
+        Some(Sheen {
+            colour: [0.5, 0.25, 1.0],
+            roughness: 0.3
+        })
+    );
+    assert_eq!(
+        material.anisotropy,
+        Some(Anisotropy {
+            strength: 0.6,
+            rotation: 1.5
+        })
+    );
+    // Without them: none, as glTF has it.
+    let plain = pyramid_with(r#"{"axcenity_shading": "cloth"}"#, "");
+    let model = load_model(plain.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    assert_eq!(model.primitives[0].material.sheen, None);
+    assert_eq!(model.primitives[0].material.anisotropy, None);
+    // Out of range or broken values are held or left out.
+    let odd = pyramid_with(
+        "",
+        r#"{"KHR_materials_sheen": {"sheenColorFactor": [2.0, -1.0, 0.5]},
+            "KHR_materials_anisotropy": "broken"}"#,
+    );
+    let model = load_model(odd.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    let material = &model.primitives[0].material;
+    assert_eq!(material.shading, ModelShading::Standard);
+    assert_eq!(
+        material.sheen,
+        Some(Sheen {
+            colour: [1.0, 0.0, 0.5],
+            roughness: 0.0
+        })
+    );
+    assert_eq!(material.anisotropy, None);
+}
+
+#[test]
+fn a_hair_cards_data_and_flow_maps_are_read_where_its_colour_map_is() {
+    // The pyramid's one texture stands in for both maps.
+    let file = pyramid_with(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 0},
+            "axcenity_hair_flow": {"index": 0}}"#,
+        "",
+    );
+    let model = load_model(file.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    let material = &model.primitives[0].material;
+    assert_eq!(material.shading, ModelShading::Hair);
+    assert!(material.hair_data_texture.is_some());
+    assert!(material.hair_flow_texture.is_some());
+    assert!(!material.hair_shell, "loose cards unless marked");
+    assert!(model.primitives[0].images().count() >= 3);
+    // Marked a shell over the head.
+    let shell = pyramid_with(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": true}"#,
+        "",
+    );
+    let model = load_model(shell.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    assert!(model.primitives[0].material.hair_shell);
+    // A texture index the file hasn't: no map.
+    let missing = pyramid_with(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 9}}"#,
+        "",
+    );
+    let model = load_model(missing.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    assert!(model.primitives[0].material.hair_data_texture.is_none());
 }

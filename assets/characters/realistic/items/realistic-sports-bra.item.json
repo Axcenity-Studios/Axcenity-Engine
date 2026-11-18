@@ -85,14 +85,16 @@
       "Masculine_Muscle_Up_Fat_Up",
       "Masculine_Waist_Narrow",
       "Masculine_Waist_Wide",
+      "Corrective_Shoulder_Back_Left",
+      "Corrective_Shoulder_Back_Right",
+      "Corrective_Shoulder_Forward_Left",
+      "Corrective_Shoulder_Forward_Right",
       "Corrective_Shoulder_Level_Left",
       "Corrective_Shoulder_Level_Right",
       "Corrective_Shoulder_Lowered_Left",
       "Corrective_Shoulder_Lowered_Right",
       "Corrective_Shoulder_Raised_Left",
-      "Corrective_Shoulder_Raised_Right",
-      "Face_Jaw_Width_Left",
-      "Face_Jaw_Width_Right"
+      "Corrective_Shoulder_Raised_Right"
     ]
   },
   "tags": [

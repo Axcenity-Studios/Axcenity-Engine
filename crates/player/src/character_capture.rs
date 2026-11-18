@@ -36,8 +36,11 @@
 //! `AXCENITY_CAPTURE_FACE` (what the face shows: face controls and
 //! expressions with their strengths, such as `Blink_Left:1,Jaw_Open:0.5`
 //! or `Happy:1`; blinking, gaze and idle motion are off with it),
-//! `AXCENITY_CAPTURE_ONLY` (names containing this text) and
-//! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures).
+//! `AXCENITY_CAPTURE_ONLY` (names containing this text),
+//! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures) and
+//! `AXCENITY_CAPTURE_FULL_DETAIL=<part name>` (that part drawn at full
+//! detail whatever its size, to tell a simpler copy's fault from the
+//! part's own).
 //!
 //! Added beside the fixed set for the refinement's benchmarks (plan 11.6,
 //! brief §17.2), never changing what a run without them draws:
@@ -46,8 +49,10 @@
 //!   and cameras, by name, separated by `,` (from [`LIGHTS`] and
 //!   [`MORE_LIGHTS`]: `studio`, `hard`, `warm`, `cool`, `outdoor`; from
 //!   [`VIEWS`] and [`MORE_VIEWS`]: the six above and `face-three-quarter`,
-//!   `face-side`, `skin-close`). The sheet has a row per light and a
-//!   column per view, as before.
+//!   `face-side`, `skin-close`; from [`HAIR_VIEWS`], R6: `hair-back`,
+//!   `hair-top`, `hair-hairline`, `hair-temple`, `hair-crown`,
+//!   `hair-nape`). The sheet has a row per light and a column per view,
+//!   as before.
 //! - `AXCENITY_CAPTURE_POSE` also takes the held poses of the brief's body
 //!   tests ([`HeldPose`]): `t-pose`, `arms-raised`, `elbows-bent`,
 //!   `knees-bent`, both sides, at the Blender harness's angles.
@@ -158,6 +163,52 @@ pub(crate) const MORE_VIEWS: [View; 3] = [
         name: "skin-close",
         eye: [-0.62, 4.57, -0.84],
         target: [-0.05, 4.54, -0.31],
+        fov: 30.0,
+    },
+];
+
+/// Cameras for hair (Character Studio R6, asset-quality.md §4: scalp
+/// coverage from the back and the top, and close crops of the hairline,
+/// a temple, the crown and the nape), drawn only when named, like
+/// [`MORE_VIEWS`]. Aimed between the two realistic frames' heads (the
+/// feminine head is about 0.16 studs lower).
+pub(crate) const HAIR_VIEWS: [View; 6] = [
+    View {
+        name: "hair-back",
+        eye: [0.0, 4.66, 2.3],
+        target: [0.0, 4.62, 0.0],
+        fov: 30.0,
+    },
+    // From above and a little in front (a camera straight down has no
+    // "up"): the crown, the top and the scalp between cards.
+    View {
+        name: "hair-top",
+        eye: [0.0, 7.1, -0.75],
+        target: [0.0, 4.82, 0.0],
+        fov: 30.0,
+    },
+    View {
+        name: "hair-hairline",
+        eye: [0.0, 4.9, -1.05],
+        target: [0.0, 4.8, -0.2],
+        fov: 30.0,
+    },
+    View {
+        name: "hair-temple",
+        eye: [-0.78, 4.78, -0.62],
+        target: [-0.16, 4.75, -0.12],
+        fov: 30.0,
+    },
+    View {
+        name: "hair-crown",
+        eye: [0.0, 5.75, 0.85],
+        target: [0.0, 4.88, 0.08],
+        fov: 30.0,
+    },
+    View {
+        name: "hair-nape",
+        eye: [0.0, 4.42, 1.05],
+        target: [0.0, 4.45, 0.1],
         fov: 30.0,
     },
 ];
@@ -316,10 +367,15 @@ pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
             VIEWS
                 .iter()
                 .chain(&MORE_VIEWS)
+                .chain(&HAIR_VIEWS)
                 .find(|view| view.name == name)
                 .ok_or_else(|| {
-                    let known: Vec<&str> =
-                        VIEWS.iter().chain(&MORE_VIEWS).map(|v| v.name).collect();
+                    let known: Vec<&str> = VIEWS
+                        .iter()
+                        .chain(&MORE_VIEWS)
+                        .chain(&HAIR_VIEWS)
+                        .map(|v| v.name)
+                        .collect();
                     format!("no view `{name}` (there are {})", known.join(", "))
                 })
         })
@@ -991,6 +1047,17 @@ pub(crate) fn draw_staged(
             // it left behind (temporal history, exposure) reaches it.
             let mut renderer = TextureRenderer::new(device, queue, width, height);
             renderer.set_graphics(&graphics);
+            // `AXCENITY_CAPTURE_FULL_DETAIL=<part name>`: that part drawn
+            // at full detail whatever its size (the editor's LOD preview),
+            // to tell a simpler copy's fault from the part's own.
+            if let Ok(name) = std::env::var("AXCENITY_CAPTURE_FULL_DETAIL")
+                && let Some(part) = world
+                    .all_below(world.workspace(), |class| class == ClassName::MeshPart)
+                    .into_iter()
+                    .find(|part| world.get(*part).is_some_and(|p| p.name() == name))
+            {
+                renderer.preview_lod(Some((axcenity_scene::item_id(part), 0)));
+            }
             let mut cache = TerrainCache::new();
             let camera = Camera {
                 position: Vec3::from(view.eye),
@@ -1491,7 +1558,7 @@ fn the_default_run_is_every_fixed_view_under_every_fixed_light() {
         .map(|view| view.name)
         .collect();
     assert_eq!(views, VIEWS.map(|view| view.name));
-    for added in MORE_VIEWS.iter().map(|view| view.name) {
+    for added in MORE_VIEWS.iter().chain(&HAIR_VIEWS).map(|view| view.name) {
         assert!(VIEWS.iter().all(|view| view.name != added), "{added}");
     }
     for added in MORE_LIGHTS.iter().map(|more| more.light.name) {

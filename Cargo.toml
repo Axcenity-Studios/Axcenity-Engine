@@ -317,6 +317,15 @@ opt-level = 3
 [profile.dev.package.axcenity-avatar]
 opt-level = 3
 
+# Reading a character's model and posing it: the realistic body
+# (`RealisticParts.glb`, 40 MB, 181 shapes) is every new game's default
+# character since R10, and a game test spawns it for each test.
+[profile.dev.package.axcenity-assets]
+opt-level = 3
+
+[profile.dev.package.axcenity-anim]
+opt-level = 3
+
 # Release builds (`cargo build --release`, and the editor's
 # `bench_project_play`): thin LTO lets the engine's crates inline across one
 # another, and line tables keep file and line in panics and backtraces.

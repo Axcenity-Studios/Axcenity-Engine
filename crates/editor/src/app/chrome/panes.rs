@@ -1171,9 +1171,15 @@ impl EditorApp {
                             nav_mesh: self.nav_mesh.as_ref().map(|cache| &cache.mesh),
                             agent_paths: &agent_paths,
                             physics: physics_debug.as_ref(),
+                            // In edit mode, described characters at rest
+                            // with their identity (OPEN-21).
                             poses: sequence
                                 .map(crate::sequencer::Preview::poses)
-                                .or(self.play.as_ref().map(|play| play.poses())),
+                                .or(self.play.as_ref().map(|play| play.poses()))
+                                .or_else(|| {
+                                    let edit = self.edit_characters.poses();
+                                    (!edit.is_empty()).then_some(edit)
+                                }),
                             // A Sequencer preview draws its own poses, not
                             // the game's.
                             blends: self

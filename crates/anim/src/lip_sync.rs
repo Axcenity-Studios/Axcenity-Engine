@@ -426,6 +426,24 @@ mod tests {
         assert!(find_viseme_map(&VisemeMaps::default(), "Klingon").is_none());
     }
 
+    /// The built-in map opens the jaw only through `jaw_share`: one map
+    /// drives both families, and a viseme that turned the jaw by itself
+    /// opened the stylized head's mouth to a slit with the teeth's flat
+    /// front in it (R9 review 2, TH).
+    #[test]
+    fn the_built_in_map_opens_the_jaw_only_by_its_share() {
+        let map = default_viseme_map();
+        for (name, values) in &map.visemes {
+            assert!(
+                !values.contains_key("Jaw_Open"),
+                "{name} sets Jaw_Open: {values:?}"
+            );
+        }
+        // TH still puts the tongue out between the teeth.
+        let th = &map.visemes["TH"];
+        assert!(th["Tongue_Out"] >= 0.7, "{th:?}");
+    }
+
     #[test]
     fn neighbours_cross_fade_early_and_the_line_fades_in_and_out() {
         let lip = line(&[(0.0, "MBP"), (0.5, "AI"), (1.0, "Silence")], 1.2);

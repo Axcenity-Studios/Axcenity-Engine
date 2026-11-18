@@ -182,7 +182,8 @@ pub(super) struct FrameUniform {
     pub(super) ray_reflections: [f32; 4],
     /// x: which of 64 frames this is while TAA is on (0 otherwise), so
     /// the shadow filters' per-pixel turn changes every frame and TAA
-    /// averages it away (lighting.wgsl's `shading_noise`).
+    /// averages it away (lighting.wgsl's `shading_noise`); y: 1 while TAA
+    /// is on, so hair cards' alpha is hashed (hair.wgsl).
     pub(super) noise: [f32; 4],
 }
 
@@ -532,6 +533,8 @@ pub(super) const SHADING_STANDARD: f32 = 0.0;
 pub(super) const SHADING_UNLIT: f32 = 1.0;
 pub(super) const SHADING_TOON: f32 = 2.0;
 pub(super) const SHADING_SKIN: f32 = 3.0;
+pub(super) const SHADING_HAIR: f32 = 4.0;
+pub(super) const SHADING_CLOTH: f32 = 5.0;
 
 /// A texture uploaded to the GPU, with a view for each way it's read.
 pub(super) struct GpuTexture {
@@ -1022,6 +1025,9 @@ pub(super) struct ScenePipeline {
     pub(super) no_prepass_depth_view: wgpu::TextureView,
     pub(super) shadow_sampler: wgpu::Sampler,
     pub(super) shadow_pipeline: wgpu::RenderPipeline,
+    /// The shadow pipeline for cut-out casters, which reads their
+    /// materials to leave their texture's holes out.
+    pub(super) shadow_cut_out_pipeline: wgpu::RenderPipeline,
     /// Each shadow view's matrix, [`CASCADE_UNIFORM_STRIDE`] apart: the sun's
     /// cascades, then the shadow-casting spot lights', then the point
     /// lights' faces.

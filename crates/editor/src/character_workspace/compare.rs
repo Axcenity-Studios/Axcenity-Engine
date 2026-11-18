@@ -69,12 +69,13 @@ impl Comparison {
 }
 
 impl CharacterWorkspace {
-    /// What the main preview shows: a held state in its place, or the
+    /// What the main preview shows: a held state in its place, a browser
+    /// tile tried on (the character wearing it, not yet worn), or the
     /// character being edited.
     pub fn shown(&self) -> &Description {
         match self.comparison.instead() {
             Some(index) => &self.comparison.held[index],
-            None => &self.description,
+            None => self.browser.preview.as_ref().unwrap_or(&self.description),
         }
     }
 

@@ -22,18 +22,18 @@ pub use atmosphere::Atmosphere;
 pub use axcenity_render_types::Camera;
 pub use decal::{Decal, DecalRole, decal_quad};
 pub use draw_list::{
-    AmbientLight, CURVE_ENTRIES, Channel, ChannelMap, Clouds, ColorGrading, ColorLookup, Cone,
-    DepthOfField, DrawItem, DrawList, Dust, DustBoxes, Edges, FilmGrain, Flipbook, FlipbookFrame,
-    FlipbookMode, Fog, GridPlane, GridTint, ItemChunk, LensEffects, Light, LightProbeGrid,
-    LightProbeVolume, MAX_DUST_BOXES, MAX_PALETTE_COLORS, Makeup, Material, MeshSource, MorphView,
-    NormalMap, Outline, ParticleCollision, ParticleCurves, ParticleEmitter, ParticleLook,
-    PointShadows, PostProcessing, ProbeImage, ProbeSky, RectArea, ReflectionProbe,
-    SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, Shading, Shadows, Shape, ShapeInOut, Skin, SkinLayers,
-    SkinShading, Sky, SkyImage, SpawnKind, SpawnShape, SpotShadows, Spots, Sprite, Sun, SunRays,
-    Sway, TerrainLayer, TerrainLayers, TerrainSurface, TerrainView, TextAlign, TextShadow,
-    TextSpan, TextStroke, TextureMaps, TextureSource, Toon, UiBorderSide, UiClip, UiDrawItem,
-    UiImage, UiRectangle, UiShadow, UiSlice, UiText, VerticalAlign, Vignette, Weather, curve_at,
-    is_turned, turn_point, turned_bounds,
+    AmbientLight, CURVE_ENTRIES, Channel, ChannelMap, ClothShading, Clouds, ColorGrading,
+    ColorLookup, Cone, DepthOfField, DrawItem, DrawList, Dust, DustBoxes, Edges, FilmGrain,
+    Flipbook, FlipbookFrame, FlipbookMode, Fog, GridPlane, GridTint, HairShading, ItemChunk,
+    LensEffects, Light, LightProbeGrid, LightProbeVolume, MAX_DUST_BOXES, MAX_PALETTE_COLORS,
+    Makeup, Material, MeshSource, MorphView, NormalMap, Outline, ParticleCollision, ParticleCurves,
+    ParticleEmitter, ParticleLook, PointShadows, PostProcessing, ProbeImage, ProbeSky, RectArea,
+    ReflectionProbe, SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, Shading, Shadows, Shape, ShapeInOut,
+    Skin, SkinLayers, SkinShading, Sky, SkyImage, SpawnKind, SpawnShape, SpotShadows, Spots,
+    Sprite, Sun, SunRays, Sway, TerrainLayer, TerrainLayers, TerrainSurface, TerrainView,
+    TextAlign, TextShadow, TextSpan, TextStroke, TextureMaps, TextureSource, Toon, UiBorderSide,
+    UiClip, UiDrawItem, UiImage, UiRectangle, UiShadow, UiSlice, UiText, VerticalAlign, Vignette,
+    Weather, curve_at, is_turned, turn_point, turned_bounds,
 };
 pub use fonts::{BUILT_IN_FONTS, BuiltInFont, UiFont, font_families};
 pub use graphics::{

@@ -32,8 +32,9 @@ What is measured, per pose (millimetres; counts are vertices or rays):
   (material `Mouth`) and one of the skin, that cross, more than 8 mm from
   the lips' edges (where closed lips touch): the lining would show
   outside the face.
-- `self_crossing`: pairs of the head's triangles that cross, less the
-  resting face's own.
+- `self_crossing`: pairs of the head's triangles (those wholly above the
+  base of the neck at the frame's rest, the same in every pose) that
+  cross, less the resting face's own.
 - `mouth_asymmetry_mm`, `teeth_asymmetry_mm`, `tongue_asymmetry_mm`: how
   far the mouth's skin (the vertices `Mouth_Pucker` moves by more than
   half a millimetre), the teeth and gums, and the tongue are from their
@@ -127,14 +128,24 @@ HELD_IDENTITY = ("nose_tip_projection", "nose_tip_rotation", "nose_width", "phil
                  "upper_lid_fold", "lower_lid", "eye_corner", "earlobe")
 
 
-def head_crossings(ch):
-    """The pairs of the head's posed skin triangles (above the neck) that
-    cross and share no vertex, as pairs of their numbers. (Of the skin:
-    the mouth's lining lies folded on itself inside the mouth, where no
-    one sees it, and its crossing the skin is `lining_through_skin`.)"""
+def head_triangles(piece, ch):
+    """Which of `piece`'s triangles are the head's: those wholly above the
+    base of the neck (the `Neck` bone's head) in the pose the character is
+    in, a frame's rest. Chosen once and kept for every pose of the frame:
+    a line drawn through the posed face let a pose move skin across it.
+    (It was 20 mm under the `Head` bone, which is 5 mm over the masculine
+    mouth's corners: the philtrum's and the mouth's height's ends lifted
+    the corners' resting contact over it, where it counted as new.)"""
+    return np.where(piece.co[piece.tris][:, :, 2].min(axis=1) > ch.head("Neck").z)[0]
+
+
+def head_crossings(ch, keep):
+    """The pairs of the head's posed skin triangles (`keep`, from
+    `head_triangles` at the frame's rest) that cross and share no vertex,
+    as pairs of their numbers. (Of the skin: the mouth's lining lies
+    folded on itself inside the mouth, where no one sees it, and its
+    crossing the skin is `lining_through_skin`.)"""
     body = Piece(ch.parts["Body"], ("Skin",))
-    z_neck = ch.head("Head").z - 0.02
-    keep = np.where(body.co[body.tris][:, :, 2].min(axis=1) > z_neck)[0]
     tris = body.tris[keep]
     tree = BVHTree.FromPolygons([tuple(p) for p in body.co], [tuple(int(i) for i in t) for t in tris], all_triangles=True)
     return {(int(keep[i]), int(keep[j])) for i, j in tree.overlap(tree) if i < j and not set(tris[i]) & set(tris[j])}
@@ -151,10 +162,13 @@ def identity_pairs(ch, frame, parameters, shapes, only=""):
 
     Left out, as `measure.py`'s sliders check leaves them out: pairs that
     touch at rest (within 4 mm) at the closed lips (within `LIPS_EDGE`
-    of `LipSeal`), where any move makes or unmakes a crossing (the
-    philtrum and the mouth's height moved the corners of closed lips 9.5
-    mm up together, and a few hundredths of a millimetre between them
-    did). Elsewhere, the lids' crease among them, every pair counts."""
+    of `LipSeal`), where any move makes or unmakes a crossing. Elsewhere,
+    the lids' crease among them, every pair counts. The head's triangles
+    are the same in every pose (`head_triangles`, at the frame's rest):
+    the philtrum's and the mouth's height's ends together once lifted the
+    corners' resting contact (four pairs crossing by 0.03 mm in every
+    pose) over a line drawn through the posed mouth, where it counted as
+    new (wave 4)."""
     def identity(*ends):
         out = {}
         for drivers, end in ends:
@@ -164,8 +178,9 @@ def identity_pairs(ch, frame, parameters, shapes, only=""):
         return out
 
     pose(ch, frame, {})
-    rest = head_crossings(ch)
     skin = Piece(ch.parts["Body"], ("Skin",))
+    head = head_triangles(skin, ch)
+    rest = head_crossings(ch, head)
     seal = Piece(ch.parts["LipSeal"]).co if "LipSeal" in ch.parts else np.zeros((0, 3))
 
     def at_lips(pair):
@@ -181,7 +196,7 @@ def identity_pairs(ch, frame, parameters, shapes, only=""):
     for pid, drivers in parameters:
         for end in (-1.0, 1.0):
             pose(ch, frame, {}, identity((drivers, end)))
-            alone[(pid, end)] = head_crossings(ch)
+            alone[(pid, end)] = head_crossings(ch, head)
     poses, offenders = 0, []
     for pid, drivers in parameters:
         if not held_identity(pid):
@@ -199,7 +214,7 @@ def identity_pairs(ch, frame, parameters, shapes, only=""):
                     continue
                 for other_end in (-1.0, 1.0):
                     pose(ch, frame, {}, identity((drivers, end), (other_drivers, other_end)))
-                    new = counted(head_crossings(ch) - alone[(other, other_end)] - rest)
+                    new = counted(head_crossings(ch, head) - alone[(other, other_end)] - rest)
                     poses += 1
                     if new:
                         clean = not counted(alone[(other, other_end)] - rest)
@@ -259,16 +274,24 @@ class Piece:
     def inside(self, p):
         """Whether `p` is inside this piece, which must be closed (the
         body is): a ray from `p` crosses its surface an odd number of
-        times. Three rays vote, as one can graze an edge."""
+        times. Three rays vote, as one can graze an edge. A ray goes on
+        from each hit a micrometre past it, and at a grazing angle that
+        can land back on the triangle it just crossed, which the tree
+        then reports again; a ray crosses a flat triangle once, so a hit
+        on the same triangle as the last is not counted. (Two of the three
+        rays counted one triangle twice at a tooth 4 mm behind the lower
+        lip, R9's wave 4, and called it in the flesh.)"""
         votes = 0
         for way in (Vector((0.31, -0.93, 0.19)), Vector((-0.42, 0.37, 0.83)), Vector((0.77, 0.21, -0.60))):
             way.normalize()
-            at, crossings = Vector(p), 0
+            at, crossings, last = Vector(p), 0, None
             for _ in range(64):
                 hit = self.bvh.ray_cast(at, way, 3.0)
                 if hit[0] is None:
                     break
-                crossings += 1
+                if hit[2] != last:
+                    crossings += 1
+                last = hit[2]
                 at = hit[0] + way * 1e-6
             votes += crossings % 2
         return votes >= 2
@@ -393,8 +416,9 @@ def lips_open(skin, seal_rest):
     return step * gap
 
 
-def measure(ch, rest_crossing=None, mouth_skin=None, seal_rest=None):
-    """The measures of the pose the character is in (with `mouth_skin`,
+def measure(ch, head, rest_crossing=None, mouth_skin=None, seal_rest=None):
+    """The measures of the pose the character is in (`head`: the body's
+    head triangles, `head_triangles` at the frame's rest; with `mouth_skin`,
     the mouth's vertices: how far it and the teeth are from even; with
     `seal_rest`, the resting `LipSeal`: how far the lips are apart and
     how much of it is in view)."""
@@ -484,8 +508,7 @@ def measure(ch, rest_crossing=None, mouth_skin=None, seal_rest=None):
                 continue
             crossed += 1
     out["lining_through_skin"] = crossed
-    z_neck = ch.head("Head").z - 0.02
-    tris = body.tris[body.co[body.tris][:, :, 2].min(axis=1) > z_neck]
+    tris = body.tris[head]
     tree = BVHTree.FromPolygons([tuple(p) for p in body.co], [tuple(int(i) for i in t) for t in tris], all_triangles=True)
     crossing = sum(1 for i, j in tree.overlap(tree) if i < j and not set(tris[i]) & set(tris[j]))
     out["self_crossing"] = crossing if rest_crossing is None else crossing - rest_crossing
@@ -663,12 +686,13 @@ def main():
         mouth = mouth_vertices(ch, frame)
         pose(ch, frame, {})
         seal_rest = Piece(ch.parts["LipSeal"]).co if "LipSeal" in ch.parts else None
+        head = head_triangles(Piece(ch.parts["Body"]), ch)
         for group, name, weights, identity, required in listed:
             pose(ch, frame, weights, identity)
             # (Evenness: of the poses that are even, and not of the
             # identity's, whose ends are a face's own.)
             even = required and not identity and even_weights(weights)
-            m, crossing = measure(ch, rest_crossing, mouth if even else None, seal_rest)
+            m, crossing = measure(ch, head, rest_crossing, mouth if even else None, seal_rest)
             if rest_crossing is None:
                 rest_crossing = crossing
                 m["self_crossing_at_rest"] = crossing

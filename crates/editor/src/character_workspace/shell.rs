@@ -11,7 +11,8 @@ use eframe::egui::{self, Rect, Sense, vec2};
 use eframe::egui_wgpu::RenderState;
 
 use super::compare::{self, OTHER_AT};
-use super::intent::{Gesture, Intent};
+use super::intent::Intent;
+use super::numeric;
 use super::stage::{self, ViewPreset};
 use super::{Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, toolbar};
 use crate::dialog;
@@ -22,6 +23,10 @@ use crate::theme::{self, icons};
 pub enum WorkspaceAction {
     /// Back to the start screen (after any Save it asked for).
     Home,
+    /// Back to the Game Editor with the edited character (the round trip).
+    Done,
+    /// Back to the Game Editor, nothing applied.
+    Cancel,
 }
 
 const TOOLBAR: f32 = 48.0;
@@ -77,6 +82,10 @@ impl CharacterWorkspace {
         self.pictures.poll(ui.ctx());
         if self.selection.category == Category::Presets {
             self.load_preset_pictures(ui.ctx(), &library);
+        }
+        if let Some(shelf) = super::browser::Shelf::of(self.selection.category) {
+            let tiles = self.browser_tiles(&library, shelf);
+            self.load_item_pictures(ui.ctx(), tiles);
         }
         // While a held version is shown in the character's place, editing
         // is off: what's edited is always what's seen.
@@ -164,6 +173,24 @@ impl CharacterWorkspace {
             Intent::ApplyPreset(id) => self.use_preset(&id),
             Intent::SaveAsPreset { kind, name } => self.save_as_preset(kind, &name),
             Intent::ToggleFavourite(id) => self.toggle_favourite(&id),
+            Intent::ToggleItemFavourite(id) => self.toggle_item_favourite(&id),
+            Intent::Browse(change) => self.browse(change),
+            Intent::EndPreview => self.end_preview(),
+            Intent::SetItemVariant { item, variant } => {
+                self.set_item_variant(&item, variant.as_deref())
+            }
+            Intent::SetItemMaterial {
+                item,
+                slots,
+                values,
+                gesture,
+            } => self.set_item_material(&item, &slots, &values, gesture),
+            Intent::SetItemParameter {
+                item,
+                id,
+                value,
+                gesture,
+            } => self.set_item_parameter(&item, &id, value, gesture),
             Intent::New(_) | Intent::Open(_) if self.dirty() => self.asking = Some(intent),
             Intent::New(start) => self.new_character(&start),
             Intent::Open(file) => {
@@ -195,6 +222,9 @@ impl CharacterWorkspace {
             Intent::SetBackdrop(backdrop) => self.backdrop = backdrop,
             Intent::PreviewExpression(name) => self.preview_expression(name),
             Intent::PreviewMotion(motion) => self.preview_motion(motion),
+            Intent::PreviewFaceControl { name, value } => self.preview_face_control(&name, value),
+            Intent::FacePreview(on) => self.face_preview(on),
+            Intent::FacePreviewMotion { blink, idle } => self.face_preview_motion(blink, idle),
             Intent::Sides { tool, of } => self.use_sides(tool, &of),
             Intent::Randomize(scope) => self.randomize(scope),
             Intent::SetLock { ids, locked } => self.set_lock(&ids, locked),
@@ -205,6 +235,8 @@ impl CharacterWorkspace {
             Intent::DiscardHeld(index) => self.discard_held(index),
             Intent::Recover(take) => self.recover(take),
             Intent::Home => return Some(WorkspaceAction::Home),
+            Intent::Done => return Some(WorkspaceAction::Done),
+            Intent::Cancel => return Some(WorkspaceAction::Cancel),
         }
         None
     }
@@ -318,7 +350,8 @@ impl CharacterWorkspace {
             return Vec::new();
         }
         let dragging = self.dragging();
-        ui.input_mut(|input| {
+        let previewing = self.browser.trying().is_some();
+        let intents = ui.input_mut(|input| {
             let mut intents = Vec::new();
             if input.consume_key(
                 egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
@@ -335,9 +368,18 @@ impl CharacterWorkspace {
             }
             if dragging && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
                 intents.push(Intent::CancelEdit);
+            } else if previewing && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+                // Esc takes a browser tile's preview off the character.
+                intents.push(Intent::EndPreview);
             }
             intents
-        })
+        });
+        if intents.contains(&Intent::CancelEdit) {
+            // The key is taken here, before the panel is drawn: the row
+            // whose drag it was is told so (`numeric.rs`).
+            numeric::cancelled_by_shell(ui.ctx());
+        }
+        intents
     }
 
     pub(super) fn save_now(&mut self) {
@@ -360,6 +402,12 @@ impl CharacterWorkspace {
             return;
         }
         let was = self.selection.category;
+        if was == Category::Expressions {
+            // An expression, the controls held and the face preview are
+            // the Expressions page's only (the face preview first puts
+            // back the view it found).
+            self.leave_expressions();
+        }
         if category.frames_the_face() && self.view != Some(ViewPreset::Face) {
             self.focus(ViewPreset::Face);
         } else if was.frames_the_face()
@@ -368,10 +416,8 @@ impl CharacterWorkspace {
         {
             self.focus(ViewPreset::FullBody);
         }
-        if was == Category::Expressions && category != Category::Expressions {
-            // An expression is a preview of the Expressions page only.
-            self.preview_expression(None);
-        }
+        // A browser tile tried on is a preview of its page too.
+        self.end_preview();
         self.selection.pick_category(category);
     }
 
@@ -547,14 +593,5 @@ impl CharacterWorkspace {
                 );
             });
         });
-    }
-}
-
-/// A slider's gesture from its response: a drag going on, or done.
-pub(super) fn gesture(response: &egui::Response) -> Gesture {
-    if response.dragged() {
-        Gesture::Drag
-    } else {
-        Gesture::Commit
     }
 }

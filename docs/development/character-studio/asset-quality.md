@@ -42,8 +42,8 @@ An item passes only when **every** check of its kind passes **and** the review f
 | Poke-through | 0 body vertices outside the garment by more than 1 mm in covered regions, at rest and in every pose of the body suite, on every cast body and at the supported parameter extremes *(proposed)* | Fit check |
 | Layers | Clearance between layers at least the item's `fit.margin`; no inner layer through an outer one | Fit check |
 | Sleeves and waist | A sleeve hem stays on the arm through arms raised; a waistband stays closed round the waist in the walk and the hip flex; no gap to skin at the waist | Fit check and review |
-| Footwear | No foot through the sole or upper in any pose; sole flat on the floor at rest (within 2 mm); toe box deforms only at the toe joint | Fit check |
-| Stability in motion | No popping or tearing between consecutive frames of Idle and Walk (vertex displacement continuous) | Motion capture check |
+| Footwear | No foot through the sole or upper in any pose; sole flat on the floor at rest (within 2 mm); toe box deforms only at the toe joint | Footwear check (`player` `garment_checks::footwear`: a foot corner the shoe covers at rest, a ray out along its normal meeting the shoe, is out when that ray meets no shoe in the pose; the tread is the shoe's downward faces within 1 cm of its lowest point) |
+| Stability in motion | No popping or tearing between consecutive frames of Idle and Walk (vertex displacement continuous) | Motion check (`player` `garment_checks::motion`, Idle, Walk and Run frame by frame: no garment corner jolts, its second difference, more than 1.25 times the most the skin within 10 cm of it does plus 2 mm; corners made at one place stay within 0.2 mm) |
 | Budgets *(proposed)* | LOD0: top 6k, jacket or coat 10k, bottom 6k, shoes 4k a pair, accessory 2k triangles; textures 2K (hero 4K) | Counts |
 
 ## 4. Hair
@@ -57,7 +57,7 @@ An item passes only when **every** check of its kind passes **and** the review f
 | Card or strand quality | No visible card edge or straight alpha cut at 1080p in any view; strand-like detail in the atlas (clumps, tapered ends, flyaways); no stair-stepping or shimmer under TAA (frame-to-frame variance of hair pixels under a limit set at the first sign-off) | Review; a TAA stability capture |
 | Material response | Dedicated hair shading (CO7 Hair model): a primary and a shifted secondary highlight along the strands, no plastic sheen; colour by melanin and redness, with roots and highlights where declared | Review under the four lights |
 | No slab shadows | Self-shadowing reads as many strands, not as solid sheets | Review under hard and outdoor light |
-| Motion | 0 hair vertices more than 1 mm inside the head in sampled frames of Idle, Walk and Run; spring-boned parts settle without jitter | Motion capture check |
+| Motion | 0 hair vertices more than 1 mm inside the head in sampled frames of Idle, Walk and Run; spring-boned parts settle without jitter | Motion check (`player` `garment_checks::motion`) |
 | Budgets (plan section 7) | Cards up to 40k triangles at hero LOD, 25k at gameplay LOD0, 3k at crowd LOD; strands optional (section 0, decision 3) | Counts; GPU timers |
 
 ## 5. What a draft may and may not do

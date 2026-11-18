@@ -1,0 +1,147 @@
+{
+  "style": "short-crop",
+  "levels": {
+    "0": {
+      "triangles": 27618,
+      "vertices": 27651,
+      "by_layer": {
+        "cap": 764,
+        "coverage": 2468,
+        "mid": 6876,
+        "top": 13812,
+        "short": 1732,
+        "hairline": 992,
+        "flyaway": 974
+      },
+      "roots_deepest_mm": 0.7
+    },
+    "1": {
+      "triangles": 15980,
+      "vertices": 15553,
+      "by_layer": {
+        "cap": 764,
+        "coverage": 2468,
+        "mid": 5432,
+        "top": 5212,
+        "short": 1336,
+        "hairline": 768
+      },
+      "roots_deepest_mm": 0.699
+    },
+    "2": {
+      "triangles": 466,
+      "vertices": 554,
+      "by_layer": {
+        "cap": 150,
+        "coverage": 316
+      },
+      "roots_deepest_mm": 0.649
+    }
+  },
+  "head_centre": [
+    0.0,
+    -0.04014,
+    1.63305
+  ],
+  "crown": [
+    0.01596,
+    0.01942,
+    1.73173
+  ],
+  "shapes": [
+    "Blink_Left",
+    "Brow_Inward_Left",
+    "Brow_Inward_Right",
+    "Brow_Lower_Left",
+    "Brow_Lower_Right",
+    "Brow_Raise_Left",
+    "Brow_Raise_Right",
+    "Face_Brow_Arch_Left",
+    "Face_Brow_Arch_Right",
+    "Face_Brow_Arch_Up_Left",
+    "Face_Brow_Arch_Up_Right",
+    "Face_Brow_Height_Left",
+    "Face_Brow_Height_Right",
+    "Face_Brow_Height_Up_Left",
+    "Face_Brow_Height_Up_Right",
+    "Face_Brow_Ridge",
+    "Face_Ear_Height_Left",
+    "Face_Ear_Height_Right",
+    "Face_Ear_Out_Left",
+    "Face_Ear_Out_Right",
+    "Face_Ear_Size_Left",
+    "Face_Ear_Size_Right",
+    "Face_Eye_Size_Left",
+    "Face_Forehead_Height",
+    "Face_Forehead_Slope",
+    "Face_Head_Width",
+    "Feminine_Fat_Over_Muscle",
+    "Feminine_Fat_Soft",
+    "Feminine_Muscle_Down_Fat_Down",
+    "Feminine_Muscle_Down_Fat_Up",
+    "Feminine_Muscle_Up_Fat_Up",
+    "Frame_Feminine",
+    "Masculine_Fat_Down",
+    "Masculine_Fat_Over_Muscle",
+    "Masculine_Fat_Soft",
+    "Masculine_Fat_Up",
+    "Masculine_Muscle_Down",
+    "Masculine_Muscle_Down_Fat_Down",
+    "Masculine_Muscle_Down_Fat_Up",
+    "Masculine_Muscle_Up",
+    "Masculine_Muscle_Up_Fat_Down",
+    "Masculine_Muscle_Up_Fat_Up",
+    "Nose_Sneer_Left"
+  ],
+  "follows": [
+    "Face_Brow_Arch_Left",
+    "Face_Brow_Arch_Right",
+    "Face_Brow_Arch_Up_Left",
+    "Face_Brow_Arch_Up_Right",
+    "Face_Brow_Height_Left",
+    "Face_Brow_Height_Right",
+    "Face_Brow_Height_Up_Left",
+    "Face_Brow_Height_Up_Right",
+    "Face_Brow_Ridge",
+    "Face_Ear_Height_Left",
+    "Face_Ear_Height_Right",
+    "Face_Ear_Out_Left",
+    "Face_Ear_Out_Right",
+    "Face_Ear_Size_Left",
+    "Face_Ear_Size_Right",
+    "Face_Eye_Size_Left",
+    "Face_Forehead_Height",
+    "Face_Forehead_Slope",
+    "Face_Head_Width",
+    "Feminine_Fat_Over_Muscle",
+    "Feminine_Fat_Soft",
+    "Feminine_Muscle_Down_Fat_Down",
+    "Feminine_Muscle_Down_Fat_Up",
+    "Feminine_Muscle_Up_Fat_Up",
+    "Frame_Feminine",
+    "Masculine_Fat_Down",
+    "Masculine_Fat_Over_Muscle",
+    "Masculine_Fat_Soft",
+    "Masculine_Fat_Up",
+    "Masculine_Muscle_Down",
+    "Masculine_Muscle_Down_Fat_Down",
+    "Masculine_Muscle_Down_Fat_Up",
+    "Masculine_Muscle_Up",
+    "Masculine_Muscle_Up_Fat_Down",
+    "Masculine_Muscle_Up_Fat_Up"
+  ],
+  "atlas": {
+    "size": 2048,
+    "islands": {
+      "cap": 1,
+      "band": 1,
+      "coverage": 4,
+      "clump": 5,
+      "detail": 9,
+      "flyaway": 10,
+      "sparse": 3,
+      "hairline": 3,
+      "short": 5
+    }
+  }
+}

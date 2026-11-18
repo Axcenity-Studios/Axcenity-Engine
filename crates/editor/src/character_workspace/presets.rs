@@ -377,26 +377,58 @@ pub fn save_own(
 struct FavouritesFile {
     format_version: u32,
     presets: Vec<String>,
+    /// The favourite items (the Hair and Clothing browsers), by ID. Left
+    /// out by an older editor, which keeps only `presets`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    items: Vec<String>,
+    /// The items worn last from a browser, newest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recent_items: Vec<String>,
 }
 
-/// The favourite presets' IDs in `folder` (none when there's no file).
-pub fn read_favourites(folder: &Path) -> BTreeSet<String> {
+fn read_file(folder: &Path) -> FavouritesFile {
     std::fs::read_to_string(folder.join(FAVOURITES_FILE))
         .ok()
         .and_then(|text| serde_json::from_str::<FavouritesFile>(&text).ok())
         .filter(|file| file.format_version <= FAVOURITES_VERSION)
-        .map(|file| file.presets.into_iter().collect())
         .unwrap_or_default()
 }
 
-/// Writes the favourites of `folder`.
-pub fn write_favourites(folder: &Path, favourites: &BTreeSet<String>) {
-    let file = FavouritesFile {
-        format_version: FAVOURITES_VERSION,
-        presets: favourites.iter().cloned().collect(),
-    };
+/// Changes the favourites file of `folder`, keeping what `change` leaves.
+fn update_file(folder: &Path, change: impl FnOnce(&mut FavouritesFile)) {
+    let mut file = read_file(folder);
+    file.format_version = FAVOURITES_VERSION;
+    change(&mut file);
     let text = serde_json::to_string_pretty(&file).expect("plain data");
     if let Err(err) = std::fs::write(folder.join(FAVOURITES_FILE), text) {
         log::warn!("could not write Character Studio's favourites: {err}");
     }
+}
+
+/// The favourite presets' IDs in `folder` (none when there's no file).
+pub fn read_favourites(folder: &Path) -> BTreeSet<String> {
+    read_file(folder).presets.into_iter().collect()
+}
+
+/// Writes the favourite presets of `folder` (the item lists are kept).
+pub fn write_favourites(folder: &Path, favourites: &BTreeSet<String>) {
+    update_file(folder, |file| {
+        file.presets = favourites.iter().cloned().collect();
+    });
+}
+
+/// The browsers' favourite items and recently used items in `folder`
+/// (editor state beside the preset favourites).
+pub fn read_item_lists(folder: &Path) -> (BTreeSet<String>, Vec<String>) {
+    let file = read_file(folder);
+    (file.items.into_iter().collect(), file.recent_items)
+}
+
+/// Writes the browsers' favourite and recently used items of `folder`
+/// (the preset favourites are kept).
+pub fn write_item_lists(folder: &Path, favourites: &BTreeSet<String>, recent: &[String]) {
+    update_file(folder, |file| {
+        file.items = favourites.iter().cloned().collect();
+        file.recent_items = recent.to_vec();
+    });
 }

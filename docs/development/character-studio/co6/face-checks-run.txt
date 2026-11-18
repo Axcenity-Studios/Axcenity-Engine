@@ -1,4 +1,9 @@
+masculine: identity_pairs 3388 poses, 6 with new crossings
+feminine: identity_pairs 3388 poses, 0 with new crossings
 masculine: at rest open [9.53, 9.42] mm; full blink open [0.0, 0.0] mm, 0 rays bare
 feminine: at rest open [9.4, 9.3] mm; full blink open [0.0, 0.0] mm, 0 rays bare
 0 failures
 exit 0
+(Wave 4, lead's face-gate follow-up: the check's inside test no longer counts a ray's
+repeat hit on the triangle it just crossed, and the head's triangles are chosen once per frame,
+at rest, above the base of the neck. See refinement/wave4/r9-expressions.md, Lead's face-gate follow-up.)

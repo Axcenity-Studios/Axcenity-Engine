@@ -14,6 +14,9 @@ use crate::BaseManifest;
 pub const HIDE_SHARE: f32 = 0.995;
 /// How far a garment may stand off the skin and still cover it.
 const COVER_REACH: f32 = 0.08;
+/// How far a ray out of a crease looks for the skin across it or the
+/// garment closing over it ([`closed_creases`]).
+pub(super) const CREASE_REACH: f32 = 0.15;
 
 /// A body's region map: a region index per texel over its first texture
 /// coordinates (0 where no skin is), as `RealisticRegions.png` holds it.
@@ -84,21 +87,40 @@ impl Coverage {
 pub fn coverage(body: &BodyMesh, regions: &[u8], surface: &Surface) -> Coverage {
     let weld = welded(&surface.positions);
     let open = open_edges(&weld, &surface.triangles);
+    let middles: Vec<(Vec3, Vec3)> = body
+        .triangles
+        .iter()
+        .map(|t| {
+            let corners = t.map(|v| body.positions[v as usize]);
+            let normal = t
+                .iter()
+                .map(|&v| body.normals[v as usize])
+                .sum::<Vec3>()
+                .normalize_or_zero();
+            ((corners[0] + corners[1] + corners[2]) / 3.0, normal)
+        })
+        .collect();
+    let mut under: Vec<bool> = middles
+        .iter()
+        .zip(regions)
+        .map(|((middle, normal), &region)| {
+            region != 0 && covers(surface, &weld, &open, *middle, *normal)
+        })
+        .collect();
+    for (t, closed) in closed_creases(body, surface, regions, &middles, &under)
+        .into_iter()
+        .enumerate()
+    {
+        under[t] |= closed;
+    }
     let mut covered: BTreeMap<u8, (usize, usize)> = BTreeMap::new();
-    for (t, &region) in body.triangles.iter().zip(regions) {
+    for (&region, &under) in regions.iter().zip(&under) {
         if region == 0 {
             continue;
         }
-        let corners = t.map(|v| body.positions[v as usize]);
-        let middle = (corners[0] + corners[1] + corners[2]) / 3.0;
-        let normal = t
-            .iter()
-            .map(|&v| body.normals[v as usize])
-            .sum::<Vec3>()
-            .normalize_or_zero();
         let entry = covered.entry(region).or_default();
         entry.1 += 1;
-        if covers(surface, &weld, &open, middle, normal) {
+        if under {
             entry.0 += 1;
         }
     }
@@ -138,6 +160,85 @@ fn covers(
         }
     }
     true
+}
+
+/// Skin in a crease the garment closes over (the armpit under a sleeve):
+/// each patch of body triangles the garment doesn't cover by [`covers`]
+/// (joined across their edges) whose every way out is shut, a ray out
+/// along each triangle's normal meeting, within [`CREASE_REACH`], the
+/// body's skin facing back across the crease or the garment from inside.
+/// Such a patch lies between covered skin on every side, and no cloth can
+/// lie along most of its normals, which point at the crease's other wall.
+/// A patch with one triangle whose way out is open (skin under a hole in
+/// the garment, or the bare skin past its hems, which the patch joins) is
+/// not one. Returns which triangles are in one.
+fn closed_creases(
+    body: &BodyMesh,
+    garment: &Surface,
+    regions: &[u8],
+    middles: &[(Vec3, Vec3)],
+    under: &[bool],
+) -> Vec<bool> {
+    let skin = Surface::new(
+        body.positions.clone(),
+        body.normals.clone(),
+        body.triangles.clone(),
+    );
+    // Is the way out along the triangle's normal shut: by skin facing
+    // back across a crease, or by the garment, met from inside?
+    let shut = |t: usize| {
+        let (middle, normal) = middles[t];
+        if normal == Vec3::ZERO {
+            return false;
+        }
+        let from = middle + normal * 1e-3;
+        let skin_hit = skin
+            .cast(from, normal, CREASE_REACH)
+            .filter(|hit| hit.triangle as usize != t && hit.normal.dot(normal) < 0.0);
+        let cloth_hit = garment
+            .cast(from, normal, CREASE_REACH)
+            .filter(|hit| hit.normal.dot(normal) > 0.0);
+        skin_hit.is_some() || cloth_hit.is_some()
+    };
+    // Triangles sharing an edge (corners at one place are one).
+    let weld = welded(&body.positions);
+    let mut by_edge: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
+    for (k, t) in body.triangles.iter().enumerate() {
+        let t = t.map(|v| weld[v as usize]);
+        for (u, v) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+            by_edge.entry((u.min(v), u.max(v))).or_default().push(k);
+        }
+    }
+    let mut out = vec![false; body.triangles.len()];
+    let mut seen = vec![false; body.triangles.len()];
+    for start in 0..body.triangles.len() {
+        if seen[start] || under[start] {
+            continue;
+        }
+        // The patch of uncovered triangles joined to `start`.
+        let mut patch = vec![start];
+        seen[start] = true;
+        let mut next = 0;
+        while next < patch.len() {
+            let k = patch[next];
+            next += 1;
+            let t = body.triangles[k].map(|v| weld[v as usize]);
+            for (u, v) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                for &other in &by_edge[&(u.min(v), u.max(v))] {
+                    if !seen[other] && !under[other] {
+                        seen[other] = true;
+                        patch.push(other);
+                    }
+                }
+            }
+        }
+        if patch.iter().all(|&k| regions[k] != 0 && shut(k)) {
+            for k in patch {
+                out[k] = true;
+            }
+        }
+    }
+    out
 }
 
 /// Edges with one triangle: a garment's hems and openings. Corners at the

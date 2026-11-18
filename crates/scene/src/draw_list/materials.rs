@@ -4,7 +4,7 @@
 use super::*;
 
 use axcenity_assets::ModelShading;
-use axcenity_render::{Shading, SkinLayers, SkinShading, Spots};
+use axcenity_render::{ClothShading, HairShading, Shading, SkinLayers, SkinShading, Spots};
 
 /// A Part's material from its Material preset and properties, with
 /// `appearance`'s maps over it. `None` when it's invisible.
@@ -216,6 +216,12 @@ pub(super) fn surface_material(
         // colour map, which the appearance replaces too.
         skin.layers = None;
     }
+    // A hair card atlas's data and flow maps go with the file's colour
+    // map, which the appearance replaces.
+    if let Shading::Hair(hair) = &mut material.shading {
+        hair.data = None;
+        hair.flow = None;
+    }
     maps.metalness = channel_map("MetalnessMap", "MetalnessChannel", false);
     if maps.metalness.is_some() {
         material.metalness = 1.0;
@@ -303,6 +309,24 @@ pub(super) fn model_material(material: &ModelMaterial) -> Material {
                     })
                 }),
                 ..SkinShading::default()
+            }),
+            // The file marks it hair: its atlas's data and flow maps
+            // (`docs/rendering/hair.md`), read as plain values.
+            // A shell over the head where the file marks one.
+            ModelShading::Hair => Shading::Hair(HairShading {
+                data: material.hair_data_texture.as_ref().map(texture),
+                flow: material.hair_flow_texture.as_ref().map(texture),
+                shell: material.hair_shell,
+                ..HairShading::default()
+            }),
+            // The file marks it cloth: its sheen and anisotropy are glTF's
+            // `KHR_materials_sheen` and `KHR_materials_anisotropy`; without
+            // them it has none (`docs/rendering/cloth.md`).
+            ModelShading::Cloth => Shading::Cloth(ClothShading {
+                sheen_colour: material.sheen.map_or([0.0; 3], |sheen| srgb(sheen.colour)),
+                sheen_roughness: material.sheen.map_or(0.5, |sheen| sheen.roughness),
+                anisotropy: material.anisotropy.map_or(0.0, |a| a.strength),
+                anisotropy_rotation: material.anisotropy.map_or(0.0, |a| a.rotation),
             }),
         },
         ..Material::default()

@@ -3,11 +3,16 @@
 //! detail level (Quick, Detailed, Advanced: brief §3.3) and Symmetry. Every
 //! page returns [`Intent`]s; nothing here changes the workspace.
 
+mod browser;
+mod expressions;
 mod materials;
 mod parameters;
 mod row;
 #[cfg(test)]
 mod tests;
+mod worn;
+
+pub(super) use browser::none_picture;
 
 #[cfg(test)]
 pub(super) use parameters::{Shown, hidden_changes, rows, side_choices};
@@ -28,8 +33,10 @@ pub(super) fn about(category: Category) -> &'static str {
     match category {
         Category::Body => "Pick the body type, then shape the body. Changes show as you drag.",
         Category::Face => "Shape the face, one feature at a time.",
-        Category::Hair => "Pick a hairstyle.",
-        Category::Clothing => "Dress the character one piece at a time.",
+        Category::Hair => "Pick a hairstyle: point at one to see it on the character.",
+        Category::Clothing => {
+            "Dress the character one piece at a time: point at a piece to see it on."
+        }
         Category::SkinAndMakeup => "The skin's colour and surface.",
         Category::Accessories => "Glasses, jewellery, hats and bags.",
         Category::Expressions => {
@@ -41,11 +48,16 @@ pub(super) fn about(category: Category) -> &'static str {
     }
 }
 
-/// Whether `category`'s page has sliders (and so a level and Symmetry).
+/// Whether `category`'s page has sliders (and so a level and Symmetry;
+/// the browsers' sliders are the worn items' own).
 fn has_sliders(category: Category) -> bool {
     matches!(
         category,
-        Category::Body | Category::Face | Category::SkinAndMakeup
+        Category::Body
+            | Category::Face
+            | Category::SkinAndMakeup
+            | Category::Hair
+            | Category::Clothing
     )
 }
 
@@ -188,7 +200,7 @@ pub(super) fn show(
                     asked
                 }
                 Category::SkinAndMakeup => {
-                    let mut asked = materials::skin(ui, workspace, base, selection.level);
+                    let mut asked = materials::skin(ui, workspace, base);
                     if base
                         .groups
                         .iter()
@@ -207,10 +219,18 @@ pub(super) fn show(
                     }
                     asked
                 }
-                Category::Hair | Category::Clothing | Category::Accessories => {
-                    slots_page(ui, workspace, library, base, category)
+                Category::Hair => {
+                    browser::page(ui, workspace, library, base, super::browser::Shelf::Hair)
                 }
-                Category::Expressions => expressions_page(ui, workspace),
+                Category::Clothing => browser::page(
+                    ui,
+                    workspace,
+                    library,
+                    base,
+                    super::browser::Shelf::Clothing,
+                ),
+                Category::Accessories => slots_page(ui, workspace, library, base, category),
+                Category::Expressions => expressions::page(ui, workspace),
                 Category::Presets => presets_page(ui, workspace, library),
             });
         });
@@ -394,48 +414,6 @@ pub(super) fn motion_chips(ui: &mut egui::Ui, workspace: &CharacterWorkspace) ->
             }
         }
     });
-    intents
-}
-
-/// The built-in expressions as chips: a click shows one on the preview's
-/// face; the description never changes (brief §10). Above them, the
-/// body's pose and motion, which the expression shows on top of.
-fn expressions_page(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<Intent> {
-    let palette = theme::palette(ui.ctx());
-    let mut intents = Vec::new();
-    widgets::section_label(ui, "Pose and motion");
-    intents.extend(motion_chips(ui, workspace));
-    ui.label(
-        egui::RichText::new(
-            "Walk and Run play at their own pace, in place. The camera follows the head.",
-        )
-        .small()
-        .color(palette.text_weak),
-    );
-    ui.add_space(8.0);
-    widgets::section_label(ui, "Built-in expressions");
-    ui.horizontal_wrapped(|ui| {
-        for name in axcenity_anim::BUILT_IN_EXPRESSIONS {
-            let shown = match &workspace.expression {
-                Some(shown) => shown.eq_ignore_ascii_case(name),
-                None => name.eq_ignore_ascii_case("Neutral"),
-            };
-            if widgets::chip(ui, name, shown).clicked() {
-                intents.push(Intent::PreviewExpression(
-                    (!shown).then(|| (*name).to_owned()),
-                ));
-            }
-        }
-    });
-    ui.add_space(8.0);
-    ui.label(
-        egui::RichText::new(
-            "Shown on the preview only, over the pose or motion. Expressions are made and \
-             edited in the Game Editor's face tab.",
-        )
-        .small()
-        .color(palette.text_weak),
-    );
     intents
 }
 

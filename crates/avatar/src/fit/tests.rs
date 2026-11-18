@@ -399,6 +399,98 @@ fn coverage_finds_the_regions_a_garment_covers_whole() {
     assert!(covered.share(1) < 0.05, "{covered:?}");
 }
 
+/// A grid of corners, `profile` (x, y) extruded along Z over `zs`, with
+/// triangles facing up (+Y) where the profile goes +X: a strip of skin or
+/// a sheet of cloth.
+fn extruded(profile: &[(f32, f32)], zs: &[f32]) -> (Vec<Vec3>, Vec<[u32; 3]>) {
+    let mut positions = Vec::new();
+    for &(x, y) in profile {
+        for &z in zs {
+            positions.push(Vec3::new(x, y, z));
+        }
+    }
+    let row = zs.len() as u32;
+    let mut triangles = Vec::new();
+    for i in 0..profile.len() as u32 - 1 {
+        for j in 0..row - 1 {
+            let a = i * row + j;
+            let (b, c, d) = (a + 1, a + row, a + row + 1);
+            // (Z step) × (X step) faces up.
+            triangles.push([a, b, c]);
+            triangles.push([b, d, c]);
+        }
+    }
+    (positions, triangles)
+}
+
+/// From `a` to `b` in steps of about 1 cm (both ends included).
+fn steps(a: f32, b: f32) -> Vec<f32> {
+    let n = ((b - a).abs() / 0.01).ceil().max(1.0) as usize;
+    (0..=n).map(|k| a + (b - a) * k as f32 / n as f32).collect()
+}
+
+/// Skin with a narrow crease along Z (two walls 6 cm apart at the top,
+/// 10 cm deep, facing each other, as an arm's underside and the chest's
+/// side do at an armpit). Region 1 is the top, region 2 the crease.
+fn creased_skin() -> (BodyMesh, Vec<u8>) {
+    let mut profile: Vec<(f32, f32)> = steps(-0.2, -0.03).into_iter().map(|x| (x, 0.1)).collect();
+    profile.pop();
+    profile.extend(steps(0.1, 0.0).into_iter().map(|y| (-0.3 * y, y)));
+    profile.pop();
+    profile.extend(steps(0.0, 0.1).into_iter().map(|y| (0.3 * y, y)));
+    profile.pop();
+    profile.extend(steps(0.03, 0.2).into_iter().map(|x| (x, 0.1)));
+    let (positions, triangles) = extruded(&profile, &steps(-0.2, 0.2));
+    let normals = vertex_normals(&positions, &triangles);
+    let regions = triangles
+        .iter()
+        .map(|t| {
+            let middle = t.iter().map(|v| positions[*v as usize]).sum::<Vec3>() / 3.0;
+            if middle.y < 0.099 { 2 } else { 1 }
+        })
+        .collect();
+    let mut body = tube_body();
+    body.uvs = Vec::new();
+    body.joints = vec![[0; 4]; positions.len()];
+    body.weights = vec![[1.0, 0.0, 0.0, 0.0]; positions.len()];
+    body.shapes = Vec::new();
+    body.positions = positions;
+    body.normals = normals;
+    body.triangles = triangles;
+    (body, regions)
+}
+
+/// A flat sheet of cloth 1 cm over the creased skin's top, wider and
+/// longer than it (bridging the crease, as a sleeve's underarm does), less
+/// the triangles whose middle `hole` takes out.
+fn sheet(hole: impl Fn(Vec3) -> bool) -> Surface {
+    let profile: Vec<(f32, f32)> = steps(-0.25, 0.25).into_iter().map(|x| (x, 0.11)).collect();
+    let (positions, triangles) = extruded(&profile, &steps(-0.25, 0.25));
+    let triangles: Vec<[u32; 3]> = triangles
+        .into_iter()
+        .filter(|t| !hole(t.iter().map(|v| positions[*v as usize]).sum::<Vec3>() / 3.0))
+        .collect();
+    let normals = vertex_normals(&positions, &triangles);
+    Surface::new(positions, normals, triangles)
+}
+
+/// A crease the garment closes over (an armpit under a sleeve) is under
+/// it, though no cloth lies along its walls' normals (each faces the
+/// other wall); a hole in the garment over plain skin still leaves that
+/// skin uncovered.
+#[test]
+fn coverage_counts_a_crease_the_garment_closes_over() {
+    let (body, regions) = creased_skin();
+    let covered = coverage(&body, &regions, &sheet(|_| false));
+    assert!(covered.share(1) >= HIDE_SHARE, "{covered:?}");
+    assert!(covered.share(2) >= HIDE_SHARE, "{covered:?}");
+    // A 6 × 8 cm hole over the top's skin (away from the crease).
+    let holed = sheet(|m| (0.08..0.16).contains(&m.x) && (-0.04..0.04).contains(&m.z));
+    let covered = coverage(&body, &regions, &holed);
+    assert!(covered.share(1) < 0.97, "{covered:?}");
+    assert!(covered.share(2) >= HIDE_SHARE, "{covered:?}");
+}
+
 #[test]
 fn a_fitted_garment_written_as_gltf_loads_with_its_skeleton_weights_and_shapes() {
     let body = tube_body();

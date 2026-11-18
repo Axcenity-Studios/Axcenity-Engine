@@ -7,8 +7,12 @@ use crate::draw_list::{
 use crate::graphics::ShadowQuality;
 use glam::Mat4;
 
+mod alpha_cards;
 mod ambient_occlusion;
 mod anti_aliasing;
+mod card_set;
+mod character_models_evidence;
+mod cloth;
 mod clouds;
 mod color_grading;
 mod cooked_textures;
@@ -17,10 +21,12 @@ mod debug_views;
 mod decals;
 mod environment_maps;
 mod fog;
+mod foliage_shadow_bench;
 mod frame_planning;
 mod frustum_culling;
 mod gpu_particles;
 mod grid;
+mod hair;
 mod lens;
 mod level_of_detail;
 mod light_probe_volumes;

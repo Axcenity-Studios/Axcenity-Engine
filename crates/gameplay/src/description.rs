@@ -669,6 +669,14 @@ impl DescriptionSync {
         );
     }
 
+    /// Forgets that `description` was applied, so the next
+    /// [`step`](Self::step) applies it again: for a host that sees what
+    /// applying it put on is gone though its `Base` and `Data` are the same
+    /// (the editor's undo putting back a world from before it was applied).
+    pub fn forget(&mut self, description: InstanceId) {
+        self.applied.remove(&description);
+    }
+
     /// Applies what isn't applied yet. Returns what went wrong, each as a
     /// sentence.
     pub fn step(&mut self, world: &mut World, assets: &Assets) -> Vec<String> {

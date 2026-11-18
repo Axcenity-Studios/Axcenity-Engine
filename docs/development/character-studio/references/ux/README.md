@@ -197,7 +197,7 @@ A second pass on 2026-11-16 checked this folder against the sources and against 
 | 120 ms between applies during a slider drag | patterns.md section 0 | `crates/editor/src/character_workspace.rs:69` |
 | 75 parameters, 13 groups, 14 map regions, `hip_width` 1.0 to 1.15 | patterns.md section 0 | `assets/characters/realistic/Realistic.base.json` |
 
-Numbers with no source: "up to seven" randomize aspects (U-05, a search summary that could not be opened); about 6 ms per apply (the topic file's figure, not measured again); and the tuning values in patterns.md section 3 (240 points, 12 points, 0.4 s, a quarter of a second, the last tenth of a range, 45 degrees) and section 6 (six variants), which are proposals. Section 3 now labels them so.
+Numbers with no source: "up to seven" randomize aspects (U-05, a search summary that could not be opened); about 6 ms per apply (the topic file's figure, not measured again); and the tuning values in patterns.md section 3 (12 points, 0.4 s, a quarter of a second, the last tenth of a range, 45 degrees) and section 6 (six variants), which are proposals. Section 3 now labels them so. The drag's own numbers (110 points for a range, Shift a quarter, Ctrl double) are Paul's rule of 2026-11-18, a decision rather than a source.
 
 ### Corrections to this file
 

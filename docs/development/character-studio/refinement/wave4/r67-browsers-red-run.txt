@@ -1,0 +1,61 @@
+r67-browsers red run (2026-11-18): the tests of crates/editor/src/character_workspace/browser_tests.rs
+run against browser.rs with every function returning at once (list empty, dressed unchanged,
+Declared empty, browse and the worn item's setters doing nothing), before the logic was put back.
+Command: cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+(the_browsers_are_drawn passes because it returns at once without AXCENITY_SNAPSHOTS)
+
+        PASS ( 1/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_browsers_are_drawn
+        FAIL ( 2/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::search_matches_every_word_against_name_tags_and_about
+        FAIL ( 3/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::wearing_takes_off_what_conflicts_and_what_its_slots_held
+        FAIL ( 4/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::filters_narrow_by_slot_kind_colour_fit_and_favourites
+        FAIL ( 5/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::every_style_declares_only_what_it_supports
+        FAIL ( 6/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::recently_used_lists_the_items_last_worn_newest_first
+        FAIL ( 7/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::drafts_are_hidden_until_show_drafts_and_marked_when_shown
+        FAIL ( 8/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::only_items_for_this_base_in_a_slot_the_page_takes_are_offered
+        FAIL ( 9/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_realistic_pages_say_what_they_have
+        FAIL (10/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::a_tile_is_previewed_without_committing_until_wear
+        FAIL (11/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::favourites_and_recently_used_are_kept_beside_the_preset_favourites
+        FAIL (12/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_worn_items_controls_are_one_undo_step_each
+        FAIL (13/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_worn_style_shows_only_the_controls_it_declares
+        FAIL (14/14) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::drafts_show_only_with_show_drafts_and_say_draft
+     Summary 14 tests run: 1 passed, 13 failed, 1409 skipped
+
+Added during the visual review (the underwear tiles of a dressed character looked alike): a clothing
+tile's picture leaves off the garments on layers over the tile's. Red run with browser::pictured
+returning its input unchanged (the hoodie fixture on layer 3; the test fails at "the tee's picture
+leaves the hoodie off"):
+        FAIL (1/1) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::a_clothing_tile_shows_its_item_over_what_is_under_it_only
+     Summary 1 test run: 0 passed, 1 failed, 1424 skipped
+
+=== Review fixes 1: red run (tests written before the fix) ===
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+
+FAIL character_workspace::browser_tests::keeping_a_held_version_ends_a_tile_preview
+  panicked at browser_tests.rs:1117:5: the try-on ended
+  (after Capture, an edit, Select plain-crop, ShowHeld(Some(0)), KeepHeld(0),
+  the tile preview was still on)
+FAIL character_workspace::browser_tests::esc_takes_a_try_on_off_while_the_pointer_stays_on_its_tile
+  panicked at browser_tests.rs:1191:5: assertion `left == right` failed: Esc took the try-on off
+  left (shown):  ... WornItem { id: "test/plain-crop", ... }
+  right (description): ... WornItem { id: "axcenity/hair-swept", ... }
+  (the pointer stayed on the clicked tile; the next frame's Hover put the preview back)
+
+Summary [8.673s] 17 tests run: 15 passed, 2 failed, 1410 skipped
+
+== Review fixes 2: red run (before the fix) ==
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+        FAIL [   6.078s] (16/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile
+    test character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1423 filtered out; finished in 6.00s
+    thread 'character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile' panicked at crates\editor\src\character_workspace\browser_tests.rs:1282:5:
+      left: Some("axcenity/hair-bob")
+     right: Some("axcenity/hair-long")
+        FAIL [   6.142s] (17/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing
+    test character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1423 filtered out; finished in 6.00s
+    thread 'character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing' panicked at crates\editor\src\character_workspace\browser_tests.rs:1314:5:
+    assertion `left == right` failed: nothing is tried on (hovered: Some(Pick { slot: "hair", item: Some("axcenity/hair-long") }))
+     Summary [   9.047s] 19 tests run: 17 passed, 2 failed, 1410 skipped
+        FAIL [   6.078s] (16/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_near_a_tiles_top_tries_on_that_tile
+        FAIL [   6.142s] (17/19) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::clicking_the_worn_tile_while_trying_one_on_previews_nothing
+(The worn-tile failure's descriptions: shown wears axcenity/hair-long, the description wears axcenity/hair-bob.)

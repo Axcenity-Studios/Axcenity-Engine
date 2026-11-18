@@ -2117,6 +2117,130 @@ pub enum Shading {
     /// Skin: light spreads under the surface and comes back out softened
     /// and redder, with two specular lobes. See [`SkinShading`].
     Skin(SkinShading),
+    /// Hair cards: light along the strands, a white highlight shifted
+    /// toward the root, a coloured one toward the tip and light through
+    /// from behind. See [`HairShading`].
+    Hair(HairShading),
+    /// Fabric: a sheen that brightens at grazing angles and an optional
+    /// anisotropic highlight. See [`ClothShading`].
+    Cloth(ClothShading),
+}
+
+/// Hair shading (characters' `hair` model, ADR-0036;
+/// `docs/rendering/hair.md`): a Marschner-style model (Karis's
+/// approximation, SIGGRAPH 2016) lit along the strand, not the surface's
+/// normal. The strand runs along the texture's +V, or as its `flow` map
+/// says. Its colour is the material's, moved along the two-pigment
+/// absorption curve by `melanin` and `redness` (and by the root, tip and
+/// streak values, where `data` says a pixel is a root, a tip or a
+/// streak). Every value at its neutral setting draws the material as
+/// made. A cut-out hair card is drawn with hashed alpha under TAA and
+/// with graded coverage under MSAA.
+#[derive(Clone, Debug)]
+pub struct HairShading {
+    /// The card atlas's data, placed like the base colour map and read as
+    /// plain values: red root (0) to tip (1), green a value per strand or
+    /// card (0 to 1, varies the highlights' shift), blue the streak mask,
+    /// alpha the strands' own ambient occlusion. It takes the metalness
+    /// map's place (hair isn't metal). `None`: halfway along every strand,
+    /// no streaks, no occlusion of its own.
+    pub data: Option<Arc<dyn TextureSource>>,
+    /// The strands' direction in the card's tangent space (red along the
+    /// texture's U, green along its V, each 0.5 + 0.5 × the direction),
+    /// from root to tip. It takes the specular map's place. `None`: along
+    /// +V.
+    pub flow: Option<Arc<dyn TextureSource>>,
+    /// Darker (to 1) or lighter (to -1) than the material's colour, along
+    /// the melanin absorption curve: absorption times 8 at 1, an eighth at
+    /// -1.
+    pub melanin: f32,
+    /// More (to 1) or less (to -1) pheomelanin than the colour has: red to
+    /// ash.
+    pub redness: f32,
+    /// A dye's colour (sRGB) and how much of the natural colour it
+    /// replaces, 0 to 1.
+    pub dye: [f32; 3],
+    pub dye_amount: f32,
+    /// Lighter toward the tips, 0 to 1 (a melanin offset down to -1.5 at
+    /// the tip).
+    pub tip_lightening: f32,
+    /// A melanin offset at the root (-1 to 1, 0 none), fading out over
+    /// `root_length` of the strand (0 to 1).
+    pub root_melanin: f32,
+    pub root_length: f32,
+    /// How much of the streak mask shows, 0 to 1, and the streaks'
+    /// melanin offset (-1 lighter to 1 darker).
+    pub streaks: f32,
+    pub streak_melanin: f32,
+    /// The secondary (coloured) highlight's strength, 1 as made, 0 to 2.
+    pub secondary: f32,
+    /// Multiplies the cuticle's tilt, which shifts the highlights along
+    /// the strand: 0 to 2, 1 human hair's.
+    pub shift: f32,
+    /// Multiplies the colour after melanin and dye (sRGB; white leaves it).
+    pub tint: [f32; 3],
+    /// A shell over something solid (a hair cap, or cards lying on the
+    /// scalp): its light fades out over the solid's terminator, by the
+    /// mesh's own (outward) normal, so light from behind the head doesn't
+    /// come through it. A single-sided hair material is always one; a
+    /// double-sided one is one when its file says so (glTF `extras`
+    /// `axcenity_hair_shell: true`). Loose cards (a ponytail's, flyaways)
+    /// aren't, so light from behind comes through them.
+    pub shell: bool,
+}
+
+impl Default for HairShading {
+    fn default() -> Self {
+        Self {
+            data: None,
+            flow: None,
+            melanin: 0.0,
+            redness: 0.0,
+            dye: [1.0; 3],
+            dye_amount: 0.0,
+            tip_lightening: 0.0,
+            root_melanin: 0.0,
+            root_length: 0.15,
+            streaks: 0.0,
+            streak_melanin: 0.0,
+            secondary: 1.0,
+            shift: 1.0,
+            tint: [1.0; 3],
+            shell: false,
+        }
+    }
+}
+
+/// Cloth shading (characters' `cloth` model, ADR-0036;
+/// `docs/rendering/cloth.md`): the material's diffuse and specular light
+/// under a sheen layer (the Charlie distribution with Neubelt's
+/// visibility, as glTF's `KHR_materials_sheen` defines it), which
+/// brightens toward grazing angles and takes from the layer under it what
+/// it reflects. The specular highlight can be stretched along a direction
+/// (anisotropic GGX), for satin, silk and brushed fibres.
+#[derive(Clone, Debug)]
+pub struct ClothShading {
+    /// The sheen's colour (sRGB); black draws none.
+    pub sheen_colour: [f32; 3],
+    /// How wide the sheen spreads, 0 to 1 (Charlie's roughness).
+    pub sheen_roughness: f32,
+    /// How much the highlight stretches, -1 to 1: positive along the
+    /// direction, negative across it, 0 none.
+    pub anisotropy: f32,
+    /// Turns the direction from the texture's U (the mesh's tangent), in
+    /// radians, counter-clockwise.
+    pub anisotropy_rotation: f32,
+}
+
+impl Default for ClothShading {
+    fn default() -> Self {
+        Self {
+            sheen_colour: [0.0; 3],
+            sheen_roughness: 0.5,
+            anisotropy: 0.0,
+            anisotropy_rotation: 0.0,
+        }
+    }
 }
 
 /// Skin shading (characters' `skin` model, ADR-0036;

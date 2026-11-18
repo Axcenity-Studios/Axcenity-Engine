@@ -31,6 +31,8 @@ pub(super) const SCENE_SHADER: &str = concat!(
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
     include_str!("../skin.wgsl"),
+    include_str!("../hair.wgsl"),
+    include_str!("../cloth.wgsl"),
     include_str!("../surface.wgsl")
 );
 /// Water's shader: the scene's, then water.wgsl, with nothing traced (see
@@ -43,6 +45,8 @@ pub(super) const WATER_SHADER: &str = concat!(
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
     include_str!("../skin.wgsl"),
+    include_str!("../hair.wgsl"),
+    include_str!("../cloth.wgsl"),
     include_str!("../surface.wgsl"),
     include_str!("../water.wgsl"),
     include_str!("../water_no_rays.wgsl")
@@ -58,6 +62,8 @@ pub(super) const TRACED_WATER_SHADER: &str = concat!(
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
     include_str!("../skin.wgsl"),
+    include_str!("../hair.wgsl"),
+    include_str!("../cloth.wgsl"),
     include_str!("../surface.wgsl"),
     include_str!("../water.wgsl"),
     include_str!("../water_rays.wgsl")
@@ -71,7 +77,9 @@ pub(super) const SCENE_TEMPLATE: &str = concat!(
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
-    include_str!("../skin.wgsl")
+    include_str!("../skin.wgsl"),
+    include_str!("../hair.wgsl"),
+    include_str!("../cloth.wgsl")
 );
 /// The shader for terrain chunks: the sky's colors, the fog and the
 /// shared lighting, then `terrain.wgsl`.
@@ -538,73 +546,117 @@ pub(super) fn create_frame_bind_group(
 }
 
 /// Draws solid items' depth as the sun, a spot light or a point light's
-/// face sees them. No color, no materials.
+/// face sees them. No color; with `cut_out` (the material layout), the
+/// pipeline for cut-out casters, which reads each one's material to leave
+/// its texture's holes out (`fs_shadow_cut_out`), else no materials.
 pub(super) fn create_shadow_pipeline(
     device: &wgpu::Device,
     shadow_layout: &wgpu::BindGroupLayout,
     skinning: &Skinning,
+    cut_out: Option<&wgpu::BindGroupLayout>,
 ) -> wgpu::RenderPipeline {
     let shader = shader_module(device, "shadow", SCENE_SHADER);
-    // No material (group 1), and group 2 is empty (posed corners are the
-    // frame's binding 9).
+    // No material (group 1) but a cut-out's, and group 2 is empty (posed
+    // corners are the frame's binding 9).
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("shadow"),
         bind_group_layouts: &[
             Some(shadow_layout),
-            Some(&skinning.empty_layout),
+            Some(cut_out.unwrap_or(&skinning.empty_layout)),
             Some(&skinning.layout),
         ],
         immediate_size: 0,
     });
-    // Only the position, the model matrix, the skin and the sway matter here.
+    // Only the position, the model matrix, the skin and the sway matter
+    // here; a cut-out's texture coordinates, opacity and cutoff too.
+    let vertex_attributes = [
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x3,
+            offset: std::mem::offset_of!(Vertex, position) as u64,
+            shader_location: 0,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x2,
+            offset: std::mem::offset_of!(Vertex, uv) as u64,
+            shader_location: 12,
+        },
+    ];
     let vertex_layout = wgpu::VertexBufferLayout {
         array_stride: size_of::<Vertex>() as u64,
         step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &wgpu::vertex_attr_array![0 => Float32x3],
+        attributes: if cut_out.is_some() {
+            &vertex_attributes
+        } else {
+            &vertex_attributes[..1]
+        },
     };
+    let cut_out_attributes = [
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: std::mem::offset_of!(InstanceRaw, base_color_opacity) as u64,
+            shader_location: 9,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: std::mem::offset_of!(InstanceRaw, surface) as u64,
+            shader_location: 11,
+        },
+    ];
+    let mut instance_attributes = vec![
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 0,
+            shader_location: 2,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 16,
+            shader_location: 3,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 32,
+            shader_location: 4,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 48,
+            shader_location: 5,
+        },
+        // The skin and the sway are last, past the attributes left out.
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Uint32x2,
+            offset: std::mem::offset_of!(InstanceRaw, skin) as u64,
+            shader_location: 14,
+        },
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: std::mem::offset_of!(InstanceRaw, sway) as u64,
+            shader_location: 15,
+        },
+    ];
+    if cut_out.is_some() {
+        instance_attributes.extend(cut_out_attributes);
+    }
     let instance_layout = wgpu::VertexBufferLayout {
         array_stride: size_of::<InstanceRaw>() as u64,
         step_mode: wgpu::VertexStepMode::Instance,
-        attributes: &[
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: 0,
-                shader_location: 2,
-            },
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: 16,
-                shader_location: 3,
-            },
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: 32,
-                shader_location: 4,
-            },
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: 48,
-                shader_location: 5,
-            },
-            // The skin and the sway are last, past the attributes left out.
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Uint32x2,
-                offset: std::mem::offset_of!(InstanceRaw, skin) as u64,
-                shader_location: 14,
-            },
-            wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x4,
-                offset: std::mem::offset_of!(InstanceRaw, sway) as u64,
-                shader_location: 15,
-            },
-        ],
+        attributes: &instance_attributes,
     };
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("shadow"),
+        label: Some(if cut_out.is_some() {
+            "shadow cut-out"
+        } else {
+            "shadow"
+        }),
         layout: Some(&layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: Some("vs_shadow"),
+            entry_point: Some(if cut_out.is_some() {
+                "vs_shadow_cut_out"
+            } else {
+                "vs_shadow"
+            }),
             compilation_options: Default::default(),
             buffers: &[Some(vertex_layout), Some(instance_layout)],
         },
@@ -628,7 +680,14 @@ pub(super) fn create_shadow_pipeline(
             },
         }),
         multisample: Default::default(),
-        fragment: None,
+        // A cut-out's fragments are kept only where its texture isn't cut
+        // out; they write depth alone.
+        fragment: cut_out.map(|_| wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_shadow_cut_out"),
+            compilation_options: Default::default(),
+            targets: &[],
+        }),
         multiview_mask: None,
         cache: None,
     })

@@ -3,8 +3,9 @@
 //! **modulate** the material's own maps (a tint multiplies the base colour
 //! map, a scale multiplies roughness), never replace them, and a material
 //! with no values looks exactly as authored: every value's neutral setting
-//! changes nothing. Until the renderer has the Skin, Eye, Cloth and Hair
-//! shading models (CO7) they draw as Standard with the same values.
+//! changes nothing. The renderer draws the Skin, Cloth and Hair models
+//! (CO7: `docs/rendering/skin.md`, `cloth.md`, `hair.md`); Eye still draws
+//! as Standard with the same values.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -305,6 +306,14 @@ const CLOTH: &[ValueSpec] = &[
         1.0,
         "Multiplies the authored anisotropy (satin, silk).",
     ),
+    number(
+        "anisotropy_rotation",
+        -90.0,
+        90.0,
+        0.0,
+        "Turns the direction the highlight stretches along, in degrees from the authored one \
+         (a stretched highlight repeats every half turn).",
+    ),
 ];
 
 const HAIR: &[ValueSpec] = &[
@@ -351,6 +360,41 @@ const HAIR: &[ValueSpec] = &[
         1.5,
         1.0,
         "Multiplies the strands' roughness.",
+    ),
+    number(
+        "root_melanin",
+        -1.0,
+        1.0,
+        0.0,
+        "Darker (1) or lighter (-1) roots: a melanin offset at the root, fading out over `root_length`.",
+    ),
+    number(
+        "root_length",
+        0.0,
+        1.0,
+        0.15,
+        "How far down the strand the roots' colour reaches, as a share of its length.",
+    ),
+    number(
+        "streaks",
+        0.0,
+        1.0,
+        0.0,
+        "How much of the style's streak mask shows (highlights or lowlights).",
+    ),
+    number(
+        "streak_melanin",
+        -1.0,
+        1.0,
+        0.0,
+        "The streaks' melanin offset: lighter (-1, highlights) to darker (1, lowlights).",
+    ),
+    number(
+        "shift_scale",
+        0.0,
+        2.0,
+        1.0,
+        "Multiplies how far the highlights shift along the strand (the cuticle's tilt).",
     ),
 ];
 
@@ -454,6 +498,54 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// CO7 (wave 4): the Hair model's roots, streaks and highlight shift,
+    /// and the Cloth model's stretch direction, all optional and neutral
+    /// at their defaults.
+    #[test]
+    fn hair_and_cloth_have_the_values_their_shading_models_draw() {
+        for (model, names) in [
+            (
+                ShadingModel::Hair,
+                &[
+                    "melanin",
+                    "redness",
+                    "tip_lightening",
+                    "root_melanin",
+                    "root_length",
+                    "streaks",
+                    "streak_melanin",
+                    "highlight",
+                    "shift_scale",
+                ][..],
+            ),
+            (
+                ShadingModel::Cloth,
+                &[
+                    "sheen_tint",
+                    "sheen_roughness_scale",
+                    "anisotropy_scale",
+                    "anisotropy_rotation",
+                ][..],
+            ),
+        ] {
+            for name in names {
+                assert!(model.value(name).is_some(), "{model:?} {name}");
+            }
+        }
+        let values: MaterialValues = serde_json::from_str(
+            r#"{"root_melanin": 0.5, "streaks": 1.0, "shift_scale": 2.0, "root_length": 0.3}"#,
+        )
+        .unwrap();
+        assert!(check_values("Hair", ShadingModel::Hair, &values).is_empty());
+        // An anisotropic lobe repeats every half turn: -90 to 90 degrees.
+        let rotated: MaterialValues =
+            serde_json::from_str(r#"{"anisotropy_rotation": 120.0}"#).unwrap();
+        assert_eq!(
+            check_values("Shirt", ShadingModel::Cloth, &rotated).len(),
+            1
+        );
     }
 
     #[test]

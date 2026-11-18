@@ -42,8 +42,9 @@ pub type FinishPose = fn(&Rig, &mut Vec<BoneTransform>);
 /// `correctives` (a test holds them to the build data).
 pub type CorrectiveRule = (&'static str, &'static str, [f32; 3], f32, f32);
 
-/// The realistic body's corrective rules (its shoulders).
-pub const CORRECTIVE_RULES: [CorrectiveRule; 6] = [
+/// The realistic body's corrective rules (its shoulders: raised, level,
+/// lowered, and the hanging arm swung forward and back).
+pub const CORRECTIVE_RULES: [CorrectiveRule; 10] = [
     (
         "Corrective_Shoulder_Level_Left",
         "LeftUpperArm",
@@ -86,6 +87,34 @@ pub const CORRECTIVE_RULES: [CorrectiveRule; 6] = [
         0.0,
         35.0,
     ),
+    (
+        "Corrective_Shoulder_Forward_Left",
+        "LeftUpperArm",
+        [0.32884, -0.87444, -0.35668],
+        0.0,
+        40.0,
+    ),
+    (
+        "Corrective_Shoulder_Forward_Right",
+        "RightUpperArm",
+        [0.32888, 0.8747, 0.35601],
+        0.0,
+        40.0,
+    ),
+    (
+        "Corrective_Shoulder_Back_Left",
+        "LeftUpperArm",
+        [-0.32884, 0.87444, 0.35668],
+        0.0,
+        50.0,
+    ),
+    (
+        "Corrective_Shoulder_Back_Right",
+        "RightUpperArm",
+        [-0.32888, -0.8747, -0.35601],
+        0.0,
+        50.0,
+    ),
 ];
 
 /// A rotation's twist about `axis` (radians, the short way round): how
@@ -113,7 +142,9 @@ pub fn corrective_weights(rig: &Rig, bones: &[BoneTransform]) -> Vec<(String, f3
             let now = bones.get(index).map_or(rest, |b| b.rotation);
             let angle =
                 twist_angle(now * rest.inverse(), Vec3::from(axis).normalize()).to_degrees();
-            let weight = ((angle - start) / (full - start)).clamp(0.0, 1.0);
+            // Eased at both ends, as `anim::correctives::ramp`.
+            let t = ((angle - start) / (full - start)).clamp(0.0, 1.0);
+            let weight = t * t * (3.0 - 2.0 * t);
             Some((shape.to_owned(), weight))
         })
         .collect()
@@ -279,13 +310,13 @@ pub fn fit_poses(rig: &Rig, finish: Option<FinishPose>) -> Vec<FitPose> {
     // leg, as people walk.
     for (name, ahead) in [("walk-left", "Left"), ("walk-right", "Right")] {
         let behind = if ahead == "Left" { "Right" } else { "Left" };
-        for arm_degrees in [15.0, 40.0] {
+        for (arm_degrees, forward, back) in [(15.0, 15.0, 25.0), (40.0, 30.0, 48.0)] {
             let mut posing = Posing::new(rig, finish);
             for side in ["Left", "Right"] {
-                posing.arm_out(side, 8.0);
+                posing.arm_out(side, 14.0);
             }
-            posing.arm_swing(ahead, arm_degrees);
-            posing.arm_swing(behind, -arm_degrees);
+            posing.arm_swing(ahead, forward);
+            posing.arm_swing(behind, -back);
             posing.leg_swing(behind, 30.0);
             posing.leg_swing(ahead, -20.0);
             for side in ["Left", "Right"] {
