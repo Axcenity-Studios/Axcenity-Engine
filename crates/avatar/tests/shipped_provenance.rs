@@ -5,7 +5,10 @@
 
 use std::path::{Path, PathBuf};
 
-use axcenity_avatar::{ACCEPTED_LICENCES, Library, LicenceTerms, check_provenance, licence_terms};
+use axcenity_avatar::{
+    ACCEPTED_LICENCES, Library, LicenceTerms, check_provenance, licence_page, licence_terms,
+    needs_notice,
+};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters")
@@ -42,6 +45,18 @@ fn the_intake_scripts_accept_and_refuse_the_same_licences() {
     for example in list["refused_examples"].as_array().unwrap() {
         let id = example.as_str().unwrap();
         assert!(licence_terms(id).is_err(), "{id} should be refused");
+    }
+    // The page a record names as the licence's text, and the licences
+    // whose notice a record carries.
+    for id in &accepted {
+        let page = list["licence_pages"][id.as_str()].as_str();
+        assert_eq!(page, licence_page(id), "{id}'s page");
+        let notice = list["notice_required"]
+            .as_array()
+            .expect("notice_required")
+            .iter()
+            .any(|listed| listed.as_str() == Some(id.as_str()));
+        assert_eq!(notice, needs_notice(id), "{id}'s notice");
     }
 }
 

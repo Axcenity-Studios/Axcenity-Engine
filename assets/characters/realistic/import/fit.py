@@ -14,7 +14,9 @@ beside it go its binding, thumbnail, manifest (`quality: "draft"`: nothing
 becomes Production without the review, asset-quality.md section 1) and
 provenance record (`<Object>.provenance.json`, with what every step
 changed and the item's ID). The model is read back and its levels'
-triangles and skinning are checked (`export.json`).
+triangles and the weights it ships are judged against section 2's
+skinning rules (`export.json`), and the library's `catalogue.json` is
+written again so the provenance check and a capture can read it.
 
 The weights the item ships are the engine fit's, not the intake's
 (`skinning.py` only stands in for them while the item is conformed and
@@ -215,7 +217,10 @@ def assemble(spec, fitted, maps, out, placed=None):
     doc["materials"] = []
     for m in spec["_materials"]:
         options = item.get("materials", {}).get(m["name"], {})
-        mat = {"name": m["name"], "doubleSided": bool(options.get("double_sided", True)),
+        # Section 2: no surface is seen from both sides unless it is a
+        # card; a material opts in (`"double_sided": true`), so a flipped
+        # face isn't hidden.
+        mat = {"name": m["name"], "doubleSided": bool(options.get("double_sided", False)),
                "pbrMetallicRoughness": {"metallicFactor": 1.0, "roughnessFactor": 1.0}}
         found = maps.get(m["name"], {})
         mime = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
@@ -250,27 +255,55 @@ def assemble(spec, fitted, maps, out, placed=None):
     return rigid
 
 
-def read_back(path):
-    """Each level's triangles and skinning, from the written model."""
+def read_back(path, body=None, rigid_bone=None):
+    """Each level's triangles and skinning, from the written model: the
+    weights it ships (the engine fit's, or the rigid bone's), judged
+    against section 2's skinning rules, with the far-bone rule measured
+    against `body`'s joints when it is given."""
     import bodyglb
     doc, binary = bodyglb.read_glb(path)
     out = {}
     for node in doc["nodes"]:
         if "mesh" not in node:
             continue
-        tris, joints, weights, uvs = 0, [], [], True
+        tris, points, joints, weights, uvs = 0, [], [], [], True
         for prim in doc["meshes"][node["mesh"]]["primitives"]:
             tris += doc["accessors"][prim["indices"]]["count"] // 3
             a = prim["attributes"]
             uvs &= "TEXCOORD_0" in a
             if "WEIGHTS_0" in a:
-                joints.append(bodyglb.accessor(doc, binary, a["JOINTS_0"]))
+                points.append(bodyglb.accessor(doc, binary, a["POSITION"]))
+                joints.append(bodyglb.accessor(doc, binary, a["JOINTS_0"]).astype(np.int64))
                 weights.append(bodyglb.accessor(doc, binary, a["WEIGHTS_0"]))
         entry = {"triangles": int(tris), "texture_coordinates": uvs}
         if weights:
-            entry["skinning"] = checks.skinning(np.vstack(joints), np.vstack(weights))
+            J, W = np.vstack(joints), np.vstack(weights)
+            skin = checks.skinning(J, W)
+            if body is not None and "skin" in node:
+                # The skin's joints by name, in the order JOINTS_0 counts.
+                bones = [doc["nodes"][j]["name"] for j in doc["skins"][node["skin"]]["joints"]]
+                skin["far_from_their_bone"] = checks.far_weights(np.vstack(points), J, W, bones,
+                                                                 body.heads, body.parents)
+            entry["skinning"] = skin
+            entry["limits"] = checks.skin_limits(skin, rigid_bone)
         out[node["name"]] = entry
     return out
+
+
+def write_catalogue(root):
+    """`catalogue.json` of the library at `root`, by the library's own
+    script (`assets/characters/catalogue.py`), so the provenance check and
+    a capture can read the library the item went into."""
+    sys.path.insert(0, os.path.join(REPOSITORY, "assets", "characters"))
+    try:
+        import catalogue
+    finally:
+        sys.path.pop(0)
+    catalogue.ROOT = os.path.abspath(root)
+    catalogue.main()
+    with open(os.path.join(root, "catalogue.json"), encoding="utf-8") as f:
+        written = json.load(f)
+    return {"bases": len(written["bases"]), "items": len(written["items"])}
 
 
 def changes_of(spec, work):
@@ -313,6 +346,7 @@ def changes_of(spec, work):
 
 
 def step(spec, work, out_root):
+    import bodyglb
     item = spec["item"]
     loaded = WorkMesh.load(os.path.join(work, "lod0.npz"))
     spec = dict(spec)
@@ -387,11 +421,13 @@ def step(spec, work, out_root):
     export = {
         "folder": item["folder"],
         "files": sorted(os.listdir(folder)),
-        "levels": read_back(os.path.join(folder, f"{obj}.glb")),
+        "levels": read_back(os.path.join(folder, f"{obj}.glb"), bodyglb.load(spec.get("body")),
+                            spec.get("fit", {}).get("rigid_bone")),
         "rigid": rigid,
         "import": [[line for line in r.splitlines()
                     if line.startswith(("imported", "slot", "alignment", "coverage"))] for r in reports],
     }
+    export["catalogue"] = write_catalogue(out_root)
     with open(os.path.join(work, "export.json"), "w", newline="\n") as f:
         json.dump(export, f, indent=1)
         f.write("\n")

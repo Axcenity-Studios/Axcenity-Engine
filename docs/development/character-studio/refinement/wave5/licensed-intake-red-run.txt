@@ -64,3 +64,41 @@ cargo nextest run -p axcenity-avatar -p axcenity-project --no-fail-fast: 437 tes
 cargo nextest run -p axcenity-editor -E 'test(/build_game|browser|round_trip/)': 67 tests run: 67 passed
 cargo nextest run -p axcenity-player -E 'test(/fit_gate|wardrobe/)': 22 tests run: 22 passed
 python -I assets/characters/realistic/import/test_intake.py: Ran 20 tests, OK
+
+Review fixes 1: the red run, 2026-11-18, before the fixes.
+The tests were written first against stubs (CharacterCredits::is_cleared returning true, licence_page returning None, needs_notice returning false, the new Provenance.notice field unchecked; credits_note unchanged), and the Python tests against the committed provenance.py and licences.json.
+
+== cargo nextest run -p axcenity-avatar -p axcenity-project --no-fail-fast -E 'test(/provenance|credit|licences/)' ==
+FAIL [   0.027s] ( 6/31) axcenity-avatar tests::provenance::a_cleared_library_says_so
+FAIL [   0.039s] (10/31) axcenity-avatar tests::provenance::a_library_without_apache_items_carries_no_apache_text
+FAIL [   0.060s] (15/31) axcenity-avatar tests::provenance::a_record_names_its_licences_own_text
+FAIL [   0.079s] (24/31) axcenity-avatar tests::provenance::a_required_credit_carries_what_its_licence_asks
+FAIL [   0.069s] (21/31) axcenity-avatar tests::provenance::a_third_party_item_that_doesnt_say_it_was_imported_is_not_cleared
+FAIL [   0.074s] (22/31) axcenity-avatar tests::provenance::mit_and_apache_records_carry_their_notice
+FAIL [   0.042s] (12/31) axcenity-avatar::shipped_provenance the_intake_scripts_accept_and_refuse_the_same_licences
+FAIL [   0.101s] (29/31) axcenity-project character_credits::tests::a_game_with_an_unmarked_third_party_item_lists_it_as_not_cleared
+Summary [   0.107s] 31 tests run: 23 passed, 8 failed, 415 skipped
+
+== cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_credits|credits_the_imported|isnt_cleared|credits_note/)' ==
+FAIL [   0.072s] (1/4) axcenity-editor::bin/axcenity-editor build_game::tests::the_credits_note_says_where_the_file_is
+FAIL [   0.088s] (2/4) axcenity-editor::bin/axcenity-editor build_game::tests::a_build_warns_of_a_character_item_that_isnt_cleared
+PASS [   0.103s] (3/4) axcenity-editor::bin/axcenity-editor build_game::tests::a_build_without_imported_character_items_has_no_character_credits
+PASS [   0.104s] (4/4) axcenity-editor::bin/axcenity-editor build_game::tests::a_build_credits_the_imported_character_items
+Summary [   0.106s] 4 tests run: 2 passed, 2 failed, 1465 skipped
+
+== python -I test_intake.py ProvenanceTest (Blender's Python; committed provenance.py and licences.json) ==
+ERROR: test_a_refused_licence_stops_before_any_file_is_read (__main__.ProvenanceTest.test_a_refused_licence_stops_before_any_file_is_read)
+ERROR: test_the_model_is_one_of_the_hashed_files (__main__.ProvenanceTest.test_the_model_is_one_of_the_hashed_files)
+ERROR: test_the_notice_is_read_from_its_downloaded_file (__main__.ProvenanceTest.test_the_notice_is_read_from_its_downloaded_file)
+FAIL: test_mit_and_apache_records_carry_their_notice (__main__.ProvenanceTest.test_mit_and_apache_records_carry_their_notice)
+FAIL: test_the_licence_url_is_the_licences_own_text (__main__.ProvenanceTest.test_the_licence_url_is_the_licences_own_text)
+Ran 11 tests in 0.033s
+FAILED (failures=2, errors=3)
+
+== python -I test_intake.py SkinningTest (the far-bone rule as pass/fail; before checks.skin_limits existed) ==
+ERROR: test_a_vertex_weighted_past_the_next_joint_fails (__main__.SkinningTest.test_a_vertex_weighted_past_the_next_joint_fails)
+AttributeError: module 'checks' has no attribute 'skin_limits'
+Ran 4 tests in 1.970s
+FAILED (errors=1)
+
+After the fixes: avatar + project 445 passed (2 skipped); editor -E 'test(/build_game|browser|round_trip|credit/)' 69 passed; test_intake.py 26 tests OK.

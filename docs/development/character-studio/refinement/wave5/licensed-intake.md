@@ -57,3 +57,58 @@ All in [licensed-intake/README.md](licensed-intake/README.md). In short: 25 s fo
 - Nothing generated was rebuilt (no catalogue, manifest, preset or model changed). The shipped items are all original work and pass the check as they are; when the generators next run, writing `"origin": "original"` explicitly is optional (unset reads as original).
 - `fit.py` calls the `import_garment` example with `--placed`: the release example must be rebuilt after the merge (`cargo build -p axcenity-avatar --release --example import_garment`).
 - `progress.md` and the plan's status were not edited (yours).
+
+## Review fixes 1 (2026-11-18)
+
+The review found two blocking problems. Both are fixed test first; the red run is appended to [licensed-intake-red-run.txt](licensed-intake-red-run.txt).
+
+### Blocking 1: credits skipped a third-party item that didn't say it was imported
+
+`character_credits` now goes through **every** item. One that isn't imported but fails `check_item_provenance(item, None)` is listed under "Not cleared for shipping" as `<label> (<id>): <problem>`. That covers a licence other than CC0-1.0 (what `import_garment --licence CC-BY-4.0` writes) and an item without a `source`. Original CC0 work is still not listed. The new `CharacterCredits::is_cleared()` says whether anything is uncleared. Build Game's note now starts with `Warning: N character item(s) ... not cleared for shipping ..., listed in CREDITS-CHARACTERS.txt: <items>. Clear or remove them before shipping the game.` and is a warning in Output. The build still succeeds, because a test build may hold items being worked on. This is documented in architecture.md 8a and Known-Limitations; `is_cleared` is what a stricter publish gate would ask.
+
+Tests: `tests::provenance::a_third_party_item_that_doesnt_say_it_was_imported_is_not_cleared` and `a_cleared_library_says_so` (avatar); `character_credits::tests::a_game_with_an_unmarked_third_party_item_lists_it_as_not_cleared` (project, packed game included); `build_game::tests::a_build_warns_of_a_character_item_that_isnt_cleared` (editor).
+
+### Blocking 2: the credits carried only a free-form line
+
+- **Each credit is built from the record's fields.** `Credit` now carries the licence, the address of its text, the source page, the changes and the notice. The file prints `- <line>`, `Licence: <id> (<url>)`, `Source:`, `Changed: a; b` (CC BY 4.0 3(a)(1): the licence URI and that it was modified), `Used for:` and, when there is one, `Notice, as given with the asset:` in full. A source-given line that leaves something out is still a complete credit.
+- **`licence.url` must be the licence's own text.** `licence_page(id)` gives the CC deed or legal code, opensource.org's MIT or apache.org's 2.0 page. `validate` refuses anything else; http or https and a page under it (`legalcode.en`) are accepted. The source's page about its licence belongs in `evidence`. The proof's first record (`https://polyhaven.com/license`) fails this now; the rerun's record has the CC0 legal code.
+- **MIT and Apache-2.0 records carry their notice.** I kept these two licences rather than removing them. The record has a new optional `notice` field, the licence's notice word for word as given with the asset. `needs_notice(id)` makes it required for these two, and MIT's notice must contain the permission notice ("Permission is hereby granted"). The intake reads it from `source.notice` or `source.notice_file`, a downloaded file such as `LICENSE` that must be one of the hashed `files`.
+- **The Apache License text travels.** When any required credit is Apache-2.0, the file ends once with the Apache License 2.0 terms (`apache_licence_text()`). That text is the engine's own `LICENSE` up to "END OF TERMS AND CONDITIONS", and a test checks it is still that licence.
+- `licences.json` gained `notice_required`. `shipped_provenance.rs` now also holds `licence_pages` and `notice_required` to the crate's lists.
+
+Tests: `a_record_names_its_licences_own_text`, `mit_and_apache_records_carry_their_notice`, `a_required_credit_carries_what_its_licence_asks` (CC BY, MIT and two Apache items: each entry has its licence id, URL, source and changes, the notices appear, and the Apache terms appear exactly once), `a_library_without_apache_items_carries_no_apache_text`, `the_apache_text_is_the_apache_licence`, `the_intake_scripts_accept_and_refuse_the_same_licences` (extended). Python: `test_the_licence_url_is_the_licences_own_text`, `test_mit_and_apache_records_carry_their_notice`, `test_the_notice_is_read_from_its_downloaded_file`.
+
+Compatibility: `notice` is optional and the record stays at format 1. The format is new on this branch, so no older reader exists. Nothing a description, project file or item manifest carries changed.
+
+### Non-blocking items taken
+
+- `credits_note`'s broken string literal (ten spaces in user-visible text) is fixed; `the_credits_note_says_where_the_file_is` checks for no double spaces.
+- `wiki/Reference/File-Formats.md` has rows for `CREDITS-CHARACTERS.txt` and `*.provenance.json`.
+- **Far-bone rule as pass/fail, on the shipped weights.** `checks.skin_limits` judges `no_weight_past_the_next_joint`, and `checks.json` uses it. `fit.read_back` reads the shipped GLB's positions, joints (by the skin's joint names) and weights, and writes `levels.*.limits` to `export.json`. The rule isn't judged on a `rigid_bone` item, which is on one bone by design. On the proof it would have caught the brim tips: the engine fit's LOD0 weights, before the rigid step, have **344 of 6,437 vertices** past the next joint (fails). The shipped rigid hat has 0. Test: `test_a_vertex_weighted_past_the_next_joint_fails` (red first).
+- **`doubleSided` defaults to false** in `fit.assemble`; a material opts in with `"double_sided": true` (for cards). On the proof hat, 0 pixels differ by more than 24/255 at 2560x1440 across all 12 views. The shell is closed with consistent normals, so the committed sheet still holds.
+- **The export writes `catalogue.json`** of `--out` (`fit.write_catalogue`, through `assets/characters/catalogue.py` with its root set), and the import README says a capture still needs the base in that library.
+- **`provenance.step`** checks the licence before any download is read (a refused licence with a missing downloads folder raises `Refused`, not a file error), and checks that `model` is one of the hashed `files`. Tests: `test_a_refused_licence_stops_before_any_file_is_read`, `test_the_model_is_one_of_the_hashed_files`.
+- The proof's record has the CC0 legal code as `licence.url` (the spec dropped `licence_url`). See the "Rerun after review fixes 1" section of [licensed-intake/README.md](licensed-intake/README.md).
+
+Not taken: failing the build on an uncleared item. It warns first instead, as described above. Crediting the whole library is unchanged; the reviewer accepted it.
+
+### Rerun and evidence
+
+- The chain ran again on the same downloads (scratch folders `work-review1`, `out-review1` in the intake-proof sources folder): 29 s, exit 0. LOD limits failing are unchanged: non-manifold edges on all three levels, and stretch on LOD1 and LOD2.
+- `AXCENITY_PROVENANCE_LIBRARY=<capture library with the rerun's item> cargo test -p axcenity-avatar --test shipped_provenance -- --ignored --nocapture`: 1 passed, 20 items. The printed credits show the hat under thanks with `Licence: CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/)`, `Source:` and `Changed:`. The same check on the first proof library fails on `licence.url`.
+- Engine captures of the rerun's hat on the masculine and feminine average cast bodies, idle and Walk@0.3, front, side and rear, at 2560x1440. I looked at the sheet whole: the hat is seated on both heads and rigid through the walk, with no tearing or separation. From the rear, skin shows up to the band behind the edge-on back brim, the same as before. The pixel diff against the first captures is described above.
+
+### Tests run
+
+- `cargo nextest run -p axcenity-avatar -p axcenity-project --no-fail-fast`: 445 tests run, 445 passed, 2 skipped; no ABORT lines.
+- `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/build_game|browser|round_trip|credit/)'`: 69 tests run, 69 passed.
+- `python -I assets/characters/realistic/import/test_intake.py` (Blender's Python): Ran 26 tests, OK.
+- `cargo clippy -p axcenity-avatar -p axcenity-project -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all -- --check`: clean.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 57 warnings (staleness notes).
+- `capture_characters` (release) on the rerun's item, idle and Walk@0.3: both runs passed.
+
+### For the lead at merge (additions)
+
+- `Credit` gained fields and derives `Default`. A literal elsewhere needs `..Default::default()`; the only one is in the editor test.
+- `avatar` exports `licence_page`, `needs_notice` and `apache_licence_text`. `apache_licence_text` uses `include_str!` on the repository's `LICENSE`.
+- The release `import_garment` example is rebuilt by any capture or intake run; nothing generated was regenerated.

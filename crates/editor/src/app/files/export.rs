@@ -120,7 +120,7 @@ impl EditorApp {
         }
         if let Some(credits) = &built.character_credits {
             let note = crate::build_game::credits_note(credits);
-            if credits.uncleared.is_empty() {
+            if credits.is_cleared() {
                 self.output.info(note);
             } else {
                 self.output.warning(note);

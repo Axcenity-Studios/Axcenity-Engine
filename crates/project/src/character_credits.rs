@@ -97,6 +97,8 @@ mod tests {
             )
             .unwrap();
             if imported {
+                // The page of the licence's own text, as the check wants it.
+                let page = axcenity_avatar::licence_page(licence).unwrap_or("https://example.org/");
                 let attribution = if licence == "CC-BY-4.0" {
                     format!(r#""attribution": "{}","#, LINE.replace('"', "\\\""))
                 } else {
@@ -107,7 +109,7 @@ mod tests {
                     format!(
                         r#"{{ "format_version": 1, "asset": "{label} source", "source_page": "https://example.org/hat",
                              "author": "A. Modeller",
-                             "licence": {{ "id": "{licence}", "url": "https://creativecommons.org/" }},
+                             "licence": {{ "id": "{licence}", "url": "{page}" }},
                              "retrieved": "2026-11-18",
                              "files": [{{ "name": "hat.glb", "sha256": "{HASH}" }}],
                              "changes": ["Fitted to the realistic body"], {attribution}
@@ -189,6 +191,24 @@ mod tests {
         project.item("tee", "axcenity/tee", "Tee", "CC0-1.0", false);
         assert!(character_credits(&project.folder).is_none());
         assert_eq!(project.packed_credits(), None);
+    }
+
+    /// Review fix 1: an item under a third party's licence that doesn't
+    /// say it was imported (what `import_garment --licence CC-BY-4.0`
+    /// writes) isn't left out: the game's credits list it as not cleared.
+    #[test]
+    fn a_game_with_an_unmarked_third_party_item_lists_it_as_not_cleared() {
+        let project = Project::new("unmarked");
+        project.item("tee", "axcenity/tee", "Tee", "CC0-1.0", false);
+        project.item("tee-by", "imported/tee", "Licensed tee", "CC-BY-4.0", false);
+        let (credits, text) = character_credits(&project.folder).expect("credits");
+        assert!(!credits.is_cleared());
+        assert!(credits.required.is_empty(), "{credits:#?}");
+        assert!(text.contains("Not cleared"), "{text}");
+        assert!(text.contains("Licensed tee (imported/tee)"), "{text}");
+        assert!(text.contains("CC-BY-4.0"), "{text}");
+        assert!(!text.contains("Tee (axcenity/tee)"), "{text}");
+        assert_eq!(project.packed_credits(), Some(text));
     }
 
     #[test]

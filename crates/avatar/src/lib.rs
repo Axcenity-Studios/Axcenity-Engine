@@ -73,8 +73,9 @@ pub use preset::{
 };
 pub use provenance::{
     ACCEPTED_LICENCES, CharacterCredits, Credit, LicenceRecord, LicenceTerms, ORIGINAL_LICENCE,
-    PROVENANCE_SUFFIX, PROVENANCE_VERSION, Provenance, SourceFile, character_credits,
-    check_item_provenance, check_provenance, is_imported, licence_terms, read_provenance,
+    PROVENANCE_SUFFIX, PROVENANCE_VERSION, Provenance, SourceFile, apache_licence_text,
+    character_credits, check_item_provenance, check_provenance, is_imported, licence_page,
+    licence_terms, needs_notice, read_provenance,
 };
 pub use randomize::{Scope, random_span, randomize};
 pub use resolve::{

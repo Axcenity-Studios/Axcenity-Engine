@@ -244,26 +244,36 @@ fn asset_credits(folder: &Path) -> Result<Option<String>, String> {
 }
 
 /// What the build says about its character credits (in its report and in
-/// Output): how many attributions it carries and where.
+/// Output): how many attributions it carries and where, after a warning
+/// first when an item isn't cleared for shipping. The build still
+/// succeeds (a test build may hold items being worked on); the warning
+/// leads the note so it isn't missed.
 pub fn credits_note(credits: &axcenity_avatar::CharacterCredits) -> String {
-    let mut note = format!(
-        "{} credits {} character asset{} (attribution required for {}); it is beside the game          and inside game.axgame.",
-        project::CHARACTER_CREDITS_FILE,
-        credits.required.len() + credits.thanks.len(),
-        if credits.required.len() + credits.thanks.len() == 1 {
-            ""
-        } else {
-            "s"
-        },
-        credits.required.len(),
-    );
-    if !credits.uncleared.is_empty() {
-        note.push_str(&format!(
-            " Not cleared for shipping (no sound provenance record): {}.",
-            credits.uncleared.join("; ")
+    let file = project::CHARACTER_CREDITS_FILE;
+    let listed = credits.required.len() + credits.thanks.len();
+    let plural = |n: usize| if n == 1 { "" } else { "s" };
+    let mut parts = Vec::new();
+    if !credits.is_cleared() {
+        let n = credits.uncleared.len();
+        parts.push(format!(
+            "Warning: {n} character item{} {} not cleared for shipping (no sound licence or \
+             provenance record), listed in {file}: {}. Clear or remove {} before shipping the \
+             game.",
+            plural(n),
+            if n == 1 { "is" } else { "are" },
+            credits.uncleared.join("; "),
+            if n == 1 { "it" } else { "them" },
         ));
     }
-    note
+    if listed > 0 || parts.is_empty() {
+        parts.push(format!(
+            "{file} credits {listed} character asset{} (attribution required for {}); it is \
+             beside the game and inside game.axgame.",
+            plural(listed),
+            credits.required.len(),
+        ));
+    }
+    parts.join(" ")
 }
 
 /// Builds the game in the project at `folder` into `destination` for
@@ -1015,6 +1025,66 @@ mod tests {
         assert_eq!(
             fs::read_to_string(unpacked.join(project::CHARACTER_CREDITS_FILE)).unwrap(),
             beside
+        );
+    }
+
+    /// Review fix 1: a character item under a third party's licence that
+    /// doesn't say it was imported is listed as not cleared, and the
+    /// build's note about it is a warning that comes first.
+    #[test]
+    fn a_build_warns_of_a_character_item_that_isnt_cleared() {
+        let scratch = Scratch::new("uncleared-character");
+        let library = scratch.root.join("project/assets/characters");
+        fs::create_dir_all(library.join("tee")).unwrap();
+        // What `import_garment --licence CC-BY-4.0 --author X` writes.
+        fs::write(
+            library.join("tee/Tee.item.json"),
+            r#"{ "format_version": 1, "id": "imported/tee", "label": "Licensed tee",
+                 "kind": "garment", "slot": "top", "bases": ["axcenity/realistic"],
+                 "model": { "file": "Tee.glb" }, "fit": { "method": "binding" },
+                 "source": { "author": "A. Modeller", "licence": "CC-BY-4.0" } }"#,
+        )
+        .unwrap();
+        fs::write(
+            library.join("catalogue.json"),
+            r#"{ "format_version": 1, "items": [{ "id": "imported/tee", "manifest": "tee/Tee.item.json",
+                 "label": "Licensed tee", "kind": "garment", "slot": "top", "tier": "built_in",
+                 "bases": ["axcenity/realistic"] }] }"#,
+        )
+        .unwrap();
+        let built = scratch.build(ExportTarget::Windows, false);
+        let credits = built.character_credits.as_ref().expect("credits");
+        assert!(!credits.is_cleared(), "{credits:#?}");
+        let beside = fs::read_to_string(scratch.out(project::CHARACTER_CREDITS_FILE)).unwrap();
+        assert!(beside.contains("Not cleared"), "{beside}");
+        assert!(beside.contains("Licensed tee (imported/tee)"), "{beside}");
+        let note = built
+            .report
+            .notes
+            .iter()
+            .find(|note| note.contains(project::CHARACTER_CREDITS_FILE))
+            .expect("a note");
+        assert!(note.starts_with("Warning:"), "{note}");
+        assert!(note.contains("Licensed tee (imported/tee)"), "{note}");
+    }
+
+    /// The note reads as one sentence, without stray spaces.
+    #[test]
+    fn the_credits_note_says_where_the_file_is() {
+        let credits = axcenity_avatar::CharacterCredits {
+            thanks: vec![axcenity_avatar::Credit {
+                line: "\"Hat\" by A. Modeller".to_owned(),
+                items: vec!["Hat".to_owned()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let note = credits_note(&credits);
+        assert!(!note.contains("  "), "{note}");
+        assert!(!note.starts_with("Warning"), "{note}");
+        assert!(
+            note.contains("beside the game and inside game.axgame"),
+            "{note}"
         );
     }
 

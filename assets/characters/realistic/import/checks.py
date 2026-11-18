@@ -256,7 +256,22 @@ def settle(points, P, tris, direction=(0, -1, 0), clearance=0.004, step=0.002, m
     return lo
 
 
-def limits_report(kind, geometry_report, uv_report, skin_report):
+def skin_limits(skin_report, rigid_bone=None):
+    """Section 2's skinning rules, pass or fail: four influences at most,
+    normalized, and (when the report counts it) no vertex weighted to a
+    bone more than one joint from the bone nearest it. A rigid item
+    (`fit.rigid_bone`) is on its one bone by design, so that rule isn't
+    judged for it."""
+    out = {
+        "four_influences_at_most": skin_report["over_four"] == 0,
+        "weights_normalized": skin_report["not_normalized"] == 0 and skin_report["unweighted"] == 0,
+    }
+    if "far_from_their_bone" in skin_report and not rigid_bone:
+        out["no_weight_past_the_next_joint"] = skin_report["far_from_their_bone"] == 0
+    return out
+
+
+def limits_report(kind, geometry_report, uv_report, skin_report, rigid_bone=None):
     """Pass or fail against section 2's limits, rule by rule."""
     out = {
         "no_degenerate_faces": geometry_report["degenerate"] == 0,
@@ -268,8 +283,7 @@ def limits_report(kind, geometry_report, uv_report, skin_report):
         out["stretch_under_10_percent_on_95_percent"] = uv_report["stretched_share"] <= 1 - STRETCH_AREA
         out["texel_density"] = uv_report["texel_density_px_per_cm"]["p5"] >= DENSITY.get(kind, 8.0)
     if skin_report:
-        out["four_influences_at_most"] = skin_report["over_four"] == 0
-        out["weights_normalized"] = skin_report["not_normalized"] == 0 and skin_report["unweighted"] == 0
+        out.update(skin_limits(skin_report, rigid_bone))
     return out
 
 
@@ -296,7 +310,9 @@ def step(spec, work):
             "clearance_m": {"inside_body": int((inside < 0).sum()),
                             "least": round(float(inside.min()), 4),
                             "median": round(float(np.median(inside)), 4)},
-            "limits": limits_report(kind, g, u, s),
+            # These are the intake's own weights (skinning.py), before the
+            # engine's fit; the export step judges the shipped ones again.
+            "limits": limits_report(kind, g, u, s, spec.get("fit", {}).get("rigid_bone")),
         }
         level += 1
     with open(os.path.join(work, "checks.json"), "w", newline="\n") as f:

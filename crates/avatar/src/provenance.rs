@@ -47,6 +47,13 @@ pub struct Provenance {
     /// attribution licence, a courtesy otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<String>,
+    /// The licence's notice as given with the asset, word for word: for
+    /// MIT, its copyright and permission notice (the asset's LICENSE
+    /// file); for Apache-2.0, its copyright notice and the text of any
+    /// NOTICE file. Required for those two ([`needs_notice`]); a game
+    /// carries it in full.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice: Option<String>,
     /// The items it feeds, by ID.
     pub items: Vec<String>,
     /// What the source's own page says about the licence, quoted, so a
@@ -129,6 +136,63 @@ pub fn licence_terms(id: &str) -> Result<LicenceTerms, String> {
     Err(why)
 }
 
+/// The page of an accepted licence's own text (its legal code or deed),
+/// which a record's `licence.url` must be; `None` for a public-domain
+/// statement without a licence.
+pub fn licence_page(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "CC0-1.0" => "https://creativecommons.org/publicdomain/zero/1.0/",
+        "CC-PDDC" => "https://creativecommons.org/licenses/publicdomain/",
+        "CC-BY-3.0" => "https://creativecommons.org/licenses/by/3.0/",
+        "CC-BY-4.0" => "https://creativecommons.org/licenses/by/4.0/",
+        "MIT" => "https://opensource.org/license/mit",
+        "Apache-2.0" => "https://www.apache.org/licenses/LICENSE-2.0",
+        _ => return None,
+    })
+}
+
+/// Whether `url` is the licence's own text: its page or a page under it
+/// (CC's `.../legalcode.en`), over http or https, with or without `www.`.
+fn is_licence_page(page: &str, url: &str) -> bool {
+    let bare = |url: &str| -> String {
+        let url = url.trim();
+        let url = url
+            .strip_prefix("https://")
+            .or_else(|| url.strip_prefix("http://"))
+            .unwrap_or(url);
+        url.strip_prefix("www.")
+            .unwrap_or(url)
+            .trim_end_matches('/')
+            .to_owned()
+    };
+    let (page, url) = (bare(page), bare(url));
+    // The next character after the page closes a path segment, so
+    // `by/4.0` doesn't take `by/4.01`.
+    url.strip_prefix(&page)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/') || rest.starts_with('.'))
+}
+
+/// Whether a licence asks for its notice to travel with every copy, so a
+/// record must carry it word for word: MIT (its copyright and permission
+/// notice "shall be included in all copies") and Apache-2.0 (section 4:
+/// the copyright notices and any NOTICE text).
+pub fn needs_notice(id: &str) -> bool {
+    matches!(id, "MIT" | "Apache-2.0")
+}
+
+/// The Apache License 2.0's terms, which a game carries once when an item
+/// is under it (section 4(a)). The engine is itself Apache-2.0, so this
+/// is its own `LICENSE` file, up to the end of the terms (a test checks
+/// it still is that licence).
+pub fn apache_licence_text() -> &'static str {
+    const LICENSE: &str = include_str!("../../../LICENSE");
+    const END: &str = "END OF TERMS AND CONDITIONS";
+    match LICENSE.find(END) {
+        Some(at) => &LICENSE[..at + END.len()],
+        None => LICENSE,
+    }
+}
+
 /// Whether `text` is a web address.
 fn is_url(text: &str) -> bool {
     (text.starts_with("https://") || text.starts_with("http://"))
@@ -191,6 +255,44 @@ impl Provenance {
                 ),
             )),
             Ok(_) => {}
+        }
+        // CC BY asks for the licence's address with the credit: the
+        // record's is the licence's own text, not a page about it.
+        if let Some(page) = licence_page(&self.licence.id)
+            && is_url(&self.licence.url)
+            && !is_licence_page(page, &self.licence.url)
+        {
+            p.push(Problem::new(
+                "licence.url",
+                format!(
+                    "`{}` isn't the text of `{}` ({page}); the source's page about the licence \
+                     belongs in `evidence`",
+                    self.licence.url, self.licence.id
+                ),
+            ));
+        }
+        let notice = self.notice.as_deref().unwrap_or("").trim();
+        if needs_notice(&self.licence.id) {
+            if notice.is_empty() {
+                p.push(Problem::new(
+                    "notice",
+                    format!(
+                        "`{}` asks for its notice in every copy: record it word for word as \
+                         given with the asset",
+                        self.licence.id
+                    ),
+                ));
+            } else if self.licence.id == "MIT"
+                && !notice
+                    .to_ascii_lowercase()
+                    .contains("permission is hereby granted")
+            {
+                p.push(Problem::new(
+                    "notice",
+                    "MIT's notice is the copyright and permission notice (\"Permission is \
+                     hereby granted...\"), not only a copyright line",
+                ));
+            }
         }
         if !is_date(&self.retrieved) {
             p.push(Problem::new(
@@ -370,30 +472,106 @@ pub fn check_provenance(root: &Path, library: &Library) -> Vec<Problem> {
     problems
 }
 
-/// One credit: the line, and the items (labels) it covers.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// One credit, from the record it comes from: the attribution line, the
+/// licence and the address of its text, the source, what was changed,
+/// the licence's notice (MIT, Apache-2.0) and the items (labels) it
+/// covers. CC BY asks for the licence's address and a note that the work
+/// was changed (4.0, 3(a)(1)); MIT and Apache-2.0 for their notice.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Credit {
     pub line: String,
+    /// The licence's SPDX ID.
+    pub licence: String,
+    /// The address of the licence's text.
+    pub licence_url: String,
+    pub source_page: String,
+    pub changes: Vec<String>,
+    pub notice: Option<String>,
     pub items: Vec<String>,
 }
 
-/// The credits of a library's imported items: what a game that ships the
-/// library must carry, what it carries as thanks, and the items that
-/// aren't cleared (no record, a refused licence, no attribution line).
+impl Credit {
+    fn of(record: &Provenance, line: String) -> Credit {
+        Credit {
+            line,
+            licence: record.licence.id.clone(),
+            licence_url: record.licence.url.clone(),
+            source_page: record.source_page.clone(),
+            changes: record
+                .changes
+                .iter()
+                .map(|change| change.trim().to_owned())
+                .filter(|change| !change.is_empty())
+                .collect(),
+            notice: record
+                .notice
+                .as_deref()
+                .map(str::trim)
+                .filter(|notice| !notice.is_empty())
+                .map(str::to_owned),
+            items: Vec::new(),
+        }
+    }
+
+    /// Whether `other` credits the same record (all but the items).
+    fn same_as(&self, other: &Credit) -> bool {
+        Credit {
+            items: Vec::new(),
+            ..self.clone()
+        } == Credit {
+            items: Vec::new(),
+            ..other.clone()
+        }
+    }
+
+    /// The credit as the file prints it.
+    fn write(&self, text: &mut String) {
+        text.push_str(&format!("- {}\n", self.line));
+        text.push_str(&format!(
+            "  Licence: {} ({})\n",
+            self.licence, self.licence_url
+        ));
+        text.push_str(&format!("  Source: {}\n", self.source_page));
+        if !self.changes.is_empty() {
+            text.push_str(&format!("  Changed: {}\n", self.changes.join("; ")));
+        }
+        text.push_str(&format!("  Used for: {}\n", self.items.join(", ")));
+        if let Some(notice) = &self.notice {
+            text.push_str("  Notice, as given with the asset:\n");
+            for line in notice.lines() {
+                text.push_str(format!("    {line}").trim_end());
+                text.push('\n');
+            }
+        }
+    }
+}
+
+/// The credits of a library's character items: what a game that ships
+/// the library must carry, what it carries as thanks, and the items that
+/// aren't cleared for shipping (a third party's licence without a sound
+/// record, a refused licence, no attribution line or notice, no source).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CharacterCredits {
     pub required: Vec<Credit>,
     pub thanks: Vec<Credit>,
+    /// `label (id): problem`, one per item.
     pub uncleared: Vec<String>,
 }
 
 impl CharacterCredits {
-    /// Whether no item is made from an imported asset.
+    /// Whether every item may ship: none is listed as not cleared.
+    pub fn is_cleared(&self) -> bool {
+        self.uncleared.is_empty()
+    }
+
+    /// Whether there is nothing to list: every item is original work.
     pub fn is_empty(&self) -> bool {
         self.required.is_empty() && self.thanks.is_empty() && self.uncleared.is_empty()
     }
 
-    /// The plain text a game carries, headed with its name.
+    /// The plain text a game carries, headed with its name: each credit
+    /// with its licence, source, changes and notice, then the Apache
+    /// License's terms once when an item is under it.
     pub fn text(&self, game: &str) -> String {
         let section = |text: &mut String, title: &str, credits: &[Credit]| {
             if credits.is_empty() {
@@ -401,11 +579,7 @@ impl CharacterCredits {
             }
             text.push_str(&format!("\n{title}\n\n"));
             for credit in credits {
-                text.push_str(&format!(
-                    "- {}\n  Used for: {}\n",
-                    credit.line,
-                    credit.items.join(", ")
-                ));
+                credit.write(text);
             }
         };
         let mut text = format!(
@@ -423,10 +597,21 @@ impl CharacterCredits {
             &self.thanks,
         );
         if !self.uncleared.is_empty() {
-            text.push_str("\nNot cleared (no sound provenance record)\n\n");
+            text.push_str("\nNot cleared for shipping (no sound licence or provenance record)\n\n");
             for line in &self.uncleared {
                 text.push_str(&format!("- {line}\n"));
             }
+        }
+        if self
+            .required
+            .iter()
+            .any(|credit| credit.licence == "Apache-2.0")
+        {
+            text.push_str(&format!(
+                "\nThe Apache License, Version 2.0, under which the items above marked \
+                 Apache-2.0 are used:\n\n{}\n",
+                apache_licence_text()
+            ));
         }
         text
     }
@@ -434,14 +619,25 @@ impl CharacterCredits {
 
 /// The credits of every item in the library at `root` (a game ships its
 /// whole library, so any of them can be worn). Original work isn't
-/// listed; an imported item under an attribution licence is credited with
-/// its record's line, one under a public-domain licence is thanked (its
-/// line, or title, author, source and licence when it has none), and one
-/// whose record is missing or unsound is listed as not cleared.
+/// listed; an imported item under an attribution licence is credited from
+/// its record, one under a public-domain licence is thanked (its line, or
+/// title, author, source and licence when it has none), and any item
+/// that can't ship as it is (a record missing or unsound, or a third
+/// party's licence on an item that doesn't say it was imported, or no
+/// source at all) is listed as not cleared, so nothing is left out.
 pub fn character_credits(root: &Path, library: &Library) -> CharacterCredits {
     let mut credits = CharacterCredits::default();
-    for (id, item) in library.items.iter().filter(|(_, item)| is_imported(item)) {
+    for (id, item) in &library.items {
         let label = format!("{} ({id})", item.label);
+        if !is_imported(item) {
+            // Original work under CC0 has nothing to credit; anything
+            // else (another licence, no source) is a third party's work
+            // without its record.
+            if let Some(problem) = check_item_provenance(item, None).first() {
+                credits.uncleared.push(format!("{label}: {problem}"));
+            }
+            continue;
+        }
         let record = match read_provenance(root, library, id) {
             Ok(Some(record)) => record,
             Ok(None) => {
@@ -466,17 +662,18 @@ pub fn character_credits(root: &Path, library: &Library) -> CharacterCredits {
                 record.asset, record.author, record.source_page, record.licence.id
             )
         });
+        let credit = Credit::of(&record, line);
         let list = if required {
             &mut credits.required
         } else {
             &mut credits.thanks
         };
-        // One line per record, however many items it feeds.
-        match list.iter_mut().find(|credit| credit.line == line) {
-            Some(credit) => credit.items.push(item.label.clone()),
+        // One credit per record, however many items it feeds.
+        match list.iter_mut().find(|listed| listed.same_as(&credit)) {
+            Some(listed) => listed.items.push(item.label.clone()),
             None => list.push(Credit {
-                line,
                 items: vec![item.label.clone()],
+                ..credit
             }),
         }
     }

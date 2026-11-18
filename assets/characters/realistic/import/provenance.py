@@ -5,7 +5,10 @@ Before anything of a downloaded asset is used, its licence is checked
 against `licences.json` (accepted: CC0, public domain, CC BY 3.0 and
 4.0, MIT, Apache-2.0; refused: share-alike, non-commercial,
 no-derivatives, custom or unknown), each file is hashed as downloaded,
-and the record is written in the engine's schema
+the licence's notice is kept word for word where the licence asks for it
+(MIT, Apache-2.0: `source.notice`, or `source.notice_file`, a
+downloaded file read as text), and the record is written in the engine's
+schema
 (`axcenity_avatar::Provenance`, `docs/development/character-studio/
 architecture.md`, "Provenance"). The export step adds what was changed
 and the item IDs and writes it beside the item as
@@ -83,10 +86,36 @@ def attribution_line(spec, licence, changes):
             f"{licence_text}; changed: {changed}, by {CREDIT}")
 
 
-def make_record(spec, files, changes):
+def needs_notice(licence):
+    """Whether the licence asks for its notice in every copy (the same
+    list as `axcenity_avatar::needs_notice`)."""
+    return licence in LICENCES["notice_required"]
+
+
+def _bare(url):
+    """A web address without its scheme, `www.` or a closing `/`."""
+    url = re.sub(r"^https?://", "", (url or "").strip())
+    return re.sub(r"^www\.", "", url).rstrip("/")
+
+
+def is_licence_page(licence, url):
+    """Whether `url` is the licence's own text (its page or a page under
+    it, such as CC's legal code), the same rule as `Provenance::validate`.
+    A licence without a page (a public-domain statement) takes any."""
+    page = LICENCES["licence_pages"].get(licence)
+    if not page:
+        return True
+    page, url = _bare(page), _bare(url)
+    return url == page or url.startswith(page + "/") or url.startswith(page + ".")
+
+
+def make_record(spec, files, changes, notice=None):
     """The record in the engine's schema. `spec` holds the source's facts
     (asset, source_page, author, licence, retrieved, items, evidence and,
-    when the source gives its own wording, attribution)."""
+    when the source gives its own wording, attribution). The licence's
+    address is the page of its own text (`licences.json`); the source's
+    page about the licence belongs in the evidence. `notice` is the
+    licence's notice as given with the asset (MIT, Apache-2.0)."""
     licence = spec["licence"]
     terms(licence)  # raises for a refused licence
     record = {
@@ -95,16 +124,18 @@ def make_record(spec, files, changes):
         "source_page": spec["source_page"],
         "author": spec["author"],
         "licence": {"id": licence,
-                    "url": spec.get("licence_url") or LICENCES["licence_pages"].get(licence, "")},
+                    "url": LICENCES["licence_pages"].get(licence) or spec.get("licence_url", "")},
         "retrieved": spec["retrieved"],
         "files": files,
         "changes": list(changes),
         "attribution": spec.get("attribution") or attribution_line(spec, licence, changes),
+        "notice": notice if notice is not None else spec.get("notice"),
         "items": list(spec.get("items", [])),
         "evidence": spec.get("evidence"),
     }
-    if not record["evidence"]:
-        del record["evidence"]
+    for optional in ("notice", "evidence"):
+        if not record[optional]:
+            del record[optional]
     return record
 
 
@@ -126,6 +157,18 @@ def problems(record):
             out.append(f"attribution: `{licence}` asks for credit: the attribution line is required")
     except Refused as why:
         out.append(f"licence.id: {why}")
+    licence_url = record.get("licence", {}).get("url", "")
+    if url.match(licence_url or "") and not is_licence_page(licence, licence_url):
+        out.append(f"licence.url: `{licence_url}` isn't the text of `{licence}` "
+                   f"({LICENCES['licence_pages'][licence]})")
+    notice = str(record.get("notice") or "")
+    if needs_notice(licence):
+        if not notice.strip():
+            out.append(f"notice: `{licence}` asks for its notice in every copy: "
+                       "record it as given with the asset")
+        elif licence == "MIT" and "permission is hereby granted" not in notice.lower():
+            out.append("notice: MIT's notice is the copyright and permission notice "
+                       "(\"Permission is hereby granted...\"), not only a copyright line")
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", record.get("retrieved", "")):
         out.append(f"retrieved: `{record.get('retrieved')}` isn't a date (YYYY-MM-DD)")
     if not record.get("files"):
@@ -155,13 +198,30 @@ def finish(work, item_ids, changes):
     return record
 
 
+def read_notice(downloads, source):
+    """The licence's notice as given with the asset: `notice` written in
+    the spec, or `notice_file`, a downloaded file (one of `files`) read
+    as text. Reading it runs nothing."""
+    name = source.get("notice_file")
+    if not name:
+        return source.get("notice")
+    if name not in source["files"]:
+        raise SystemExit(f"the notice file `{name}` isn't one of the hashed `files`")
+    with open(os.path.join(downloads, *name.split("/")), encoding="utf-8", errors="replace") as f:
+        return f.read().strip()
+
+
 def step(spec, downloads, work):
-    """Checks the licence and hashes the downloads; writes
-    `work/provenance.json` (changes and items are completed at export)."""
+    """Checks the licence, then hashes the downloads; writes
+    `work/provenance.json` (changes and items are completed at export).
+    A refused licence stops the chain before any download is read."""
     source = dict(spec["source"])
     source["items"] = [spec["item"]["id"]]
+    terms(source["licence"])  # raises for a refused licence, before any file is read
+    if source.get("model") and source["model"] not in source["files"]:
+        raise SystemExit(f"the model `{source['model']}` isn't one of the hashed `files`")
     files = hash_files(downloads, source["files"])
-    record = make_record(source, files, [])
+    record = make_record(source, files, [], notice=read_notice(downloads, source))
     if source.get("attribution"):
         record["given_attribution"] = True
     os.makedirs(work, exist_ok=True)

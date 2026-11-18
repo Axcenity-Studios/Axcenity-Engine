@@ -70,7 +70,7 @@ Looked at full size and cropped (the close-ups are 3.4x the whole views):
   "asset": "Fishermans Hat",
   "source_page": "https://polyhaven.com/a/fishermans_hat",
   "author": "PierreB3D",
-  "licence": { "id": "CC0-1.0", "url": "https://polyhaven.com/license" },
+  "licence": { "id": "CC0-1.0", "url": "https://creativecommons.org/publicdomain/zero/1.0/" },
   "retrieved": "2026-11-18",
   "files": [
     { "name": "fishermans_hat_2k.gltf", "sha256": "5087e03713c70f5d25e9c3129c059f36f727606b2aeb19bc85983e405ed5f917", "bytes": 2788 },
@@ -93,6 +93,15 @@ Looked at full size and cropped (the close-ups are 3.4x the whole views):
 ```
 
 The credits a game made from the scratch library carries (`character_credits`), under "With thanks (public domain, no credit required)": the attribution line above, "Used for: Fisherman's hat (intake proof)".
+
+## Rerun after review fixes 1 (2026-11-18)
+
+The chain ran again on the same downloads with the fixed scripts (29 s; the spec no longer gives `licence_url`). What changed in the item:
+
+- **The record's `licence.url`** is now CC0's own text, `https://creativecommons.org/publicdomain/zero/1.0/` (above); Poly Haven's licence page stays quoted in `evidence`. The first record, with `https://polyhaven.com/license`, now fails the check: `licence.url: ... isn't the text of CC0-1.0`.
+- **The hat's material is single-sided** (`doubleSided: false`, the new default). At 2560x1440, 0 pixels differ by more than 24/255 from the first captures in all 12 views (both bodies, idle and Walk@0.3, front, side, rear): the shell is closed and its normals agree, so nothing was hiding behind double-sided rendering. The committed sheet is unchanged.
+- **The shipped weights are judged** (`export.json`): every level has at most 1 influence, normalized, and 0 vertices past the next joint. The far rule isn't judged on a `rigid_bone` item, but it is measured, and measured on the engine fit's weights before the rigid step (LOD0) it **fails: 344 of 6,437 vertices** (the brim tips bound to the shoulders). That is the problem the rigid step works round, now caught by a rule.
+- **`catalogue.json`** of the output library is written by the export (1 item); the provenance check on the item in a library with the base passes (20 items), and the credits print it under thanks with `Licence: CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/)`, `Source:` and `Changed:` lines.
 
 ## What it proves and what it doesn't
 

@@ -117,6 +117,62 @@ class ProvenanceTest(unittest.TestCase):
         for where in ["source_page", "retrieved", "files[0].sha256"]:
             self.assertIn(where, found)
 
+    # Review fixes 1 (2026-11-18): the licence's own text, the notice MIT
+    # and Apache-2.0 ask for, and the licence checked before any file.
+
+    def test_the_licence_url_is_the_licences_own_text(self):
+        spec = self.spec("CC0-1.0")
+        spec["licence_url"] = "https://polyhaven.com/license"
+        record = provenance.make_record(spec, [{"name": "x", "sha256": "b" * 64}], ["Fitted"])
+        self.assertEqual(record["licence"]["url"], "https://creativecommons.org/publicdomain/zero/1.0/")
+        self.assertEqual(provenance.problems(record), [])
+        record["licence"]["url"] = "https://polyhaven.com/license"
+        self.assertIn("licence.url", " ".join(provenance.problems(record)))
+        record["licence"]["url"] = "http://creativecommons.org/publicdomain/zero/1.0/legalcode.en"
+        self.assertEqual(provenance.problems(record), [])
+
+    def test_mit_and_apache_records_carry_their_notice(self):
+        for licence in ("MIT", "Apache-2.0"):
+            record = provenance.make_record(self.spec(licence), [{"name": "x", "sha256": "c" * 64}],
+                                            ["Fitted"])
+            self.assertIn("notice", " ".join(provenance.problems(record)), licence)
+        mit = provenance.make_record(self.spec("MIT"), [{"name": "x", "sha256": "c" * 64}], ["Fitted"],
+                                     notice="Copyright (c) 2026 A. Modeller")
+        self.assertIn("permission", " ".join(provenance.problems(mit)))
+        mit["notice"] = "Copyright (c) 2026 A. Modeller\n\nPermission is hereby granted, free of charge..."
+        self.assertEqual(provenance.problems(mit), [])
+
+    def test_the_notice_is_read_from_its_downloaded_file(self):
+        with tempfile.TemporaryDirectory() as downloads, tempfile.TemporaryDirectory() as work:
+            for name, text in (("hat.glb", "glb"), ("LICENSE", "Copyright 2026 A. Modeller\n"
+                                                    "Permission is hereby granted, free of charge\n")):
+                with open(os.path.join(downloads, name), "w", encoding="utf-8") as f:
+                    f.write(text)
+            spec = {"item": {"id": "imported/bucket-hat"},
+                    "source": dict(self.spec("MIT"), files=["hat.glb", "LICENSE"], model="hat.glb",
+                                   notice_file="LICENSE")}
+            provenance.step(spec, downloads, work)
+            with open(os.path.join(work, "provenance.json"), encoding="utf-8") as f:
+                record = json.load(f)
+        self.assertTrue(record["notice"].startswith("Copyright 2026 A. Modeller"))
+        self.assertIn("Permission is hereby granted", record["notice"])
+
+    def test_a_refused_licence_stops_before_any_file_is_read(self):
+        spec = {"item": {"id": "imported/bucket-hat"},
+                "source": dict(self.spec("CC-BY-NC-4.0"), files=["missing.glb"], model="missing.glb")}
+        with tempfile.TemporaryDirectory() as work:
+            # The downloads folder doesn't exist: hashing would fail first.
+            with self.assertRaises(provenance.Refused):
+                provenance.step(spec, os.path.join(work, "no-such-folder"), work)
+
+    def test_the_model_is_one_of_the_hashed_files(self):
+        spec = {"item": {"id": "imported/bucket-hat"},
+                "source": dict(self.spec("CC0-1.0"), files=["hat.bin"], model="hat.gltf")}
+        with tempfile.TemporaryDirectory() as work:
+            with self.assertRaises(SystemExit) as stopped:
+                provenance.step(spec, work, work)
+        self.assertIn("hat.gltf", str(stopped.exception))
+
 
 class GeometryTest(unittest.TestCase):
     def test_a_closed_cube_is_sound(self):
@@ -225,6 +281,29 @@ class SkinningTest(unittest.TestCase):
         self.assertEqual(report["most_influences"], 5)
         self.assertEqual(report["over_four"], 1)
         self.assertEqual(report["not_normalized"], 1)
+
+    def test_a_vertex_weighted_past_the_next_joint_fails(self):
+        # Review fixes 1: section 2's "no vertex weighted to a bone more
+        # than one joint away" is a pass/fail rule (it is what would have
+        # caught the hat's brim tips bound to the shoulders), judged on the
+        # shipped weights; a rigid item is on its one bone by design.
+        bones = ["Spine", "Neck", "Head", "LeftShoulder"]
+        heads = {"Spine": np.array([0.0, 1.2, 0.0]), "Neck": np.array([0.0, 1.5, 0.0]),
+                 "Head": np.array([0.0, 1.6, 0.0]), "LeftShoulder": np.array([0.1, 1.45, 0.0])}
+        parents = {"Spine": None, "Neck": "Spine", "Head": "Neck", "LeftShoulder": "Spine"}
+        P = np.array([[0.0, 1.75, 0.0], [0.0, 1.75, 0.1]])     # both at the head
+        joints = np.array([[2, 0, 0, 0], [3, 0, 0, 0]])         # the second on the shoulder
+        weights = np.array([[1.0, 0, 0, 0], [1.0, 0, 0, 0]])
+        report = checks.skinning(joints, weights)
+        report["far_from_their_bone"] = checks.far_weights(P, joints, weights, bones, heads, parents)
+        self.assertEqual(report["far_from_their_bone"], 1)
+        self.assertFalse(checks.skin_limits(report)["no_weight_past_the_next_joint"])
+        self.assertNotIn("no_weight_past_the_next_joint", checks.skin_limits(report, rigid_bone="Head"))
+        report["far_from_their_bone"] = 0
+        self.assertTrue(all(checks.skin_limits(report).values()))
+        limits = checks.limits_report("garment", {"degenerate": 0, "non_manifold_edges": 0,
+                                                  "flipped_edges": 0}, None, dict(report, far_from_their_bone=3))
+        self.assertFalse(limits["no_weight_past_the_next_joint"])
 
 
 class ConformTest(unittest.TestCase):
