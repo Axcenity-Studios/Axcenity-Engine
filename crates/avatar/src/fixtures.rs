@@ -118,7 +118,16 @@ pub fn library() -> Library {
     library.add_item("test/items/tee.item.json", item(TEE));
     library.add_item("test/items/hair.item.json", item(HAIR));
     library.add_item("test/items/watch.item.json", item(WATCH));
+    production(&mut library);
     library
+}
+
+/// Marks every item in `library` Production (ADR-0043): the fixtures
+/// stand for finished content, which is what Randomize draws.
+fn production(library: &mut Library) {
+    for item in library.items.values_mut() {
+        item.quality = Some(crate::Quality::Production);
+    }
 }
 
 fn names(list: &[&str]) -> std::collections::BTreeSet<String> {
@@ -366,6 +375,7 @@ pub fn rich_library() -> Library {
     ] {
         library.add_item(format!("test/items/{file}.item.json"), item(text));
     }
+    production(&mut library);
     library
 }
 

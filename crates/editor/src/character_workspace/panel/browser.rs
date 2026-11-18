@@ -1,13 +1,15 @@
 //! The Hair and Clothing pages as browsers (R6 CO25, R7 CO26; brief §7.1,
 //! §8.2): a search field, the page's slots as categories, filters (kind,
-//! "Recolourable", "Fits this body", favourites, "Show drafts"), a row of
+//! "Recolourable", "Fits this body", favourites, "Legacy items"), a row of
 //! the items worn last and picture tiles of the character wearing each
 //! item. Hovering a tile, or clicking it, shows it on the character
 //! without wearing it; "Wear" (or a double click) wears it as one undo
 //! step. Above the tiles, the worn items' own controls (`worn.rs`). What
 //! is listed is `browser::list`; this only draws it and returns intents.
+//! Drafts show only for content review (the toolbar's View menu,
+//! ADR-0043); the page then says so.
 
-use axcenity_avatar::{BaseManifest, Library};
+use axcenity_avatar::{BaseManifest, Library, Quality};
 use eframe::egui::{self, Sense, vec2};
 
 use super::super::browser::{self, Browse, Entry, Filters, Pick, Shelf};
@@ -27,7 +29,8 @@ struct Tile<'a> {
     label: &'a str,
     /// The picture's key in the workspace (an item ID, or `""` + a slot).
     picture: String,
-    draft: bool,
+    /// Marked "Draft" or "Legacy" unless Production.
+    state: Quality,
     worn: bool,
     favourite: Option<bool>,
     trying: bool,
@@ -66,7 +69,7 @@ pub(super) fn page(
         description,
         shelf,
         &filters,
-        state.show_drafts,
+        state.shown(),
         &workspace.item_favourites,
         &workspace.recent_items,
     );
@@ -175,22 +178,32 @@ pub(super) fn page(
         {
             intents.extend(set(&|f| f.favourites = !f.favourites));
         }
+        // The optional content filter (ADR-0043): only where there is
+        // legacy content to show.
+        if listing.hidden_legacy > 0 || state.show_legacy {
+            let tip = if state.show_legacy {
+                "Hide the older items kept for compatibility".to_owned()
+            } else {
+                format!(
+                    "Show {} older items kept for compatibility, marked \"Legacy\". \
+                     Randomize never uses them",
+                    listing.hidden_legacy
+                )
+            };
+            if widgets::chip(ui, "Legacy items", state.show_legacy)
+                .on_hover_text(tip)
+                .clicked()
+            {
+                intents.push(Intent::Browse(Browse::ShowLegacy(!state.show_legacy)));
+            }
+        }
     });
-    let mut drafts = state.show_drafts;
-    let label = if listing.hidden_drafts > 0 {
-        format!("Show drafts ({} hidden)", listing.hidden_drafts)
-    } else {
-        "Show drafts".to_owned()
-    };
-    if ui
-        .checkbox(&mut drafts, label)
-        .on_hover_text(
-            "Drafts haven't passed the quality checks yet. They're marked \"Draft\" and never \
-             used by presets or Randomize.",
-        )
-        .changed()
-    {
-        intents.push(Intent::Browse(Browse::ShowDrafts(drafts)));
+    if state.show_drafts {
+        ui.label(
+            egui::RichText::new("Content review: drafts are shown, marked \"Draft\" (View menu).")
+                .small()
+                .color(palette.warning),
+        );
     }
     ui.add_space(4.0);
 
@@ -228,21 +241,8 @@ pub(super) fn page(
         ui.add_space(6.0);
     }
 
-    if listing.entries.is_empty() {
-        let sentence = if filters.narrowed() {
-            "Nothing matches. Clear the search or a filter."
-        } else if listing.hidden_drafts > 0 {
-            "Everything here is still a draft. Turn on Show drafts to see them."
-        } else {
-            "Nothing in the library fits this body here yet."
-        };
-        widgets::empty_state(
-            ui,
-            icons::MAGNIFYING_GLASS,
-            "Nothing to show",
-            sentence,
-            None,
-        );
+    if let Some((title, sentence)) = browser::empty_message(&listing, shelf, &filters) {
+        widgets::empty_state(ui, icons::MAGNIFYING_GLASS, &title, &sentence, None);
     }
     // By slot, each with its "nothing worn" tile first (on the whole list).
     for slot in &listing.slots {
@@ -275,7 +275,7 @@ pub(super) fn page(
                 pick,
                 label: none,
                 picture: none_picture(&slot.id),
-                draft: false,
+                state: Quality::Production,
                 worn: !worn_here,
                 favourite: None,
                 tip: format!("Wear nothing here ({none})"),
@@ -310,8 +310,11 @@ fn item_tile<'a>(entry: &'a Entry, trying: Option<&Pick>) -> Tile<'a> {
             .unwrap_or_else(|| entry.item.label.clone()),
         entry.slot
     );
-    if entry.draft {
-        tip.push_str("\nA draft: it hasn't passed the quality checks yet.");
+    match entry.state {
+        Quality::Draft => tip.push_str("\nA draft: it hasn't passed the quality review yet."),
+        Quality::Legacy => tip
+            .push_str("\nLegacy: older content kept for compatibility. Randomize doesn't use it."),
+        _ => {}
     }
     if let Some(note) = &entry.misfit {
         tip.push_str(&format!("\nMay not fit this body: {note}"));
@@ -332,7 +335,7 @@ fn item_tile<'a>(entry: &'a Entry, trying: Option<&Pick>) -> Tile<'a> {
         pick,
         label: &entry.item.label,
         picture: entry.item.id.clone(),
-        draft: entry.draft,
+        state: entry.state,
         worn: entry.worn,
         favourite: Some(entry.favourite),
         tip,
@@ -463,7 +466,7 @@ fn grid_rows(
 }
 
 /// One tile: the character wearing it (a placeholder until drawn), its
-/// label, "Draft", a check when worn, a star for favourites.
+/// label, "Draft" or "Legacy", a check when worn, a star for favourites.
 fn draw_tile(
     ui: &mut egui::Ui,
     picture: Option<&egui::TextureHandle>,
@@ -512,7 +515,7 @@ fn draw_tile(
             egui::StrokeKind::Inside,
         );
     }
-    // Badges along the picture's foot: Draft, Worn.
+    // Badges along the picture's foot: Draft or Legacy, Worn.
     let mut x = image.left() + 4.0;
     let mut badge = |text: &str, fill: egui::Color32, colour: egui::Color32| {
         let galley =
@@ -523,8 +526,10 @@ fn draw_tile(
         x = back.right() + 3.0;
         painter.galley(at, galley, colour);
     };
-    if tile.draft {
-        badge("Draft", palette.elevated, palette.warning);
+    match tile.state {
+        Quality::Draft => badge("Draft", palette.elevated, palette.warning),
+        Quality::Legacy => badge("Legacy", palette.elevated, palette.text_secondary),
+        _ => {}
     }
     if tile.worn {
         badge(

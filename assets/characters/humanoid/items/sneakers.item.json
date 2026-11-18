@@ -49,5 +49,6 @@
   "source": {
     "author": "Axcenity Engine contributors",
     "licence": "CC0-1.0"
-  }
+  },
+  "quality": "legacy"
 }

@@ -309,46 +309,31 @@ fn randomize_keeps_max_sum_and_moves_follow_targets() {
     }
 }
 
-/// Drafts never appear in randomization (asset-quality.md §5): an item
-/// marked `draft` is never drawn, while one with no quality yet (every
-/// item before the standard, the stylized family's included) still is.
+/// Randomize draws Production items only (Paul's decision 12, ADR-0043):
+/// the same item as a draft, as legacy, with its state unset (legacy) or
+/// with a state this engine doesn't know (a draft) is never drawn; as
+/// production it is.
 #[test]
-fn randomize_never_wears_an_item_marked_draft() {
-    let mut library = fixtures::rich_library();
-    let mut draft = library.item("test/hair").unwrap().clone();
-    draft.id = "test/draft-hair".to_owned();
-    draft.quality = Some(crate::Quality::Draft);
-    library.add_item("test/items/draft-hair.item.json", draft);
-    let none = BTreeSet::new();
-    let mut unmarked = 0;
-    for seed in 0..1000 {
-        let description = randomize(&start(), &Scope::All, &none, seed, &library);
-        let ids: Vec<&str> = description.items.iter().map(|i| i.id.as_str()).collect();
-        assert!(!ids.contains(&"test/draft-hair"), "seed {seed}: {ids:?}");
-        unmarked += usize::from(ids.contains(&"test/hair"));
-    }
-    assert!(unmarked > 0, "an item with no quality is still drawn");
-}
-
-/// A draft (an item that says `quality: "draft"`) is never drawn
-/// (`asset-quality.md` §5); the same item marked production is, and so is
-/// one made before the standard, with `quality` unset.
-#[test]
-fn a_declared_draft_is_never_drawn() {
+fn randomize_draws_production_items_only() {
+    use crate::Quality;
     let none = BTreeSet::new();
     let drawn = |library: &Library| {
         let mut worn: BTreeSet<String> = BTreeSet::new();
-        for seed in 0..400 {
-            let d = randomize(&start(), &Scope::All, &none, seed, library);
+        let mut start = start();
+        start.items.clear();
+        for seed in 0..1000 {
+            let d = randomize(&start, &Scope::All, &none, seed, library);
             worn.extend(d.items.iter().map(|item| item.id.clone()));
         }
         worn
     };
     let id = "test/tee";
     for (quality, offered) in [
-        (Some(crate::Quality::Draft), false),
-        (Some(crate::Quality::Production), true),
-        (None, true),
+        (Some(Quality::Draft), false),
+        (Some(Quality::Legacy), false),
+        (None, false),
+        (Some(Quality::Other), false),
+        (Some(Quality::Production), true),
     ] {
         let mut library = fixtures::rich_library();
         library
@@ -357,5 +342,96 @@ fn a_declared_draft_is_never_drawn() {
             .expect("the fixture's tee")
             .quality = quality;
         assert_eq!(drawn(&library).contains(id), offered, "{quality:?}");
+    }
+}
+
+/// A slot with no Production item for the base keeps what the character
+/// wore there, item, variant and values, and an empty one stays empty:
+/// Randomize never takes off what it can't replace (ADR-0043).
+#[test]
+fn a_slot_without_production_items_keeps_what_it_wore() {
+    let mut library = fixtures::rich_library();
+    for id in ["test/hair", "test/bob", "test/tee", "test/dress"] {
+        library.items.get_mut(id).unwrap().quality = Some(crate::Quality::Legacy);
+    }
+    let none = BTreeSet::new();
+    let mut start = start();
+    let mut tee = WornItem::new("test/tee");
+    tee.variant = Some("navy".to_owned());
+    start.items = vec![tee.clone()];
+    let mut bottoms = 0;
+    for seed in 0..1000 {
+        let d = randomize(&start, &Scope::All, &none, seed, &library);
+        // The top (tee and dress legacy) keeps the tee as it was; the hair
+        // (both styles legacy) stays bald.
+        assert!(d.items.contains(&tee), "seed {seed}: {:?}", d.items);
+        assert!(
+            !d.items
+                .iter()
+                .any(|w| ["test/hair", "test/bob", "test/dress"].contains(&w.id.as_str())),
+            "seed {seed}: {:?}",
+            d.items
+        );
+        // The bottom has a production skirt: it is drawn as before.
+        bottoms += usize::from(d.items.iter().any(|w| w.id == "test/skirt"));
+        sound(&d, &library, seed);
+    }
+    assert!(bottoms > 0, "a slot with a production item is drawn");
+    // A category scope with nothing to draw changes nothing there.
+    let hair = randomize(&start, &Scope::Category(Category::Hair), &none, 3, &library);
+    assert_eq!(hair.items, start.items);
+}
+
+/// The modesty layer (layer 0, underwear) is never taken off: where a
+/// character wears underwear and the slot has Production underwear,
+/// Randomize draws one of them, never "nothing"; where it has none, the
+/// worn underwear stays.
+#[test]
+fn randomize_never_strips_the_modesty_layer() {
+    let mut library = fixtures::rich_library();
+    let mut base = library.bases["test/body"].clone();
+    base.slots.push(crate::Slot {
+        id: "underwear".to_owned(),
+        label: "Underwear".to_owned(),
+        category: Category::Clothing,
+        multiple: false,
+        empty_label: None,
+        about: None,
+        icon: None,
+    });
+    library.add_base("test/Body.base.json", base);
+    for id in ["test/briefs", "test/boxers"] {
+        let mut under = fixtures::item(fixtures::SKIRT);
+        under.id = id.to_owned();
+        under.slot = "underwear".to_owned();
+        under.layer = Some(0);
+        under.quality = Some(crate::Quality::Production);
+        library.add_item(format!("{id}.item.json"), under);
+    }
+    let none = BTreeSet::new();
+    let mut start = start();
+    start.items.push(WornItem::new("test/briefs"));
+    let mut seen = BTreeSet::new();
+    for seed in 0..1000 {
+        for scope in [Scope::All, Scope::Category(Category::Clothing)] {
+            let d = randomize(&start, &scope, &none, seed, &library);
+            let under: Vec<&str> = d
+                .items
+                .iter()
+                .map(|w| w.id.as_str())
+                .filter(|id| ["test/briefs", "test/boxers"].contains(id))
+                .collect();
+            assert_eq!(under.len(), 1, "seed {seed} {scope:?}: {:?}", d.items);
+            seen.insert(under[0].to_owned());
+        }
+    }
+    assert_eq!(seen.len(), 2, "both are drawn: {seen:?}");
+    // With no production underwear, the worn pair stays.
+    for id in ["test/briefs", "test/boxers"] {
+        library.items.get_mut(id).unwrap().quality = Some(crate::Quality::Legacy);
+    }
+    for seed in 0..200 {
+        let d = randomize(&start, &Scope::All, &none, seed, &library);
+        assert!(d.items.iter().any(|w| w.id == "test/briefs"), "seed {seed}");
     }
 }

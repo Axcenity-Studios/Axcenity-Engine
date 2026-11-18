@@ -1,7 +1,8 @@
 //! The toolbar (brief §3.1): Home (Cancel and Done for a game's
 //! character, the round trip), the character's name and whether it's
 //! saved, New (a family or a preset), Open, Save, undo and redo, Reset
-//! with a scope and Randomize with a scope (brief §11), and the switch for
+//! with a scope and Randomize with a scope (brief §11), View (content
+//! review: drafts shown, ADR-0043), and the switch for
 //! editing on the character (R2: hover, click to select, handles;
 //! `direct.rs`). Comparison is the strip over the viewport (`compare.rs`).
 
@@ -159,6 +160,19 @@ pub(super) fn show(
                     }
                 }
             });
+            widgets::menu_button(ui, Some(icons::EYE), "View", |ui| {
+                for option in view_options(workspace) {
+                    let mut on = option.on;
+                    if ui
+                        .checkbox(&mut on, option.label)
+                        .on_hover_text(option.about)
+                        .changed()
+                    {
+                        intents.push(option.toggle);
+                        ui.close();
+                    }
+                }
+            });
             ui.add_space(8.0);
             let on = workspace.direct.on;
             let tip = if on {
@@ -194,6 +208,30 @@ pub(super) fn show(
         });
     });
     intents
+}
+
+/// An option of the View menu: shown checked when `on`; picking it
+/// asks for `toggle`.
+#[derive(Clone, Debug)]
+pub(super) struct ViewOption {
+    pub label: &'static str,
+    pub about: &'static str,
+    pub on: bool,
+    pub toggle: Intent,
+}
+
+/// What the View menu offers: drafts for content review (ADR-0043), off
+/// by default, editor state.
+pub(super) fn view_options(workspace: &CharacterWorkspace) -> Vec<ViewOption> {
+    let on = workspace.browser.show_drafts;
+    vec![ViewOption {
+        label: "Show drafts for content review",
+        about: "Lists items that haven't passed the asset quality review on the Hair and \
+                Clothing pages, marked \"Draft\". Drafts are never in presets or Randomize. \
+                For reviewing content; not saved in a character.",
+        on,
+        toggle: Intent::Browse(super::browser::Browse::ShowDrafts(!on)),
+    }]
 }
 
 /// The character's name. What's typed is kept as a draft and becomes one
@@ -302,9 +340,16 @@ pub(super) fn random_choices(
             RandomScope::Category => "This category drawn again",
             RandomScope::Feature => "This feature drawn again",
         };
+        // Randomize draws Production items only (ADR-0043): say when the
+        // scope's slots have none, so what's worn stays.
+        let items = if super::random::no_items_to_draw(library, base, &reach) {
+            super::random::NO_ITEMS
+        } else {
+            ""
+        };
         choices.push((
             label,
-            format!("{about}, as one undo step.{}", locked(&reach)),
+            format!("{about}, as one undo step.{}{items}", locked(&reach)),
             scope,
         ));
     }

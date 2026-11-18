@@ -335,8 +335,13 @@ fn every_page_is_drawn_with_its_controls() {
             Level::Detailed,
             &["Eyes", "Nose", "Ears", "Symmetry"],
         ),
-        // The realistic short crop (R6) is a draft, hidden until shown.
-        (Category::Hair, Level::Detailed, &["Show drafts (1 hidden)"]),
+        // The realistic short crop (R6) is a draft, for content review
+        // only: no production hairstyle yet (ADR-0043).
+        (
+            Category::Hair,
+            Level::Detailed,
+            &["No production hairstyles yet"],
+        ),
         (
             Category::Clothing,
             Level::Detailed,

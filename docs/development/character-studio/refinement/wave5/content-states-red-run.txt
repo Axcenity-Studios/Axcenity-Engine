@@ -1,0 +1,67 @@
+Content states (wave 5): the RED run, before the implementation.
+
+1. avatar (cargo nextest run -p axcenity-avatar, the state tests; check_declared_state and production_slots were stubs, Randomize unchanged)
+
+left: 0
+right: 1
+PASS [   0.055s] (13/22) axcenity-avatar tests::randomizing::values_stay_inside_the_random_share
+PASS [   0.061s] (14/22) axcenity-avatar tests::randomizing::the_same_seed_gives_the_same_character
+PASS [   0.077s] (15/22) axcenity-avatar::content_states every_shipped_item_declares_its_state
+FAIL [   0.158s] (16/22) axcenity-avatar::content_states randomize_on_both_families_draws_no_legacy_or_draft_item
+thread 'randomize_on_both_families_draws_no_legacy_or_draft_item' (23360) panicked at crates\avatar\tests\content_states.rs:175:23:
+axcenity/stylized All seed 0: drew `axcenity/sports-top`, which is Legacy
+PASS [   0.158s] (17/22) axcenity-avatar::content_states a_character_wearing_legacy_and_draft_items_resolves
+PASS [   0.158s] (18/22) axcenity-avatar::content_states default_outfits_keep_their_legacy_items_and_wear_no_draft
+FAIL [   0.158s] (19/22) axcenity-avatar::content_states randomize_draws_a_production_item_once_there_is_one
+thread 'randomize_draws_a_production_item_once_there_is_one' (35912) panicked at crates\avatar\tests\content_states.rs:226:30:
+axcenity/stylized seed 0: drew `axcenity/sports-top`, which is Legacy
+PASS [   0.158s] (20/22) axcenity-avatar::content_states the_shipped_items_are_classified
+PASS [   0.160s] (21/22) axcenity-avatar::content_states an_older_projects_library_without_states_still_loads
+PASS [   0.197s] (22/22) axcenity-avatar::realistic_hair randomize_never_wears_a_draft_on_either_realistic_frame
+Summary [   0.197s] 22 tests run: 15 passed, 7 failed, 155 skipped
+FAIL [   0.021s] ( 5/22) axcenity-avatar tests::randomizing::randomize_draws_production_items_only
+FAIL [   0.024s] ( 7/22) axcenity-avatar tests::randomizing::a_slot_without_production_items_keeps_what_it_wore
+FAIL [   0.033s] ( 9/22) axcenity-avatar tests::content_states::a_shipped_item_must_declare_one_of_the_three_states
+FAIL [   0.035s] (10/22) axcenity-avatar tests::content_states::production_slots_are_the_slots_with_a_production_item_for_the_base
+FAIL [   0.046s] (12/22) axcenity-avatar tests::randomizing::randomize_never_strips_the_modesty_layer
+FAIL [   0.158s] (16/22) axcenity-avatar::content_states randomize_on_both_families_draws_no_legacy_or_draft_item
+FAIL [   0.158s] (19/22) axcenity-avatar::content_states randomize_draws_a_production_item_once_there_is_one
+
+Note: every_shipped_item_declares_its_state passed in this run because check_declared_state was a stub; with the real check and the manifests not yet regenerated it fails (part 3).
+
+2. editor (cargo nextest run -p axcenity-editor -E 'test(/character_workspace::(browser_tests|shell_tests)::/)'; the browser listed every state as before, empty_message, view_options and the Randomize note were stubs)
+
+FAIL [   0.262s] ( 3/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::only_items_for_this_base_in_a_slot_the_page_takes_are_offered
+FAIL [   0.262s] ( 4/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::filters_narrow_by_slot_kind_colour_fit_and_favourites
+FAIL [   0.277s] ( 7/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::legacy_and_drafts_are_hidden_by_default_and_marked_when_shown
+FAIL [   0.327s] (10/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::an_empty_page_says_what_is_hidden
+FAIL [   2.044s] (11/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::randomize_says_when_there_are_no_production_items_to_draw
+FAIL [   2.376s] (14/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_view_menu_shows_drafts_for_content_review
+FAIL [   2.713s] (19/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::production_is_listed_legacy_on_request_and_drafts_only_for_review
+FAIL [   3.144s] (25/29) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::the_realistic_pages_say_what_they_have
+FAIL [   3.211s] (29/29) axcenity-editor::bin/axcenity-editor character_workspace::shell_tests::every_page_is_drawn_with_its_controls
+Summary [   3.215s] 29 tests run: 20 passed, 9 failed, 1439 skipped
+thread 'character_workspace::browser_tests::only_items_for_this_base_in_a_slot_the_page_takes_are_offered' (45060) panicked at crates\editor\src\character_workspace\browser_tests.rs:236:5:
+left: ["test/tee", "test/old-vest", "test/vest", "test/hoodie", "test/plain-shorts", "test/jeans"]
+right: ["test/tee", "test/vest", "test/hoodie", "test/jeans"]
+thread 'character_workspace::browser_tests::filters_narrow_by_slot_kind_colour_fit_and_favourites' (29084) panicked at crates\editor\src\character_workspace\browser_tests.rs:415:5:
+left: ["test/tee", "test/old-vest", "test/vest"]
+right: ["test/tee", "test/vest"]
+thread 'character_workspace::browser_tests::legacy_and_drafts_are_hidden_by_default_and_marked_when_shown' (14288) panicked at crates\editor\src\character_workspace\browser_tests.rs:281:5:
+left: ["test/tee", "test/old-vest", "test/vest", "test/hoodie", "test/plain-shorts"]
+right: ["test/tee", "test/vest", "test/hoodie"]
+thread 'character_workspace::browser_tests::an_empty_page_says_what_is_hidden' (36520) panicked at crates\editor\src\character_workspace\browser_tests.rs:347:61:
+thread 'character_workspace::browser_tests::randomize_says_when_there_are_no_production_items_to_draw' (18212) panicked at crates\editor\src\character_workspace\browser_tests.rs:953:5:
+the menu says so: This category drawn again, as one undo step.
+thread 'character_workspace::browser_tests::the_view_menu_shows_drafts_for_content_review' (27352) panicked at crates\editor\src\character_workspace\browser_tests.rs:924:10:
+the content review option
+thread 'character_workspace::browser_tests::production_is_listed_legacy_on_request_and_drafts_only_for_review' (31296) panicked at crates\editor\src\character_workspace\browser_tests.rs:855:9:
+thread 'character_workspace::browser_tests::the_realistic_pages_say_what_they_have' (25076) panicked at crates\editor\src\character_workspace\browser_tests.rs:1156:5:
+thread 'character_workspace::shell_tests::every_page_is_drawn_with_its_controls' (46232) panicked at crates\editor\src\character_workspace\shell_tests.rs:368:13:
+
+3. avatar, the real check_declared_state on the manifests as they were (before the generators wrote the state)
+
+FAIL [   0.063s] (1/1) axcenity-avatar::content_states every_shipped_item_declares_its_state
+Summary [   0.065s] 1 test run: 0 passed, 1 failed, 176 skipped
+FAIL [   0.063s] (1/1) axcenity-avatar::content_states every_shipped_item_declares_its_state
+15 items: "doesn't say its content state: set `quality` to `production`, `legacy` or `draft`" (the twelve stylized items and the three realistic underwear items)

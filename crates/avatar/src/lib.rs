@@ -24,6 +24,7 @@
 
 mod catalogue;
 mod choices;
+mod content_state;
 mod description;
 pub mod fit;
 mod ids;
@@ -45,6 +46,7 @@ mod tests;
 
 pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem, CataloguePreset};
 pub use choices::{chosen_slots, wear_choice, wear_choices};
+pub use content_state::{check_declared_state, production_slots};
 pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{

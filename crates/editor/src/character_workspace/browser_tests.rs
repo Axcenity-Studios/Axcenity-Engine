@@ -14,7 +14,7 @@ use axcenity_avatar::{
 };
 use eframe::egui;
 
-use super::browser::{self, Browse, Declared, Filters, Pick, Shelf};
+use super::browser::{self, Browse, Declared, Filters, Pick, Shelf, Shown};
 use super::intent::{Gesture, Intent};
 use super::shell_tests::{drawn_texts, input};
 use super::{Category, CharacterWorkspace, DEFAULT_BASE, Start, find_character_library};
@@ -103,6 +103,23 @@ fn fixtures() -> Vec<ItemManifest> {
             r#", "quality": "production", "tags": ["cotton"], "excludes": ["test/hoodie"]"#,
         ),
         item(
+            "test/old-vest",
+            "Old vest",
+            "garment",
+            "top",
+            r,
+            r#", "quality": "legacy", "tags": ["cotton"]"#,
+        ),
+        // No `quality`: a manifest from before the three states (legacy).
+        item(
+            "test/plain-shorts",
+            "Plain shorts",
+            "garment",
+            "bottom",
+            r,
+            r#", "tags": ["casual"]"#,
+        ),
+        item(
             "test/bob",
             "Plain bob",
             "groom",
@@ -144,6 +161,12 @@ fn library() -> Arc<Library> {
     Arc::new(library)
 }
 
+/// What content review lists: drafts as well, legacy items not.
+const REVIEW: Shown = Shown {
+    legacy: false,
+    drafts: true,
+};
+
 fn realistic(library: &Library) -> Description {
     axcenity_gameplay::description::default_description(library, DEFAULT_BASE)
 }
@@ -165,7 +188,7 @@ fn listed(
     description: &Description,
     shelf: Shelf,
     filters: &Filters,
-    drafts: bool,
+    drafts: Shown,
 ) -> Vec<String> {
     ids(&browser::list(
         library,
@@ -187,7 +210,7 @@ fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
         &description,
         Shelf::Clothing,
         &Filters::default(),
-        true,
+        REVIEW,
         &BTreeSet::new(),
         &[],
     );
@@ -221,77 +244,146 @@ fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
             &description,
             Shelf::Hair,
             &Filters::default(),
-            true
+            REVIEW
         ),
         ["test/bob", "test/streaked"]
     );
 }
 
 #[test]
-fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
+fn legacy_and_drafts_are_hidden_by_default_and_marked_when_shown() {
+    use axcenity_avatar::Quality;
     let library = library();
     let mut description = realistic(&library);
-    let off = browser::list(
-        &library,
-        &description,
-        Shelf::Clothing,
-        &Filters::default(),
-        false,
-        &BTreeSet::new(),
-        &[],
-    );
-    assert!(!ids(&off).contains(&"test/jeans".to_owned()));
-    // The jeans and the shipped realistic drafts (the first garments).
-    let shipped_drafts = browser::list(
-        &library,
-        &description,
-        Shelf::Clothing,
-        &Filters::default(),
-        true,
-        &BTreeSet::new(),
-        &[],
-    )
-    .entries
-    .iter()
-    .filter(|e| !e.item.id.starts_with("test/") && e.draft)
-    .count();
-    assert_eq!(off.hidden_drafts, 1 + shipped_drafts);
-    let on = browser::list(
-        &library,
-        &description,
-        Shelf::Clothing,
-        &Filters::default(),
-        true,
-        &BTreeSet::new(),
-        &[],
-    );
-    let jeans = on
+    let list = |description: &Description, shown: Shown| {
+        browser::list(
+            &library,
+            description,
+            Shelf::Clothing,
+            &Filters::default(),
+            shown,
+            &BTreeSet::new(),
+            &[],
+        )
+    };
+    let state_of = |listing: &browser::Listing, id: &str| {
+        listing
+            .entries
+            .iter()
+            .find(|e| e.item.id == id)
+            .map(|e| e.state)
+    };
+    // Normal character creation: Production only. The old vest says
+    // `legacy`; the plain shorts say nothing (made before the states:
+    // legacy too); the jeans are a draft.
+    let normal = list(&description, Shown::default());
+    let offered = ids(&normal);
+    assert_eq!(offered, ["test/tee", "test/vest", "test/hoodie"]);
+    // Counted, so the page can say what is there (the shipped realistic
+    // drafts, the first garments, are hidden drafts too).
+    let shipped_drafts = list(&description, REVIEW)
         .entries
         .iter()
-        .find(|e| e.item.id == "test/jeans")
-        .unwrap();
-    assert!(jeans.draft);
-    assert!(
-        on.entries
-            .iter()
-            .filter(|e| e.item.id.starts_with("test/") && e.item.id != "test/jeans")
-            .all(|e| !e.draft)
-    );
-    // A draft that is worn is always listed (and still marked).
-    description
-        .items
-        .push(axcenity_avatar::WornItem::new("test/jeans"));
-    let worn = browser::list(
-        &library,
+        .filter(|e| !e.item.id.starts_with("test/") && e.state == Quality::Draft)
+        .count();
+    assert_eq!(normal.hidden_legacy, 2);
+    assert_eq!(normal.hidden_drafts, 1 + shipped_drafts);
+    // The Legacy items filter adds the two, marked Legacy, and no draft.
+    let legacy = list(
         &description,
-        Shelf::Clothing,
+        Shown {
+            legacy: true,
+            drafts: false,
+        },
+    );
+    assert_eq!(state_of(&legacy, "test/old-vest"), Some(Quality::Legacy));
+    assert_eq!(
+        state_of(&legacy, "test/plain-shorts"),
+        Some(Quality::Legacy)
+    );
+    assert_eq!(state_of(&legacy, "test/jeans"), None);
+    assert_eq!(legacy.hidden_legacy, 0);
+    // Content review adds the drafts, marked Draft, and not the legacy.
+    let review = list(&description, REVIEW);
+    assert_eq!(state_of(&review, "test/jeans"), Some(Quality::Draft));
+    assert_eq!(state_of(&review, "test/old-vest"), None);
+    assert_eq!(state_of(&review, "test/tee"), Some(Quality::Production));
+    // What is worn is always listed, marked, whatever its state.
+    for id in ["test/jeans", "test/old-vest"] {
+        description.items.push(axcenity_avatar::WornItem::new(id));
+    }
+    let worn = list(&description, Shown::default());
+    for (id, state) in [
+        ("test/jeans", Quality::Draft),
+        ("test/old-vest", Quality::Legacy),
+    ] {
+        let entry = worn.entries.iter().find(|e| e.item.id == id);
+        assert!(entry.is_some_and(|e| e.state == state && e.worn), "{id}");
+    }
+}
+
+/// The empty page says what is there, plainly: no production items yet,
+/// and how many legacy items and drafts are hidden.
+#[test]
+fn an_empty_page_says_what_is_hidden() {
+    let library = library();
+    let description = realistic(&library);
+    let hair = |shown: Shown, filters: &Filters| {
+        let listing = browser::list(
+            &library,
+            &description,
+            Shelf::Hair,
+            filters,
+            shown,
+            &BTreeSet::new(),
+            &[],
+        );
+        browser::empty_message(&listing, Shelf::Hair, filters)
+    };
+    // The realistic body's own hairstyle (the short crop) is a draft, and
+    // the fixtures' two are production: the page has tiles.
+    assert!(hair(Shown::default(), &Filters::default()).is_none());
+    let searching = Filters {
+        search: "velvet".to_owned(),
+        ..Filters::default()
+    };
+    let (title, sentence) = hair(Shown::default(), &searching).unwrap();
+    assert_eq!(title, "Nothing to show");
+    assert_eq!(sentence, "Nothing matches. Clear the search or a filter.");
+    // A library with legacy and draft hairstyles only.
+    let mut only_old = (*library).clone();
+    for id in ["test/bob", "test/streaked"] {
+        only_old.items.get_mut(id).unwrap().quality = Some(axcenity_avatar::Quality::Legacy);
+    }
+    let listing = browser::list(
+        &only_old,
+        &description,
+        Shelf::Hair,
         &Filters::default(),
-        false,
+        Shown::default(),
         &BTreeSet::new(),
         &[],
     );
-    let jeans = worn.entries.iter().find(|e| e.item.id == "test/jeans");
-    assert!(jeans.is_some_and(|e| e.draft && e.worn));
+    let (title, sentence) =
+        browser::empty_message(&listing, Shelf::Hair, &Filters::default()).unwrap();
+    assert_eq!(title, "No production hairstyles yet");
+    assert_eq!(
+        sentence,
+        "Legacy items: 2 (turn on Legacy items to show them). Drafts: 1 (content review only)."
+    );
+    let clothing = browser::list(
+        &only_old,
+        &description,
+        Shelf::Clothing,
+        &Filters {
+            slot: Some("bottom".to_owned()),
+            ..Filters::default()
+        },
+        Shown::default(),
+        &BTreeSet::new(),
+        &[],
+    );
+    assert!(clothing.entries.is_empty());
 }
 
 #[test]
@@ -303,7 +395,7 @@ fn search_matches_every_word_against_name_tags_and_about() {
             search: text.to_owned(),
             ..Filters::default()
         };
-        listed(&library, &description, Shelf::Clothing, &filters, true)
+        listed(&library, &description, Shelf::Clothing, &filters, REVIEW)
     };
     assert_eq!(search("hoodie"), ["test/hoodie"]);
     assert_eq!(search("FLEECE"), ["test/hoodie"], "the about");
@@ -317,7 +409,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
     let library = library();
     let mut description = realistic(&library);
     let with = |filters: Filters, description: &Description| {
-        listed(&library, description, Shelf::Clothing, &filters, true)
+        listed(&library, description, Shelf::Clothing, &filters, REVIEW)
     };
     let slot = Filters {
         slot: Some("top".to_owned()),
@@ -340,7 +432,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
         &description,
         Shelf::Clothing,
         &Filters::default(),
-        true,
+        REVIEW,
         &BTreeSet::new(),
         &[],
     );
@@ -372,7 +464,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
             fits: false,
             ..Filters::default()
         },
-        true,
+        REVIEW,
         &BTreeSet::new(),
         &[],
     );
@@ -395,7 +487,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
             favourites: true,
             ..Filters::default()
         },
-        true,
+        REVIEW,
         &favourites,
         &[],
     );
@@ -405,7 +497,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
         &realistic(&library),
         Shelf::Clothing,
         &Filters::default(),
-        true,
+        REVIEW,
         &favourites,
         &[],
     );
@@ -421,7 +513,8 @@ fn recently_used_lists_the_items_last_worn_newest_first() {
         browser::remember(&mut recent, id);
     }
     assert_eq!(recent, ["test/tee", "test/hoodie", "test/jeans"]);
-    let shown = |filters: &Filters, drafts| {
+    let shown = |filters: &Filters, drafts: bool| {
+        let drafts = if drafts { REVIEW } else { Shown::default() };
         browser::list(
             &library,
             &description,
@@ -479,7 +572,7 @@ fn wearing_takes_off_what_conflicts_and_what_its_slots_held() {
         &description,
         Shelf::Clothing,
         &Filters::default(),
-        true,
+        REVIEW,
         &BTreeSet::new(),
         &[],
     );
@@ -747,36 +840,142 @@ fn a_tile_is_previewed_without_committing_until_wear() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// Paul's decision 12 in the studio (ADR-0043): normal character creation
+/// lists Production; Legacy shows through the "Legacy items" filter,
+/// marked; drafts only for content review (the View menu), marked, never
+/// from the page's own filters; a worn item is always shown as worn and
+/// stays editable, whatever its state.
 #[test]
-fn drafts_show_only_with_show_drafts_and_say_draft() {
-    let (folder, mut workspace) = stylized_workspace("browser-drafts");
-    // Only an item that says `draft` is one; the shipped stylized
-    // hairstyles (no `quality`, made before the standard) are listed.
+fn production_is_listed_legacy_on_request_and_drafts_only_for_review() {
+    let (folder, mut workspace) = stylized_workspace("browser-states");
     let library = workspace.library();
     assert!(library.item("test/draft-crop").unwrap().is_draft());
-    assert!(!library.item("axcenity/hair-long").unwrap().is_draft());
+    assert!(library.item("axcenity/hair-long").unwrap().is_legacy());
+    let has = |texts: &[String], text: &str| texts.iter().any(|t| t == text);
+    // The stylized default wears the legacy Swept: shown, worn, marked.
     let texts = draw(&mut workspace, Vec::new());
-    assert!(!texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
-    assert!(texts.iter().any(|t| t == "Long"), "{texts:?}");
-    assert!(texts.iter().any(|t| t == "Streaked bob"), "{texts:?}");
+    for shown in [
+        "Streaked bob",
+        "Plain crop",
+        "Swept",
+        "Legacy items",
+        "Legacy",
+    ] {
+        assert!(has(&texts, shown), "{shown}: {texts:?}");
+    }
+    for hidden in ["Long", "Bob", "Draft crop", "Draft"] {
+        assert!(!has(&texts, hidden), "{hidden}: {texts:?}");
+    }
+    // Drafts are no longer a filter of the page.
+    assert!(
+        !texts.iter().any(|t| t.contains("Show drafts")),
+        "{texts:?}"
+    );
+    // The Legacy items filter: the older styles, marked; still no draft.
+    workspace.apply(Intent::Browse(Browse::ShowLegacy(true)));
+    let texts = draw(&mut workspace, Vec::new());
+    for shown in ["Long", "Bob", "Ponytail", "Legacy"] {
+        assert!(has(&texts, shown), "{shown}: {texts:?}");
+    }
+    assert!(!has(&texts, "Draft crop"), "{texts:?}");
+    // Trying a legacy tile on, then hiding legacy, drops the try-on.
+    workspace.apply(Intent::Browse(Browse::Select(Some(pick(
+        "axcenity/hair-long",
+    )))));
+    assert!(workspace.browser.previewing());
+    workspace.apply(Intent::Browse(Browse::ShowLegacy(false)));
+    assert!(!workspace.browser.previewing());
+    // Content review (the View menu): drafts listed and marked, and the
+    // page says it is reviewing.
+    workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(has(&texts, "Draft crop"), "{texts:?}");
+    assert!(has(&texts, "Draft"), "{texts:?}");
     assert!(
         texts
             .iter()
-            .any(|t| t.starts_with("Show drafts (") && t.ends_with(" hidden)")),
+            .any(|t| t.starts_with("Content review: drafts are shown")),
         "{texts:?}"
     );
-    workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
-    let texts = draw(&mut workspace, Vec::new());
-    assert!(texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
-    assert!(texts.iter().any(|t| t == "Draft"), "{texts:?}");
-    // Turning them off again drops a draft being tried on.
     workspace.apply(Intent::Browse(Browse::Select(Some(pick(
         "test/draft-crop",
     )))));
     assert!(workspace.browser.previewing());
     workspace.apply(Intent::Browse(Browse::ShowDrafts(false)));
     assert!(!workspace.browser.previewing());
-    assert!(!workspace.can_undo());
+    assert!(!workspace.can_undo(), "none of it is an edit");
+    // A worn draft stays listed and editable with review off.
+    workspace.apply(Intent::Wear {
+        slot: "hair".to_owned(),
+        item: Some("test/draft-crop".to_owned()),
+    });
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(has(&texts, "Draft crop"), "{texts:?}");
+    assert!(has(&texts, "Draft"), "{texts:?}");
+    assert!(
+        texts.iter().any(|t| t.eq_ignore_ascii_case("Hair colour")),
+        "its controls: {texts:?}"
+    );
+    // Nothing of this is in the character.
+    assert!(!workspace.description().to_json().contains("legacy"));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Drafts are shown for content review from the studio's View menu: off
+/// by default, labelled for reviewing content, never saved in a character.
+#[test]
+fn the_view_menu_shows_drafts_for_content_review() {
+    let (folder, mut workspace) = stylized_workspace("browser-view-menu");
+    let options = super::toolbar::view_options(&workspace);
+    let review = options
+        .iter()
+        .find(|option| option.label == "Show drafts for content review")
+        .expect("the content review option");
+    assert!(!review.on, "off by default");
+    assert_eq!(review.toggle, Intent::Browse(Browse::ShowDrafts(true)));
+    assert!(review.about.contains("not saved"), "{}", review.about);
+    workspace.apply(review.toggle.clone());
+    let options = super::toolbar::view_options(&workspace);
+    assert!(options[0].on);
+    assert_eq!(options[0].toggle, Intent::Browse(Browse::ShowDrafts(false)));
+    // The toolbar draws the menu.
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(texts.iter().any(|t| t.contains("View")), "{texts:?}");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Randomize with nothing to draw says so: no production items in the
+/// Hair page's slots (the realistic body's one style is a draft), so the
+/// menu's note and the notice say what's worn stays, and no undo step.
+#[test]
+fn randomize_says_when_there_are_no_production_items_to_draw() {
+    use super::random::RandomScope;
+    let folder = test_folder("browser-randomize-nothing");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.apply(Intent::PickCategory(Category::Hair));
+    let library = workspace.library();
+    let choices = super::toolbar::random_choices(&workspace.selection, &workspace, &library);
+    let hair = choices
+        .iter()
+        .find(|(_, _, scope)| *scope == RandomScope::Category)
+        .expect("Hair is offered");
+    assert!(
+        hair.1.contains("no production items"),
+        "the menu says so: {}",
+        hair.1
+    );
+    let before = workspace.description().clone();
+    workspace.apply(Intent::Randomize(RandomScope::Category));
+    assert_eq!(*workspace.description(), before);
+    assert!(!workspace.can_undo(), "no empty undo step");
+    assert!(
+        workspace
+            .notice
+            .as_deref()
+            .is_some_and(|n| n.contains("no production items")),
+        "{:?}",
+        workspace.notice
+    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -936,7 +1135,7 @@ fn favourites_and_recently_used_are_kept_beside_the_preset_favourites() {
         workspace.description(),
         Shelf::Hair,
         &Filters::default(),
-        false,
+        Shown::default(),
         &workspace.item_favourites,
         &workspace.recent_items,
     );
@@ -961,11 +1160,16 @@ fn the_realistic_pages_say_what_they_have() {
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::PickCategory(Category::Hair));
     let texts = draw(&mut workspace, Vec::new());
-    // Its one hairstyle, the short crop (R6), is a draft.
+    // Its one hairstyle, the short crop (R6), is a draft: no production
+    // hairstyle yet, and the page says so.
+    assert!(
+        texts.iter().any(|t| t == "No production hairstyles yet"),
+        "{texts:?}"
+    );
     assert!(
         texts
             .iter()
-            .any(|t| t == "Everything here is still a draft. Turn on Show drafts to see them."),
+            .any(|t| t == "Drafts: 1 (content review only)."),
         "{texts:?}"
     );
     workspace.apply(Intent::PickCategory(Category::Clothing));
@@ -991,9 +1195,14 @@ fn the_browsers_are_drawn() {
     let (folder, mut workspace) = stylized_workspace("browser-snapshots");
     workspace.selection.level = super::selection::Level::Detailed;
     let shots: Vec<(&str, Category, Vec<Intent>)> = vec![
-        ("hair-drafts-off", Category::Hair, vec![]),
+        ("hair-normal", Category::Hair, vec![]),
         (
-            "hair-drafts-on",
+            "hair-legacy-on",
+            Category::Hair,
+            vec![Intent::Browse(Browse::ShowLegacy(true))],
+        ),
+        (
+            "hair-review",
             Category::Hair,
             vec![Intent::Browse(Browse::ShowDrafts(true))],
         ),
@@ -1310,6 +1519,7 @@ fn clicking_near_a_tiles_top_tries_on_that_tile() {
     // pointer, or the tile above it would be previewed in its place.
     let (folder, mut workspace) = stylized_workspace("browser-click-top");
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+    workspace.apply(Intent::Browse(Browse::ShowLegacy(true)));
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
@@ -1350,6 +1560,7 @@ fn clicking_the_worn_tile_while_trying_one_on_previews_nothing() {
     // tiles must not move under the still pointer and preview another.
     let (folder, mut workspace) = stylized_workspace("browser-click-worn");
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
+    workspace.apply(Intent::Browse(Browse::ShowLegacy(true)));
     // Bob is worn: its tile is in the first row, with Long below it.
     workspace.apply(Intent::Wear {
         slot: "hair".to_owned(),

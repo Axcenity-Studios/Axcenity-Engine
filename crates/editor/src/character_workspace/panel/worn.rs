@@ -64,10 +64,11 @@ pub(super) fn controls(
     let mut intents = Vec::new();
     let declared = Declared::of(item);
     let groom = item.kind == ItemKind::Groom;
-    let title = if item.is_draft() {
-        format!("{} (Draft)", item.label)
-    } else {
-        item.label.clone()
+    // Worn whatever its state (ADR-0043), and said so.
+    let title = match item.state() {
+        axcenity_avatar::Quality::Draft => format!("{} (Draft)", item.label),
+        axcenity_avatar::Quality::Legacy => format!("{} (Legacy)", item.label),
+        _ => item.label.clone(),
     };
     widgets::section(theme::icons::SLIDERS_HORIZONTAL, &title)
         .id_salt(&format!("worn item {}", item.id))

@@ -332,6 +332,12 @@ def base_manifest(data, parts, folder=HERE):
     return manifest
 
 
+# The underwear was made before the asset quality standard and never
+# passed it: Legacy (ADR-0043), until a Production set replaces it. It is
+# still what each body type wears (the modesty layer).
+UNDERWEAR_QUALITY = "legacy"
+
+
 def item_manifests(parts):
     """The underwear's item manifests, by object name."""
     items = {}
@@ -344,7 +350,7 @@ def item_manifests(parts):
             "hides": [GARMENT_REGIONS[name]],
             "materials": [{"name": m, "shading": GARMENT_SHADING[m]} for m in part["materials"]],
             "fit": {"method": "shapes", "follows": part["shapes"]},
-            "tags": tags, "source": SOURCE,
+            "tags": tags, "source": SOURCE, "quality": UNDERWEAR_QUALITY,
         }
     return items
 
