@@ -19,5 +19,11 @@ serde_json.workspace = true
 thiserror.workspace = true
 axcenity-workspace-hack.workspace = true
 
+# The fitting tests and the import example pose garments as the runtime
+# does (its twist and helper bones, `axcenity_anim::twist::drive`); the
+# library itself has no animation code.
+[dev-dependencies]
+axcenity-anim.workspace = true
+
 [lints]
 workspace = true

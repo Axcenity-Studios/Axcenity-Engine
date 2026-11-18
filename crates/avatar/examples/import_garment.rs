@@ -56,6 +56,9 @@ fn main() -> ExitCode {
         }
     };
     let request = ImportRequest {
+        // The runtime's twist and helper bones, so the fit poses are the
+        // runtime's.
+        finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
         source: PathBuf::from(source),
         library: PathBuf::from(library),
         base,

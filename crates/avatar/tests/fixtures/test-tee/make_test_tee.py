@@ -33,12 +33,22 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-# How far the shirt stands off the body (a loose fit), and at the neck.
+# How far the shirt stands off the body (a loose fit), and at the neck
+# (a crew neck's rib sits close round the neck's base).
 EASE = 0.022
-NECK_EASE = 0.018
+NECK_EASE = 0.006
 SLEEVE_EASE = 0.014
+# How much wider than the neck the crew neck's opening is at the sides,
+# where it sits on the neck's base (the sports bra's straps come up to
+# the neck there, under it).
+NECK_SIDE = 0.002
 # How far down the neck (from its joint) the crew neck's cylinder starts.
 NECK_DROP = 0.08
+# The crew neck's front: a scoop this deep below the neck's sides, and
+# this much narrower than the opening at the sides (where the sports bra's
+# straps come up beside the neck, it stays high).
+NECK_SCOOP = 0.07
+NECK_SCOOP_IN = 0.016
 # The voxel remesh's size: about 6k triangles for the shirt.
 VOXEL = 0.019
 ARM_PARTS = ("UpperArm", "LowerArm", "Hand", "Thumb", "Index", "Middle", "Ring", "Little")
@@ -50,8 +60,16 @@ GAP = 0.03
 # How far past the trunk's side at the armpit a girth above it reaches
 # (the arm's root, under the front and back of the shoulder).
 ARM_ROOT = 0.05
-# The sleeve's length, as a share of the upper arm.
-SLEEVE = 0.55
+# The sleeve's length, as a share of the upper arm: past the armpit by a
+# hand's width underneath, as a T-shirt's underarm seam is, so a raised
+# arm doesn't open the side.
+SLEEVE = 0.9
+# The sleeve's hem leans: longer underneath than on top by this share of
+# the sleeve's width either side of its middle (a T-shirt's underarm seam
+# is longer than the arm's top is from the shoulder's line to the hem).
+HEM_TILT = 0.4
+# How far below the armpit, at least, the sleeve's hem is underneath.
+UNDERARM = 0.025
 COLOUR = (0.30, 0.38, 0.52, 1.0)
 
 
@@ -186,24 +204,135 @@ def solid(rings):
     return obj
 
 
-def sleeve(start, axis, steps, radii, count=32):
-    """A tube along `axis` from `start`: a ring of radius `radii[k]` at
-    `steps[k]` along."""
+def sleeve(centres, axis, radii, count=32):
+    """A tube along `axis`: a ring of radius `radii[k]` round `centres[k]`."""
     side = np.cross(axis, [0.0, 0.0, 1.0])
     side /= np.linalg.norm(side)
     up = np.cross(side, axis)
     rings = []
-    for t, r in zip(steps, radii):
-        centre = start + axis * t
+    for centre, r in zip(centres, radii):
         rings.append([tuple(centre + r * (math.cos(a) * side + math.sin(a) * up))
                       for a in (2 * math.pi * k / count for k in range(count))])
     return solid(rings)
+
+
+def mesh_points(obj, key=None):
+    """`obj`'s vertices in the world, or its shape `key`'s."""
+    me = obj.data
+    co = np.zeros(len(me.vertices) * 3)
+    (me.shape_keys.key_blocks[key].data if key else me.vertices).foreach_get("co", co)
+    world = np.array(obj.matrix_world)
+    return co.reshape(-1, 3) @ world[:3, :3].T + world[:3, 3]
+
+
+def check_underarm(tee, armpit, side):
+    """The sleeves' hems are below the armpit underneath (a short sleeve
+    whose hem is above it leaves the side open when the arm is raised)."""
+    from collections import Counter
+    me = tee.data
+    uses = Counter()
+    for poly in me.polygons:
+        vs = list(poly.vertices)
+        for a, b in zip(vs, vs[1:] + vs[:1]):
+            uses[(min(a, b), max(a, b))] += 1
+    hem = {v for edge, n in uses.items() if n == 1 for v in edge}
+    P = mesh_points(tee)
+    sleeve_hem = [P[v] for v in hem if abs(P[v][0]) > side + EASE]
+    lowest = min(p[2] for p in sleeve_hem)
+    print(f"the sleeves' hems are {armpit - lowest:.3f} m below the armpit underneath")
+    return [] if lowest <= armpit - UNDERARM else [f"the sleeves' hems are {armpit - lowest:.3f} m below the armpit"]
+
+
+def check_covers_the_bra(tee, armpit, side, neck_a):
+    """The shirt hides the sports bra on both frames, from every way a
+    capture looks at it: a ray from each of the bra's corners off the skin
+    toward the camera meets the shirt or the body. On the feminine frame
+    the shirt is moved as the skin under it moves. The straps come up
+    beside the neck and the side band up under the arm: a neckline or an
+    armhole that shows them fails here.
+
+    Two places are let off, by a few corners each, and counted: the
+    straps' tops, which come up against the neck's side above its base
+    (where a crew neck sits, so the collar's edge is at their top: what
+    shows is the top 1 cm of the strap, at most 2 mm of it beside the
+    neck), and the side band seen from straight beside the body up the
+    sleeve, past the arm (as up any short sleeve)."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    from mathutils.kdtree import KDTree
+    body = bpy.data.objects["Body"]
+    bra = bpy.data.objects["Underwear_Bra"]
+    skin = {key: mesh_points(body, key) for key in (None, "Frame_Feminine")}
+    tree = KDTree(len(skin[None]))
+    for k, p in enumerate(skin[None]):
+        tree.insert(Vector(p), k)
+    tree.balance()
+    tee_m = mesh_points(tee)
+    nearest = np.array([tree.find(Vector(p))[1] for p in tee_m])
+    polys = [list(p.vertices) for p in tee.data.polygons]
+    body_polys = [list(p.vertices) for p in body.data.polygons]
+    # The capture matrix's views (front, three-quarter, side, back; both
+    # sides), level and from as far above as its three-quarter view is
+    # (2 degrees), and a little more. Blender's -Y is the front.
+    looks = [Vector((math.cos(a) * math.cos(e), math.sin(a) * math.cos(e), math.sin(e)))
+             for a in np.radians([0.0, 90.0, 180.0, 225.0, 270.0, 315.0]) for e in np.radians([0.0, 5.0])]
+    from collections import Counter
+    uses = Counter()
+    for poly in polys:
+        for a, b in zip(poly, poly[1:] + poly[:1]):
+            uses[(min(a, b), max(a, b))] += 1
+    rim = sorted({v for e, n in uses.items() if n == 1 for v in e})
+    problems = []
+    for key in (None, "Frame_Feminine"):
+        moved = tee_m + skin[key][nearest] - skin[None][nearest]
+        # The shirt's open edges (hem, neck, sleeves), where the bra can
+        # show past it.
+        edge = KDTree(len(rim))
+        for k, v in enumerate(rim):
+            edge.insert(Vector(moved[v]), k)
+        edge.balance()
+        shirt = BVHTree.FromPolygons(moved.tolist(), polys)
+        skin_tree = BVHTree.FromPolygons(skin[key].tolist(), body_polys)
+        seen, collar, sleeve_ = 0, 0, 0
+        under = mesh_points(bra, key)
+        top = under[:, 2].max()
+        for p in under:
+            p = Vector(p)
+            loc, normal, _, _ = skin_tree.find_nearest(p, 0.05)
+            # The rim folded under the skin is not seen.
+            if loc is None or (p - loc).dot(normal) < 0.001:
+                continue
+            # Where the bra stands out through the shirt (straight out from
+            # the shirt's surface, not past an edge of it), the import's
+            # layer push-out lifts the shirt over it: not this check's.
+            loc, normal, _, _ = shirt.find_nearest(p, 0.05)
+            if loc is not None and (p - loc).dot(normal) > 0 and edge.find(loc)[2] > 0.015:
+                continue
+            for d in looks:
+                start = p + d * 0.001
+                if shirt.ray_cast(start, d, 3.0)[0] is None and skin_tree.ray_cast(start, d, 3.0)[0] is None:
+                    where = f"x {p.x:+.3f} y {p.y:+.3f} z {p.z:.3f} from {tuple(round(c, 2) for c in d)}"
+                    if p.z > top - 0.01 and abs(p.x) < neck_a + 0.01:
+                        collar += 1
+                    elif abs(d.x) > 0.9 and abs(p.z - armpit) < 0.06 and abs(p.x) > side - 0.04:
+                        sleeve_ += 1
+                    else:
+                        seen += 1
+                        print(f"  seen at {where}")
+                    break
+        print(f"the sports bra on the {key or 'masculine'} frame: {seen} corners seen; "
+              f"{collar} at the straps' tops by the collar, {sleeve_} up a sleeve from the side")
+        if seen or collar > 25 or sleeve_ > 4:
+            problems.append(f"{seen} of the sports bra's corners show on the {key or 'masculine'} frame")
+    return problems
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--body", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--keep-going", action="store_true",
+                        help="write the shirt even when a check fails, to look at it")
     args = parser.parse_args()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.abspath(args.body))
@@ -262,18 +391,36 @@ def main():
     axis_l = (elbow_l - shoulder_l) / length
     rel = P[upper_arm > 0.5] - shoulder_l
     along = rel @ axis_l
-    across = np.linalg.norm(rel - np.outer(along, axis_l), axis=1)
-    steps = np.linspace(0.0, SLEEVE * length, 8)
-    radii = [np.percentile(across[np.abs(along - t) < 0.015], 80) + SLEEVE_EASE for t in steps]
+    # The tube runs on past the hem (which leans further along
+    # underneath), so the cut is through it, not through its rounded end.
+    steps = np.linspace(0.0, SLEEVE * length + 0.05, 9)
+    # Each ring round the arm's slice there (its middle, which is off the
+    # bone), out to all but its farthest few corners and the ease.
+    centres, radii = [], []
+    for t in steps:
+        # Past the upper arm's skin (by the elbow) as it is just before.
+        m = min(t, 0.9 * length)
+        part = rel[np.abs(along - m) < 0.015]
+        middle = part.mean(axis=0)
+        middle -= (middle @ axis_l - t) * axis_l
+        # At the shoulder the slice takes in the deltoid's top: the ring
+        # keeps to the bone there, and goes over to the slice's middle by
+        # half way along.
+        share = min(t / (0.5 * steps[-1]), 1.0)
+        middle = axis_l * t + share * (middle - axis_l * t)
+        centres.append(middle)
+        off = part - middle
+        off -= np.outer(off @ axis_l, axis_l)
+        radii.append(np.percentile(np.linalg.norm(off, axis=1), 90) + SLEEVE_EASE)
     # No wider at the shoulder than a little over the sleeve's middle: a
     # wider start stands up off the shoulder's line.
-    radii = [min(r, 1.12 * radii[len(radii) // 2]) for r in radii]
+    radii = [min(r, 1.05 * radii[len(radii) // 2]) for r in radii]
     radius = max(radii)
     print("sleeve radii " + " ".join(f"{r:.3f}" for r in radii))
     for sign in (1.0, -1.0):
-        s = shoulder_l * np.array([sign, 1.0, 1.0])
-        axis = axis_l * np.array([sign, 1.0, 1.0])
-        parts.append(sleeve(s, axis, steps, radii))
+        mirror = np.array([sign, 1.0, 1.0])
+        axis = axis_l * mirror
+        parts.append(sleeve([shoulder_l * mirror + c * mirror for c in centres], axis, radii))
 
     # One shell: the solids' union, smoothed.
     for obj in bpy.data.objects:
@@ -292,35 +439,50 @@ def main():
     bpy.ops.object.modifier_apply(modifier="remesh")
     bpy.ops.object.modifier_apply(modifier="smooth")
 
-    # The neck: a crew neck, cut by an upright elliptic cylinder round the
-    # neck (from below its base up past the head), a little wider than the
-    # shell's neck: the opening is where it meets the shoulders' slope,
-    # lower in front. The cylinder's faces (a pit into the closed shell)
-    # are deleted after, which leaves the opening.
-    outline = section(P, edges, neck[2] + 0.02, arm_weight < 0.1)
-    neck_a = np.abs(outline[:, 0]).max() + NECK_EASE + 0.008
-    neck_cy = (outline[:, 1].max() + outline[:, 1].min()) / 2
-    neck_b = (outline[:, 1].max() - outline[:, 1].min()) / 2 + NECK_EASE + 0.008
-    up = Vector((0.0, 0.0, 1.0))
-    base = Vector((0.0, neck_cy, neck[2])) - up * NECK_DROP
+    # The neck: a crew neck. An elliptic cylinder along the neck, close
+    # round it (its column a little above the joint, the chin left out),
+    # opens the shell's top: at the sides the opening sits on the neck's
+    # base, above the sports bra's straps where they come up beside the
+    # neck. In front a leaning plane (below) brings it down to the hollow
+    # at the neck's base. The cylinder's faces (a pit into the closed
+    # shell) are deleted after, which leaves the opening.
+    column = section(P, edges, neck[2] + 0.03, arm_weight < 0.1)
+    column = column[column[:, 1] > neck[1] - 0.09]
+    neck_a = np.abs(column[:, 0]).max() + NECK_SIDE
+    neck_cy = (column[:, 1].max() + column[:, 1].min()) / 2
+    neck_b = (column[:, 1].max() - column[:, 1].min()) / 2 + NECK_SIDE
+    print(f"the neck's opening: {2 * neck_a:.3f} m across, {2 * neck_b:.3f} m front to back")
+    up = Vector(joint(arm, "Head") - neck).normalized()
+    base = Vector((0.0, neck_cy, neck[2] + 0.03)) - up * (NECK_DROP + 0.03)
     bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=1.0, depth=1.0)
     cutter = bpy.context.active_object
     cutter.scale = (neck_a, neck_b, 0.5)
     cutter.rotation_mode = "QUATERNION"
     cutter.rotation_quaternion = up.to_track_quat("Z", "Y")
     cutter.location = base + up * 0.25
+    # The front's scoop: an elliptic cylinder from the neck's middle
+    # forward, as wide as the neck less `NECK_SCOOP_IN` either side and
+    # reaching `NECK_SCOOP` below the sides of the opening: a U, high at
+    # the sides, down to the hollow at the neck's base in front.
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=1.0, depth=1.0)
+    scoop = bpy.context.active_object
+    scoop.scale = (neck_a - NECK_SCOOP_IN, NECK_SCOOP, 0.15)
+    scoop.rotation_mode = "QUATERNION"
+    scoop.rotation_quaternion = Vector((0.0, -1.0, 0.0)).to_track_quat("Z", "Y")
+    scoop.location = (0.0, neck_cy - 0.15, neck[2] + 0.03)
     shell = bpy.data.materials.new("Shell")
     hole = bpy.data.materials.new("Hole")
     tee.data.materials.append(shell)
-    cutter.data.materials.append(hole)
-    boolean = tee.modifiers.new("neck", "BOOLEAN")
-    boolean.operation = "DIFFERENCE"
-    boolean.solver = "EXACT"
-    boolean.material_mode = "TRANSFER"
-    boolean.object = cutter
-    bpy.context.view_layer.objects.active = tee
-    bpy.ops.object.modifier_apply(modifier="neck")
-    bpy.data.objects.remove(cutter)
+    for tool in (cutter, scoop):
+        tool.data.materials.append(hole)
+        boolean = tee.modifiers.new("neck", "BOOLEAN")
+        boolean.operation = "DIFFERENCE"
+        boolean.solver = "EXACT"
+        boolean.material_mode = "TRANSFER"
+        boolean.object = tool
+        bpy.context.view_layer.objects.active = tee
+        bpy.ops.object.modifier_apply(modifier="neck")
+        bpy.data.objects.remove(tool)
     hole_slot = [m.name for m in tee.data.materials].index(hole.name)
 
     # Open the hem and the sleeve ends with straight cuts: a
@@ -356,7 +518,14 @@ def main():
             off_axis = np.linalg.norm((c - s) - along * axis)
             return along > 0.3 * length and off_axis < 1.6 * radius and abs(c[0]) > side + EASE
 
-        cut(s + axis * (SLEEVE * length - 0.02), axis, on_sleeve)
+        # Leaning: the plane's normal turned from the arm's axis toward
+        # its underside (toward the trunk and down), so the hem is
+        # `HEM_TILT` of the sleeve's radius further along underneath.
+        down = np.array([0.0, 0.0, -1.0])
+        under = down - (down @ axis) * axis
+        under /= np.linalg.norm(under)
+        lean = axis - HEM_TILT * under
+        cut(s + axis * (SLEEVE * length - 0.02), lean / np.linalg.norm(lean), on_sleeve)
     # Keep the largest piece (a cut can leave a stray ring).
     bm.faces.ensure_lookup_table()
     bm.faces.index_update()
@@ -383,6 +552,8 @@ def main():
     me.update()
     for poly in me.polygons:
         poly.use_smooth = True
+    problems = check_underarm(tee, armpit, side) + check_covers_the_bra(tee, armpit, side, neck_a)
+    assert args.keep_going or not problems, problems
 
     mat = bpy.data.materials.new("TeeCotton")
     mat.diffuse_color = COLOUR
@@ -409,6 +580,9 @@ def main():
                           export_selected_objects=True, forward_axis="NEGATIVE_Z", up_axis="Y",
                           export_materials=True, export_normals=True, export_uv=True,
                           apply_modifiers=True, path_mode="STRIP")
+    # A shirt that fails a check is written only to be looked at
+    # (`--keep-going`); the script still fails.
+    assert not problems, problems
 
 
 if __name__ == "__main__":

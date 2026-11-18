@@ -345,3 +345,107 @@ What I saw:
 - **Rebuilt:** `RealisticParts.glb` and `Realistic.build.json`, by `build.py` with the bpy Python; the only changes are the underwear's shapes and their report. `Realistic.base.json`, the region map and the item manifests came out the same apart from line endings, which I didn't commit. The lead rebuilds the realistic package at merge as usual; keep `underwear.py`'s `push_out`.
 - **The gate's records** (`Known`, per garment and pose in `fit_gate_tests.rs`) are this branch's. Lower them as items improve.
 - **Cache:** the gate library cache is `target/<profile>/fit-gate/`; deleting it is safe.
+
+## Review fixes 2 (2026-11-17)
+
+The second review had four blocking items. **None reaches 0.** One is fixed at the source, one is half fixed, and two are not fixed. The red run is appended to `co9-binding-red-run.txt`. The gate's records (`Known`, per garment and pose) are back at the numbers measured now, and the new posed check in `fitting.rs` has one too. Both are ratchets. Read them as open defects, not as passes.
+
+**In one paragraph.** The tear with the arms raised was in the fixture, not the skinning. The old sleeve's hem was above the armpit underneath, and the cut stopped at the torso's side, so the side under the arm was an open, ragged hole. You can see it in the first round's `test-tee-source-renders.png`. The remade tee has a closed underarm, a close crew neck and sleeves past the armpit. The script checks that the shirt hides the sports bra from the capture views. Because it now covers the armpit and the base of the neck, the gate counts it in more places: every body in the walk (up to 31 mm, the front of the armpit as the arm swings back) and with the arms raised (up to 16 mm, the base of the neck rising into the collar). The import now fits the tee in poses. In every pose a body corrective leans on, the tee's copies of those correctives are made to follow the skin it is bound to. That is the reviewer's fix (a). Measured, it barely changes the gate. I also tried pushing the cloth out in the pose, into the correctives or the rest, and taking weights from other sources (fix (b) and others). Pushing made every pose worse and the weights made no difference. Neither is in the commit. The boxer briefs' gusset and the stylized clothes are not fixed.
+
+### Each blocking item
+
+1. **The tee in the walk and with the arms raised.** Not fixed (54 bodies in each).
+   - **The tear came from the fixture** (`make_test_tee.py`):
+     - the sleeve tubes now run round the arm's slices (their middle is off the bone) out past the hem;
+     - the sleeves go 90% of the way to the elbow;
+     - each hem is cut by a leaning plane, longer underneath (`HEM_TILT`).
+     - Underneath, the hem is now 6.6 cm below the armpit. Before, it was above it. The script checks this (`UNDERARM`).
+     - My render of the OBJ (`test-tee-source-renders.png`, replaced) shows a closed side and a straight hem.
+   - **The posed fit** (`avatar::fit::pose`, `posed`; `FitOptions::poses` and `pose_states`; `ImportRequest::finish_pose`):
+     - The poses are made on the body's own skeleton (`fit_poses`): arms hanging, level and raised to 150°; elbows and knees bent 135°; and a walk's swings either way round (arms 15° and 40°, thighs, elbows).
+     - The runtime's last touch to a pose, the twist and helper bones (`anim::twist::drive`), is passed in, because `avatar` has no animation code. `avatar` takes `axcenity-anim` as a dev-dependency only, for the tests and the example.
+     - The body's corrective weights in each pose come from the same rules as `anim` (`CORRECTIVE_RULES`). A test holds them to the build data.
+     - The body states are both frames, each with the build's four muscle and fat corners and the body presets (10 in the gate's library, which has no presets).
+     - In each pose a corrective leans on, each garment corner's gap is measured: where its binding puts it on the posed skin, less where linear skinning puts it, less the same gap at rest, taken back to rest. That gap goes into the leaning correctives on the corner's side, as the mean over poses and states, in 4 rounds.
+     - On the tee: 6 correctives followed, the farthest moving a corner 93 mm. Import time is 8.5 s.
+   - **What it did to the gate:**
+
+     | Run (each on a fresh gate library) | Arms raised | Walk | Bra through tee, walk |
+     |---|---|---|---|
+     | No posed fit (red run) | 54 bodies, 17.4 mm | 54, 29.9 mm | 21, 17.5 mm |
+     | Corrective follow (committed) | 54, 16.1 mm | 54, 31.4 mm | 20, 17.1 mm |
+     | Follow, then pushing out in the pose (8 rounds) | 54, 20.6 mm | 54, 38.3 mm; **T-pose 54 bodies** | 21, 26.6 mm |
+     | Follow; weights from the bound point only, smoothed or not, or projected but not smoothed | 54, 13.3 to 16.2 mm | 54, 31.2 to 32.0 mm | 21, 16.8 to 18.0 mm |
+
+   - **Why pushing fails.** In a dump of the masculine average cast in the walk (rendered with the failing corners marked), the failing skin is the front of the armpit, where the swung-back arm meets the chest and the skin folds outward. When the arm hangs, its skin and the side's come together. A push for one is into the other, so the solve diverges: after 8 rounds 70 of 90 cases were still out, by up to 48 mm.
+   - **What would work.** No body corrective leans on an arm's swing, so nothing the runtime drives can carry a fix for the walk. Fixing it needs one of:
+     - correctives for the swings (an `anim` and build change: new rules and shapes);
+     - a garment that doesn't cover the armpit fold;
+     - cloth proxies or deformer maps (ADR-0035's later options).
+   - **Arms raised.** Here the failing skin is the base of the neck, x ±5 cm in front. It rises into a crew neck that is now close (it has to be, item 2). The follow didn't change it either.
+2. **The bra through and above the tee.** Half fixed.
+   - **The neckline and armhole are fixed at the source.** The realistic sports bra's straps rise against the side of the neck, up to 1.50 m on the masculine frame, with their inner edge at the neck's surface (|x| 0.063 m against a neck 0.061 m wide). A crew neck 2.6 cm wider than the neck, as before, shows them; that was the black band above the neckline.
+     - The opening is now an elliptic cylinder along the neck, 2 mm wider than its column, with a scoop down to the hollow in front.
+     - `check_covers_the_bra` casts a ray from every corner of the bra that stands off the skin toward each capture view (front, three-quarter, side and back, both sides, level and from 5° above), on both frames. A ray that meets neither the shirt nor the body means the corner shows. On the feminine frame the shirt is moved with the skin under it.
+     - Result: 0 corners show, apart from two counted allowances. The straps' tops at the collar's edge: 20 corners on the masculine frame and 17 on the feminine, about 2 mm of strap. A crew neck sits on the neck's base, and these straps rise above it. And 2 or 3 corners of the side band, seen up a sleeve from straight beside the body.
+   - **Posed, it is not fixed.** In the gate the bra comes through the tee in the walk (20 bodies, 17.1 mm) and with the arms raised (5, 3.7 mm).
+   - `fitting.rs` now checks the pair posed: the bra's corners the tee covers at rest, posed with each item's own skin in every fit pose on the 10 states, must not be more than 1 mm outside it. It finds 58 failing (pose, state) cases, up to 19 mm, all with the arms hanging, swung or raised. It is recorded as a ceiling (58 cases, 19.1 mm). The bra is a lower layer the posed fit doesn't push against (pushing was dropped, item 1).
+3. **The boxer briefs.** Not fixed.
+   - I changed `push_out` to leave out one hem ring instead of two. One ring in matches what the gate counts as covered, two rings in from the rim's edge.
+   - I rebuilt the package (`build.py`). The boxer briefs' push grew from 6.9 to 26.1 mm and the briefs' from 5.4 to 25.3 mm, but the gate's case didn't move at all: one vertex, 14.22 mm (17.1 mm in the walk), on the masculine heavy-soft body.
+   - So that vertex isn't one the build's states reach. The build checks single shapes and the four muscle and fat corners, not the heavy-soft benchmark's own mix.
+   - I reverted the change and the rebuild, because it loosened both garments for nothing. `underwear.py`, `RealisticParts.glb` and `Realistic.build.json` are unchanged from review fixes 1.
+   - Next step: put the benchmark compositions themselves among `push_out`'s states, or measure that vertex in Blender.
+4. **The stylized clothes.** Not fixed, not started this round. They are recorded as before (sneakers 16 bodies, 34 mm; tee 7 or 8, 25 mm; cargo 7, 34 mm; stylized briefs 3, 18 mm). The tee's back hem still crumples into the waistband. The reviewer is right that "a gate artefact" for the sneakers is a claim without a test.
+
+### Non-blocking items
+
+- The test tee README's repeated sentence is gone. The README describes the remade tee.
+- Not done: the layered test's push-out mechanism, the underwear's feminine-frame state and shared pushes, the proportions' extremes, reporting `lift_most` at import, `hidden_of` decoding on the calling thread, and the triangle budget. The tee has 3,710 vertices and 7,124 triangles; the closed underarm and longer sleeves added triangles, so it is further over the 6k budget.
+
+### Interfaces changed
+
+All in `avatar::fit`; no manifest schema changed.
+- New: `fit_poses(&Rig, Option<FinishPose>)`, `FitPose`, `FinishPose`, `corrective_weights`, `CORRECTIVE_RULES`, `skin`, `skin_matrices`, `pose_states_of`, `PoseReport`.
+- `FitOptions` gains `poses` and `pose_states` (empty: no posed fit).
+- `FitReport` gains `posed` (serde default).
+- `ImportRequest` gains `finish_pose`. Callers outside the crate must set it; the example and the gate pass `anim::twist::drive`.
+- `Layer` gains `joints` and `weights` (empty: not posed).
+
+### Tests
+
+| Run | Result |
+|---|---|
+| Red run (`co9-binding-red-run.txt`): the new fitting tests and the gate with 0 allowed | 15 run, 7 failed (the posed bra check: 11 of 18 cases; the gate in all six poses) |
+| `cargo nextest run -p axcenity-avatar -p axcenity-player -E 'binary(fitting) \| test(/fit_gate_tests/)' --no-fail-fast` | 15 tests run: 15 passed (against the records above) |
+| `cargo nextest run -p axcenity-assets -p axcenity-avatar -p axcenity-anim -p axcenity-gameplay -p axcenity-project -p axcenity-player --no-fail-fast` | 990 tests run: 990 passed (3 slow), 21 skipped |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all`; `cargo hakari generate` | done; no changes |
+| `python3 -I scripts/check-wiki.py` | 113 pages, 0 errors (58 staleness warnings on other pages) |
+| `make_test_tee.py` (bpy) | hems 0.066 m below the armpit; bra hidden but for the allowances above; 3,710 vertices, 7,124 triangles. The OBJ's vertex order isn't byte-for-byte reproducible between runs (Blender's set order); the shape is |
+
+New tests in `fitting.rs`:
+- `the_fit_poses_lean_on_the_shoulder_correctives`;
+- `the_corrective_rules_are_the_build_datas`;
+- the posed half of `a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme`.
+
+### Visual evidence
+
+New files in `co9-binding/`:
+- `test-tee-source-renders.png`: the remade OBJ on the body, from the front, three-quarter, side, back and below. It replaces the round-1 file.
+- `rf2-crops-rest.jpg`, `rf2-crops-arms-raised.jpg`, `rf2-crops-walk.jpg`: in-engine captures of the imported tee over the cast's underwear, in studio light, front, three-quarter and side. Rows are feminine average, feminine heavyset, masculine average and masculine heavyset. Each crop is 1.5 times the capture's 1280 × 720.
+- `walk-armpit-dump.jpg`: the gate's posed meshes for the masculine average cast in the walk, from the gate's dump. Failing covered skin is red; the tee is shown, then hidden.
+
+What I saw:
+- **Arms raised: the tear is gone.** On all four bodies the side under the raised arm is closed cloth, with no skin and no bra showing. The sleeves and upper sides are faceted, crumpled cloth: linear skinning of a stretched sleeve, with the facets of a 7k-triangle draft. The shoulders look boxy.
+- **Rest: the bra is gone from the neckline and the armhole.** There is no black band above the neck and no bra in the armhole from the side.
+  - **The new defect is the collar.** It is a high, close collar that rises a little up the neck, like a low mock neck rather than a crew neck. That is most visible on the feminine bodies. It was the price of covering straps that rise up the side of the neck.
+  - The sleeves are full and stand off the upper arm, and from the side the sleeve opening shows dark inside.
+- **Walk: at crop size, no skin and no bra show through.** The gate's cases (the front of the armpit, up to 26 mm on this body) are in the fold where the arm, swung back, meets the chest, and the arm hides them in every capture view (`walk-armpit-dump.jpg`). They are real by the gate's rule and hidden in these pictures. On the masculine bodies, one or two light specks at the back of the armpit in the side view may be pin-holes where the skin comes through.
+- **Not captured this round:** the underwear (unchanged), the stylized clothes (unchanged), the hard light and the elbows or knees bent (the gate finds nothing for the tee there).
+
+### At merge (added)
+
+- `crates/avatar/Cargo.toml` gains the dev-dependency `axcenity-anim` (a workspace crate; hakari reports no change; `Cargo.lock` gains the edge).
+- `TestTee.obj` is replaced. Nothing generated in `assets/` changed this round.
+- The gate's records in `fit_gate_tests.rs` and the posed ceiling in `fitting.rs` are this branch's. They are open defects; lower them as the fit improves.

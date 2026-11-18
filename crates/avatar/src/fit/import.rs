@@ -14,6 +14,7 @@ use glam::Vec3;
 
 use super::coverage::{RegionMap, classify, coverage, hidden_regions, triangle_regions};
 use super::glb::{FittedModel, write_fitted_glb};
+use super::pose::{FinishPose, fit_poses};
 use super::surface::Surface;
 use super::thumbnail::{thumbnail, write_png};
 use super::transfer::{FitOptions, FitReport, Layer, carried_shapes, extremes_near, fit_garment};
@@ -49,6 +50,11 @@ pub struct ImportRequest {
     pub under: Vec<String>,
     /// A sentence for the browser.
     pub about: Option<String>,
+    /// What the runtime does to a pose before skinning (the twist and
+    /// helper bones: `axcenity_anim::twist::drive`), so the poses it is
+    /// fitted in are the runtime's ([`FinishPose`]). `None`: the fit's
+    /// poses turn only the limbs.
+    pub finish_pose: Option<FinishPose>,
 }
 
 /// How the garment was moved onto the body: each corner `p` became
@@ -325,6 +331,53 @@ pub fn extremes_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f
     sets
 }
 
+/// The body states a garment on `base` is posed in when it is fitted
+/// ([`FitOptions::pose_states`](super::FitOptions)): on both ends of the
+/// frame, the frame alone, the build's four corners (muscle and fat at
+/// either end), and every body preset. (The posed solve checks every pose
+/// on each, so these are a few bodies far apart, not the [`extremes_of`]
+/// pairs.)
+pub fn pose_states_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f32)>> {
+    let frames: Vec<Option<f32>> = match base.parameter("frame") {
+        Some(frame) => vec![Some(frame.range[0]), Some(frame.range[1])],
+        None => vec![None],
+    };
+    let mut sets: Vec<Vec<(String, f32)>> = Vec::new();
+    for frame in &frames {
+        let mut description = Description::new("pose", &base.id);
+        if let Some(frame) = frame {
+            description.parameters.insert("frame".to_owned(), *frame);
+        }
+        sets.push(weights_of(base, &description, library));
+        if base.parameter("muscle").is_some() && base.parameter("fat").is_some() {
+            for muscle in [-1.0, 1.0] {
+                for fat in [-1.0, 1.0] {
+                    let mut corner = description.clone();
+                    corner.parameters.insert("muscle".to_owned(), muscle);
+                    corner.parameters.insert("fat".to_owned(), fat);
+                    sets.push(weights_of(base, &corner, library));
+                }
+            }
+        }
+        for preset in library.presets.values() {
+            if preset.base != base.id
+                || preset.preset().map(|p| p.kind) != Some(crate::PresetKind::Body)
+            {
+                continue;
+            }
+            let mut description = Description::new("pose", &base.id);
+            description.parameters.extend(preset.parameters.clone());
+            if let Some(frame) = frame {
+                description.parameters.insert("frame".to_owned(), *frame);
+            }
+            sets.push(weights_of(base, &description, library));
+        }
+    }
+    sets.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+    sets.dedup();
+    sets
+}
+
 fn weights_of(
     base: &BaseManifest,
     description: &Description,
@@ -413,6 +466,8 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         shapes: carried_shapes(base, &body),
         under,
         extremes: extremes_near(&body, &garment, &extremes_of(base, &library)),
+        poses: fit_poses(&body.rig, request.finish_pose),
+        pose_states: pose_states_of(base, &library),
         ..FitOptions::default()
     };
     let fitted = fit_garment(&body, &garment, &options)?;

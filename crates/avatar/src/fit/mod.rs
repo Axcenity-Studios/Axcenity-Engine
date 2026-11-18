@@ -32,6 +32,8 @@ mod bind;
 mod coverage;
 mod glb;
 mod import;
+mod pose;
+mod posed;
 mod surface;
 mod thumbnail;
 mod transfer;
@@ -50,7 +52,14 @@ pub use coverage::{
     triangle_regions,
 };
 pub use glb::{FittedModel, write_fitted_glb};
-pub use import::{Alignment, ImportRequest, Imported, align, extremes_of, import_garment};
+pub use import::{
+    Alignment, ImportRequest, Imported, align, extremes_of, import_garment, pose_states_of,
+};
+pub use pose::{
+    CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses, skin,
+    skin_matrices,
+};
+pub use posed::PoseReport;
 pub use surface::{Hit, Surface, closest_on_triangle, vertex_normals};
 pub use thumbnail::{thumbnail, write_png};
 pub use transfer::{

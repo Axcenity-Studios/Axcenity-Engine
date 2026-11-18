@@ -440,7 +440,7 @@ GarmentMesh::from_model(&Model);  Surface::new(positions, normals, triangles).cl
 bind(&Surface, &[Vec3], &[Vec3]) -> Binding                         // garment points and their normals (empty: closest points)
 place(&Binding, positions, normals, triangles) -> Vec<Vec3>
 carried_shapes(&BaseManifest, &BodyMesh) -> Vec<String>          // identity (parameters, corners) + Corrective_*, no Mask_*
-fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds }) -> Result<Fitted, FitError>
+fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds, poses, pose_states }) -> Result<Fitted, FitError>
     // weights from the skin under each corner (both sides of a crease), the bound point's where none; normals turned with the push-out
 Fitted { garment, joints, weights, shapes: Vec<CarriedShape>, binding, report: FitReport { layers: Vec<LayerOffset>, inside_most, .. } }
 triangle_regions(&BodyMesh, &RegionMap) -> Vec<u8>;  coverage(&BodyMesh, &regions, &Surface) -> Coverage
@@ -448,6 +448,11 @@ hidden_regions(&BaseManifest, &Coverage) -> Vec<String>;  classify(&BaseManifest
 write_fitted_glb(&FittedModel) -> Vec<u8>;  thumbnail(&GarmentMesh, size) -> rgba
 extremes_of(&BaseManifest, &Library) -> Vec<Vec<(shape, weight)>>  // the sliders check's pairs of build ends, and body presets, both frames
 extremes_near(&BodyMesh, &GarmentMesh, &extremes) -> extremes        // only the shapes that reach the garment; duplicates dropped
+fit_poses(&Rig, Option<FinishPose>) -> Vec<FitPose>                  // held poses, arms hanging, walk swings; with the body's corrective weights
+pose_states_of(&BaseManifest, &Library) -> states                    // frames, the build's muscle/fat corners, body presets
+// posed fit: in each pose a corrective leans on, the garment's copies of the
+// leaning correctives take what linear skinning leaves between the cloth and
+// where its binding puts it on the posed skin (FitReport.posed)
 align(&mut GarmentMesh, &BodyMesh) -> Alignment { scale, offset, units, spread_before, spread_after }   // units, rough place, fine fit
 import_garment(&ImportRequest) -> Result<Imported, FitError>     // align, fit, classify, thumbnail, write, list in the catalogue
 // assets (region hiding)

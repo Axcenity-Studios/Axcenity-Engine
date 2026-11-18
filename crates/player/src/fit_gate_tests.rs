@@ -102,6 +102,7 @@ fn gate_library() -> &'static Path {
                 margin: 0.002,
                 under: vec!["axcenity/realistic-sports-bra".to_owned()],
                 about: None,
+                finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
             })
             .expect("the test tee imports");
         });
@@ -648,37 +649,42 @@ fn gate(stance: Stance, known: &[Known]) {
     check(&label, &failures, known);
 }
 
-// What the realistic gate still finds (review fixes 1, 2026-11-17), per
-// garment and pose. Every item here is a draft; each is an open defect in
-// `docs/development/character-studio/refinement/wave3/co9-binding.md`,
-// not accepted behaviour. The test tee fits at rest, in the T-pose and
-// with the elbows or knees bent (nothing recorded); the briefs fit in
-// every pose.
+// What the realistic gate still finds (review fixes 2, 2026-11-17), per
+// garment and pose. Every item here is a draft or an open defect in
+// `docs/development/character-studio/refinement/wave3/co9-binding.md`
+// (Review fixes 2), not accepted behaviour. The test tee was remade in
+// review fixes 2 (a closed underarm and sleeves past the armpit, a crew
+// neck over the bra's straps): it covers more skin than before, so it is
+// counted in more places. It fits at rest, in the T-pose and with the
+// elbows or knees bent.
 
-/// The boxer briefs on the masculine heavy-soft body: the skin under the
-/// gusset hangs below it (body vertices 1 to 4 cm under the cloth at that
-/// composition; one is in the covered region). The gusset is narrower
-/// than two rings from each leg opening, so the build's push-out
-/// (`underwear.py`, `push_out`) doesn't reach it.
+/// The boxer briefs on the masculine heavy-soft body: one body vertex
+/// under the gusset, 14 mm out (17 mm in the walk), which the build's
+/// push-out (`underwear.py`) doesn't reach.
 const BOXER_GUSSET: f32 = 0.0143;
+
+fn boxer(pose: &'static str) -> Known {
+    Known {
+        garment: "Underwear_BoxerBriefs",
+        pose,
+        cases: 1,
+        worst: if pose == "Walk@18" {
+            0.0172
+        } else {
+            BOXER_GUSSET
+        },
+    }
+}
 
 #[test]
 fn garments_cover_the_cast_at_rest() {
-    gate(
-        Stance::Rest,
-        &[Known {
-            garment: "Underwear_BoxerBriefs",
-            pose: "rest",
-            cases: 1,
-            worst: BOXER_GUSSET,
-        }],
-    );
+    gate(Stance::Rest, &[boxer("rest")]);
 }
 
-/// The walk: the tee where the arm swings back across the front of the
-/// armpit and at the hem over the hip as the thigh comes forward, and the
-/// bra through it there, are linear skinning's limits for a garment
-/// standing off the skin (`co9-binding.md`, Review fixes 1).
+/// The walk: the front of the armpit, where the arm swings back and the
+/// skin there folds out of the tee's armpit (on every body, up to 31 mm),
+/// and the bra's side through the tee there. The posed fit's correctives
+/// don't reach it: no body corrective leans on a swing.
 #[test]
 fn garments_cover_the_cast_walking() {
     gate(
@@ -690,40 +696,27 @@ fn garments_cover_the_cast_walking() {
             Known {
                 garment: "TestTee",
                 pose: "Walk@18",
-                cases: 33,
-                worst: 0.0125,
+                cases: 54,
+                worst: 0.0314,
             },
             Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "Walk@18",
-                cases: 12,
-                worst: 0.0113,
-            },
-            Known {
-                garment: "Underwear_BoxerBriefs",
-                pose: "Walk@18",
-                cases: 1,
+                cases: 20,
                 worst: 0.0172,
             },
+            boxer("Walk@18"),
         ],
     );
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_arms_out() {
-    gate(
-        Stance::Held(HeldPose::TPose),
-        &[Known {
-            garment: "Underwear_BoxerBriefs",
-            pose: "TPose",
-            cases: 1,
-            worst: BOXER_GUSSET,
-        }],
-    );
+    gate(Stance::Held(HeldPose::TPose), &[boxer("TPose")]);
 }
 
-/// Arms raised: the tee's underarm opens as the sleeve rises with the arm
-/// (the bra shows at the side) and the trapezius rises into its neckline.
+/// Arms raised: the base of the neck rises into the tee's close crew neck
+/// (on every body, up to 16 mm), and the bra's straps with it.
 #[test]
 fn garments_cover_the_cast_with_the_arms_raised() {
     gate(
@@ -732,49 +725,28 @@ fn garments_cover_the_cast_with_the_arms_raised() {
             Known {
                 garment: "TestTee",
                 pose: "ArmsRaised",
-                cases: 25,
-                worst: 0.0098,
+                cases: 54,
+                worst: 0.0161,
             },
             Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "ArmsRaised",
-                cases: 2,
-                worst: 0.0053,
+                cases: 5,
+                worst: 0.0037,
             },
-            Known {
-                garment: "Underwear_BoxerBriefs",
-                pose: "ArmsRaised",
-                cases: 1,
-                worst: BOXER_GUSSET,
-            },
+            boxer("ArmsRaised"),
         ],
     );
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_elbows_bent() {
-    gate(
-        Stance::Held(HeldPose::ElbowsBent),
-        &[Known {
-            garment: "Underwear_BoxerBriefs",
-            pose: "ElbowsBent",
-            cases: 1,
-            worst: BOXER_GUSSET,
-        }],
-    );
+    gate(Stance::Held(HeldPose::ElbowsBent), &[boxer("ElbowsBent")]);
 }
 
 #[test]
 fn garments_cover_the_cast_with_the_knees_bent() {
-    gate(
-        Stance::Held(HeldPose::KneesBent),
-        &[Known {
-            garment: "Underwear_BoxerBriefs",
-            pose: "KneesBent",
-            cases: 1,
-            worst: BOXER_GUSSET,
-        }],
-    );
+    gate(Stance::Held(HeldPose::KneesBent), &[boxer("KneesBent")]);
 }
 
 /// Wearing the tee leaves the regions it covers whole out of the body

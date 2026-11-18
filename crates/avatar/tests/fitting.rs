@@ -9,8 +9,9 @@ use std::path::{Path, PathBuf};
 
 use axcenity_assets::Assets;
 use axcenity_avatar::fit::{
-    BodyMesh, FitOptions, GarmentMesh, ImportRequest, Surface, align, carried_shapes, extremes_of,
-    fit_garment, import_garment,
+    BodyMesh, CORRECTIVE_RULES, FitOptions, GarmentMesh, ImportRequest, Surface, align,
+    carried_shapes, extremes_of, fit_garment, fit_poses, import_garment, pose_states_of, skin,
+    skin_matrices,
 };
 use axcenity_avatar::{
     Catalogue, CatalogueBase, CatalogueItem, Fit, Library, ModelContents, Quality, Source,
@@ -115,7 +116,13 @@ fn request(root: &Path, id: &str, under: &[&str]) -> ImportRequest {
         margin: 0.002,
         under: under.iter().map(|s| (*s).to_owned()).collect(),
         about: Some("A test garment for the import flow (a draft).".to_owned()),
+        finish_pose: Some(finish_pose),
     }
+}
+
+/// The runtime's last touch to a pose: the twist and helper bones.
+fn finish_pose(rig: &axcenity_assets::Rig, pose: &mut Vec<axcenity_assets::BoneTransform>) {
+    axcenity_anim::twist::drive(rig, pose, &mut []);
 }
 
 fn body_and(assets: &Assets, object: &str) -> (BodyMesh, BodyMesh) {
@@ -353,6 +360,154 @@ fn a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme() {
         started.elapsed().as_secs_f32()
     );
     assert!(worst > 0.0015, "{worst} m over the bra");
+
+    // And posed: in every pose it is fitted in (the held poses, the arms
+    // hanging, a walk's swings either way round), on both frames and every
+    // body preset, no corner of the bra the tee covers at rest is more
+    // than 1 mm outside it. The bra and the tee are posed with their own
+    // skin weights and the body's corrective weights in that pose, as the
+    // runtime poses them.
+    let body = BodyMesh::from_model(&assets.model_blocking(BODY).unwrap()).unwrap();
+    let poses = fit_poses(&body.rig, Some(finish_pose));
+    let pose_states = pose_states_of(base, &library);
+    let mut failing = Vec::new();
+    let mut worst_posed = 0.0f32;
+    for state in &pose_states {
+        let (tee_rest, tee_rest_normals) = tee.shaped(state);
+        let (bra_rest, bra_rest_normals) = bra.shaped(state);
+        let inner = Surface::new(tee_rest, tee_rest_normals, tee.triangles.clone());
+        let covered: Vec<bool> = bra_rest
+            .iter()
+            .zip(&bra_rest_normals)
+            .map(|(p, n)| {
+                inner
+                    .closest(*p, 0.02)
+                    .is_some_and(|hit| hit.is_over(*p) && n.dot(hit.normal) > 0.5)
+            })
+            .collect();
+        for pose in &poses {
+            let mut weights = state.clone();
+            weights.extend(pose.correctives.iter().cloned());
+            let matrices = skin_matrices(&body.rig, &pose.bones);
+            let (tee_at, tee_normals) = tee.shaped(&weights);
+            let (tee_posed, tee_posed_normals, _) =
+                skin(&matrices, &tee.joints, &tee.weights, &tee_at, &tee_normals);
+            let (bra_at, bra_normals) = bra.shaped(&weights);
+            let (bra_posed, bra_posed_normals, _) =
+                skin(&matrices, &bra.joints, &bra.weights, &bra_at, &bra_normals);
+            let cloth = Surface::new(tee_posed, tee_posed_normals, tee.triangles.clone());
+            let mut out = 0;
+            let mut most = 0.0f32;
+            for (k, (p, n)) in bra_posed.iter().zip(&bra_posed_normals).enumerate() {
+                if !covered[k] {
+                    continue;
+                }
+                let Some(hit) = cloth.closest(*p, 0.05) else {
+                    continue;
+                };
+                if n.dot(hit.normal) <= 0.0 {
+                    continue;
+                }
+                let signed = hit.signed(*p);
+                if signed > 0.001 {
+                    out += 1;
+                    most = most.max(signed);
+                }
+            }
+            worst_posed = worst_posed.max(most);
+            if out > 0 {
+                failing.push(format!(
+                    "{} on {state:?}: {out} bra corners out, {:.1} mm",
+                    pose.name,
+                    most * 1000.0
+                ));
+            }
+        }
+    }
+    println!(
+        "posed: {} poses on {} body states, {} failing, worst {:.1} mm",
+        poses.len(),
+        pose_states.len(),
+        failing.len(),
+        worst_posed * 1000.0
+    );
+    for case in &failing {
+        println!("  {case}");
+    }
+    // Recorded, not accepted (`co9-binding.md`, Review fixes 2): with the
+    // arms hanging or swung the bra's side band comes out at the tee's
+    // armpit, and with them raised its straps at the neck. Lower these as
+    // the fit improves; never raise them.
+    assert!(
+        failing.len() <= 58 && worst_posed <= 0.0191,
+        "{} cases, {worst_posed} m: {failing:#?}",
+        failing.len()
+    );
+}
+
+/// The fit poses lean on the body's shoulder correctives as the runtime
+/// does (`anim::correctives`): level arms on the level shape, raised arms
+/// on both the level and the raised ones, hanging arms on the lowered.
+#[test]
+fn the_fit_poses_lean_on_the_shoulder_correctives() {
+    let assets = Assets::new(shipped());
+    let body = BodyMesh::from_model(&assets.model_blocking(BODY).unwrap()).unwrap();
+    let poses = fit_poses(&body.rig, Some(finish_pose));
+    let weight = |pose: &str, shape: &str| {
+        poses
+            .iter()
+            .find(|p| p.name == pose)
+            .unwrap_or_else(|| panic!("no pose {pose}"))
+            .correctives
+            .iter()
+            .find(|(name, _)| name == shape)
+            .map_or(0.0, |(_, w)| *w)
+    };
+    for side in ["Left", "Right"] {
+        let shape = |kind: &str| format!("Corrective_Shoulder_{kind}_{side}");
+        assert!((weight("t-pose", &shape("Level")) - 1.0).abs() < 0.02);
+        assert!(weight("t-pose", &shape("Raised")) < 0.02);
+        assert!((weight("arms-raised", &shape("Level")) - 1.0).abs() < 0.02);
+        assert!((weight("arms-raised", &shape("Raised")) - 1.0).abs() < 0.02);
+        assert!(weight("arms-hanging", &shape("Lowered")) > 0.9);
+        assert!(weight("arms-hanging", &shape("Level")) < 0.02);
+    }
+    for pose in ["elbows-bent", "knees-bent"] {
+        assert!(
+            poses
+                .iter()
+                .find(|p| p.name == pose)
+                .unwrap()
+                .correctives
+                .iter()
+                .all(|(_, w)| *w < 0.02),
+            "{pose}"
+        );
+    }
+}
+
+/// The corrective rules the fit poses use are the realistic build's (the
+/// same numbers `anim` drives the shapes with at run time).
+#[test]
+fn the_corrective_rules_are_the_build_datas() {
+    let text = std::fs::read_to_string(shipped().join("realistic/Realistic.build.json")).unwrap();
+    let data: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let rules = data["correctives"].as_array().unwrap();
+    assert_eq!(rules.len(), CORRECTIVE_RULES.len());
+    for rule in rules {
+        let shape = rule["shape"].as_str().unwrap();
+        let ours = CORRECTIVE_RULES
+            .iter()
+            .find(|r| r.0 == shape)
+            .unwrap_or_else(|| panic!("no rule for {shape}"));
+        assert_eq!(ours.1, rule["bone"].as_str().unwrap());
+        for (a, b) in ours.2.iter().zip(rule["axis"].as_array().unwrap()) {
+            assert!((a - b.as_f64().unwrap() as f32).abs() < 1e-5, "{shape}");
+        }
+        let angles = rule["angles"].as_array().unwrap();
+        assert!((ours.3 - angles[0].as_f64().unwrap() as f32).abs() < 1e-4);
+        assert!((ours.4 - angles[1].as_f64().unwrap() as f32).abs() < 1e-4);
+    }
 }
 
 /// The extremes a garment is fitted at are the sliders check's

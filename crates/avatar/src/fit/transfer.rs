@@ -8,6 +8,8 @@ use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::bind::{BIND_REACH, Binding, bind, frames};
+use super::pose::FitPose;
+use super::posed::{self, PoseReport};
 use super::surface::Surface;
 use super::{BodyMesh, FitError, GarmentMesh, is_mask_shape};
 use crate::BaseManifest;
@@ -43,6 +45,13 @@ pub struct FitOptions {
     pub extremes: Vec<Vec<(String, f32)>>,
     /// How many times the push-out is checked again after moving.
     pub rounds: usize,
+    /// Poses the garment is posed in with the body ([`fit_poses`](super::fit_poses)),
+    /// on each of `pose_states` (body shape weights: the frames, the
+    /// build's corners and the body presets), and its copies of the
+    /// correctives leaning there made to follow the skin it is bound to
+    /// (`posed`). Empty: not posed.
+    pub poses: Vec<FitPose>,
+    pub pose_states: Vec<Vec<(String, f32)>>,
 }
 
 impl Default for FitOptions {
@@ -53,12 +62,16 @@ impl Default for FitOptions {
             under: Vec::new(),
             extremes: Vec::new(),
             rounds: 4,
+            poses: Vec::new(),
+            pose_states: Vec::new(),
         }
     }
 }
 
-/// A lower layer a garment stays outside of: its surface at rest and its
-/// shapes (offsets per corner, by the body shape's name).
+/// A lower layer a garment stays outside of: its surface at rest, its
+/// shapes (offsets per corner, by the body shape's name) and its skin
+/// weights (one set per corner on the body's joints, to pose it with the
+/// garment; empty when it has none, and then it isn't posed).
 #[derive(Clone, Debug)]
 pub struct Layer {
     pub name: String,
@@ -66,6 +79,8 @@ pub struct Layer {
     pub normals: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
     pub shapes: BTreeMap<String, Vec<Vec3>>,
+    pub joints: Vec<[u16; 4]>,
+    pub weights: Vec<[f32; 4]>,
 }
 
 impl Layer {
@@ -81,6 +96,8 @@ impl Layer {
                 .iter()
                 .map(|shape| (shape.name.clone(), shape.offsets.clone()))
                 .collect(),
+            joints: fitted.joints.clone(),
+            weights: fitted.weights.clone(),
         }
     }
 
@@ -97,10 +114,12 @@ impl Layer {
                 .iter()
                 .map(|shape| (shape.name.clone(), shape.dense(mesh.positions.len())))
                 .collect(),
+            joints: mesh.joints.clone(),
+            weights: mesh.weights.clone(),
         }
     }
 
-    fn shaped(&self, weights: &[(String, f32)]) -> Vec<Vec3> {
+    pub(super) fn shaped(&self, weights: &[(String, f32)]) -> Vec<Vec3> {
         let mut out = self.positions.clone();
         for (name, weight) in weights {
             if let Some(offsets) = self.shapes.get(name) {
@@ -167,6 +186,9 @@ pub struct FitReport {
     /// or a lower layer's surface at rest, at any carried shape's full
     /// weight or at any extreme (metres; 0 when none is).
     pub inside_most: f32,
+    /// What posing it with the body did ([`FitOptions::poses`]).
+    #[serde(default)]
+    pub posed: PoseReport,
 }
 
 /// A garment fitted to a body: its rest (pushed out), skin weights and
@@ -483,7 +505,23 @@ pub fn fit_garment(
             *total += a.length();
         }
     }
-    if lifted.iter().any(|l| *l > 0.0) {
+    let lift_most = lifted.into_iter().fold(0.0, f32::max);
+
+    // 5b. Posed: its copies of the body's correctives made to follow the
+    // skin it is bound to in the poses they lean in (`posed`).
+    let posed_report = posed::solve(
+        body,
+        &posed::Garment {
+            binding: &binding,
+            joints: &joints,
+            weights: &weights,
+        },
+        &options.poses,
+        &options.pose_states,
+        &rest,
+        &mut shapes,
+    );
+    if lift_most > 0.0 {
         // The binding's offsets follow the lifted rest.
         for (bound, (k, (point, axes))) in binding
             .vertices
@@ -493,12 +531,16 @@ pub fn fit_garment(
             bound.local = (axes.transpose() * (rest[k] - *point)).to_array();
         }
     }
-    let lift_most = lifted.into_iter().fold(0.0, f32::max);
 
     // 6. What is left: the deepest anything is still inside.
     let mut inside_most = deepest(&obstacles(body, &near, &options.under, &[]), &rest);
     for shape in &shapes {
         if shape.reach() <= LEAST {
+            continue;
+        }
+        // A corrective the posed solve pushed is meant for its pose (where
+        // the solve checked it), not the rest pose at full weight.
+        if !options.poses.is_empty() && shape.name.starts_with("Corrective_") {
             continue;
         }
         let weights = [(shape.name.clone(), 1.0)];
@@ -573,6 +615,7 @@ pub fn fit_garment(
         extremes_lifting: lifting,
         lift_most,
         inside_most,
+        posed: posed_report,
     };
     Ok(Fitted {
         garment: fitted_garment,
@@ -921,7 +964,7 @@ impl Welds {
 
 /// `each` of `items`, worked out on several threads (the machine's, at most
 /// eight), in order.
-fn par_map<T: Sync, R: Send>(items: &[T], each: impl Fn(&T) -> R + Sync) -> Vec<R> {
+pub(super) fn par_map<T: Sync, R: Send>(items: &[T], each: impl Fn(&T) -> R + Sync) -> Vec<R> {
     let threads = std::thread::available_parallelism()
         .map_or(1, |n| n.get())
         .clamp(1, 8);
