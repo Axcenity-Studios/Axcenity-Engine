@@ -230,10 +230,15 @@ def build(out_dir):
     identity = fr.identity()
     body_fields = {"Frame_Feminine": bodyshapes.frame_feminine(P, F.P)}
     body_fields.update(bodyshapes.builds(P, lm, normals, nbr, joints))
-    # Kept apart where the heavy and muscular builds made the body cross
-    # itself (R3, wave 3).
+    edges = [tuple(e.vertices) for e in body_obj.data.edges]
+    # The hips narrowed by a shape below 1, per frame (R3 wave 3, review
+    # fixes 1; driven by `manifests.py`'s corners).
+    body_fields.update(bodyshapes.hips_narrow(P, F.P, joints, joints_f, weights, edges))
+    # Kept apart where the builds made the body cross itself (R3, wave 3):
+    # at rest, with the hips narrowed and with the head scaled.
     apart, apart_report = bodyshapes.keep_apart(
-        P, body_fields, face.triangles(body_obj.data), [tuple(e.vertices) for e in body_obj.data.edges])
+        P, body_fields, face.triangles(body_obj.data), edges, weights,
+        {"masculine": joints["Head"][0], "feminine": joints_f["Head"][0]})
     body_fields.update(apart)
     masks = bodyshapes.masks(P, normals, weights, joints)
     shapes = {}

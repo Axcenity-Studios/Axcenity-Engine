@@ -37,8 +37,8 @@ def main():
     ap.add_argument("--title", default="")
     ap.add_argument("--package", default="realistic", choices=sorted(Q.PACKAGES))
     ap.add_argument("--parts", default="", help="another build's parts file (its build data beside it)")
-    ap.add_argument("--aim", default="trunk", choices=["trunk", "body"],
-                    help="frame the trunk (the default) or the whole body")
+    ap.add_argument("--aim", default="trunk", choices=["trunk", "body", "head"],
+                    help="frame the trunk (the default), the whole body, or the head and neck")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:])
     cases = json.load(open(a.cases))
     os.makedirs(a.out, exist_ok=True)
@@ -61,6 +61,8 @@ def main():
         span = 0.75
         if a.aim == "body":
             aim, span = Vector((0.0, 0.0, h["Hips"].z - 0.05)), 1.9
+        elif a.aim == "head":
+            aim, span = Vector((0.0, 0.0, h["Head"].z)), 0.4
         for view in case.get("views", ["front", "three-quarter", "side"]):
             direction, back = VIEWS[view]
             for o in list(bpy.data.objects):

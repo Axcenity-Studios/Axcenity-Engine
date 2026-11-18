@@ -667,7 +667,7 @@
       "label": "Hip width",
       "group": "proportions",
       "range": [
-        1.0,
+        0.7,
         1.15
       ],
       "default": 1,
@@ -675,7 +675,7 @@
         {
           "attribute": "HipWidth",
           "from": [
-            1.0,
+            1,
             1.15
           ]
         }
@@ -687,16 +687,16 @@
       "label": "Head size",
       "group": "proportions",
       "range": [
-        0.975,
-        1.025
+        0.87,
+        1.125
       ],
       "default": 1,
       "attributes": [
         {
           "attribute": "HeadSize",
           "from": [
-            0.975,
-            1.025
+            0.87,
+            1.125
           ]
         }
       ],
@@ -1149,6 +1149,62 @@
           "shape": "Face_Ears_Out",
           "from": [
             -1,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "corners": [
+    {
+      "shape": "Masculine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            1,
+            0
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "shape": "Feminine_Hips_Narrow",
+      "factors": [
+        {
+          "parameter": "frame",
+          "from": [
+            0,
+            1
+          ],
+          "to": [
+            0,
+            1
+          ]
+        },
+        {
+          "parameter": "hip_width",
+          "from": [
+            1,
+            0.6
+          ],
+          "to": [
+            0,
             1
           ]
         }

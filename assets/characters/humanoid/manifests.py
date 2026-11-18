@@ -69,11 +69,31 @@ PROPORTION_RANGES = {
     "arm_length": [0.92, 1.08],
     "shoulder_width": [0.95, 1.12],
     "waist_width": [0.775, 1.225],
-    "hip_width": [1.0, 1.15],
-    "head_size": [0.975, 1.025],
+    "hip_width": [0.7, 1.15],
+    "head_size": [0.87, 1.125],
     "hand_size": [0.81, 1.11],
     "foot_size": [0.98, 1.27],
 }
+
+# Sliders whose attribute (`anim`'s body slider) starts at 1: below 1 they
+# move no bone and a shape does the work (review fixes 1, as the realistic
+# body's `ATTRIBUTE_FROM_ONE`). The hips: `HipWidth` below 1 pulls the legs
+# in and the heavy inner thighs cross; `<Frame>_Hips_Narrow`
+# (`bodyshapes.hips_narrow`) narrows the surface instead, whole at
+# `NARROW_AT`, each frame's driven with the frame (`corners`).
+ATTRIBUTE_FROM_ONE = {"hip_width"}
+NARROW_AT = 0.6
+
+
+def corners():
+    """The manifest's `corners`: each frame's hips narrowing."""
+    out = []
+    for frame, to in (("Masculine", [1, 0]), ("Feminine", [0, 1])):
+        out.append({"shape": f"{frame}_Hips_Narrow",
+                    "factors": [{"parameter": "frame", "from": [0, 1], "to": to},
+                                {"parameter": "hip_width", "from": [1, NARROW_AT], "to": [0, 1]}]})
+    return out
+
 
 # Face identity shapes: (shape, label, group). Their range is -1 to 1.
 FACE = [
@@ -241,8 +261,9 @@ def base_manifest(custom, parts):
     ]
     for pid, label, attribute, advanced in PROPORTIONS:
         span = PROPORTION_RANGES[pid]
+        drives = [max(span[0], 1), span[1]] if pid in ATTRIBUTE_FROM_ONE else span
         parameter = {"id": pid, "label": label, "group": "proportions", "range": span,
-                     "default": 1, "attributes": [{"attribute": attribute, "from": span}]}
+                     "default": 1, "attributes": [{"attribute": attribute, "from": drives}]}
         if advanced:
             parameter["advanced"] = True
         parameters.append(parameter)
@@ -267,6 +288,7 @@ def base_manifest(custom, parts):
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45"},
         "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS],
         "parameters": parameters,
+        "corners": corners(),
         "regions": [{"id": region_id(m), "label": region_label(m), "mask_shape": m}
                     for m in custom["masks"]],
         "slots": SLOTS,

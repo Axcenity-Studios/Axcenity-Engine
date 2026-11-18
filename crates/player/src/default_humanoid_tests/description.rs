@@ -501,8 +501,8 @@ fn a_descriptions_proportions_reach_the_body_sliders() {
     .unwrap();
     assert_eq!(height(&game), None, "a slider at 1 isn't written");
     // (Inside the stylized body's ranges since R3's wave 3: `height` 0.85 to
-    // 1.15, `head_size` 0.975 to 1.025.)
-    let tall = described(&[("height", 1.1), ("head_size", 0.98)], &[]);
+    // 1.15, `head_size` 0.87 to 1.125.)
+    let tall = described(&[("height", 1.1), ("head_size", 0.9)], &[]);
     apply_description(&mut game.world, &game.assets, character, &tall).unwrap();
     assert!((height(&game).unwrap() - 1.1).abs() < 1e-6);
     assert!(axcenity_anim::BodyShape::read(&game.world, body).is_some());

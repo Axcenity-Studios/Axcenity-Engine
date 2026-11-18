@@ -52,7 +52,9 @@ Before: every proportion 0.5 to 1.5; `measure.py --package stylized` with the sl
 
 | `height` | `leg_length` | `arm_length` | `shoulder_width` | `waist_width` | `hip_width` | `head_size` | `hand_size` | `foot_size` |
 |---|---|---|---|---|---|---|---|---|
-| 0.85 to 1.15 | 0.81 to 1.275 | 0.92 to 1.08 | 0.95 to 1.12 | 0.775 to 1.225 | 1 to 1.15 | 0.975 to 1.025 | 0.81 to 1.11 | 0.98 to 1.27 |
+| 0.85 to 1.15 | 0.81 to 1.275 | 0.92 to 1.08 | 0.95 to 1.12 | 0.775 to 1.225 | ~~1 to 1.15~~ **0.7 to 1.15** | ~~0.975 to 1.025~~ **0.87 to 1.125** | 0.81 to 1.11 | 0.98 to 1.27 |
+
+(The hips and head as shipped after [Review fixes 1](#review-fixes-1).)
 
 - **Held:** `humanoid/qa/body-thresholds.json` (new, beside the clothing's `thresholds.json`): no pair of the body's own sliders and none alone may cross (`body_bodies_with_new_crossings`, `body_alone_with_new_crossings`, new counts in `measure.py`'s sliders pass); each joint keeps the ring area it reaches today. Its elbow (0.37, 0.38) and knee (0.44, 0.45) are far under the realistic body's 0.6: it has no twist or helper bones, and adding them is a redesign, so they are held, not raised.
 
@@ -116,12 +118,12 @@ None added.
 
 ## Open issues
 
-1. **The stylized hips can't narrow and its head barely scales** (1 to 1.15; 0.975 to 1.025). The bone crosses the heavy inner thighs, and the heavy build's chin meets the neck as the head grows. A narrowing shape like the realistic body's, and keeping the build apart across the head's scale, would widen both; that is shape work on the stylized body, past "don't redesign".
+1. ~~**The stylized hips can't narrow and its head barely scales**~~ (fixed in [Review fixes 1](#review-fixes-1)) (1 to 1.15; 0.975 to 1.025). The bone crosses the heavy inner thighs, and the heavy build's chin meets the neck as the head grows. A narrowing shape like the realistic body's, and keeping the build apart across the head's scale, would widen both; that is shape work on the stylized body, past "don't redesign".
 2. **The stylized elbow and knee** keep 0.37 to 0.45 of their ring area at 135 degrees (the realistic body 0.6 or more): no twist or helper bones. Held where they are.
 3. **The stylized face** isn't checked by these body checks: its eye measure counts its own lids (541 and 410 vertices at rest), and `eyes_size` 1 and `ears_size` 1 cross the head's own triangles (16 and 10 pairs). `face_checks.py` covers the realistic face only.
 4. **One range for both frames** still (wave 2's item 5).
 5. **The waist's ends** are set by the outline check's 0.05 at 3 cm; a wider fade would reach the population's 0.79 to 1.19 but would reach into the hips and chest more.
-6. `benchmarks/make.py` writes `stylized-*-body-narrowest-hips` at `hip_width` 1 now (the range's low end), the same as the default body.
+6. ~~`benchmarks/make.py` writes `stylized-*-body-narrowest-hips` at `hip_width` 1~~ (since Review fixes 1 at 0.7).
 7. The Blender clay close-ups of the waist under a side lamp were not made; the engine close-ups were judged instead.
 8. **The stylized underwear shows skin through it in blotches** on the heavy body in the engine (the sports top and briefs, front and side). It is there before this change too (captured from `main`'s parts file): the garments' clearance, not the body; RA4's or the stylized clothing's.
 
@@ -131,3 +133,125 @@ None added.
 - **The stylized package was rebuilt** (`humanoid/build.py`) for the kept-apart build shapes. I committed only `HumanoidParts.glb` and `Humanoid.base.json`: the rebuild also rewrites `Humanoid.glb` (the default character, which carries no build shape) with float noise in its JSON (about 27 kB of digits; the same happens with no change to the scripts), so I kept `main`'s. The examples' copy needs nothing.
 - The morph count in `realistic_parameters.rs` (180 here) adds to whatever another branch adds.
 - Write the progress entry (progress.md is the lead's).
+
+## Review fixes 1
+
+The review found two blocking problems. Both were real, and both are fixed with shapes rather than by cutting the ranges.
+
+### 1. The stylized hips narrow again (decision 8, "hips go both ways")
+
+Wave 3 had cut `hip_width` to 1 to 1.15, because narrowing by the bone pushed the heavy inner thighs through each other. The fix ports the realistic body's mechanism (`realistic/shapes.py`, `hips_narrow`) to the stylized body.
+
+- **Shapes.** `bodyshapes.hips_narrow` builds `Masculine_Hips_Narrow` and `Feminine_Hips_Narrow`, each on its own frame's rest positions and mirrored to be symmetric. The move is side to side only, toward the middle, so the two sides can't cross. It brings the pelvis and the thighs' tops in by up to 0.22 of their distance from the middle (`NARROW_SCALE` 0.78). The inner thighs are held (fully within 12 mm of the middle, let go by 70 mm). It fades out above the hip crest and down the thigh, using the realistic body's constants and the stylized bones (Hips, Spine, Chest, UpperLeg, LowerLeg).
+- **Driving.** Two manifest `corners` with the frame drive the shapes, each whole at `hip_width` 0.6 (`manifests.NARROW_AT`). `HipWidth` is driven only from 1 up (`ATTRIBUTE_FROM_ONE`), so below 1 no bone moves.
+- **Garments.** The garments follow both shapes (`briefs`, `sports-top`, `tee`, `cargo-pants`, `cropped-jacket` items now list them).
+- **Kept apart.** The build shapes are also kept apart with the narrowing whole: the masculine heavy body loses up to 0.2 of its build over 81 vertices of the inner thighs.
+- **Breadth.** Measured by the sweep, the hips' breadth falls by 0.51 (masculine) and 0.53 (feminine) of the slider's change below 1. Above 1, `HipWidth` widens it by 0.57 and 0.52, so there is no kink at 1.
+- **Range.** The sweep (`ranges.py --package stylized`, which switches to the shape when the manifest has one) passes every step down to 0.7. At 0.675 the masculine outline steps by 0.050 under the hip joints, the same limit that stops the realistic body at 0.7. **`hip_width` is 0.7 to 1.15** (it was 1 to 1.15). The stylized narrowest-hips benchmarks are rewritten at 0.7 (`benchmarks/make.py`).
+
+### 2. The stylized head scales 0.87 to 1.125 (it was 0.975 to 1.025)
+
+A diagnostic counted new crossings the way the sliders pass does, on the reviewed build. The own body, slim, muscular and slim and muscular bodies never crossed between 0.85 and 1.125. The only crossings were these:
+
+- the heavy masculine chin into the jaw: 6 pairs at 0.9 and 20 at 1.1;
+- the heavy feminine chin: 6 pairs at 1.1;
+- the slim feminine jaw folding into itself: 26 pairs at 1.1.
+
+The fix is in `bodyshapes.keep_apart`, as the review suggested:
+
+- **Head scaled.** The build corners are also kept apart with the head scaled to 0.88 and 1.12 (`APART_HEAD`, just past the population's 0.5th and 99.5th percentiles). The model follows `anim`: `HeadSize` scales the Head bone and its children (jaw and eyes) about the head's joint, so the skin moves by `(p - head)(s - 1)w`, and a shape's offset on that skin grows by `1 + (s - 1)w`, where `w` is the Head, Jaw and eye weight.
+- **Slim build.** `Build_Slim` is now kept apart as well, at the slim corners.
+- **Touching pairs.** A pair counts as crossing unless it touches (within 4 mm) both in the frame's neutral body (the sliders pass's rule) and in the same build at rest (the sweep's rule). The first build used only the neutral body. Its sweep still failed at 0.925 and at 1.1, 2 pairs each, so the second rule was added.
+- **Rest.** The rest-pose keeping apart is unchanged.
+
+What it costs, measured on the built `HumanoidParts.glb` against the reviewed one (each vertex counted under the bone it is most weighted to):
+
+- `Build_Heavy`'s RMS move on the jaw drops from 5.29 to 5.13 mm, and on the rest of the head from 2.57 to 2.55 mm. Its largest move is unchanged everywhere (jaw 9.5, head 11.1, neck 6.3, belly 54.8 mm). It changes by more than 0.1 mm at 93 jaw, 90 head and 42 hip and inner-thigh vertices.
+- `Build_Slim`'s jaw drops from 1.34 to 1.23 mm RMS.
+- `Build_Muscular` changes at 13 vertices.
+- The double chin is still there: compare `blender-stylized-head-before.jpg` with `-after.jpg`.
+
+**The sweep's result:**
+
+- Every step passes down to 0.85. The population's 0.5th percentile sets the low end at 0.873 (masculine) and 0.863 (feminine), so **0.87**.
+- Every step passes up to 1.125. At 1.15 the heavy masculine chin meets the neck again (2 pairs), so **1.125**.
+
+The realistic body's head range is 0.88 to 1.12.
+
+### Re-run (after the fix)
+
+- **Whole stylized sweep.** Re-run on the installed build. The other seven proportions end exactly where they did. ranges.md's "Stylized shipped ranges", its numbers table, `ranges/ranges-stylized.json`, `PROPORTION_RANGES` and the prose are updated. The realistic package is untouched.
+- **`measure.py --package stylized` check.** Run with `--only files,weights,clipping,face,shapes,sliders,proportions,deformation,twist --check assets/characters/humanoid/qa/thresholds.json,assets/characters/humanoid/qa/body-thresholds.json`.
+  - Result: **`check: passed`** in 278 s ([r3-body-2/measure-stylized-check.txt](r3-body-2/measure-stylized-check.txt), [r3-body-2/measure-stylized.json](r3-body-2/measure-stylized.json)).
+  - The body's own sliders: **0 bodies and 0 alone with new crossings on both frames**, with 1,682 bodies a frame, including `hip_width` 0.7 and `head_size` 0.87 and 1.125 against every other slider's ends.
+  - Face parameters (out of scope; open issue 3): 112 masculine and 4 feminine bodies with new crossings, against 110 and 5 before. All involve `eyes_size` 1 or `ears_size`.
+  - `thresholds.json` and `body-thresholds.json` are unchanged.
+
+### Tests (red first)
+
+[r3-body-2-red-run.txt](r3-body-2-red-run.txt), section "Review fixes 1", against the reviewed assets: `6 tests run: 3 passed, 3 failed`.
+
+- `the_stylized_proportion_ranges_are_its_sweeps` (changed) failed: every stylized slider must now go both ways, with the hips' driver from 1. It reported `stylized hip_width: [1.0, 1.15]`.
+- `stylized_hips_narrow_below_one_by_a_shape_not_a_bone` (new) failed. It shares the realistic test's body with `hips_narrow_by_a_shape`. At the low end it requires:
+  - `HipWidth` 1;
+  - each frame's shape driven at more than 0.5;
+  - the hips' widest skin in by at least 0.35 of the slider's change;
+  - nothing moving out or across the middle.
+- `the_stylized_head_size_reaches_the_population` (new) failed: it requires at least 0.925 to 1.075, and got `stylized head_size [0.975, 1.025]`.
+
+Green:
+
+| Command | Result |
+|---|---|
+| `cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(realistic_ranges)'` | `6 tests run: 6 passed` |
+| `cargo nextest run -p axcenity-avatar -p axcenity-anim -p axcenity-project -p axcenity-gameplay --no-fail-fast` | `565 tests run: 565 passed, 1 skipped` |
+| `cargo nextest run -p axcenity-player --no-fail-fast -E 'test(description) \| test(humanoid)'` | `27 tests run: 27 passed` (`description.rs` sets `head_size` 0.9 again, where wave 3 had moved it to 0.98) |
+| `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(character)'` | `76 tests run: 76 passed` |
+| `cargo clippy -p axcenity-avatar -p axcenity-anim -p axcenity-project -p axcenity-gameplay -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all --check` | clean |
+| `python3 -I scripts/check-wiki.py` | `113 pages, 0 errors, 58 warnings` (the existing staleness notes) |
+
+### Visual evidence and what I saw
+
+- **`blender-stylized-head-before.jpg` and `-after.jpg`.** Clay under one side lamp, through `render_ranges.py --aim head` (new: the head and neck). Rows: masculine heavy at head 1, 0.87 and 1.125; feminine heavy and feminine slim at 1.125. Views: front, three-quarter and side.
+  - Before and after look the same at this size. The double chin, the jaw line and the neck are unchanged, as the 0.16 mm RMS change says.
+  - The head visibly shrinks at 0.87 and grows at 1.125.
+  - In the side views the line from chin to neck is smooth at both ends, with no fold or ridge where the head's skin meets the neck's.
+- **`blender-stylized-hips-narrow.jpg`.** Clay trunk close-ups at hips 1 and 0.7, masculine, feminine, masculine heavy and feminine heavy.
+  - Feminine at 0.7: the hip flare comes in to a straighter, still smooth outline from the waist down the thigh, with no step at the hip crest or where the change fades at mid-thigh. The three-quarter view shows no flat patch. The side view is unchanged, as intended.
+  - Masculine at 0.7: the flanks and hips are a little straighter.
+  - Heavy at 0.7: the belly and seat are unchanged, and the inner thighs stay apart.
+- **`engine-stylized-hips.jpg`.** The engine, with the benchmarks at hips 0.7 and 1.15 in underwear, front, studio light (top) and hard light (bottom), cropped 2x.
+  - Both frames show a clear difference in hip breadth, and the briefs follow the narrower pelvis with no skin out at the sides.
+  - No crease or step shows under either light.
+  - The skin-through-cloth blotches on the stylized underwear are on both ends alike. That is the existing clothing-clearance problem (open issue 8; the reviewer matched it to the 2026-11-14 baseline), not this change.
+
+### Files (review fixes 1)
+
+- **Body and manifest:**
+  - `assets/characters/humanoid/bodyshapes.py`: `hips_narrow`; `keep_apart` with the hips narrowed and the head scaled, `Build_Slim` and the two touching rules.
+  - `build.py`: calls them.
+  - `manifests.py`: `PROPORTION_RANGES`, `ATTRIBUTE_FROM_ONE`, `NARROW_AT`, `corners`.
+- **QA scripts:** `qa/ranges.py` (its docstring) and `qa/render_ranges.py` (`--aim head`).
+- **Docs:** `README.md` and `qa/README.md`.
+- **Generated:** `HumanoidParts.glb`, `Humanoid.base.json`, the five garment items that follow the new shapes, and the six stylized hip benchmarks (only the three narrowest change).
+- **Tests:** `crates/avatar/tests/realistic_ranges.rs` (three tests; `body` and `baked_on` take the base) and `crates/player/src/default_humanoid_tests/description.rs`.
+- **Docs and evidence:**
+  - `refinement/r3/ranges.md` and `ranges/ranges-stylized.json`;
+  - `testing.md`;
+  - `wiki/Engine-Systems/Characters.md` and `wiki/Roadmap/Known-Limitations.md`;
+  - this section, the red run, and the four new sheets;
+  - a local path removed from `measure-realistic-check.txt`.
+
+### What the lead must do at merge (in addition to the above)
+
+- **Rebuild the stylized package.** Run `humanoid/build.py` with the bpy Python, then `catalogue.py` and `benchmarks/make.py`. I committed `HumanoidParts.glb`, `Humanoid.base.json` and the five garment items. As before, I kept the branch's `Humanoid.glb`: the default character carries no build or hips shape, so a rebuild changes only its float noise. `Humanoid.customization.json`, the hair items, the sneakers and the catalogue changed line endings only and are not committed.
+- **Re-run the stylized sweep** (`ranges.py --package stylized`, about 5 minutes) if another branch changes the stylized body's shapes or weights, and check the hips' and head's ends against `PROPORTION_RANGES` and ranges.md.
+- **Tell the owners about the QA scripts.** RA6 owns the QA scripts and now has a `--aim head` in `render_ranges.py`. The player test owner should know about `head_size` 0.9.
+
+### Still open (not blocking, from the review)
+
+- **Waist share by build.** The realistic waist's share of the slider is measured on the default body only. The reviewer measured 0.57 at 0.8 on the masculine heavy body: the shape is a fixed offset, so a fatter waist gets a smaller share.
+- **Stylized waist slider.** The stylized `waist_width` is still the bone alone, at about a quarter of its value.
+- **Untested corner.** `Fat_Over_Muscle` is driven by the global sliders only. Region sliders at 1 with fat at 1 bring back local definition, and no test covers that.
+- **Presets to re-check.** The realistic presets with `waist_width` 1.04 to 1.05 now widen the waist about 3.5 times as much as before. Re-check their thumbnails after the merge.

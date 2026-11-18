@@ -21,6 +21,7 @@ use axcenity_assets::{Model, ModelFormat, Pick, load_models};
 use axcenity_avatar::{Description, Library, resolve};
 
 const BASE: &str = "axcenity/realistic";
+const STYLIZED: &str = "axcenity/stylized";
 /// The nine proportions and the body slider each drives.
 const PROPORTIONS: [(&str, &str); 9] = [
     ("height", "BodyHeight"),
@@ -110,12 +111,13 @@ fn the_shipped_proportion_ranges_are_the_sweeps() {
 
 /// R3 wave 3: the stylized family is held to the same body checks, so its
 /// proportion sliders end where its own sweep found them (`ranges.py
-/// --package stylized`), not at `anim`'s clamp. Its hips narrow by the
-/// bone (it has no narrowing shape), so every driver spans its range.
+/// --package stylized`), not at `anim`'s clamp. Every slider goes both
+/// ways (decision 8: "hips go both ways"); its hips narrow by a shape, as
+/// the realistic body's do, so their driver starts at 1 (review fixes 1).
 #[test]
 fn the_stylized_proportion_ranges_are_its_sweeps() {
     let library = library();
-    let base = library.base("axcenity/stylized").unwrap();
+    let base = library.base(STYLIZED).unwrap();
     let table = recorded_under("Stylized shipped ranges");
     assert_eq!(table.len(), PROPORTIONS.len(), "{table:?}");
     for (id, attribute) in PROPORTIONS {
@@ -127,14 +129,31 @@ fn the_stylized_proportion_ranges_are_its_sweeps() {
             "stylized {id}: the manifest ships {:?}, ranges.md says {range:?}",
             parameter.range
         );
-        assert!(
-            range[0] <= 1.0 && range[1] >= 1.0,
-            "stylized {id}: {range:?}"
-        );
+        assert!(range[0] < 1.0 && range[1] > 1.0, "stylized {id}: {range:?}");
         let driver = &parameter.attributes[0];
         assert_eq!(driver.attribute, attribute, "stylized {id}");
-        assert_eq!(driver.from, range, "stylized {id}");
+        let expected = if id == "hip_width" {
+            [1.0, range[1]]
+        } else {
+            range
+        };
+        assert_eq!(driver.from, expected, "stylized {id}");
     }
+}
+
+/// Review fixes 1: a head slider of a few per cent does next to nothing.
+/// The stylized head reaches about as far as the population's (the
+/// realistic body's runs 0.88 to 1.12): the build shapes are kept apart
+/// with the head scaled, rather than the range cut.
+#[test]
+fn the_stylized_head_size_reaches_the_population() {
+    let library = library();
+    let base = library.base(STYLIZED).unwrap();
+    let range = base.parameter("head_size").unwrap().range;
+    assert!(
+        range[0] <= 0.925 && range[1] >= 1.075,
+        "stylized head_size {range:?}"
+    );
 }
 
 #[test]
@@ -151,11 +170,14 @@ fn the_ranges_stay_inside_anims_clamp() {
     }
 }
 
-fn body(library: &Library) -> Model {
-    let base = library.base(BASE).unwrap();
+/// The base model's body mesh (`folder`: its package under
+/// assets/characters).
+fn body(library: &Library, id: &str, folder: &str) -> Model {
+    let base = library.base(id).unwrap();
     let bytes = std::fs::read(
         root()
-            .join("assets/characters/realistic")
+            .join("assets/characters")
+            .join(folder)
             .join(&base.model.file),
     )
     .unwrap();
@@ -175,8 +197,8 @@ struct Baked {
     weights: BTreeMap<String, f32>,
 }
 
-fn baked(library: &Library, model: &Model, values: &[(&str, f32)]) -> Baked {
-    let mut description = Description::new("Hips", BASE);
+fn baked_on(library: &Library, id: &str, model: &Model, values: &[(&str, f32)]) -> Baked {
+    let mut description = Description::new("Hips", id);
     for (id, value) in values {
         description.parameters.insert((*id).to_owned(), *value);
     }
@@ -207,19 +229,41 @@ fn baked(library: &Library, model: &Model, values: &[(&str, f32)]) -> Baked {
 
 #[test]
 fn hips_narrow_below_one_by_a_shape_not_a_bone() {
+    hips_narrow_by_a_shape(BASE, "realistic", |_| 0.95);
+}
+
+/// Review fixes 1 (decision 8, "hips go both ways"; decision 7, the
+/// stylized family fully supported): the stylized hips narrow too, by the
+/// realistic body's mechanism, and their breadth falls at least 0.35 of
+/// the slider's change (the bone widens them about 0.55 of it above 1).
+#[test]
+fn stylized_hips_narrow_below_one_by_a_shape_not_a_bone() {
+    hips_narrow_by_a_shape(STYLIZED, "humanoid", |low| 1.0 - 0.35 * (1.0 - low));
+}
+
+/// At the low end of `hip_width` on both frames: `HipWidth` stays 1, the
+/// frame's `<Frame>_Hips_Narrow` is driven, and the widest skin of the
+/// hips comes in to under `most(low)` of its breadth, nothing moving out
+/// or across the middle.
+fn hips_narrow_by_a_shape(id: &str, folder: &str, most: impl Fn(f32) -> f32) {
     let library = library();
-    let base = library.base(BASE).unwrap();
+    let base = library.base(id).unwrap();
     let hips = base.parameter("hip_width").unwrap();
     let low = hips.range[0];
-    assert!(low < 1.0, "the hips go below 1: {:?}", hips.range);
-    let model = body(&library);
+    assert!(low < 1.0, "{id}: the hips go below 1: {:?}", hips.range);
+    let model = body(&library, id, folder);
     for (frame, name) in [(0.0, "Masculine"), (1.0, "Feminine")] {
-        let neutral = baked(&library, &model, &[("frame", frame)]).positions;
+        let neutral = baked_on(&library, id, &model, &[("frame", frame)]).positions;
         let Baked {
             positions: narrow,
             attributes,
             weights,
-        } = baked(&library, &model, &[("frame", frame), ("hip_width", low)]);
+        } = baked_on(
+            &library,
+            id,
+            &model,
+            &[("frame", frame), ("hip_width", low)],
+        );
         assert_eq!(attributes["HipWidth"], 1.0, "{name}: no bone narrows");
         let shape = format!("{name}_Hips_Narrow");
         assert!(
@@ -244,8 +288,8 @@ fn hips_narrow_below_one_by_a_shape_not_a_bone() {
         };
         let (before, after) = (widest(&neutral), widest(&narrow));
         assert!(
-            after < before * 0.95,
-            "{name}: hips {before} m to {after} m from the middle at {low}"
+            after < before * most(low),
+            "{id} {name}: hips {before} m to {after} m from the middle at {low}"
         );
         // Nothing moves out, and nothing crosses the middle.
         for (a, b) in neutral.iter().zip(&narrow) {

@@ -78,6 +78,8 @@
       "Build_Heavy",
       "Build_Slim",
       "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow",
       "Mask_Torso",
       "Mask_Hips",
       "Mask_UpperArms_Top",
@@ -89,7 +91,7 @@
       "Mask_Shins_Low",
       "Mask_Feet"
      ],
-     "shape_key_count": 74,
+     "shape_key_count": 76,
      "bones_weighted": 53,
      "topology": {
       "vertices_merged": 12502,
@@ -379,9 +381,11 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
      ],
-     "shape_key_count": 4,
+     "shape_key_count": 6,
      "bones_weighted": 18,
      "topology": {
       "vertices_merged": 3301,
@@ -458,9 +462,11 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
      ],
-     "shape_key_count": 4,
+     "shape_key_count": 6,
      "bones_weighted": 9,
      "topology": {
       "vertices_merged": 3419,
@@ -489,9 +495,11 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
      ],
-     "shape_key_count": 4,
+     "shape_key_count": 6,
      "bones_weighted": 12,
      "topology": {
       "vertices_merged": 1756,
@@ -580,9 +588,11 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
      ],
-     "shape_key_count": 4,
+     "shape_key_count": 6,
      "bones_weighted": 4,
      "topology": {
       "vertices_merged": 720,
@@ -611,9 +621,11 @@
       "Frame_Feminine",
       "Build_Heavy",
       "Build_Slim",
-      "Build_Muscular"
+      "Build_Muscular",
+      "Masculine_Hips_Narrow",
+      "Feminine_Hips_Narrow"
      ],
-     "shape_key_count": 4,
+     "shape_key_count": 6,
      "bones_weighted": 9,
      "topology": {
       "vertices_merged": 807,
@@ -1347,8 +1359,8 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
-     "gap_median_mm": 15.5,
-     "gap_p95_mm": 19.03
+     "gap_median_mm": 15.51,
+     "gap_p95_mm": 19.06
     }
    },
    "Jacket_Cropped": {
@@ -1463,7 +1475,7 @@
      "gap_p95_mm": 41.91
     },
     "masculine/Build_Heavy": {
-     "covered": 2887,
+     "covered": 2888,
      "poke": 0,
      "poke_pct": 0.0,
      "poke_max_mm": 0.0,
@@ -1471,8 +1483,8 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
-     "gap_median_mm": 34.64,
-     "gap_p95_mm": 41.33
+     "gap_median_mm": 34.65,
+     "gap_p95_mm": 41.38
     },
     "masculine/Build_Slim": {
      "covered": 2919,
@@ -1734,7 +1746,7 @@
      "gap_p95_mm": 2.85
     },
     "masculine/Build_Muscular": {
-     "covered": 367,
+     "covered": 366,
      "poke": 0,
      "poke_pct": 0.0,
      "poke_max_mm": 0.0,
@@ -1743,7 +1755,7 @@
      "exposed_over_opening": 0,
      "exposed_where": {},
      "gap_median_mm": 1.94,
-     "gap_p95_mm": 2.86
+     "gap_p95_mm": 2.85
     },
     "feminine/neutral": {
      "covered": 364,
@@ -1767,7 +1779,7 @@
      "exposed_over_opening": 0,
      "exposed_where": {},
      "gap_median_mm": 1.96,
-     "gap_p95_mm": 2.51
+     "gap_p95_mm": 2.52
     },
     "feminine/Build_Slim": {
      "covered": 366,
@@ -1791,7 +1803,7 @@
      "exposed_over_opening": 0,
      "exposed_where": {},
      "gap_median_mm": 1.94,
-     "gap_p95_mm": 2.56
+     "gap_p95_mm": 2.57
     }
    },
    "Underwear_Top": {
@@ -1819,7 +1831,7 @@
      "exposed_over_opening": 0,
      "exposed_where": {},
      "gap_median_mm": 1.98,
-     "gap_p95_mm": 15.05
+     "gap_p95_mm": 15.22
     },
     "masculine/Build_Slim": {
      "covered": 387,
@@ -1959,7 +1971,7 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
-     "gap_median_mm": 7.39,
+     "gap_median_mm": 7.37,
      "gap_p95_mm": 9.59
     },
     "feminine/Build_Heavy": {
@@ -1983,7 +1995,7 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
-     "gap_median_mm": 7.45,
+     "gap_median_mm": 7.42,
      "gap_p95_mm": 9.84
     },
     "feminine/Build_Muscular": {
@@ -2013,7 +2025,7 @@
      "gap_p95_mm": 3.19
     },
     "masculine/Build_Heavy": {
-     "covered": 104,
+     "covered": 106,
      "poke": 0,
      "poke_pct": 0.0,
      "poke_max_mm": 0.0,
@@ -2021,70 +2033,10 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
-     "gap_median_mm": 3.12,
-     "gap_p95_mm": 7.74
+     "gap_median_mm": 3.13,
+     "gap_p95_mm": 8.44
     },
     "masculine/Build_Slim": {
-     "covered": 117,
-     "poke": 0,
-     "poke_pct": 0.0,
-     "poke_max_mm": 0.0,
-     "poke_p90_mm": 0.0,
-     "where": {},
-     "exposed_over_opening": 0,
-     "exposed_where": {},
-     "gap_median_mm": 3.0,
-     "gap_p95_mm": 5.75
-    },
-    "masculine/Build_Muscular": {
-     "covered": 114,
-     "poke": 0,
-     "poke_pct": 0.0,
-     "poke_max_mm": 0.0,
-     "poke_p90_mm": 0.0,
-     "where": {},
-     "exposed_over_opening": 0,
-     "exposed_where": {},
-     "gap_median_mm": 3.0,
-     "gap_p95_mm": 3.9
-    },
-    "feminine/neutral": {
-     "covered": 119,
-     "poke": 0,
-     "poke_pct": 0.0,
-     "poke_max_mm": 0.0,
-     "poke_p90_mm": 0.0,
-     "where": {},
-     "exposed_over_opening": 0,
-     "exposed_where": {},
-     "gap_median_mm": 3.0,
-     "gap_p95_mm": 7.29
-    },
-    "feminine/Build_Heavy": {
-     "covered": 118,
-     "poke": 0,
-     "poke_pct": 0.0,
-     "poke_max_mm": 0.0,
-     "poke_p90_mm": 0.0,
-     "where": {},
-     "exposed_over_opening": 0,
-     "exposed_where": {},
-     "gap_median_mm": 3.0,
-     "gap_p95_mm": 4.67
-    },
-    "feminine/Build_Slim": {
-     "covered": 117,
-     "poke": 0,
-     "poke_pct": 0.0,
-     "poke_max_mm": 0.0,
-     "poke_p90_mm": 0.0,
-     "where": {},
-     "exposed_over_opening": 0,
-     "exposed_where": {},
-     "gap_median_mm": 3.05,
-     "gap_p95_mm": 7.71
-    },
-    "feminine/Build_Muscular": {
      "covered": 116,
      "poke": 0,
      "poke_pct": 0.0,
@@ -2093,8 +2045,68 @@
      "where": {},
      "exposed_over_opening": 0,
      "exposed_where": {},
+     "gap_median_mm": 3.0,
+     "gap_p95_mm": 4.73
+    },
+    "masculine/Build_Muscular": {
+     "covered": 116,
+     "poke": 0,
+     "poke_pct": 0.0,
+     "poke_max_mm": 0.0,
+     "poke_p90_mm": 0.0,
+     "where": {},
+     "exposed_over_opening": 0,
+     "exposed_where": {},
+     "gap_median_mm": 3.0,
+     "gap_p95_mm": 6.63
+    },
+    "feminine/neutral": {
+     "covered": 122,
+     "poke": 0,
+     "poke_pct": 0.0,
+     "poke_max_mm": 0.0,
+     "poke_p90_mm": 0.0,
+     "where": {},
+     "exposed_over_opening": 0,
+     "exposed_where": {},
+     "gap_median_mm": 3.0,
+     "gap_p95_mm": 8.43
+    },
+    "feminine/Build_Heavy": {
+     "covered": 120,
+     "poke": 0,
+     "poke_pct": 0.0,
+     "poke_max_mm": 0.0,
+     "poke_p90_mm": 0.0,
+     "where": {},
+     "exposed_over_opening": 0,
+     "exposed_where": {},
+     "gap_median_mm": 3.01,
+     "gap_p95_mm": 5.49
+    },
+    "feminine/Build_Slim": {
+     "covered": 121,
+     "poke": 0,
+     "poke_pct": 0.0,
+     "poke_max_mm": 0.0,
+     "poke_p90_mm": 0.0,
+     "where": {},
+     "exposed_over_opening": 0,
+     "exposed_where": {},
+     "gap_median_mm": 3.05,
+     "gap_p95_mm": 8.01
+    },
+    "feminine/Build_Muscular": {
+     "covered": 120,
+     "poke": 0,
+     "poke_pct": 0.0,
+     "poke_max_mm": 0.0,
+     "poke_p90_mm": 0.0,
+     "where": {},
+     "exposed_over_opening": 0,
+     "exposed_where": {},
      "gap_median_mm": 3.02,
-     "gap_p95_mm": 4.2
+     "gap_p95_mm": 6.43
     }
    },
    "Body_under_default_outfit": {
@@ -2116,7 +2128,7 @@
      "gap_p95_mm": 40.36
     },
     "masculine/Build_Heavy": {
-     "covered": 6713,
+     "covered": 6714,
      "poke": 4,
      "poke_pct": 0.06,
      "poke_max_mm": 10.81,
@@ -2129,7 +2141,7 @@
      "exposed_where": {
       "RightToes": 2
      },
-     "gap_median_mm": 22.93,
+     "gap_median_mm": 22.92,
      "gap_p95_mm": 40.07
     },
     "masculine/Build_Slim": {
@@ -2689,19 +2701,19 @@
      "gap_p95_mm": 51.8
     },
     "masculine/Build_Heavy": {
-     "covered": 1603,
+     "covered": 1596,
      "poke": 0,
      "poke_pct": 0.0,
      "poke_max_mm": 0.0,
      "poke_p90_mm": 0.0,
      "where": {},
-     "exposed_over_opening": 98,
+     "exposed_over_opening": 99,
      "exposed_where": {
-      "forehead/face": 78,
+      "forehead/face": 79,
       "ear": 20
      },
-     "gap_median_mm": 18.87,
-     "gap_p95_mm": 52.18
+     "gap_median_mm": 18.83,
+     "gap_p95_mm": 51.96
     },
     "feminine/neutral": {
      "covered": 1659,
@@ -2719,19 +2731,19 @@
      "gap_p95_mm": 56.07
     },
     "feminine/Build_Heavy": {
-     "covered": 1647,
+     "covered": 1643,
      "poke": 0,
      "poke_pct": 0.0,
      "poke_max_mm": 0.0,
      "poke_p90_mm": 0.0,
      "where": {},
-     "exposed_over_opening": 97,
+     "exposed_over_opening": 96,
      "exposed_where": {
-      "forehead/face": 76,
+      "forehead/face": 75,
       "ear": 21
      },
-     "gap_median_mm": 17.11,
-     "gap_p95_mm": 55.63
+     "gap_median_mm": 17.08,
+     "gap_p95_mm": 55.61
     }
    },
    "Hair_Crop": {
@@ -5443,6 +5455,8 @@
    "Build_Heavy": 54.96,
    "Build_Slim": 19.24,
    "Build_Muscular": 12.05,
+   "Masculine_Hips_Narrow": 31.6,
+   "Feminine_Hips_Narrow": 38.2,
    "Mask_Torso": 11.0,
    "Mask_Hips": 8.73,
    "Mask_UpperArms_Top": 11.0,
@@ -5516,9 +5530,11 @@
    "Face_Ears_Size": 512,
    "Face_Ears_Out": 368,
    "Frame_Feminine": 12502,
-   "Build_Heavy": 8111,
-   "Build_Slim": 6042,
+   "Build_Heavy": 8060,
+   "Build_Slim": 6034,
    "Build_Muscular": 3458,
+   "Masculine_Hips_Narrow": 922,
+   "Feminine_Hips_Narrow": 920,
    "Mask_Torso": 1703,
    "Mask_Hips": 701,
    "Mask_UpperArms_Top": 762,
@@ -5595,13 +5611,16 @@
      "waist_width=1.225": {
       "new_crossings": 0
      },
+     "hip_width=0.7": {
+      "new_crossings": 0
+     },
      "hip_width=1.15": {
       "new_crossings": 0
      },
-     "head_size=0.975": {
+     "head_size=0.87": {
       "new_crossings": 0
      },
-     "head_size=1.025": {
+     "head_size=1.125": {
       "new_crossings": 0
      },
      "hand_size=0.81": {
@@ -5846,8 +5865,8 @@
      }
     },
     "pairs": 435,
-    "bodies": 1625,
-    "bodies_with_new_crossings": 110,
+    "bodies": 1682,
+    "bodies_with_new_crossings": 112,
     "new_crossings_largest": 84,
     "offenders": [
      {
@@ -5911,6 +5930,10 @@
       "new_crossings": 16
      },
      {
+      "sliders": "hip_width=0.7, eyes_size=1",
+      "new_crossings": 16
+     },
+     {
       "sliders": "height=1.15, eyes_size=1",
       "new_crossings": 16
      },
@@ -5919,11 +5942,11 @@
       "new_crossings": 16
      },
      {
-      "sliders": "head_size=1.025, eyes_size=1",
+      "sliders": "head_size=1.125, eyes_size=1",
       "new_crossings": 16
      },
      {
-      "sliders": "head_size=0.975, eyes_size=1",
+      "sliders": "head_size=0.87, eyes_size=1",
       "new_crossings": 16
      },
      {
@@ -6005,10 +6028,6 @@
      {
       "sliders": "eyes_size=1, head_width=-1",
       "new_crossings": 16
-     },
-     {
-      "sliders": "eyes_size=1, head_length=1",
-      "new_crossings": 16
      }
     ],
     "alone_with_new_crossings": 2,
@@ -6029,7 +6048,7 @@
       "new_crossings": 0,
       "skin_inside_eyeball_verts": 432,
       "front_eye_inside_lid_flesh_verts": 105,
-      "teeth_verts_inside_lips_or_gums_flesh": 152
+      "teeth_verts_inside_lips_or_gums_flesh": 31
      },
      "muscle=1": {
       "new_crossings": 0,
@@ -6067,13 +6086,16 @@
      "waist_width=1.225": {
       "new_crossings": 0
      },
+     "hip_width=0.7": {
+      "new_crossings": 0
+     },
      "hip_width=1.15": {
       "new_crossings": 0
      },
-     "head_size=0.975": {
+     "head_size=0.87": {
       "new_crossings": 0
      },
-     "head_size=1.025": {
+     "head_size=1.125": {
       "new_crossings": 0
      },
      "hand_size=0.81": {
@@ -6318,8 +6340,8 @@
      }
     },
     "pairs": 435,
-    "bodies": 1625,
-    "bodies_with_new_crossings": 5,
+    "bodies": 1682,
+    "bodies_with_new_crossings": 4,
     "new_crossings_largest": 28,
     "offenders": [
      {
@@ -6333,10 +6355,6 @@
      {
       "sliders": "eyes_size=1, eyes_tilt=1",
       "new_crossings": 14
-     },
-     {
-      "sliders": "build=1, lips_full=1",
-      "new_crossings": 4
      },
      {
       "sliders": "ears_size=-1, ears_out=-1",

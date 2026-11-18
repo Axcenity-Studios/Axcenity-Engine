@@ -19,3 +19,19 @@ FAIL [   1.810s] ( 9/14) axcenity-avatar::realistic_parameters a_baked_body_keep
 FAIL [   1.819s] (10/14) axcenity-gameplay::realistic_waist the_waist_slider_changes_the_waists_breadth_by_most_of_its_value
 FAIL [   1.897s] (12/14) axcenity-avatar::realistic_heavy_muscular heavy_and_muscular_is_not_a_bodybuilder
 error: test run failed
+
+## Review fixes 1: red run (tests first, against this branch's assets as reviewed, e91ffcee)
+
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(realistic_ranges)'
+
+FAIL [   0.279s] (2/6) axcenity-avatar::realistic_ranges stylized_hips_narrow_below_one_by_a_shape_not_a_bone
+FAIL [   0.280s] (3/6) axcenity-avatar::realistic_ranges the_stylized_head_size_reaches_the_population
+FAIL [   0.280s] (4/6) axcenity-avatar::realistic_ranges the_stylized_proportion_ranges_are_its_sweeps
+PASS [   0.280s] (5/6) axcenity-avatar::realistic_ranges the_shipped_proportion_ranges_are_the_sweeps
+PASS [   1.844s] (6/6) axcenity-avatar::realistic_ranges hips_narrow_below_one_by_a_shape_not_a_bone
+Summary [   1.844s] 6 tests run: 3 passed, 3 failed, 0 skipped
+stylized head_size [0.975, 1.025]
+stylized hip_width: [1.0, 1.15]
+thread 'the_stylized_head_size_reaches_the_population' panicked at crates\avatar\tests\realistic_ranges.rs:153:5:
+thread 'the_stylized_proportion_ranges_are_its_sweeps' panicked at crates\avatar\tests\realistic_ranges.rs:132:9:
+(stylized_hips_narrow_below_one_by_a_shape_not_a_bone's message fell outside the saved tail; it fails at its first assertion, the low end of the stylized hip_width range, which is 1.0 here.)

@@ -4,7 +4,7 @@ cleanly or the population's 0.5th / 99.5th percentile, whichever is
 nearer to 1. The realistic body by default; `--package stylized` holds the
 stylized one to the same checks (R3, wave 3: its own build corners,
 `COMPOSITIONS`; its outline under its armpits, `OUTLINE_SPANS`; no eye
-check; its hips narrowed by the bone, since it has no narrowing shape).
+check; its hips narrowed by its own `<Frame>_Hips_Narrow` since review fixes 1).
 
     python -I ranges.py [--package realistic] [--parts FILE] [--out ranges.json] [--only hip_width,height]
                         [--step 0.025] [--hips-by-bone]
