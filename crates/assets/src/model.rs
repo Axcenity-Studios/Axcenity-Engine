@@ -178,6 +178,7 @@ impl Model {
                     normals: primitive.normals.clone(),
                     uvs: primitive.uvs.clone(),
                     tangents,
+                    regions: primitive.regions.clone(),
                     indices: primitive.indices.clone(),
                     material,
                     joints: primitive.joints.clone(),
@@ -242,6 +243,13 @@ pub struct Primitive {
     /// the direction U grows along the surface, and in `w` 1 or -1, the
     /// side of the normal the texture's "up" (V shrinking) is on.
     pub tangents: Vec<[f32; 4]>,
+    /// One per position, or empty: the body region each corner belongs to,
+    /// for a character's body whose build stores its region map in the
+    /// second set of texture coordinates (`TEXCOORD_1`, `u = (index + 0.5)
+    /// / 16`, `v = 0.5`; `assets/characters/realistic/README.md`, "Body
+    /// regions"). Picking on the character reads it (refinement R2). A
+    /// second set that isn't such a map (a lightmap's) leaves it empty.
+    pub regions: Vec<u8>,
     /// Three per triangle, counter-clockwise seen from outside.
     pub indices: Vec<u32>,
     pub material: ModelMaterial,
@@ -272,6 +280,7 @@ impl Primitive {
             + std::mem::size_of_val(self.normals.as_slice())
             + std::mem::size_of_val(self.uvs.as_slice())
             + std::mem::size_of_val(self.tangents.as_slice())
+            + self.regions.len()
             + std::mem::size_of_val(self.indices.as_slice())
             + std::mem::size_of_val(self.joints.as_slice())
             + std::mem::size_of_val(self.weights.as_slice())
@@ -329,6 +338,7 @@ impl Primitive {
             normals,
             uvs,
             tangents: Vec::new(),
+            regions: Vec::new(),
             indices,
             material,
             joints: Vec::new(),
@@ -1724,6 +1734,10 @@ impl Reader<'_> {
             if uvs.is_empty() {
                 material.remove_textures();
             }
+            let regions = reader
+                .read_tex_coords(1)
+                .map(|uvs| region_map(uvs.into_f32(), count))
+                .unwrap_or_default();
 
             // Each corner's 4 joints (the skin's numbers after the ones
             // before it) and weights, adding up to 1.
@@ -1784,6 +1798,7 @@ impl Reader<'_> {
                 normals,
                 uvs,
                 tangents: Vec::new(),
+                regions,
                 indices,
                 material,
                 joints,
@@ -2167,6 +2182,27 @@ pub(crate) fn decode_image(bytes: &[u8], name: &str) -> Result<Image, String> {
         return Err("it has no pixels".to_owned());
     }
     Ok(Image::new(rgba.width(), rgba.height(), rgba.into_raw()))
+}
+
+/// A character body's region map read from its second texture coordinates
+/// (`Primitive::regions`): each corner's `u` is `(index + 0.5) / 16` and
+/// its `v` is 0.5. Anything else (a lightmap's coordinates, a count that
+/// doesn't match the corners) is no region map, and gives none.
+fn region_map(uvs: impl Iterator<Item = [f32; 2]>, count: usize) -> Vec<u8> {
+    let mut regions = Vec::with_capacity(count);
+    for [u, v] in uvs {
+        let cell = u * 16.0 - 0.5;
+        let index = cell.round();
+        if (v - 0.5).abs() > 1e-3 || (cell - index).abs() > 1e-2 || !(0.0..16.0).contains(&index) {
+            return Vec::new();
+        }
+        regions.push(index as u8);
+    }
+    if regions.len() == count {
+        regions
+    } else {
+        Vec::new()
+    }
 }
 
 /// Normals for a mesh that has none: each corner gets the average of the

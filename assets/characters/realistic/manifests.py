@@ -15,7 +15,9 @@ Then rebuild the library's catalogue: python -I assets/characters/catalogue.py
 Every parameter carries its `about` (tooltip), `feature` and `level`
 (R1; the face's come from `faceparams.py`), and the manifest lists the
 body's and the face's `features`, with anchors measured on the model by
-`anchors.py` (numpy). The presets are `presets.py`'s.
+`anchors.py` (numpy), and the `handles` a person drags on the character
+in the viewport (R2), measured by `handles.py`. The presets are
+`presets.py`'s.
 
 Slots, sockets and the proportion sliders are the stylized humanoid's
 (`../humanoid/manifests.py`), read from there, so an item or a script
@@ -295,7 +297,7 @@ def base_manifest(data, parts, folder=HERE):
     parameters = [describe(p) if p["group"] in BODY_GROUPS else p for p in parameters]
     body = parts["Body"]
     materials = sorted({m for name in ["Body", *FACE_PARTS] for m in parts[name]["materials"]})
-    return {
+    manifest = {
         "format_version": 1,
         "id": BASE_ID,
         "label": "Realistic",
@@ -319,6 +321,11 @@ def base_manifest(data, parts, folder=HERE):
         "features": features(data, folder),
         "skin_layers": [dict(layer, material="Skin") for layer in SKIN_LAYERS],
     }
+    # The handles a person drags in the viewport (R2), measured on the
+    # model with the parameters above (`handles.py`).
+    import handles
+    manifest["handles"] = handles.handles(manifest, os.path.join(folder, PARTS_FILE))
+    return manifest
 
 
 def item_manifests(parts):

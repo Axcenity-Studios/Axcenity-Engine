@@ -279,6 +279,28 @@ fn parameter_metadata_features_and_handles_with_mistakes_report_each() {
     assert_problem(&base.validate(), &["handles[1]", "twice"]);
 }
 
+/// R2: a mirrored pair of handles is one feature's left and right: a
+/// handle can't be its own mirror, and both sit on the same feature.
+#[test]
+fn a_handle_s_mirror_is_another_handle_of_its_feature() {
+    let mut base = fixtures::rich_base();
+    base.handles[0].mirror = Some("eye_size_left".to_owned());
+    base.handles[1].mirror = None;
+    assert_problem(&base.validate(), &["handles[0]", "its own mirror"]);
+    let mut base = fixtures::rich_base();
+    base.handles[1].feature = "torso".to_owned();
+    let problems = base.validate();
+    assert_problem(
+        &problems,
+        &["handles[0]", "eye_size_right", "another feature"],
+    );
+    assert_problem(
+        &problems,
+        &["handles[1]", "eye_size_left", "another feature"],
+    );
+    assert!(fixtures::rich_base().validate().is_empty());
+}
+
 #[test]
 fn anchor_bones_must_be_in_the_model() {
     let mut base = fixtures::rich_base();

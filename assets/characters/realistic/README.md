@@ -6,7 +6,7 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 | --- | --- |
 | `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`, `LipSeal`, and the underwear `Underwear_BoxerBriefs`, `Underwear_Briefs`, `Underwear_Bra`. The skin maps are inside it. |
 | `items/*.item.json` | The underwear's item manifests (written by `manifests.py`). |
-| `Realistic.base.json` | The base model manifest (written by `manifests.py`), with every parameter's `about`, `feature` and `level` and the 23 `features`, whose anchors `anchors.py` measures on `RealisticParts.glb` (R1). `manifests.py` is plain Python with numpy and runs without Blender. |
+| `Realistic.base.json` | The base model manifest (written by `manifests.py`), with every parameter's `about`, `feature` and `level`, the 23 `features`, whose anchors `anchors.py` measures on `RealisticParts.glb` (R1), and the 19 `handles` Character Studio's viewport draws for the nose, eyes, jaw, mouth, shoulders, waist and hips, whose skin corners, axes and travels `handles.py` measures (R2). `manifests.py` is plain Python with numpy and runs without Blender. |
 | `presets/*.preset.json` | The shipped presets: 14 body (seven per body type), 9 face, 6 character (written by `presets.py`; R1). |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |

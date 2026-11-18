@@ -918,6 +918,7 @@ impl Reader<'_> {
                 normals,
                 uvs,
                 tangents: Vec::new(),
+                regions: Vec::new(),
                 indices,
                 material,
                 joints,

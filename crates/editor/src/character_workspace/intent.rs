@@ -103,6 +103,13 @@ pub enum Intent {
     PickFeature(Option<String>),
     PickLevel(Level),
     SetSymmetry(bool),
+    /// Turns editing on the character in the viewport on or off (R2): the
+    /// hover highlight, picking by click and the handles. Off, the
+    /// viewport is the camera only (editor state).
+    SetHandles(bool),
+    /// Frames a feature (R2: a feature clicked on the character, when it's
+    /// small on the screen or partly off it).
+    FocusFeature(String),
     FocusView(ViewPreset),
     SetLighting(Lighting),
     SetBackdrop(Backdrop),
