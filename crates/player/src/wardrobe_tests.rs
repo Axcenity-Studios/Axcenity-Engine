@@ -21,7 +21,7 @@ use axcenity_core::{ClassName, Value};
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
 use super::fit_gate_tests::{
     Failure, Known, Posed, bodies, check, cover_at_rest, measure, poke_through, pose_name,
-    posed_at, worn,
+    posed_at, undressed, worn,
 };
 use super::garment_checks::{Record, check_motion, footwear, stale, unrecorded};
 
@@ -61,7 +61,10 @@ fn wardrobe_gate(stance: Stance, known: &[Known]) {
         for part in PARTS {
             assert!(names.contains(&part), "{}: {names:?}", description.name);
         }
-        let cover = cover_at_rest(&body, &garments);
+        // The bare body at rest, to find the skin the items hide (the
+        // gate's hole check, CO9 part 2).
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let cover = cover_at_rest(&body, &garments, &bare);
         let (body, garments) = if stance == Stance::Rest {
             (body, garments)
         } else {
@@ -164,7 +167,8 @@ fn the_wardrobe_levels_of_detail_stay_clear_of_the_body() {
         let dressed = dressed(&description);
         let (body, full) = worn_at_level(&stage, &dressed, 0);
         assert_eq!(full.len(), PARTS.len(), "{}", description.name);
-        let cover = cover_at_rest(&body, &full);
+        let (bare, _) = worn_at_level(&stage, &undressed(&description), 0);
+        let cover = cover_at_rest(&body, &full, &bare);
         for level in 1..=2 {
             let (_, simpler) = worn_at_level(&stage, &dressed, level);
             for garment in &simpler {

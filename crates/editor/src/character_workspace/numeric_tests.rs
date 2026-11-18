@@ -346,11 +346,17 @@ fn a_face_row_follows_the_same_rule() {
 fn the_expression_rows_follow_the_same_rule() {
     use super::expressions::ROWS;
     let mut studio = Studio::new("numeric-expressions", vec2(1440.0, 1400.0));
-    studio.workspace.apply(Intent::PickCategory(Category::Expressions));
+    studio
+        .workspace
+        .apply(Intent::PickCategory(Category::Expressions));
     studio.settle();
     let raise = ROWS.iter().find(|row| row.label == "Raise").unwrap();
-    let look = ROWS.iter().find(|row| row.label == "Look down or up").unwrap();
-    let id = |row: &super::expressions::Row| format!("face control {} {}", row.group.label(), row.label);
+    let look = ROWS
+        .iter()
+        .find(|row| row.label == "Look down or up")
+        .unwrap();
+    let id =
+        |row: &super::expressions::Row| format!("face control {} {}", row.group.label(), row.label);
     let track = studio.track(&id(raise));
     studio.drag(track.center(), vec2(22.0, 0.0));
     let value = studio.workspace.row_value(raise.controls, false);
@@ -358,8 +364,15 @@ fn the_expression_rows_follow_the_same_rule() {
     let track = studio.track(&id(look));
     studio.drag_with(track.center(), vec2(44.0, 0.0), egui::Modifiers::SHIFT);
     let value = studio.workspace.row_value(look.controls, false);
-    assert!(close(value, 0.2), "a quarter of two fifths of -1 to 1: {value}");
-    assert_eq!(studio.undo_depth(), 0, "the page never edits the description");
+    assert!(
+        close(value, 0.2),
+        "a quarter of two fifths of -1 to 1: {value}"
+    );
+    assert_eq!(
+        studio.undo_depth(),
+        0,
+        "the page never edits the description"
+    );
 }
 
 /// The Skin page's values and a makeup layer's sliders take the same drag.

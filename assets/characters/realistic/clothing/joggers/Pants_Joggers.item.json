@@ -13,12 +13,7 @@
     "file": "Pants_Joggers.glb",
     "object": "AxcenityRealistic/Pants_Joggers"
   },
-  "hides": [
-    "hips",
-    "thighs_top",
-    "thighs_low",
-    "shins_top"
-  ],
+  "hides": [],
   "materials": [
     {
       "name": "Fleece",
