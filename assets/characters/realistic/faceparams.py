@@ -3,10 +3,12 @@
 
 Every face identity shape (`face.Face.identity`) is one parameter from -1
 to 1, 0 being the face as built, but for the brows' height, arch and
-length, which have a shape for each end (`SPLIT`): a shape moves its
-vertices along one straight line, and a lowered brow's fold has to come
-forward over the lid where a raised one lies back on the brow bone (and a
-brow's tail follows the brow's curve, `lashes.brow_lengths`). The length
+length and the nose tip's rotation, which have a shape for each end
+(`SPLIT`): a shape moves its vertices along one straight line, and a
+lowered brow's fold has to come forward over the lid where a raised one
+lies back on the brow bone (and a brow's tail follows the brow's curve,
+`lashes.brow_lengths`); the nose's drooped end is held short of a line it
+draws under the columella, which the upturned end does not draw. The length
 shapes move the `Brows` card only; the body carries them empty. A paired
 feature has a parameter a side
 (`eye_height_left`, `eye_height_right`), each naming the other as its
@@ -87,12 +89,12 @@ SINGLE = [
 ]
 
 
-# Paired features with a shape for each end: {shape stem: the raising
-# shape's stem}. The stem's own shape is the lowering one, driven from 0
-# to -1 (weights 0 to -1, as one shape for both ends would be); the
-# raising one is driven from 0 to 1.
+# Features with a shape for each end: {shape stem: the raising shape's
+# stem} (a paired feature's shapes add the side, `_Left`). The stem's own
+# shape is the lowering one, driven from 0 to -1 (weights 0 to -1, as one
+# shape for both ends would be); the raising one is driven from 0 to 1.
 SPLIT = {"Face_Brow_Height": "Face_Brow_Height_Up", "Face_Brow_Arch": "Face_Brow_Arch_Up",
-         "Face_Brow_Length": "Face_Brow_Length_Long"}
+         "Face_Brow_Length": "Face_Brow_Length_Long", "Face_Nose_Tip_Rotation": "Face_Nose_Tip_Rotation_Up"}
 
 
 # What each parameter does, in a sentence (its tooltip, R1). A pair's
@@ -182,7 +184,11 @@ def shapes():
             out.append(f"{stem}_{side}")
             if stem in SPLIT:
                 out.append(f"{SPLIT[stem]}_{side}")
-    return out + [s for s, *_ in SINGLE]
+    for shape, *_ in SINGLE:
+        out.append(shape)
+        if shape in SPLIT:
+            out.append(SPLIT[shape])
+    return out
 
 
 def groups():
@@ -224,7 +230,7 @@ def parameters(face_identity):
                                                  f"{stem}_{side.capitalize()}", advanced, f"{pid}_{other}", raising,
                                                  stem=pid, side=side)))
     for shape, pid, label, group, advanced in SINGLE:
-        rows.append((order[group], parameter(pid, label, group, shape, advanced)))
+        rows.append((order[group], parameter(pid, label, group, shape, advanced, raising=SPLIT.get(shape))))
     rows.sort(key=lambda row: row[0])
     out = [p for _, p in rows]
     return out

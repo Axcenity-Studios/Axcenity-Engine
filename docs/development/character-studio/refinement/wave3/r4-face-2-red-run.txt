@@ -93,3 +93,52 @@ thread 'the_brows_sit_where_the_references_put_them' panicked: no brows.masculin
 
 (The first pass's front-view column check passed on this same square-ended
 card; the per-segment height across the card's own line fails it.)
+
+# Review fixes 2: red run (tests written first; package and presets not yet changed, fd463fd2)
+
+cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_second_pass)' --no-fail-fast --no-capture
+
+frame 0 default: hollow 0.00 mm
+frame 0 round: hollow 0.00 mm
+frame 0 oval: hollow 0.00 mm
+frame 0 square: hollow 0.85 mm
+frame 0 heart: hollow 0.00 mm
+frame 0 long: hollow 0.00 mm
+frame 0 broad: hollow 0.00 mm
+frame 0 narrow: hollow 0.00 mm
+frame 0 soft: hollow 0.00 mm
+frame 0 angular: hollow 0.40 mm
+frame 1 default: hollow 0.00 mm
+frame 1 round: hollow 0.00 mm
+frame 1 oval: hollow 0.00 mm
+frame 1 square: hollow 0.00 mm
+frame 1 heart: hollow 0.00 mm
+frame 1 long: hollow 0.00 mm
+frame 1 broad: hollow 0.00 mm
+frame 1 narrow: hollow 0.00 mm
+frame 1 soft: hollow 0.00 mm
+frame 1 angular: hollow 0.00 mm
+thread 'no_face_preset_puts_a_shelf_on_the_forehead' (39904) panicked at crates\avatar\tests\realistic_face_second_pass.rs:811:5:
+forehead hollows: ["frame 0 square 0.85 mm (default 0.00)"]
+test no_face_preset_puts_a_shelf_on_the_forehead ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.42s
+        FAIL [   1.424s] (1/7) axcenity-avatar::realistic_face_second_pass no_face_preset_puts_a_shelf_on_the_forehead
+        PASS [   0.065s] (2/7) axcenity-avatar::realistic_face_second_pass the_brow_texture_is_hair_not_a_card
+        PASS [   0.007s] (3/7) axcenity-avatar::realistic_face_second_pass the_brows_sit_where_the_references_put_them
+        PASS [   0.045s] (4/7) axcenity-avatar::realistic_face_second_pass the_brows_taper_and_differ_by_frame
+        PASS [   0.007s] (5/7) axcenity-avatar::realistic_face_second_pass the_feminine_face_differs_where_the_references_say
+        PASS [   1.156s] (6/7) axcenity-avatar::realistic_face_second_pass the_masculine_brow_ridge_stands_forward_in_profile
+frame 0: nasolabial angle 91.6 / 111.6 / 130.8 (-20.0 / +19.2)
+frame 1: nasolabial angle 90.5 / 112.6 / 133.4 (-22.1 / +20.9)
+thread 'the_nose_tip_turns_by_the_references_range' (24900) panicked at crates\avatar\tests\realistic_face_second_pass.rs:750:5:
+nasolabial angle: ["frame 0: opens by 19.2 at +1"]
+test the_nose_tip_turns_by_the_references_range ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.21s
+        FAIL [   1.220s] (7/7) axcenity-avatar::realistic_face_second_pass the_nose_tip_turns_by_the_references_range
+     Summary [   3.924s] 7 tests run: 5 passed, 2 failed, 0 skipped
+        FAIL [   1.424s] (1/7) axcenity-avatar::realistic_face_second_pass no_face_preset_puts_a_shelf_on_the_forehead
+        FAIL [   1.220s] (7/7) axcenity-avatar::realistic_face_second_pass the_nose_tip_turns_by_the_references_range
+
+The same nasolabial measure on earlier packages (generated files put back for the run, then restored):
+- first pass (4de12bef): frame 0 89.0 / 111.6 / 131.9 (-22.5 / +20.3); frame 1 88.1 / 112.6 / 133.1 (-24.5 / +20.5)
+- wave 2 (b39a9ed7): frame 0 93.0 / 111.6 / 129.4 (-18.6 / +17.8); frame 1 93.3 / 114.0 / 131.8 (-20.7 / +17.8)

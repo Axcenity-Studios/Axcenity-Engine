@@ -76,18 +76,22 @@ FACES = [
 # `face_preset_tests`; the lead: square, heart and soft barely differed
 # from the default on the masculine frame, and in profile none reached
 # 3%). The profile is what the chin, the nose, the brow ridge, the
-# forehead's slope and the jaw's angle change.
+# forehead's slope and the jaw's angle change. (Review fixes 2: square's
+# brow ridge 0.7 on a forehead tipped back by 0.6 drew a hard band across
+# the forehead, a shelf with a hollow over it in profile; it keeps a
+# moderate ridge, an upright forehead and the chin further forward.
+# `avatar`'s `no_face_preset_puts_a_shelf_on_the_forehead` holds it.)
 FACE_TABLE = [
     ("forehead_height", [-0.2, 0.6, 0, 0.6, 0.7, -0.6, 0.6, 0, 0]),
-    ("forehead_slope", [0.6, 0.2, -0.6, 0.7, -0.4, 0, 0, 0.5, -0.2]),
+    ("forehead_slope", [0.6, 0.2, 0.1, 0.7, -0.4, 0, 0, 0.5, -0.2]),
     ("temple_width", [0.3, -0.3, 0.5, 0.7, -0.3, 0.6, -0.6, 0, 0]),
-    ("brow_ridge", [-0.2, 0, 0.7, 0, 0, 0, 0, -0.7, 0.6]),
+    ("brow_ridge", [-0.2, 0, 0.35, 0, 0, 0, 0, -0.7, 0.6]),
     ("cheekbone*", [-0.2, 0.7, 0, 0.7, -0.2, 0.6, -0.4, -0.4, 0.7]),
     ("cheek_fullness*", [0.7, -0.3, -0.6, -0.2, -0.3, 0.6, -0.7, 0.7, -0.7]),
     ("jaw_width*", [0.3, -0.6, 0.7, -0.6, -0.3, 0.5, -0.5, -0.5, 0.3]),
     ("chin_width", [0.4, -0.6, 0.7, -0.7, 0, 0.3, -0.3, 0.6, -0.2]),
     ("chin_length", [-0.6, 0.6, -0.5, 0.6, 0.7, -0.7, 0.6, -0.1, 0.1]),
-    ("chin_forward", [-0.6, 0.3, 0.6, -0.6, 0.7, 0, 0, -0.4, 0.5]),
+    ("chin_forward", [-0.6, 0.3, 0.7, -0.6, 0.7, 0, 0, -0.4, 0.5]),
     ("nose_length", [-0.1, 0.4, 0, 0, 0.7, -0.5, 0.5, -0.1, 0.1]),
     ("nose_bridge", [0, 0, 0.5, 0, 0, 0, 0, -0.6, 0.6]),
     ("nose_tip", [0, 0, 0, 0, 0, 0, 0, 0.4, 0]),

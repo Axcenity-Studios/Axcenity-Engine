@@ -392,3 +392,162 @@ No new dependency, and no contract changed: no new parameter, shape or manifest 
 - Rebuild the generated files as before. The brows' card and texture, and the nose rotation shape, changed in `lashes.py` and `face.py` only.
 - A saved `brow_length` value now moves a longer tail: the ends are 1.98 and 2.52 along the brow line (were 1.06 and 1.60).
 - A saved `nose_tip_rotation` value now turns the tip less: about 9.5 degrees at an end, was 14.
+
+## Review fixes 2
+
+The second review found two blocking items:
+- `nose_tip_rotation`'s +1 end was cut to about +1.2 SD, with no reason given for that end.
+- The square preset had a hard band across its forehead.
+
+Both are fixed below, test first. Part of the first item's premise was wrong, and the evidence is in section 1: the +1.2 SD came from review fixes 1's coarse measure, not from the shape.
+
+### Red first
+
+Appended to [r4-face-2-red-run.txt](r4-face-2-red-run.txt). On review fixes 1's package (fd463fd2), 7 tests ran: 5 passed and 2 failed.
+- `no_face_preset_puts_a_shelf_on_the_forehead`: `frame 0 square 0.85 mm (default 0.00)`.
+- `the_nose_tip_turns_by_the_references_range`: `frame 0: opens by 19.2 at +1`.
+
+### 1. `nose_tip_rotation`'s ends (`faceparams.py`, `face.py`)
+
+**The measure.** The new test measures the nasolabial angle the way the references define it (columella point, subnasale, labrale superius), in profile on the midline.
+- It slices the posed body's triangles with the plane x = 0. The midline's own vertices are about 5 mm apart, too coarse to use directly.
+- Subnasale is the deepest point of the outline between the tip and the lip, found at rest. The ends are measured at that same height, because the turn holds subnasale.
+- The columella's line is the tangent from subnasale to the nose's lower edge.
+- The lip's line runs to the most forward point of the upper lip, 5 to 20 mm under subnasale.
+- At rest the angle is 111.6 degrees masculine and 112.6 feminine (references: 105 +- 9.6).
+
+**Why the review's figure was wrong.** Review fixes 1 drew the columella line to "the lobule's lowest point", on vertices 4 mm apart, and got -5.3 / +11.8 degrees. Measured the references' way, the packages move the angle by:
+
+| Package | Masculine -1 / +1 | Feminine -1 / +1 |
+|---|---|---|
+| Wave 2 (b39a9ed7) | -18.6 / +17.8 | -20.7 / +17.8 |
+| First pass (4de12bef) | -22.5 / +20.3 | -24.5 / +20.5 |
+| Review fixes 1 (fd463fd2) | -20.0 / +19.2 | -22.1 / +20.9 |
+| **Review fixes 2** | **-20.0 / +21.3** | **-22.1 / +22.6** |
+
+- Review fixes 1 cost the +1 end about 1 degree, not 8.
+- Both ends were already at about 2 SD, the nose README's +-20 degrees.
+- Review fixes 1's "-0.55 / +1.2 SD" was wrong. I corrected it in `co6/README.md` and `Known-Limitations.md`.
+
+**The split.** The review's fix was still right in kind: the droop is held back by the line under the columella, and the upturn has no such limit. So each end now has its own shape, as the brows' ends already do:
+- `faceparams.SPLIT` gains `"Face_Nose_Tip_Rotation": "Face_Nose_Tip_Rotation_Up"`. Single parameters can now take a raising shape, and `shapes()` lists it.
+- In the manifest, `nose_tip_rotation` drives `Face_Nose_Tip_Rotation` from -1 to 0 and `Face_Nose_Tip_Rotation_Up` from 0 to 1. The parameter id is unchanged, so saved values still load.
+- In `face.py` the droop stays at `NOSE_TURNS_DEG` 34. The upturn uses the same eased and smoothed field at `NOSE_TURNS_UP_DEG` 38. The averaging is linear, so the up shape is the droop's field scaled by sin 38 / sin 34.
+
+**The sweep.** The shapes are linear, and the angle at +1 grows with the scale.
+- 38 degrees gives +21.3 masculine and +22.6 feminine. That is inside the test's 20 to 24 on both frames: 2.2 and 2.4 SD.
+- The cap is the brief's 2.5 SD. 40 degrees would have put the feminine end over it.
+
+**What +1 looks like** ([review2-nose-tip-rotation.jpg](r4-face-2/review2-nose-tip-rotation.jpg)):
+- In profile the tip turns up a little more than in review fixes 1. It stays rounded, not pointed.
+- The columella shows. From the front the nostrils show but do not face forward.
+- A jagged bright sliver shows inside the right nostril at +1, face-front: the lit side of the columella. It is there before and after, and small at 0. I did not check it at 4K.
+- -1 is unchanged: the same faint grey edge as the neutral face, and no bright line.
+
+**The test.** `the_nose_tip_turns_by_the_references_range` checks that +1 opens the angle by 20 to 24 degrees and -1 closes it by 15 to 24, on both frames. The droop's upper bound (2.5 SD) is also the regression guard for the columella line that the review asked for: review fixes 1's table shows the line coming back with a larger droop.
+
+### 2. The square preset's forehead band (`presets.py`)
+
+**What it was.** I cropped it at 3x ([review2-forehead.jpg](r4-face-2/review2-forehead.jpg), the "square before" column).
+- On the masculine frame, from the front, a straight, hard-edged dark band sat right above the brows with a lit shelf over it, under both lights.
+- In profile there was a shelf with a hollow over it.
+- The midline profile measures the hollow: the forehead's outline dips 0.85 mm behind a straight line from glabella to 4 cm above it. The default face and every other preset dip 0.00 mm, except angular at 0.40.
+- On the feminine frame, square had no hollow (0.00 mm) and no band.
+
+**The fix**, as the review proposed: square's `brow_ridge` goes from 0.7 to 0.35, `forehead_slope` from -0.6 to +0.1, and `chin_forward` from 0.6 to 0.7 to keep the profile distinct. `Face.ridge()` is unchanged, so this needs no approval from the lead.
+
+**Measured.**
+- Square's hollow is 0.00 mm on both frames.
+- I reran the GPU preset test. Square now changes 4.9% of the face crop from the front and 4.3% in profile on the masculine frame (review fixes 1: 6.7% and 3.6%), and 4.2% and 3.9% on the feminine frame.
+- Every preset view is still between 3.1% and 10.2%.
+
+**Seen at 3x.**
+- Square after has no hard edge. The light falls off across the lower forehead as it does on the default face, and the profile is a smooth curve like the default's.
+- Angular (brow ridge 0.6, slope -0.2) has a soft step of light above the brows on the masculine frame. It is softer than square before and shows as a small rounded ridge in profile. It reads as a brow ridge, not a band, so I left it. Its hollow is 0.40 mm, under the test's 0.5.
+- The feminine frame shows no band in any column.
+
+**The test.** `no_face_preset_puts_a_shelf_on_the_forehead` checks that no face preset's forehead hollow is more than 0.5 mm deeper than the default face's on the same frame.
+
+**A measure I tried and dropped.** I tried the largest 2 px brightness step down the middle of the forehead in the image. It did not tell square before from after (3.0 against 3.0, masculine, studio light): the band's edge is slanted and soft at pixel scale. The geometric hollow is the measure.
+
+### Non-blocking notes acted on
+
+- **Eye spacing.** `the_feminine_face_differs_where_the_references_say` no longer requires the feminine ratio of eye spacing to face width to be 3% above the masculine's. That bar rewarded a wide feminine IPD; the references' own ratio is about 1.02. The test now requires only that the feminine ratio not be smaller, and prints both: 0.449 and 0.486, a ratio of 1.08.
+  - The feminine IPD itself (67.4 mm, about +1.5 SD for women) is an open issue. Changing it moves the feminine frame's eyes and needs both gates again, so I left it for the lead to decide.
+- **`co6/README.md`.** The wave 3 brows bullet is now one current description, with review fixes 1's numbers and the build's lengths (59.2 and 51.4 mm). The nose bullet describes the split and gives the ends on the references' measure.
+- **A full-face sheet with the final brows.** [review2-frames-final-brows.jpg](r4-face-2/review2-frames-final-brows.jpg) shows both default frames under studio and hard light, face-front, three-quarter and side. The new preset sheets also show the final brows.
+- **A guard for the columella line.** The droop's upper bound in the nose test (section 1).
+
+### Non-blocking notes not acted on
+
+- **The masculine brow's even lower edge.** The suggestion was to scatter sparse roots below it. That changes the texture and its tests, so I left it for the next brow pass.
+- **`brow_length` on the feminine frame.** Its shapes are still built on the masculine card.
+- **Build data, not the GLB.** The brow length and feminine IPD checks still read `Realistic.build.json`.
+- **Filing the -1 end with RA7 in `progress.md`.** Progress entries are written at merge, so it is in "What the lead must do at merge" below.
+
+### Files changed in this round
+
+- `assets/characters/realistic/faceparams.py`: `SPLIT` now covers a single parameter; `shapes()` and `parameters()` follow.
+- `assets/characters/realistic/face.py`: `Face_Nose_Tip_Rotation_Up` and `NOSE_TURNS_UP_DEG`.
+- `assets/characters/realistic/presets.py`: square's brow ridge, forehead slope and chin forward.
+- `crates/avatar/tests/realistic_face_second_pass.rs`:
+  - `posed_with` and `posed_as`;
+  - the midline helpers (`midline`, `crossing`, `outline`, `pronasale`, `nasolabial`, `forehead_hollow`);
+  - the two new tests;
+  - the relaxed eye-spacing check.
+- `crates/avatar/tests/realistic_parameters.rs`: the body has 175 shapes, one more for the upturned nose.
+- Regenerated by me with the README's commands:
+  - `RealisticParts.glb` (175 shapes, 42.8 MB);
+  - `Realistic.base.json` (the parameter's two shapes);
+  - `Realistic.build.json`;
+  - `presets/face-square.preset.json`;
+  - `co6/face_checks.json`, written by the gate.
+  - `catalogue.json`, the benchmarks, the other presets and the item manifests changed only in line endings and are not committed.
+- Docs: `co6/README.md`, `testing.md`, `wiki/Roadmap/Known-Limitations.md`, this section and the red run.
+- Sheets, 1.4 MB (the folder is 3.4 MB):
+  - `review2-nose-tip-rotation.jpg`;
+  - `review2-forehead.jpg`;
+  - `review2-presets-masculine.jpg` and `review2-presets-feminine.jpg`;
+  - `review2-frames-final-brows.jpg`.
+
+No new dependency, and no schema or contract change: a parameter whose `shapes` list has a lowering and a raising shape already exists for the brows. The GLB gains one morph target.
+
+### Visual evidence and what I saw
+
+All sheets are in-engine 1280 x 720 captures with TAA, cropped. "Before" is review fixes 1's package (a copy of fd463fd2's library) and "after" is this round's.
+- [review2-nose-tip-rotation.jpg](r4-face-2/review2-nose-tip-rotation.jpg): -1, 0 and +1, front and side, both frames.
+  - +1 turns up a little further than before and stays rounded.
+  - -1 is unchanged.
+  - The sliver inside the nostril at +1 is unchanged.
+- [review2-forehead.jpg](r4-face-2/review2-forehead.jpg): the forehead at 3x, front and side, studio and hard light, both frames. The columns are default, square before, square after and angular. What I saw is in section 2.
+- [review2-presets-masculine.jpg](r4-face-2/review2-presets-masculine.jpg) and [review2-presets-feminine.jpg](r4-face-2/review2-presets-feminine.jpg): the default first, then the nine presets, front and side, before and after.
+  - Only square changes visibly: the forehead band is gone and the chin is a little further forward.
+  - Soft's slight upturn (+0.2) is a little stronger.
+- [review2-frames-final-brows.jpg](r4-face-2/review2-frames-final-brows.jpg): both default frames with the final brows.
+  - The masculine brow reads full and dark brown in all three views under both lights.
+  - The feminine brow is thin and arched, and faint in profile.
+
+### Tests and gates (this round)
+
+- Red, then green: `cargo nextest run -p axcenity-avatar -E 'binary(realistic_face_second_pass)'`: 7 run, 7 passed. Nasolabial angle at -1 / 0 / +1: masculine 91.6 / 111.6 / 132.9, feminine 90.5 / 112.6 / 135.1. Forehead hollows: all 0.00 mm except masculine angular, 0.40.
+- `cargo nextest run -p axcenity-avatar -p axcenity-anim --no-fail-fast`: 282 tests run, 282 passed. The first run had 1 failure, `a_baked_body_keeps_only_its_live_shapes`: 175 shapes against 174, which is the new shape. I updated the count.
+- `cargo nextest run -p axcenity-player --release -E 'test(every_face_preset)'`: 1 passed. The 36 views range from 3.1% to 10.2%; square is at 4.9% and 4.3% (masculine) and 4.2% and 3.9% (feminine).
+- `cargo nextest run -p axcenity-editor -E 'test(/character_workspace/) | test(/preset/)'`: 81 run, 81 passed.
+- `cargo clippy -p axcenity-avatar -p axcenity-anim --all-targets -- -D warnings`: clean. `cargo fmt --all --check`: clean. The player and editor code did not change in this round.
+- `python3 -I scripts/check-wiki.py`: 113 pages, 0 errors, 58 warnings (none new).
+- `face_checks.py --package realistic --out docs/development/character-studio/co6/face_checks.json --check`: **0 failures**. `identity_pairs`: masculine 6 poses with new crossings, the same `eye_corner` cases as before and not required; feminine 0. A full blink leaves 0.0 mm open with 0 rays bare on both frames.
+- `measure.py --package realistic --only files,weights,clipping,face,shapes,sliders,proportions,deformation,twist --check assets/characters/realistic/qa/thresholds.json`: **check passed (2 targets not met)**. The two are the shoulder at 90 degrees (0.847 and 0.88), unmet since before R4. Sliders: 3,828 pairs and 15,312 bodies a frame, **0 with new crossings** on both frames. It took 26 minutes.
+
+### Open issues after review fixes 2
+
+- **The feminine eye spacing** is wide against the references (see "Non-blocking notes acted on").
+- **The droop end** is at about 2 SD, not 2.5, because of the line under the columella. Reaching 2.5 SD needs specular occlusion in narrow creases, which belongs to the render owner (RA7).
+- **Angular's soft step of light** above the masculine brows (0.40 mm hollow) is acceptable to me but is the strongest one left. The lead should judge it in `review2-forehead.jpg`.
+- **Carried over from review fixes 1:** the brows' lengths at the short end of F-29, the masculine brow's lower edge, `brow_length` on the feminine frame, the feminine mouth width and the feminine under-chin.
+
+### What the lead must do at merge (added)
+
+- Rebuild the generated files as before. This round changed `faceparams.py`, `face.py` (one new shape) and `presets.py`.
+- A saved `nose_tip_rotation` value means the same at -1 as before. At +1 it turns about 12% further (38 degrees of field against 34).
+- Add to `progress.md`'s open list: the -1 end of `nose_tip_rotation` is held at about 2 SD by the columella line, because the skin has no specular occlusion in narrow creases. Revisit it, and the test's 24-degree bound, when RA7 adds specular occlusion.
+- Discard the line-ending-only changes left in the worktree: the catalogue, the benchmarks, the item manifests and the body presets.

@@ -461,7 +461,11 @@ EAR_OUT_REACH = 0.012
 # 2.5 SD (wave 3; 6.5 mm, 2.4 SD, in wave 2).
 NOSE_PROJECTS = 0.00675
 # Nose tip rotation: the tip and the column under it turned about
-# subnasale, up at +1 (the nasolabial angle, 105 +- 9.6 degrees).
+# subnasale, up at +1 (the nasolabial angle, 105 +- 9.6 degrees; the nose
+# README's range +-20). A shape for each end (`faceparams.SPLIT`): the
+# drooped end `Face_Nose_Tip_Rotation` (driven 0 to -1) turns by
+# `NOSE_TURNS_DEG`, the upturned end `Face_Nose_Tip_Rotation_Up` (0 to 1)
+# by `NOSE_TURNS_UP_DEG`, the same field.
 # Wave 3, review fixes 1: at -1 a thin blue-grey line showed under the
 # columella (the lobule's lower edge, turned down to subnasale's height
 # and seen edge-on, reflecting the backdrop). The turn's weight now eases
@@ -474,7 +478,15 @@ NOSE_PROJECTS = 0.00675
 # within a level of the neutral face's (wave 3's hand-back, "Review fixes
 # 1"): the tip turns about 9.5 degrees about subnasale either way (14 in
 # the first pass, which drew the line).
+#
+# Wave 3, review fixes 2: measured as the references do (columella point,
+# subnasale, labrale superius; `realistic_face_second_pass`), the 34
+# degrees close the angle by 20 and 22 degrees (masculine, feminine; about
+# 2 SD) and opened it by 19.2 and 20.9 with one shape for both ends. The
+# upturned end draws no line, so it turns further on its own shape: the
+# angle opens by 20 to 24 degrees on both frames (2 to 2.5 SD).
 NOSE_TURNS_DEG = 34.0
+NOSE_TURNS_UP_DEG = 38.0
 NOSE_TURN_SMOOTH = 4
 NOSE_TURN_ROUND = 10
 NOSE_TURN_EASE = (0.002, 0.009)
@@ -1822,7 +1834,12 @@ class Face:
         tangent = np.stack([np.zeros(len(P)), r[:, 2], -r[:, 1]], axis=1)
         turn = tangent * (column * np.sin(np.radians(NOSE_TURNS_DEG)))[:, None]
         pivot = np.where(np.linalg.norm(r, axis=1) < NOSE_TURN_EASE[0] + 0.001)[0]
-        put("Face_Nose_Tip_Rotation", self.topo.smooth(turn, NOSE_TURN_ROUND, keep=pivot, among=nose), teeth=False)
+        turn = self.topo.smooth(turn, NOSE_TURN_ROUND, keep=pivot, among=nose)
+        put("Face_Nose_Tip_Rotation", turn, teeth=False)
+        # (The averaging is linear, so the upturned end is the same field
+        # scaled.)
+        up_by = np.sin(np.radians(NOSE_TURNS_UP_DEG)) / np.sin(np.radians(NOSE_TURNS_DEG))
+        put("Face_Nose_Tip_Rotation_Up", turn * up_by, teeth=False)
         put("Face_Nose_Width", self.nose_width(sn) * NOSE_WIDENS, teeth=False)
         put("Face_Brow_Ridge", (self.ridge() * 0.0046)[:, None] * N, teeth=False)
         crown = self.crown

@@ -309,8 +309,10 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // Three more in R3: `Masculine_Fat_Soft`, `Feminine_Fat_Soft` (fat that
     // is fat) and `Masculine_Belly_Flat` (the slight body's belly); two more
     // for the wider ranges, `<Frame>_Hips_Narrow` (the hips below 1).
-    // Fourteen more in R4: the face's new controls, one shape each.
-    assert_eq!(model.morph_targets.len(), 174);
+    // Fourteen more in R4: the face's new controls, one shape each. One
+    // more in wave 3: `nose_tip_rotation`'s upturned end has its own shape,
+    // `Face_Nose_Tip_Rotation_Up` (`faceparams.SPLIT`).
+    assert_eq!(model.morph_targets.len(), 175);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always

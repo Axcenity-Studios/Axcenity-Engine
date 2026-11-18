@@ -46,9 +46,31 @@ fn build_data() -> serde_json::Value {
 /// at rest on `frame` (0 masculine, 1 feminine), in metres (glTF: Y up,
 /// the face toward +Z).
 fn posed(library: &Library, model: &Model, frame: f32) -> (Vec<[f32; 3]>, Vec<[usize; 3]>) {
+    posed_with(library, model, frame, &[])
+}
+
+/// As [`posed`], with parameters set (`(id, value)`).
+fn posed_with(
+    library: &Library,
+    model: &Model,
+    frame: f32,
+    parameters: &[(&str, f32)],
+) -> (Vec<[f32; 3]>, Vec<[usize; 3]>) {
     let mut description = Description::new("Frame", BASE);
     description.parameters.insert("frame".into(), frame);
-    let resolved = resolve(library, &description).unwrap();
+    for &(id, value) in parameters {
+        description.parameters.insert(id.into(), value);
+    }
+    posed_as(library, model, &description)
+}
+
+/// As [`posed`], for a whole description.
+fn posed_as(
+    library: &Library,
+    model: &Model,
+    description: &Description,
+) -> (Vec<[f32; 3]>, Vec<[usize; 3]>) {
+    let resolved = resolve(library, description).unwrap();
     let baked = model.bake(&resolved.identity);
     let rig = baked.rig.as_ref().unwrap();
     let posed = baked.pose_shaped(&rig.rest_pose(), &[]).unwrap();
@@ -530,7 +552,11 @@ fn the_masculine_brow_ridge_stands_forward_in_profile() {
 /// The build measures both frames' faces on the skin (`face.rest.frames`);
 /// the feminine against the masculine must reach at least these ratios
 /// (zy-zy 0.965, se-me 0.95, go-go 0.95, al-al 0.94), and its eyes'
-/// spacing against its face width must be 3% more than the masculine's.
+/// spacing against its face width must be no less than the masculine's.
+/// (The references' own ratio is about 1.02: women's interpupillary
+/// distance is 0.96 of men's, F-01 and F-05. The second review: the bar of
+/// 1.03 rewarded a wide feminine eye spacing; the shipped 1.08 is an open
+/// issue, wave 3's hand-back.)
 #[test]
 fn the_feminine_face_differs_where_the_references_say() {
     let data = build_data();
@@ -553,10 +579,243 @@ fn the_feminine_face_differs_where_the_references_say() {
         );
     }
     let eyes = |frame: &str| get(frame, "eye_centres_mm") / get(frame, "zy_zy_mm");
-    assert!(
-        eyes("feminine") >= 1.03 * eyes("masculine"),
+    println!(
         "eyes against the face's width: {:.3} and {:.3}",
         eyes("masculine"),
         eyes("feminine")
     );
+    assert!(
+        eyes("feminine") >= eyes("masculine"),
+        "eyes against the face's width: {:.3} and {:.3}",
+        eyes("masculine"),
+        eyes("feminine")
+    );
+}
+
+/// The face's midline (x = 0) as segments in profile: where each triangle
+/// meets it, (height, forward) at both ends. (The mesh has a loop of
+/// vertices on the midline, so most segments are its edges.)
+fn midline(points: &[[f32; 3]], tris: &[[usize; 3]]) -> Vec<[(f32, f32); 2]> {
+    const ON: f32 = 2e-5;
+    let mut out = Vec::new();
+    for t in tris {
+        let mut ends: Vec<(f32, f32)> = t
+            .iter()
+            .map(|&i| points[i])
+            .filter(|p| p[0].abs() < ON)
+            .map(|p| (p[1], p[2]))
+            .collect();
+        for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+            let (p, q) = (points[a], points[b]);
+            if p[0].abs() >= ON && q[0].abs() >= ON && (p[0] < 0.0) != (q[0] < 0.0) {
+                let s = p[0] / (p[0] - q[0]);
+                ends.push((p[1] + s * (q[1] - p[1]), p[2] + s * (q[2] - p[2])));
+            }
+        }
+        if ends.len() >= 2 && ends[0] != ends[1] {
+            out.push([ends[0], ends[1]]);
+        }
+    }
+    out
+}
+
+/// Where `segment` crosses `at` along its axis `k` (0 height, 1 forward):
+/// the other coordinate there.
+fn crossing(segment: &[(f32, f32); 2], k: usize, at: f32) -> Option<f32> {
+    let get = |p: (f32, f32)| if k == 0 { (p.0, p.1) } else { (p.1, p.0) };
+    let (a, b) = (get(segment[0]), get(segment[1]));
+    if (a.0 - at) * (b.0 - at) > 0.0 || a.0 == b.0 {
+        return None;
+    }
+    Some(a.1 + (at - a.0) / (b.0 - a.0) * (b.1 - a.1))
+}
+
+/// The face's outline in profile: the front-most point of the midline at
+/// each quarter millimetre of height from `from` to `to` (metres), among
+/// the points no more than 4 cm behind the nose's tip (so not the back of
+/// the head): (height, forward).
+fn outline(line: &[[(f32, f32); 2]], tip: (f32, f32), from: f32, to: f32) -> Vec<(f32, f32)> {
+    let step = 0.00025;
+    let bins = ((to - from) / step) as usize;
+    (0..bins)
+        .filter_map(|k| {
+            let y = from + (k as f32 + 0.5) * step;
+            line.iter()
+                .filter_map(|s| crossing(s, 0, y))
+                .filter(|&z| z > tip.1 - 0.04)
+                .fold(None, |most: Option<f32>, z| {
+                    Some(most.map_or(z, |m| m.max(z)))
+                })
+                .map(|z| (y, z))
+        })
+        .collect()
+}
+
+/// The nose's tip (pronasale): the front-most midline point of the face.
+fn pronasale(line: &[[(f32, f32); 2]]) -> (f32, f32) {
+    let ends = || line.iter().flat_map(|s| s.iter().cloned());
+    let top = ends().map(|p| p.0).fold(f32::MIN, f32::max);
+    ends()
+        .filter(|p| p.0 > top - 0.24 && p.0 < top - 0.04)
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .unwrap()
+}
+
+/// The nasolabial angle in degrees, in profile on the midline (the
+/// references' rule, `references/face/nose/README.md`: columella point,
+/// subnasale, labrale superius). Subnasale is the deepest point of the
+/// outline between the nose's tip and the lip; the columella's line is the
+/// tangent from subnasale to the nose's lower edge (the chord to it that
+/// rises least, over the edge from 3 mm forward of subnasale to 1 mm short
+/// of the tip); the lip's line runs to labrale superius, the front-most
+/// point of the outline 5 to 20 mm under subnasale.
+fn nasolabial(points: &[[f32; 3]], tris: &[[usize; 3]], at: Option<f32>) -> (f32, f32) {
+    let line = midline(points, tris);
+    let tip = pronasale(&line);
+    let face = outline(&line, tip, tip.0 - 0.045, tip.0 + 0.002);
+    let deepest = || {
+        *face
+            .iter()
+            .filter(|p| p.0 > tip.0 - 0.025 && p.0 < tip.0 - 0.002)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .unwrap()
+    };
+    let sn = match at {
+        Some(y) => *face
+            .iter()
+            .min_by(|a, b| (a.0 - y).abs().total_cmp(&(b.0 - y).abs()))
+            .unwrap(),
+        None => deepest(),
+    };
+    // The nose's lower edge: the lowest midline point over subnasale and
+    // under the tip, every quarter millimetre forward.
+    let steps = ((tip.1 - sn.1 - 0.004) / 0.00025).max(1.0) as usize;
+    let column = (0..steps)
+        .filter_map(|k| {
+            let z = sn.1 + 0.003 + k as f32 * 0.00025;
+            line.iter()
+                .filter_map(|s| crossing(s, 1, z))
+                .filter(|&y| y > sn.0 - 0.0005 && y < tip.0 + 0.001)
+                .fold(None, |low: Option<f32>, y| {
+                    Some(low.map_or(y, |m| m.min(y)))
+                })
+                .map(|y| (y, z))
+        })
+        .min_by(|a, b| ((a.0 - sn.0) / (a.1 - sn.1)).total_cmp(&((b.0 - sn.0) / (b.1 - sn.1))))
+        .expect("the nose's lower edge");
+    let lip = *face
+        .iter()
+        .filter(|p| p.0 < sn.0 - 0.005 && p.0 > sn.0 - 0.020)
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .unwrap();
+    let (c, l) = (
+        (column.0 - sn.0, column.1 - sn.1),
+        (lip.0 - sn.0, lip.1 - sn.1),
+    );
+    let cos = (c.0 * l.0 + c.1 * l.1) / (c.0.hypot(c.1) * l.0.hypot(l.1));
+    (cos.clamp(-1.0, 1.0).acos().to_degrees(), sn.0)
+}
+
+/// Brief item 4 and the second review: `nose_tip_rotation` reaches the
+/// references' range at both ends. The nose README sets the nasolabial
+/// angle's range at +-20 degrees (105 +- 9.6, about 2 SD); the brief's
+/// 2.5 SD is 24. On both frames the angle (columella point, subnasale,
+/// labrale superius) opens by 20 to 24 degrees at +1 and closes by 15 to
+/// 24 at -1. The ends are separate shapes (`faceparams.SPLIT`): the
+/// drooped end is held where the thin line under the columella stayed
+/// within a level of the neutral face's (`face.NOSE_TURNS_DEG`; wave 3's
+/// hand-back, review fixes 1), and its upper bound guards that line.
+#[test]
+fn the_nose_tip_turns_by_the_references_range() {
+    let library = library();
+    let base = library.base(BASE).unwrap();
+    let model = object(&library, &base.model.body);
+    let mut short = Vec::new();
+    for frame in [0.0, 1.0] {
+        let shape =
+            |value: f32| posed_with(&library, &model, frame, &[("nose_tip_rotation", value)]);
+        let (points, tris) = shape(0.0);
+        let (rest, sn) = nasolabial(&points, &tris, None);
+        // (The turn holds subnasale: the ends are measured there, not at
+        // their own deepest point, which climbs the columella as the angle
+        // opens.)
+        let angle = |value: f32| {
+            let (points, tris) = shape(value);
+            nasolabial(&points, &tris, Some(sn)).0
+        };
+        let (down, up) = (angle(-1.0), angle(1.0));
+        println!(
+            "frame {frame}: nasolabial angle {down:.1} / {rest:.1} / {up:.1} ({:+.1} / {:+.1})",
+            down - rest,
+            up - rest
+        );
+        if !(20.0..=24.0).contains(&(up - rest)) {
+            short.push(format!("frame {frame}: opens by {:.1} at +1", up - rest));
+        }
+        if !(15.0..=24.0).contains(&(rest - down)) {
+            short.push(format!("frame {frame}: closes by {:.1} at -1", rest - down));
+        }
+    }
+    assert!(short.is_empty(), "nasolabial angle: {short:?}");
+}
+
+/// How far the forehead's outline dips behind a straight line from
+/// glabella (the most forward point within 3 cm over sellion) to the
+/// outline 4 cm over it, in millimetres: 0 for a forehead that rounds back
+/// evenly, more for a shelf with a hollow over it.
+fn forehead_hollow(points: &[[f32; 3]], tris: &[[usize; 3]]) -> f32 {
+    let line = midline(points, tris);
+    let tip = pronasale(&line);
+    let face = outline(&line, tip, tip.0 - 0.01, tip.0 + 0.11);
+    let (_, glabella, _) = nasion_and_glabella(&face);
+    let at = |y: f32| {
+        *face
+            .iter()
+            .min_by(|a, b| (a.0 - y).abs().total_cmp(&(b.0 - y).abs()))
+            .unwrap()
+    };
+    let top = at(glabella.0 + 0.04);
+    face.iter()
+        .filter(|p| p.0 > glabella.0 && p.0 < top.0)
+        .map(|p| {
+            let s = (p.0 - glabella.0) / (top.0 - glabella.0);
+            let chord = glabella.1 + s * (top.1 - glabella.1);
+            (chord - p.1) * 1000.0
+        })
+        .fold(0.0, f32::max)
+}
+
+/// The second review: the square preset's strong brow ridge on a forehead
+/// tipped back read as a hard band across the forehead, a shelf with a
+/// hollow over it in profile. No face preset hollows the forehead more
+/// than 0.5 mm deeper than the frame's default face does.
+#[test]
+fn no_face_preset_puts_a_shelf_on_the_forehead() {
+    let library = library();
+    let base = library.base(BASE).unwrap();
+    let model = object(&library, &base.model.body);
+    let mut deep = Vec::new();
+    for frame in [0.0, 1.0] {
+        let (points, tris) = posed(&library, &model, frame);
+        let plain = forehead_hollow(&points, &tris);
+        println!("frame {frame} default: hollow {plain:.2} mm");
+        for name in [
+            "round", "oval", "square", "heart", "long", "broad", "narrow", "soft", "angular",
+        ] {
+            let id = format!("axcenity/realistic-face-{name}");
+            let preset = library.preset(&id).unwrap_or_else(|| panic!("no `{id}`"));
+            let mut description = Description::new("Frame", BASE);
+            description.parameters.insert("frame".into(), frame);
+            axcenity_avatar::apply_preset(&mut description, preset, &library).unwrap();
+            let (points, tris) = posed_as(&library, &model, &description);
+            let hollow = forehead_hollow(&points, &tris);
+            println!("frame {frame} {name}: hollow {hollow:.2} mm");
+            if hollow > plain + 0.5 {
+                deep.push(format!(
+                    "frame {frame} {name} {hollow:.2} mm (default {plain:.2})"
+                ));
+            }
+        }
+    }
+    assert!(deep.is_empty(), "forehead hollows: {deep:?}");
 }
