@@ -5519,5 +5519,1174 @@
       "opacity": 0.8,
       "material": "Skin"
     }
+  ],
+  "handles": [
+    {
+      "id": "nose_tip",
+      "feature": "nose",
+      "label": "Nose tip",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.0144,
+          0.1364
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_length",
+          "axis": [
+            0.0,
+            -0.963,
+            0.2696
+          ],
+          "travel": 0.0069,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              0.194,
+              -0.981
+            ],
+            "side": [
+              0.27,
+              -0.963
+            ],
+            "back": [
+              0.0,
+              -1.0
+            ]
+          }
+        },
+        {
+          "parameter": "nose_tip_projection",
+          "axis": [
+            -0.0,
+            0.7483,
+            0.6634
+          ],
+          "travel": 0.0135,
+          "screen": {
+            "three_quarter": [
+              0.531,
+              0.847
+            ],
+            "side": [
+              0.663,
+              0.748
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_bridge",
+      "feature": "nose",
+      "label": "Bridge",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0,
+          0.0304,
+          0.1277
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_bridge",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.0092,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "three_quarter",
+        "side"
+      ]
+    },
+    {
+      "id": "nostril_left",
+      "feature": "nose",
+      "label": "Left nostril",
+      "mirror": "nostril_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0179,
+          0.01,
+          0.1228
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nostril_width_left",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0088,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "nostril_right",
+      "feature": "nose",
+      "label": "Right nostril",
+      "mirror": "nostril_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0179,
+          0.01,
+          0.1228
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nostril_width_right",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0088,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_left",
+      "feature": "eyes",
+      "label": "Left eye",
+      "mirror": "eye_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0346,
+          0.0571,
+          0.1049
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "eye_spacing_left",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0084,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "eye_height_left",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.009,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "eye_depth_left",
+          "axis": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "travel": 0.0084,
+          "screen": {
+            "side": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_right",
+      "feature": "eyes",
+      "label": "Right eye",
+      "mirror": "eye_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0345,
+          0.057,
+          0.1048
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "eye_spacing_right",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0084,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "eye_height_right",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.009,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "eye_depth_right",
+          "axis": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "travel": 0.0084,
+          "screen": {
+            "side": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_corner_left",
+      "feature": "eyes",
+      "label": "Left eye corner",
+      "mirror": "eye_corner_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0487,
+          0.0473,
+          0.093
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "eye_size_left",
+          "axis": [
+            0.9931,
+            0.0465,
+            0.1072
+          ],
+          "travel": 0.0036,
+          "screen": {
+            "front": [
+              0.999,
+              0.047
+            ],
+            "three_quarter": [
+              0.998,
+              0.06
+            ],
+            "back": [
+              -0.999,
+              0.047
+            ]
+          }
+        },
+        {
+          "parameter": "eye_tilt_left",
+          "axis": [
+            -0.0467,
+            0.9989,
+            0.0
+          ],
+          "travel": 0.0068,
+          "screen": {
+            "front": [
+              -0.047,
+              0.999
+            ],
+            "three_quarter": [
+              -0.033,
+              0.999
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.047,
+              0.999
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_corner_right",
+      "feature": "eyes",
+      "label": "Right eye corner",
+      "mirror": "eye_corner_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0486,
+          0.0474,
+          0.0931
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "eye_size_right",
+          "axis": [
+            -0.9919,
+            0.0562,
+            0.1137
+          ],
+          "travel": 0.0036,
+          "screen": {
+            "front": [
+              -0.998,
+              0.057
+            ],
+            "three_quarter": [
+              -0.996,
+              0.09
+            ],
+            "back": [
+              0.998,
+              0.057
+            ]
+          }
+        },
+        {
+          "parameter": "eye_tilt_right",
+          "axis": [
+            0.0565,
+            0.9984,
+            0.0
+          ],
+          "travel": 0.0068,
+          "screen": {
+            "front": [
+              0.056,
+              0.998
+            ],
+            "three_quarter": [
+              0.04,
+              0.999
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              -0.056,
+              0.998
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "jaw_left",
+      "feature": "jaw",
+      "label": "Left jaw corner",
+      "mirror": "jaw_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0635,
+          -0.0355,
+          0.0085
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "jaw_width_left",
+          "axis": [
+            0.9754,
+            -0.2203,
+            0.0
+          ],
+          "travel": 0.0122,
+          "screen": {
+            "front": [
+              0.975,
+              -0.22
+            ],
+            "three_quarter": [
+              0.953,
+              -0.304
+            ],
+            "back": [
+              -0.975,
+              -0.22
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_angle_left",
+          "axis": [
+            0.0,
+            -0.5459,
+            -0.8378
+          ],
+          "travel": 0.0136,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.735,
+              -0.678
+            ],
+            "side": [
+              -0.838,
+              -0.546
+            ],
+            "back": [
+              -0.0,
+              -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "jaw_right",
+      "feature": "jaw",
+      "label": "Right jaw corner",
+      "mirror": "jaw_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0635,
+          -0.0355,
+          0.0085
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "jaw_width_right",
+          "axis": [
+            -0.9754,
+            -0.2203,
+            0.0
+          ],
+          "travel": 0.0122,
+          "screen": {
+            "front": [
+              -0.975,
+              -0.22
+            ],
+            "three_quarter": [
+              -0.953,
+              -0.304
+            ],
+            "back": [
+              0.975,
+              -0.22
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_angle_right",
+          "axis": [
+            0.0,
+            -0.5489,
+            -0.8359
+          ],
+          "travel": 0.0136,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.733,
+              -0.68
+            ],
+            "side": [
+              -0.836,
+              -0.549
+            ],
+            "back": [
+              -0.0,
+              -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "mouth_corner_left",
+      "feature": "lips",
+      "label": "Left mouth corner",
+      "mirror": "mouth_corner_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0274,
+          -0.0249,
+          0.107
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "mouth_width_left",
+          "axis": [
+            0.9119,
+            0.0,
+            -0.4104
+          ],
+          "travel": 0.0096,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "mouth_height",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.009,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "mouth_corner_right",
+      "feature": "lips",
+      "label": "Right mouth corner",
+      "mirror": "mouth_corner_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0274,
+          -0.0249,
+          0.107
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "mouth_width_right",
+          "axis": [
+            -0.9119,
+            0.0,
+            -0.4104
+          ],
+          "travel": 0.0096,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "side": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "mouth_height",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.009,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "upper_lip",
+      "feature": "lips",
+      "label": "Upper lip",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          -0.017,
+          0.127
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "upper_lip_fullness",
+          "axis": [
+            -0.0,
+            0.3565,
+            0.9343
+          ],
+          "travel": 0.0097,
+          "screen": {
+            "front": [
+              -0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.88,
+              0.475
+            ],
+            "side": [
+              0.934,
+              0.356
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "lower_lip",
+      "feature": "lips",
+      "label": "Lower lip",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0,
+          -0.0493,
+          0.1009
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "lower_lip_fullness",
+          "axis": [
+            0.0,
+            -0.343,
+            0.9393
+          ],
+          "travel": 0.0095,
+          "screen": {
+            "three_quarter": [
+              0.888,
+              -0.459
+            ],
+            "side": [
+              0.939,
+              -0.343
+            ]
+          }
+        }
+      ],
+      "views": [
+        "three_quarter",
+        "side"
+      ]
+    },
+    {
+      "id": "shoulder_left",
+      "feature": "shoulders",
+      "label": "Left shoulder",
+      "mirror": "shoulder_right",
+      "anchor": {
+        "bone": "LeftShoulderHelper",
+        "offset": [
+          0.0138,
+          0.0515,
+          0.0026
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "shoulder_width",
+          "axis": [
+            0.8907,
+            -0.2853,
+            -0.3539
+          ],
+          "travel": 0.037,
+          "screen": {
+            "front": [
+              0.952,
+              -0.305
+            ],
+            "three_quarter": [
+              0.799,
+              -0.601
+            ],
+            "side": [
+              -0.779,
+              -0.628
+            ],
+            "back": [
+              -0.952,
+              -0.305
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "shoulder_right",
+      "feature": "shoulders",
+      "label": "Right shoulder",
+      "mirror": "shoulder_left",
+      "anchor": {
+        "bone": "RightShoulderHelper",
+        "offset": [
+          -0.014,
+          0.0517,
+          0.0024
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "shoulder_width",
+          "axis": [
+            -0.891,
+            -0.2854,
+            -0.3531
+          ],
+          "travel": 0.0369,
+          "screen": {
+            "front": [
+              -0.952,
+              -0.305
+            ],
+            "three_quarter": [
+              -0.951,
+              -0.309
+            ],
+            "side": [
+              -0.778,
+              -0.628
+            ],
+            "back": [
+              0.952,
+              -0.305
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "waist_left",
+      "feature": "waist",
+      "label": "Left waist",
+      "mirror": "waist_right",
+      "anchor": {
+        "bone": "LeftHipHelper",
+        "offset": [
+          0.0653,
+          0.1629,
+          0.0294
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "waist_width",
+          "axis": [
+            0.9997,
+            0.0,
+            0.0255
+          ],
+          "travel": 0.0482,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "waist_right",
+      "feature": "waist",
+      "label": "Right waist",
+      "mirror": "waist_left",
+      "anchor": {
+        "bone": "RightHipHelper",
+        "offset": [
+          -0.0648,
+          0.1629,
+          0.0294
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "waist_width",
+          "axis": [
+            -0.9997,
+            -0.0,
+            0.0252
+          ],
+          "travel": 0.0487,
+          "screen": {
+            "front": [
+              -1.0,
+              -0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              -0.0
+            ],
+            "back": [
+              1.0,
+              -0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "hip_left",
+      "feature": "hips",
+      "label": "Left hip",
+      "mirror": "hip_right",
+      "anchor": {
+        "bone": "LeftUpperLegTwist",
+        "offset": [
+          0.0827,
+          -0.0106,
+          0.0227
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "hip_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0447,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "hip_right",
+      "feature": "hips",
+      "label": "Right hip",
+      "mirror": "hip_left",
+      "anchor": {
+        "bone": "RightUpperLegTwist",
+        "offset": [
+          -0.0823,
+          -0.0107,
+          0.0229
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "hip_width",
+          "axis": [
+            -1.0,
+            0.0,
+            -0.0
+          ],
+          "travel": 0.0447,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    }
   ]
 }

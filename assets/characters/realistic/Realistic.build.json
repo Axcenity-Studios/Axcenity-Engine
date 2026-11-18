@@ -1509,16 +1509,16 @@
   "makeup": {
    "covered_share": {
     "blush": 0.00093,
-    "brow_fill": 0.00024,
+    "brow_fill": 0.00053,
     "eyeliner": 0.00027,
     "eyeshadow": 0.00071,
     "foundation": 0.04312,
     "lips": 0.00104
    },
    "digests": {
-    "RealisticSkin_MakeupA.png": "96a690d561c958b1",
-    "RealisticSkin_MakeupB.png": "f709845f1cd51c58",
-    "RealisticSkin_Markings.png": "5d03d2d8c14493d2"
+    "RealisticSkin_MakeupA.png": "63d7b1ac60619476",
+    "RealisticSkin_MakeupB.png": "d7985a51627ea3d0",
+    "RealisticSkin_Markings.png": "042eb90fd919eadd"
    },
    "face_moles": 9,
    "files": [
@@ -1536,7 +1536,7 @@
      "lower_lid_degrees": 50.8,
      "rise_degrees": 22.0,
      "side": 1,
-     "skin_degrees": 23.3
+     "skin_degrees": 4.7
     },
     {
      "from_corner_mm": 1.6,
@@ -1544,7 +1544,7 @@
      "lower_lid_degrees": 50.5,
      "rise_degrees": 22.0,
      "side": -1,
-     "skin_degrees": 22.9
+     "skin_degrees": 4.4
     }
    ]
   },
@@ -1584,17 +1584,23 @@
  ],
  "underwear": {
   "Underwear_BoxerBriefs": {
+   "push_most": 0.0069,
    "shapes": 48,
+   "shapes_pushed": 47,
    "triangles": 1568,
    "weight_moved_most": 0.07
   },
   "Underwear_Bra": {
+   "push_most": 0.0217,
    "shapes": 64,
+   "shapes_pushed": 20,
    "triangles": 2476,
    "weight_moved_most": 0.116
   },
   "Underwear_Briefs": {
+   "push_most": 0.0054,
    "shapes": 48,
+   "shapes_pushed": 47,
    "triangles": 1214,
    "weight_moved_most": 0.057
   }

@@ -55,6 +55,7 @@ fn kept(primitive: &Primitive, hide: &dyn Fn([f32; 2]) -> bool) -> Primitive {
         normals: primitive.normals.clone(),
         uvs: primitive.uvs.clone(),
         tangents: primitive.tangents.clone(),
+        regions: primitive.regions.clone(),
         indices,
         material: primitive.material.clone(),
         joints: primitive.joints.clone(),
