@@ -232,8 +232,10 @@ fn every_handle_s_anchor_is_on_the_skin_at_rest() {
 /// on the skin: its anchor where the start description draws it, plus the
 /// drive's `axis` times `travel` times the share of the range the value
 /// moved from its default. It is measured against the skin's triangles as
-/// the player applies and poses that end. The travel was measured on the
-/// masculine frame, so the feminine frame is the stricter case.
+/// the player applies and poses that end. Each frame uses its own drive
+/// (`Drive::on_frame`): the waist has a shape per frame, so the feminine
+/// waist's travel is its own; every other drive was measured on the
+/// masculine frame, so the feminine frame is the stricter case for them.
 #[test]
 fn every_handle_stays_on_the_skin_at_its_parameters_ends() {
     let mut character = Character::new("handles-on-skin");
@@ -257,8 +259,9 @@ fn every_handle_stays_on_the_skin_at_its_parameters_ends() {
                     description.parameters.insert(drive.parameter.clone(), end);
                     character.wear(&description);
                     let share = (end - parameter.default) / span;
-                    let point = from
-                        + to_world.transform_vector3(Vec3::from(drive.axis) * drive.travel * share);
+                    let (axis, travel) = drive.on_frame(frame);
+                    let point =
+                        from + to_world.transform_vector3(Vec3::from(axis) * travel * share);
                     let mm = distance_to_surface(point, &character.skin()) / character.per_metre()
                         * 1000.0;
                     let line = format!(

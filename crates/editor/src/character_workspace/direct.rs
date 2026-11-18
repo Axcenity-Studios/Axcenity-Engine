@@ -272,10 +272,24 @@ struct PreparedHandle {
 struct PreparedDrive {
     parameter: String,
     range: [f32; 2],
-    /// The drive's travel along its axis, in fitted units.
+    /// The drive's travel along its axis, in fitted units, on the default
+    /// frame; `frames` holds it on a frame whose own shapes move it
+    /// otherwise (`Drive::frames`).
     travel: Vec3,
+    frames: Vec<(f32, Vec3)>,
     /// Its screen direction (x right, y up) in each framing it works in.
     screen: Vec<(String, Vec2)>,
+}
+
+impl PreparedDrive {
+    /// Its travel on `frame` (`Drive::on_frame`).
+    fn travel_on(&self, frame: f32) -> Vec3 {
+        self.frames
+            .iter()
+            .filter(|(at, _)| (at - frame).abs() < 0.5)
+            .min_by(|a, b| (a.0 - frame).abs().total_cmp(&(b.0 - frame).abs()))
+            .map_or(self.travel, |(_, travel)| *travel)
+    }
 }
 
 /// How much each corner of each of `model`'s primitives belongs to a
@@ -717,6 +731,18 @@ impl Prepared {
                             range: parameter.range,
                             travel: fit.transform_vector3(Vec3::from(drive.axis) * drive.travel)
                                 / sensitivity,
+                            frames: drive
+                                .frames
+                                .iter()
+                                .map(|f| {
+                                    let (axis, travel) = drive.on_frame(f.frame);
+                                    (
+                                        f.frame,
+                                        fit.transform_vector3(Vec3::from(axis) * travel)
+                                            / sensitivity,
+                                    )
+                                })
+                                .collect(),
                             screen: drive
                                 .screen
                                 .iter()
@@ -1447,6 +1473,7 @@ impl CharacterWorkspace {
             .and_then(|handle| handle.mirror.clone());
         let library = self.library();
         let base = library.base(&self.description.base);
+        let frame = super::value_of(&self.description, base, "frame");
         if let Some(selected) = self.selection.feature.clone() {
             for handle in prepared.handles.iter().filter(|h| h.feature == selected) {
                 // While one is dragged, the others hide (ux patterns P8),
@@ -1497,7 +1524,8 @@ impl CharacterWorkspace {
                     else {
                         continue;
                     };
-                    let travel = transform.transform_vector3(turn.transform_vector3(drive.travel));
+                    let travel =
+                        transform.transform_vector3(turn.transform_vector3(drive.travel_on(frame)));
                     let span = (drive.range[1] - drive.range[0]).abs().max(1e-6);
                     let moved = to_screen(point + travel)
                         .map(|end| Vec2::new(end.x - at.x, end.y - at.y))

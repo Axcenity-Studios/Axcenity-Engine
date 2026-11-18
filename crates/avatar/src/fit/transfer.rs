@@ -507,6 +507,40 @@ pub fn fit_garment(
     }
     let lift_most = lifted.into_iter().fold(0.0, f32::max);
 
+    // 5a. A lift moves the rest the way an extreme needed, which isn't
+    // always the way a shape on its own was pushed in step 4: a corner
+    // lifted sideways can sit inside a shape's body again (the merged
+    // realistic body's heavy masculine shapes, wave 3). So each shape is
+    // pushed out once more from the lifted rest, as in step 4.
+    if lift_most > 0.0 {
+        let again = par_map(&shapes, |shape| {
+            let mut offsets = shape.offsets.clone();
+            let mut pushes = Vec::new();
+            if shape.reach() > LEAST {
+                let weights = [(shape.name.clone(), 1.0)];
+                let state = obstacles(body, &near, &options.under, &weights);
+                for _ in 0..options.rounds.max(1) {
+                    let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
+                    let (need, by) = needs(&state, &now, margin);
+                    if need.iter().all(|n| *n == Vec3::ZERO) {
+                        break;
+                    }
+                    for (o, a) in offsets.iter_mut().zip(welds.spread(&need)) {
+                        *o += a;
+                    }
+                    pushes.push((need, by));
+                }
+            }
+            (offsets, pushes)
+        });
+        for (shape, (offsets, pushes)) in shapes.iter_mut().zip(again) {
+            for (need, by) in &pushes {
+                record(&mut layers, need, by, true);
+            }
+            shape.offsets = offsets;
+        }
+    }
+
     // 5b. Posed: its copies of the body's correctives made to follow the
     // skin it is bound to in the poses they lean in (`posed`).
     let posed_report = posed::solve(

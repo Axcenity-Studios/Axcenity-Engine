@@ -139,6 +139,31 @@ pub struct Drive {
     /// A multiplier on the one-to-one feel (1 when unset).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensitivity: Option<f32>,
+    /// The drive on a frame whose own shapes move the anchor otherwise
+    /// (the realistic waist's `<Frame>_Waist_*`); `axis` and `travel` are
+    /// the default frame's, and hold on every frame not listed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frames: Vec<FrameDrive>,
+}
+
+/// A [`Drive`]'s axis and travel on one value of the `frame` parameter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrameDrive {
+    pub frame: f32,
+    pub axis: [f32; 3],
+    pub travel: f32,
+}
+
+impl Drive {
+    /// The axis and travel on `frame`: a listed frame's within half a
+    /// frame of it (the nearest), else the drive's own.
+    pub fn on_frame(&self, frame: f32) -> ([f32; 3], f32) {
+        self.frames
+            .iter()
+            .filter(|f| (f.frame - frame).abs() < 0.5)
+            .min_by(|a, b| (a.frame - frame).abs().total_cmp(&(b.frame - frame).abs()))
+            .map_or((self.axis, self.travel), |f| (f.axis, f.travel))
+    }
 }
 
 /// Where the base model's meshes are.
@@ -748,15 +773,22 @@ impl BaseManifest {
                     format!("names no parameter `{}`", drive.parameter),
                 ));
             }
-            let finite = drive.axis.iter().all(|v| v.is_finite());
-            if !finite || drive.axis.iter().all(|v| *v == 0.0) {
-                p.push(Problem::new(
-                    &at,
-                    "the axis must be a finite, non-zero vector",
-                ));
+            let ends = std::iter::once((drive.axis, drive.travel))
+                .chain(drive.frames.iter().map(|f| (f.axis, f.travel)));
+            for (axis, travel) in ends {
+                let finite = axis.iter().all(|v| v.is_finite());
+                if !finite || axis.iter().all(|v| *v == 0.0) {
+                    p.push(Problem::new(
+                        &at,
+                        "the axis must be a finite, non-zero vector",
+                    ));
+                }
+                if !(travel.is_finite() && travel > 0.0) {
+                    p.push(Problem::new(&at, "the travel must be above 0 metres"));
+                }
             }
-            if !(drive.travel.is_finite() && drive.travel > 0.0) {
-                p.push(Problem::new(&at, "the travel must be above 0 metres"));
+            if drive.frames.iter().any(|f| !f.frame.is_finite()) {
+                p.push(Problem::new(&at, "a drive's frame must be finite"));
             }
             if drive
                 .sensitivity

@@ -657,11 +657,19 @@ fn gate(stance: Stance, known: &[Known]) {
 // neck over the bra's straps): it covers more skin than before, so it is
 // counted in more places. It fits at rest, in the T-pose and with the
 // elbows or knees bent.
+//
+// Re-recorded once, at the wave-3 merge, because the body under them
+// changed (R3's `<Frame>_Waist_*` and `<Frame>_Fat_Over_Muscle` shapes
+// joined the cast's heavy and muscular builds), not to pass a garment:
+// the boxer briefs 14.30 -> 14.61 mm (walk 17.20 -> 17.89 mm), the bra
+// through the tee in the walk 20 -> 21 bodies (17.20 -> 17.68 mm), and with
+// the arms raised 5 -> 4 bodies but 3.70 -> 3.88 mm. The rule above holds
+// from here.
 
 /// The boxer briefs on the masculine heavy-soft body: one body vertex
-/// under the gusset, 14 mm out (17 mm in the walk), which the build's
+/// under the gusset, 15 mm out (18 mm in the walk), which the build's
 /// push-out (`underwear.py`) doesn't reach.
-const BOXER_GUSSET: f32 = 0.0143;
+const BOXER_GUSSET: f32 = 0.0147;
 
 fn boxer(pose: &'static str) -> Known {
     Known {
@@ -669,7 +677,7 @@ fn boxer(pose: &'static str) -> Known {
         pose,
         cases: 1,
         worst: if pose == "Walk@18" {
-            0.0172
+            0.0179
         } else {
             BOXER_GUSSET
         },
@@ -702,8 +710,8 @@ fn garments_cover_the_cast_walking() {
             Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "Walk@18",
-                cases: 20,
-                worst: 0.0172,
+                cases: 21,
+                worst: 0.0177,
             },
             boxer("Walk@18"),
         ],
@@ -731,8 +739,8 @@ fn garments_cover_the_cast_with_the_arms_raised() {
             Known {
                 garment: BRA_THROUGH_TEE,
                 pose: "ArmsRaised",
-                cases: 5,
-                worst: 0.0037,
+                cases: 4,
+                worst: 0.0039,
             },
             boxer("ArmsRaised"),
         ],

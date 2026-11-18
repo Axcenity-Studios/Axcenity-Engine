@@ -301,6 +301,40 @@ fn a_handle_s_mirror_is_another_handle_of_its_feature() {
     assert!(fixtures::rich_base().validate().is_empty());
 }
 
+/// Wave 3: a drive can list its axis and travel on another frame (the
+/// realistic waist has a shape per frame); any other frame keeps its own.
+#[test]
+fn a_drive_on_a_listed_frame_uses_that_frames_axis_and_travel() {
+    let mut base = fixtures::rich_base();
+    let drive = &mut base.handles[0].drives[0];
+    let own = (drive.axis, drive.travel);
+    drive.frames.push(crate::FrameDrive {
+        frame: 1.0,
+        axis: [0.0, 1.0, 0.0],
+        travel: 0.002,
+    });
+    assert_eq!(drive.on_frame(0.0), own);
+    assert_eq!(drive.on_frame(0.3), own);
+    assert_eq!(drive.on_frame(1.0), ([0.0, 1.0, 0.0], 0.002));
+    assert_eq!(drive.on_frame(0.8), ([0.0, 1.0, 0.0], 0.002));
+    assert!(base.validate().is_empty(), "{:?}", base.validate());
+    // It round-trips, and a drive without frames writes none.
+    let text = serde_json::to_string(&base).unwrap();
+    let again: BaseManifest = serde_json::from_str(&text).unwrap();
+    assert_eq!(again.handles[0].drives[0].frames.len(), 1);
+    assert!(
+        !serde_json::to_string(&base.handles[1])
+            .unwrap()
+            .contains("frames")
+    );
+    // A listed frame's axis and travel are checked as the drive's own.
+    base.handles[0].drives[0].frames[0].axis = [0.0; 3];
+    base.handles[0].drives[0].frames[0].travel = 0.0;
+    let problems = base.validate();
+    assert_problem(&problems, &["handles[0].drives[0]", "axis"]);
+    assert_problem(&problems, &["handles[0].drives[0]", "travel"]);
+}
+
 #[test]
 fn anchor_bones_must_be_in_the_model() {
     let mut base = fixtures::rich_base();

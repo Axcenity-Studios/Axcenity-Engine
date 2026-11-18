@@ -47,6 +47,10 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anchors  # noqa: E402 (beside this file)
 
+# How far (metres) a drive's move on the feminine frame may differ from the
+# masculine one's before the drive lists it on its own (`frames`).
+FRAME_APART = 0.001
+
 # The share of a drive's travel that must show across the screen in a
 # framing for the drive to work there.
 LIVE = 0.35
@@ -185,14 +189,20 @@ class Model:
         self.manifest = manifest
         self.parameters = {p["id"]: p for p in manifest["parameters"]}
 
-    def corners_at(self, pid, value):
-        """Every body corner with parameter `pid` at `value`."""
+    def corners_at(self, pid, value, frame=0.0):
+        """Every body corner with parameter `pid` at `value`, on `frame`
+        (its shapes at that value; the frame's bone offsets move every
+        corner alike at both ends, so they are left out)."""
         body, rig = self.body, self.rig
         values = {p["id"]: p.get("default", 0.0) for p in self.manifest["parameters"]}
-        values["frame"] = 0.0
+        values["frame"] = frame
         values[pid] = value
-        # The shapes: each parameter's own, then the corners.
+        # The shapes: the frame's, each parameter's own, then the corners.
         P = body.P.copy()
+        if frame and pid != "frame" and "frame" in self.parameters:
+            for driver in self.parameters["frame"].get("shapes", []):
+                weight = span(frame, driver.get("from", [0, 1]), driver.get("to"))
+                P += weight * body.shapes[driver["shape"]]
         parameter = self.parameters[pid]
         for driver in parameter.get("shapes", []):
             weight = span(value, driver.get("from", [0, 1]), driver.get("to"))
@@ -247,9 +257,9 @@ class Model:
             out += body.weights[:, k:k + 1] * moved
         return out
 
-    def ends(self, pid):
+    def ends(self, pid, frame=0.0):
         low, high = self.parameters[pid]["range"]
-        return self.corners_at(pid, low), self.corners_at(pid, high)
+        return self.corners_at(pid, low, frame), self.corners_at(pid, high, frame)
 
 
 def body_slider(attribute, factor):
@@ -366,10 +376,10 @@ def handles(manifest, path):
     model = Model(path, manifest)
     cache = {}
 
-    def ends(pid):
-        if pid not in cache:
-            cache[pid] = model.ends(pid)
-        return cache[pid]
+    def ends(pid, frame=0.0):
+        if (pid, frame) not in cache:
+            cache[(pid, frame)] = model.ends(pid, frame)
+        return cache[(pid, frame)]
 
     out = []
     for spec in HANDLES:
@@ -398,7 +408,16 @@ def handles(manifest, path):
                 travel = float(np.linalg.norm(moved))
                 if travel < 1e-4:
                     raise ValueError(f"{sided(spec['id'], side)}: {pid} doesn't move its corner")
-                drives.append({"parameter": pid, "axis": moved / travel, "travel": travel, "screen": {}})
+                drive = {"parameter": pid, "axis": moved / travel, "travel": travel, "screen": {}}
+                # On the other frame, where its own shapes (the waist's
+                # `<Frame>_Waist_*`) move the corner otherwise.
+                if pid != "frame" and "frame" in model.parameters:
+                    low, high = ends(pid, 1.0)
+                    other = high[corner] - low[corner]
+                    if np.linalg.norm(other - moved) > FRAME_APART:
+                        length = float(np.linalg.norm(other))
+                        drive["frames"] = [{"frame": 1.0, "axis": other / length, "travel": length}]
+                drives.append(drive)
             for view in VIEWS:
                 shown = []
                 for drive in drives:
@@ -417,8 +436,9 @@ def handles(manifest, path):
                         if view not in views:
                             views.append(view)
             for drive in drives:
-                drive["axis"] = [round(float(v), 4) for v in drive["axis"]]
-                drive["travel"] = round(drive["travel"], 4)
+                for d in [drive] + drive.get("frames", []):
+                    d["axis"] = [round(float(v), 4) for v in d["axis"]]
+                    d["travel"] = round(d["travel"], 4)
             handle = {"id": sided(spec["id"], side), "feature": spec["feature"],
                       "label": sided(spec["label"], side)}
             if side:

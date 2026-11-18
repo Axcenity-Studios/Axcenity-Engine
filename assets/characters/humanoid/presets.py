@@ -43,7 +43,7 @@ BODY = [
      {"masculine": {"frame": 0, "build": 0.8, "waist_width": 1.1},
       "feminine": {"frame": 1, "build": 0.8, "hip_width": 1.1}}),
     ("broad", "Broad", "A wide, solid frame: wider shoulders and hips.",
-     {"masculine": {"frame": 0, "build": 0.3, "muscle": 0.4, "shoulder_width": 1.15,
+     {"masculine": {"frame": 0, "build": 0.3, "muscle": 0.4, "shoulder_width": 1.12,
                     "hip_width": 1.05},
       "feminine": {"frame": 1, "build": 0.3, "muscle": 0.3, "shoulder_width": 1.1,
                    "hip_width": 1.08}}),
