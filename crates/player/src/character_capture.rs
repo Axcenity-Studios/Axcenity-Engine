@@ -450,8 +450,8 @@ pub(crate) fn held_pose(rig: &Rig, pose: HeldPose) -> Vec<(usize, BoneTransform)
                 };
                 // Let down to hanging straight (the shortest turn: about the
                 // forward axis, nearly), then raised forward to level (about
-                // the axis across the body), as
-                // `avatar::fit::fit_poses`' `arms-forward`.
+                // the axis across the body). The fit has no such pose; only
+                // the gate and the capture hold it.
                 let arm = (head(lower) - head(upper)).normalize();
                 let down = Quat::from_rotation_arc(arm, -UP);
                 let hanging = down * arm;
