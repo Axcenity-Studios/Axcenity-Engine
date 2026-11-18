@@ -1,0 +1,177 @@
+CO9 binding: the red run (tests written before the behaviour they check was right)
+
+Run: cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(/fit/)' and -E 'binary(fitting)'
+on the first build of the fit module (crates/avatar/src/fit), before the fixes listed at the end.
+
+        PASS [   0.008s] ( 1/14) axcenity-avatar fit::tests::a_thumbnail_draws_the_garment_on_a_clear_background
+        PASS [   0.010s] ( 2/14) axcenity-avatar fit::tests::mask_shapes_are_never_carried
+        PASS [   0.013s] ( 3/14) axcenity-avatar tests::presets::hair_and_outfit_presets_set_their_slots
+        PASS [   0.018s] ( 4/14) axcenity-avatar fit::tests::alignment_brings_a_garment_in_centimetres_and_off_centre_onto_the_body
+        PASS [   0.019s] ( 5/14) axcenity-avatar::shipped_library an_outfit_preset_leaves_the_chosen_underwear
+        PASS [   0.038s] ( 6/14) axcenity-avatar fit::tests::a_binding_puts_every_vertex_back_where_it_was
+        PASS [   0.061s] ( 7/14) axcenity-avatar fit::tests::a_garment_takes_the_bodys_weights_at_its_bound_points_and_they_add_up_to_one
+        FAIL [   0.069s] ( 8/14) axcenity-avatar fit::tests::coverage_finds_the_regions_a_garment_covers_whole
+    test fit::tests::coverage_finds_the_regions_a_garment_covers_whole ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 78 filtered out; finished in 0.05s
+    thread 'fit::tests::coverage_finds_the_regions_a_garment_covers_whole' (26296) panicked at crates\avatar\src\fit\tests.rs:379:5:
+    Coverage { shares: {1: 0.0, 2: 0.5, 3: 0.8888889, 4: 0.5, 5: 0.0} }
+        PASS [   0.072s] ( 9/14) axcenity-avatar fit::tests::the_closest_point_is_the_one_every_triangle_agrees_on
+        FAIL [   0.077s] (10/14) axcenity-avatar fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest
+    test fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest ... FAILED
+        fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 78 filtered out; finished in 0.05s
+    thread 'fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest' (42608) panicked at crates\avatar\src\fit\tests.rs:295:5:
+    LayerOffset { layer: "body", pushed: 70, most: 0.003991565, shapes_pushed: 0, shape_most: 0.0 }
+        PASS [   0.081s] (11/14) axcenity-avatar fit::tests::a_fitted_garment_written_as_gltf_loads_with_its_skeleton_weights_and_shapes
+        PASS [   0.086s] (12/14) axcenity-avatar fit::tests::carried_shapes_follow_the_body_and_clear_it_at_full_weight
+        PASS [   0.219s] (13/14) axcenity-avatar fit::tests::an_outer_layer_stays_outside_the_lower_one_at_rest_and_at_every_extreme
+        FAIL [  12.678s] (14/14) axcenity-avatar::fitting a_garment_not_made_from_the_body_imports_as_a_fitted_draft
+    FitReport {
+            LayerOffset {
+        inside_most: 0.0,
+    Alignment { scale: 1.0, offset: Vec3(7.113814e-5, 0.0, -0.0021486357) }
+    test a_garment_not_made_from_the_body_imports_as_a_fitted_draft ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 12.64s
+    thread 'a_garment_not_made_from_the_body_imports_as_a_fitted_draft' (31056) panicked at crates\avatar\tests\fitting.rs:163:5:
+     Summary [  12.679s] 14 tests run: 11 passed, 3 failed, 93 skipped
+        FAIL [   0.069s] ( 8/14) axcenity-avatar fit::tests::coverage_finds_the_regions_a_garment_covers_whole
+        FAIL [   0.077s] (10/14) axcenity-avatar fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest
+        FAIL [  12.678s] (14/14) axcenity-avatar::fitting a_garment_not_made_from_the_body_imports_as_a_fitted_draft
+
+binary(fitting):
+  FAIL the_realistic_underwear_already_carries_what_the_transfer_gives
+    Underwear_BoxerBriefs: 42 shapes, worst 63.65 mm (Frame_Feminine), 99th percentile 7.271 mm
+  FAIL a_garment_not_made_from_the_body_imports_as_a_fitted_draft (hides [] : torso 0.72, waist 0.03 covered)
+  PASS a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme
+  Summary: 3 tests run: 1 passed, 2 failed
+
+Player gate (cargo nextest run -p axcenity-player -E 'test(/fit_gate_tests/)'), first run:
+        FAIL [   3.352s] (1/5) axcenity-player::bin/axcenity-player fit_gate_tests::stylized_clothes_cover_the_stylized_cast
+        FAIL [  32.032s] (2/5) axcenity-player::bin/axcenity-player fit_gate_tests::wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them
+        FAIL [  36.971s] (3/5) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_at_rest_and_walking
+        FAIL [  37.879s] (4/5) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_elbows_and_knees_bent
+        FAIL [  38.056s] (5/5) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_out_and_raised
+     Summary [  38.057s] 5 tests run: 0 passed, 5 failed, 209 skipped
+    ["waist"]
+    a MeshPart without a MeshId
+    thread 'fit_gate_tests::garments_cover_the_cast_at_rest_and_walking' (35364) panicked at crates\player\src\fit_gate_tests.rs:134:14:
+    thread 'fit_gate_tests::garments_cover_the_cast_with_the_arms_out_and_raised' (35040) panicked at crates\player\src\fit_gate_tests.rs:134:14:
+    thread 'fit_gate_tests::garments_cover_the_cast_with_the_elbows_and_knees_bent' (4976) panicked at crates\player\src\fit_gate_tests.rs:134:14:
+    thread 'fit_gate_tests::stylized_clothes_cover_the_stylized_cast' (29648) panicked at crates\player\src\fit_gate_tests.rs:134:14:
+    thread 'fit_gate_tests::wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them' (10300) panicked at crates\player\src\fit_gate_tests.rs:356:5:
+
+== Review fixes 1: red run (2026-11-17), the new tests before the fixes ==
+
+-- cargo nextest run -p axcenity-avatar -E 'test(/fit::|fitting/) | binary(fitting)' (the remade TestTee.obj; surface.rs as before) --
+PASS [   0.020s] ( 1/19) axcenity-avatar fit::tests::alignment_brings_a_garment_in_centimetres_and_off_centre_onto_the_body
+FAIL [   0.029s] ( 2/19) axcenity-avatar fit::tests::alignment_finds_the_units_of_short_garments
+PASS [   0.040s] ( 3/19) axcenity-avatar fit::tests::a_thumbnail_draws_the_garment_on_a_clear_background
+FAIL [   0.050s] ( 4/19) axcenity-avatar fit::tests::a_vertex_far_from_the_body_is_bound_to_its_closest_point
+PASS [   0.052s] ( 5/19) axcenity-avatar fit::tests::mask_shapes_are_never_carried
+PASS [   0.073s] ( 6/19) axcenity-avatar fit::tests::a_binding_puts_every_vertex_back_where_it_was
+PASS [   0.093s] ( 7/19) axcenity-avatar fit::tests::a_garment_takes_the_bodys_weights_at_its_bound_points_and_they_add_up_to_one
+PASS [   0.120s] ( 8/19) axcenity-avatar fit::tests::the_closest_point_is_the_one_every_triangle_agrees_on
+PASS [   0.123s] ( 9/19) axcenity-avatar fit::tests::carried_shapes_follow_the_body_and_clear_it_at_full_weight
+PASS [   0.142s] (10/19) axcenity-avatar fit::tests::coverage_finds_the_regions_a_garment_covers_whole
+PASS [   0.147s] (11/19) axcenity-avatar fit::tests::a_fitted_garment_written_as_gltf_loads_with_its_skeleton_weights_and_shapes
+PASS [   0.193s] (12/19) axcenity-avatar fit::tests::a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest
+FAIL [   0.200s] (13/19) axcenity-avatar fit::tests::corners_moved_by_the_push_out_take_the_normals_of_where_they_are
+FAIL [   0.242s] (14/19) axcenity-avatar::fitting the_extremes_are_every_pair_of_build_parameter_ends_on_both_frames
+PASS [   0.426s] (15/19) axcenity-avatar fit::tests::an_outer_layer_stays_outside_the_lower_one_at_rest_and_at_every_extreme
+FAIL [   2.482s] (16/19) axcenity-avatar::fitting alignment_puts_a_garment_made_too_high_and_too_small_back_on_the_body
+PASS [   4.374s] (17/19) axcenity-avatar::fitting the_realistic_underwear_already_carries_what_the_transfer_gives
+FAIL [  32.207s] (18/19) axcenity-avatar::fitting a_garment_not_made_from_the_body_imports_as_a_fitted_draft
+PASS [  61.389s] (19/19) axcenity-avatar::fitting a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme
+Summary [  61.390s] 19 tests run: 13 passed (1 slow), 6 failed, 93 skipped
+
+
+-- cargo nextest run -p axcenity-player -E 'test(/fit_gate_tests/)' (ceilings now per garment and pose, and none for the realistic items or the tee) --
+FAIL [  29.360s] (1/8) axcenity-player::bin/axcenity-player fit_gate_tests::stylized_clothes_cover_the_stylized_cast
+stylized: 160 garment checks, 67 failing
+PASS [  53.115s] (2/8) axcenity-player::bin/axcenity-player fit_gate_tests::wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them
+FAIL [  72.955s] (3/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_at_rest
+fit gate rest: 150 garment checks in 23.9 s, 2 failing
+FAIL [  75.501s] (4/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_walking
+fit gate Walk@18: 150 garment checks in 26.7 s, 9 failing
+FAIL [  75.641s] (5/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_elbows_bent
+fit gate ElbowsBent: 150 garment checks in 26.6 s, 2 failing
+FAIL [  75.750s] (6/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_out
+fit gate TPose: 150 garment checks in 26.7 s, 4 failing
+FAIL [  75.937s] (7/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_raised
+fit gate ArmsRaised: 150 garment checks in 26.9 s, 58 failing
+FAIL [  76.127s] (8/8) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_knees_bent
+fit gate KneesBent: 150 garment checks in 27.1 s, 2 failing
+FAIL [  29.360s] (1/8) axcenity-player::bin/axcenity-player fit_gate_tests::stylized_clothes_cover_the_stylized_cast
+Summary [  76.128s] 8 tests run: 1 passed (1 slow), 7 failed, 209 skipped
+"Pants_Cargo TPose: 7 bodies failing, worst 33.84 mm (recorded 0, 0.00 mm)",
+"Pants_Cargo rest: 7 bodies failing, worst 33.84 mm (recorded 0, 0.00 mm)",
+"Shirt_Tee TPose: 8 bodies failing, worst 24.81 mm (recorded 0, 0.00 mm)",
+"Shirt_Tee rest: 7 bodies failing, worst 24.68 mm (recorded 0, 0.00 mm)",
+"Shoes_Sneakers TPose: 16 bodies failing, worst 33.81 mm (recorded 0, 0.00 mm)",
+"Shoes_Sneakers rest: 16 bodies failing, worst 33.81 mm (recorded 0, 0.00 mm)",
+"TestTee ArmsRaised: 54 bodies failing, worst 28.85 mm (recorded 0, 0.00 mm)",
+"TestTee TPose: 2 bodies failing, worst 2.48 mm (recorded 0, 0.00 mm)",
+"TestTee Walk@18: 7 bodies failing, worst 17.96 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs ArmsRaised: 1 bodies failing, worst 14.35 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs ElbowsBent: 1 bodies failing, worst 14.35 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs KneesBent: 1 bodies failing, worst 14.35 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs TPose: 1 bodies failing, worst 14.35 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs Walk@18: 1 bodies failing, worst 17.52 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs rest: 1 bodies failing, worst 14.35 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee ArmsRaised: 2 bodies failing, worst 3.60 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk@18: 1 bodies failing, worst 3.06 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs ArmsRaised: 1 bodies failing, worst 18.15 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs ElbowsBent: 1 bodies failing, worst 18.15 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs KneesBent: 1 bodies failing, worst 18.15 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs TPose: 1 bodies failing, worst 18.15 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs TPose: 3 bodies failing, worst 17.58 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs rest: 1 bodies failing, worst 18.15 mm (recorded 0, 0.00 mm)",
+"Underwear_Briefs rest: 3 bodies failing, worst 17.58 mm (recorded 0, 0.00 mm)",
+
+-- what the avatar failures were --
+thread 'fit::tests::a_vertex_far_from_the_body_is_bound_to_its_closest_point' (2708) panicked at crates/avatar/src/fit/surface.rs:92:21:
+attempt to add with overflow
+thread 'fit::tests::alignment_finds_the_units_of_short_garments' (10196) panicked at crates\avatar\src\fit\tests.rs:521:9:
+0.12 m made in units of 0.01 m: scaled by 1
+corners_moved_by_the_push_out_take_the_normals_of_where_they_are: the written normals were the source's on corners the push-out moved
+the_extremes_are_every_pair_of_build_parameter_ends_on_both_frames: a pair of build parameters' ends was not among the extremes
+alignment_puts_a_garment_made_too_high_and_too_small_back_on_the_body: scale stayed 1.0 (no fine fit)
+a_garment_not_made_from_the_body_imports_as_a_fitted_draft: LayerOffset { layer: "body", most: 0.0188 } (the old alignment moved the tee 2 cm forward)
+
+== Review fixes 2 (2026-11-17): red run ==
+The remade tee (crew neck over the straps, closed underarm, sleeves past the armpit) and the underwear push-out at one hem ring are in; the gate's TestTee, bra-through-tee and boxer records are removed (0 allowed); fitting.rs checks the tee over the bra posed in the fit poses; the posed solve is written but the import doesn't use it yet.
+cargo nextest run -p axcenity-avatar -p axcenity-player -E 'binary(fitting) | test(/fit_gate_tests/)' --no-fail-fast
+        FAIL [  12.430s] ( 8/15) axcenity-avatar::fitting a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme
+        FAIL [  16.673s] (10/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_at_rest
+        FAIL [  18.816s] (11/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_walking
+        FAIL [  18.879s] (12/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_elbows_bent
+        FAIL [  19.081s] (13/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_out
+        FAIL [  19.301s] (14/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_knees_bent
+        FAIL [  19.333s] (15/15) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_raised
+     Summary [  19.334s] 15 tests run: 8 passed, 7 failed, 316 skipped
+
+-- what the gate found --
+"TestTee ArmsRaised: 54 bodies failing, worst 17.38 mm (recorded 0, 0.00 mm)",
+"TestTee Walk@18: 54 bodies failing, worst 29.86 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs ArmsRaised: 1 bodies failing, worst 14.22 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs ElbowsBent: 1 bodies failing, worst 14.22 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs KneesBent: 1 bodies failing, worst 14.22 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs TPose: 1 bodies failing, worst 14.22 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs Walk@18: 1 bodies failing, worst 17.10 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs rest: 1 bodies failing, worst 14.22 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee ArmsRaised: 3 bodies failing, worst 5.29 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk@18: 21 bodies failing, worst 17.51 mm (recorded 0, 0.00 mm)",
+
+-- the tee over the bra, posed (fitting.rs) --
+"arms-hanging on [(\"Frame_Feminine\", 1.0)]: 63 bra corners out, 16.1 mm",
+"arms-hanging on []: 53 bra corners out, 17.4 mm",
+"arms-raised on []: 3 bra corners out, 6.9 mm",
+"walk-left-15 on [(\"Frame_Feminine\", 1.0)]: 18 bra corners out, 13.0 mm",
+"walk-left-15 on []: 54 bra corners out, 16.6 mm",
+"walk-left-40 on [(\"Frame_Feminine\", 1.0)]: 24 bra corners out, 16.5 mm",
+"walk-left-40 on []: 25 bra corners out, 16.0 mm",
+"walk-right-15 on [(\"Frame_Feminine\", 1.0)]: 21 bra corners out, 10.9 mm",
+"walk-right-15 on []: 52 bra corners out, 13.8 mm",
+"walk-right-40 on [(\"Frame_Feminine\", 1.0)]: 22 bra corners out, 13.8 mm",
+"walk-right-40 on []: 24 bra corners out, 17.3 mm",
+posed: 9 poses on 2 body states, 11 failing

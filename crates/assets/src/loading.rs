@@ -420,8 +420,9 @@ impl Assets {
     /// it's loaded or loading already, and returns at once. A failed load is
     /// remembered, as for [`model_blocking`](Self::model_blocking).
     pub fn request_model(&self, mesh_id: &str) -> LoadTicket {
-        // A derived model loads its base; it's baked when asked for.
-        let (mesh_id, _) = crate::split_derived(mesh_id);
+        // A derived model (or one with hidden regions) loads its base;
+        // it's made when asked for.
+        let mesh_id = crate::strip_tags(mesh_id);
         self.request_kind(Kind::Model, mesh_id)
     }
 

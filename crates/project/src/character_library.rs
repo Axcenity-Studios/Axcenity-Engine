@@ -134,6 +134,11 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
         if let Some(model) = shipped.path_of(id, &base.model.file) {
             copied |= copy(&model)?;
         }
+        // The region map hides the skin a worn item covers (CO9).
+        let map = base.model.regions_map.as_deref();
+        if let Some(map) = map.and_then(|map| shipped.path_of(id, map)) {
+            copied |= copy(&map)?;
+        }
         if copied || library.base(id) != Some(base) {
             library.add_base(manifest, base.clone());
             added.push(id.clone());

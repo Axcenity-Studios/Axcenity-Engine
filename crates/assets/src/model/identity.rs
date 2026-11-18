@@ -171,23 +171,46 @@ pub fn derived_mesh_id(base: &str, key: u64) -> String {
 
 /// A `MeshId`'s base model and, for a derived one, its identity's key.
 /// Object names never hold a `#` (they write it as `%23`), so a second one
-/// can only start the identity.
+/// can only start a tag. A model with hidden regions (`#h`, CO9,
+/// [`hidden_mesh_id`](crate::hidden_mesh_id)) is a base of its own: a
+/// derived model can be baked from it (`…#h<key>#i<key>`).
 pub fn split_derived(mesh_id: &str) -> (&str, Option<u64>) {
-    let Some((file, rest)) = mesh_id.split_once('#') else {
-        return (mesh_id, None);
-    };
-    let Some((objects, tag)) = rest.split_once('#') else {
-        return (mesh_id, None);
-    };
-    let base = if objects.is_empty() {
+    match last_tag(mesh_id) {
+        None => (mesh_id, None),
+        Some((_, tag, Some(_))) if tag == crate::hidden::TAG => (mesh_id, None),
+        Some((base, tag, key)) if tag == TAG => (base, key),
+        // A tag that isn't a key names the base.
+        Some((base, _, _)) => (base, None),
+    }
+}
+
+/// A `MeshId`'s last tag past its objects: (everything before it, its
+/// letter, its key when it is one).
+pub(crate) fn last_tag(mesh_id: &str) -> Option<(&str, char, Option<u64>)> {
+    let (file, rest) = mesh_id.split_once('#')?;
+    let (head, last) = rest.rsplit_once('#')?;
+    let base = if head.is_empty() {
         file
     } else {
-        &mesh_id[..file.len() + 1 + objects.len()]
+        &mesh_id[..file.len() + 1 + head.len()]
     };
-    let key = tag
-        .strip_prefix(TAG)
-        .and_then(|hex| u64::from_str_radix(hex, 16).ok());
-    (base, key)
+    let mut chars = last.chars();
+    let tag = chars.next().unwrap_or('\0');
+    let hex = chars.as_str();
+    let key = (hex.len() == 16)
+        .then(|| u64::from_str_radix(hex, 16).ok())
+        .flatten();
+    Some((base, tag, key))
+}
+
+/// A `MeshId` without any of its tags (a derived model's identity, hidden
+/// regions): the file and the objects it picks.
+pub fn strip_tags(mesh_id: &str) -> &str {
+    let mut mesh_id = mesh_id;
+    while let Some((base, _, _)) = last_tag(mesh_id) {
+        mesh_id = base;
+    }
+    mesh_id
 }
 
 impl Rig {
@@ -1000,5 +1023,15 @@ mod tests {
         );
         // A tag that isn't a key names the base.
         assert_eq!(split_derived("a.glb#B#nonsense"), ("a.glb#B", None));
+        // A model with hidden regions is a base of its own, and a derived
+        // model can be baked from it.
+        let hidden = "a.glb#B#h00000000000000ff";
+        assert_eq!(split_derived(hidden), (hidden, None));
+        let baked = derived_mesh_id(hidden, 3);
+        assert_eq!(baked, "a.glb#B#h00000000000000ff#i0000000000000003");
+        assert_eq!(split_derived(&baked), (hidden, Some(3)));
+        assert_eq!(strip_tags(&baked), "a.glb#B");
+        assert_eq!(strip_tags("a.glb##h00000000000000ff"), "a.glb");
+        assert_eq!(strip_tags("a.glb#B"), "a.glb#B");
     }
 }

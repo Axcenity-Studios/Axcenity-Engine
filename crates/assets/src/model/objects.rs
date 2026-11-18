@@ -54,7 +54,7 @@ impl Pick {
     /// model's identity (after a second `#`, see `identity.rs`) is left
     /// out: it picks what its base model picks.
     pub fn of_mesh_id(mesh_id: &str) -> (&str, Pick) {
-        let (mesh_id, _) = super::split_derived(mesh_id);
+        let mesh_id = super::identity::strip_tags(mesh_id);
         match mesh_id.split_once('#') {
             Some((file, objects)) => {
                 let paths = objects

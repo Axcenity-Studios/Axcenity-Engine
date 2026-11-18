@@ -311,6 +311,12 @@ opt-level = 3
 [profile.dev.package.axcenity-mesh-edit]
 opt-level = 3
 
+# Fitting a garment (CO9, `avatar::fit`) binds thousands of vertices to the
+# body and checks each of the body's shapes for push-out: tens of times
+# faster optimized.
+[profile.dev.package.axcenity-avatar]
+opt-level = 3
+
 # Release builds (`cargo build --release`, and the editor's
 # `bench_project_play`): thin LTO lets the engine's crates inline across one
 # another, and line tables keep file and line in panics and backtraces.

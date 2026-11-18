@@ -51,7 +51,16 @@ Garments fit by **surface binding**: each vertex bound to the body's surface (tr
 - Revisit if binding artefacts on loose garments exceed the poke-through thresholds after push-out.
 - **Interim exception (2026-11-16, before CO9):** the realistic body's underwear (`assets/characters/realistic/underwear.py`) is cut from the body's own surface, so it fits by `shapes` (each vertex a fixed mix of body vertices, exact under every shape, nothing to bind), and each item hides a region with a **mask shape** that sinks the skin under it, because region-map hiding isn't drawn yet. Paul asked for undergarments on every character before CO9. When CO9 lands they move to map regions and the mask shapes go; being body topology, they can keep `shapes`. Not a change of this decision.
 
+## Implementation notes (CO9, 2026-11-17)
+
+- Fitting happens at build or import time, not when a description changes ([ADR-0041](ADR-0041-Shared-Base-Mesh-With-Live-Identity-Morphs-Baking-Is-Optional.md) decision 4): the binding carries the body's skin weights and every identity and corrective shape onto the garment as same-named morph targets, pushed out of the body and lower layers per shape and at the parameter extremes. At run time a binding item is a skinned part that takes the body's weights by name.
+- Region hiding uses the base manifest's `model.regions_map` (the region map image); the body is drawn from a model with the hidden map regions' triangles left out (`…#h<key>`, `crates/assets/src/hidden.rs`).
+- The realistic underwear keeps `shapes` and its mask shapes: it covers no map region whole, and where it bridges hollows its own per-frame shapes are better than a transfer (measured in `crates/avatar/tests/fitting.rs`). Its build pushes those shapes out of the skin the same way (`underwear.py` `push_out`: each shape at full weight and the build's muscle and fat corners, on both frames).
+- Skin weights come from the skin under each garment corner (rays out along the skin's normals that meet it), so cloth bridging a crease takes both sides; a corner no skin reaches keeps its bound point's. Binding to the closest point is still ambiguous in concave places, and linear skinning of cloth that stands off the skin leaves the underarm open with the arms raised; loose garments still need proxies, deformer maps or solved pose correctives (review fixes 1, 2026-11-17).
+
 ## Implementation references
+
+- `crates/avatar/src/fit/` (binding, transfer, push-out, coverage, the import flow), `crates/assets/src/hidden.rs`, `crates/gameplay/src/description.rs` (`hidden_body`); tests `avatar` `fit::tests` and `tests/fitting.rs`, `player` `fit_gate_tests`
 
 - `crates/avatar/src/item.rs` (`Fit`, `layer`, `hides`), `manifest.rs` (`Region`)
 - Plan: D6, CO9 (binding, push-out, region hiding, the import flow)

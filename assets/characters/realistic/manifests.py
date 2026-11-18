@@ -87,6 +87,8 @@ GARMENTS = {
     "Underwear_Bra": ("axcenity/realistic-sports-bra", "Sports bra", "underwear_top", ["underwear"]),
 }
 # The region each one hides: its mask shape sinks the skin under it.
+# The body's region map (`regions.py`'s `MAP_FILE`), beside the model.
+REGIONS_MAP = "RealisticRegions.png"
 GARMENT_REGIONS = {"Underwear_BoxerBriefs": "under_boxer_briefs", "Underwear_Briefs": "under_briefs",
                    "Underwear_Bra": "under_sports_bra"}
 GARMENT_SHADING = {"Underwear": "cloth", "Waistband": "cloth"}
@@ -303,7 +305,9 @@ def base_manifest(data, parts, folder=HERE):
         "label": "Realistic",
         "family": "realistic",
         "model": {"file": PARTS_FILE, "body": body["path"],
-                  "parts": [parts[name]["path"] for name in FACE_PARTS]},
+                  "parts": [parts[name]["path"] for name in FACE_PARTS],
+                  # The region map hides what a worn item covers (CO9).
+                  "regions_map": REGIONS_MAP},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",
                      "added_bones": data["added_bones"]},
         "groups": [{"id": i, "label": l, "category": c} for i, l, c in GROUPS] + faceparams.groups(),

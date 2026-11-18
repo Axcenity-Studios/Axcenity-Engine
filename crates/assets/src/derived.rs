@@ -24,6 +24,10 @@ pub(crate) struct Derived {
     models: HashMap<String, (u64, Arc<Model>)>,
     /// How many derived models have been baked this run.
     baked: usize,
+    /// Hidden regions registered (`hidden.rs`), by key, and the models
+    /// made with them, by `MeshId` (with their base model's key).
+    pub(crate) hidings: HashMap<u64, Arc<crate::RegionHiding>>,
+    pub(crate) hidden_models: HashMap<String, (u64, Arc<Model>)>,
 }
 
 impl Assets {
@@ -107,11 +111,13 @@ impl Assets {
         model
     }
 
-    /// [`model_slot`](Self::model_slot) for a derived `MeshId`, or `None`
-    /// for any other.
+    /// [`model_slot`](Self::model_slot) for a derived `MeshId` (or one
+    /// with hidden regions, `hidden.rs`), or `None` for any other.
     pub(crate) fn derived_slot(&self, mesh_id: &str) -> Option<Slot<Model>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_slot(mesh_id);
+        };
         Some(match self.model_slot(base) {
             Slot::Ready(model) => Slot::Ready(self.derived_of(mesh_id, key, model)),
             other => other,
@@ -121,7 +127,9 @@ impl Assets {
     /// [`model_ready`](Self::model_ready) for a derived `MeshId`.
     pub(crate) fn derived_ready(&self, mesh_id: &str) -> Option<Option<Arc<Model>>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_ready(mesh_id);
+        };
         Some(
             self.model_ready(base)
                 .map(|model| self.derived_of(mesh_id, key, model)),
@@ -131,7 +139,9 @@ impl Assets {
     /// [`model_blocking`](Self::model_blocking) for a derived `MeshId`.
     pub(crate) fn derived_blocking(&self, mesh_id: &str) -> Option<Option<Arc<Model>>> {
         let (base, key) = split_derived(mesh_id);
-        let key = key?;
+        let Some(key) = key else {
+            return self.hidden_blocking(mesh_id);
+        };
         Some(
             self.model_blocking(base)
                 .map(|model| self.derived_of(mesh_id, key, model)),

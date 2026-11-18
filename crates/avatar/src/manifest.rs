@@ -152,6 +152,12 @@ pub struct BaseModel {
     /// object path. They follow the body's pose and shapes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<String>,
+    /// The body's region map (CO9), relative to the manifest: an image
+    /// over the body's first texture coordinates whose red value at each
+    /// texel is a region's `map_index` (0 where none). What hides a worn
+    /// item's regions and what fitting reads coverage from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regions_map: Option<String>,
 }
 
 /// The skeleton contract the model keeps.
@@ -511,6 +517,9 @@ impl BaseManifest {
         not_empty(p, "label", &self.label);
         not_empty(p, "family", &self.family);
         check_path(p, "model.file", &self.model.file);
+        if let Some(map) = &self.model.regions_map {
+            check_path(p, "model.regions_map", map);
+        }
         not_empty(p, "model.body", &self.model.body);
         unique(p, "model.parts", self.model.parts.iter());
         not_empty(p, "skeleton.convention", &self.skeleton.convention);

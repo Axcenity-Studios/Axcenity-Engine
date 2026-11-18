@@ -84,6 +84,20 @@ pub struct ItemManifest {
     /// None means it stays as made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adjust: Option<Adjust>,
+    /// Whether it meets the asset quality standard (plan 11.3,
+    /// `asset-quality.md`): `draft` or `production`. Unset is a draft.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality: Option<Quality>,
+}
+
+/// An item's quality (`docs/development/character-studio/asset-quality.md`):
+/// a draft until it passes every check of its kind and the review.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Quality {
+    #[default]
+    Draft,
+    Production,
 }
 
 /// An item's own slider: shaped like a base model's parameter, without a
@@ -242,6 +256,11 @@ impl ItemManifest {
 
     pub fn material(&self, name: &str) -> Option<&MaterialSlot> {
         self.materials.iter().find(|m| m.name == name)
+    }
+
+    /// Whether it is still a draft (no `quality`, or `draft`).
+    pub fn is_draft(&self) -> bool {
+        self.quality != Some(Quality::Production)
     }
 
     pub fn variant(&self, id: &str) -> Option<&Variant> {
