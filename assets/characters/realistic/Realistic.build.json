@@ -307,6 +307,16 @@
   "shapes": 59
  },
  "corrective_shapes": {
+  "Back": {
+   "largest_move_mm": 20.6,
+   "pose": "shoulder_swing_back_50",
+   "vertices": 716
+  },
+  "Forward": {
+   "largest_move_mm": 31.9,
+   "pose": "shoulder_swing_forward_40",
+   "vertices": 712
+  },
   "Level": {
    "largest_move_mm": 16.9,
    "pose": "shoulder_abd_90",
@@ -407,6 +417,58 @@
    ],
    "bone": "RightUpperArm",
    "shape": "Corrective_Shoulder_Lowered_Right"
+  },
+  {
+   "angles": [
+    0.0,
+    40.0
+   ],
+   "axis": [
+    0.32884,
+    -0.87444,
+    -0.35668
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Forward_Left"
+  },
+  {
+   "angles": [
+    0.0,
+    40.0
+   ],
+   "axis": [
+    0.32888,
+    0.8747,
+    0.35601
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Forward_Right"
+  },
+  {
+   "angles": [
+    0.0,
+    50.0
+   ],
+   "axis": [
+    -0.32884,
+    0.87444,
+    0.35668
+   ],
+   "bone": "LeftUpperArm",
+   "shape": "Corrective_Shoulder_Back_Left"
+  },
+  {
+   "angles": [
+    0.0,
+    50.0
+   ],
+   "axis": [
+    -0.32888,
+    -0.8747,
+    -0.35601
+   ],
+   "bone": "RightUpperArm",
+   "shape": "Corrective_Shoulder_Back_Right"
   }
  ],
  "eyes": {
@@ -1355,13 +1417,13 @@
    "id": "neck",
    "label": "Neck",
    "map_index": 2,
-   "triangles": 256
+   "triangles": 300
   },
   {
    "id": "torso",
    "label": "Torso",
    "map_index": 3,
-   "triangles": 1408
+   "triangles": 1364
   },
   {
    "id": "waist",
@@ -1385,7 +1447,7 @@
    "id": "upper_arms_low",
    "label": "Upper arms (low)",
    "map_index": 7,
-   "triangles": 676
+   "triangles": 336
   },
   {
    "id": "forearms",
@@ -1428,6 +1490,12 @@
    "label": "Feet",
    "map_index": 14,
    "triangles": 4280
+  },
+  {
+   "id": "upper_arms_mid",
+   "label": "Upper arms (middle)",
+   "map_index": 15,
+   "triangles": 340
   }
  ],
  "regions_map": {
@@ -1591,11 +1659,11 @@
    "weight_moved_most": 0.07
   },
   "Underwear_Bra": {
-   "push_most": 0.0217,
-   "shapes": 64,
-   "shapes_pushed": 20,
-   "triangles": 2476,
-   "weight_moved_most": 0.116
+   "push_most": 0.0135,
+   "shapes": 66,
+   "shapes_pushed": 15,
+   "triangles": 2407,
+   "weight_moved_most": 0.119
   },
   "Underwear_Briefs": {
    "push_most": 0.0054,

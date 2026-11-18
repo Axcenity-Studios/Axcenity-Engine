@@ -36,8 +36,11 @@
 //! `AXCENITY_CAPTURE_FACE` (what the face shows: face controls and
 //! expressions with their strengths, such as `Blink_Left:1,Jaw_Open:0.5`
 //! or `Happy:1`; blinking, gaze and idle motion are off with it),
-//! `AXCENITY_CAPTURE_ONLY` (names containing this text) and
-//! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures).
+//! `AXCENITY_CAPTURE_ONLY` (names containing this text),
+//! `AXCENITY_CAPTURE_SHEETS=only` (no single pictures) and
+//! `AXCENITY_CAPTURE_FULL_DETAIL=<part name>` (that part drawn at full
+//! detail whatever its size, to tell a simpler copy's fault from the
+//! part's own).
 //!
 //! Added beside the fixed set for the refinement's benchmarks (plan 11.6,
 //! brief §17.2), never changing what a run without them draws:
@@ -991,6 +994,17 @@ pub(crate) fn draw_staged(
             // it left behind (temporal history, exposure) reaches it.
             let mut renderer = TextureRenderer::new(device, queue, width, height);
             renderer.set_graphics(&graphics);
+            // `AXCENITY_CAPTURE_FULL_DETAIL=<part name>`: that part drawn
+            // at full detail whatever its size (the editor's LOD preview),
+            // to tell a simpler copy's fault from the part's own.
+            if let Ok(name) = std::env::var("AXCENITY_CAPTURE_FULL_DETAIL")
+                && let Some(part) = world
+                    .all_below(world.workspace(), |class| class == ClassName::MeshPart)
+                    .into_iter()
+                    .find(|part| world.get(*part).is_some_and(|p| p.name() == name))
+            {
+                renderer.preview_lod(Some((axcenity_scene::item_id(part), 0)));
+            }
             let mut cache = TerrainCache::new();
             let camera = Camera {
                 position: Vec3::from(view.eye),

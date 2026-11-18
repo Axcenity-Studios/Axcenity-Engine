@@ -28,6 +28,8 @@ Blender only for making the objects; the geometry is NumPy. Units are
 metres, Blender axes (Z up, the character faces -Y).
 """
 
+import os
+
 import numpy as np
 
 import shapes as body_shapes
@@ -63,6 +65,15 @@ PUSH_REACH = 0.03
 PUSH_FADE = 0.7
 PUSH_RINGS = 4
 PUSH_ROUNDS = 5
+# The sports bra's straps: their middle as a share of the way from the
+# body's middle to the shoulder joint (on the feminine frame), and half
+# their width. Over the top of the shoulder where a sports bra's straps
+# sit, off the neck (whose skin is weighted to the neck past a fifth
+# inside about 0.53 of the way on this body): a crew neck needn't close
+# round the neck to cover them.
+STRAP_AT = 0.75
+STRAP_HALF = 0.013
+BENCHMARKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "benchmarks")
 
 
 def smoothstep(a, b, x):
@@ -430,13 +441,18 @@ def push_out(body, rest, cloth_tris, count, hem_verts, shapes, margin=MARGIN):
            if name != "Frame_Feminine" and name in body.shapes and not name.startswith("Mask_")]
     # The states: each shape at its full weight, and the build's corners
     # (muscle and fat at either end: heavy and soft among them), on both
-    # frames.
+    # frames; and every realistic cast and body benchmark's own mix (the
+    # fit gate's bodies: their waist, hips and the shapes R3 added).
     states = [({name: 1.0}, feminine) for name in own for feminine in (0.0, 1.0)]
     for feminine in (0.0, 1.0):
         for muscle in (-1.0, 1.0):
             for fat in (-1.0, 1.0):
                 mix = body_shapes.weights_of({"muscle": muscle, "fat": fat}, feminine)
                 states.append(({k: w for k, w in mix.items() if k in shapes and abs(w) > 1e-6}, feminine))
+    for values in benchmark_bodies():
+        feminine = float(values.get("frame", 0.0))
+        mix = body_shapes.weights_of(values, feminine)
+        states.append(({k: w for k, w in mix.items() if k in shapes and abs(w) > 1e-6}, feminine))
     pushed, most = set(), 0.0
     for mix, feminine in states:
         if not mix:
@@ -480,6 +496,21 @@ def push_out(body, rest, cloth_tris, count, hem_verts, shapes, margin=MARGIN):
                     shapes[k][r] += share[v]
                 pushed.add(k)
     return len(pushed), most
+
+
+def benchmark_bodies():
+    """The parameter values of every realistic cast and body benchmark
+    (`assets/characters/benchmarks`), the bodies the fit gate dresses."""
+    import glob
+    import json
+    out = []
+    for path in sorted(glob.glob(os.path.join(BENCHMARKS, "realistic-*.character.json"))):
+        name = os.path.basename(path)
+        if "-cast-" not in name and "-body-" not in name:
+            continue
+        with open(path, encoding="utf-8") as f:
+            out.append(json.load(f).get("parameters", {}))
+    return out
 
 
 def recess(body, covered, hem):
@@ -621,15 +652,16 @@ def fields(body, joints, joints_f):
 
     # The sports bra, laid out on the feminine frame: under the bust to a
     # scooped neckline in front and across the shoulder blades behind,
-    # cut away under each arm, with a strap over each shoulder.
+    # cut away under each arm, with a strap over the top of each shoulder
+    # (`STRAP_AT`: off the neck).
     fx, fy, fz = F[:, 0], F[:, 1], F[:, 2]
     ax_ = np.abs(fx)
     chest_f = np.array(joints_f["Chest"][0][:])
     apex = bust_apex(F, body, chest_f)
     ax, ay, az = apex
     low = az - 0.088
-    strap_x = 0.55 * abs(np.array(joints_f["LeftUpperArm"][0][:])[0])
-    strap_w = 0.013
+    strap_x = STRAP_AT * abs(np.array(joints_f["LeftUpperArm"][0][:])[0])
+    strap_w = STRAP_HALF
     front = 1.0 - smoothstep(chest_f[1] - 0.03, chest_f[1] + 0.03, fy)
     neckline = az + 0.040 + 0.060 * smoothstep(0.0, strap_x, ax_)
     behind = az + 0.050

@@ -4746,6 +4746,11 @@
       "map_index": 14
     },
     {
+      "id": "upper_arms_mid",
+      "label": "Upper arms (middle)",
+      "map_index": 15
+    },
+    {
       "id": "under_boxer_briefs",
       "label": "Under boxer briefs",
       "mask_shape": "Mask_Underwear_BoxerBriefs"
@@ -4908,12 +4913,12 @@
           "bone": "Chest",
           "offset": [
             0.0,
-            -0.0259,
-            -0.0096
+            -0.0199,
+            -0.0101
           ]
         }
       ],
-      "radius": 0.434
+      "radius": 0.4324
     },
     {
       "id": "head",
@@ -4946,13 +4951,13 @@
         {
           "bone": "Neck",
           "offset": [
-            -0.0,
-            0.0078,
-            0.0133
+            -0.0003,
+            0.0148,
+            0.0071
           ]
         }
       ],
-      "radius": 0.0707,
+      "radius": 0.0768,
       "regions": [
         "neck"
       ]
@@ -4967,21 +4972,21 @@
         {
           "bone": "LeftShoulderHelper",
           "offset": [
-            -0.0373,
-            0.0155,
-            0.0215
+            -0.0387,
+            0.0177,
+            0.0197
           ]
         },
         {
           "bone": "RightShoulderHelper",
           "offset": [
-            0.0354,
-            0.0162,
-            0.0201
+            0.0365,
+            0.0182,
+            0.0188
           ]
         }
       ],
-      "radius": 0.1085,
+      "radius": 0.1082,
       "regions": [
         "upper_arms_top"
       ]
@@ -4997,12 +5002,12 @@
           "bone": "Chest",
           "offset": [
             0.0001,
-            0.1237,
+            0.1238,
             0.1024
           ]
         }
       ],
-      "radius": 0.1462
+      "radius": 0.1463
     },
     {
       "id": "arms",
@@ -5014,22 +5019,23 @@
         {
           "bone": "LeftUpperArm",
           "offset": [
-            0.1962,
-            -0.2006,
-            0.0091
+            0.1944,
+            -0.1992,
+            0.0084
           ]
         },
         {
           "bone": "RightUpperArm",
           "offset": [
-            -0.1963,
-            -0.2007,
-            0.0089
+            -0.1946,
+            -0.1992,
+            0.0082
           ]
         }
       ],
-      "radius": 0.1442,
+      "radius": 0.1414,
       "regions": [
+        "upper_arms_mid",
         "upper_arms_low",
         "forearms"
       ]
@@ -5112,13 +5118,13 @@
         {
           "bone": "Chest",
           "offset": [
-            0.0001,
-            0.0921,
-            -0.0662
+            0.0002,
+            0.098,
+            -0.066
           ]
         }
       ],
-      "radius": 0.1834
+      "radius": 0.1858
     },
     {
       "id": "hips",

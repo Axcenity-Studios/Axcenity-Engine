@@ -280,6 +280,10 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     assert_eq!(
         correctives,
         [
+            "Corrective_Shoulder_Back_Left",
+            "Corrective_Shoulder_Back_Right",
+            "Corrective_Shoulder_Forward_Left",
+            "Corrective_Shoulder_Forward_Right",
             "Corrective_Shoulder_Level_Left",
             "Corrective_Shoulder_Level_Right",
             "Corrective_Shoulder_Lowered_Left",
@@ -296,9 +300,9 @@ fn a_baked_body_keeps_only_its_live_shapes() {
             || *name == "Pupil_Size";
         assert!(!identity_name, "`{name}` is left on the baked body");
     }
-    // 6 corrective shapes and the 44 expression shapes (the 48 face
+    // 10 corrective shapes and the 44 expression shapes (the 48 face
     // controls less the four eye looks, which are bones).
-    assert_eq!(left.len(), 50, "{left:?}");
+    assert_eq!(left.len(), 54, "{left:?}");
     // (One less than at the merge: the body no longer carries `Pupil_Size`,
     // which is the eyes' own shape and no slider's. Four more since: the
     // brows' height and arch have a raising shape each side besides the
@@ -313,8 +317,10 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // more in wave 3: R3's `<Frame>_Waist_Wide` and `_Narrow` (the waist
     // slider's shape) and `<Frame>_Fat_Over_Muscle` (heavy and muscular),
     // and R4's `Face_Nose_Tip_Rotation_Up` (`nose_tip_rotation`'s upturned
-    // end, `faceparams.SPLIT`).
-    assert_eq!(model.morph_targets.len(), 181);
+    // end, `faceparams.SPLIT`). Four more in wave 4 (CO9 part 2): the
+    // shoulder's swing correctives, `Corrective_Shoulder_Forward_*` and
+    // `_Back_*`.
+    assert_eq!(model.morph_targets.len(), 185);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always
