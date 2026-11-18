@@ -378,3 +378,89 @@ fn a_layers_roughness_changes_the_skins_highlight() {
     );
     assert!(sum(matte) < sum(kept) - 2.0, "matte: {matte:?} vs {kept:?}");
 }
+
+/// [`only`]'s masks with channel `channel` at `value` over the right half
+/// (not whole), and every rank at `rank`.
+fn partly(channel: usize, value: u8, rank: u8) -> [Arc<dyn TextureSource>; 3] {
+    std::array::from_fn(|mask| {
+        let key = 0x5e_c000
+            + ((channel * 3 + mask) as u64) * 0x1_0000
+            + u64::from(value) * 0x100
+            + u64::from(rank);
+        map(key, 16, move |x, _| {
+            let mut texel = [0u8; 4];
+            for (c, slot) in texel.iter_mut().enumerate() {
+                if mask * 4 + c == channel && x >= 8 {
+                    *slot = value;
+                }
+            }
+            if mask == 2 {
+                texel[1] = rank;
+                texel[3] = rank;
+            }
+            texel
+        })
+    })
+}
+
+/// A mask's value is coverage, read as it is stored: half a mask under a
+/// whole layer draws what a whole mask under a half-opaque layer draws.
+/// Lips (the second mask, bound in the emissive map's place, a colour
+/// slot otherwise read through its sRGB view) and blush (the first, in
+/// the metalness place). Read through sRGB, 128 would cover 0.22.
+#[test]
+fn a_masks_middle_value_covers_half_in_every_slot() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    for (index, channel, name) in [(4, 4, "lips"), (1, 1, "blush"), (5, 5, "brow fill")] {
+        let draw_with = |value: u8, opacity: f32| {
+            let mut with = layers();
+            with.masks = partly(channel, value, 0);
+            with.makeup[index] = Makeup {
+                colour: Some([0.2, 0.6, 0.9]),
+                opacity,
+                roughness: None,
+            };
+            mean(&lit(skin(Some(with))), true)
+        };
+        let (half_mask, half_layer) = (draw_with(128, 1.0), draw_with(255, 128.0 / 255.0));
+        eprintln!("{name}: half mask {half_mask:?}, half layer {half_layer:?}");
+        assert!(
+            apart(half_mask, half_layer) < 2.0,
+            "{name}: half its mask {half_mask:?} against half its opacity {half_layer:?}"
+        );
+    }
+}
+
+/// Amount 1 shows every spot, the last ranked too: a freckle ranked 0.99
+/// is as dark as one ranked 0.
+#[test]
+fn a_markings_full_amount_shows_every_spot() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    let spots = Spots {
+        amount: 1.0,
+        opacity: 1.0,
+        seed: 0.0,
+    };
+    let freckled = |rank: u8| {
+        let mut with = layers();
+        with.masks = partly(8, 255, rank);
+        with.freckles = spots;
+        mean(&lit(skin(Some(with))), true)
+    };
+    let (first, last) = (freckled(0), freckled(253));
+    eprintln!("ranked 0: {first:?}; ranked 0.99: {last:?}");
+    // (Each spot's own shade comes from its rank too: within that.)
+    let sum = |c: [f32; 3]| c.iter().sum::<f32>();
+    let bare = sum(mean(&lit(skin(None)), true));
+    assert!(
+        bare - sum(last) > (bare - sum(first)) * 0.6,
+        "a spot ranked 0.99 shows {} of the way",
+        (bare - sum(last)) / (bare - sum(first))
+    );
+}

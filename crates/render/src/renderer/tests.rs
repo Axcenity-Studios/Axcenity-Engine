@@ -34,6 +34,7 @@ mod shading;
 mod shadows;
 mod skin;
 mod skin_layers;
+mod skin_pores;
 mod skinning;
 mod streaming;
 mod sun_rays;

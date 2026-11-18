@@ -176,7 +176,9 @@ fn freckles_change_the_face_against_bare_skin() {
 
 #[test]
 fn moles_change_the_face_against_bare_skin() {
-    layer_changes_the_face("moles", true, 0.0001, 0.02);
+    // (Since the review the face's moles keep off its middle, where one
+    // read as a bindi: about a dozen pixels of this small picture.)
+    layer_changes_the_face("moles", true, 0.00004, 0.02);
 }
 
 #[test]
@@ -261,9 +263,11 @@ fn softness_alone_hides_the_definition_the_body_drives() {
 }
 
 /// A colour change re-applies live: the applier writes the new value as
-/// an attribute, the body keeps its base model (nothing is baked, no
-/// texture is made), and the next draw list draws the new colour. Timed
-/// (debug builds are slow; the figure for the hand-back is release).
+/// the body's material value attribute, and the body keeps its base model
+/// (nothing is baked, no texture is made). Timed (debug builds are slow;
+/// the figure for the hand-back is release). (That the draw list draws
+/// from those attributes is scene's test,
+/// `skin_layers_draw_from_their_values_and_none_on_draws_no_layers`.)
 #[test]
 fn a_makeup_colour_change_re_applies_live_without_a_bake() {
     let stage = Stage::new("makeup-live", &repository_library()).expect("the stage");
@@ -385,5 +389,74 @@ fn a_skin_tint_changes_the_face_the_way_it_means() {
     assert!(
         now[1] / now[0] > was[1] / was[0] * 1.1,
         "{was:?} -> {now:?}"
+    );
+}
+
+/// Close up, the cheek reads as pores (R5 review: the grain without its
+/// crackle read as smooth, waxy skin with a few pale specks). In the
+/// `skin-close` view (about 0.19 mm a pixel on the cheek) under the hard
+/// light, with temporal anti-aliasing, a crop of the cheek below the eye
+/// has many small dark pits: pixels darker than their eight neighbours and
+/// than their 7 × 7 neighbourhood by more than 2 levels of luminance. Real
+/// cheek skin has tens to hundreds of pores to a square centimetre.
+#[test]
+fn the_cheek_close_up_shows_pores() {
+    let Some((device, queue)) = super::bench_tests::bench_gpu() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let stage = Stage::new("skin-pores", &repository_library()).expect("the stage");
+    let bare = character("realistic-feminine-cast-average");
+    let settings = Settings {
+        frames: 8,
+        ..Settings::default()
+    };
+    let (width, _) = settings.size;
+    let shot = capture_in(
+        &device,
+        &queue,
+        &stage.assets,
+        &bare,
+        settings,
+        &lights_named("hard").unwrap(),
+        &views_named("skin-close").unwrap(),
+    )
+    .unwrap()
+    .remove(0);
+    let width = width as usize;
+    let lum = |x: usize, y: usize| {
+        let p = &shot.pixels[(y * width + x) * 4..][..3];
+        0.2126 * f32::from(p[0]) + 0.7152 * f32::from(p[1]) + 0.0722 * f32::from(p[2])
+    };
+    // The cheek below the eye's outer corner and in front of the ear.
+    let (xs, ys) = (700..980, 440..660);
+    let mut pits = 0;
+    for y in ys.clone() {
+        for x in xs.clone() {
+            let v = lum(x, y);
+            let mut sum = 0.0;
+            let mut lowest = true;
+            for dy in -3i32..=3 {
+                for dx in -3i32..=3 {
+                    let w = lum((x as i32 + dx) as usize, (y as i32 + dy) as usize);
+                    sum += w;
+                    if dx.abs() <= 1 && dy.abs() <= 1 && (dx, dy) != (0, 0) && w <= v {
+                        lowest = false;
+                    }
+                }
+            }
+            if lowest && v < sum / 49.0 - 2.0 {
+                pits += 1;
+            }
+        }
+    }
+    let square_cm = (xs.len() * ys.len()) as f32 * 0.019 * 0.019;
+    let per_cm2 = pits as f32 / square_cm;
+    eprintln!(
+        "the cheek close up: {pits} pits in {square_cm:.1} cm2, {per_cm2:.0} a square centimetre"
+    );
+    assert!(
+        (25.0..=600.0).contains(&per_cm2),
+        "{per_cm2} pits a square centimetre on the cheek"
     );
 }

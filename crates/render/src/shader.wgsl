@@ -467,6 +467,13 @@ fn standard_surface(input: SurfaceInput) -> Surface {
     out.normal = surface_normal(input.normal, input.tangent, uv);
     out.emissive = input.emissive * emissive_texel.rgb;
     out.opacity = input.opacity * mix(texel.a, opacity_map, maps.settings.w);
+    // Skin's pores and fine lines (skin.wgsl), finer than its maps, under
+    // any makeup. `maps` is uniform, so every pixel takes the same branch.
+    if maps.shading.x == SHADING_SKIN && maps.settings.x > 0.0 {
+        let micro = skin_micro(out.normal, input.world_position, uv);
+        out.normal = micro.xyz;
+        out.base_color *= 1.0 - micro.w;
+    }
     // Skin's makeup and markings (skin.wgsl): their masks are in the
     // metalness, emissive and opacity maps' places. `maps` is uniform, so
     // every pixel takes the same branch.

@@ -187,6 +187,75 @@ def lash_line(face, s, upper=True, loop=1):
     return pts[order]
 
 
+# The eyeliner's wing: how long, and how far it rises from the line
+# through the eye's corners (degrees). A wing carries the lower lid's
+# line on out of the corner, rising a little toward the brow's tail
+# (makeup guides: "follow the angle of the lower lash line"). 5 mm on the
+# face's plane is about 6.5 mm along the skin, which turns back toward
+# the temple there.
+WING_MM = 5.0
+WING_RISE = (15.0, 22.0)
+
+
+def liner_wing(face, s):
+    """The eyeliner wing of eye `s`: the outer corner of the lid's skin
+    loop the liner runs along (where its upper and lower halves meet), the
+    wing's points on the resting skin from there, in the eye's own frame,
+    and the lower lid's own angle at the corner (degrees). Its direction is the lower lid's line at the corner, held to
+    `WING_RISE` above the corners' line; each point is put on the skin
+    straight back along the face's forward axis, so the wing keeps that
+    direction seen from the front. (Wave 3's first wing was put on the
+    skin by the nearest point, which pulled it up the curved temple: it
+    rose 60 to 70 degrees, a spike beside the eye.)"""
+    from mathutils import Vector
+
+    eye = face.eye[s]
+    ring = face.P[eye.loops[2]]
+    corner = ring[np.argmax(eye.along(ring))]
+    low = lash_line(face, s, upper=False)
+    near_corner = low[eye.along(low) > eye.t_out - 0.004]
+    if len(near_corner) < 2:
+        near_corner = low[-2:]
+    v = near_corner[-1] - near_corner[0]
+    lower = float(np.degrees(np.arctan2(v @ eye.up, v @ eye.axis)))
+    rise = float(np.clip(lower, *WING_RISE))
+    out = eye.axis * np.cos(np.radians(rise)) + eye.up * np.sin(np.radians(rise))
+    pts = []
+    for k in np.linspace(0.0, WING_MM / 1000.0, 9):
+        target = corner + out * k
+        hit = face.skin_tree.ray_cast(Vector(target + eye.fwd * 0.03), Vector(-eye.fwd), 0.06)
+        pts.append(np.array(hit[0]) if hit[0] is not None else face.on_skin(target))
+    pts[0] = corner
+    return corner, np.array(pts), lower
+
+
+def wing_report(face):
+    """Each side's wing measured on the resting skin: how far it rises
+    from the corners' line on the face's plane (`rise_degrees`) and along
+    the skin at the corner (`skin_degrees`, the angle to that line laid on
+    the skin), its length and how far it leaves from where the lids'
+    margins meet. Raises if a wing turns more than 30 degrees: the build
+    doesn't ship a spike."""
+    report = []
+    for _, s in SIDES:
+        eye = face.eye[s]
+        corner, wing, lower = liner_wing(face, s)
+        w = wing[-1] - wing[0]
+        rise = float(np.degrees(np.arctan2(w @ eye.up, w @ eye.axis)))
+        hit = face.skin_tree.find_nearest(tuple(corner), 0.01)
+        n = np.array(hit[1]) if hit[0] is not None else eye.fwd
+        flat = lambda v: (v - n * (v @ n)) / max(np.linalg.norm(v - n * (v @ n)), 1e-12)  # noqa: E731
+        along_skin = float(np.degrees(np.arccos(np.clip(flat(w) @ flat(eye.axis), -1.0, 1.0))))
+        length = float(np.sum(np.linalg.norm(np.diff(wing, axis=0), axis=1)))
+        from_corner = float(np.linalg.norm(corner - face.P[eye.canthus_out]))
+        report.append({"side": s, "rise_degrees": round(rise, 1), "skin_degrees": round(along_skin, 1),
+                       "length_mm": round(length * 1000.0, 2), "from_corner_mm": round(from_corner * 1000.0, 2),
+                       "lower_lid_degrees": round(lower, 1)})
+        if not (10.0 <= rise <= 30.0 and along_skin <= 30.0):
+            raise RuntimeError(f"eyeliner wing on side {s} turns {rise:.1f} degrees ({along_skin:.1f} on the skin)")
+    return report
+
+
 def makeup_masks(tx, face, lips):
     """Foundation, blush, eyeshadow, eyeliner, lip colour and brow fill
     over the covered texels (each 0 to 1)."""
@@ -234,21 +303,25 @@ def makeup_masks(tx, face, lips):
         blush = np.maximum(blush, w * (X[:, 0] * s > 0.01))
 
         # Eyeliner: along the upper lash line, thin at the inner corner and
-        # wider outward, with a short wing past the outer corner; a thinner
-        # line under the outer half of the lower lid.
-        # (Drawn along the lid's skin just outside the lashes' roots, the
-        # line a person sees: on the roots themselves the lashes and the
-        # lid's rim hid it, and the wing stood alone as a stray stroke.)
+        # wider outward, then out of the outer corner as a short wing that
+        # tapers to a point (`liner_wing`); a thinner line under the outer
+        # half of the lower lid. (Drawn along the lid's skin just outside
+        # the lashes' roots, the line a person sees: on the roots
+        # themselves the lashes and the lid's rim hid it.)
         up_line = lash_line(face, s, loop=2)
-        out_dir = eye.axis * 0.95 + eye.up * 0.3
-        out_dir /= np.linalg.norm(out_dir)
-        wing = up_line[-1] + np.outer(np.linspace(0.0, 0.009, 8)[1:], out_dir)
-        wing = np.array([face.on_skin(p + eye.fwd * 0.002) for p in wing])
-        line = np.concatenate([up_line, wing])
+        corner, wing, _ = liner_wing(face, s)
+        # The upper line runs into the corner the wing leaves from, so the
+        # two are one stroke.
+        line = np.concatenate([up_line[eye.along(up_line) < eye.along(corner)[0] - 0.0005], wing])
         d, near, t = polyline_distance(X, line)
-        n_up = len(up_line)
-        share = n_up / len(line)
-        width = np.where(t < share, 0.0009 + 0.0013 * (t / share), 0.0022 * (1.0 - (t - share) / (1.0 - share)) + 0.0003)
+        lengths = np.linalg.norm(np.diff(line, axis=0), axis=1)
+        share = float(np.sum(lengths[:len(line) - len(wing)]) / np.sum(lengths))
+        # Widest (2.2 mm) where the line meets the wing; the wing tapers
+        # from that to 0.3 mm at its tip.
+        width = np.where(t < share, 0.0009 + 0.0013 * (t / share),
+                         0.0022 - 0.0019 * (t - share) / max(1.0 - share, 1e-6))
+        # Held to the line's upper side, as a liner's lower edge follows the
+        # lashes (and, on the wing, carries the lower lid's line on).
         above = (X - near) @ eye.up > -0.0012
         on = (1.0 - _step(width * 0.75, width + 0.0004, d)) * above
         low_line = lash_line(face, s, False)
@@ -443,7 +516,9 @@ def masks(body, topo, P, PV, lm, eyes, eye_radius, lips, size, out_dir):
     head = np.zeros(len(P))
     head[topo.verts(FS_HEAD, FS_MUZZLE)] = 1.0
     front = (np.asarray(P)[:, 1] < face.ear_at[1][1] - 0.02) & (np.asarray(P)[:, 2] > face.chin[2] - 0.01)
-    face_moles = _spots_on(tx, head * front, 0.0, MOLE_RADIUS, rng, fixed=FACE_MOLES)
+    # (Off the face's middle: a mole between the brows read as a bindi.)
+    off_middle = _step(0.005, 0.012, np.abs(np.asarray(P)[:, 0]))
+    face_moles = _spots_on(tx, head * front * off_middle, 0.0, MOLE_RADIUS, rng, fixed=FACE_MOLES)
     body_moles = _spots_on(tx, anywhere * (1.0 - head), 0.0, MOLE_RADIUS, rng, fixed=MOLES - FACE_MOLES)
     moles = face_moles + body_moles
     freckle_cover, freckle_rank = spot_masks(tx, freckles, rng.random(len(freckles)), rng)
@@ -460,16 +535,32 @@ def masks(body, topo, P, PV, lm, eyes, eye_radius, lips, size, out_dir):
     b = np.stack([tx.image(makeup["lips"]), tx.image(makeup["brow_fill"]), tx.image(scar),
                   np.zeros((size, size))], axis=2)
     c = np.stack([freckle_cover, freckle_rank, mole_cover, mole_rank], axis=2)
+    digests = {}
     for name, image in zip(FILES, (a, b, c)):
-        Image.fromarray(byte(image), "RGBA").save(os.path.join(out_dir, name), optimize=True)
+        path = os.path.join(out_dir, name)
+        Image.fromarray(byte(image), "RGBA").save(path, optimize=True)
+        with open(path, "rb") as f:
+            digests[name] = digest(f.read())
     return {
         "files": list(FILES),
+        # FNV-1a of each file's bytes, as `mark` embeds them: a test holds
+        # the model file's masks to the ones measured here.
+        "digests": digests,
+        "wing": wing_report(face),
         "freckles": len(freckles),
         "moles": len(moles),
         "face_moles": len(face_moles),
         "scar_mm": round(scar_length * 1000.0, 1),
         "covered_share": {k: round(float((tx.image(v) > 0.5).mean()), 5) for k, v in makeup.items()},
     }
+
+
+def digest(data):
+    """FNV-1a, 64 bits, as hex (the assets test computes the same)."""
+    h = 0xCBF29CE484222325
+    for byte in data:
+        h = ((h ^ byte) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return f"{h:016x}"
 
 
 def mark(glb, out_dir):

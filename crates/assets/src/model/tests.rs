@@ -187,6 +187,75 @@ fn patches(on: &[bool], width: usize, height: usize) -> (usize, usize) {
     (count, biggest)
 }
 
+/// FNV-1a, 64 bits: the build (`makeup.py`, `digest`) records each mask's
+/// bytes by it, so a test can tell the file's masks are the ones measured.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, &byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// The eyeliner's wing continues the lash line out of the eye's outer
+/// corner (R5 review: it rose 60 to 70 degrees, a spike beside the eye).
+/// The build measures each side's wing on the face at rest, in the eye's
+/// own frame (`makeup.py`, `wing_report`): it leaves from the outer corner
+/// of the lid's skin the liner runs along (within 2 mm of where the lids'
+/// margins meet), runs 5 to 7 mm along the skin, and rises 10 to 30
+/// degrees from the line through the eye's corners, on the face's plane
+/// and along the skin. The masks in the model file are the ones measured.
+#[test]
+fn the_eyeliner_wing_continues_the_lash_line_out_of_the_corner() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let makeup = &build["textures"]["makeup"];
+    let wings = makeup["wing"]
+        .as_array()
+        .expect("the build measures the wing");
+    assert_eq!(wings.len(), 2, "a wing each side");
+    for wing in wings {
+        let number = |key: &str| wing[key].as_f64().unwrap_or(f64::NAN);
+        let (rise, along_skin) = (number("rise_degrees"), number("skin_degrees"));
+        let (length, corner) = (number("length_mm"), number("from_corner_mm"));
+        assert!(
+            (10.0..=30.0).contains(&rise),
+            "the wing rises {rise} degrees"
+        );
+        assert!(
+            (0.0..=30.0).contains(&along_skin),
+            "along the skin the wing turns {along_skin} degrees from the corners' line"
+        );
+        assert!(
+            (5.0..=7.0).contains(&length),
+            "the wing is {length} mm long"
+        );
+        assert!(corner <= 2.0, "the wing leaves {corner} mm from the corner");
+    }
+    // The model file's masks are the ones the build measured.
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let gltf = gltf::Gltf::from_slice(&bytes).unwrap();
+    let blob = gltf.blob.as_deref().expect("a binary chunk");
+    let digests = makeup["digests"].as_object().expect("the masks' digests");
+    assert_eq!(digests.len(), 3);
+    for (file, digest) in digests {
+        let stem = file.trim_end_matches(".png");
+        let image = gltf
+            .images()
+            .find(|image| image.name() == Some(stem))
+            .unwrap_or_else(|| panic!("{stem} in the model file"));
+        let gltf::image::Source::View { view, .. } = image.source() else {
+            panic!("{stem} is embedded");
+        };
+        let png = &blob[view.offset()..view.offset() + view.length()];
+        assert_eq!(
+            format!("{:016x}", fnv1a(png)),
+            digest.as_str().unwrap(),
+            "{file} in the model file isn't the mask the build measured"
+        );
+    }
+}
+
 /// The skin's grain reads as pores, not cracks (R5, wave 2's open issue):
 /// the build measures its bump's height on the belly (`skin.py`,
 /// `grain_shape`). Pores, isolated pits in a level surface, give the

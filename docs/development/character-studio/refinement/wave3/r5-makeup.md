@@ -110,11 +110,11 @@ None.
 
 ## Open issues
 
-1. **Pores are faint and sparse** (see above): a close view under soft light reads smooth. Next: a tiling pore detail normal made by the build (references/skin §2) or a 4K face set.
+1. ~~**Pores are faint and sparse**~~: fixed in Review fixes 1 (the Skin model draws pores and fine lines finer than the maps).
 2. **Decals** (tattoos, birthmarks, placed marks) are ADR-0042's later part: the data shape and the projection are described, nothing is built. The ADR is Proposed: the lead accepts it or changes it.
 3. The masks' **channel layout is fixed** (nine layers, one spare channel); a tenth kind needs a fourth mask (no slot left) or the decal path.
 4. **Ray-traced reflections and GI** don't see makeup (they read the material colour, not the masks). Known-Limitations says so.
-5. **Eyeliner at 2K** is two to three texels on the face; its wing is short (9 mm). A face-only mask at higher density would sharpen it.
+5. **Eyeliner at 2K** is two to three texels on the face. A face-only mask at higher density would sharpen it. (The wing was a spike: fixed in Review fixes 1; now 6.6 mm along the skin at 22 degrees.)
 6. The **GPU cost** of layers on is not measured (`bench_realistic_character` draws no makeup).
 7. **Brow fill** barely shows on the realistic brows (above).
 8. Wave 2's other open items are untouched: the shadowed lips' extra red, the probe guard's hard-coded numbers, `DRAWN_TODAY` and the Skin page's outdated footer note ("Until skin shading lands...": RA1's file; I added the new section above it and left the note).
@@ -127,3 +127,105 @@ None.
 - **Render, for CO8's merge**: I touched `skin.wgsl` (new functions), the block at the end of `standard_surface` in `shader.wgsl`, `material_textures` and `material_key` in `renderer/lighting.rs` (plus `skin_layers`, `skin_layer_uniform`), `create_material` in `renderer/gpu.rs`, and `draw_list.rs`'s `SkinShading`. No vertex code, bind group layout, `MapsUniform` field or binding count changed.
 - **Contract**: `avatar` gains `skin` (description) and `skin_layers` (base manifest), both optional (ADR-0042); `architecture.md` §5, §6 and §10 say so. The lead's `intent.rs` and `edit.rs` gained one variant and one line.
 - The capture tool and `Settings::default`, VIEWS, LIGHTS and MORE_VIEWS are untouched.
+
+## Review fixes 1
+
+The review found two blocking problems: the eyeliner wing was a spike, and close-up skin read smooth with sparse pale specks rather than as pores and fine lines. Both are fixed. I also did six of the review's non-blocking items. Tests were written first; the red run is appended to `r5-makeup-red-run.txt`.
+
+### 1. The eyeliner wing
+
+**Cause.** The first wing started at the last point of the lid's skin loop and was put on the skin by the nearest-point search from 2 mm in front of it. Beside the outer corner the skin turns back toward the temple, so the nearest skin point slid up the curved surface, and each point of the wing climbed further: 60 to 70 degrees seen from the front.
+
+**Fix** (`makeup.py`, `liner_wing`): the wing now leaves from the outer corner of the lid's skin loop, where the upper and lower halves of the loop meet and the upper liner ends, so the two are one stroke. It is built in the eye's own frame. Its direction follows the lower lid's line at the corner, held between 15 and 22 degrees above the line through the eye's corners. The lower lid itself rises about 51 degrees into the corner, so the 22-degree limit applies. The wing runs 5 mm on the face's plane, and each point is put on the skin by a ray straight back along the face's forward axis, which keeps its direction as seen from the front. Its width tapers from the liner's widest point (2.2 mm) to 0.3 mm at the tip.
+
+**Check.** The build measures each wing and fails if one turns more than 30 degrees (`wing_report`, recorded in `Realistic.build.json`'s `textures.makeup.wing`). Measured on both sides:
+- rise from the corners' line: 22.0 degrees on the face's plane;
+- along the skin: 23.3 and 22.9 degrees;
+- length along the skin: 6.6 and 6.8 mm;
+- start: 1.6 mm from where the lids' margins meet.
+
+The assets test `the_eyeliner_wing_continues_the_lash_line_out_of_the_corner` holds these numbers. It also checks that the three masks in `RealisticParts.glb` are the ones the build measured: the build records an FNV-1a digest of each mask's bytes, and the test hashes the images embedded in the GLB. This also answers the review's stale-file point for the masks.
+
+**What I saw** (`wing-*-before-after.jpg`, `detail-*-eyes-cheek.jpg`, `msaa-makeup-markings.jpg`, both frames, studio and hard light, 2 to 3 times enlarged): the wing is now a short flick out of the outer corner, carrying the upper liner on outward and slightly up, and it reads as winged liner. The horn is gone on both frames, under both lights, and with MSAA. It is a modest wing. A dramatic cat-eye would need a longer, wider one, which could be a layer setting later.
+
+### 2. Pores and fine lines (option (a): in the Skin model's fragment shading)
+
+**Fix** (`skin.wgsl`, `skin_micro`, called from `standard_surface` before the makeup). The Skin model now draws detail finer than the 2K maps hold, worked out per pixel from the texture coordinates:
+- **Pores:** a rounded pit with a low raised rim, at a jittered point in half the cells of a grid of 1,150 cells across texture space. That is 0.7 mm cells on the realistic face, about 100 pores to a square centimetre, and 1.6 mm cells on the body. Pore depth varies over 18 mm patches.
+- **Fine lines:** two crossing sets of faint lines, made from the contours of a stretched value noise.
+
+How it is drawn:
+- The slope is computed analytically and tilts the full normal through the screen-space change of position and texture coordinates (Mikkelsen 2010, as the scar's relief does), so no tangents are needed.
+- A pore also darkens the albedo by up to 20%.
+- The detail fades out between a cell spanning two pixels and one pixel, so it can't alias. In face-front captures (0.6 mm a pixel) it is gone: 0.007% of pixels changed, and those changes are the moved moles.
+- It scales with the normal map's strength (`detail_strength`; 0 draws none).
+- The blurred diffuse normals don't get it.
+- No texture slot, binding or content was added. The baked grain in `skin.py` is unchanged.
+
+**Tuning, as I saw it** (five capture rounds):
+1. 0.5 mm cells looked right on the forehead but faded out over most of the cheek: a cheek seen at an angle puts a cell under two pixels.
+2. Strongly stretched lines read as long scratches.
+3. Lines stretched less closed into small loops, close to the old crackle.
+4. The final version has 0.7 mm cells, lines stretched 3:1 and shallow (0.015 mm), and pores with a rim.
+
+**What I saw** (`grain-skin-close-before-after.jpg`, `grain-cheek-3x.jpg`):
+- Under the hard light, the cheek and temple now show dark pores with a lit rim on the side toward the light. They are densest in the highlight. Faint crossing fine lines are visible at 3 times enlargement and just visible at 1 time.
+- Under the studio light, the pores show as fine dark specks across the whole crop. The skin no longer reads airbrushed.
+- MSAA looks like TAA in stills, slightly crisper. I can't judge shimmer in motion from stills.
+
+Remaining weaknesses:
+- The pores are a uniform population. A real cheek has larger pores toward the nose and finer ones toward the jaw, and this has no regional map.
+- Some lines run as long arcs that read a little like faint scratches at 3 times enlargement.
+- The pattern is the same on every character, because it is seeded by texture coordinates.
+
+**Measured:**
+- `the_cheek_close_up_shows_pores` (player, `skin-close`, hard light, TAA, a 22 cm² crop of the cheek): 67 dark pits a square centimetre, against 0 before (the test allows 25 to 600).
+- Render `skin_pores` on a flat skin square: pixel-to-pixel spread 2.60 at full strength, 5.42 at `detail_strength` 2, 0.18 at 0; 169 pits; far away, every pixel within a level of the strength-0 picture.
+- GPU cost: `bench_realistic_character` at 1080p High with TAA, two runs each, with the pores and with them forced off. At the face view the pores are partly drawn.
+
+| View | Scene pass, pores on | Scene pass, pores off |
+| --- | --- | --- |
+| Front | 0.706 ms | 0.715 ms |
+| Face | 0.654 to 0.766 ms | 0.815 ms |
+
+The difference is inside the shared machine's noise. The cost is below what this bench can resolve.
+
+### Non-blocking items done
+
+- **The emissive slot's linear view is tested.** `a_masks_middle_value_covers_half_in_every_slot` (render) checks that half a mask under a whole layer draws what a whole mask under a half-opaque layer draws, for lips (the emissive place), blush and brow fill. I checked it fails if `create_material`'s linear view is reverted: for lips, half mask (132.9, 110.1, 115.6) against half layer (111.7, 113.8, 141.9).
+- **Amount 1 shows every spot.** `skin_spot_shown` returns 1 at amount 1 or more. Test `a_markings_full_amount_shows_every_spot`: a freckle ranked 0.99 showed 0.36 of the way before the fix.
+- **No mole between the brows.** The face's moles keep at least 5 to 12 mm off the face's middle, where one read as a bindi. This moved them: at the player test's 480 by 270 face-front size about a dozen pixels change, so `moles_change_the_face_against_bare_skin`'s lower bound went from 0.0001 to 0.00004 of the picture. It failed once in the full run at 0.000085 and passes now.
+- **ADR-0042 records its departure from plan row 290.** Plan row 290 reserved `skin: {tone, undertone, details, ...}`. The ADR now says tone, undertone and detail stay Skin material values on purpose, and records the pores' route.
+- **The live colour test's docstring no longer overclaims.** It now says the test checks the attribute. That the draw list draws from it is scene's test.
+- **Docs:** `docs/rendering/skin.md` (a Pores and fine lines bullet, and the new tests), `wiki/Engine-Systems/Rendering.md`, `wiki/Roadmap/Known-Limitations.md` (the pores, and the wing's size).
+
+### Not done (non-blocking, left open)
+
+- The player per-layer tests still don't pin placement. The vivid-colour sheet is the only check.
+- The grain test still reads `Realistic.build.json` only. The new digest check covers the masks, not the normal map.
+- The masks have not been checked through BC7 cooking.
+- The scar is still faint under the studio light at face-front distance.
+- Brow fill still barely shows.
+- The GPU cost with makeup layers on is not measured (the bench draws no makeup).
+- The Skin page's footer, `DRAWN_TODAY` and a snapshot with layers on are left to RA1.
+- The plan's row 290 still says "Waits for R5". That is the lead's file.
+
+### Tests run
+
+- Red run (before the fixes): 6 run, 4 failed, 2 passed. The two that passed from the start are the fade guard and the linear-view test; see the red-run file.
+- `cargo nextest run -p axcenity-avatar -p axcenity-assets -p axcenity-render -p axcenity-scene -p axcenity-gameplay -p axcenity-player -p axcenity-editor --no-fail-fast`: Summary [490.8s] 2527 tests run: 2526 passed (34 slow), 1 failed, 35 skipped. The failure was `moles_change_the_face_against_bare_skin` (above). After the bound change: 1 run, 1 passed.
+- The new and changed tests on their own, all passing:
+  - assets: `the_eyeliner_wing_continues_the_lash_line_out_of_the_corner`;
+  - render: `skin_pores::skin_shows_pores_close_up_as_strong_as_its_detail`, `skin_pores::skin_pores_fade_out_where_they_would_be_smaller_than_a_pixel`, `skin_layers::a_masks_middle_value_covers_half_in_every_slot`, `skin_layers::a_markings_full_amount_shows_every_spot`;
+  - player: `makeup_tests::the_cheek_close_up_shows_pores`.
+- The full run includes `every_example_renders`, the probe guard `every_other_material_draws_as_it_did_before_the_skin_model`, every wave-2 skin test and the nine per-layer tests. All passed.
+- `cargo clippy` on the 7 crates with `--all-targets -- -D warnings`: clean. `cargo fmt --all -- --check`: clean.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all "may be stale" on pages I didn't touch).
+
+### Regenerated for this fix (committed)
+
+- `RealisticParts.glb`, from the bpy 5.3 python running `build.py --out <scratch>`. The masks changed: the wing, and the moles off the middle. The skin maps are unchanged.
+- `Realistic.build.json`: `textures.makeup` gains `digests` and `wing`, and the eyeliner's share changed.
+- Unchanged: `Realistic.base.json`, `catalogue.json` (line endings only, not committed), the item manifests (line endings only), presets and benchmarks.
+
+**At merge:** if another track rebuilt the GLB, run `build.py` again after merging. My content change is only `makeup.py`. The render changes for the CO8 merge are fragment-only: new functions in `skin.wgsl` (the pores, and `skin_spot_shown`'s clamp) and one more guarded block in `standard_surface` (`shader.wgsl`). No binding, layout or uniform changed.

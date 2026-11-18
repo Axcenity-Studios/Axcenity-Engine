@@ -74,3 +74,29 @@ cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/makeup/)'
 in the full debug run on the shared machine, so it was split into one test per layer with the same
 assertions: foundation_changes_the_face_against_bare_skin, blush_..., eyeshadow_..., eyeliner_...,
 lip_colour_..., brow_fill_..., freckles_change_..., moles_change_..., the_scar_changes_the_face_against_bare_skin.)
+
+======================================================================================================
+Review fixes 1 (the tests written before the fixes, run against the branch as reviewed, f2204ddb)
+======================================================================================================
+
+cargo nextest run -p axcenity-render -p axcenity-assets -p axcenity-player --no-fail-fast \
+  -E 'test(/skin_pores|middle_value|full_amount_shows|eyeliner_wing|cheek_close_up/)'
+
+    FAIL axcenity-assets model::tests::the_eyeliner_wing_continues_the_lash_line_out_of_the_corner
+        the build measures the wing
+    FAIL axcenity-player makeup_tests::the_cheek_close_up_shows_pores
+        the cheek close up: 0 pits in 22.2 cm2, 0 a square centimetre
+    FAIL axcenity-render renderer::tests::skin_layers::a_markings_full_amount_shows_every_spot
+        ranked 0: [127.9, 88.8, 71.5]; ranked 0.99: [139.5, 100.6, 82.9]
+        a spot ranked 0.99 shows 0.359 of the way
+    FAIL axcenity-render renderer::tests::skin_pores::skin_shows_pores_close_up_as_strong_as_its_detail
+        (first version measured the square's whole shading and failed on flat skin too; rewritten to
+        measure each pixel against its 7 x 7 neighbourhood, then run again:)
+        spread: none 0.18, full 0.17, double 0.18; pits: none 0, full 0
+        skin close up varies by only 0.166: no pores
+    PASS axcenity-render renderer::tests::skin_pores::skin_pores_fade_out_where_they_would_be_smaller_than_a_pixel
+        (passes before the change: nothing is drawn yet; it guards the fade once pores are)
+    PASS axcenity-render renderer::tests::skin_layers::a_masks_middle_value_covers_half_in_every_slot
+        (a test the review found missing, of behaviour that already worked: the emissive slot's
+        linear view. Reverting create_material's linear view makes it fail.)
+     Summary 6 tests run: 2 passed, 4 failed
