@@ -151,3 +151,35 @@ fn drives_have_a_measured_axis_and_travel_and_one_line_each_per_view() {
         }
     }
 }
+
+/// The eye-corner handles sit on the outer corner of the eye, not on the
+/// cheek (where they were, 10 mm below): within 4 mm of the eye's height
+/// and out to the side of it, within 2 cm. The eye's height is the eyes
+/// feature's anchor on that side (both are offsets from the head bone);
+/// that anchor, the eye region's middle, is about 6 mm under the eyeball's
+/// centre and the outer corner about 3 mm under it, so they are 3 mm apart.
+#[test]
+fn the_eye_corner_handles_sit_at_the_eye_s_outer_corner() {
+    let base = realistic();
+    let eyes = base.feature("eyes").unwrap();
+    for id in ["eye_corner_left", "eye_corner_right"] {
+        let handle = base.handle(id).unwrap();
+        let [x, y, _] = handle.anchor.offset;
+        let eye = eyes
+            .anchors
+            .iter()
+            .find(|anchor| anchor.offset[0].signum() == x.signum())
+            .unwrap();
+        assert_eq!(handle.anchor.bone, eye.bone, "{id}");
+        let below = (y - eye.offset[1]) * 1000.0;
+        assert!(
+            below.abs() <= 4.0,
+            "{id}: {below:.1} mm off the eye's height"
+        );
+        let out = (x.abs() - eye.offset[0].abs()) * 1000.0;
+        assert!(
+            (0.0..=20.0).contains(&out),
+            "{id}: {out:.1} mm out to the side of the eye"
+        );
+    }
+}

@@ -287,15 +287,17 @@ fn symmetry_moves_the_mirror() {
         let mut studio = Studio::new(&format!("handles-symmetry-{symmetry}"));
         studio.workspace.apply(Intent::SetSymmetry(symmetry));
         studio.select("eyes", ViewPreset::Face);
-        // The right handle's place against the nose's (the head idles,
-        // so the screen alone would move it a little).
-        let right_of_nose = |studio: &mut Studio| {
-            studio.handle("eye_right") - studio.workspace.handle_point("nose_tip").unwrap()
+        // The right handle's place against the right eye's anchor, which
+        // the head's bone carries and no eye parameter moves (the head
+        // idles, so the screen alone would move it; the nose, further off,
+        // turned with the idle by up to 1.3 points under load).
+        let right_of_eye = |studio: &mut Studio| {
+            studio.handle("eye_right") - studio.workspace.anchor_point("eyes", 1).unwrap()
         };
         let left = studio.handle("eye_left");
-        let right = right_of_nose(&mut studio);
+        let right = right_of_eye(&mut studio);
         studio.drag(left, vec2(120.0, 0.0));
-        let moved = right_of_nose(&mut studio) - right;
+        let moved = right_of_eye(&mut studio) - right;
         let spacing = |side: &str| studio.workspace.parameter(&format!("eye_spacing_{side}"));
         assert!(spacing("left") > 0.4, "the left eye moved out");
         if symmetry {
@@ -309,6 +311,51 @@ fn symmetry_moves_the_mirror() {
             assert!(moved.x.abs() < 0.75, "the right handle stayed ({moved:?})");
         }
     }
+}
+
+/// Esc during a handle drag takes it back: the description is as it was
+/// before the press, nothing is left to undo, and the rest of the drag
+/// does nothing.
+#[test]
+fn esc_cancels_a_handle_drag() {
+    let mut studio = Studio::new("handles-esc");
+    studio.select("eyes", ViewPreset::Face);
+    let start = studio.workspace.description().clone();
+    let from = studio.handle("eye_left");
+    let button = |pos: Pos2, pressed: bool| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    studio.frame(vec![egui::Event::PointerMoved(from)]);
+    studio.frame(vec![button(from, true)]);
+    for step in 1..=3 {
+        studio.frame(vec![egui::Event::PointerMoved(
+            from + vec2(30.0 * step as f32, 0.0),
+        )]);
+    }
+    assert!(
+        studio.workspace.parameter("eye_spacing_left") > 0.0,
+        "the drag moved the eye"
+    );
+    let escape = egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    studio.frame(vec![escape]);
+    studio.frame(vec![egui::Event::PointerMoved(from + vec2(150.0, 0.0))]);
+    studio.frame(vec![button(from + vec2(150.0, 0.0), false)]);
+    studio.settle();
+    assert_eq!(
+        studio.workspace.description(),
+        &start,
+        "as before the press"
+    );
+    assert_eq!(studio.undo_depth(), 0, "nothing to undo");
 }
 
 /// Hovering lights the feature under the pointer and names it; a click

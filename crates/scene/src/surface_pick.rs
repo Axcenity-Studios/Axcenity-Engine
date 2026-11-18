@@ -166,7 +166,7 @@ pub fn ray_model(
 /// Möller and Trumbore's ray and triangle test: the distance along the ray
 /// and the hit's share of `b` and `c`, or `None` for a miss (or a hit
 /// behind the origin).
-fn triangle_hit(
+pub fn triangle_hit(
     origin: Vec3,
     direction: Vec3,
     a: Vec3,
@@ -245,6 +245,15 @@ pub fn fitted_per_metre(model: &Model) -> Option<f32> {
     Some(rig.fit.transform_vector3(Vec3::X).length()).filter(|scale| scale.is_finite())
 }
 
+/// What turns a step in `model`'s fitted space into the file's metres,
+/// axis by axis. The fitted box scales each axis by its own size (a body
+/// is much wider, arms out, than deep), so a distance between fitted
+/// points is only a distance once multiplied by this.
+pub fn to_metres(model: &Model) -> Vec3 {
+    let size = Vec3::from(model.size);
+    Vec3::select(size.cmpgt(Vec3::splat(1e-6)), size, Vec3::ONE)
+}
+
 /// An anchor (a bone, and an offset from its head in the file's space at
 /// rest, metres) in `model`'s fitted space at rest. The head is where the
 /// skin was bound to the bone (its inverse bind), as the build measured it;
@@ -263,17 +272,19 @@ pub fn rest_anchor(model: &Model, bone: &str, offset: Vec3) -> Option<Vec3> {
 /// space, at rest): the skin a handle anchored there sits on. A model with
 /// skin-shaded primitives (a character's body) answers with a corner of its
 /// skin: where the skin meets the inside of the mouth or the eye sockets
-/// the two share positions, and only the skin's corner faces out.
+/// the two share positions, and only the skin's corner faces out. Nearest
+/// in the file's metres ([`to_metres`]), not in the fitted box.
 pub fn nearest_corner(model: &Model, point: Vec3) -> Option<Corner> {
     let skin = |mesh: &axcenity_assets::Primitive| mesh.material.shading == ModelShading::Skin;
     let any_skin = model.primitives.iter().any(skin);
+    let metres = to_metres(model);
     let mut best: Option<(f32, Corner)> = None;
     for (primitive, mesh) in model.primitives.iter().enumerate() {
         if any_skin && !skin(mesh) {
             continue;
         }
         for (index, position) in mesh.positions.iter().enumerate() {
-            let distance = Vec3::from(*position).distance_squared(point);
+            let distance = ((Vec3::from(*position) - point) * metres).length_squared();
             if best.is_none_or(|(nearest, _)| distance < nearest) {
                 best = Some((distance, Corner { primitive, index }));
             }
@@ -312,6 +323,20 @@ pub fn corners_drawn(
     drawn(model, posed, primitive)
         .iter()
         .map(|position| transform.transform_point3(Vec3::from(*position)))
+        .collect()
+}
+
+/// The normals of [`corners_drawn`]'s corners, in the world (unit length).
+pub fn normals_drawn(
+    model: &Model,
+    posed: Option<&Posed>,
+    transform: Mat4,
+    primitive: usize,
+) -> Vec<Vec3> {
+    let turn = Mat3::from_mat4(transform).inverse().transpose();
+    drawn_normals(model, posed, primitive)
+        .iter()
+        .map(|normal| (turn * Vec3::from(*normal)).normalize_or_zero())
         .collect()
 }
 

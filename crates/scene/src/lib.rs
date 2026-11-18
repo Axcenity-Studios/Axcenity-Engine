@@ -77,7 +77,7 @@ pub use preload::{AssetFile, asset_files};
 pub use streaming::Streaming;
 pub use surface_pick::{
     Corner, MeshHit, PartHit, corner_drawn, corners_drawn, fitted_per_metre, nearest_corner,
-    placement, ray_model, ray_parts, rest_anchor,
+    normals_drawn, placement, ray_model, ray_parts, rest_anchor, to_metres, triangle_hit,
 };
 pub use terrain::{DEFAULT_DETAIL_DISTANCE, TerrainCache, terrain_hit};
 pub use time_of_day::sun_direction;

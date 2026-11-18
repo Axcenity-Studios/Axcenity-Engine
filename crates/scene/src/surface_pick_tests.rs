@@ -4,7 +4,9 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
-use axcenity_assets::{Identity, IdentityLayer, Model, ModelFormat, Pick, Posed, load_models};
+use axcenity_assets::{
+    Identity, IdentityLayer, Model, ModelFormat, ModelShading, Pick, Posed, load_models,
+};
 use axcenity_render::glam::{Mat4, Quat, Vec3};
 
 use super::*;
@@ -137,7 +139,7 @@ fn the_identity_s_weights_change_where_the_ray_hits() {
     // The corner moved with it, and the ray still meets the skin there.
     let (tip, _) = corner_drawn(model, Some(&longer), placement(), corner).unwrap();
     assert!(tip.distance(point) / millimetre > 2.0);
-    // A pose of another model is not used: the rest mesh is.
+    // Without a pose the rest mesh is tested: the same as the plain pose.
     let rest = ray_model(model, None, placement(), ray).unwrap();
     assert!((rest.distance - before.distance).abs() < millimetre);
 }
@@ -160,4 +162,77 @@ fn a_ray_that_misses_the_body_returns_none() {
         direction: Vec3::Z,
     };
     assert_eq!(ray_model(model, Some(&posed), placement(), beside), None);
+}
+
+/// A handle's anchor finds the skin's corner nearest it in the file's
+/// metres, not in the fitted box (whose axes are scaled apart: the body is
+/// much wider, arms out, than it is deep). Points 3 mm off corners spread
+/// over the skin find the corner a search in metres finds.
+#[test]
+fn the_nearest_corner_is_nearest_in_the_file_s_metres() {
+    let model = body();
+    let fit = model.rig.as_ref().unwrap().fit;
+    let unfit = fit.inverse();
+    let tip = nose_tip(model);
+    let ahead = rest_anchor(model, "Head", Vec3::new(0.0, 0.0144, 0.1414)).unwrap();
+    assert_eq!(nearest_corner(model, ahead), Some(tip));
+    let skin: Vec<(Corner, Vec3)> = model
+        .primitives
+        .iter()
+        .enumerate()
+        .filter(|(_, mesh)| mesh.material.shading == ModelShading::Skin)
+        .flat_map(|(primitive, mesh)| {
+            mesh.positions.iter().enumerate().map(move |(index, at)| {
+                (
+                    Corner { primitive, index },
+                    unfit.transform_point3(Vec3::from(*at)),
+                )
+            })
+        })
+        .collect();
+    let mut wrong = 0;
+    let tried = skin.len().div_ceil(211);
+    for (_, at) in skin.iter().step_by(211) {
+        let near = *at + Vec3::new(0.0017, -0.0017, 0.0017);
+        let expected = skin
+            .iter()
+            .min_by(|a, b| a.1.distance(near).total_cmp(&b.1.distance(near)))
+            .unwrap();
+        let found = nearest_corner(model, fit.transform_point3(near)).unwrap();
+        let found_at = skin.iter().find(|(corner, _)| *corner == found).unwrap().1;
+        // A tie (corners repeated at seams) is as near either way.
+        if found_at.distance(near) > expected.1.distance(near) + 1e-6 {
+            wrong += 1;
+        }
+    }
+    assert_eq!(wrong, 0, "{wrong} of {tried} points found a farther corner");
+}
+
+/// The ray meets the skin where the pose puts it, not where it rests: with
+/// the head turned 30 degrees, a ray at the turned nose tip hits it within
+/// a millimetre, and the same ray against the rest mesh does not.
+#[test]
+fn a_ray_at_a_turned_head_meets_the_posed_skin() {
+    let model = body();
+    let rig = model.rig.as_ref().unwrap();
+    let mut pose = rig.rest_pose();
+    let head = rig.bone("Head").unwrap();
+    pose[head].rotation = Quat::from_rotation_y(30f32.to_radians()) * pose[head].rotation;
+    let turned = model.pose(&pose).unwrap();
+    let corner = nose_tip(model);
+    let (point, normal) = corner_drawn(model, Some(&turned), placement(), corner).unwrap();
+    let (resting, _) = corner_drawn(model, None, placement(), corner).unwrap();
+    let millimetre = 0.001 * per_metre(model);
+    assert!(
+        point.distance(resting) / millimetre > 20.0,
+        "the turn moved the tip"
+    );
+    let ray = Ray {
+        origin: point + normal * 0.5,
+        direction: -normal,
+    };
+    let hit = ray_model(model, Some(&turned), placement(), ray).expect("a hit");
+    assert!(hit.point.distance(point) < millimetre);
+    let rest = ray_model(model, None, placement(), ray);
+    assert!(rest.is_none_or(|rest| rest.point.distance(point) > 5.0 * millimetre));
 }

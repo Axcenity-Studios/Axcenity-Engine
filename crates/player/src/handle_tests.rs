@@ -4,10 +4,21 @@
 //! drives, and its measured `axis` and `travel` are how that skin moves,
 //! so one centimetre of drag moves the surface about one centimetre.
 //!
-//! The handle is found as Character Studio finds it: its anchor at rest
+//! A handle is found as Character Studio finds it: its anchor at rest
 //! (`scene::rest_anchor`), the skin's corner there (`nearest_corner`), and
 //! that corner where the frame's pose draws it (`corner_drawn`), the pose
-//! carrying the identity live (ADR-0041).
+//! carrying the identity live (ADR-0041). The tests hold the data to the
+//! skin, not that corner to itself: the anchor must lie on the skin at
+//! rest, and at a parameter's end the handle the data predicts (the
+//! anchor where the start draws it, plus the drive's `axis` times `travel`
+//! times the share of the range the value moved) must lie on the skin the
+//! player applied for that end. A wrong anchor, axis or travel fails.
+//!
+//! The anchor is carried by its skin corner, not by its bone alone: the
+//! feminine frame's shapes move the face up to 22 mm and the shoulders 36
+//! mm off where the head's or the shoulder's bone would carry them, and a
+//! hip corner shared with the thigh's twist bone sits 5 mm off its bone's
+//! carry even on the masculine frame (Review fixes 1 in the hand-back).
 
 use std::sync::Arc;
 
@@ -15,7 +26,9 @@ use axcenity_avatar::{BaseManifest, Description, Handle};
 use axcenity_core::Value;
 use axcenity_gameplay::description::{apply_description, default_description, library};
 use axcenity_render::glam::{Mat4, Vec3};
-use axcenity_scene::{corner_drawn, fitted_per_metre, nearest_corner, placement, rest_anchor};
+use axcenity_scene::{
+    corner_drawn, fitted_per_metre, nearest_corner, placement, rest_anchor, to_metres,
+};
 
 use super::character_capture::{Stage, repository_library};
 use super::*;
@@ -91,24 +104,49 @@ impl Character {
         self.stage.assets.model_blocking(&mesh).unwrap()
     }
 
-    /// Where `handle` is drawn, and the body as posed (every triangle's
-    /// corners in the world).
-    fn handle(&self, handle: &Handle) -> (Vec3, Vec<[Vec3; 3]>) {
+    /// Where `handle` is drawn by the studio (its skin corner as posed).
+    fn handle(&self, handle: &Handle) -> Vec3 {
         let model = self.model();
         let posed = self.animators.poses().get(&self.body).cloned();
         let transform = placement(&self.world, self.body).unwrap();
         let offset = Vec3::from(handle.anchor.offset);
         let anchor = rest_anchor(&model, &handle.anchor.bone, offset).unwrap();
         let corner = nearest_corner(&model, anchor).unwrap();
-        let (point, _) = corner_drawn(&model, posed.as_deref(), transform, corner).unwrap();
+        corner_drawn(&model, posed.as_deref(), transform, corner)
+            .unwrap()
+            .0
+    }
+
+    /// Where the data puts `handle`'s anchor now: its skin corner as the
+    /// frame's pose draws it, plus the anchor's own offset from that corner
+    /// at rest (so an anchor off the skin stays off it).
+    fn anchored(&self, handle: &Handle) -> Vec3 {
+        let model = self.model();
+        let offset = Vec3::from(handle.anchor.offset);
+        let anchor = rest_anchor(&model, &handle.anchor.bone, offset).unwrap();
+        let corner = nearest_corner(&model, anchor).unwrap();
+        let at = Vec3::from(model.primitives[corner.primitive].positions[corner.index]);
+        let transform = placement(&self.world, self.body).unwrap();
+        self.handle(handle) + transform.transform_vector3(anchor - at)
+    }
+
+    /// The body's skin as posed: every triangle of its skin-shaded
+    /// primitives, corners in the world.
+    fn skin(&self) -> Vec<[Vec3; 3]> {
+        let model = self.model();
+        let posed = self.animators.poses().get(&self.body).cloned();
+        let transform = placement(&self.world, self.body).unwrap();
         let mut triangles = Vec::new();
         for (index, primitive) in model.primitives.iter().enumerate() {
+            if primitive.material.shading != axcenity_assets::ModelShading::Skin {
+                continue;
+            }
             let corners = axcenity_scene::corners_drawn(&model, posed.as_deref(), transform, index);
             for triangle in primitive.indices.as_chunks::<3>().0 {
                 triangles.push(triangle.map(|corner| corners[corner as usize]));
             }
         }
-        (point, triangles)
+        triangles
     }
 
     /// World units in a metre of the body's file.
@@ -164,37 +202,83 @@ fn distance_to_surface(point: Vec3, triangles: &[[Vec3; 3]]) -> f32 {
         .fold(f32::INFINITY, f32::min)
 }
 
+/// A handle's anchor names a point of the skin: at rest, the skin's
+/// nearest corner (the one the studio draws the handle on) is within 2 mm
+/// of it. An anchor moved to another bone, or off the skin, fails here.
+#[test]
+fn every_handle_s_anchor_is_on_the_skin_at_rest() {
+    let character = Character::new("handles-anchored");
+    let base = character.base();
+    let model = character.model();
+    assert!(!base.handles.is_empty(), "the realistic body has handles");
+    for handle in &base.handles {
+        let offset = Vec3::from(handle.anchor.offset);
+        let anchor = rest_anchor(&model, &handle.anchor.bone, offset).unwrap();
+        let corner = nearest_corner(&model, anchor).unwrap();
+        let at = Vec3::from(model.primitives[corner.primitive].positions[corner.index]);
+        let off = ((at - anchor) * to_metres(&model)).length();
+        assert!(
+            off <= 0.002,
+            "{}: its anchor is {:.2} mm from the nearest skin corner",
+            handle.id,
+            off * 1000.0
+        );
+    }
+}
+
 /// The R2 "Done when": every handle stays within 2 mm of the applied
 /// body's skin at both ends of each parameter it drives, on both frames.
+/// The handle at an end is predicted from the data (plan 11.3), not found
+/// on the skin: its anchor where the start description draws it, plus the
+/// drive's `axis` times `travel` times the share of the range the value
+/// moved from its default. It is measured against the skin's triangles as
+/// the player applies and poses that end. The travel was measured on the
+/// masculine frame, so the feminine frame is the stricter case.
 #[test]
 fn every_handle_stays_on_the_skin_at_its_parameters_ends() {
     let mut character = Character::new("handles-on-skin");
     let base = character.base();
     assert!(!base.handles.is_empty(), "the realistic body has handles");
     let shipped = library(&character.stage.assets);
+    let mut report = Vec::new();
+    let mut off = Vec::new();
     for frame in [0.0, 1.0] {
         let mut start = default_description(&shipped, BASE);
         start.parameters.insert("frame".into(), frame);
-        for handle in &base.handles {
+        character.wear(&start);
+        let from: Vec<Vec3> = base.handles.iter().map(|h| character.anchored(h)).collect();
+        let to_world = character.transform();
+        for (handle, from) in base.handles.iter().zip(from) {
             for drive in &handle.drives {
                 let parameter = base.parameter(&drive.parameter).unwrap();
+                let span = parameter.range[1] - parameter.range[0];
                 for end in parameter.range {
                     let mut description = start.clone();
                     description.parameters.insert(drive.parameter.clone(), end);
                     character.wear(&description);
-                    let (point, triangles) = character.handle(handle);
-                    let off = distance_to_surface(point, &triangles) / character.per_metre();
-                    assert!(
-                        off <= 0.002,
-                        "{} with {} at {end} (frame {frame}): {:.2} mm off the skin",
-                        handle.id,
-                        drive.parameter,
-                        off * 1000.0
+                    let share = (end - parameter.default) / span;
+                    let point = from
+                        + to_world.transform_vector3(Vec3::from(drive.axis) * drive.travel * share);
+                    let mm = distance_to_surface(point, &character.skin()) / character.per_metre()
+                        * 1000.0;
+                    let line = format!(
+                        "frame {frame} {} {} at {end}: {mm:.2} mm",
+                        handle.id, drive.parameter
                     );
+                    if mm > 2.0 {
+                        off.push(line.clone());
+                    }
+                    report.push(line);
                 }
             }
         }
     }
+    println!("{}", report.join("\n"));
+    assert!(
+        off.is_empty(),
+        "more than 2 mm off the skin:\n{}",
+        off.join("\n")
+    );
 }
 
 /// Each drive's `axis` and `travel` (measured by `handles.py` on the
@@ -220,7 +304,7 @@ fn every_drive_moves_the_skin_by_its_measured_travel() {
                 let mut description = start.clone();
                 description.parameters.insert(drive.parameter.clone(), end);
                 character.wear(&description);
-                ends.push(character.handle(handle).0);
+                ends.push(character.handle(handle));
             }
             let moved = ends[1] - ends[0];
             let expected = character

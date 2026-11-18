@@ -34,3 +34,52 @@ manifest (its loop is empty), and the snapshot test only draws when
 AXCENITY_SNAPSHOTS is set. The assets region-map and scene ray tests were
 written with their code (Primitive::regions did not exist, so they could not
 compile before it).
+
+Review fixes 1 (2026-11-17)
+===========================
+
+1. The "within 2 mm" test was vacuous: it measured a skin corner against
+   the skin it belongs to. The reviewer showed it passed with the nose tip's
+   anchor moved to LeftFoot. The rewritten tests, run against two mutations
+   of the nose tip's anchor in Realistic.base.json (restored afterwards):
+
+   Anchor moved to bone LeftFoot, offset [0, 0, 0]:
+        FAIL handle_tests::every_handle_s_anchor_is_on_the_skin_at_rest
+             nose_tip: its anchor is 24.04 mm from the nearest skin corner
+        FAIL handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+             nose_tip nose_length: 0.0 mm measured, 6.9 mm in the data
+        FAIL handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+             frame 0 nose_tip nose_length at -1: 24.12 mm (more than 2 mm off the skin)
+     Summary 3 tests run: 0 passed, 3 failed
+
+   Anchor offset moved 5 mm forward, off the nose tip:
+        FAIL handle_tests::every_handle_s_anchor_is_on_the_skin_at_rest
+             nose_tip: its anchor is 4.99 mm from the nearest skin corner
+        PASS handle_tests::every_drive_moves_the_skin_by_its_measured_travel
+        FAIL handle_tests::every_handle_stays_on_the_skin_at_its_parameters_ends
+             frame 0 nose_tip nose_length at -1: 4.99 mm (more than 2 mm off the skin)
+     Summary 3 tests run: 1 passed, 2 failed
+
+   (The first version of the rest check measured in the fitted box, whose
+   axes are scaled apart, and reported the 5 mm move as 21.54 mm; that is
+   what found the scene fix below.)
+
+   scene, written first against the old nearest_corner (distance in the
+   fitted box):
+        FAIL surface_pick::tests::the_nearest_corner_is_nearest_in_the_file_s_metres
+             assertion `left == right` failed: 20 of 55 points found a farther corner
+     Summary 5 tests run: 4 passed, 1 failed
+
+2. The eye-corner handles sat on the cheek. avatar, written first against
+   the old manifest:
+        FAIL realistic_handles the_eye_corner_handles_sit_at_the_eye_s_outer_corner
+             eye_corner_left: -10.1 mm off the eye's height
+     Summary 4 tests run: 3 passed, 1 failed
+
+3. The overlay (jagged outline, broad eye tint, nostril loop) is visual: it
+   was checked on the drawing snapshots before and after
+   (r2-handles/handles-close-ups.jpg), not by a red test.
+
+Also added, passing when first run (they cover behaviour already there):
+editor handle_tests::esc_cancels_a_handle_drag, scene
+surface_pick::tests::a_ray_at_a_turned_head_meets_the_posed_skin.

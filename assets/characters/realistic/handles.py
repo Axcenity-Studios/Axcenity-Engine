@@ -77,6 +77,12 @@ TRUNK = ["torso", "waist", "hips", "thighs_top"]
 #       bone's head that face away from it, the one most nearly in
 #       `direction` from it (the upper lid over the pupil, from the
 #       eyeball's centre);
+#   ("canthus", bone): the eye's outer corner. Of the skin's corners
+#       within 2 cm of the eyeball's centre and within 4 mm of its height,
+#       those that face into the eye are the lid's margin turning into the
+#       opening; the most lateral of them is where the lids meet. The
+#       handle sits on the outward-facing skin corner nearest it (within
+#       3 mm), so it shows from the front;
 #   ("narrowest", region) / ("widest", region): the side of the region
 #       where the trunk is narrowest or widest (in slices), the
 #       outline's corner half-way front to back.
@@ -91,7 +97,7 @@ HANDLES = [
      "at": ("lid", "{Side}Eye", [0.0, 0.6, 0.8]),
      "drives": ["eye_spacing_{side}", "eye_height_{side}", "eye_depth_{side}"]},
     {"id": "eye_corner_{side}", "feature": "eyes", "label": "{Side} eye corner",
-     "at": ("moved", "eye_tilt_{side}"), "drives": ["eye_size_{side}", "eye_tilt_{side}"]},
+     "at": ("canthus", "{Side}Eye"), "drives": ["eye_size_{side}", "eye_tilt_{side}"]},
     {"id": "jaw_{side}", "feature": "jaw", "label": "{Side} jaw corner",
      "at": ("moved", "jaw_width_{side}"), "drives": ["jaw_width_{side}", "jaw_angle_{side}"]},
     {"id": "mouth_corner_{side}", "feature": "lips", "label": "{Side} mouth corner",
@@ -309,6 +315,21 @@ def choose(model, at, side, ends):
         want = np.array(at[2]) / np.linalg.norm(at[2])
         allowed = model.skin & (reach < 0.02) & facing
         return int(np.argmax(np.where(allowed, out @ want, -2.0)))
+    if kind == "canthus":
+        offset = P - body.heads[sided(at[1], side)]
+        reach = np.linalg.norm(offset, axis=1)
+        facing = np.einsum("ij,ij->i", model.normals, offset / np.maximum(reach, 1e-9)[:, None])
+        lateral = offset[:, 0] * (1.0 if side == "Left" else -1.0)
+        band = model.skin & (reach < 0.02) & (np.abs(offset[:, 1]) < 0.004) & (lateral > 0)
+        margin = band & (facing < 0.0)
+        if not margin.any():
+            raise ValueError(f"no lid margin round {sided(at[1], side)}")
+        rim = int(np.argmax(np.where(margin, lateral, -np.inf)))
+        apart = np.linalg.norm(P - P[rim], axis=1)
+        outside = model.skin & (facing > 0.5) & (apart < 0.003)
+        if not outside.any():
+            raise ValueError(f"no skin facing out by the corner of {sided(at[1], side)}")
+        return int(np.argmin(np.where(outside, apart, np.inf)))
     if kind == "forward":
         moved = np.linalg.norm(body.shapes[at[1]], axis=1) > 1e-5
         return int(np.argmax(np.where(moved & on_side, P[:, 2], -np.inf)))
