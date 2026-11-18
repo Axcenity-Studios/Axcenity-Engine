@@ -104,7 +104,8 @@ fn the_realistic_skin_has_its_makeup_and_marking_masks() {
     // freckles and their ranks, moles and their ranks.
     let names = [
         ["foundation", "blush", "eyeshadow", "eyeliner"],
-        ["lips", "brow fill", "scar", ""],
+        // Stubble's density fills the spare channel since R6.
+        ["lips", "brow fill", "scar", "stubble"],
         ["freckles", "freckle ranks", "moles", "mole ranks"],
     ];
     for (mask, names) in skin.skin_masks.iter().zip(names) {
@@ -116,10 +117,6 @@ fn the_realistic_skin_has_its_makeup_and_marking_masks() {
                 .chunks_exact(4)
                 .filter(|texel| texel[channel] > 127)
                 .count() as f64;
-            if name.is_empty() {
-                assert_eq!(covered, 0.0, "the spare channel is empty");
-                continue;
-            }
             let share = covered / count;
             assert!(
                 share > 0.00002 && share < 0.25,

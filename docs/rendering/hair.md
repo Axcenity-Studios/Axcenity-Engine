@@ -15,7 +15,7 @@ A model file says it. A glTF material whose `extras` hold `"axcenity_shading": "
 | `roughnessFactor` (and a roughness map, if any) | the strands' longitudinal roughness | 0.3 to 0.45 reads as human hair. The lobes' widths are `roughness²` (R), half of it (TT) and twice it (TRT) |
 | `extras.axcenity_hair_data` | `{"index": <texture>}`: the atlas's data map | Optional. Placed like the base colour map; read only where there is one |
 | `extras.axcenity_hair_flow` | `{"index": <texture>}`: the flow map | Optional; without it the strands run along the texture's +V |
-| mesh tangents | MikkTSpace (glTF `TANGENT`, or the engine's own) | The strand's direction is built from them |
+| mesh tangents | MikkTSpace (glTF `TANGENT`, or the engine's own) | The strand's direction is built from them. **Give the material a normal map** (a strand relief is right for cards anyway): `assets` makes tangents only for a material with one (`model.rs`, `fit`) and doesn't read a file's `TANGENT`, so a hair material without a normal map gets the fallback tangent (`mesh::NO_TANGENT`, model-space +X) and is lit along one fixed direction (found by R6's first hairstyle; a fix in `assets` is RA7's) |
 | `metallicFactor` | ignored | Hair isn't metal; the metalness map's place holds the data map |
 
 ### The atlas's data map
@@ -102,6 +102,10 @@ A hair card is a cut-out (`alpha_cutoff` > 0). Its depth is drawn before the sce
 ## Cost
 
 `bench_hair_and_cloth_models` (render tests, ignored; RX 9070 XT, 1080p High with TAA, medians of 200 frames, the sun with shadows): a ball filling the view costs 0.432 ms in the Scene pass drawn Standard, 0.464 ms drawn Hair (+0.03 ms), 0.479 ms Skin. 24 layered cut-out cards over the view: 0.681 ms as Hair under TAA against 0.818 ms as Standard cut-outs (the hashed band leaves out fainter pixels), 0.928 ms against 0.927 ms under MSAA 4×; their shadow maps 0.029 to 0.037 ms (the cut-out shadow pipeline reads each caster's texture). One run, on a machine shared with other builds. For scale: the same pipeline on 36,000 leaf cards cost 0.22 ms more than casting them whole ([shadows.md](shadows.md)), so a hairstyle of a few hundred cards adds a few hundredths of a millisecond.
+
+## The first hairstyle
+
+`axcenity/realistic-hair-short-crop` (Character Studio R6, `assets/characters/realistic/hair/`, a **draft**) is the first content built to this contract: one `Hair` material (MASK, cut-off 0.5, two-sided, roughness 0.3), a 2048² atlas with the colour, data, flow and normal maps, every card's texture coordinates running root to tip down its tile. Its cards and cap are 27,600 triangles at hero, 16,000 at the gameplay copy and under 500 at the crowd copy. What it showed about this model is in its hand-back (`docs/development/character-studio/refinement/wave4/r6-hair-first.md`): the R lobe reads as a broad pale grey sheen over the top of dark hair under the studio light, and the tangent gap above.
 
 ## Not yet
 

@@ -68,6 +68,7 @@ The constraints:
 - The masks are 2K like the skin maps: a 1 mm eyeliner is about two texels on the face. A face-only mask at higher density is the upgrade if close-ups need it.
 - Pores and fine lines finer than the maps (the review of this ADR's first build) are drawn by the Skin model from the texture coordinates (`skin.wgsl`, `skin_micro`), not a mask: they need no slot and no content, and fade where they would alias.
 - Revisit when decals are built (point 6), or if CO8's posed buffer gives the shader a rest position (then freckles could be procedural at any density).
+- **The spare channel is stubble's** (R6, 2026-11-18): mask 2's alpha holds the beard region's stubble density with a follicle stipple (`makeup.py`, `stubble_mask`), for a marking-kind layer `stubble` whose colour comes from the hair's melanin. Drawing it needs uniform room in `skin_layer_uniform` (every slot is taken), so the base doesn't offer the layer until the Skin model draws it (`docs/rendering/skin.md`). With it, the three masks are full: a tenth layer needs the fourth mask or the decal path, as above.
 
 ## Implementation references
 
