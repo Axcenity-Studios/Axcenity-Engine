@@ -65,7 +65,7 @@ PROPORTION_RANGES = {
     "leg_length": [0.85, 1.125],
     "arm_length": [0.95, 1.08],
     "shoulder_width": [0.88, 1.12],
-    "waist_width": [0.775, 1.225],
+    "waist_width": [0.8, 1.175],
     "hip_width": [0.7, 1.2],
     "head_size": [0.88, 1.12],
     "hand_size": [0.82, 1.07],

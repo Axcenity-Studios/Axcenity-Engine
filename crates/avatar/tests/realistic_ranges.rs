@@ -46,16 +46,21 @@ fn library() -> Library {
 
 /// The "Shipped ranges" table of ranges.md: parameter -> [low, high].
 fn recorded() -> BTreeMap<String, [f32; 2]> {
+    recorded_under("Shipped ranges")
+}
+
+/// The table under the heading `## {heading}` of ranges.md.
+fn recorded_under(heading: &str) -> BTreeMap<String, [f32; 2]> {
     let path = root().join("docs/development/character-studio/refinement/r3/ranges.md");
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
     let table = text
-        .split("\n## Shipped ranges")
+        .split(&format!("\n## {heading}"))
         .nth(1)
-        .expect("a \"Shipped ranges\" section");
+        .unwrap_or_else(|| panic!("a \"{heading}\" section"));
     let mut out = BTreeMap::new();
     for line in table.lines().skip(1) {
-        if line.starts_with("## ") {
+        if line.starts_with('#') {
             break;
         }
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
@@ -103,10 +108,42 @@ fn the_shipped_proportion_ranges_are_the_sweeps() {
     }
 }
 
+/// R3 wave 3: the stylized family is held to the same body checks, so its
+/// proportion sliders end where its own sweep found them (`ranges.py
+/// --package stylized`), not at `anim`'s clamp. Its hips narrow by the
+/// bone (it has no narrowing shape), so every driver spans its range.
+#[test]
+fn the_stylized_proportion_ranges_are_its_sweeps() {
+    let library = library();
+    let base = library.base("axcenity/stylized").unwrap();
+    let table = recorded_under("Stylized shipped ranges");
+    assert_eq!(table.len(), PROPORTIONS.len(), "{table:?}");
+    for (id, attribute) in PROPORTIONS {
+        let parameter = base.parameter(id).unwrap_or_else(|| panic!("{id}"));
+        let range = table[id];
+        assert!(
+            (parameter.range[0] - range[0]).abs() < 1e-6
+                && (parameter.range[1] - range[1]).abs() < 1e-6,
+            "stylized {id}: the manifest ships {:?}, ranges.md says {range:?}",
+            parameter.range
+        );
+        assert!(
+            range[0] <= 1.0 && range[1] >= 1.0,
+            "stylized {id}: {range:?}"
+        );
+        let driver = &parameter.attributes[0];
+        assert_eq!(driver.attribute, attribute, "stylized {id}");
+        assert_eq!(driver.from, range, "stylized {id}");
+    }
+}
+
 #[test]
 fn the_ranges_stay_inside_anims_clamp() {
     // `anim::BodyShape` clamps every body slider to 0.5 to 1.5.
-    for (id, [low, high]) in recorded() {
+    for (id, [low, high]) in recorded()
+        .into_iter()
+        .chain(recorded_under("Stylized shipped ranges"))
+    {
         assert!(
             (0.5..=1.5).contains(&low) && (0.5..=1.5).contains(&high),
             "{id}"

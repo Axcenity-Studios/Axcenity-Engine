@@ -78,10 +78,10 @@
       "vertices_cut": 0
      },
      "heavy and muscular": {
-      "crossings_before": 81,
-      "least_factor": 0.512,
+      "crossings_before": 19,
+      "least_factor": 0.8,
       "left": 0,
-      "vertices_cut": 316
+      "vertices_cut": 94
      },
      "heavy and soft": {
       "crossings_before": 36,
@@ -108,10 +108,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 26,
+      "crossings_before": 33,
       "least_factor": 0.8,
       "left": 0,
-      "vertices_cut": 124
+      "vertices_cut": 178
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -140,14 +140,15 @@
      "Feminine_Fat_Chest": 17.7,
      "Feminine_Fat_Down": 28.3,
      "Feminine_Fat_Hips": 34.7,
+     "Feminine_Fat_Over_Muscle": 28.8,
      "Feminine_Fat_Shoulders": 20.4,
      "Feminine_Fat_Soft": 42.4,
      "Feminine_Fat_Thighs": 47.9,
      "Feminine_Fat_Up": 21.7,
      "Feminine_Hips_Narrow": 36.1,
      "Feminine_Muscle_Abdomen": 8.2,
-     "Feminine_Muscle_Arms": 39.2,
-     "Feminine_Muscle_Back": 50.1,
+     "Feminine_Muscle_Arms": 38.2,
+     "Feminine_Muscle_Back": 50.2,
      "Feminine_Muscle_Calves": 18.9,
      "Feminine_Muscle_Chest": 7.1,
      "Feminine_Muscle_Down": 31.4,
@@ -158,9 +159,17 @@
      "Feminine_Muscle_Thighs": 33.4,
      "Feminine_Muscle_Up": 22.4,
      "Feminine_Muscle_Up_Fat_Down": 25.5,
-     "Feminine_Muscle_Up_Fat_Up": 53.3
+     "Feminine_Muscle_Up_Fat_Up": 53.4,
+     "Feminine_Waist_Narrow": 45.4,
+     "Feminine_Waist_Wide": 45.4
     },
-    "neutral_crossings": 26
+    "neutral_crossings": 26,
+    "waist": {
+     "fades_down_to_share": -0.15,
+     "fades_up_to_share": 1.9,
+     "hip_to_chest_m": 0.2022,
+     "natural_waist_share": 1.0
+    }
    },
    "Masculine": {
     "bony_vertices": 4369,
@@ -173,10 +182,10 @@
       "vertices_cut": 0
      },
      "heavy and muscular": {
-      "crossings_before": 170,
-      "least_factor": 0.328,
+      "crossings_before": 139,
+      "least_factor": 0.41,
       "left": 0,
-      "vertices_cut": 493
+      "vertices_cut": 423
      },
      "heavy and soft": {
       "crossings_before": 50,
@@ -203,10 +212,10 @@
       "vertices_cut": 0
      },
      "slight": {
-      "crossings_before": 1,
-      "least_factor": 0.8,
+      "crossings_before": 10,
+      "least_factor": 0.64,
       "left": 0,
-      "vertices_cut": 76
+      "vertices_cut": 134
      },
      "slight, whole sliders only": {
       "crossings_before": 0,
@@ -230,20 +239,21 @@
     "largest_move_mm": {
      "Masculine_Belly_Flat": 16.0,
      "Masculine_Fat_Abdomen": 72.4,
-     "Masculine_Fat_Arms": 25.8,
+     "Masculine_Fat_Arms": 25.0,
      "Masculine_Fat_Back": 49.1,
      "Masculine_Fat_Calves": 19.5,
      "Masculine_Fat_Chest": 25.7,
      "Masculine_Fat_Down": 18.1,
      "Masculine_Fat_Hips": 29.9,
+     "Masculine_Fat_Over_Muscle": 22.4,
      "Masculine_Fat_Shoulders": 27.4,
      "Masculine_Fat_Soft": 69.0,
      "Masculine_Fat_Thighs": 52.7,
      "Masculine_Fat_Up": 37.6,
      "Masculine_Hips_Narrow": 35.9,
      "Masculine_Muscle_Abdomen": 19.4,
-     "Masculine_Muscle_Arms": 39.6,
-     "Masculine_Muscle_Back": 36.2,
+     "Masculine_Muscle_Arms": 38.0,
+     "Masculine_Muscle_Back": 36.9,
      "Masculine_Muscle_Calves": 25.8,
      "Masculine_Muscle_Chest": 15.9,
      "Masculine_Muscle_Down": 71.3,
@@ -252,11 +262,19 @@
      "Masculine_Muscle_Hips": 6.2,
      "Masculine_Muscle_Shoulders": 39.2,
      "Masculine_Muscle_Thighs": 23.9,
-     "Masculine_Muscle_Up": 44.0,
+     "Masculine_Muscle_Up": 44.3,
      "Masculine_Muscle_Up_Fat_Down": 23.2,
-     "Masculine_Muscle_Up_Fat_Up": 65.9
+     "Masculine_Muscle_Up_Fat_Up": 65.9,
+     "Masculine_Waist_Narrow": 56.3,
+     "Masculine_Waist_Wide": 56.3
     },
-    "neutral_crossings": 66
+    "neutral_crossings": 66,
+    "waist": {
+     "fades_down_to_share": -0.15,
+     "fades_up_to_share": 1.78,
+     "hip_to_chest_m": 0.2131,
+     "natural_waist_share": 0.88
+    }
    }
   },
   "local": 0.6,
@@ -286,7 +304,7 @@
     ]
    }
   },
-  "shapes": 53
+  "shapes": 59
  },
  "corrective_shapes": {
   "Level": {
@@ -1465,17 +1483,17 @@
  ],
  "underwear": {
   "Underwear_BoxerBriefs": {
-   "shapes": 42,
+   "shapes": 48,
    "triangles": 1568,
    "weight_moved_most": 0.07
   },
   "Underwear_Bra": {
-   "shapes": 58,
+   "shapes": 64,
    "triangles": 2476,
    "weight_moved_most": 0.122
   },
   "Underwear_Briefs": {
-   "shapes": 42,
+   "shapes": 48,
    "triangles": 1214,
    "weight_moved_most": 0.057
   }

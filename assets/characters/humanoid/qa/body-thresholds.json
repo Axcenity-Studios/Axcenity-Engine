@@ -1,0 +1,27 @@
+{
+ "about": "R3, wave 3: the stylized family held to the realistic body's body checks (plan 11.5, R3). `at_most`: no pair of the body's own sliders (build and proportions, at their ranges' ends) and none alone may make the body newly cross itself (measure.py --only ...,sliders,...: `body_bodies_with_new_crossings`, `body_alone_with_new_crossings`; the face's parameters are face_checks.py's). `at_least`: each joint keeps the ring area it had when this was set (2026-11-17), rounded down; the elbow and knee are far under the realistic body's 0.6 (no twist or helper bones), which needs a redesign of the stylized rig, so they are held, not raised. The proportion ranges are qa/ranges.py --package stylized's (docs/development/character-studio/refinement/r3/ranges.md, \"Stylized shipped ranges\").",
+ "at_most": {
+  "sliders/frames/masculine/body_bodies_with_new_crossings": 0,
+  "sliders/frames/masculine/body_alone_with_new_crossings": 0,
+  "sliders/frames/feminine/body_bodies_with_new_crossings": 0,
+  "sliders/frames/feminine/body_alone_with_new_crossings": 0
+ },
+ "at_least": {
+  "deformation/masculine/elbow_135/ring_area_ratio": 0.37,
+  "deformation/masculine/knee_135/ring_area_ratio": 0.44,
+  "deformation/masculine/shoulder_abd_10/ring_area_ratio": 0.94,
+  "deformation/masculine/shoulder_abd_90/ring_area_ratio": 0.94,
+  "deformation/masculine/shoulder_abd_150/ring_area_ratio": 0.65,
+  "deformation/masculine/hip_flex_100/ring_area_ratio": 0.83,
+  "deformation/masculine/wrist_70/ring_area_ratio": 0.79,
+  "deformation/masculine/spine_twist_45/ring_area_ratio": 0.97,
+  "deformation/feminine/elbow_135/ring_area_ratio": 0.38,
+  "deformation/feminine/knee_135/ring_area_ratio": 0.45,
+  "deformation/feminine/shoulder_abd_10/ring_area_ratio": 0.95,
+  "deformation/feminine/shoulder_abd_90/ring_area_ratio": 0.93,
+  "deformation/feminine/shoulder_abd_150/ring_area_ratio": 0.67,
+  "deformation/feminine/hip_flex_100/ring_area_ratio": 0.89,
+  "deformation/feminine/wrist_70/ring_area_ratio": 0.8,
+  "deformation/feminine/spine_twist_45/ring_area_ratio": 0.97
+ }
+}

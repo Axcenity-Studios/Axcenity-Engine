@@ -49,6 +49,32 @@ PROPORTIONS = [
     ("foot_size", "Foot size", "FootSize", True),
 ]
 
+# How far each proportion slider goes on this body (R3, wave 3: the
+# stylized family held to the realistic body's checks; plan section 0
+# decision 8). Each end is where the ranges sweep
+# (`qa/ranges.py --package stylized`) found the last step that still
+# deforms cleanly on both frames and at the corners of `build` and
+# `muscle`, or the population's 0.5th or 99.5th percentile (ANSUR II),
+# whichever is nearer to 1. What set each end:
+# docs/development/character-studio/refinement/r3/ranges.md ("Stylized
+# shipped ranges"), which a test holds this table to (`avatar`'s
+# `realistic_ranges`). Two ends are nearer 1 than the sweep's, set by
+# `measure.py`'s sliders pass (every pair of sliders at their ends): the
+# hips don't narrow (by the bone, at 0.975 with `build` 1, the inner thighs
+# cross), and the head stops at 1.025 (at 1.05 with `build` 1, the chin's
+# fat meets the neck).
+PROPORTION_RANGES = {
+    "height": [0.85, 1.15],
+    "leg_length": [0.81, 1.275],
+    "arm_length": [0.92, 1.08],
+    "shoulder_width": [0.95, 1.12],
+    "waist_width": [0.775, 1.225],
+    "hip_width": [1.0, 1.15],
+    "head_size": [0.975, 1.025],
+    "hand_size": [0.81, 1.11],
+    "foot_size": [0.98, 1.27],
+}
+
 # Face identity shapes: (shape, label, group). Their range is -1 to 1.
 FACE = [
     ("Face_Eyes_Spacing", "Eye spacing", "eyes"),
@@ -214,8 +240,9 @@ def base_manifest(custom, parts):
          "shapes": [{"shape": "Build_Muscular"}]},
     ]
     for pid, label, attribute, advanced in PROPORTIONS:
-        parameter = {"id": pid, "label": label, "group": "proportions", "range": [0.5, 1.5],
-                     "default": 1, "attributes": [{"attribute": attribute, "from": [0.5, 1.5]}]}
+        span = PROPORTION_RANGES[pid]
+        parameter = {"id": pid, "label": label, "group": "proportions", "range": span,
+                     "default": 1, "attributes": [{"attribute": attribute, "from": span}]}
         if advanced:
             parameter["advanced"] = True
         parameters.append(parameter)

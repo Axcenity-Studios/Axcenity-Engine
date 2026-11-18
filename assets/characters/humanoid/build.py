@@ -230,6 +230,11 @@ def build(out_dir):
     identity = fr.identity()
     body_fields = {"Frame_Feminine": bodyshapes.frame_feminine(P, F.P)}
     body_fields.update(bodyshapes.builds(P, lm, normals, nbr, joints))
+    # Kept apart where the heavy and muscular builds made the body cross
+    # itself (R3, wave 3).
+    apart, apart_report = bodyshapes.keep_apart(
+        P, body_fields, face.triangles(body_obj.data), [tuple(e.vertices) for e in body_obj.data.edges])
+    body_fields.update(apart)
     masks = bodyshapes.masks(P, normals, weights, joints)
     shapes = {}
     shapes.update(expressions)

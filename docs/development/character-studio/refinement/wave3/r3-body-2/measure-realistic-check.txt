@@ -1,0 +1,14 @@
+files 3.2
+weights 4.9
+face 17.1
+shapes 17.4
+masculine pairs 3828 bodies 15312 with new crossings 0
+feminine pairs 3828 bodies 15312 with new crossings 0
+sliders 2965.2
+proportions 2965.3
+deformation 2966.2
+twist 2967.8
+wrote C:/Users/PAULJA~1/AppData/Local/Temp/claude/2d48dd53aa2c77b2/4fa3ddb0-8f77-4707-9e45-91f8ef98a934/scratchpad/measure-realistic.json 2967.8 s
+TARGET NOT MET: deformation/masculine/shoulder_abd_90/local_volume_ratio: 0.847, at least 0.853
+TARGET NOT MET: deformation/feminine/shoulder_abd_90/local_volume_ratio: 0.88, at least 0.992
+check: passed (2 targets not met)

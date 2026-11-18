@@ -150,3 +150,62 @@ def joint_offsets(joints_from, joints_to, scale=1.0):
         if d.length > 1e-4:
             out[name] = {"offset": [round(d.x, 5), round(d.y, 5), round(d.z, 5)]}
     return out
+
+
+# The build shapes' corners the body is kept apart in (R3, wave 3: the
+# stylized family held to the realistic body's checks), on both frames:
+# (name, {shape: weight}). The manifest drives `Build_Heavy` with `build`
+# 0 to 1 and `Build_Muscular` with `muscle` 0 to 1, so these are the
+# corners a character can reach.
+APART = [("heavy", {"Build_Heavy": 1.0}), ("muscular", {"Build_Muscular": 1.0}),
+         ("heavy and muscular", {"Build_Heavy": 1.0, "Build_Muscular": 1.0})]
+# The shapes are kept apart as if this much stronger, so the proportion
+# sliders' small moves of the bones don't bring the crossings back.
+APART_MARGIN = 1.25
+
+
+def keep_apart(P, fields, tris, edges, log=print):
+    """`Build_Heavy` and `Build_Muscular` scaled down, smoothly, round the
+    places where they make the body cross itself in the rest pose (the
+    inner thighs, the chin into the neck, the upper arm's folds), on both
+    frames, as the realistic body's shapes are (`../transfer/transfer.py`,
+    `apart`). Returns the two fields and a report. Elsewhere they are
+    unchanged."""
+    import os
+    import sys
+
+    import numpy as np
+    here = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "transfer")
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import geom
+    import transfer
+
+    n = len(P)
+    dense = lambda field: np.array([tuple(field.get(i, (0.0, 0.0, 0.0))) for i in range(n)])  # noqa: E731
+    X = np.array([tuple(p) for p in P])
+    frames = {"masculine": X, "feminine": X + dense(fields["Frame_Feminine"])}
+    tris = np.array(tris)
+    lap = geom.Laplacian(n, np.array(edges))
+    mirror = geom.mirror_map(list(frames.values()))
+    shape = {name: dense(fields[name]) for name in ("Build_Heavy", "Build_Muscular")}
+    factor = {name: np.ones(n) for name in shape}
+    report = {}
+    for label, B in frames.items():
+        known = transfer.crossing_pairs(B, tris)
+        for corner, weights in APART:
+            d = APART_MARGIN * sum(shape[name] * factor[name][:, None] * w for name, w in weights.items())
+            before = len(transfer.new_crossings(B, B + d, tris, known))
+            _, f, left = transfer.apart(B, d, tris, lap, mirror, known)
+            for name in weights:
+                factor[name] *= f
+            report[f"{label} {corner}"] = {"crossings_before": before, "left": left,
+                                           "vertices_cut": int((f < 0.999).sum()),
+                                           "least_factor": round(float(f.min()), 3)}
+            log(f"  kept apart, {label} {corner}: {before} new crossings, {left} left, "
+                f"{int((f < 0.999).sum())} vertices cut (to {f.min():.2f} at most)")
+    out = {}
+    for name, d in shape.items():
+        d = d * factor[name][:, None]
+        out[name] = {i: Vector(d[i]) for i in range(n) if np.abs(d[i]).max() > 1e-7}
+    return out, report

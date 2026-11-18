@@ -1,0 +1,13 @@
+files 3.0
+weights 4.0
+clipping 13.3
+face 32.0
+shapes 32.2
+masculine pairs 435 bodies 1625 with new crossings 110
+feminine pairs 435 bodies 1625 with new crossings 5
+sliders 390.3
+proportions 390.4
+deformation 399.2
+twist 403.5
+wrote C:/Users/PAULJA~1/AppData/Local/Temp/claude/2d48dd53aa2c77b2/4fa3ddb0-8f77-4707-9e45-91f8ef98a934/scratchpad/sty/measure-final.json 403.6 s
+check: passed 
