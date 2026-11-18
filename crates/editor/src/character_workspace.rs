@@ -527,13 +527,15 @@ impl CharacterWorkspace {
     /// Edits `description` from scratch: a fresh undo, saved when `file`
     /// holds it.
     fn start_over(&mut self, description: Description, file: Option<PathBuf>) {
+        // The page's expression, controls and face preview were on the old
+        // body's face: leave them first, which also puts back the light,
+        // camera and motion the face preview found (its framing was the
+        // old character's head).
+        self.leave_expressions();
         self.saved = file.is_some().then(|| description.clone());
         self.description = description;
         self.file = file;
         self.history = History::default();
-        // The page's expression and controls were on the old body's face.
-        self.expression = None;
-        self.face_controls.clear();
         self.leaving = false;
         self.asking = None;
         self.autosave.untouched = None;

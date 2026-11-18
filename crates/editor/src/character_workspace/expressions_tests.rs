@@ -431,3 +431,38 @@ fn expressions_pages_are_drawn() {
     drop(workspace);
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// Review fix: a new or opened character leaves the face preview, and
+/// puts back the light, camera and motion it found (the old framing was
+/// the old character's head).
+#[test]
+fn a_new_or_opened_character_leaves_the_face_preview() {
+    let folder = test_folder("expressions-face-preview-new");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.apply(Intent::Save);
+    let saved = workspace.file().unwrap().to_owned();
+    workspace.apply(Intent::PickCategory(Category::Expressions));
+    workspace.apply(Intent::SetLighting(Lighting::Sunset));
+    run_for(&mut workspace, 0.3);
+
+    // Opened first: the opened file is saved, so the New after it asks
+    // nothing.
+    for start_over in [Intent::Open(saved.clone()), Intent::New(Start::default())] {
+        assert!(!workspace.dirty());
+        let (orbit, view, motion) = (workspace.orbit, workspace.view, workspace.motion.clone());
+        workspace.apply(Intent::PreviewExpression(Some("Happy".into())));
+        workspace.apply(Intent::FacePreview(true));
+        assert!(workspace.face_view.is_some());
+        run_for(&mut workspace, 0.3);
+        workspace.apply(start_over);
+        assert!(workspace.face_view.is_none(), "the face preview is off");
+        assert_eq!(workspace.lighting, Lighting::Sunset, "the light put back");
+        assert_eq!(workspace.orbit, orbit, "the camera put back");
+        assert_eq!(workspace.view, view);
+        assert_eq!(workspace.motion, motion);
+        assert!(workspace.expression.is_none());
+        assert!(preview_face(&workspace).is_none());
+        run_for(&mut workspace, 0.3);
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}

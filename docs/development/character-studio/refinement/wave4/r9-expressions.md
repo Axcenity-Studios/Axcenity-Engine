@@ -14,7 +14,7 @@ Branched from `main` after wave 3 (e1658afb, PR #427). Plan: section 11.5 row R9
   - Jaw: open, forward, sideways, tongue out.
   - Brief §10's six controls (smile intensity, brow movement, eye squint, mouth opening, jaw movement, blink intensity) are all there. Left and right move together; a sideways or up-and-down row is one slider from -1 to 1 over two opposite controls (`RowControls::Signed`).
 - **How it shows:** the preview's own FaceControls ("Studio Expression Preview", as before). The expression plays on its Expression layer; a moved control is held as a gameplay override (`FaceState::overrides`, the Override layer, which goes over everything under it), so a slider shows exactly the value it says. A slider not moved shows what the expression gives its control (`face_value`, `row_value`); its reset and a double click go back to that value and let the override go. Picking an expression starts the controls again from its values; **Neutral** takes the expression and every held control off.
-- **Preview only:** all of it is editor state. `Intent::PreviewFaceControl`, `FacePreview`, `FacePreviewMotion` are new; none is in `Intent::edits()`. Leaving the page, or a new or opened character, takes the expression, controls and face preview off.
+- **Preview only:** all of it is editor state. `Intent::PreviewFaceControl`, `FacePreview`, `FacePreviewMotion` are new; none is in `Intent::edits()`. Leaving the page, or a new or opened character, takes the expression, controls and face preview off (New and Open since Review fixes 1: before, they left the face preview on).
 - **Drag rule hook:** the sliders are the panel's shared slider rows (`panel/row.rs`'s `slider`), with the value typed in. They set no drag speed of their own, so when ux-drag's helper lands in that row they follow Paul's rule (full range in about 100 to 120 points, Shift about a quarter, Ctrl about double, typed values) with the body and face sliders. `TODO(ux-drag)` in `panel/expressions.rs`'s `controls` says so. ux-drag's helper was not on `main` when this branched.
 
 ### 2. The face preview mode
@@ -32,7 +32,7 @@ Measured by rays from the front on a 0.25 mm grid over the mouth, each frame (ma
   - Width at 75% of the opening's height over width at 25%: 0.69 and 0.70 before, **0.86 and 0.86** after (1 is a straight-sided U).
   - The opening's height 2 mm in from each end over its largest (0 is a point): 0.10 and 0.15 before, **0.25 and 0.31** after.
   - `Jaw_Open` 0.5: 0.81 and 0.77 before, 1.04 and 1.01 after; corners 0.10 and 0.18, now 0.24 and 0.33.
-- **The lower first premolars are in the mouth's shade** (`teeth.LOWER_IN_SHADE`): with the lower lip lower toward the corners they stood in the U as pale-rimmed blocks.
+- **The lower first premolars were put in the mouth's shade** (`teeth.LOWER_IN_SHADE`, a dark red by whole tooth): with the lower lip lower toward the corners they stood in the U as pale-rimmed blocks. Replaced in Review fixes 1 by a shade that eases per vertex from the canine back, toward dimmed enamel, not red (below).
 - **The smile** (`SMILE_PULL` 14.8 mm, was 12.8; `SMILE_CHEEK` 8.6 and 7.8 mm, was 7.2 and 6.2; `SMILE_FOLD` 5.4 mm, was 4.2) and **Happy's recipe** (smile 1, was 0.8; cheek raise 0.75, was 0.6; squint 0.35, was 0.3; corners back 0.5, was 0.4; the 0.15 brow raise taken out: a smile's brows don't rise). `Mouth_Smile`'s largest move is 15.2 mm (13.1).
 - **Visemes**
   - `Mouth_Pucker` gathers the lips by 0.40 of their width (0.31) and 7.2 mm forward (5.4): `PUCKER_GATHERS`, `PUCKER_FORWARD`.
@@ -46,7 +46,7 @@ Measured by rays from the front on a 0.25 mm grid over the mouth, each frame (ma
 - New: `crates/editor/src/character_workspace/expressions.rs`, `expressions_tests.rs`, `panel/expressions.rs`; this hand-back, `wave4/r9-expressions-red-run.txt`, `wave4/r9-expressions/` (sheets).
 - Changed, editor: `character_workspace.rs` (fields `face_controls`, `face_view`; `preview_expression` moved to `expressions.rs`; `start_over` clears the page), `intent.rs` (three intents, at the end of the preview group), `shell.rs` (dispatch; leaving the page leaves the face preview first), `panel.rs` (the page moved out), `stage.rs` (`Lighting::Neutral`, `ShadowSoftness`), `crates/editor/CLAUDE.md`.
 - Changed, anim: `faces/expressions/Happy.expression.json`, `faces/visemes/default.visemes.json`; `face_play.rs` and `face_tests.rs` (their Happy numbers: smile 1, squint 0.35).
-- Changed, the realistic package: `face.py`, `teeth.py`; regenerated `RealisticParts.glb` (40.38 MB) and `Realistic.build.json` (only `Mouth_Pucker` and `Mouth_Smile_*` largest moves change).
+- Changed, the realistic package: `face.py`, `teeth.py`; regenerated `RealisticParts.glb` (40.38 MB; again in Review fixes 1) and `Realistic.build.json` (only `Mouth_Pucker` and `Mouth_Smile_*` largest moves change).
 - Docs: `docs/editor/character-studio.md` (the Expressions page), `co6/README.md` (an R9 section; its "What still falls short" mouth items), `assets/characters/realistic/README.md` (the jaw), `wiki/Roadmap/Known-Limitations.md`.
 
 ## Interfaces
@@ -95,7 +95,7 @@ The mouth from the front (script in the session's scratch folder, not committed:
 | TH | | | 135 > 183, 134 > 152 | 33 > 135, 12 > 117 |
 | FV | | | 123 > 44, 114 > 47 | |
 
-"Teeth seen" counts every tooth, the shaded lower back teeth included: in the open poses it grows with the opening (the U is wider at the bottom, so more of the lower row is in it); the pictures show the lower premolars dark red there. The dark band (lining seen between the upper lip and the first tooth below it, the middle 10 mm): 1.50 mm masculine, 0.82 feminine at `Jaw_Open` 1, before and after.
+"Teeth seen" counts every tooth, the shaded lower back teeth included: in the open poses it grows with the opening (the U is wider at the bottom, so more of the lower row is in it); the pictures showed the lower premolars dark red there (until Review fixes 1; the shade changes no geometry, so these areas stand). The dark band (lining seen between the upper lip and the first tooth below it, the middle 10 mm): 1.50 mm masculine, 0.82 feminine at `Jaw_Open` 1, before and after.
 
 ## Visual evidence and what I saw
 
@@ -106,7 +106,7 @@ The references: [references/face](../../references/face/README.md) has no index 
 - **`Jaw_Open` 1** (`mouth-open.jpg`): the out-turned points at both corners are gone on both frames under both lights; the opening's sides fall nearly straight from the corners and the bottom is broad. It reads as an open mouth rather than a bell. The lower sides are straight lines rather than a curve (a broad U drawn with a ruler, not an oval), and a row of dark-red lower premolars with pale rims shows along each lower side, more than before on the masculine frame. The dark band under the upper lip's edge is as before.
 - **Surprised, Laughing, Excited**: broader at the bottom; Laughing's corners still show the upper back teeth's edges, as before; Surprised shows more of the lower incisors' tops than before.
 - **Happy** (`mouth-smile.jpg`, `expressions-1.jpg`): the corners rise further and the mouth is wider; the cheeks are fuller at the corners and the lower lids a little higher. It reads more as a smile than before, most on the feminine frame, but it is still a closed-lip smile with no dimple or crease. At full size the lips' line shows a slight point at its middle in the after pictures (both frames, clearer under the hard light) that the before pictures don't have. Trying Happy with the upper lip raised (0.25, to bare the upper teeth) showed a dark slit, not teeth (`LipSeal` covers them at that parting), so it was not kept.
-- **U, WQ** (`mouth-visemes.jpg`): smaller and rounder openings with the lips further forward; on the feminine frame both are a small ring (13 to 14 mm across) with the lips' inner red and a little enamel. The masculine U and WQ still show the upper teeth's edges across a 23 to 25 mm opening.
+- **U, WQ** (`mouth-visemes.jpg`): smaller and rounder openings with the lips further forward; on the feminine frame both are a small ring (13 to 14 mm across). (Corrected in Review fixes 1: at three times the size, the feminine U's and WQ's openings are still mostly pale enamel, with a dark cross at the incisors' gap; teeth still show, as the 47 and 34 mm² say.) The masculine U and WQ still show the upper teeth's edges across a 23 to 25 mm opening.
 - **TH**: the tongue now shows between the rows in the middle (pink under the upper incisors, both lights); the opening is taller than before.
 - **FV**: the upper teeth show over the lower lip, which sits right under their edges, but the lower lip does not tuck under them.
 - **The other expressions** (Neutral, Sad, Angry, Confused, Worried, Frustrated, Disgusted, Fearful, Crying, Determined, Sleepy): no shape they use changed but the jaw's (Crying, Fearful at 0.3); the pictures match before at sheet size (Sad checked at full size: the same). Crying and Fearful (the jaw at 0.3) are a little broader at the bottom; in Crying under the hard light a lower premolar now shows dark red beside a white canine on the feminine frame (the shade rule is whole teeth by rank), which reads as a gap or a dark tooth close up.
@@ -116,10 +116,10 @@ The references: [references/face](../../references/face/README.md) has no index 
 
 1. **FV's lower lip doesn't tuck under the upper teeth.** No standard control moves the lower lip up and back (ARKit's `mouthRollLower`); it needs a lip-roll control, which is a change to the standard face controls (`core::face::FACE_CONTROLS`, the profiles, the build's `EXPRESSIONS`): the lead's call.
 2. **The dark band under the upper lip** in every open mouth is unchanged (1.5 mm high at the middle on the masculine frame). The one attempt (the lip's inner side forward) was withdrawn. It probably needs the lining's shading (RA5/RA7: specular occlusion and a lighter inner lip) rather than a shape.
-3. **The broad U's lower sides are straight**, and the lower premolars show along them, dark red with pale rims. A rounder bottom needs the lower lip's own curve (a corrective along the lip), not more of the jaw's turn. The first premolars' shade is by whole tooth: in a slightly open mouth (Crying, hard light, feminine) one shows dark red beside a white canine; a shade that eases from the canine back would read better.
+3. **The broad U's lower sides are straight**, and the lower premolars show along them. A rounder bottom needs the lower lip's own curve (a corrective along the lip), not more of the jaw's turn. (Their dark red, pale-rimmed shade and the dark red premolar beside a white canine in Crying are fixed in Review fixes 1; the teeth themselves still show as a row of shaded teeth.)
 4. **Happy is a closed-lip smile** with a slight point at the middle of the lips' line at full size; no dimple or nasolabial crease (no wrinkle maps). A teeth-showing smile needs `LipSeal`'s flaps to give way to `Upper_Lip_Raise` sooner, which the seal's other cases constrain.
 5. **The masculine U and WQ** still show the upper teeth's edges (23 to 25 mm openings; a real one is about half that).
-6. **No reference photographs of expressions are indexed** (`references/face` has anthropometry and anatomy plates only). The judgements above are against written anatomy; an index of licence-compatible expression photographs (smile, open mouth, the visemes) is needed for Paul's rule.
+6. **No reference photographs of expressions are indexed** (`references/face` has anthropometry and anatomy plates only). The judgements above are against written anatomy and one drawing (L-07), so R9's "Done when" ("reviewed against reference photographs") is **not met** and stays open until licence-compatible expression photographs are indexed. Asked of the lead or RA6: links only, Class 1, 2 or 5, for example Wikimedia Commons CC0 or CC BY photographs of a Duchenne smile, a wide-open mouth and the U, TH and FV mouth shapes; then the captures here are reviewed against them.
 7. The face controls move left and right together (no one-sided preview); the expression tiles have no pictures.
 8. The drag rule: the face sliders take ux-drag's helper only once it is in `panel/row.rs`'s `slider` (the hook above).
 
@@ -130,3 +130,95 @@ The references: [references/face](../../references/face/README.md) has no index 
 - `panel/expressions.rs`'s sliders go through `panel/row.rs`: if ux-drag replaces `row::slider`, check the face rows still call the shared one.
 - `anim`'s two tests now hold Happy's new numbers (smile 1, squint 0.35); a track that changes Happy again must change them too.
 - If another track changes `rig._jaw`, `face.jaw_u`'s formula assumes the weights along the lips are `0.30 u^2.5` and `1 - 0.70 u^2.5`.
+
+## Review fixes 1
+
+The review found three blocking items. All three are fixed below; no item was disputed.
+
+### 1. New or Open left the face preview on
+
+`start_over` cleared the expression and the controls but not `face_view`, so with the face preview on, a new or opened character kept the Neutral light and the old character's head framing (wrong for a taller or shorter character), and the stored restore held the old orbit.
+
+- Test first: `expressions_tests::a_new_or_opened_character_leaves_the_face_preview` (Open of the saved file, then New, each with Happy and the face preview on). Red: `the face preview is off` failed (`wave4/r9-expressions-red-run.txt`, "Review fixes 1").
+- Fix: `start_over` now calls `leave_expressions()` first (the face preview off, which puts back the light, camera, view and motion it found; then no expression and no held control), before the description changes. The test asserts `face_view` is None, the light is the Sunset it found, the orbit, view and motion are those from before the preview, no expression, and the preview's FaceControls is gone.
+
+### 2. The lower teeth's shade: dark red, pale-rimmed, by whole tooth
+
+The broad U shows more of the lower row, and the lower first premolars had been put in a dark red shade by whole tooth: at full size the masculine `Jaw_Open` 1 had a sawtooth of dark red, pale-rimmed teeth down each lower side; Surprised and Crying under the hard light had a white canine beside a dark red premolar (a fang beside a decayed tooth); the page's face preview showed dark red rounded lower teeth.
+
+Fix (`teeth.py` only; no geometry changes):
+- The shade's colour is now **dimmed, then darkened enamel** (`SHADED_ENAMEL`, two stops), not a dark red, at the **far end** of the teeth's palette after the thin edge's pale grey (`OWN` = 0.75: neck, enamel, edge, then the shade). Part of the way over a tooth is a paler or darker grey-ivory and never mixes with the yellow neck. A first try with the shade colour at the start of the ramp, as before, came through olive.
+- The lower teeth go over to it **per vertex, eased from the canine back** (`LOWER_SHADE_FROM` 6 to 34 mm behind the incisors' front, smoothstep), in place of `LOWER_IN_SHADE`'s whole teeth by rank. No tooth stands out from its neighbour.
+- Lit 0.6 (`SHADE_LIT`, was 0.4). At 0.4, or with a far stop of 0.30, the back teeth read as charcoal, which is a decayed look too.
+
+Tried and not kept (all captured): shade colours 0.40, 0.52 and 0.56 grey at the ramp's start (olive or slate); the far end with one stop (slate grey); a darker far stop (charcoal molars).
+
+Measured on the pixels that changed between the branch before the review and after it (front view, 2560 x 1440; mean sRGB of 255; "red" is R less the mean of G and B):
+
+| Pose | Frame | Light | Pixels | Before: mean, red | After: mean, red |
+|---|---|---|---|---|---|
+| `Jaw_Open` 1 | masculine | studio | 1,728 | (35, 21, 24), 13.0 | (47, 43, 43), 4.1 |
+| `Jaw_Open` 1 | masculine | hard | 1,480 | (13, 6, 9), 5.5 | (20, 19, 21), -0.4 |
+| `Jaw_Open` 0.5 | masculine | studio | 2,107 | (36, 20, 23), 13.9 | (48, 44, 44), 4.5 |
+| Surprised | masculine | hard | 1,972 | (14, 7, 9), 6.7 | (22, 22, 24), -1.0 |
+| Laughing | masculine | studio | 3,914 | (36, 20, 23), 14.2 | (49, 44, 44), 5.1 |
+| Crying | feminine | hard | 2,044 | (22, 10, 11), 11.8 | (32, 33, 36), -2.8 |
+| Crying | feminine | studio | 2,127 | (37, 20, 22), 16.3 | (50, 50, 53), -1.6 |
+| Happy + `Jaw_Open` 0.35 | feminine | studio | 1,119 | (36, 22, 25), 12.8 | (49, 43, 42), 6.9 |
+
+Across all 24 cases (6 poses, 2 frames, 2 lights), "red" fell from 4.8 to 16.3 to between -2.8 and 6.9.
+
+What I saw:
+- [r9-expressions/review-teeth.jpg](r9-expressions/review-teeth.jpg): six poses, both frames, studio and hard light, before and after each.
+- [review-teeth-close.jpg](r9-expressions/review-teeth-close.jpg): the same at 3x.
+- The refreshed `page-r9-*.jpg`.
+
+At 3x, by pose:
+- **`Jaw_Open` 1, masculine:** the lower sides are a row of grey-ivory teeth that darkens toward the back, with no red and no pale-rimmed dark blocks. The teeth are still there to be seen: the lower lip doesn't cover them (open issue 3).
+- **Crying, feminine, hard light:** the white canine is followed by premolars that dim smoothly to grey. Before, there was a glossy dark red tooth.
+- **Surprised, masculine, hard light:** the canine still carries a bright specular spot from the key light. Its neighbours now continue the row, so it no longer reads as a fang beside a dark gap.
+- **Laughing:** the lower molars are now a lighter grey-ivory than before and more visible as teeth. I judge that more natural than dark red, but they can still be counted at 3x (as before).
+- **The page's face preview (Happy with the jaw at 0.35):** grey, dim lower teeth beside the tongue instead of dark red rounded ones.
+- **Three-quarter view (Laughing):** no change at sheet size beyond the colour.
+
+Gates on this build:
+- `face_checks.py --package realistic --check`: exit 0, 0 failures. The identity_pairs result is unchanged: masculine 6 poses with new crossings, the same optional pairs as `main`; feminine 0. The output is byte for byte the committed `co6/face_checks.json` (the shade changes no geometry).
+- `measure.py --only face,sliders`: sliders 3,828 pairs on 15,312 bodies a frame, **0 new crossings on both frames**; no measured line is worse; the command exits 1 only on the two shoulder targets `--only` leaves unmeasured, as before.
+
+### 3. The hand-back overstated the photograph review and misdescribed the feminine U
+
+- **R9's "Done when", "reviewed against reference photographs": not met.** `references/face` indexes no expression photographs. The review was against written anatomy and one drawing (L-07). The stage stays open until licence-compatible expression photographs are indexed. Asked of the lead or RA6: links only, Class 1, 2 or 5. For example, Wikimedia Commons CC0 or CC BY photographs of a Duchenne smile, a wide-open mouth, and the U, TH and FV mouth shapes. Open issue 6 says so.
+- **The feminine U and WQ:** at 3x their openings are still mostly pale enamel, with a dark cross at the incisors' gap. The "What I saw" bullet is corrected. Teeth seen stay at 47 and 34 mm².
+
+### Non-blocking items taken up
+
+- The front-view mouth measurement is now committed as [r9-expressions/mouth_measure.py](r9-expressions/mouth_measure.py) (bpy: `--repo REPO --out FILE.json [--png DIR]`), so the bell and corner numbers can be reproduced.
+- Not changed:
+  - The drag rule waits on ux-drag. Until then the face rows drag at about 300 points for the full range, with no Shift or Ctrl.
+  - Restoring the light the face preview found discards a bottom-bar pick made during it.
+  - Surprised's corner wedges.
+  - The tongue band in Happy with the jaw at 0.35.
+
+### Tests and checks (Review fixes 1)
+
+- Red, then green: `a_new_or_opened_character_leaves_the_face_preview`.
+- `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::/)'`: 112 run, 112 passed.
+- `cargo nextest run -p axcenity-editor --no-fail-fast`: 1,406 run, 1,405 passed, 1 failed, 10 skipped, no ABORT. The failure is `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, timing under the shared load. Run alone, it passes in 12.3 s.
+- `cargo clippy -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all -- --check`: clean.
+- In-engine captures: before and after, 6 poses, both cast-average frames, `face-front` and `face-three-quarter`, studio and hard, 2560 x 1440. Page snapshots: `AXCENITY_SNAPSHOTS ... expressions_pages_are_drawn`.
+
+### Files (Review fixes 1)
+
+- `crates/editor/src/character_workspace.rs` (`start_over`).
+- `crates/editor/src/character_workspace/expressions_tests.rs` (the new test).
+- `assets/characters/realistic/teeth.py` (shade).
+- Regenerated `RealisticParts.glb`. `Realistic.build.json` is unchanged. The base, items, presets, catalogue and benchmarks had line-ending-only differences and are not committed.
+- Docs:
+  - `assets/characters/realistic/README.md` (the palette)
+  - `docs/development/character-studio/co6/README.md` (the R9 Teeth bullet)
+  - `docs/editor/character-studio.md` (New and Open leave the page)
+  - this hand-back
+  - the red run
+- `r9-expressions/review-teeth.jpg`, `review-teeth-close.jpg`, `mouth_measure.py` and the four refreshed `page-r9-*.jpg`.
+
+At merge: rebuild as before. Nothing else depends on `LOWER_IN_SHADE`, which is gone.

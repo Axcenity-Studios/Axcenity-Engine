@@ -15,3 +15,10 @@ cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/character_workspac
         FAIL [   6.713s] (4/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_face_preview_frames_the_face_holds_it_still_and_leaving_restores_the_view
         FAIL [   7.389s] (5/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::face_controls_move_the_face_over_the_expression_and_neutral_resets_them
         FAIL [   7.942s] (6/6) axcenity-editor::bin/axcenity-editor character_workspace::expressions_tests::the_expressions_page_draws_tiles_groups_and_the_face_preview
+
+
+Review fixes 1 (red run, before the fix in start_over):
+cargo nextest run -p axcenity-editor -E 'test(a_new_or_opened_character_leaves_the_face_preview)'
+FAIL character_workspace::expressions_tests::a_new_or_opened_character_leaves_the_face_preview
+  panicked at expressions_tests.rs:455:9: the face preview is off
+Summary 1 test run: 0 passed, 1 failed
