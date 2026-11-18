@@ -37,3 +37,21 @@ cargo nextest run -p axcenity-editor -E 'test(/round_trip_tests::a_described_cha
     panicked at crates\editor\src\app\round_trip_tests.rs:429:5:
     second open in the same run: the identity is worn in the new Assets
      Summary [   2.534s] 1 test run: 0 passed, 1 failed, 1417 skipped
+
+Review fixes 2 (blocking 1: a recorded change puts back the unshown state with the same Data;
+blocking 2: false prefab overrides on a placed copy of the described Character prefab)
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/round_trip_tests::(a_placed_described|revert_all_on|undo_and_redo_of_placing|a_whole_world_undo)/)'
+        FAIL [   1.408s] (1/4) app::round_trip_tests::revert_all_on_a_placed_described_copy_keeps_it_shown
+    panicked at round_trip_tests.rs:728: "the body draws assets/models/Humanoid/Humanoid.glb"
+        FAIL [   1.424s] (2/4) app::round_trip_tests::a_placed_described_prefab_copy_has_no_overrides_from_edit_mode
+    panicked at round_trip_tests.rs:680: placement at most: children: {Body: properties {MeshId,
+    Position, Size}, attributes: true, added: [Eyes, Teeth, EyeShell, Lashes, Brows, LipSeal,
+    Underwear_BoxerBriefs]}
+        FAIL [   1.440s] (3/4) app::round_trip_tests::a_whole_world_undo_to_before_it_was_shown_shows_it_again
+    panicked at round_trip_tests.rs:775: "the body draws assets/models/Humanoid/Humanoid.glb"
+        PASS [   1.459s] (4/4) app::round_trip_tests::undo_and_redo_of_placing_a_described_copy_keep_it_shown
+     Summary [   1.463s] 4 tests run: 1 passed, 3 failed, 1418 skipped
+
+Undo and redo of a placement (a tree step) passed before the fix: undo takes the copy out of the
+Workspace, so the sync drops it, and redo puts it back to be applied again. The whole-world path
+the reviewer reasoned about is the third test, which failed.

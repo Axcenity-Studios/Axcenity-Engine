@@ -7,12 +7,14 @@
 use std::path::{Path, PathBuf};
 
 use axcenity_avatar::{Description, LIBRARY_FOLDER, Library};
+use axcenity_core::prefab::{self, Overrides};
 use axcenity_core::{ClassName, InstanceId, Value, World};
 use axcenity_gameplay::description as applier;
 
 use super::tests::{drawn_texts, inserted, play_for};
 use super::*;
 use crate::character_workspace::{Gesture, Intent};
+use crate::prefab_menu::PrefabAction;
 
 const REALISTIC: &str = "axcenity/realistic";
 
@@ -599,6 +601,188 @@ fn edit_mode_draws_the_described_character() {
         changed > total / 100,
         "edit mode draws the description: {changed} pixels changed"
     );
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
+/// A copy of the project's `Character` prefab (the realistic described
+/// character every new project's StarterCharacter names), placed as the
+/// asset browser places it: one undo step. Returns the copy's root.
+fn placed_character_prefab(app: &mut EditorApp) -> InstanceId {
+    let workspace = app.world.workspace();
+    let root = app
+        .instantiate_prefab(axcenity_project::DEFAULT_CHARACTER_PREFAB_PATH, workspace)
+        .unwrap()[0];
+    app.world.set_parent(root, None).unwrap();
+    app.place_new(workspace, vec![root], "Place Character".to_owned());
+    root
+}
+
+/// Edit frames until the described characters' models are loaded and
+/// they're posed (tests load models at once; a frame applies first, so the
+/// realistic body's model is named only after it).
+fn settle(app: &mut EditorApp, character: InstanceId) {
+    for _ in 0..3 {
+        load_models(app, character);
+        app.edit_characters_frame();
+    }
+}
+
+/// Whether `character` shows its kept description: its body draws the
+/// library's model and wears an identity registered in this run, with its
+/// parts on.
+fn worn(app: &EditorApp, character: InstanceId) -> Result<(), String> {
+    let body = applier::body_of(&app.world, character).ok_or("no body")?;
+    let mesh = mesh_id(&app.world, body);
+    if !mesh.starts_with(LIBRARY_FOLDER) {
+        return Err(format!("the body draws {mesh}"));
+    }
+    let key = axcenity_anim::identity_key(&app.world, body).ok_or("no identity key")?;
+    if app.assets.identity(key).is_none() {
+        return Err("its identity isn't registered".to_owned());
+    }
+    let parts = app
+        .world
+        .get(body)
+        .unwrap()
+        .children()
+        .iter()
+        .filter(|id| {
+            app.world
+                .get(**id)
+                .is_some_and(|p| p.attribute(applier::DESCRIPTION_PART).is_some())
+        })
+        .count();
+    if parts == 0 {
+        return Err("no description parts".to_owned());
+    }
+    if !app.edit_characters.poses().contains_key(&body) {
+        return Err("the body isn't posed".to_owned());
+    }
+    Ok(())
+}
+
+/// OPEN-21 with prefabs: a placed copy of the described `Character`
+/// prefab that nobody changed has no overrides once edit mode shows it.
+/// What edit mode derives from the description (the body's model, size and
+/// identity, its parts and their placement) isn't the person's change, so
+/// Properties shows no ↺ on the body, the Prefab menu offers nothing to
+/// apply or revert, and saving writes no derived values as overrides.
+#[test]
+fn a_placed_described_prefab_copy_has_no_overrides_from_edit_mode() {
+    let (parent, folder, studio) = new_project("prefab-overrides");
+    let mut app = open(&folder, &studio);
+    let root = placed_character_prefab(&mut app);
+    assert!(prefab::overrides(&app.world, root).is_empty());
+    // Saved as placed, so what follows shows whether showing it changes
+    // anything to save.
+    assert!(app.save());
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    let found = prefab::overrides(&app.world, root);
+    assert_eq!(
+        found,
+        found.placement_only(),
+        "placement at most: {found:?}"
+    );
+    let body = applier::body_of(&app.world, root).unwrap();
+    let here = prefab::place(&app.world, body).unwrap().here();
+    assert!(
+        here.properties.is_empty() && !here.attributes && here.added.is_empty(),
+        "no overridden Body property: {here:?}"
+    );
+    assert!(!app.unsaved(), "showing it changed nothing to save");
+
+    // Saved and opened again: still no overrides, and still worn.
+    app.world.set_name(root, "Npc").unwrap();
+    app.history.seal();
+    assert!(app.save());
+    drop(app);
+    let mut app = open(&folder, &studio);
+    let root = app
+        .world
+        .find_first_child(app.world.workspace(), "Npc")
+        .unwrap();
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    let found = prefab::overrides(&app.world, root);
+    let found = Overrides {
+        properties: found
+            .properties
+            .iter()
+            .filter(|name| name.as_str() != "Name")
+            .cloned()
+            .collect(),
+        ..found
+    };
+    assert_eq!(found, found.placement_only(), "after reopening: {found:?}");
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
+/// OPEN-21 after Revert all: the copy goes back to its prefab, and edit
+/// mode still shows the description (it used to stay on the stylized base
+/// mesh for the rest of the session).
+#[test]
+fn revert_all_on_a_placed_described_copy_keeps_it_shown() {
+    let (parent, folder, studio) = new_project("prefab-revert");
+    let mut app = open(&folder, &studio);
+    let root = placed_character_prefab(&mut app);
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    app.prefab_action(PrefabAction::RevertAll(root));
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
+/// OPEN-21 through undo and redo: placing a described copy, undoing it and
+/// redoing it shows it again.
+#[test]
+fn undo_and_redo_of_placing_a_described_copy_keep_it_shown() {
+    let (parent, folder, studio) = new_project("prefab-undo");
+    let mut app = open(&folder, &studio);
+    let root = placed_character_prefab(&mut app);
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    app.undo();
+    assert!(app.world.get(root).and_then(|r| r.parent()).is_none());
+    app.edit_characters_frame();
+    app.redo();
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
+/// OPEN-21 through a whole-world undo step: one whose "before" was kept
+/// before edit mode showed the character (Unpack, Revert, a version
+/// restore and the team paths keep whole worlds) puts back the unshown
+/// character with the same Instance IDs and the same `Data`. Edit mode
+/// shows it again.
+#[test]
+fn a_whole_world_undo_to_before_it_was_shown_shows_it_again() {
+    let (parent, folder, studio) = new_project("world-undo");
+    let mut app = open(&folder, &studio);
+    let root = placed_character_prefab(&mut app);
+    let before = app.world.clone();
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    app.world.set_name(root, "Renamed").unwrap();
+    app.history
+        .record_world(&mut app.world, "Rename".to_owned(), before);
+    app.undo();
+    let body = applier::body_of(&app.world, root).unwrap();
+    assert!(
+        !mesh_id(&app.world, body).starts_with(LIBRARY_FOLDER),
+        "the step put back the unshown character"
+    );
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
+    app.redo();
+    settle(&mut app, root);
+    worn(&app, root).unwrap();
     drop(app);
     let _ = std::fs::remove_dir_all(parent);
 }

@@ -122,3 +122,69 @@ Tests run:
 - `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all there before).
 
 I didn't act on the non-blocking items: the draft default outfit, Done copying the whole studio library, the single entry point, edit-mode cost, Quit with the studio open, Collaborate IDs, the opt-level profile entries, and the order of the shipped-library lookup. They stay as open issues for the lead.
+
+## Review fixes 2
+
+Both blocking items are fixed. Tests were written first; the red run is appended to `r10-roundtrip-red-run.txt`.
+
+1. **Edit mode stopped showing a described character after a recorded step put back its unshown state with the same `Data`** (Revert all on a placed copy; an undo to a whole-world snapshot taken before edit mode showed it).
+   - Cause: `DescriptionSync` remembers each description by its Instance ID and its `(Base, Data)`. A recorded step that removes what applying put on, but leaves `Base` and `Data` alone, looks already applied to it.
+   - Fix: `gameplay` gains `DescriptionSync::forget(description)`, an additive change recorded in `architecture.md`. `EditCharacters` (`app/edit_characters.rs`) keeps what each character showed after its last step. That record, `Showing`, holds the body, the body's `MeshId` and `Identity` attribute, and the body's `DescriptionPart` children. Before each step, a character whose showing changed is forgotten, so the step applies it again. A description that couldn't be applied shows the same each frame, so its error is still said only once.
+   - I chose this over the suggested check (identity key missing or not registered, or MeshId outside the library). That check would retry a failing description every frame. It would also miss a step that keeps the body but takes away the parts.
+   - One consequence, now documented: changing what the applier owns by hand (the body's `MeshId`, a description part) doesn't stick while the character keeps a description. Play has always done the same.
+2. **An untouched placed copy of the described `Character` prefab showed false overrides.** They were the Body's `MeshId`, `Position` and `Size`, its attributes, and seven added parts.
+   - I chose neither of the reviewer's options as written, but a variant of (a) done in memory. Edit mode shows a copy's **source** the same way it shows the copy: applied and posed at rest, in memory, never written to the file.
+   - That shown source is set on the copy's prefab link with `World::set_prefab`, which is not recorded, sent or saved.
+   - A shown source is made once per source `Arc`, and kept while a copy or an undo step holds it. A source whose models are still loading is tried again next frame.
+   - Why not (a), writing the file applied:
+     - it would cover only prefabs the editor writes, not projects made by `create_project_from` (tests, tools);
+     - edit mode's posed placement of the parts (`Size`, `Position`, `Orientation`) would still show as overrides, unless the editor also posed the character when writing the file.
+   - Why not (b), filtering the diff:
+     - it would teach `core`'s prefab diff about `gameplay`'s `DescriptionPart`;
+     - it can't ignore the Body's `Position`. That is a real placement override when a copy is moved, and the applier's refit also changes it.
+   - The result:
+     - A copy nobody changed has no overrides. Properties marks no Body property, and the Prefab menu offers nothing.
+     - Revert all puts back the shown prefab.
+     - Saving writes only the person's changes. The file stays free of derived values, and the copy is shown again on reopening.
+     - Apply to prefab now writes the copy as shown, so the prefab file then holds the applied character. A prefab made from a shown character already did this. It is noted in `docs/editor/character-studio.md`.
+
+New tests in `app/round_trip_tests.rs`:
+- `a_placed_described_prefab_copy_has_no_overrides_from_edit_mode`:
+  - It places the prefab as the asset browser does, saves, and shows it.
+  - The overrides equal `placement_only()`.
+  - The Body's own overrides (`prefab::place(..).here()`) have no properties, attributes or added children.
+  - The world is not unsaved.
+  - After a rename, a save and a reopen, the copy is shown again, and its overrides are still at most placement and the name.
+- `revert_all_on_a_placed_described_copy_keeps_it_shown` is the reviewer's repro. After Revert all, the body draws the library's model, its identity is registered, its parts are on and it is posed.
+- `undo_and_redo_of_placing_a_described_copy_keep_it_shown` covers undo and redo of a placement, which is a tree step.
+  - It **passed before the fix**. Undo takes the copy out of the Workspace, so the sync drops it, and redo puts it back to be applied again.
+  - The whole-world path the reviewer reasoned about is the next test.
+- `a_whole_world_undo_to_before_it_was_shown_shows_it_again` records a whole-world step whose "before" was taken before edit mode showed the copy. Undo puts back the unshown copy (the test checks this), and the copy is shown again. Redo also leaves it shown.
+
+Test runs:
+- RED: `4 tests run: 1 passed, 3 failed`. Revert all and the whole-world undo each left `assets/models/Humanoid/Humanoid.glb`. The overrides test listed the Body overrides above.
+- GREEN: `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/round_trip_tests::/)'` gives `13 tests run: 13 passed`.
+- `cargo nextest run -p axcenity-editor -p axcenity-gameplay -p axcenity-project --no-fail-fast` gives `Summary [106.177s] 1702 tests run: 1700 passed (10 slow), 2 failed, 11 skipped`. There were no ABORT or TIMEOUT lines. The two failures:
+  - `app::tests::the_view_mode_changes_the_viewport_at_once_and_lit_comes_back`, GPU timing ("lit comes back");
+  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, the known load-timing test on hello-part, which has no character.
+  - Rerun alone: `2 tests run: 2 passed`.
+- `cargo clippy -p axcenity-editor -p axcenity-gameplay -p axcenity-project --all-targets -- -D warnings`: clean.
+- `cargo fmt --all`.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all there before).
+- The grep for runs of spaces over the diff prints nothing.
+
+Docs:
+- `docs/editor/character-studio.md`: edit mode under recorded steps, placed prefab copies, and the new tests.
+- `docs/development/character-studio/architecture.md`: `DescriptionSync::forget`, and how edit mode handles recorded steps and prefab copies.
+
+Still open for the lead (non-blocking, not done):
+- The default outfit is a draft item. It needs an asset-quality exemption, or the briefs must reach production quality.
+- `GameLink` stores a bare `InstanceId` across `replace_world`.
+- No test drives Done through the toolbar.
+- Cancel and Quit don't ask before discarding.
+- Done copies the whole studio library.
+- Edit-mode cost isn't measured. It now also includes one cloned, applied and posed source per prefab source that holds a described character. That source is made once, or each frame while its models load.
+- The dev-profile opt-levels.
+- Collaborate IDs for parts made in edit mode.
+
+Merge note: `EditCharacters::step` now finds the described characters before applying, and `pose` became the free function `pose_at_rest`.
