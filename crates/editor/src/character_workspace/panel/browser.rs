@@ -285,7 +285,10 @@ pub(super) fn page(
         intents.extend(grid(ui, workspace, &slot.id, &tiles, &mut hovered));
         ui.add_space(8.0);
     }
-    if hovered != state.hovered {
+    // After Esc the tiles can shift under a still pointer (the "Trying
+    // on" bar goes), so a muted tile waits for the pointer to move.
+    let moved = ui.input(|input| input.pointer.delta() != egui::Vec2::ZERO);
+    if state.hover_changed(&hovered, moved) {
         intents.push(Intent::Browse(Browse::Hover(hovered)));
     }
 

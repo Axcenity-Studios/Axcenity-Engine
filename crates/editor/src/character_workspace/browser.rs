@@ -143,6 +143,10 @@ pub struct Browser {
     /// What the preview shows in the character's place while a tile is
     /// hovered or picked: the character wearing it.
     pub preview: Option<Description>,
+    /// The tile under the pointer when a preview ended (Esc, an edit):
+    /// hovering it doesn't preview it again until the pointer leaves it,
+    /// or the panel, still seeing the pointer there, would bring it back.
+    pub muted: Option<Pick>,
 }
 
 impl Browser {
@@ -171,10 +175,37 @@ impl Browser {
     }
 
     /// Forgets the tiles hovered and picked: the character is shown again.
+    /// The tile under the pointer is muted (see [`Browser::muted`]).
     pub fn end_preview(&mut self) {
+        if let Some(pick) = self.trying() {
+            self.muted = Some(pick.clone());
+        }
         self.hovered = None;
         self.selected = None;
         self.preview = None;
+    }
+
+    /// Whether the panel should report `hovered`, the tile under the
+    /// pointer now (`moved`: the pointer moved this frame): when it
+    /// changed, and once the pointer has moved off a muted tile (so the
+    /// mute ends). A still pointer never ends a mute, though the tiles
+    /// may shift under it.
+    pub fn hover_changed(&self, hovered: &Option<Pick>, moved: bool) -> bool {
+        match &self.muted {
+            Some(_) => moved && *hovered != self.muted,
+            None => *hovered != self.hovered,
+        }
+    }
+
+    /// The pointer is over `pick` now (`None`: no tile). Returns false,
+    /// changing nothing, for the muted tile.
+    pub fn hover(&mut self, pick: Option<Pick>) -> bool {
+        if pick.is_some() && pick == self.muted {
+            return false;
+        }
+        self.muted = None;
+        self.hovered = pick;
+        true
     }
 
     /// Works out the preview again for `description` (after a hover or a
@@ -565,8 +596,14 @@ impl CharacterWorkspace {
                     }
                 }
             }
-            Browse::Hover(pick) => self.browser.hovered = pick,
+            Browse::Hover(pick) => {
+                if !self.browser.hover(pick) {
+                    return;
+                }
+            }
             Browse::Select(pick) => {
+                // A click is a new pick, even of the muted tile.
+                self.browser.muted = None;
                 self.browser.selected = pick;
                 self.browser.hovered = None;
             }
@@ -578,10 +615,18 @@ impl CharacterWorkspace {
 
     /// Takes a tile's preview off the character.
     pub fn end_preview(&mut self) {
-        if self.browser.trying().is_some() || self.browser.previewing() {
-            self.browser.end_preview();
+        if self.drop_preview() {
             self.refresh();
         }
+    }
+
+    /// Ends a tile's preview without showing the character again (the
+    /// caller does): whether one was on. Every change to the description
+    /// calls it, so what is edited is what is seen.
+    pub(super) fn drop_preview(&mut self) -> bool {
+        let was = self.browser.trying().is_some() || self.browser.previewing();
+        self.browser.end_preview();
+        was
     }
 
     /// Marks item `id` a favourite, or not (editor state).

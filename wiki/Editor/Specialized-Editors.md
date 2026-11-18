@@ -6,8 +6,8 @@ implementation: implemented
 crates: [editor, mesh_edit, anim, blocks, ui]
 source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/scatter_pane.rs, crates/editor/src/app/scatter_pane.rs, crates/editor/src/effect_editor.rs]
 docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/editor/scatter.md, docs/research/usability/usability-audit.md]
-verified: 2026-11-16
-verified_commit: fbfacacb
+verified: 2026-11-18
+verified_commit: 0046d549
 tags: [system/editor, tools]
 ---
 

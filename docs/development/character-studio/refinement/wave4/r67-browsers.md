@@ -128,3 +128,26 @@ Sheets in `r67-browsers/` (1440×900 drawn for real; the status line's local pat
 - `intent.rs`, a lead file, gains six variants, as the task allowed. `edits()` lists the three item edits.
 - Conflicts are likely with ux-drag in `panel/row.rs` (not touched here) and with anyone else's `shell.rs`/`intent.rs` additions. Mine are additive match arms and variants.
 - `progress.md` and plan 11.5's status line are left for you.
+
+## Review fixes 1
+
+The review found two blocking defects. Both were real. I reproduced each with a test that failed first; the red run is appended to `r67-browsers-red-run.txt`. Both are fixed.
+
+1. **Keep A/B/C left a stale try-on in the viewport.** `KeepHeld` replaces the description through `edit`, but it isn't in `Intent::edits()`, so the shell's end-the-preview gate never ran. **Fix (the sturdier option):** the workspace's `edit`, `transact`, `undo`, `redo` and `cancel_edit` now end a tile's preview (`drop_preview`), so every path that changes the description ends it. When the preview was on, they also redraw after a change of nothing. The shell's gate is gone. `wear` no longer ends the preview itself: `edit` does it, so Wear applies once, not twice (this was a non-blocking item). Test: `keeping_a_held_version_ends_a_tile_preview`. The steps are Capture, height 1.1, Select plain-crop, ShowHeld(Some(0)), KeepHeld(0). The test asserts that nothing is previewing and that `shown() == description()`, and repeats the check for Undo during a try-on. Red: "the try-on ended" failed.
+2. **Esc didn't take the try-on off while the pointer stayed on the tile.** `Browser` has a new field, `muted: Option<Pick>`. `end_preview` sets it to the tile that was being tried on. `Browser::hover` ignores a Hover for that tile. `hover_changed(hovered, moved)` (the panel's check) ends the mute only once the **pointer moves** off the tile. A first version ended it when no tile was under the pointer, but the test showed that wasn't enough: when Esc removes the "Trying on" bar, the tiles shift up under the still pointer. For one frame no tile is under it, which ended the mute, and on the next frame the tile was hovered again. A click (`Select`) clears the mute. Test: `esc_takes_a_try_on_off_while_the_pointer_stays_on_its_tile`. It runs the whole studio through pointer events in one egui context. The pointer moves onto the Plain crop tile (hover preview), clicks it (pick), and presses Esc without moving. After three still frames, `shown()` is the character. A repeated `Hover(Some(plain-crop))` changes nothing. Moving off the tile and back previews it again. Red: `shown` still wore `test/plain-crop`.
+
+Also fixed from the non-blocking list:
+- `docs/editor/character-studio.md`: the "Show drafts" example now says "5 hidden", as the sheets show.
+- `wiki/Editor/Specialized-Editors.md`: `verified_commit` is bumped, so its stale warning is gone (57 warnings now, none on this page).
+- The docs (topic file and architecture §15c) now say which workspace calls end a try-on and describe the mute.
+
+Not changed (non-blocking, noted for later): there is still no hover throttle and no cache of `browser_tiles`; the realistic hover cost is not measured. The other non-blocking items are unchanged and are listed in the review.
+
+Tests after the fixes:
+- `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'`: 17 run, 17 passed (the two new tests included).
+- `cargo nextest run -p axcenity-editor --no-fail-fast`: 1416 run, 1412 passed, 1 failed, 3 timed out, 11 skipped, no ABORT lines. The 4 were `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved` (FAIL) and three collab tests (TIMEOUT), the same load failures the review saw. Rerun alone with `-j 1`: 4 run, 4 passed.
+- After the last lint fix, `-E 'test(/browser_tests::|shell_tests::|compare|character_workspace::tests::/)'`: 39 run, 39 passed.
+- `cargo clippy -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all`: run.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 57 warnings.
+
+No visual change: the pages draw as before, and the sheets still stand.

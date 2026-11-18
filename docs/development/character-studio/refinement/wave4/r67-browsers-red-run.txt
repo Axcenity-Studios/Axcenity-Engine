@@ -26,3 +26,18 @@ returning its input unchanged (the hoodie fixture on layer 3; the test fails at 
 leaves the hoodie off"):
         FAIL (1/1) axcenity-editor::bin/axcenity-editor character_workspace::browser_tests::a_clothing_tile_shows_its_item_over_what_is_under_it_only
      Summary 1 test run: 0 passed, 1 failed, 1424 skipped
+
+=== Review fixes 1: red run (tests written before the fix) ===
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/browser_tests::/)'
+
+FAIL character_workspace::browser_tests::keeping_a_held_version_ends_a_tile_preview
+  panicked at browser_tests.rs:1117:5: the try-on ended
+  (after Capture, an edit, Select plain-crop, ShowHeld(Some(0)), KeepHeld(0),
+  the tile preview was still on)
+FAIL character_workspace::browser_tests::esc_takes_a_try_on_off_while_the_pointer_stays_on_its_tile
+  panicked at browser_tests.rs:1191:5: assertion `left == right` failed: Esc took the try-on off
+  left (shown):  ... WornItem { id: "test/plain-crop", ... }
+  right (description): ... WornItem { id: "axcenity/hair-swept", ... }
+  (the pointer stayed on the clicked tile; the next frame's Hover put the preview back)
+
+Summary [8.673s] 17 tests run: 15 passed, 2 failed, 1410 skipped

@@ -1096,3 +1096,115 @@ fn snapshot(snapshots: &Path, name: &str, folder: &Path, workspace: &mut Charact
         },
     );
 }
+
+#[test]
+fn keeping_a_held_version_ends_a_tile_preview() {
+    // Review fix 1: Keep A replaces the description, so a tile tried on
+    // the character before it must not stay in the viewport.
+    let (folder, mut workspace) = stylized_workspace("browser-keep-held");
+    workspace.apply(Intent::Capture);
+    workspace.apply(Intent::SetParameter {
+        id: "height".to_owned(),
+        value: 1.1,
+        gesture: Gesture::Commit,
+    });
+    workspace.apply(Intent::Browse(Browse::Select(Some(pick(
+        "test/plain-crop",
+    )))));
+    assert!(workspace.browser.previewing());
+    workspace.apply(Intent::ShowHeld(Some(0)));
+    workspace.apply(Intent::KeepHeld(0));
+    assert!(!workspace.browser.previewing(), "the try-on ended");
+    assert_eq!(
+        *workspace.shown(),
+        *workspace.description(),
+        "what is edited is what is seen"
+    );
+    // Undo and redo change the character too: a try-on gives way.
+    workspace.apply(Intent::Browse(Browse::Select(Some(pick(
+        "test/plain-crop",
+    )))));
+    workspace.apply(Intent::Undo);
+    assert!(!workspace.browser.previewing());
+    assert_eq!(*workspace.shown(), *workspace.description());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Where text `text` is drawn in `output` (its first appearance).
+fn text_at(output: &egui::FullOutput, text: &str) -> Option<egui::Pos2> {
+    fn walk(shape: &egui::Shape, text: &str) -> Option<egui::Pos2> {
+        match shape {
+            egui::Shape::Text(shape) if shape.galley.text() == text => {
+                Some(shape.visual_bounding_rect().center())
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().find_map(|s| walk(s, text)),
+            _ => None,
+        }
+    }
+    output
+        .shapes
+        .iter()
+        .find_map(|clipped| walk(&clipped.shape, text))
+}
+
+#[test]
+fn esc_takes_a_try_on_off_while_the_pointer_stays_on_its_tile() {
+    // Review fix 1: after a click the pointer is still on the tile; Esc
+    // must not be undone by the panel hovering that tile again next frame.
+    let (folder, mut workspace) = stylized_workspace("browser-esc-hover");
+    let before = workspace.description().clone();
+    let ctx = theme::test_context();
+    let frame = |workspace: &mut CharacterWorkspace, events: Vec<egui::Event>| {
+        theme::run(&ctx, input(events), |ui| {
+            assert_eq!(workspace.ui(ui, None), None);
+        })
+    };
+    frame(&mut workspace, Vec::new());
+    let output = frame(&mut workspace, Vec::new());
+    let tile = text_at(&output, "Plain crop").expect("the Plain crop tile is drawn");
+    let button = |pressed| egui::Event::PointerButton {
+        pos: tile,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    frame(&mut workspace, vec![egui::Event::PointerMoved(tile)]);
+    frame(&mut workspace, vec![egui::Event::PointerMoved(tile)]);
+    assert!(wears(workspace.shown(), "test/plain-crop"), "hovered");
+    frame(&mut workspace, vec![button(true)]);
+    frame(&mut workspace, vec![button(false)]);
+    frame(&mut workspace, Vec::new());
+    frame(&mut workspace, Vec::new());
+    assert!(wears(workspace.shown(), "test/plain-crop"), "picked");
+    let escape = egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    frame(&mut workspace, vec![escape]);
+    // The pointer hasn't moved: the try-on stays off, though the tiles
+    // shift up under it when the "Trying on" bar goes.
+    for _ in 0..3 {
+        frame(&mut workspace, Vec::new());
+    }
+    assert_eq!(*workspace.shown(), before, "Esc took the try-on off");
+    assert!(!workspace.browser.previewing());
+    // The same Hover again (what the panel would send) changes nothing.
+    workspace.apply(Intent::Browse(Browse::Hover(Some(pick("test/plain-crop")))));
+    assert_eq!(*workspace.shown(), before);
+    // Off the tile and back: hovering previews it again.
+    frame(
+        &mut workspace,
+        vec![egui::Event::PointerMoved(egui::pos2(5.0, 5.0))],
+    );
+    frame(&mut workspace, Vec::new());
+    frame(&mut workspace, vec![egui::Event::PointerMoved(tile)]);
+    frame(&mut workspace, Vec::new());
+    assert!(
+        wears(workspace.shown(), "test/plain-crop"),
+        "hovering the tile again previews it"
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

@@ -585,16 +585,23 @@ impl CharacterWorkspace {
     /// Changes the description as one undo step and shows it. A drag that
     /// was open is closed first.
     pub fn edit(&mut self, change: impl FnOnce(&mut Description)) {
+        // A tile tried on gives way to any change of the character.
+        let previewing = self.drop_preview();
         self.history.commit(&self.description);
         let before = self.description.clone();
         let mut changed = before.clone();
         change(&mut changed);
         let library = self.library();
         self.description = tidy(changed, &library);
-        if edit::same_character(&before, &self.description, library.base(&before.base)) {
-            // A change of nothing makes no step and keeps redo (audit D-05).
-            self.description = before;
-        } else if self.history.record(before, &self.description) {
+        let recorded =
+            if edit::same_character(&before, &self.description, library.base(&before.base)) {
+                // A change of nothing makes no step and keeps redo (audit D-05).
+                self.description = before;
+                false
+            } else {
+                self.history.record(before, &self.description)
+            };
+        if recorded || previewing {
             self.refresh();
         }
     }
@@ -602,6 +609,7 @@ impl CharacterWorkspace {
     /// A change that is part of a gesture: a drag's changes are one undo
     /// step, closed by its [`Gesture::Commit`]; nothing changed, no step.
     pub fn transact(&mut self, change: impl FnOnce(&mut Description), gesture: Gesture) {
+        self.drop_preview();
         self.history.begin(&self.description);
         let mut changed = self.description.clone();
         change(&mut changed);
@@ -627,8 +635,11 @@ impl CharacterWorkspace {
 
     /// Ends a drag going back to where it started.
     pub fn cancel_edit(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(start) = self.history.cancel() {
             self.description = start;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
@@ -763,7 +774,7 @@ impl CharacterWorkspace {
     /// "Recently used".
     pub fn wear(&mut self, slot: &str, item: Option<&str>) {
         let library = self.library();
-        self.end_preview();
+        // `edit` ends a tile's preview (one apply, not two).
         self.edit(|description| *description = browser::dressed(description, &library, slot, item));
         if let Some(item) = item
             && self.description.items.iter().any(|worn| worn.id == item)
@@ -879,15 +890,21 @@ impl CharacterWorkspace {
     }
 
     pub fn undo(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(before) = self.history.undo(self.description.clone()) {
             self.description = before;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
 
     pub fn redo(&mut self) {
+        let previewing = self.drop_preview();
         if let Some(after) = self.history.redo(self.description.clone()) {
             self.description = after;
+            self.refresh();
+        } else if previewing {
             self.refresh();
         }
     }
@@ -1002,6 +1019,7 @@ impl CharacterWorkspace {
     /// pictures): its undo is left alone.
     pub(crate) fn show_only(&mut self, description: Description) {
         let library = self.library();
+        self.browser.end_preview();
         self.description = adopt(description, &library).0;
         self.animators.clear();
         self.applied = None;

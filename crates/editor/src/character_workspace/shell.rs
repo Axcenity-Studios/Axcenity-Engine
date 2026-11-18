@@ -136,10 +136,6 @@ impl CharacterWorkspace {
             // Back to the character being edited before it changes.
             self.show_held(None);
         }
-        if intent.edits() && !matches!(intent, Intent::Wear { .. }) {
-            // A tile tried on gives way to any edit (Wear ends it itself).
-            self.end_preview();
-        }
         match intent {
             Intent::SetParameter { id, value, gesture } => {
                 self.set_value(&id, value, false, gesture)
