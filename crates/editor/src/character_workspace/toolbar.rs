@@ -1,4 +1,5 @@
-//! The toolbar (brief §3.1): Home, the character's name and whether it's
+//! The toolbar (brief §3.1): Home (Cancel and Done for a game's
+//! character, the round trip), the character's name and whether it's
 //! saved, New (a family or a preset), Open, Save, undo and redo, Reset
 //! with a scope and Randomize with a scope (brief §11), and the switch for
 //! editing on the character (R2: hover, click to select, handles;
@@ -24,8 +25,29 @@ pub(super) fn show(
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     ui.horizontal_centered(|ui| {
-        if widgets::icon_button(ui, icons::HOUSE, "Back to the start screen", false).clicked() {
-            intents.push(Intent::Home);
+        // Opened from the Game Editor (the round trip, `game.rs`): Cancel
+        // in Home's place, and Done beside Save.
+        let game = workspace.game();
+        match game {
+            Some(game) => {
+                if ui
+                    .button(theme::with_icon(icons::X, "Cancel"))
+                    .on_hover_text(format!(
+                        "Back to {} without changing {}",
+                        game.project, game.name
+                    ))
+                    .clicked()
+                {
+                    intents.push(Intent::Cancel);
+                }
+            }
+            None => {
+                if widgets::icon_button(ui, icons::HOUSE, "Back to the start screen", false)
+                    .clicked()
+                {
+                    intents.push(Intent::Home);
+                }
+            }
         }
         ui.add_space(4.0);
         ui.label(
@@ -43,14 +65,40 @@ pub(super) fn show(
             );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(game) = game
+                && ui
+                    .add(widgets::button(
+                        Role::Primary,
+                        Some(icons::CHECK),
+                        "Done",
+                        &palette,
+                    ))
+                    .on_hover_text(format!(
+                        "Back to {} with {} looking like this (one undo step there)",
+                        game.project, game.name
+                    ))
+                    .clicked()
+            {
+                intents.push(Intent::Done);
+            }
+            let save = if game.is_some() {
+                Role::Secondary
+            } else {
+                Role::Primary
+            };
+            let about = if game.is_some() {
+                "Save a copy in Character Studio's characters (Ctrl+S)"
+            } else {
+                "Save the character (Ctrl+S)"
+            };
             if ui
                 .add(widgets::button(
-                    Role::Primary,
+                    save,
                     Some(icons::FLOPPY_DISK),
                     "Save",
                     &palette,
                 ))
-                .on_hover_text("Save the character (Ctrl+S)")
+                .on_hover_text(about)
                 .clicked()
             {
                 intents.push(Intent::Save);

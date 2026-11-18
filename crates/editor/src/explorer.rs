@@ -235,6 +235,9 @@ pub enum Action {
     /// Give back the parts the grouped MeshPart `id` (and the rest of the
     /// selection) was made of.
     UngroupMesh(InstanceId),
+    /// Open the character `id` is (or is part of) in Character Studio,
+    /// and back (refinement R10, `character_workspace/game.rs`).
+    EditInCharacterStudio(InstanceId),
     /// A plugin's Explorer item (plugin API 3): the plugin at `plugin` in
     /// the list, its item numbered `action`. It gets the selection.
     Plugin {
@@ -1124,6 +1127,8 @@ enum RowCommand {
     GroupAsMesh,
     /// Ungroup Mesh, on the selection.
     UngroupMesh,
+    /// Edit in Character Studio, on a character.
+    EditCharacter,
     Rename,
     Duplicate,
     Delete,
@@ -1151,6 +1156,7 @@ impl RowCommand {
             RowCommand::ReportBug => Some(Action::ReportBug(id)),
             RowCommand::GroupAsMesh => Some(Action::GroupAsMesh(id)),
             RowCommand::UngroupMesh => Some(Action::UngroupMesh(id)),
+            RowCommand::EditCharacter => Some(Action::EditInCharacterStudio(id)),
             RowCommand::MakeUnique => Some(Action::MakeUnique(id)),
             RowCommand::Prefab(action) => Some(Action::Prefab(action)),
             RowCommand::Duplicate => Some(Action::Duplicate(id)),
@@ -1489,6 +1495,21 @@ fn row_menu(
             .clicked()
     {
         chosen = Some(RowCommand::UngroupMesh);
+    }
+    if crate::character_workspace::game::editable_character(world, id).is_some()
+        && ui
+            .button(theme::menu_item(
+                ui.ctx(),
+                icons::USER_FOCUS,
+                "Edit in Character Studio",
+            ))
+            .on_hover_text(
+                "Change how this character looks in Character Studio; Done brings it back here \
+                 as one undo step",
+            )
+            .clicked()
+    {
+        chosen = Some(RowCommand::EditCharacter);
     }
     if id != world.root()
         && ui

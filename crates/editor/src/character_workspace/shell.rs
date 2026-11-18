@@ -23,6 +23,10 @@ use crate::theme::{self, icons};
 pub enum WorkspaceAction {
     /// Back to the start screen (after any Save it asked for).
     Home,
+    /// Back to the Game Editor with the edited character (the round trip).
+    Done,
+    /// Back to the Game Editor, nothing applied.
+    Cancel,
 }
 
 const TOOLBAR: f32 = 48.0;
@@ -206,6 +210,8 @@ impl CharacterWorkspace {
             Intent::DiscardHeld(index) => self.discard_held(index),
             Intent::Recover(take) => self.recover(take),
             Intent::Home => return Some(WorkspaceAction::Home),
+            Intent::Done => return Some(WorkspaceAction::Done),
+            Intent::Cancel => return Some(WorkspaceAction::Cancel),
         }
         None
     }

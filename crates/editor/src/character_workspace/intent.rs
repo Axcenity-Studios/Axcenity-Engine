@@ -150,6 +150,11 @@ pub enum Intent {
     Recover(bool),
     /// Back to the start screen (the editor asks to save first).
     Home,
+    /// Back to the Game Editor, the edited character applied to the game
+    /// character the workspace was opened on (the round trip, `game.rs`).
+    Done,
+    /// Back to the Game Editor, the game character left as it was.
+    Cancel,
 }
 
 impl Intent {

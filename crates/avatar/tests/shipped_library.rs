@@ -497,3 +497,125 @@ const BENCHMARK_CAST: [&str; 8] = [
     "narrow-face",
     "distinctive",
 ];
+
+/// R10's Done-when (plan 11.5), on both shipped families: 1,000 seeded
+/// randomizations of each, spread over every scope Character Studio
+/// offers (everything, each category, each feature, a list of
+/// parameters), starting from the family's default character and each of
+/// its presets, each with a different set of locks. Every character
+/// validates and resolves with no problem, and nothing locked changes:
+/// a locked parameter keeps its value and a locked slot keeps what it
+/// wears.
+#[test]
+fn every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks() {
+    use axcenity_avatar::{Category, Scope, parameter_values, randomize};
+    use std::collections::BTreeSet;
+    let library = read();
+    let families = [axcenity_avatar::V1_BASE, "axcenity/realistic"];
+    for family in families {
+        let base = library.base(family).expect("both families ship");
+        let mut scopes = vec![Scope::All];
+        scopes.extend(
+            [
+                Category::Body,
+                Category::Face,
+                Category::Skin,
+                Category::Hair,
+                Category::Clothing,
+                Category::Accessories,
+            ]
+            .map(Scope::Category),
+        );
+        scopes.extend(base.features.iter().map(|f| Scope::Feature(f.id.clone())));
+        let ids: Vec<String> = base.parameters.iter().map(|p| p.id.clone()).collect();
+        scopes.push(Scope::Parameters(ids.iter().step_by(5).cloned().collect()));
+        // The default character and every preset on this family.
+        let mut starts = vec![{
+            let mut start = Description::new("Npc", family);
+            start.items = base.defaults.items.iter().map(WornItem::new).collect();
+            start
+        }];
+        for preset in library.presets.values().filter(|p| p.base == family) {
+            let mut start = starts[0].clone();
+            if axcenity_avatar::apply_preset(&mut start, preset, &library).is_ok() {
+                starts.push(start);
+            }
+        }
+        assert!(starts.len() > 1, "{family} has presets");
+        // A slot a parameter's choices fill (the realistic underwear) always
+        // wears the choice's item, so it can't be locked on its own: the
+        // studio's slot locks leave those out too.
+        let chosen = axcenity_avatar::chosen_slots(&library, family);
+        let slots: Vec<String> = base
+            .slots
+            .iter()
+            .map(|s| s.id.clone())
+            .filter(|id| !chosen.contains(id))
+            .collect();
+        let mut changed_any = vec![false; scopes.len()];
+        for seed in 0..1000u64 {
+            let at = seed as usize;
+            let scope = &scopes[at % scopes.len()];
+            let start = &starts[(at / scopes.len()) % starts.len()];
+            // A different set of locks each time: about one parameter in
+            // seven, and one slot.
+            let mut locks: BTreeSet<String> = ids.iter().skip(at % 7).step_by(7).cloned().collect();
+            locks.insert(slots[at % slots.len()].clone());
+            let drawn = randomize(start, scope, &locks, seed, &library);
+            let problems = drawn.validate(&library);
+            assert!(
+                problems.is_empty(),
+                "{family} {scope:?} seed {seed}:\n{}",
+                lines(&problems)
+            );
+            let resolved = axcenity_avatar::resolve(&library, &drawn).unwrap();
+            assert!(
+                resolved.problems.is_empty(),
+                "{family} {scope:?} seed {seed}: {}",
+                lines(&resolved.problems)
+            );
+            let (before, after) = (
+                parameter_values(base, start),
+                parameter_values(base, &drawn),
+            );
+            for id in locks.iter().filter(|id| base.parameter(id).is_some()) {
+                assert_eq!(
+                    before.get(id),
+                    after.get(id),
+                    "{family} {scope:?} seed {seed}: locked `{id}` changed"
+                );
+            }
+            let slot = &slots[at % slots.len()];
+            let worn = |d: &Description| -> Vec<WornItem> {
+                d.items
+                    .iter()
+                    .filter(|w| {
+                        library
+                            .item(&w.id)
+                            .is_some_and(|i| i.slots().any(|s| s == slot))
+                    })
+                    .cloned()
+                    .collect()
+            };
+            assert_eq!(
+                worn(start),
+                worn(&drawn),
+                "{family} {scope:?} seed {seed}: locked slot `{slot}` changed"
+            );
+            if &drawn != start {
+                changed_any[at % scopes.len()] = true;
+            }
+        }
+        // Everything, and the body and face, do draw something new.
+        for (index, scope) in scopes.iter().enumerate() {
+            let named = matches!(
+                scope,
+                Scope::All | Scope::Category(Category::Body) | Scope::Category(Category::Face)
+            );
+            assert!(
+                !named || changed_any[index],
+                "{family}: {scope:?} never changed anything"
+            );
+        }
+    }
+}

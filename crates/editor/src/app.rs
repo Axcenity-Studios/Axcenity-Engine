@@ -30,6 +30,7 @@ mod autorecover;
 mod behavior_trees;
 mod block_undo;
 mod branding;
+mod character_round_trip;
 mod character_studio;
 mod character_workspace;
 mod chrome;
@@ -44,6 +45,7 @@ mod data_tables;
 mod dev_console;
 mod dialogues;
 mod documents;
+mod edit_characters;
 mod edits;
 mod effect_tab;
 mod engine;
@@ -491,6 +493,8 @@ pub struct EditorApp {
     /// (`docs/research/character-studio.md` CS2), and where it keeps files.
     character_workspace: Option<Box<crate::character_workspace::CharacterWorkspace>>,
     characters_folder: Option<PathBuf>,
+    /// Described characters shown in edit mode (OPEN-21).
+    edit_characters: Box<edit_characters::EditCharacters>,
     /// The block script whose tab is under the mouse, set as it's drawn:
     /// Ctrl+Z and Ctrl+Y are its then, and the world's keys aren't taken.
     block_tab_pointer: Option<String>,
@@ -1130,6 +1134,7 @@ impl EditorApp {
             character_studio: Default::default(),
             character_workspace: None,
             characters_folder: None,
+            edit_characters: Default::default(),
             block_tab_pointer: None,
             scene_drawn_pass: None,
             ui_designer: UiDesigner::default(),
@@ -1636,7 +1641,11 @@ impl EditorApp {
         self.finish_thumbnail(ctx);
         // Taken from the input before the viewport sees it, so the S doesn't
         // also fly the camera backward.
-        if ctx.input_mut(|input| shortcuts::consume(input, shortcuts::Action::Save)) {
+        // Character Studio has its own Ctrl+S (and Ctrl+Z): over it, the
+        // Game Editor's keys are left to it, so a game's world isn't saved
+        // or undone out of sight (refinement R10).
+        let studio = self.character_workspace.is_some();
+        if !studio && ctx.input_mut(|input| shortcuts::consume(input, shortcuts::Action::Save)) {
             self.save();
         }
         if ctx.input_mut(|input| shortcuts::consume(input, shortcuts::Action::Settings)) {
@@ -1653,7 +1662,12 @@ impl EditorApp {
         }
         self.generate_frame();
         self.palette_frame(ctx);
-        self.shortcuts(ctx);
+        if !studio {
+            self.shortcuts(ctx);
+        }
+        // Described characters show their description in edit mode
+        // (OPEN-21).
+        self.edit_characters_frame();
         // Set again if the Model Studio is drawn under the mouse this frame;
         // a closed or hidden tab mustn't keep the keys.
         self.model_studio.forget_pointer();
@@ -1779,8 +1793,10 @@ impl EditorApp {
         }
 
         // With no project open, the start screen takes the place of the
-        // toolbar, the Explorer, the tabs and the viewport.
-        let has_project = self.project.is_some();
+        // toolbar, the Explorer, the tabs and the viewport; Character
+        // Studio does too while it's open, over a project as well (the
+        // round trip, refinement R10).
+        let has_project = self.project.is_some() && !studio;
 
         // Panels take their space in the order they're added: the menu bar
         // spans the whole top, then the Explorer (with Properties under it)
@@ -2156,6 +2172,8 @@ mod posing_tests;
 mod prefab_tests;
 #[cfg(test)]
 mod ribbon_editor_tests;
+#[cfg(test)]
+mod round_trip_tests;
 #[cfg(test)]
 mod scene_tools_tests;
 #[cfg(test)]
