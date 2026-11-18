@@ -383,6 +383,65 @@ fn a_saved_described_character_shows_its_identity_in_edit_mode() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
+/// OPEN-21 across opens in one run: opening the same project again (File >
+/// Open, Open Recent, close and reopen) gives it new `Assets` but the same
+/// Instance IDs, so the edit-mode state of the last open must not count
+/// its description as already worn.
+#[test]
+fn a_described_character_shows_its_identity_after_reopening_in_the_same_run() {
+    let (parent, folder, studio) = new_project("reopen");
+    let mut app = open(&folder, &studio);
+    let character = inserted(&mut app, Insertable::Character, None);
+    app.edit_in_character_studio(character).unwrap();
+    app.character_workspace
+        .as_mut()
+        .unwrap()
+        .apply(Intent::SetParameter {
+            id: "fat".into(),
+            value: 0.8,
+            gesture: Gesture::Commit,
+        });
+    app.finish_character_round_trip(true);
+    assert!(app.save());
+    drop(app);
+
+    let mut app = open(&folder, &studio);
+    let body_and_key = |app: &EditorApp| {
+        let character = app
+            .world
+            .find_first_child(app.world.workspace(), "Character")
+            .unwrap();
+        let body = applier::body_of(&app.world, character).unwrap();
+        let key = axcenity_anim::identity_key(&app.world, body).unwrap();
+        (character, body, key)
+    };
+    let (character, _, key) = body_and_key(&app);
+    load_models(&app, character);
+    app.edit_characters_frame();
+    assert!(app.assets.identity(key).is_some(), "first open: worn");
+
+    // The same project opened again in this run.
+    app.open(&folder);
+    let (character, body, key) = body_and_key(&app);
+    assert!(
+        app.assets.identity(key).is_none(),
+        "new Assets: not worn yet"
+    );
+    load_models(&app, character);
+    app.edit_characters_frame();
+    assert!(
+        app.assets.identity(key).is_some(),
+        "second open in the same run: the identity is worn in the new Assets"
+    );
+    let posed = app.edit_characters.poses().get(&body);
+    assert!(
+        posed.is_some_and(|pose| pose.is_morphed()),
+        "and the body is posed with its shapes"
+    );
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
 /// Save and open polish: inside the editor, Ctrl+Z, Ctrl+Shift+Z and
 /// Ctrl+S reach Character Studio (the Game Editor's own shortcuts used to
 /// take them first), and the Game Editor's world isn't undone or saved

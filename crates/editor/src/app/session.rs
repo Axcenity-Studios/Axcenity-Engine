@@ -401,6 +401,10 @@ impl EditorApp {
             self.stop_plugin(index);
         }
         self.world = world;
+        // What edit mode applied and posed belongs to the old world (and,
+        // on an open, the old `Assets`): a new world reuses Instance IDs,
+        // so kept state would count its descriptions as already worn.
+        *self.edit_characters = Default::default();
         self.selected = None;
         self.selection.clear();
         self.history = History::new();

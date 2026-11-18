@@ -633,14 +633,17 @@ impl EditorApp {
             Ok(_) => {
                 if new {
                     self.output.info(format!(
-                        "Added the default humanoid to the project: its model `{}`, its                          animations and the state machine `{}`.",
+                        "Added the default humanoid to the project: its model `{}`, its \
+                         animations and the state machine `{}`.",
                         axcenity_project::DEFAULT_HUMANOID_MODEL_PATH,
                         axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH
                     ));
                 }
                 if !had_realistic && realistic(&project) {
                     self.output.info(format!(
-                        "Added the realistic character family to the project's character                          library (`{}`). Right-click a character in the Explorer and pick                          Edit in Character Studio to change how it looks.",
+                        "Added the realistic character family to the project's character \
+                         library (`{}`). Right-click a character in the Explorer and pick \
+                         Edit in Character Studio to change how it looks.",
                         axcenity_avatar::LIBRARY_FOLDER
                     ));
                 }

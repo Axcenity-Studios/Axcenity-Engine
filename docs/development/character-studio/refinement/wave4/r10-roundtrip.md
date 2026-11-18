@@ -105,3 +105,20 @@ Sheet: [r10-roundtrip/edit-mode-before-now-play.jpg](r10-roundtrip/edit-mode-bef
 - `CharacterWorkspace` gained one field (`game`) and its line in `open`'s struct literal: a one-line conflict with any branch that adds a field.
 - Tracks that create projects from templates in their tests now get the realistic starter character. A test about the stylized default humanoid should take the kept description out, as `player`'s `default_humanoid_tests` now does.
 - `progress.md` and the audit rows (OPEN-21, OPEN-22, MAP-S10-08) are yours to update.
+
+## Review fixes 1
+
+All three blocking items are fixed.
+
+1. **OPEN-21 came back after reopening a project in the same run.** `EditCharacters` (its `DescriptionSync`, poses and stamp) outlived the world and `Assets` it belonged to. A reopened world reuses the same Instance IDs, so its description counted as already worn and the identity was never registered in the new `Assets`. The fix is in `EditorApp::replace_world` (`app/session.rs`): it now resets `*self.edit_characters`. Every path that replaces the world goes through `replace_world`: opening a project (after its new `Assets` are set), closing one, a file-watch reload, and the three team paths. The only other places that set `self.assets` (`open_loaded` and `finish_closing_project`) both call `replace_world` afterwards.
+   - Test first: `round_trip_tests::a_described_character_shows_its_identity_after_reopening_in_the_same_run`. It saves a character with fat 0.8 and opens the project. One edit frame wears the identity. It then calls `app.open(&folder)` again, runs a frame, and checks that the identity is in the new `Assets` and that the body is posed with its shapes. RED: it failed with "second open in the same run: the identity is worn in the new Assets" (appended to `r10-roundtrip-red-run.txt`). GREEN after the fix.
+2. **Space runs in user-visible strings.** I restored the `\` line continuations in `tree_ops.rs` (the existing "Added the default humanoid…" Output message and the new realistic-family message) and in `explorer.rs` (the Edit in Character Studio tooltip). The reviewer's check, `git diff main -U0 -- '*.rs' | grep -E '"[^"]*[a-z,;.)]          +[a-z(`]'`, now prints nothing. The same grep over the whole crate still finds four strings that are **already broken on main** and were not changed here: `app/solid.rs:96` and `:99` (the Group as Mesh and Ungroup Mesh tooltips), and `explorer.rs:764` and `:1481`. They belong to another owner, so I left them for the lead.
+3. **Stale topic docs.** `docs/project/templates.md` now says the character templates get `project::add_default_game_character`: both families in `assets/characters/` (the realistic package is about 40 MB), and the `Character` prefab is the realistic described character, or the stylized one only when the shipped library isn't found. It links `docs/editor/character-studio.md`. `docs/scripting/api-character.md` now says Insert ▸ Character places the realistic described character, applied in the same undo step (decision 7). The page points to Edit in Character Studio and notes that the stylized family stays selectable. Its StarterCharacter bullet no longer calls the prefab "the default humanoid". `docs/editor/character-studio.md` lists the new test.
+
+Tests run:
+- `cargo nextest run -p axcenity-editor -p axcenity-project --no-fail-fast`: `Summary [119.156s] 1655 tests run: 1655 passed (13 slow), 11 skipped`. No FAIL or ABORT lines.
+- `cargo clippy -p axcenity-editor -p axcenity-project --all-targets -- -D warnings`: clean.
+- `cargo fmt --all`.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (all there before).
+
+I didn't act on the non-blocking items: the draft default outfit, Done copying the whole studio library, the single entry point, edit-mode cost, Quit with the studio open, Collaborate IDs, the opt-level profile entries, and the order of the shipped-library lookup. They stay as open issues for the lead.

@@ -1504,7 +1504,8 @@ fn row_menu(
                 "Edit in Character Studio",
             ))
             .on_hover_text(
-                "Change how this character looks in Character Studio; Done brings it back here                  as one undo step",
+                "Change how this character looks in Character Studio; Done brings it back here \
+                 as one undo step",
             )
             .clicked()
     {

@@ -30,3 +30,10 @@ Why each failed:
   slot locks; the test now leaves choice-filled slots out of its lock candidates and passes. No
   product code changed for it: Randomize already kept every parameter lock and gave sound
   characters on every scope (the existing 1,000-seed test covered Scope::All only).
+
+Review fixes 1 (blocking 1: edit-mode state survives a reopen in the same run)
+cargo nextest run -p axcenity-editor -E 'test(/round_trip_tests::a_described_character_shows_its_identity_after_reopening/)'
+        FAIL [   2.531s] (1/1) axcenity-editor::bin/axcenity-editor app::round_trip_tests::a_described_character_shows_its_identity_after_reopening_in_the_same_run
+    panicked at crates\editor\src\app\round_trip_tests.rs:429:5:
+    second open in the same run: the identity is worn in the new Assets
+     Summary [   2.534s] 1 test run: 0 passed, 1 failed, 1417 skipped
