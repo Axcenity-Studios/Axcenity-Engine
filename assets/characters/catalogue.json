@@ -180,6 +180,24 @@
       ]
     },
     {
+      "id": "axcenity/realistic-crew-tee",
+      "manifest": "realistic/clothing/crew-tee/Shirt_CrewTee.item.json",
+      "label": "Crew-neck T-shirt",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "tee",
+        "t-shirt",
+        "jersey",
+        "casual"
+      ],
+      "thumbnail": "realistic/clothing/crew-tee/Shirt_CrewTee.png"
+    },
+    {
       "id": "axcenity/realistic-hair-short-crop",
       "manifest": "realistic/items/realistic-hair-short-crop.item.json",
       "label": "Short textured crop",
@@ -195,6 +213,42 @@
         "crop",
         "textured"
       ]
+    },
+    {
+      "id": "axcenity/realistic-joggers",
+      "manifest": "realistic/clothing/joggers/Pants_Joggers.item.json",
+      "label": "Joggers",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "joggers",
+        "sweatpants",
+        "fleece",
+        "casual"
+      ],
+      "thumbnail": "realistic/clothing/joggers/Pants_Joggers.png"
+    },
+    {
+      "id": "axcenity/realistic-sneakers",
+      "manifest": "realistic/clothing/sneakers/Shoes_CourtSneakers.item.json",
+      "label": "Court sneakers",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "sneakers",
+        "trainers",
+        "leather",
+        "casual"
+      ],
+      "thumbnail": "realistic/clothing/sneakers/Shoes_CourtSneakers.png"
     },
     {
       "id": "axcenity/realistic-sports-bra",

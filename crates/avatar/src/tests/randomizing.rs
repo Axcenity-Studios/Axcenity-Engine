@@ -329,3 +329,33 @@ fn randomize_never_wears_an_item_marked_draft() {
     }
     assert!(unmarked > 0, "an item with no quality is still drawn");
 }
+
+/// A draft (an item that says `quality: "draft"`) is never drawn
+/// (`asset-quality.md` §5); the same item marked production is, and so is
+/// one made before the standard, with `quality` unset.
+#[test]
+fn a_declared_draft_is_never_drawn() {
+    let none = BTreeSet::new();
+    let drawn = |library: &Library| {
+        let mut worn: BTreeSet<String> = BTreeSet::new();
+        for seed in 0..400 {
+            let d = randomize(&start(), &Scope::All, &none, seed, library);
+            worn.extend(d.items.iter().map(|item| item.id.clone()));
+        }
+        worn
+    };
+    let id = "test/tee";
+    for (quality, offered) in [
+        (Some(crate::Quality::Draft), false),
+        (Some(crate::Quality::Production), true),
+        (None, true),
+    ] {
+        let mut library = fixtures::rich_library();
+        library
+            .items
+            .get_mut(id)
+            .expect("the fixture's tee")
+            .quality = quality;
+        assert_eq!(drawn(&library).contains(id), offered, "{quality:?}");
+    }
+}

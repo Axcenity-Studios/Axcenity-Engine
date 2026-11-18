@@ -258,9 +258,12 @@ impl ItemManifest {
         self.materials.iter().find(|m| m.name == name)
     }
 
-    /// Whether it is still a draft (no `quality`, or `draft`).
+    /// Whether it says it is a draft. An item with no `quality` (made
+    /// before the asset-quality standard: the stylized family's) is listed
+    /// and drawn as before until it is reviewed; the lead's call at the
+    /// wave-4 merge, so the browsers and Randomize follow one rule.
     pub fn is_draft(&self) -> bool {
-        self.quality != Some(Quality::Production)
+        self.quality == Some(Quality::Draft)
     }
 
     pub fn variant(&self, id: &str) -> Option<&Variant> {

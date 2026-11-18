@@ -698,7 +698,12 @@ fn frames_of(clip: &str) -> Range<u32> {
     }
 }
 
-fn check_motion(stage: &Stage, cast: &[Description], clip: &'static str, records: &[Record]) {
+pub(super) fn check_motion(
+    stage: &Stage,
+    cast: &[Description],
+    clip: &'static str,
+    records: &[Record],
+) {
     let mut problems = Vec::new();
     for description in cast {
         let report = motion(&stage.assets, description, clip, frames_of(clip));
