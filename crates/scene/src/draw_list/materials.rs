@@ -4,7 +4,7 @@
 use super::*;
 
 use axcenity_assets::ModelShading;
-use axcenity_render::{Shading, SkinShading};
+use axcenity_render::{Shading, SkinLayers, SkinShading, Spots};
 
 /// A Part's material from its Material preset and properties, with
 /// `appearance`'s maps over it. `None` when it's invisible.
@@ -212,6 +212,9 @@ pub(super) fn surface_material(
     // which the appearance has just replaced (with its own, or none).
     if let Shading::Skin(skin) = &mut material.shading {
         skin.defined_normal = None;
+        // And its makeup and marking masks are placed like the file's
+        // colour map, which the appearance replaces too.
+        skin.layers = None;
     }
     maps.metalness = channel_map("MetalnessMap", "MetalnessChannel", false);
     if maps.metalness.is_some() {
@@ -288,10 +291,29 @@ pub(super) fn model_material(material: &ModelMaterial) -> Material {
             // the material values (`material::modulate`) blend them.
             ModelShading::Skin => Shading::Skin(SkinShading {
                 defined_normal: material.defined_normal_texture.as_ref().map(normal_texture),
+                // Its makeup and marking masks (ADR-0042), every layer
+                // off until the material values turn one on.
+                layers: skin_masks(material).map(|masks| {
+                    Box::new(SkinLayers {
+                        masks,
+                        makeup: Default::default(),
+                        freckles: Spots::default(),
+                        moles: Spots::default(),
+                        scar: 0.0,
+                    })
+                }),
                 ..SkinShading::default()
             }),
         },
         ..Material::default()
+    }
+}
+
+/// A skin's three makeup and marking masks, read as plain values.
+fn skin_masks(material: &ModelMaterial) -> Option<[Arc<dyn TextureSource>; 3]> {
+    match material.skin_masks.as_slice() {
+        [first, second, third] => Some([texture(first), texture(second), texture(third)]),
+        _ => None,
     }
 }
 

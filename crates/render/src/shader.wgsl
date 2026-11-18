@@ -467,6 +467,22 @@ fn standard_surface(input: SurfaceInput) -> Surface {
     out.normal = surface_normal(input.normal, input.tangent, uv);
     out.emissive = input.emissive * emissive_texel.rgb;
     out.opacity = input.opacity * mix(texel.a, opacity_map, maps.settings.w);
+    // Skin's makeup and markings (skin.wgsl): their masks are in the
+    // metalness, emissive and opacity maps' places. `maps` is uniform, so
+    // every pixel takes the same branch.
+    if maps.shading.x == SHADING_SKIN && maps.specular.z != 0.0 {
+        let layered = skin_layered(out.base_color, out.roughness, input.color, uv,
+            metalness_texel, emissive_texel, opacity_texel);
+        out.base_color = layered.rgb;
+        out.roughness = layered.a;
+        out.metalness = 0.0;
+        out.emissive = input.emissive;
+        // (Only with a scar on: tilting by nothing still renormalizes.)
+        if maps.toon.z > 0.0 {
+            out.normal = skin_scar_relief(out.normal, input.world_position,
+                emissive_texel.b * maps.toon.z);
+        }
+    }
     return out;
 }
 

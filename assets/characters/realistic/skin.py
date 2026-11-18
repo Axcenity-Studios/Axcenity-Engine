@@ -99,7 +99,22 @@ FILES = ("RealisticSkin_Albedo.jpg", "RealisticSkin_Normal.png", "RealisticSkin_
 # 0.09 high); these are twice as wide and half as steep.
 GRAIN_CELL = 5.0
 GRAIN_FINE = 12.0
-GRAIN_HEIGHT = 0.09
+GRAIN_HEIGHT = 0.12
+# Pores (R5 makeup branch): a pit round each cell's point, this share of
+# the cells' spacing across (about a texel at five-texel cells),
+# over the gentle wrinkling (`FINE_SHARE` of its height) and fine lines
+# (`LINE_SHARE`: noise `GRAIN_LINES` texels across, stretched
+# `1 / LINE_STRETCH` times round the body). Wave 2's grooves along the
+# cells' edges joined into one network that read as cracked skin. A pit's
+# walls are gentler than those grooves' (they rise over a quarter of a cell,
+# the grooves over an eighth), so the bump is higher (0.09 to 0.12 texels)
+# for pores to show in a close view's highlights at all (0.16 made
+# sparse pits that read as bumps under a hard light).
+PORE_RADIUS = 0.24
+FINE_SHARE = 0.6
+GRAIN_LINES = 7.0
+LINE_STRETCH = 0.25
+LINE_SHARE = 0.35
 # How far the smooth normal map flattens the sculpt's forms over soft
 # tissue (`soft_tissue`): what fat leaves of the definition.
 SMOOTHED = 0.9
@@ -659,24 +674,42 @@ def bake(body, source, lm, size, out_dir, cage=None):
 
     def bump(nt, bsdf):
         coords = nt.nodes.new("ShaderNodeTexCoord")
+        # Pores: a small round pit at each cell's point (the distance to
+        # the nearest point, F1), not grooves along the cells' edges: an
+        # edge network read as cracked skin close up (wave 2's review).
         cells = nt.nodes.new("ShaderNodeTexVoronoi")
-        cells.feature = "DISTANCE_TO_EDGE"
+        cells.feature = "F1"
         cells.inputs["Scale"].default_value = 1.0 / (GRAIN_CELL * texel)
+        cells.inputs["Randomness"].default_value = 1.0
         nt.links.new(coords.outputs["Object"], cells.inputs["Vector"])
         fine = nt.nodes.new("ShaderNodeTexNoise")
         fine.inputs["Scale"].default_value = 1.0 / (GRAIN_FINE * texel)
         fine.inputs["Detail"].default_value = 3.0
         nt.links.new(coords.outputs["Object"], fine.inputs["Vector"])
-        # Grooves between the cells, on a gentler wrinkling.
-        ramp = nt.nodes.new("ShaderNodeMapRange")
-        ramp.inputs["From Min"].default_value = 0.0
-        ramp.inputs["From Max"].default_value = 0.12
-        nt.links.new(cells.outputs["Distance"], ramp.inputs["Value"])
+        pit = nt.nodes.new("ShaderNodeMapRange")
+        pit.interpolation_type = "SMOOTHSTEP"
+        pit.inputs["From Min"].default_value = 0.0
+        pit.inputs["From Max"].default_value = PORE_RADIUS
+        nt.links.new(cells.outputs["Distance"], pit.inputs["Value"])
+        # Fine lines: a weak noise stretched along the body's height, so it
+        # runs round the body as skin's fine creases mostly do.
+        stretch = nt.nodes.new("ShaderNodeMapping")
+        stretch.inputs["Scale"].default_value = (LINE_STRETCH, LINE_STRETCH, 1.0)
+        nt.links.new(coords.outputs["Object"], stretch.inputs["Vector"])
+        lines = nt.nodes.new("ShaderNodeTexNoise")
+        lines.inputs["Scale"].default_value = 1.0 / (GRAIN_LINES * texel)
+        lines.inputs["Detail"].default_value = 2.0
+        nt.links.new(stretch.outputs["Vector"], lines.inputs["Vector"])
+        undulate = nt.nodes.new("ShaderNodeMath")
+        undulate.operation = "MULTIPLY_ADD"
+        undulate.inputs[1].default_value = FINE_SHARE
+        nt.links.new(fine.outputs["Fac"], undulate.inputs[0])
+        nt.links.new(pit.outputs["Result"], undulate.inputs[2])
         mix = nt.nodes.new("ShaderNodeMath")
         mix.operation = "MULTIPLY_ADD"
-        mix.inputs[1].default_value = 0.6
-        nt.links.new(fine.outputs["Fac"], mix.inputs[0])
-        nt.links.new(ramp.outputs["Result"], mix.inputs[2])
+        mix.inputs[1].default_value = LINE_SHARE
+        nt.links.new(lines.outputs["Fac"], mix.inputs[0])
+        nt.links.new(undulate.outputs["Value"], mix.inputs[2])
         fields_a = nt.nodes.new("ShaderNodeVertexColor")
         fields_a.layer_name = "FieldsA"
         fields_b = nt.nodes.new("ShaderNodeVertexColor")
@@ -715,6 +748,7 @@ def bake(body, source, lm, size, out_dir, cage=None):
     rows, cols = np.mgrid[0:size, 0:size]
     from_navel = np.hypot(cols + 0.5 - navel_uv[0] * size, rows + 0.5 - navel_uv[1] * size) * texel
     soft *= _step(*NAVEL_KEPT, from_navel)
+    grain_measured = grain_shape(g, navel_uv, texel)
     flat_share = (SMOOTHED * soft)[:, :, None]
     smooth = shared * (1.0 - flat_share) + flat * flat_share
     smooth /= np.maximum(np.linalg.norm(smooth, axis=2, keepdims=True), 1e-9)
@@ -853,9 +887,54 @@ def bake(body, source, lm, size, out_dir, cage=None):
         # Where the navel is (glTF texture coordinates), which the smooth
         # map keeps: the assets crate's test checks the two maps agree there.
         "navel_uv": navel_uv,
-        "grain": {"cell_texels": GRAIN_CELL, "fine_texels": GRAIN_FINE, "height_texels": GRAIN_HEIGHT},
+        "grain": {"cell_texels": GRAIN_CELL, "fine_texels": GRAIN_FINE, "height_texels": GRAIN_HEIGHT,
+                  "pore_radius_cells": PORE_RADIUS, "line_texels": GRAIN_LINES, **grain_measured},
     }
     return images
+
+
+def grain_shape(normal, navel_uv, texel, crop=256):
+    """The grain's shape, measured on a square of the belly beside the
+    navel (`crop` texels of a 2K map, its middle 160 texels to the side of
+    the navel and 40 above: all skin, no seam, not the navel itself) of
+    the grain's own tangent-space normal map (`normal`, -1 to 1): its bump
+    height, integrated from the normals' slopes in the frequency domain
+    (rows run down the image while green points up it), less everything
+    wider than about 8 texels, in standard deviations.
+
+    - `height_skew`: the height's skewness. Pores (isolated pits in a
+      level surface) give it a long low tail, strongly negative; wave 2's
+      grooves along every cell's edge (a network, read as cracked skin)
+      measured +0.05: as much low as high.
+    - `pores_per_cm2`: the lowest points of their 5-texel neighbourhood
+      deeper than 1.5 deviations, per square centimetre.
+    """
+    size = normal.shape[0]
+    scale = size / 2048
+    crop = int(crop * scale)
+    cx = int(navel_uv[0] * size + 160 * scale)
+    cy = int(navel_uv[1] * size - 40 * scale)
+    x0, y0 = max(cx - crop // 2, 0), max(cy - crop // 2, 0)
+    patch = normal[y0:y0 + crop, x0:x0 + crop]
+    nz = np.maximum(patch[:, :, 2], 0.2)
+    gx, gy = -patch[:, :, 0] / nz, patch[:, :, 1] / nz
+    fy = np.fft.fftfreq(gx.shape[0])[:, None]
+    fx = np.fft.fftfreq(gx.shape[1])[None, :]
+    k2 = (2 * np.pi) ** 2 * (fx * fx + fy * fy)
+    k2[0, 0] = 1.0
+    spectrum = (2j * np.pi * fx * np.fft.fft2(gx) + 2j * np.pi * fy * np.fft.fft2(gy)) / -k2
+    spectrum *= 1.0 - np.exp(-k2 * 4.0 ** 2 / 2.0)
+    spectrum[0, 0] = 0.0
+    height = np.real(np.fft.ifft2(spectrum))
+    height = (height - height.mean()) / max(float(height.std()), 1e-12)
+    around = np.stack([np.roll(np.roll(height, dy, 0), dx, 1)
+                       for dy in range(-2, 3) for dx in range(-2, 3) if dy or dx])
+    pores = (height < around).all(axis=0) & (height < -1.5)
+    area_cm2 = (patch.shape[0] * texel * 100.0) * (patch.shape[1] * texel * 100.0)
+    return {
+        "height_skew": round(float((height ** 3).mean()), 3),
+        "pores_per_cm2": round(float(pores.sum()) / area_cm2, 2),
+    }
 
 
 def _texels_per_metre(body, size=1.0):

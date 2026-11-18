@@ -35,6 +35,7 @@ mod model_check;
 mod preset;
 mod randomize;
 mod resolve;
+mod skin;
 
 #[cfg(test)]
 mod fixtures;
@@ -68,6 +69,7 @@ pub use randomize::{Scope, random_span, randomize};
 pub use resolve::{
     PartFit, Resolved, ResolvedPart, body_shape_weights, parameter_values, resolve, span,
 };
+pub use skin::{Skin, SkinLayer, SkinLayerKind, SkinLayerSpec, skin_layer_value};
 
 use std::fmt;
 

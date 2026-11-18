@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use axcenity_avatar::{MaterialValue, PresetKind};
+use axcenity_avatar::{MaterialValue, PresetKind, SkinLayer};
 
 use super::edit::Scope;
 use super::random::RandomScope;
@@ -61,6 +61,16 @@ pub enum Intent {
         slot: String,
         value: String,
         to: Option<MaterialValue>,
+        gesture: Gesture,
+    },
+    /// Sets makeup layer or marking `id` (`marking`: which list of the
+    /// description's `skin` block) to `to` whole, or with `None` takes it
+    /// out (R5, ADR-0042). Turning a layer off is `to` with `enabled`
+    /// false, which keeps its settings.
+    SetSkinLayer {
+        id: String,
+        marking: bool,
+        to: Option<SkinLayer>,
         gesture: Gesture,
     },
     /// Moves the character onto another base model.
@@ -133,6 +143,7 @@ impl Intent {
                 | Intent::Choose { .. }
                 | Intent::Wear { .. }
                 | Intent::SetMaterial { .. }
+                | Intent::SetSkinLayer { .. }
                 | Intent::SetBase(_)
                 | Intent::Rename(_)
                 | Intent::ApplyPreset(_)

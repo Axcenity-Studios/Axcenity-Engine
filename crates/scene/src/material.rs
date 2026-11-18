@@ -10,8 +10,8 @@ use axcenity_core::{
 };
 use axcenity_render::glam::Mat4;
 use axcenity_render::{
-    Channel, ChannelMap, Material, NormalMap, Outline, SURFACE_PARAMETERS, Shading, SurfaceShader,
-    Sway, TextureMaps, Toon, Water,
+    Channel, ChannelMap, Makeup, Material, NormalMap, Outline, SKIN_MAKEUP_LAYERS,
+    SURFACE_PARAMETERS, Shading, SkinLayers, Spots, SurfaceShader, Sway, TextureMaps, Toon, Water,
 };
 
 use crate::draw_list::{GLOW_BOOST, texture};
@@ -157,7 +157,11 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 /// - on a material its model file marks skin ([`Shading::Skin`], R5):
 ///   `scatter_scale` multiplies how far light spreads under it (0 to 2),
 ///   and `definition` times one minus `softness` (each 0 to 1) is how much
-///   of its defined normal map shows over its own smooth one.
+///   of its defined normal map shows over its own smooth one;
+/// - on a skin whose model file names makeup and marking masks (R5,
+///   ADR-0042): the layers' draw values `layer_<id>_<field>` that
+///   `avatar::resolve` writes (`set_skin_layers`). With no layer on the
+///   masks aren't bound at all.
 ///
 /// Every value at its neutral setting changes nothing, and a part with no
 /// values is drawn as authored. The rest (`pupil_size`, `limbal_ring`,
@@ -207,7 +211,72 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
         let definition = number("definition").map_or(0.0, |v| v.clamp(0.0, 1.0));
         let softness = number("softness").map_or(0.0, |v| v.clamp(0.0, 1.0));
         skin.normal_blend = definition * (1.0 - softness);
+        if let Some(layers) = &mut skin.layers {
+            set_skin_layers(layers, &number, |name| {
+                value(name)
+                    .and_then(Value::as_color3)
+                    .map(|c| [c.r, c.g, c.b])
+            });
+            // Nothing on: the masks aren't bound, and skin costs what it
+            // did without them.
+            if !layers_on(layers) {
+                skin.layers = None;
+            }
+        }
     }
+}
+
+/// The makeup layers the renderer draws, in its order
+/// (`render::SkinLayers::makeup`), by their IDs in the base manifest
+/// (`avatar::SkinLayerSpec`).
+const MAKEUP_LAYERS: [&str; SKIN_MAKEUP_LAYERS] = [
+    "foundation",
+    "blush",
+    "eyeshadow",
+    "eyeliner",
+    "lips",
+    "brow_fill",
+];
+
+/// The golden ratio's fraction: a seed's offset into a marking's ranks
+/// (consecutive seeds land far apart).
+const GOLDEN: f64 = 0.618_033_988_749_895;
+
+/// Sets `layers`' values from the draw values `avatar::resolve` writes
+/// (`layer_<id>_<field>`, ADR-0042): `number` and `colour` read a value
+/// of the material by name.
+fn set_skin_layers(
+    layers: &mut SkinLayers,
+    number: &impl Fn(&str) -> Option<f32>,
+    colour: impl Fn(&str) -> Option<[f32; 3]>,
+) {
+    let share = |name: String| number(&name).map_or(0.0, |v| v.clamp(0.0, 1.0));
+    for (layer, id) in layers.makeup.iter_mut().zip(MAKEUP_LAYERS) {
+        *layer = Makeup {
+            colour: colour(&format!("layer_{id}_colour")),
+            opacity: share(format!("layer_{id}_opacity")),
+            roughness: number(&format!("layer_{id}_roughness")).map(|r| r.clamp(0.0, 1.0)),
+        };
+    }
+    let spots = |id: &str| Spots {
+        // A marking turned on without an amount shows all its spots.
+        amount: number(&format!("layer_{id}_amount")).map_or(1.0, |v| v.clamp(0.0, 1.0)),
+        opacity: share(format!("layer_{id}_opacity")),
+        seed: number(&format!("layer_{id}_seed")).map_or(0.0, |seed| {
+            (f64::from(seed) * GOLDEN).rem_euclid(1.0) as f32
+        }),
+    };
+    layers.freckles = spots("freckles");
+    layers.moles = spots("moles");
+    layers.scar = share("layer_scar_opacity".to_owned());
+}
+
+/// Whether any layer of `layers` shows.
+fn layers_on(layers: &SkinLayers) -> bool {
+    layers.makeup.iter().any(|layer| layer.opacity > 0.0)
+        || layers.freckles.opacity * layers.freckles.amount > 0.0
+        || layers.moles.opacity * layers.moles.amount > 0.0
+        || layers.scar > 0.0
 }
 
 /// How a part drawn with `standard` at `transform` (its 1×1×1 box) sways

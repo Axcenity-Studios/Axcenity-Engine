@@ -57,6 +57,156 @@ fn a_gltf_materials_extras_say_it_is_skin_and_name_its_defined_normal_map() {
     assert_eq!(super::shading_of(&None), (ModelShading::Standard, None));
 }
 
+/// A skin names its makeup and marking masks (ADR-0042): three textures,
+/// in order, or none.
+#[test]
+fn a_skins_extras_name_its_three_layer_masks() {
+    let of = |text: &str| {
+        let raw = serde_json::value::RawValue::from_string(text.to_owned()).unwrap();
+        super::skin_masks_of(&Some(raw))
+    };
+    assert_eq!(
+        of(r#"{"axcenity_shading": "skin",
+              "axcenity_skin_masks": [{"index": 4}, {"index": 6}, {"index": 5}]}"#),
+        vec![4, 6, 5]
+    );
+    // Two or four: a file this version can't read the layout of.
+    assert!(
+        of(r#"{"axcenity_shading": "skin", "axcenity_skin_masks": [{"index": 4}, {"index": 6}]}"#)
+            .is_empty()
+    );
+    assert!(of(r#"{"axcenity_shading": "skin", "axcenity_skin_masks": 3}"#).is_empty());
+    // Only skin has them.
+    assert!(
+        of(r#"{"axcenity_skin_masks": [{"index": 4}, {"index": 6}, {"index": 5}]}"#).is_empty()
+    );
+    assert!(super::skin_masks_of(&None).is_empty());
+}
+
+/// The realistic skin's masks, as the build writes them (`makeup.py`):
+/// three images the size of its maps, each channel a layer that covers
+/// some of the skin and not all of it, and the spots' channels many
+/// small separate spots.
+#[test]
+fn the_realistic_skin_has_its_makeup_and_marking_masks() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
+    let model = load_model(&bytes, &folder, ModelFormat::Gltf).unwrap();
+    let skin = model
+        .primitives
+        .iter()
+        .map(|primitive| &primitive.material)
+        .find(|material| material.name == "Skin")
+        .expect("a Skin material");
+    assert_eq!(skin.skin_masks.len(), 3, "three masks");
+    let albedo = skin.base_color_texture.as_ref().unwrap();
+    // Foundation, blush, eyeshadow, eyeliner; lips, brow fill, scar, (none);
+    // freckles and their ranks, moles and their ranks.
+    let names = [
+        ["foundation", "blush", "eyeshadow", "eyeliner"],
+        ["lips", "brow fill", "scar", ""],
+        ["freckles", "freckle ranks", "moles", "mole ranks"],
+    ];
+    for (mask, names) in skin.skin_masks.iter().zip(names) {
+        assert_eq!((mask.width, mask.height), (albedo.width, albedo.height));
+        let texels = mask.rgba();
+        let count = f64::from(mask.width * mask.height);
+        for (channel, name) in names.iter().enumerate() {
+            let covered = texels
+                .chunks_exact(4)
+                .filter(|texel| texel[channel] > 127)
+                .count() as f64;
+            if name.is_empty() {
+                assert_eq!(covered, 0.0, "the spare channel is empty");
+                continue;
+            }
+            let share = covered / count;
+            assert!(
+                share > 0.00002 && share < 0.25,
+                "{name} covers {share} of the map"
+            );
+        }
+    }
+    // Spots: each freckle and mole is its own small patch.
+    let markings = skin.skin_masks[2].rgba();
+    let (width, height) = (
+        skin.skin_masks[2].width as usize,
+        skin.skin_masks[2].height as usize,
+    );
+    for (channel, least, largest) in [(0, 2000, 60), (2, 40, 300)] {
+        let on: Vec<bool> = markings
+            .chunks_exact(4)
+            .map(|texel| texel[channel] > 127)
+            .collect();
+        let (count, biggest) = patches(&on, width, height);
+        assert!(count >= least, "channel {channel}: {count} spots");
+        assert!(
+            biggest <= largest,
+            "channel {channel}: a spot of {biggest} texels"
+        );
+    }
+}
+
+/// How many 4-connected patches `on` has, and the largest one's texels.
+fn patches(on: &[bool], width: usize, height: usize) -> (usize, usize) {
+    let mut seen = vec![false; on.len()];
+    let (mut count, mut biggest) = (0, 0);
+    for start in 0..on.len() {
+        if !on[start] || seen[start] {
+            continue;
+        }
+        count += 1;
+        let mut size = 0;
+        let mut stack = vec![start];
+        seen[start] = true;
+        while let Some(at) = stack.pop() {
+            size += 1;
+            let (x, y) = (at % width, at / width);
+            let mut neighbours = Vec::with_capacity(4);
+            if x > 0 {
+                neighbours.push(at - 1);
+            }
+            if x + 1 < width {
+                neighbours.push(at + 1);
+            }
+            if y > 0 {
+                neighbours.push(at - width);
+            }
+            if y + 1 < height {
+                neighbours.push(at + width);
+            }
+            for next in neighbours {
+                if on[next] && !seen[next] {
+                    seen[next] = true;
+                    stack.push(next);
+                }
+            }
+        }
+        biggest = biggest.max(size);
+    }
+    (count, biggest)
+}
+
+/// The skin's grain reads as pores, not cracks (R5, wave 2's open issue):
+/// the build measures its bump's height on the belly (`skin.py`,
+/// `grain_shape`). Pores, isolated pits in a level surface, give the
+/// height a long low tail: its skewness is strongly negative. Wave 2's
+/// grooves along every cell's edge measured +0.05 (as much low as high).
+#[test]
+fn the_realistic_skins_grain_is_pores_not_a_crackle_network() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
+    let build: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(folder.join("Realistic.build.json")).unwrap())
+            .unwrap();
+    let grain = &build["textures"]["grain"];
+    let skew = grain["height_skew"]
+        .as_f64()
+        .expect("the build measures the grain's height");
+    assert!(skew < -1.5, "the grain's height skews {skew}: no pores");
+    let pores = grain["pores_per_cm2"].as_f64().expect("pores per cm2");
+    assert!((0.5..=20.0).contains(&pores), "{pores} pores per cm2");
+}
+
 /// The realistic body's skin, as the build writes it: marked skin, with
 /// its smooth normal map as glTF's own and the defined one beside it.
 #[test]

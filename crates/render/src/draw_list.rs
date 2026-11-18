@@ -2145,6 +2145,9 @@ pub struct SkinShading {
     /// 0 draws the material's own normal map, 1 `defined_normal`, and
     /// between them a blend. Without a `defined_normal` it changes nothing.
     pub normal_blend: f32,
+    /// Makeup and markings (ADR-0042), drawn into the albedo and roughness
+    /// before light: `None` draws the skin as made.
+    pub layers: Option<Box<SkinLayers>>,
 }
 
 impl Default for SkinShading {
@@ -2153,8 +2156,60 @@ impl Default for SkinShading {
             scatter: 1.0,
             defined_normal: None,
             normal_blend: 0.0,
+            layers: None,
         }
     }
+}
+
+/// How many makeup layers [`SkinLayers::makeup`] holds, in the order they
+/// are drawn: foundation, blush, eyeshadow, eyeliner, lip colour, brow
+/// fill.
+pub const SKIN_MAKEUP_LAYERS: usize = 6;
+
+/// A skin's makeup and markings (ADR-0042, `docs/rendering/skin.md`):
+/// three masks placed like the base colour map, one layer to a channel,
+/// and each layer's values. Drawn in the order of the skin references:
+/// markings in the skin (freckles, moles, a scar), then makeup over it
+/// from foundation up to brow fill, all under the specular light. The
+/// masks take the metalness, emissive and opacity maps' places, which
+/// skin with layers doesn't read.
+#[derive(Clone, Debug)]
+pub struct SkinLayers {
+    /// Foundation, blush, eyeshadow, eyeliner (red to alpha); lips, brow
+    /// fill, scar (red to blue); freckles, their ranks, moles, their
+    /// ranks. Read as plain values, not sRGB.
+    pub masks: [Arc<dyn TextureSource>; 3],
+    /// In drawing order (see [`SKIN_MAKEUP_LAYERS`]).
+    pub makeup: [Makeup; SKIN_MAKEUP_LAYERS],
+    pub freckles: Spots,
+    pub moles: Spots,
+    /// How much of the scar's mask shows, 0 to 1.
+    pub scar: f32,
+}
+
+/// One makeup layer: off at opacity 0.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Makeup {
+    /// Its colour (sRGB, as written); `None` is the skin's own tone, the
+    /// albedo blurred (foundation that evens the tone).
+    pub colour: Option<[f32; 3]>,
+    /// How much it covers where its mask is whole, 0 to 1.
+    pub opacity: f32,
+    /// Its roughness where it covers; `None` keeps the skin's.
+    pub roughness: Option<f32>,
+}
+
+/// A marking made of spots: each spot of the mask has a rank, and the
+/// spots whose rank, offset by `seed`, is below `amount` show.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Spots {
+    /// The share of the spots shown, 0 to 1.
+    pub amount: f32,
+    /// How dark they are, 0 to 1.
+    pub opacity: f32,
+    /// Which spots show, 0 to 1: the description's seed times the golden
+    /// ratio, its fraction.
+    pub seed: f32,
 }
 
 /// Toon shading: each light's share (how squarely it falls, times its

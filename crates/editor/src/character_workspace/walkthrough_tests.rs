@@ -458,3 +458,92 @@ fn the_whole_r1_walkthrough_with_presets_randomize_comparison_and_recovery() {
     assert!(workspace.dirty());
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// Makeup and markings (R5, ADR-0042): a layer turned on, recoloured,
+/// made fainter and turned off is one undo step each, reaches the
+/// preview's body as material attributes without a new model, and a
+/// Skin reset clears it.
+#[test]
+fn a_makeup_layer_is_one_undo_step_per_change_and_reaches_the_preview_live() {
+    use axcenity_avatar::{Colour, SkinLayer};
+    let folder = test_folder("walkthrough-makeup");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let body_model = workspace.worn()[0].clone();
+    let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
+    let attribute = |workspace: &CharacterWorkspace, name: &str| {
+        workspace
+            .world
+            .get(body)
+            .unwrap()
+            .attribute(&axcenity_core::material_value_attribute("Skin", name))
+            .cloned()
+    };
+    let set = |layer: SkinLayer, gesture| Intent::SetSkinLayer {
+        id: layer.layer.clone(),
+        marking: false,
+        to: Some(layer),
+        gesture,
+    };
+
+    // On: the base's starting settings.
+    let spec = workspace
+        .library()
+        .base(&workspace.description().base)
+        .and_then(|base| base.skin_layer("blush").cloned())
+        .expect("the realistic base offers blush");
+    workspace.apply(set(SkinLayer::from_spec(&spec), Gesture::Commit));
+    assert!(workspace.skin_layer("blush").is_some_and(|l| l.enabled));
+    assert!(attribute(&workspace, "layer_blush_opacity").is_some());
+    // Recoloured.
+    let mut blush = workspace.skin_layer("blush").unwrap().clone();
+    blush.colour = Some(Colour([200, 60, 90]));
+    workspace.apply(set(blush.clone(), Gesture::Commit));
+    assert_eq!(
+        attribute(&workspace, "layer_blush_colour"),
+        Some(axcenity_core::Value::Color3(axcenity_core::Color3::new(
+            200.0 / 255.0,
+            60.0 / 255.0,
+            90.0 / 255.0
+        )))
+    );
+    // A fainter one in a drag: one step for the whole drag.
+    for opacity in [0.3, 0.25, 0.2] {
+        blush.opacity = opacity;
+        workspace.apply(set(blush.clone(), Gesture::Drag));
+    }
+    blush.opacity = 0.15;
+    workspace.apply(set(blush.clone(), Gesture::Commit));
+    assert_eq!(workspace.skin_layer("blush").unwrap().opacity, 0.15);
+    // Off: kept, drawn no more.
+    blush.enabled = false;
+    workspace.apply(set(blush, Gesture::Commit));
+    assert!(attribute(&workspace, "layer_blush_opacity").is_none());
+    assert_eq!(workspace.worn()[0], body_model, "makeup doesn't rebake");
+
+    // Back through the steps: on, the colour, the drag, off.
+    workspace.apply(Intent::Undo);
+    assert!(workspace.skin_layer("blush").unwrap().enabled);
+    workspace.apply(Intent::Undo);
+    assert_eq!(
+        workspace.skin_layer("blush").unwrap().opacity,
+        spec.opacity.unwrap()
+    );
+    workspace.apply(Intent::Undo);
+    assert_eq!(workspace.skin_layer("blush").unwrap().colour, None);
+    workspace.apply(Intent::Undo);
+    assert!(workspace.skin_layer("blush").is_none());
+
+    // A marking, and the Skin reset.
+    workspace.apply(Intent::SetSkinLayer {
+        id: "freckles".to_owned(),
+        marking: true,
+        to: Some(SkinLayer::new("freckles")),
+        gesture: Gesture::Commit,
+    });
+    assert!(attribute(&workspace, "layer_freckles_amount").is_some());
+    workspace.apply(Intent::Reset(Scope::Category(
+        axcenity_avatar::Category::Skin,
+    )));
+    assert!(workspace.description().skin.is_empty());
+    let _ = std::fs::remove_dir_all(&folder);
+}

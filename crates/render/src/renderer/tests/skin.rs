@@ -175,6 +175,7 @@ fn a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_spec
         scatter: 1.5,
         defined_normal: Some(defined.clone()),
         normal_blend: 0.4,
+        layers: None,
     })));
     assert_eq!(key.textures[7], Some(defined.key()), "the defined map");
     assert_eq!(maps_uniform_of(&key).shading, [SHADING_SKIN, 0.4, 1.5, 0.0]);
@@ -183,6 +184,7 @@ fn a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_spec
         scatter: -1.0,
         defined_normal: Some(defined),
         normal_blend: 3.0,
+        layers: None,
     })));
     assert_eq!(maps_uniform_of(&key).shading, [SHADING_SKIN, 1.0, 0.0, 0.0]);
 }

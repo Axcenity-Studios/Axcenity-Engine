@@ -700,6 +700,41 @@ fn a_model_material_marked_skin_draws_with_skin_shading_and_its_defined_normal_m
 }
 
 #[test]
+fn a_skin_models_makeup_and_marking_masks_reach_the_renderer_all_off() {
+    use axcenity_assets::{Image, ModelMaterial, ModelShading};
+    use axcenity_render::Shading;
+    let map = |byte: u8| Arc::new(Image::new(1, 1, vec![byte, 128, 255, 255]));
+    let skin = ModelMaterial {
+        name: "Skin".into(),
+        base_color_texture: Some(map(200)),
+        shading: ModelShading::Skin,
+        skin_masks: vec![map(1), map(2), map(3)],
+        ..ModelMaterial::default()
+    };
+    let drawn = materials::model_material(&skin);
+    let Shading::Skin(shading) = &drawn.shading else {
+        panic!("not skin: {:?}", drawn.shading);
+    };
+    let layers = shading.layers.as_ref().expect("its masks");
+    let firsts: Vec<u8> = layers.masks.iter().map(|mask| mask.rgba()[0]).collect();
+    assert_eq!(firsts, [1, 2, 3], "in order");
+    assert!(layers.makeup.iter().all(|layer| layer.opacity == 0.0));
+    assert_eq!((layers.freckles.amount, layers.scar), (0.0, 0.0));
+    // Without masks, none; and an appearance replaces the maps they go
+    // with, so it leaves them out.
+    let bare = materials::model_material(&ModelMaterial {
+        skin_masks: Vec::new(),
+        ..skin.clone()
+    });
+    assert!(matches!(&bare.shading, Shading::Skin(s) if s.layers.is_none()));
+    let mut world = World::new();
+    let appearance = world.create(ClassName::SurfaceAppearance).unwrap();
+    let covered =
+        materials::surface_material(&skin, world.get(appearance).unwrap(), &example_assets());
+    assert!(matches!(&covered.shading, Shading::Skin(s) if s.layers.is_none()));
+}
+
+#[test]
 fn a_surface_appearance_on_skin_leaves_out_the_files_defined_normal_map() {
     use axcenity_assets::{Image, ModelMaterial, ModelShading};
     use axcenity_render::Shading;

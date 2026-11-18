@@ -291,6 +291,126 @@ fn skin_surface(
     return lit + ambient;
 }
 
+// -- Makeup and markings (ADR-0042) ----------------------------------------
+//
+// Drawn into the albedo and roughness before any light, so skin's
+// diffusion and two specular lobes light them like the skin they are on:
+// markings in the skin (freckles, moles, a scar: pigment, multiplied),
+// then makeup over it from foundation up to brow fill (a thin layer mixed
+// over the skin by its coverage), in the skin references' order
+// (`references/skin/README.md` section 2). A layer keeps part of the
+// skin's own fine variation (pores, mottling, the lips' lines), so it
+// reads as makeup on skin, not paint. Masks (each channel a layer):
+// `a` foundation, blush, eyeshadow, eyeliner; `b` lips, brow fill, scar;
+// `c` freckles, their ranks, moles, their ranks. Values: `Maps::params`,
+// `Maps::toon` and `Maps::specular.w` (renderer/lighting.rs,
+// `skin_layer_uniform`).
+
+// The skin's own tone: its albedo read over about 32 texels (3 cm on the
+// realistic body, 1.3 cm on its face).
+const SKIN_TONE_LEVEL: f32 = 5.0;
+// The scale a layer's kept detail is measured against: about 8 texels.
+const SKIN_DETAIL_LEVEL: f32 = 3.0;
+// How much of the skin's variation shows through: foundation hides most
+// of it (that is what it is for), other makeup is thinner.
+const SKIN_FOUNDATION_DETAIL: f32 = 0.35;
+const SKIN_MAKEUP_DETAIL: f32 = 0.8;
+// What a freckle, a mole and a scar do to the albedo at full opacity:
+// melanin (brown, darker in blue), more of it in a mole; a scar has less
+// pigment and a little more red.
+const SKIN_FRECKLE: vec3<f32> = vec3<f32>(0.62, 0.48, 0.38);
+const SKIN_MOLE: vec3<f32> = vec3<f32>(0.32, 0.22, 0.17);
+const SKIN_SCAR: vec3<f32> = vec3<f32>(1.28, 1.12, 1.12);
+// A scar is smoother than the skin round it.
+const SKIN_SCAR_ROUGHNESS: f32 = 0.32;
+
+// How high a scar stands at full opacity, in world units (a stud is
+// 0.35 m): a healed scar is a little raised, about a fifth of a millimetre.
+const SKIN_SCAR_HEIGHT: f32 = 0.0006;
+
+// `n` tilted by a scar standing `scar` (0 to 1) of `SKIN_SCAR_HEIGHT` out of
+// the skin at `position`, by the screen-space change of both (Mikkelsen,
+// "Bump Mapping Unparametrized Surfaces on the GPU", 2010): no tangents or
+// height map needed, so the mask's own coverage is the height.
+fn skin_scar_relief(n: vec3<f32>, position: vec3<f32>, scar: f32) -> vec3<f32> {
+    let height = scar * SKIN_SCAR_HEIGHT;
+    let across = dpdx(position);
+    let down = dpdy(position);
+    let r1 = cross(down, n);
+    let r2 = cross(n, across);
+    let det = dot(across, r1);
+    let gradient = sign(det) * (dpdx(height) * r1 + dpdy(height) * r2);
+    let tilted = abs(det) * n - gradient;
+    if dot(tilted, tilted) < 1e-20 || abs(det) < 1e-20 {
+        return n;
+    }
+    return normalize(tilted);
+}
+
+// Whether a spot of a marking shows: its `rank` (0 to 1, one per spot)
+// offset by the marking's seed is below its amount, with a soft step so
+// the edge of the amount doesn't flicker.
+fn skin_spot_shown(rank: f32, amount: f32, seed: f32) -> f32 {
+    let order = fract(rank + seed);
+    return 1.0 - smoothstep(amount - 0.02, amount, order);
+}
+
+// The albedo and roughness (in w) with the makeup and markings over them:
+// `albedo` and `roughness` as the material's maps give them, `tint` the
+// material's colour (its tone), `a`, `b` and `c` the masks' texels.
+fn skin_layered(
+    albedo: vec3<f32>,
+    roughness: f32,
+    tint: vec3<f32>,
+    uv: vec2<f32>,
+    a: vec4<f32>,
+    b: vec4<f32>,
+    c: vec4<f32>,
+) -> vec4<f32> {
+    let own_tone = tint * textureSampleLevel(base_color_texture, material_sampler, uv,
+        SKIN_TONE_LEVEL).rgb;
+    let near = tint * textureSampleLevel(base_color_texture, material_sampler, uv,
+        SKIN_DETAIL_LEVEL).rgb;
+    // The skin's own variation at this texel, against its neighbourhood.
+    let detail = clamp(albedo / max(near, vec3<f32>(1e-4)), vec3<f32>(0.5), vec3<f32>(2.0));
+    var colour = albedo;
+    var rough = roughness;
+
+    // Markings, in the skin. Each spot is a little darker or lighter than
+    // the next (by its rank).
+    let freckle = c.r * skin_spot_shown(c.g, maps.params[7].z, maps.toon.w)
+        * maps.params[7].w * (0.65 + 0.35 * fract(c.g * 7.31 + 0.17));
+    colour *= mix(vec3<f32>(1.0), SKIN_FRECKLE, freckle);
+    let mole = c.b * skin_spot_shown(c.a, maps.toon.x, maps.specular.w) * maps.toon.y;
+    colour *= mix(vec3<f32>(1.0), SKIN_MOLE, mole);
+    let scar = b.b * maps.toon.z;
+    colour *= mix(vec3<f32>(1.0), SKIN_SCAR, scar);
+    rough = mix(rough, SKIN_SCAR_ROUGHNESS, scar);
+
+    // Makeup, foundation first.
+    let masks = array<f32, 6>(a.r, a.g, a.b, a.a, b.r, b.g);
+    let roughness_of = array<f32, 6>(maps.params[6].x, maps.params[6].y, maps.params[6].z,
+        maps.params[6].w, maps.params[7].x, maps.params[7].y);
+    for (var i = 0; i < 6; i++) {
+        let layer = maps.params[i];
+        let cover = masks[i] * layer.a;
+        if cover <= 0.0 {
+            continue;
+        }
+        var pigment = layer.rgb;
+        if layer.r < 0.0 {
+            pigment = own_tone;
+        }
+        let keep = select(SKIN_MAKEUP_DETAIL, SKIN_FOUNDATION_DETAIL, i == 0);
+        pigment *= mix(vec3<f32>(1.0), detail, keep);
+        colour = mix(colour, pigment, cover);
+        if roughness_of[i] >= 0.0 {
+            rough = mix(rough, roughness_of[i], cover);
+        }
+    }
+    return vec4<f32>(colour, rough);
+}
+
 // The pre-integrated table: diffuse light against the cosine of the angle
 // to the light (33 columns, -1 to 1) on a ring of radius 2, 4, 8, 16, 32,
 // 64 and 128 mm (7 rows), red, green and blue. Written by the render

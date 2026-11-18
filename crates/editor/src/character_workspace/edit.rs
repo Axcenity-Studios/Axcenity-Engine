@@ -184,6 +184,8 @@ pub fn reset(
                         reset.materials.remove(&slot.name);
                     }
                 }
+                // And the makeup and markings on it (ADR-0042).
+                reset.skin = axcenity_avatar::Skin::default();
             }
         }
     }

@@ -30,7 +30,7 @@ use super::{
     PointShadow, PostUniform, SHADING_SKIN, SHADING_STANDARD, SHADING_TOON, SHADING_UNLIT,
     SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
 };
-use crate::SURFACE_PARAMETERS;
+use crate::{SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, SkinLayers};
 
 /// The camera's view (world to view space) and projection (view to clip
 /// space).
@@ -1118,6 +1118,25 @@ pub(super) fn material_textures(
     }
     let material = &item.material;
     let maps = &material.maps;
+    // Skin's makeup and marking masks (ADR-0042) take the metalness,
+    // emissive and opacity maps' places: skin with layers reads none of
+    // them.
+    if let Some(layers) = skin_layers(material) {
+        let [first, second, third] = &layers.masks;
+        return [
+            material.base_color_texture.as_ref(),
+            maps.normal.as_ref().map(|map| &map.texture),
+            Some(first),
+            maps.roughness.as_ref().map(|map| &map.texture),
+            maps.occlusion.as_ref().map(|map| &map.texture),
+            Some(second),
+            Some(third),
+            match &material.shading {
+                Shading::Skin(skin) => skin.defined_normal.as_ref(),
+                _ => None,
+            },
+        ];
+    }
     [
         material.base_color_texture.as_ref(),
         maps.normal.as_ref().map(|map| &map.texture),
@@ -1134,6 +1153,60 @@ pub(super) fn material_textures(
             _ => maps.specular.as_ref(),
         },
     ]
+}
+
+/// A skin material's makeup and markings, when it has them (water and
+/// terrain never do).
+fn skin_layers(material: &Material) -> Option<&SkinLayers> {
+    match &material.shading {
+        Shading::Skin(skin) if material.water.is_none() && material.terrain.is_none() => {
+            skin.layers.as_deref()
+        }
+        _ => None,
+    }
+}
+
+/// Where a skin's makeup and markings ride in its uniform (skin.wgsl's
+/// `skin_layered`): the surface shader's values (skin has none), the toon
+/// values and the specular map's last two (skin reads neither). Returns
+/// (`params`, `toon`, the specular row's z and w).
+///
+/// - `params[0..6]`: each makeup layer's colour in linear light (red
+///   below 0: the skin's own tone) and its opacity;
+/// - `params[6]`, `params[7].xy`: each layer's roughness (below 0: the
+///   skin's own);
+/// - `params[7].zw`: the freckles' amount and opacity;
+/// - `toon`: the moles' amount and opacity, the scar's opacity, the
+///   freckles' seed;
+/// - specular z 1 (the masks are bound), w the moles' seed.
+fn skin_layer_uniform(layers: &SkinLayers) -> ([[f32; 4]; SURFACE_PARAMETERS], [f32; 4], [f32; 2]) {
+    let mut params = [[0.0; 4]; SURFACE_PARAMETERS];
+    let mut roughness = [-1.0; SKIN_MAKEUP_LAYERS];
+    for (index, layer) in layers.makeup.iter().enumerate() {
+        let opacity = layer.opacity.clamp(0.0, 1.0);
+        let colour = match layer.colour {
+            Some(colour) => linear_color(colour.map(|c| c.clamp(0.0, 1.0))),
+            None => Vec3::new(-1.0, 0.0, 0.0),
+        };
+        params[index] = colour.extend(opacity).to_array();
+        roughness[index] = layer.roughness.map_or(-1.0, |r| r.clamp(0.0, 1.0));
+    }
+    let share = |value: f32| value.clamp(0.0, 1.0);
+    let seed = |value: f32| value.rem_euclid(1.0);
+    params[6] = [roughness[0], roughness[1], roughness[2], roughness[3]];
+    params[7] = [
+        roughness[4],
+        roughness[5],
+        share(layers.freckles.amount),
+        share(layers.freckles.opacity),
+    ];
+    let toon = [
+        share(layers.moles.amount),
+        share(layers.moles.opacity),
+        share(layers.scar),
+        seed(layers.freckles.seed),
+    ];
+    (params, toon, [1.0, seed(layers.moles.seed)])
 }
 
 /// [`MapsUniform::shading`] and [`MapsUniform::toon`] for `material`.
@@ -1213,8 +1286,16 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
         params = [[0.0; 4]; SURFACE_PARAMETERS];
         params[..3].copy_from_slice(&super::water::water_params(water));
     }
-    let (shading, toon) = shading_uniform(&item.material);
+    let (shading, mut toon) = shading_uniform(&item.material);
     let outline = outline_uniform(&item.material);
+    // Skin's makeup and markings ride where skin reads nothing else.
+    let layered = skin_layers(&item.material).map(skin_layer_uniform);
+    let mut skin_specular = [0.0; 2];
+    if let Some((layer_params, layer_toon, specular)) = layered {
+        params = layer_params;
+        toon = layer_toon;
+        skin_specular = specular;
+    }
     if textures.iter().all(Option::is_none)
         && params == [[0.0; 4]; SURFACE_PARAMETERS]
         && shading == [SHADING_STANDARD, 0.0, 0.0, 0.0]
@@ -1253,7 +1334,8 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
             } else {
                 0.0
             },
-            used(maps.opacity.is_some()),
+            // (Skin's layers take the opacity map's place.)
+            used(maps.opacity.is_some() && layered.is_none()),
         ],
         specular: [
             used(maps.specular.is_some() && shading[0] == SHADING_STANDARD),
@@ -1263,8 +1345,8 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
                     .as_ref()
                     .is_some_and(|map| !map.texture.bc5_levels().is_empty()),
             ),
-            0.0,
-            0.0,
+            skin_specular[0],
+            skin_specular[1],
         ],
         uv_matrix: uv_matrix(&item.material),
         uv_offset: [

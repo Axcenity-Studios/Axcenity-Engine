@@ -295,3 +295,96 @@ fn definition_shows_the_defined_normal_map_unless_softness_hides_it() {
     let soft = drawn(&authored, "Skin", &[number("Skin", "softness", 0.5)]);
     assert_eq!(skin_of(&soft).1, 0.0);
 }
+
+/// The realistic skin with its makeup and marking masks, as a model whose
+/// file names them draws it, before values: every layer off.
+fn skin_with_masks() -> Material {
+    let mut material = skin_shaded();
+    if let Shading::Skin(skin) = &mut material.shading {
+        skin.layers = Some(Box::new(axcenity_render::SkinLayers {
+            masks: std::array::from_fn(|_| Arc::new(Flat) as Arc<dyn TextureSource>),
+            makeup: Default::default(),
+            freckles: Default::default(),
+            moles: Default::default(),
+            scar: 0.0,
+        }));
+    }
+    material
+}
+
+fn layers_of(material: &Material) -> Option<&axcenity_render::SkinLayers> {
+    match &material.shading {
+        Shading::Skin(skin) => skin.layers.as_deref(),
+        other => panic!("not skin: {other:?}"),
+    }
+}
+
+fn colour(
+    material: &'static str,
+    name: &'static str,
+    rgb: [f32; 3],
+) -> (&'static str, &'static str, Value) {
+    (
+        material,
+        name,
+        Value::Color3(Color3::new(rgb[0], rgb[1], rgb[2])),
+    )
+}
+
+#[test]
+fn skin_layers_draw_from_their_values_and_none_on_draws_no_layers() {
+    let authored = skin_with_masks();
+    // No layer on: the masks aren't bound at all (nothing to draw).
+    assert!(layers_of(&drawn(&authored, "Skin", &[])).is_none());
+    let drawn = drawn(
+        &authored,
+        "Skin",
+        &[
+            number("Skin", "layer_blush_opacity", 0.4),
+            colour("Skin", "layer_blush_colour", [0.8, 0.3, 0.3]),
+            number("Skin", "layer_blush_roughness", 0.45),
+            number("Skin", "layer_foundation_opacity", 0.7),
+            number("Skin", "layer_brow_fill_opacity", 0.5),
+            number("Skin", "layer_freckles_opacity", 0.9),
+            number("Skin", "layer_freckles_amount", 0.6),
+            number("Skin", "layer_freckles_seed", 7.0),
+            number("Skin", "layer_moles_opacity", 1.0),
+            number("Skin", "layer_scar_opacity", 0.8),
+            // Another material's values and an unknown layer change nothing.
+            number("Mouth", "layer_lips_opacity", 1.0),
+            number("Skin", "layer_glitter_opacity", 1.0),
+        ],
+    );
+    let layers = layers_of(&drawn).expect("layers on");
+    let blush = layers.makeup[1];
+    assert_eq!(blush.opacity, 0.4);
+    assert_eq!(blush.colour, Some([0.8, 0.3, 0.3]));
+    assert_eq!(blush.roughness, Some(0.45));
+    // Foundation without a colour: the skin's own tone.
+    assert_eq!(layers.makeup[0].colour, None);
+    assert_eq!(layers.makeup[0].opacity, 0.7);
+    assert_eq!(layers.makeup[5].opacity, 0.5, "brow fill");
+    assert_eq!(layers.makeup[4].opacity, 0.0, "lips are the Mouth's here");
+    assert_eq!(layers.freckles.amount, 0.6);
+    assert_eq!(layers.freckles.opacity, 0.9);
+    // The seed's golden-ratio offset: 7 × 0.618… = 4.3262…
+    assert!((layers.freckles.seed - 0.326_237).abs() < 1e-4);
+    // A marking without an amount shows all its spots.
+    assert_eq!(layers.moles.amount, 1.0);
+    assert_eq!(layers.moles.seed, 0.0);
+    assert_eq!(layers.scar, 0.8);
+    // Held to 0 to 1.
+    let past = drawn_one(&authored, number("Skin", "layer_scar_opacity", 3.0));
+    assert_eq!(layers_of(&past).unwrap().scar, 1.0);
+}
+
+fn drawn_one(material: &Material, value: (&'static str, &'static str, Value)) -> Material {
+    drawn(material, "Skin", &[value])
+}
+
+#[test]
+fn skin_without_masks_ignores_layer_values() {
+    let authored = skin_shaded();
+    let drawn = drawn_one(&authored, number("Skin", "layer_blush_opacity", 1.0));
+    assert!(layers_of(&drawn).is_none());
+}

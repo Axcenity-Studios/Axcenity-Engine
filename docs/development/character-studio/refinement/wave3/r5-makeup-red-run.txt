@@ -1,0 +1,76 @@
+R5 makeup and markings (RA5 with RA7): tests written first, run before the implementation.
+Debug build, this worktree, RX 9070 XT.
+
+== avatar: the contract (types and fields added, no checks, no resolution, presets untouched) ==
+cargo nextest run -p axcenity-avatar --no-fail-fast
+    thread 'tests::skin_layers::skin_layers_are_checked_against_what_the_base_offers' panicked at crates\avatar\src\tests\skin_layers.rs:162:5:
+    no problem mentions ["skin.makeup[2]", "glitter"]: []
+     Summary [   8.089s] 101 tests run: 97 passed, 4 failed, 0 skipped
+        FAIL tests::skin_layers::a_base_offers_its_skin_layers_and_checks_them
+        FAIL tests::skin_layers::layers_resolve_to_draw_values_on_their_material
+        FAIL tests::skin_layers::skin_presets_carry_makeup_and_markings_and_other_kinds_leave_them
+        FAIL tests::skin_layers::skin_layers_are_checked_against_what_the_base_offers
+(Passing from the start, as they test the data shape: a_layered_description_round_trips,
+a_description_without_makeup_writes_no_skin_block_and_an_older_file_reads,
+the_skin_block_is_an_additive_field_older_versions_keep,
+a_skin_layers_default_opacity_is_where_a_new_layer_starts.)
+
+== assets: the realistic file's masks and the grain (the parser and the material field in place, the content not yet built) ==
+cargo nextest run -p axcenity-assets --no-fail-fast
+    thread 'model::tests::the_realistic_skins_grain_is_pores_not_a_crackle_network' panicked at crates\assets\src\model\tests.rs:204:10:
+    the build measures the grain's groove network
+    thread 'model::tests::the_realistic_skin_has_its_makeup_and_marking_masks' panicked at crates\assets\src\model\tests.rs:101:5:
+    (assertion `left == right` failed: three masks; left: 0, right: 3)
+     Summary [   2.834s] 217 tests run: 215 passed, 2 failed, 0 skipped
+        FAIL model::tests::the_realistic_skins_grain_is_pores_not_a_crackle_network
+        FAIL model::tests::the_realistic_skin_has_its_makeup_and_marking_masks
+(a_skins_extras_name_its_three_layer_masks was written with the parser and passed on its first run: not seen failing.)
+
+== render: the Skin model's layers (the types in place, no binding, no shading) ==
+cargo nextest run -p axcenity-render --no-fail-fast -E 'test(/skin/)'
+    skin_layers_bind_their_masks_in_place_of_metalness_emissive_and_opacity panicked at skin_layers.rs:169:5
+        (assertion `left == right` failed: textures[2] is the square's own metalness map, not the first mask)
+    each_makeup_layer_and_marking_changes_the_skin_where_its_mask_is panicked at skin_layers.rs:203:5:
+        the bare square is even   (a mistake in the test: a sun from the front right lights the halves
+        differently; the assertion was replaced by a printout, each half is compared with itself)
+    a_layers_roughness_changes_the_skins_highlight panicked at skin_layers.rs:338:5:
+        gloss: [160.71875, 121.90972, 104.81597] vs [160.71875, 121.90972, 104.81597]
+    a_markings_amount_shows_a_share_of_its_spots_and_its_seed_picks_which panicked at skin_layers.rs:311:5:
+        amount 0.5 seed 0: [false, false, ... false] (no spot shown)
+     Summary [  56.640s] 21 tests run: 17 passed (5 slow), 4 failed, 371 skipped
+(layers_turned_off_draw_the_skin_bit_for_bit is a guard: it passed before and must still pass after.
+The 12 wave-2 skin tests passed.)
+
+== scene: the translation (render's types in place, scene unchanged) ==
+cargo nextest run -p axcenity-scene --no-fail-fast -E 'test(/skin/)'
+    material_values_tests::skin_layers_draw_from_their_values_and_none_on_draws_no_layers panicked at material_values_tests.rs:334:5:
+        assertion failed: layers_of(&drawn(&authored, "Skin", &[])).is_none()
+    draw_list::tests::a_skin_models_makeup_and_marking_masks_reach_the_renderer_all_off panicked at draw_list\tests.rs:718:42:
+        its masks
+     Summary [   0.063s] 15 tests run: 13 passed, 2 failed, 190 skipped
+(skin_without_masks_ignores_layer_values is a guard: it passed before and after.)
+
+== player: captures of the realistic character (engine side built; the content of HEAD put back: no masks, no skin_layers) ==
+cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/makeup_tests|softness/)'
+    a_makeup_colour_change_re_applies_live_without_a_bake panicked at makeup_tests.rs:299:5:
+        assertion `left == right` failed: the last colour is on the body
+        (debug build: a blush colour change re-applied in median 0.587 ms: nothing to write, the base offers no blush)
+    a_makeup_layers_roughness_changes_the_lips_highlight panicked at makeup_tests.rs:176:5:
+        glossy against matte lips: 0.0000 changed; roughness changed 0 of the picture
+    every_makeup_layer_and_marking_changes_the_face_against_bare_skin panicked at makeup_tests.rs:124:9:
+        foundation: 0.0000 of the picture; foundation changed 0 of the face-front picture (0.02 to 0.6)
+     Summary [  33.196s] 5 tests run: 2 passed (1 slow), 3 failed, 208 skipped
+(softness_alone_hides_the_definition_the_body_drives passed: it is the new test of wave 2's value on
+its own, which the review asked for; it tests behaviour that already worked.)
+
+== editor: the studio's Makeup and markings (the test before the Intent and the workspace's methods) ==
+cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/makeup/)'
+    error[E0599]: no variant named `SetSkinLayer` found for enum `Intent`
+    error[E0599]: no method named `skin_layer` found for struct `character_workspace::CharacterWorkspace` in the current scope
+    error: could not compile `axcenity-editor` (bin "axcenity-editor" test) due to 9 previous errors
+(a red run by compilation: a_makeup_layer_is_one_undo_step_per_change_and_reaches_the_preview_live)
+
+(Later: every_makeup_layer_and_marking_changes_the_face_against_bare_skin ran past nextest's 2-minute limit
+in the full debug run on the shared machine, so it was split into one test per layer with the same
+assertions: foundation_changes_the_face_against_bare_skin, blush_..., eyeshadow_..., eyeliner_...,
+lip_colour_..., brow_fill_..., freckles_change_..., moles_change_..., the_scar_changes_the_face_against_bare_skin.)

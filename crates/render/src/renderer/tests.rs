@@ -33,6 +33,7 @@ mod reflection_probes;
 mod shading;
 mod shadows;
 mod skin;
+mod skin_layers;
 mod skinning;
 mod streaming;
 mod sun_rays;

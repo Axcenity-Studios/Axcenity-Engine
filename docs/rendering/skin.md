@@ -23,6 +23,27 @@ The uniform (`MapsUniform::shading`): x `SHADING_SKIN` (3), y the defined map's 
 
 `scene::material::modulate` draws a character's values on it (architecture.md §10): `scatter_scale` multiplies `scatter` (0 to 2), and `definition × (1 − softness)` (each 0 to 1) is `normal_blend`. The realistic base manifest drives `definition` from `muscle` and `softness` from `fat`, so only lean, muscular bodies show the defined map's abdominal lines (OPEN-07).
 
+## Makeup and markings (ADR-0042)
+
+A skin whose model file names three masks (glTF material `extras.axcenity_skin_masks: [{index}, {index}, {index}]`, placed like the base colour map; `assets` `ModelMaterial::skin_masks`) can draw makeup and markings: `render::SkinLayers` on `SkinShading::layers`. `scene` puts the masks there with every layer off (`draw_list/materials.rs`), sets the layers from the material value attributes `Mat_<slot>_layer_<id>_<field>` that `avatar::resolve` writes from a description's `skin` block (`material.rs`, `set_skin_layers`), and leaves `layers` out when no layer is on, so skin without makeup binds and costs nothing more.
+
+The masks' channels (the content contract; the realistic build's `assets/characters/realistic/makeup.py` writes them at the skin maps' size):
+
+| Mask | Red | Green | Blue | Alpha |
+|---|---|---|---|---|
+| 1 | foundation | blush | eyeshadow | eyeliner |
+| 2 | lips | brow fill | scar | (none) |
+| 3 | freckles | their ranks | moles | their ranks |
+
+They are bound in the metalness, emissive and opacity maps' places, which skin with layers doesn't read (the item shader is at wgpu's default of 16 sampled textures: no binding is added); the emissive slot is read through its plain view. The layers' values ride in the uniform where skin reads nothing else (`renderer/lighting.rs`, `skin_layer_uniform`): `params[0..6]` each makeup layer's linear colour (red below 0: the skin's own tone) and opacity, `params[6]` and `params[7].xy` their roughness (below 0: the skin's), `params[7].zw` the freckles' amount and opacity, `toon` the moles' amount and opacity, the scar's opacity and the freckles' seed offset, and the specular row's z (1: masks bound) and w (the moles' seed offset).
+
+`skin_layered` (skin.wgsl, called at the end of `standard_surface`) draws them into the albedo and roughness before any light, so diffusion and both specular lobes light them as skin, in the skin references' order:
+
+- **Markings**, as pigment (multiplied): freckles (0.62, 0.48, 0.38) and moles (0.32, 0.22, 0.17) at full opacity, each spot a little darker or lighter than the next by its rank; a scar paler and pinker (1.28, 1.12, 1.12), smoother (roughness 0.32) and raised 0.2 mm (`skin_scar_relief`: the mask's screen-space slope tilts the normal, Mikkelsen 2010; only while the scar is on). A spot shows when its **rank**, offset by the seed (the description's seed times the golden ratio, its fraction), is below the amount: another seed shows other spots, a larger amount more of them, live.
+- **Makeup**, foundation first: each layer is mixed over the skin by its mask times its opacity, its colour keeping part of the skin's fine variation (the albedo over its neighbourhood about 8 texels across: 35% under foundation, which is meant to hide it, 80% under the rest), so it reads as makeup on skin, not paint; foundation without a colour takes the skin's own tone (the albedo about 32 texels across), which evens it. A layer with a roughness mixes it in by the same coverage.
+
+Ray-traced reflections and GI see the skin without makeup (they don't read the masks).
+
 ## Cost
 
 Measured with `bench_realistic_character` (1080p High with TAA, hard light, RX 9070 XT, medians of four runs; details in `docs/development/character-studio/refinement/r2/r5-skin-shading.md`): the Scene pass 0.625 to 0.660 ms with the whole body in view and about 0.65 to 0.71 ms with the face filling the view; no other pass changed. Skin pixels read the normal map four to six times (the own and the defined map, sharp and at two blurred levels) and the table eight times per light; other materials only test the uniform's model.
@@ -32,10 +53,12 @@ Measured with `bench_realistic_character` (1080p High with TAA, hard light, RX 9
 - No screen-space subsurface blur (Godot-style, CO17's quality phase): light doesn't bleed across shadow-casting geometry, only along a pixel's own curvature and penumbra.
 - No transmission (ears and nostrils lit from behind).
 - The curvature comes from screen-space derivatives of the interpolated normal, so it is constant per triangle; on the realistic body's 5 to 25 mm faces the change between neighbouring triangles is small, but a baked curvature map would be steadier.
-- Per-texel pigment (lips, nails, palms toned apart from the skin) and makeup layers: R5's later steps.
+- Per-texel pigment (lips, nails, palms toned apart from the skin): R5's later step. Makeup and markings are drawn (above); decals (tattoos, birthmarks, placed marks) are ADR-0042's later part.
 
 ## Tests
 
+- `crates/render/src/renderer/tests/skin_layers.rs`: the masks bound in the metalness, emissive and opacity places and the values in the uniform; each makeup layer and marking changing the skin only where its own channel's mask is; layers off drawing the skin bit for bit; a marking's amount showing a share of its spots and its seed picking which; a layer's roughness changing the highlight.
+- `crates/player/src/makeup_tests.rs`: on the realistic character, every layer changing a face capture against bare skin (and off or at opacity 0 drawing it exactly); glossy against matte lips; `softness` on its own; a colour change re-applied live with no bake.
 - `crates/render/src/renderer/tests/skin.rs`: the binding and uniform; red spreading past the terminator on a 6 mm ball (standard stays grey; no scatter, no red); a cloud shadow dims skin without reddening it (red over green lit and at the terminator within 0.03 of the open sun's, with the sun brightened by what the clouds take); a 1 mm ball no redder than a 4 mm one; light ending in a groove (a concave crease) not reddened as on a ball; a normal map's fold that green leaves dark not filled with red (red over green under 1.5, 82 unheld); a normal map's slope toward a sun just behind the surface's plane drawn as dark as the plain square (408 of 765 unheld, as Standard draws it: 0), and the same slope with the sun in front still lit more than the plain square; a bumpy normal map's pores left out of skin's diffuse light (lit and at the terminator, against a smooth ball's floor); the normal blend at 0 and 1 drawing each map bit for bit; every other material (Standard, normal-mapped, Toon, Unlit, a translucent leaf card) drawing what it drew before the Skin model; the table.
 - `crates/scene/src/material_values_tests.rs`, `draw_list/tests.rs`: a model marked skin draws as skin with its defined map; neutral values leave it as made; `scatter_scale`, `definition` and `softness`; a `SurfaceAppearance` leaves the defined map out.
 - `crates/assets/src/model/tests.rs`: the realistic file and manifest agree on what is skin; the smooth normal map keeps the navel (the two maps agree within 12 texels of `Realistic.build.json`'s `textures.navel_uv`, and the defined map leans at least 50 steps off flat there, so the place is a dimple, not a flat spot).

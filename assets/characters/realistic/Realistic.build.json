@@ -1427,7 +1427,30 @@
   "grain": {
    "cell_texels": 5.0,
    "fine_texels": 12.0,
-   "height_texels": 0.09
+   "height_skew": -2.819,
+   "height_texels": 0.12,
+   "line_texels": 7.0,
+   "pore_radius_cells": 0.24,
+   "pores_per_cm2": 1.26
+  },
+  "makeup": {
+   "covered_share": {
+    "blush": 0.00093,
+    "brow_fill": 0.00024,
+    "eyeliner": 0.00025,
+    "eyeshadow": 0.00071,
+    "foundation": 0.04312,
+    "lips": 0.00104
+   },
+   "face_moles": 9,
+   "files": [
+    "RealisticSkin_MakeupA.png",
+    "RealisticSkin_MakeupB.png",
+    "RealisticSkin_Markings.png"
+   ],
+   "freckles": 13002,
+   "moles": 70,
+   "scar_mm": 36.7
   },
   "navel_uv": [
    0.3713,
