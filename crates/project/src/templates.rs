@@ -131,8 +131,10 @@ impl Template {
         Template::BLANK.contains(&self)
     }
 
-    /// Whether its players are the default humanoid: a project made from
-    /// it gets [`add_default_humanoid`]'s files, and its world's
+    /// Whether its players are the default character: a project made from
+    /// it gets [`crate::add_default_game_character`]'s files (both
+    /// character families; the realistic character when the engine's
+    /// library is found), and its world's
     /// `StarterPlayer.StarterCharacter` names the `Character` prefab. The
     /// first-person and top-down templates place characters of their own.
     pub fn has_default_character(self) -> bool {
@@ -238,7 +240,12 @@ pub fn create_project_from(
         written = written.and_then(|()| add_default_sky(&folder).map(|_| ()));
     }
     if template.has_default_character() {
-        written = written.and_then(|()| add_default_humanoid(&folder).map(|_| ()));
+        // Both character families, the realistic one the players' default
+        // (refinement R10, OPEN-22; `game_character.rs`).
+        let shipped = crate::shipped_character_library();
+        written = written.and_then(|()| {
+            crate::add_default_game_character(&folder, shipped.as_deref()).map(|_| ())
+        });
     }
     for (path, bytes) in template.files() {
         if written.is_err() {

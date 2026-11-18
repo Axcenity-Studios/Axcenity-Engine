@@ -1467,7 +1467,16 @@ impl EditorApp {
         // A `*` after the name means unsaved changes, as in most editors.
         let unsaved = if self.unsaved() { "*" } else { "" };
         match (&self.project, &self.character_workspace) {
-            (Some(project), _) => format!("{}{unsaved} - Axcenity Editor", project.name),
+            // A game's character in Character Studio (the round trip).
+            (Some(project), Some(workspace)) => {
+                let unsaved = if workspace.dirty() { "*" } else { "" };
+                format!(
+                    "{}{unsaved} - Character Studio - {}",
+                    workspace.description().name,
+                    project.name
+                )
+            }
+            (Some(project), None) => format!("{}{unsaved} - Axcenity Editor", project.name),
             (None, Some(workspace)) => {
                 let unsaved = if workspace.dirty() { "*" } else { "" };
                 format!(

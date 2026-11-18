@@ -73,6 +73,10 @@ impl EditorApp {
             Action::ReportBug(id) => self.report_bug_about(id),
             Action::GroupAsMesh(_) => self.solid_action(super::solid::SolidAction::GroupAsMesh),
             Action::UngroupMesh(_) => self.solid_action(super::solid::SolidAction::UngroupMesh),
+            Action::EditInCharacterStudio(id) => {
+                // A failure is said in the Output.
+                let _ = self.edit_in_character_studio(id);
+            }
             Action::Plugin { plugin, action } => self.plugin_explorer_action(plugin, action),
         }
     }
@@ -267,13 +271,15 @@ impl EditorApp {
         if what == Insertable::Character {
             let parent = tree::insert_parent(&self.world, near, what);
             let position = self.insert_position();
+            let name = tree::unique_name(&self.world, parent, "Character");
+            // The realistic character when the project's library has it
+            // (refinement R10, OPEN-22).
             let character = if self.add_default_humanoid() {
-                axcenity_project::default_character(&mut self.world, position)
+                self.default_game_character(position, &name)
             } else {
                 let state_machine = self.character_state_machine();
                 tree::character(&mut self.world, position, &state_machine)
             };
-            let name = tree::unique_name(&self.world, parent, "Character");
             self.world.set_name(character, &name).expect("just made");
             let index = self.world.get(parent).map_or(0, |p| p.children().len());
             if self.place(
@@ -601,10 +607,13 @@ impl EditorApp {
     }
 
     /// Writes the default humanoid's files (model, animations, clips, state
-    /// machine and `Character` prefab; `axcenity_project::add_default_humanoid`)
-    /// into the project for Insert > Character, keeping any already there.
-    /// False when there's no project folder to write to or writing failed
-    /// (with an error): Insert > Character then makes the block character.
+    /// machine and `Character` prefab) and both character families
+    /// (`axcenity_project::add_default_game_character`: the realistic one
+    /// from the engine's library, refinement R10, OPEN-22) into the project
+    /// for Insert > Character, keeping any already there (an older
+    /// project's prefab stays). False when there's no project folder to
+    /// write to or writing failed (with an error): Insert > Character then
+    /// makes the block character.
     fn add_default_humanoid(&mut self) -> bool {
         let Some(project) = self.project.as_ref().map(|project| project.folder.clone()) else {
             return false;
@@ -612,14 +621,27 @@ impl EditorApp {
         let new = !project
             .join(axcenity_project::DEFAULT_HUMANOID_MODEL_PATH)
             .is_file();
-        match axcenity_project::add_default_humanoid(&project) {
+        let realistic = |project: &Path| {
+            axcenity_avatar::Library::read(&project.join(axcenity_avatar::LIBRARY_FOLDER))
+                .0
+                .base(axcenity_project::DEFAULT_GAME_BASE)
+                .is_some()
+        };
+        let had_realistic = realistic(&project);
+        let shipped = crate::character_workspace::find_character_library();
+        match axcenity_project::add_default_game_character(&project, shipped.as_deref()) {
             Ok(_) => {
                 if new {
                     self.output.info(format!(
-                        "Added the default humanoid to the project: its model `{}`, its \
-                         animations and the state machine `{}`.",
+                        "Added the default humanoid to the project: its model `{}`, its                          animations and the state machine `{}`.",
                         axcenity_project::DEFAULT_HUMANOID_MODEL_PATH,
                         axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH
+                    ));
+                }
+                if !had_realistic && realistic(&project) {
+                    self.output.info(format!(
+                        "Added the realistic character family to the project's character                          library (`{}`). Right-click a character in the Explorer and pick                          Edit in Character Studio to change how it looks.",
+                        axcenity_avatar::LIBRARY_FOLDER
                     ));
                 }
                 true

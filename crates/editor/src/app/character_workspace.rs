@@ -1,6 +1,7 @@
 //! The editor's side of the Character Studio workspace
 //! (`crate::character_workspace`): opening it from the start screen,
-//! drawing it in place of the start screen, and leaving it.
+//! drawing it in place of the start screen (or of a project's panels,
+//! for the round trip: `character_round_trip.rs`), and leaving it.
 
 use std::path::{Path, PathBuf};
 
@@ -88,6 +89,23 @@ impl EditorApp {
         // What it saved gets a fresh picture on the start page.
         for file in std::mem::take(&mut workspace.saved_files) {
             self.start.character_saved(&file);
+        }
+        // Opened from the Game Editor: Done and Cancel go back to it, and
+        // so does Home (as Cancel).
+        let from_game = self
+            .character_workspace
+            .as_ref()
+            .is_some_and(|workspace| workspace.game().is_some());
+        match action {
+            Some(WorkspaceAction::Done) if from_game => {
+                self.finish_character_round_trip(true);
+                return;
+            }
+            Some(WorkspaceAction::Cancel | WorkspaceAction::Home) if from_game => {
+                self.finish_character_round_trip(false);
+                return;
+            }
+            _ => {}
         }
         let Some(workspace) = self.character_workspace.as_mut() else {
             return;

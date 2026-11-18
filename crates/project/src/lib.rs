@@ -41,6 +41,7 @@ mod compat;
 mod default_humanoid;
 mod default_sky;
 mod duplicates;
+mod game_character;
 mod levels;
 pub mod memory_budget;
 mod migrate;
@@ -87,6 +88,10 @@ pub use default_humanoid::{
 };
 pub use default_sky::{
     DEFAULT_SKY, DEFAULT_SKY_CLOCK_TIME, DEFAULT_SKY_LATITUDE, DEFAULT_SKY_PATH, add_default_sky,
+};
+pub use game_character::{
+    DEFAULT_GAME_BASE, KEPT_DESCRIPTION, add_both_character_libraries, add_default_game_character,
+    described_character, game_character_description, shipped_character_library,
 };
 pub use input_map::{INPUT_FILE, load_input_map, parse_input_map, save_input_map, write_input_map};
 pub use recovery::{

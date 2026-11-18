@@ -45,6 +45,7 @@ mod bottom_bar;
 pub mod compare;
 pub mod direct;
 pub mod edit;
+pub mod game;
 pub mod intent;
 pub mod motion;
 mod nav;
@@ -129,18 +130,11 @@ pub const CHARACTERS_FOLDER: &str = "characters";
 /// editor has it beside itself; a build from source under the engine's
 /// folder), then in the source tree a debug build came from.
 pub fn find_character_library() -> Option<PathBuf> {
-    let mut roots = Vec::new();
-    if let Ok(folder) = std::env::current_dir() {
-        roots.push(folder);
-    }
-    if let Ok(program) = std::env::current_exe() {
-        roots.extend(program.ancestors().skip(1).map(Path::to_path_buf));
-    }
-    roots.extend(crate::rebuild::EngineSource::find().map(|source| source.workspace));
-    roots
-        .into_iter()
-        .map(|root| root.join(axcenity_avatar::LIBRARY_FOLDER))
-        .find(|folder| folder.join("catalogue.json").is_file())
+    axcenity_project::shipped_character_library().or_else(|| {
+        crate::rebuild::EngineSource::find()
+            .map(|source| source.workspace.join(axcenity_avatar::LIBRARY_FOLDER))
+            .filter(|folder| folder.join("catalogue.json").is_file())
+    })
 }
 
 /// What a new character starts from: a base model's default character (a
@@ -333,6 +327,9 @@ pub struct CharacterWorkspace {
     /// Hover, selection and handles on the character in the viewport
     /// (R2, `direct.rs`; editor state).
     pub direct: direct::Direct,
+    /// The game character it was opened on from the Game Editor, which
+    /// Done applies the description to (the round trip, `game.rs`).
+    game: Option<game::GameLink>,
     /// The presets' pictures (the Presets page's tiles).
     pictures: thumbnails::Thumbnails,
     /// Each preset's picture file and its texture once loaded, by ID.
@@ -429,6 +426,7 @@ impl CharacterWorkspace {
             },
             recovery: autosave::read_recovery(folder),
             direct: direct::Direct::default(),
+            game: None,
             pictures,
             preset_pictures: HashMap::new(),
         };
@@ -945,9 +943,13 @@ impl CharacterWorkspace {
         }
         self.file = Some(path.clone());
         self.saved = Some(self.description.clone());
-        // Saved: nothing left to recover.
+        // Saved: nothing left to recover. A workspace that doesn't
+        // autosave (a game's character, the start page's painter) never
+        // wrote the recovery file: one there is another session's.
         self.autosave.written = None;
-        autosave::remove_recovery(&self.folder);
+        if self.autosave.on {
+            autosave::remove_recovery(&self.folder);
+        }
         recent::remember(&self.folder, &path);
         self.saved_files.push(path.clone());
         Ok(match renamed_from {
