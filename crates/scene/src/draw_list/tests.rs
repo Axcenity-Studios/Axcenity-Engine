@@ -779,7 +779,14 @@ fn a_model_material_marked_hair_draws_with_hair_shading_and_its_atlas_maps() {
     };
     assert_eq!(shading.data.as_ref().map(|t| t.rgba()[0]), Some(10));
     assert_eq!(shading.flow.as_ref().map(|t| t.rgba()[0]), Some(20));
+    assert!(!shading.shell, "loose cards unless marked");
     assert_eq!(drawn.alpha_cutoff, 0.5, "a cut-out card");
+    // Marked a shell over the head (review fixes 2).
+    let shell = materials::model_material(&ModelMaterial {
+        hair_shell: true,
+        ..hair.clone()
+    });
+    assert!(matches!(&shell.shading, Shading::Hair(h) if h.shell));
     // An appearance replaces the colour map the atlas's maps go with.
     let mut world = World::new();
     let appearance = world.create(ClassName::SurfaceAppearance).unwrap();

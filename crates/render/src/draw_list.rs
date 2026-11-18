@@ -2179,6 +2179,14 @@ pub struct HairShading {
     pub shift: f32,
     /// Multiplies the colour after melanin and dye (sRGB; white leaves it).
     pub tint: [f32; 3],
+    /// A shell over something solid (a hair cap, or cards lying on the
+    /// scalp): its light fades out over the solid's terminator, by the
+    /// mesh's own (outward) normal, so light from behind the head doesn't
+    /// come through it. A single-sided hair material is always one; a
+    /// double-sided one is one when its file says so (glTF `extras`
+    /// `axcenity_hair_shell: true`). Loose cards (a ponytail's, flyaways)
+    /// aren't, so light from behind comes through them.
+    pub shell: bool,
 }
 
 impl Default for HairShading {
@@ -2198,6 +2206,7 @@ impl Default for HairShading {
             secondary: 1.0,
             shift: 1.0,
             tint: [1.0; 3],
+            shell: false,
         }
     }
 }

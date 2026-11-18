@@ -521,4 +521,16 @@ fn cloth_values_modulate_the_authored_sheen_and_anisotropy() {
     assert!((cloth.anisotropy_rotation - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
     // The generic tint still multiplies the base colour.
     assert!((set.base_color[0] - 0.2).abs() < 1e-6);
+    // An anisotropic lobe repeats every half turn, so the turn is held to
+    // -90 to 90 degrees (review fixes 2).
+    let turned = drawn(
+        &made,
+        "Shirt",
+        &[number("Shirt", "anisotropy_rotation", 135.0)],
+    );
+    assert!(
+        (cloth_of(&turned).anisotropy_rotation - std::f32::consts::FRAC_PI_2).abs() < 1e-6,
+        "{}",
+        cloth_of(&turned).anisotropy_rotation
+    );
 }

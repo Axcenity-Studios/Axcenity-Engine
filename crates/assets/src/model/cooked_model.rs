@@ -276,6 +276,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         hair_flow_texture,
         sheen,
         anisotropy,
+        hair_shell,
     } = material;
     out.text(name);
     out.floats(base_color);
@@ -334,6 +335,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         }
         None => out.u8(0),
     }
+    out.u8(u8::from(*hair_shell));
     Some(())
 }
 
@@ -795,6 +797,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
             Some(Anisotropy { strength, rotation })
         }
     };
+    let hair_shell = input.bool()?;
     Some(ModelMaterial {
         name,
         base_color,
@@ -827,6 +830,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         hair_flow_texture,
         sheen,
         anisotropy,
+        hair_shell,
     })
 }
 
@@ -982,6 +986,7 @@ mod tests {
                     image(&material.hair_flow_texture),
                     material.sheen,
                     material.anisotropy,
+                    material.hair_shell,
                 ),
                 primitive.lods.len(),
                 "",
@@ -1047,7 +1052,7 @@ mod tests {
         );
         let hair = crate::model::tests::pyramid_with(
             r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 0},
-                "axcenity_hair_flow": {"index": 0}}"#,
+                "axcenity_hair_flow": {"index": 0}, "axcenity_hair_shell": true}"#,
             "",
         );
         // Its texture as a file of its own: a model with embedded maps
@@ -1070,6 +1075,11 @@ mod tests {
             assert!(read(&project, model, "").is_some(), "{model}");
             let again = Assets::new(&project).model_blocking(model).unwrap();
             assert_eq!(describe(&again), describe(&first), "{model}");
+            // The hair is marked a shell over the head, and stays one.
+            let shell = model.ends_with("hair.gltf");
+            for primitive in &again.primitives {
+                assert_eq!(primitive.material.hair_shell, shell, "{model}");
+            }
         }
         let _ = fs::remove_dir_all(project);
     }

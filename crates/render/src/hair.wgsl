@@ -26,7 +26,7 @@
 // `Maps::shading` for hair: x SHADING_HAIR; y which maps are bound (1 the
 // atlas's data in the metalness map's place, 2 the flow map in the
 // specular map's place) and 4 for a shell (a single-sided hair surface,
-// `hair_shell`); z the cuticle tilt's scale (`shift`); w the
+// or one its file marks a shell: `hair_shell`); z the cuticle tilt's scale (`shift`); w the
 // secondary's strength. `Maps::params` holds the colour values
 // (renderer/lighting.rs, `hair_uniform`).
 
@@ -81,21 +81,24 @@ fn hair_has_flow() -> bool {
     return (u32(maps.shading.y + 0.5) & 2u) != 0u;
 }
 
-// How much of a light from `l` reaches a hair pixel of normal `geometric`
-// by the surface's own side. A double-sided card is a sheet of strands lit
-// from either side (light from behind comes through it): all of it. A
-// single-sided hair surface is a shell over something solid (a hair cap
-// over the skull, or a test ball): its light fades out over the solid's
-// terminator, from where the surface faces the light a little to where it
-// faces a little away (light reaching a few strands deep). Without the
-// fade, the strands' light past the terminator, which no n·l dims, showed
-// the shadow map's self-shadow edge there, torn by its filter's per-pixel
-// noise (review fixes 1).
-fn hair_shell(geometric: vec3<f32>, l: vec3<f32>) -> f32 {
+// How much of a light from `l` reaches a hair pixel whose mesh's own
+// normal (as made, not turned toward the camera) is `outward`. A loose
+// card is a sheet of strands lit from either side (light from behind comes
+// through it): all of it. A shell lies over something solid (a hair cap,
+// the cards lying on the scalp, or a test ball): single-sided hair, and
+// double-sided hair its file marks one (`axcenity_hair_shell`). Its light
+// fades out over the solid's terminator, from where the surface faces the
+// light a little to where it faces a little away (light reaching a few
+// strands deep). Without the fade, the strands' light past the
+// terminator, which no n·l dims, showed the shadow map's self-shadow edge
+// there, torn by its filter's per-pixel noise (review fixes 1 and 2). The
+// normal as made says which side the solid is on, so a shell card seen
+// from underneath (a fringe from below) still takes light from outside.
+fn hair_shell(outward: vec3<f32>, l: vec3<f32>) -> f32 {
     if (u32(maps.shading.y + 0.5) & 4u) == 0u {
         return 1.0;
     }
-    return smoothstep(-HAIR_SHELL_WRAP, HAIR_SHELL_FULL, dot(geometric, l));
+    return smoothstep(-HAIR_SHELL_WRAP, HAIR_SHELL_FULL, dot(outward, l));
 }
 
 // The amounts of eumelanin and pheomelanin whose absorption is nearest
@@ -273,7 +276,8 @@ fn hair_surface(
     // (Never quite black: the lobes raise it to powers.)
     let colour = max(hair_colour(shaded.base_color, data.r, data.b), vec3<f32>(1e-4));
     let t = hair_toward_root(in, flow_texel);
-    let geometric = normalize(in.normal) * facing;
+    let outward = normalize(in.normal);
+    let geometric = outward * facing;
     let world_position = in.world_position;
     let pixel = in.clip_position.xy;
     let v = normalize(frame.camera_position.xyz - world_position);
@@ -281,7 +285,7 @@ fn hair_surface(
     let secondary = maps.shading.w;
 
     let sun = sun_arrival(world_position, geometric, pixel, solid);
-    let sun_visible = sun.visible * hair_shell(geometric, sun.l);
+    let sun_visible = sun.visible * hair_shell(outward, sun.l);
     var lit = hair_scatter(t, v, sun.l, colour, roughness, tilt, secondary, sun_visible)
         * sun.radiance * sun_visible;
     let lamps = tile_lamps(pixel);
@@ -289,7 +293,7 @@ fn hair_surface(
     for (var i = 0u; i < lamps.count; i++) {
         let lamp = lamp_arrival(lamps, i, slot, world_position, geometric, pixel, solid);
         slot += lamp_slots(lamps, i);
-        let visible = lamp.visible * hair_shell(geometric, lamp.l);
+        let visible = lamp.visible * hair_shell(outward, lamp.l);
         if visible > 0.0 {
             lit += hair_scatter(t, v, lamp.l, colour, roughness, tilt, secondary, visible)
                 * lamp.radiance * visible;

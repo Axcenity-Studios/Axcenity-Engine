@@ -173,7 +173,8 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 /// - on a material its model file marks cloth ([`Shading::Cloth`], CO7):
 ///   `sheen_tint` multiplies its sheen's colour, `sheen_roughness_scale`
 ///   its sheen's roughness, `anisotropy_scale` its anisotropy, and
-///   `anisotropy_rotation` (degrees) turns its direction.
+///   `anisotropy_rotation` (degrees, -90 to 90: a stretched highlight
+///   repeats every half turn) turns its direction.
 ///
 /// Every value at its neutral setting changes nothing, and a part with no
 /// values is drawn as authored. The rest (`pupil_size`, `limbal_ring`,
@@ -297,7 +298,7 @@ fn set_cloth(
         cloth.anisotropy = (cloth.anisotropy * scale.clamp(0.0, 2.0)).clamp(-1.0, 1.0);
     }
     if let Some(degrees) = number("anisotropy_rotation") {
-        cloth.anisotropy_rotation += degrees.clamp(-180.0, 180.0).to_radians();
+        cloth.anisotropy_rotation += degrees.clamp(-90.0, 90.0).to_radians();
     }
 }
 

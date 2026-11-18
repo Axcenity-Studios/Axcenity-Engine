@@ -308,10 +308,11 @@ const CLOTH: &[ValueSpec] = &[
     ),
     number(
         "anisotropy_rotation",
-        -180.0,
-        180.0,
+        -90.0,
+        90.0,
         0.0,
-        "Turns the direction the highlight stretches along, in degrees from the authored one.",
+        "Turns the direction the highlight stretches along, in degrees from the authored one \
+         (a stretched highlight repeats every half turn).",
     ),
 ];
 
@@ -538,8 +539,9 @@ mod tests {
         )
         .unwrap();
         assert!(check_values("Hair", ShadingModel::Hair, &values).is_empty());
+        // An anisotropic lobe repeats every half turn: -90 to 90 degrees.
         let rotated: MaterialValues =
-            serde_json::from_str(r#"{"anisotropy_rotation": 270.0}"#).unwrap();
+            serde_json::from_str(r#"{"anisotropy_rotation": 120.0}"#).unwrap();
         assert_eq!(
             check_values("Shirt", ShadingModel::Cloth, &rotated).len(),
             1

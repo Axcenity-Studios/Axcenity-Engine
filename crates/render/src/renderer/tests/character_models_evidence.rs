@@ -178,6 +178,47 @@ fn hair_and_cloth_evidence() {
             size,
         );
     }
+    // The same ball double-sided (as a hairstyle's cards are) over a solid
+    // head just inside it: loose (light from behind comes through) and
+    // marked a shell (`axcenity_hair_shell`), under MSAA and TAA (review
+    // fixes 2).
+    for shell in [false, true] {
+        let mut list = backlit.clone();
+        list.items[0].material.double_sided = true;
+        if let Shading::Hair(hair) = &mut list.items[0].material.shading {
+            hair.shell = shell;
+        }
+        list.items.push(ball(
+            0.97,
+            Vec3::ZERO,
+            crate::Material {
+                base_color: [0.6, 0.45, 0.35],
+                roughness: 0.6,
+                ..crate::Material::default()
+            },
+        ));
+        for (label, mode, frames) in [
+            ("msaa", AntiAliasing::Msaa4, 1),
+            ("taa", AntiAliasing::Taa, 40),
+        ] {
+            let mut renderer = TextureRenderer::new(&device, &queue, size, size);
+            renderer.set_graphics(&GraphicsSettings {
+                anti_aliasing: Some(mode),
+                ambient_occlusion: Some(AmbientOcclusion::Off),
+                ..GraphicsSettings::preset(Quality::High)
+            });
+            for _ in 0..frames {
+                renderer.render(&list).unwrap();
+            }
+            let kind = if shell { "shell" } else { "loose" };
+            evidence(
+                &format!("engine-hair-blonde-backlit-double-sided-{kind}-{label}"),
+                &renderer.read_pixels(),
+                size,
+                size,
+            );
+        }
+    }
     // A card of strands over skin under each anti-aliasing, lit from the
     // front, and its striped shadow on a wall.
     let data = hair_data(0x0e71);

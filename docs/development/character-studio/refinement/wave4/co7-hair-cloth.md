@@ -294,3 +294,82 @@ No dependency was added, no shared contract changed, and no generated file was r
 - `cargo clippy -p axcenity-render -p axcenity-scene -p axcenity-assets -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings`: clean.
 - `cargo fmt --all -- --check`: clean.
 - `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (staleness on pages this round didn't touch).
+
+## Review fixes 2
+
+The second review found one blocking item. The round-1 terminator fade (`hair_shell`) applied only to single-sided hair, but `hair.md` tells content to make cards double-sided. So no real hairstyle got the fix: a back-lit head of double-sided cards still showed the torn self-shadow band, and nothing reported it. The reviewer was right; I reproduced it.
+
+### The fix: a shell mark for double-sided hair (review option B)
+
+- **The model file marks it.** A new glTF `extras` flag, `axcenity_hair_shell: true`, on a hair material makes it a shell even when it is double-sided. The contract in `hair.md` tells content to set it on the cap and on every card layer lying over the scalp. It stays off only for loose cards that stand clear of the head (a ponytail's length, flyaways), which light from behind should still come through. Single-sided hair is a shell as before.
+- **The fade uses the mesh's own normal.** `hair_shell` now measures n·l with the normal as made, not the one turned toward the camera. On a single-sided shell these are the same. On a double-sided shell, the normal as made says which side the head is on, so a card seen from underneath (a fringe from below) still takes light from outside the head.
+- **Why not the other options.** A pure-shader fade on every double-sided card (option A) can't tell light through a loose card from light behind a solid head: both arrive from the card's far side. That fade would remove the transmitted glow that `light_from_behind_comes_through_hair` checks, which is real for loose cards. A head-relative normal (option C) needs data the item doesn't carry. The flag is one line in the model file, and the content specialists build on `hair.md`.
+- **Plumbing.**
+  - `render::HairShading::shell`: bit 4 of `MapsUniform::shading.y` is now `!double_sided || shell`.
+  - `assets::ModelMaterial::hair_shell`: read by `hair_shell_of` (hair materials only) and kept in cooked models.
+  - `scene`: `model_material` passes it through.
+
+**Test, red first:** `back_lit_double_sided_hair_over_a_head_ends_smoothly_at_its_terminator`.
+- It draws the evidence's back-lit ball, double-sided and marked, over a solid Standard ball at radius 0.97, under Off and MSAA 4× at 512 px.
+- The limits are the shell test's: the lit band ends within 6 rows of the terminator, and its edge moves under 0.4 rows a column.
+- Red, with `shell` a stub: 21.1 rows and 0.48 a column under both modes. Green: 2.6 rows and 0.30, the same as the single-sided shell.
+- The uniform test also checks the shell bit for a marked double-sided material.
+- The assets and scene tests for the flag went red first too (4 failures, in the red-run file).
+
+**What I saw** (`backlit-double-sided-hair-over-head-x3.png`, the ball's top at 3×):
+- **Top row: double-sided and loose, over the head**, as the reviewer's probe drew it. Under MSAA 4× the lit band runs well past the terminator and its inner edge is torn into blotches. Under TAA (40 frames) it averages into texel-sized steps. Loose cards still do this where they close into a surface; it is reported in `hair.md` (Shells, Not yet) and Known-Limitations.
+- **Middle row: double-sided and marked a shell.** A thin, smooth crescent under MSAA and TAA alike, matching the single-sided shell (bottom right).
+- **Bottom: Blender.** Its crescent is white and a little thicker at the top; the engine's is warm gold at the sides. This is the colour difference from round 1, still to tune on the first hairstyle. The grey patch at the pole is the test ball's artefact (its strand directions meet there), as before.
+
+### Non-blocking items
+
+Done in this round:
+- **`anisotropy_rotation` is now -90 to 90 degrees** (it was -180 to 180).
+  - A stretched highlight repeats every half turn, so half the old range repeated itself. Under Paul's drag rule the full range now moves about 1.6 degrees a point instead of 3.3.
+  - Tests went red first: the avatar check now refuses 120, and `scene` holds 135 at 90.
+  - Updated in `architecture.md` §10, `cloth.md` and the value's help text.
+- **Redness.** I computed the shader's colour curve. At redness 1, brown (115, 76, 46), hue 27°, becomes (151, 96, 55), hue 26°: lighter, about the same hue, as the reviewer measured. With melanin 0.3 as well it is (124, 65, 28), hue 23°, auburn; with melanin 0.6, (94, 37, 8), a deep copper. `hair.md` now says that a red head is redness 1 with melanin raised, and gives these numbers for content and RA1's presets.
+- **Per-lobe roughness or shift.** `hair.md` now says what the model has: one roughness for all lobes (their widths are fixed multiples, as in Karis's and Blender's models), one tilt scale for both shifts, and `highlight` for the secondary's strength.
+- **Ray-traced shadows onto the scalp.** I read `cut_out_near` in `ray_shadows.wgsl` and `ray_ao.wgsl`; the reviewer's arithmetic holds (about 16 mm at 3 studs from a solid pixel). I didn't change it. It is noted in `hair.md` "Not yet" and Known-Limitations, to check on the first hairstyle.
+- **The Blender scripts are committed** under `co7-hair-cloth/tools/` with a README: `blender_references.py`, `engine_vs_blender_sheet.py` and this round's `backlit_double_sided_sheet.py`. They contain no local paths.
+- **The KHR sheen albedo.** `cloth.md` now says the engine dims by E(n·v) only, where the spec takes the smaller of the n·v and n·l terms, and what that changes under a grazing light.
+
+Not done:
+- The dark-orange speckles outside the back-lit silhouette in `engine-vs-blender.jpg` are left to check on the first hairstyle.
+- The items still open from round 1 are unchanged: TAA flicker at the bottom of the hashed band, the MSAA screen-door, the shadow stipple, the ramp card's wrap line, the pole patch, and OPEN-19 on real face content.
+- The stray folder `C:\co7hc_ev` is still for Paul to delete.
+
+### Files changed in this round
+
+- `crates/render/src/draw_list.rs`: `HairShading::shell`.
+- `crates/render/src/hair.wgsl`: `hair_shell` uses the mesh's own normal; its comments.
+- `crates/render/src/renderer/lighting.rs`: the shell bit is `!double_sided || shell`.
+- `crates/render/src/renderer/tests/hair.rs`: the double-sided test; the shell test's measuring moved into `terminator_failures`; the shell bit in the uniform test.
+- `crates/render/src/renderer/tests/character_models_evidence.rs`: the double-sided loose and shell variants.
+- `crates/assets/src/model.rs`, `model/cooked_model.rs`, `model/tests.rs`: `ModelMaterial::hair_shell`, `hair_shell_of`, its cooked encoding, and tests.
+- `crates/scene/src/draw_list/materials.rs`, `draw_list/tests.rs`: the flag passed through, and its test.
+- `crates/avatar/src/material.rs`, `crates/scene/src/material.rs`, `material_values_tests.rs`: `anisotropy_rotation` held to -90 to 90.
+- Docs: `docs/rendering/hair.md`, `cloth.md`, `models.md`, `docs/development/character-studio/architecture.md`. Wiki: `Engine-Systems/Rendering.md`, `Roadmap/Known-Limitations.md`, the ADR-0036 note.
+- This hand-back, the red-run file, the new sheet `backlit-double-sided-hair-over-head-x3.png`, and `co7-hair-cloth/tools/`.
+
+Shared contracts:
+- A new optional model-file flag, `axcenity_hair_shell` in glTF `extras`, documented in `hair.md`, `models.md` and `architecture.md` §10.
+- A narrower range for `anisotropy_rotation`, a value this branch added.
+- The cooked model encoding gains one byte per material. Cooked caches are keyed by engine build, so old ones are just remade.
+
+No dependency was added, no description or manifest enum grows, and no generated file was regenerated.
+
+### Tests run
+
+- `cargo nextest run -p axcenity-render -p axcenity-scene -p axcenity-assets -p axcenity-avatar -p axcenity-player --no-fail-fast`: `Summary [ 802.246s] 1224 tests run: 1223 passed (34 slow), 1 timed out, 29 skipped`. No FAIL or ABORT lines.
+  - The timeout was `skin_value_tests::skin_tone_values_change_the_picture_the_way_they_mean` (122.8 s under the shared load). It is not this change's: rerun alone it passes in 61.5 s.
+  - The run includes `every_example_renders`, the capture determinism test, the probe guard `every_other_material_draws_as_it_did_before_the_skin_model`, the skin table test and the new double-sided test.
+- Red runs, in `co7-hair-cloth-red-run.txt`:
+  - the double-sided test and the uniform bit (21.1 rows, 0.48 a column; shell bit 0 against 4);
+  - the flag's assets and scene tests (4 failed);
+  - the rotation range (2 failed).
+- `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::panel/)'`: 5 passed.
+- Run by hand: `hair_and_cloth_evidence`, for the new double-sided variants.
+- `cargo clippy -p axcenity-render -p axcenity-scene -p axcenity-assets -p axcenity-avatar -p axcenity-player -p axcenity-editor --all-targets -- -D warnings`: clean.
+- `cargo fmt --all -- --check`: clean.
+- `python3 -I scripts/check-wiki.py`: 114 pages, 0 errors, 58 warnings (staleness on pages this round didn't touch).

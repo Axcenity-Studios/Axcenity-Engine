@@ -312,9 +312,11 @@ pub(super) fn model_material(material: &ModelMaterial) -> Material {
             }),
             // The file marks it hair: its atlas's data and flow maps
             // (`docs/rendering/hair.md`), read as plain values.
+            // A shell over the head where the file marks one.
             ModelShading::Hair => Shading::Hair(HairShading {
                 data: material.hair_data_texture.as_ref().map(texture),
                 flow: material.hair_flow_texture.as_ref().map(texture),
+                shell: material.hair_shell,
                 ..HairShading::default()
             }),
             // The file marks it cloth: its sheen and anisotropy are glTF's

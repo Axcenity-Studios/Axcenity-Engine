@@ -1115,6 +1115,20 @@ fn a_gltf_materials_extras_mark_it_hair_or_cloth_and_name_a_hair_atlas_s_maps() 
         super::hair_maps_of(&raw(r#"{"axcenity_hair_data": {"index": 2}}"#)),
         (None, None)
     );
+    // A shell over the head (review fixes 2), hair only.
+    assert!(super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": true}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": false}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_shading": "hair"}"#
+    )));
+    assert!(!super::hair_shell_of(&raw(
+        r#"{"axcenity_hair_shell": true}"#
+    )));
+    assert!(!super::hair_shell_of(&None));
 }
 
 /// The example pyramid with its one material given `extras` and
@@ -1196,7 +1210,15 @@ fn a_hair_cards_data_and_flow_maps_are_read_where_its_colour_map_is() {
     assert_eq!(material.shading, ModelShading::Hair);
     assert!(material.hair_data_texture.is_some());
     assert!(material.hair_flow_texture.is_some());
+    assert!(!material.hair_shell, "loose cards unless marked");
     assert!(model.primitives[0].images().count() >= 3);
+    // Marked a shell over the head.
+    let shell = pyramid_with(
+        r#"{"axcenity_shading": "hair", "axcenity_hair_shell": true}"#,
+        "",
+    );
+    let model = load_model(shell.as_bytes(), &example_folder(), ModelFormat::Gltf).unwrap();
+    assert!(model.primitives[0].material.hair_shell);
     // A texture index the file hasn't: no map.
     let missing = pyramid_with(
         r#"{"axcenity_shading": "hair", "axcenity_hair_data": {"index": 9}}"#,

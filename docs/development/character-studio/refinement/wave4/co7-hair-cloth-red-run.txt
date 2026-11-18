@@ -208,3 +208,50 @@ cargo nextest run -p axcenity-render -E 'test(/a_standard_cut_out_casts_its_whol
      Summary 3 tests run: 2 passed, 1 failed, 420 skipped
         FAIL (2/3) axcenity-render renderer::tests::alpha_cards::a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps
 error: test run failed
+
+== Review fixes 2: double-sided hair over a head (red) ==
+HairShading::shell added as a stub (not yet in the uniform or the shader).
+cargo nextest run -p axcenity-render -E 'test(/tests::hair::/)' --no-fail-fast
+
+        FAIL (1/8) axcenity-render renderer::tests::hair::a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places
+  stderr ───
+    assertion `left == right` failed
+      left: 0.0
+     right: 4.0
+        FAIL (8/8) axcenity-render renderer::tests::hair::back_lit_double_sided_hair_over_a_head_ends_smoothly_at_its_terminator
+  stderr ───
+    Off: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    Msaa4: band ends 21.1 rows past the terminator at most, 0.48 rows from column to column
+    panicked at crates\render\src\renderer\tests\hair.rs:537:5:
+    [
+        "Off: lit 21.073502 rows past the terminator",
+        "Off: a ragged edge (0.48)",
+        "Msaa4: lit 21.073502 rows past the terminator",
+        "Msaa4: a ragged edge (0.48)",
+    ]
+────────────
+     Summary 8 tests run: 6 passed, 2 failed, 416 skipped
+
+== Review fixes 2: the axcenity_hair_shell extras flag (red) ==
+ModelMaterial::hair_shell added as a stub (never read, not cooked, not passed to the renderer).
+cargo nextest run -p axcenity-assets -p axcenity-scene -E 'test(/hair/)' --no-fail-fast
+
+        PASS (1/5) axcenity-scene material_values_tests::hair_values_go_to_the_hair_model_not_the_skin_curve
+        FAIL (2/5) axcenity-assets model::tests::a_gltf_materials_extras_mark_it_hair_or_cloth_and_name_a_hair_atlas_s_maps
+    panicked at crates\assets\src\model\tests.rs:1119:5
+        FAIL (3/5) axcenity-assets model::tests::a_hair_cards_data_and_flow_maps_are_read_where_its_colour_map_is
+    panicked at crates\assets\src\model\tests.rs:1217:5
+        FAIL (4/5) axcenity-scene draw_list::tests::a_model_material_marked_hair_draws_with_hair_shading_and_its_atlas_maps
+    panicked at crates\scene\src\draw_list\tests.rs:789:5
+        FAIL (5/5) axcenity-assets model::cooked_model::tests::a_cooked_model_keeps_its_hair_and_cloth_materials
+    panicked at crates\assets\src\model\cooked_model.rs:1079:17
+     Summary 5 tests run: 1 passed, 4 failed, 434 skipped
+
+== Review fixes 2: anisotropy_rotation held to -90..90 degrees (red) ==
+cargo nextest run -p axcenity-avatar -p axcenity-scene -E 'test(/cloth|shading_model|values/)' --no-fail-fast
+
+        FAIL ( 5/21) axcenity-avatar material::tests::hair_and_cloth_have_the_values_their_shading_models_draw
+    panicked at crates\avatar\src\material.rs:544:9   (120 degrees was accepted)
+        FAIL ( 9/21) axcenity-scene material_values_tests::cloth_values_modulate_the_authored_sheen_and_anisotropy
+    panicked at crates\scene\src\material_values_tests.rs:531:5   (135 degrees turned the lobe by 135, not 90)
+     Summary 21 tests run: 19 passed, 2 failed, 334 skipped

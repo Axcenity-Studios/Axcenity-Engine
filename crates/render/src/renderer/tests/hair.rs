@@ -155,6 +155,13 @@ fn a_hair_materials_data_and_flow_maps_take_the_metalness_and_specular_places() 
     // Single-sided: a shell (4), whose light fades over its terminator.
     item.material.double_sided = false;
     assert_eq!(maps_uniform_of(&material_key(&item)).shading[1], 4.0);
+    // Double-sided and marked a shell (cards lying on the head): one too.
+    item.material.double_sided = true;
+    item.material.shading = Shading::Hair(HairShading {
+        shell: true,
+        ..HairShading::default()
+    });
+    assert_eq!(maps_uniform_of(&material_key(&item)).shading[1], 4.0);
 }
 
 #[test]
@@ -491,12 +498,60 @@ fn a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator() {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let size = 512;
-    let list = super::character_models_evidence::scenes()
+    let list = backlit_ball();
+    // Before the fade: 21.1 rows past and 0.48 a column, under Off and
+    // MSAA 4x alike; with it 2.6 and 0.30.
+    let failures = terminator_failures(&device, &queue, &list);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The same for double-sided hair over a solid head (a solid Standard ball
+/// just inside it), as a hairstyle's cards are: double-sided, and marked a
+/// shell (`axcenity_hair_shell`) where they lie on the head. Before review
+/// fixes 2 only single-sided hair faded, and double-sided hair showed the
+/// torn self-shadow edge however solid the head under it.
+#[test]
+fn back_lit_double_sided_hair_over_a_head_ends_smoothly_at_its_terminator() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut list = backlit_ball();
+    let hair = &mut list.items[0];
+    hair.material.double_sided = true;
+    let Shading::Hair(shading) = &mut hair.material.shading else {
+        unreachable!("the evidence's ball is hair");
+    };
+    shading.shell = true;
+    let head = ball(
+        0.97,
+        Vec3::ZERO,
+        crate::Material {
+            base_color: [0.6, 0.45, 0.35],
+            roughness: 0.6,
+            ..crate::Material::default()
+        },
+    );
+    list.items.push(head);
+    let failures = terminator_failures(&device, &queue, &list);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The evidence's back-lit blonde ball of hair (shadows on).
+fn backlit_ball() -> DrawList {
+    super::character_models_evidence::scenes()
         .into_iter()
         .find(|(name, _)| *name == "hair-blonde-backlit")
         .unwrap()
-        .1;
+        .1
+}
+
+/// How `list`'s back-lit ball of hair (radius 1, at the origin) ends its
+/// lit band at the terminator under Off and MSAA 4x, at 512 pixels: what
+/// fails the limits (lit at most 6 rows past the terminator, the band's
+/// end moving under 0.4 rows from column to column).
+fn terminator_failures(device: &wgpu::Device, queue: &wgpu::Queue, list: &DrawList) -> Vec<String> {
+    let size = 512;
     // The terminator: the great circle of the ball (radius 1) square to
     // the sun, by where it is on screen, column by column (the half facing
     // the camera).
@@ -505,7 +560,7 @@ fn a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator() {
     let mut terminator = vec![f32::MAX; size as usize];
     for step in 0..4000 {
         let angle = std::f32::consts::PI * (step as f32 / 4000.0 - 0.5);
-        let point = on_screen(&list, a * angle.cos() + b * angle.sin(), size);
+        let point = on_screen(list, a * angle.cos() + b * angle.sin(), size);
         let x = point.x.round() as usize;
         if x < terminator.len() {
             terminator[x] = terminator[x].min(point.y);
@@ -513,13 +568,13 @@ fn a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator() {
     }
     let mut failures = Vec::new();
     for mode in [AntiAliasing::Off, AntiAliasing::Msaa4] {
-        let mut renderer = TextureRenderer::new(&device, &queue, size, size);
+        let mut renderer = TextureRenderer::new(device, queue, size, size);
         renderer.set_graphics(&GraphicsSettings {
             anti_aliasing: Some(mode),
             ambient_occlusion: Some(AmbientOcclusion::Off),
             ..GraphicsSettings::preset(Quality::High)
         });
-        let pixels = draw(&mut renderer, &list);
+        let pixels = draw(&mut renderer, list);
         let at = |x: u32, y: u32| sum(rgb_at(&pixels, size, x, y));
         // Two runs of columns either side of the middle, clear of the
         // ball's pole (its strands' directions meet there: the test ball's
@@ -551,8 +606,6 @@ fn a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator() {
             "{mode:?}: band ends {past:.1} rows past the terminator at most, \
              {steps:.2} rows from column to column"
         );
-        // Before the fade: 21.1 rows past and 0.48 a column, under Off and
-        // MSAA 4x alike; with it 2.6 and 0.30.
         if past > 6.0 {
             failures.push(format!("{mode:?}: lit {past} rows past the terminator"));
         }
@@ -560,5 +613,5 @@ fn a_back_lit_hair_shells_lit_band_ends_smoothly_at_its_terminator() {
             failures.push(format!("{mode:?}: a ragged edge ({steps:.2})"));
         }
     }
-    assert!(failures.is_empty(), "{failures:#?}");
+    failures
 }

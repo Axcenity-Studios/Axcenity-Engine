@@ -465,6 +465,22 @@ fn hair_maps_of(extras: &gltf::json::Extras) -> (Option<usize>, Option<usize>) {
         })
 }
 
+/// Whether a hair material's `extras` mark it a shell over the head
+/// (`axcenity_hair_shell: true`; `docs/rendering/hair.md`); never on any
+/// other.
+fn hair_shell_of(extras: &gltf::json::Extras) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Shell {
+        axcenity_hair_shell: Option<bool>,
+    }
+    shading_of(extras).0 == ModelShading::Hair
+        && extras
+            .as_ref()
+            .and_then(|raw| serde_json::from_str::<Shell>(raw.get()).ok())
+            .and_then(|shell| shell.axcenity_hair_shell)
+            .unwrap_or(false)
+}
+
 /// What glTF's `KHR_materials_sheen` and `KHR_materials_anisotropy` say
 /// of one material (their factors; their textures aren't read).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -662,6 +678,13 @@ pub struct ModelMaterial {
     /// glTF `KHR_materials_anisotropy`'s factors, drawn by
     /// [`ModelShading::Cloth`].
     pub anisotropy: Option<Anisotropy>,
+    /// A [`ModelShading::Hair`] material that lies over something solid
+    /// (a hair cap, the cards lying on the scalp): its light fades out over
+    /// the head's terminator, by the mesh's outward normal
+    /// (`render::HairShading::shell`). From glTF `extras`:
+    /// `axcenity_hair_shell: true`. A single-sided hair material is one
+    /// anyway.
+    pub hair_shell: bool,
 }
 
 /// glTF `KHR_materials_sheen`: the sheen's colour (linear) and roughness,
@@ -731,6 +754,7 @@ impl Default for ModelMaterial {
             hair_flow_texture: None,
             sheen: None,
             anisotropy: None,
+            hair_shell: false,
         }
     }
 }
@@ -2166,6 +2190,7 @@ impl Reader<'_> {
             hair_flow_texture,
             sheen: extensions.sheen,
             anisotropy: extensions.anisotropy,
+            hair_shell: hair_shell_of(material.extras()),
             ..wind_of(material.extras())
         };
         Ok((material, uv_set))

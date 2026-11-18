@@ -1339,7 +1339,7 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
         ),
         Shading::Unlit => ([SHADING_UNLIT, 0.0, 0.0, 0.0], [0.0; 4]),
         // hair.wgsl: which maps are bound (1 the atlas data, 2 the flow)
-        // and 4 for a single-sided shell (`hair_shell`), the cuticle tilt's
+        // and 4 for a shell (single-sided, or marked one: `hair_shell`), the cuticle tilt's
         // scale and the secondary's strength; the colour values ride in
         // `params` (`hair_uniform`).
         Shading::Hair(hair) => (
@@ -1348,7 +1348,7 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
                 f32::from(
                     u8::from(hair.data.is_some())
                         + 2 * u8::from(hair.flow.is_some())
-                        + 4 * u8::from(!material.double_sided),
+                        + 4 * u8::from(!material.double_sided || hair.shell),
                 ),
                 hair.shift.clamp(0.0, 2.0),
                 hair.secondary.clamp(0.0, 2.0),
