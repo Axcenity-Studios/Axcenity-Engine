@@ -55,7 +55,9 @@
 //!   as before.
 //! - `AXCENITY_CAPTURE_POSE` also takes the held poses of the brief's body
 //!   tests ([`HeldPose`]): `t-pose`, `arms-raised`, `elbows-bent`,
-//!   `knees-bent`, both sides, at the Blender harness's angles.
+//!   `knees-bent`, both sides, at the Blender harness's angles; and
+//!   `arms-forward` (wave 5: the arms hanging, then raised forward to
+//!   level), which the body suite doesn't draw.
 //! - `AXCENITY_CAPTURE_SUITE=face` or `body` ([`Suite`]): a fixed list of
 //!   faces or poses, each drawn from the suite's views, written as one
 //!   sheet per character, `<name>-<suite>.png` (a row per state and light,
@@ -402,6 +404,11 @@ pub(crate) enum HeldPose {
     ElbowsBent,
     /// The knees bent 135 degrees, the shins going back.
     KneesBent,
+    /// The upper arms hanging, then raised forward to level (90 degrees of
+    /// flexion): arm movement and shoulder deformation for the fit gate
+    /// (wave 5, Paul's decision 13). Not in [`HeldPose::ALL`], so the body
+    /// suite's sheets keep their rows; `AXCENITY_CAPTURE_POSE` takes it.
+    ArmsForward,
 }
 
 impl HeldPose {
@@ -418,6 +425,7 @@ impl HeldPose {
             HeldPose::ArmsRaised => "arms-raised",
             HeldPose::ElbowsBent => "elbows-bent",
             HeldPose::KneesBent => "knees-bent",
+            HeldPose::ArmsForward => "arms-forward",
         }
     }
 }
@@ -436,6 +444,28 @@ pub(crate) fn held_pose(rig: &Rig, pose: HeldPose) -> Vec<(usize, BoneTransform)
         // (the bone turned, the bone at its tail, the axis, degrees, which
         // way the tail should go)
         let joint = match pose {
+            HeldPose::ArmsForward => {
+                let (Some(upper), Some(lower)) = (bone("UpperArm"), bone("LowerArm")) else {
+                    continue;
+                };
+                // Let down to hanging straight (the shortest turn: about the
+                // forward axis, nearly), then raised forward to level (about
+                // the axis across the body). The fit has no such pose; only
+                // the gate and the capture hold it.
+                let arm = (head(lower) - head(upper)).normalize();
+                let down = Quat::from_rotation_arc(arm, -UP);
+                let hanging = down * arm;
+                let raise = {
+                    let turn = |d: f32| Quat::from_axis_angle(Vec3::X, d.to_radians());
+                    if (turn(90.0) * hanging).z >= (turn(-90.0) * hanging).z {
+                        turn(90.0)
+                    } else {
+                        turn(-90.0)
+                    }
+                };
+                turned.push((upper, turned_by(rig, &world, upper, raise * down)));
+                continue;
+            }
             HeldPose::TPose | HeldPose::ArmsRaised => {
                 let (Some(upper), Some(lower)) = (bone("UpperArm"), bone("LowerArm")) else {
                     continue;
@@ -494,6 +524,13 @@ fn bend(
     } else {
         turn(-degrees)
     };
+    turned_by(rig, world, bone, turn)
+}
+
+/// `bone`'s transform relative to its parent once it is turned by `turn`
+/// (the file's space) about its head; `world` is every bone at rest.
+fn turned_by(rig: &Rig, world: &[Mat4], bone: usize, turn: Quat) -> BoneTransform {
+    let head = world[bone].w_axis.truncate();
     // Turned in place: the bone's rest in the file's space, turned about
     // its head; then taken back into its parent's space.
     let turned = Mat4::from_translation(head)
@@ -544,7 +581,11 @@ impl Stance {
 /// out).
 pub(crate) fn stance_named(text: &str) -> Result<Stance, String> {
     let text = text.trim();
-    if let Some(pose) = HeldPose::ALL.into_iter().find(|pose| pose.name() == text) {
+    if let Some(pose) = HeldPose::ALL
+        .into_iter()
+        .chain([HeldPose::ArmsForward])
+        .find(|pose| pose.name() == text)
+    {
         return Ok(Stance::Held(pose));
     }
     match text {
@@ -1693,7 +1734,7 @@ fn held_poses_turn_each_joint_to_its_angle_on_the_realistic_body() {
     let at = |world: &[Mat4], name: &str| world[rig.bone(name).unwrap()].w_axis.truncate();
     assert!(at(&rest, "LeftEye").z > at(&rest, "Head").z, "facing +Z");
     let degrees = |a: Vec3, b: Vec3| a.normalize().angle_between(b.normalize()).to_degrees();
-    for pose in HeldPose::ALL {
+    for pose in HeldPose::ALL.into_iter().chain([HeldPose::ArmsForward]) {
         let turned = held_pose(&rig, pose);
         assert_eq!(turned.len(), 2, "{pose:?}: one joint a side");
         let mut posed = rig.rest_pose();
@@ -1712,6 +1753,13 @@ fn held_poses_turn_each_joint_to_its_angle_on_the_realistic_body() {
                         (abduction - wanted).abs() < 1.0,
                         "{pose:?} {side}: {abduction}"
                     );
+                    continue;
+                }
+                HeldPose::ArmsForward => {
+                    // Raised forward to level: straight ahead, at the
+                    // shoulder's height.
+                    let ahead = degrees(arm, Vec3::Z);
+                    assert!(ahead < 1.0, "{pose:?} {side}: {ahead} from straight ahead");
                     continue;
                 }
                 HeldPose::ElbowsBent => ("LowerArm", "Hand"),

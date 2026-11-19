@@ -1,0 +1,74 @@
+# tee-walk: the red run (wave 5, CO9 part 3)
+
+The new and changed tests, run on the unchanged fit and the unchanged gate measure:
+cargo nextest run -p axcenity-player -E 'test(/fit_gate_tests::/) | test(/held_poses/)' --no-fail-fast
+
+FAIL [   0.611s] ( 1/16) axcenity-player::bin/axcenity-player character_capture::held_poses_turn_each_joint_to_its_angle_on_the_realistic_body
+thread 'character_capture::held_poses_turn_each_joint_to_its_angle_on_the_realistic_body' (7404) panicked at crates\player\src\character_capture.rs:1767:21:
+ArmsForward Left: 1.1658361 from straight ahead
+PASS [  19.879s] ( 2/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_walking
+PASS [  20.060s] ( 3/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_at_rest
+PASS [  20.498s] ( 4/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_out
+FAIL [   0.168s] ( 5/16) axcenity-player::bin/axcenity-player fit_gate_tests::skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out
+thread 'fit_gate_tests::skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out' (10480) panicked at crates\player\src\fit_gate_tests.rs:1237:5:
+assertion `left == right` failed: enclosed skin counted out by 0.012
+left: 1
+right: 0
+PASS [   0.164s] ( 6/16) axcenity-player::bin/axcenity-player fit_gate_tests::skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered
+PASS [  21.184s] ( 7/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_raised
+PASS [   0.165s] ( 8/16) axcenity-player::bin/axcenity-player fit_gate_tests::the_gate_holds_garments_to_their_records
+FAIL [  22.004s] ( 9/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_arms_forward
+fit gate ArmsForward: 204 garment checks in 9.8 s, 75 failing
+thread 'fit_gate_tests::garments_cover_the_cast_with_the_arms_forward' (28612) panicked at crates\player\src\fit_gate_tests.rs:826:5:
+"TestTee ArmsForward: 54 bodies failing, worst 31.95 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee ArmsForward: 21 bodies failing, worst 11.48 mm (recorded 0, 0.00 mm)",
+PASS [   1.964s] (10/16) axcenity-player::bin/axcenity-player fit_gate_tests::wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them
+FAIL [  24.790s] (11/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_through_the_walk_second_third
+fit gate Walk [17, 20, 23, 26, 29]: 1020 garment checks in 12.6 s, 76 failing
+thread 'fit_gate_tests::garments_cover_the_cast_through_the_walk_second_third' (30232) panicked at crates\player\src\fit_gate_tests.rs:826:5:
+"TestTee Walk: 54 bodies failing, worst 31.89 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs Walk: 1 bodies failing, worst 1.95 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 21 bodies failing, worst 18.81 mm (recorded 0, 0.00 mm)",
+FAIL [  24.850s] (12/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_through_the_walk_last_third
+fit gate Walk [32, 35, 38, 41, 44]: 1020 garment checks in 12.9 s, 95 failing
+thread 'fit_gate_tests::garments_cover_the_cast_through_the_walk_last_third' (9976) panicked at crates\player\src\fit_gate_tests.rs:826:5:
+"TestTee Walk: 54 bodies failing, worst 31.97 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs Walk: 20 bodies failing, worst 4.06 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 21 bodies failing, worst 17.14 mm (recorded 0, 0.00 mm)",
+FAIL [  26.382s] (13/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_through_the_walk_first_third
+fit gate Walk [2, 5, 8, 11, 14]: 1020 garment checks in 14.1 s, 95 failing
+thread 'fit_gate_tests::garments_cover_the_cast_through_the_walk_first_third' (43568) panicked at crates\player\src\fit_gate_tests.rs:826:5:
+"TestTee Walk: 54 bodies failing, worst 32.62 mm (recorded 0, 0.00 mm)",
+"Underwear_BoxerBriefs Walk: 20 bodies failing, worst 4.10 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 21 bodies failing, worst 17.39 mm (recorded 0, 0.00 mm)",
+PASS [   8.371s] (14/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_knees_bent
+PASS [   8.543s] (15/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_elbows_bent
+PASS [   7.890s] (16/16) axcenity-player::bin/axcenity-player fit_gate_tests::stylized_clothes_cover_the_stylized_cast
+Summary [  28.730s] 16 tests run: 10 passed, 6 failed, 253 skipped
+
+The held-pose test's first failure (ArmsForward 1.17 degrees from straight ahead) was the new pose's own error: the arm was let down about the forward axis only, and the rest arm leans a little forward. Fixed in the pose (the shortest turn to hanging), not in the test; it passes since.
+
+Review fixes 2 (the face-normal condition in `enclosed`), before the fix:
+cargo nextest run -p axcenity-player -E 'test(/skin_a_loose_garment/)' --no-fail-fast
+
+    FAIL fit_gate_tests::skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out
+    panicked at crates\player\src\fit_gate_tests.rs:1324:5:
+    assertion `left == right` failed: skin under a flipped fold counted inside by -0.020000001
+      left: 0
+     right: 1
+    Summary [0.076s] 1 test run: 0 passed, 1 failed, 271 skipped
+
+Skin 5 mm through the panel, under a fold whose corner normals face out
+but whose triangles face the skin: the smooth normal alone called the
+fold's hit "from inside" and the skin 20 mm inside.
+
+Review fixes 2 (a record's body count must still be earned), before the fix:
+cargo nextest run -p axcenity-player -E 'test(/the_gate_holds_garments/)' --no-fail-fast
+
+    FAIL fit_gate_tests::the_gate_holds_garments_to_their_records
+    panicked at crates\player\src\fit_gate_tests.rs:1237:9:
+    fewer bodies
+    Summary [0.081s] 1 test run: 0 passed, 1 failed, 271 skipped
+
+A record of 2 bodies held with 1 body failing: `check` never caught a
+count left above the measure.
