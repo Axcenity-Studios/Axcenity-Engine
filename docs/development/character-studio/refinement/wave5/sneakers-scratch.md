@@ -89,7 +89,7 @@ The approach is a hand-made method carried out by script: the shoe is modelled b
      - The eyestays run 12.5 mm either side of the foot's middle line, from 40% to 58.5% of its length.
      - The edge rolls over a 5.6 mm padded collar at the heel (5.0 mm at the sides, 2.6 mm at the eyestays) and comes back down inside as the lining.
    - **Tongue:** a padded slab 3.6 mm thick (1.6 mm at its edges), tucked under the vamp and the eyestays.
-   - **Eyelets:** five a side, each a closed ring of 5 segments, at full detail only. The simpler levels have a small closed stud each, so the renderer doesn't simplify the full rings.
+   - **Eyelets:** five a side, each a closed ring of 5 segments, at full detail only. Five segments are too few: in the close crops every eyelet reads as a pentagon (section 6 item 12). The simpler levels have a small closed stud each, so the renderer doesn't simplify the full rings.
    - **Laces:** flat, of 3 sides, criss-crossed over the tongue and the eyestays, tied in a bow with two loops and two ends.
    - **Clearance and symmetry:** the right shoe is the left mirrored. Each shoe's upper is then moved out to at least 4 mm off its own foot, because the body's feet are not exact mirrors.
    - **Simpler levels:** their flat faces are moved out where their middles came within 1.8 mm of the foot.
@@ -162,11 +162,11 @@ The new tests:
   - skinning: only the foot chain on each side, the sole's front half on the foot and toes, the toe box on the toes alone;
   - `Frame_Feminine` carried.
 - **`avatar` `content_states.rs`:** the item is classified as a wave-5 draft.
-- **`player` `sneakers_low_tests.rs`** (10 tests on the 18 cast bodies):
+- **`player` `sneakers_low_tests.rs`** (11 tests: 10 on the 18 cast bodies, and since review fixes 1 one on the 36 body extremes):
   - footwear at rest and in Idle, in the five held poses, and at each simpler level at rest, with no records;
   - the walk's three thirds and the run, against records;
   - motion in Idle, Walk and Run, with no records.
-- **`player` `garment_checks`:** 2 new synthetic tests.
+- **`player` `garment_checks`:** 3 new synthetic tests (2 in the first hand-back, the negative control in review fixes 1).
 
 ## 5. Measurements
 
@@ -188,6 +188,8 @@ The footwear check on the cast (18 bodies):
 - **Masculine bodies:** the inner side at 3.3 cm (about 5 mm).
 - **Both frames:** skin 7.5 to 9.5 cm up at the side of the ankle (2.6 to 6.7 mm).
 - **Why:** the feminine foot is narrower and shorter than the last, and one affine map a shape doesn't give it its own shape. The ankle skin is a cover-rule edge case: skin just above the rolled collar counts as covered at rest because its way out meets the collar's roll, and it moves away from the collar as the ankle turns.
+
+**Correction (review fixes 2): on the shipped build, no stride reading is a foot out of the shoe.** The places above came from a debug build. A one-off dump on the shipped build (Review fixes 2, non-blocking item 2) finds every one of the 1,378 `through` readings, on all 18 bodies and every third frame of the walk and the run, still inside the shoe. Each is a corner 5 to 9 mm inside the shoe whose way out stops meeting the shoe once the ankle turns. The worst, 9.03 mm on the heavyset feminine body, is skin at the outer front of the ankle, 80.7 mm up at 38% of the length. It is 8.10 mm inside the collar's inner face at rest and 8.08 to 8.18 mm inside in the walk, so it does not move. The records stay as they are, because they are what the shared measure reads; the rule is the lead's call.
 
 **Geometry, from asset-quality §2:**
 
@@ -238,12 +240,14 @@ The sheets are in `refinement/wave5/sneakers-scratch/` (1.6 MB, JPG). Each pictu
 | `close-studio-hard.jpg` | 3840 × 2160 crops on both average bodies: toe, collar, laces, heel under studio light, and toe and heel under hard light |
 | `blender-sole-and-views.jpg` | Blender workbench renders of the pair with its colour map: the soles from below (the tread), the back, the side and three-quarter |
 | `body-studio.jpg` | Both average bodies, full body: front, side, back |
+| `walk-stance-wedge.jpg` (review fixes 2) | `feet-low` at `Walk@0.2` and `Walk@0.233` on the heavyset feminine body, with sneakers and bare at the same frames, and `Run@0.167` and `Walk@0.2` on the average masculine body: the sole in mid-stance and with the heel down (item 11) |
+| `eyelets-close.jpg` (review fixes 2) | Crops of the 3840 × 2160 laces (studio) and collar (hard) close-ups on the average masculine body: the eyelets and the lace ends (items 12 and 13) |
 
 **What looks right.** It reads as a plain white leather court sneaker on every body of both frames:
 
 - a cupsole with a visible stitch row and the outsole's edge groove;
 - a stitched toe cap, eyestay facings with double rows and a heel counter seam;
-- metal eyelet rings, criss-cross flat laces and a bow;
+- metal eyelets, criss-cross flat laces and a bow (but the eyelets read as pentagons and the laces end in cut faces at them: items 12 and 13);
 - a padded collar with the lining showing inside, and a slight toe spring.
 
 **Toes and fit.** No skin shows through the shoe at rest in any picture.
@@ -261,7 +265,7 @@ The sheets are in `refinement/wave5/sneakers-scratch/` (1.6 MB, JPG). Each pictu
 6. **The toe box is flat across its top** and slightly pointed in plan view. The references' toe boxes are rounder.
 7. **The leather is near-white and uniform.** The grain reads only under hard light, and the overlays' 0.9 mm steps read weakly at arm's length.
 8. **The walk captures are of limited use.** The fixed foot cameras don't follow the walking character, so one foot leaves the frame. The defects the check finds in the stride (section 5) are not visible in these frames: the stance foot shows no skin through. I didn't capture the push-off frames where the check finds the forefoot's side out.
-9. **The soles weren't captured in the engine.** Captured `knees-bent` lifts the feet out of the foot cameras' frame, so the soles are shown by the Blender render only.
+9. **The soles aren't in the committed sheets from the engine.** Captured `knees-bent` lifts the feet out of the foot cameras' frame, so the sheets show the soles only in the Blender render. The engine does draw them: the reviewer's `Walk@0.1` `feet-back` capture shows the raised foot's tread from behind. A walk frame can supply the in-engine sole picture; none is committed yet.
 10. **The silhouette: a short lacing run set back and a long, low vamp** (found by the review; not named in the first hand-back). It shows in the front and three-quarter views of `rest-studio.jpg` and `rest-hard.jpg` and in the side view of `blender-sole-and-views.jpg`: the shoe reads as a low slip-on or plimsoll with the laces bunched at the ankle, not a court sneaker. Measured from `Shoes_LowSneakers.glb` (left shoe, LOD0, 266.7 mm long), and from the side references on a grid (fractions of the shoe's length from the heel):
 
     | | Ours | 1cafb6c7 (unbranded canvas, true profile) | a24cf57c (Nike trainer, sectioned, true profile) | 9ee9a035 (Coach, three-quarter; perspective lengthens the front) |
@@ -272,6 +276,22 @@ The sheets are in `refinement/wave5/sneakers-scratch/` (1.6 MB, JPG). Each pictu
     | Top of the shoe over the floor at 80% / 90% | 43.8 / 36.4 mm (sole top 22.9 mm at 90%) | about 35 / 29 mm (sole about 20 mm) | about 47 / 41 mm (a running sole) | not measurable (perspective) |
 
     The cause is in `sneakers_low.py`: `EYESTAY_FROM = 0.40` and `THROAT = 0.585` of the foot's length put the eyestays 15 to 20% of the length (40 to 55 mm) behind the references', so the toe box's flat top runs on for 46% of the length. The toe itself is not lower than the unbranded reference's: at 80% and 90% it is 6 to 9 mm higher. That part of the review's reading ("a low toe box") isn't borne out by the measurement. What reads low is the long, flat vamp with no lacing over it. The fix is to move the throat to about 70% of the length, lengthen the eyestays to six or seven eyelets a side, and round the toe box's top (item 6). That means rebuilding the shoe and re-fitting it, and the review asked for no model change in this hand-back, so none was made.
+11. **In mid-stance of the walk and the run, the sole's front disappears and the shoe reads as a flat-toed wedge** (found by the second review; not named before). With the heel down, the heel's sole disappears instead. Seen in `walk-stance-wedge.jpg`: `Walk@0.2` (frame 12) on the heavyset feminine and average masculine bodies, `Run@0.167` (frame 10) on the average masculine body, and the reviewer's `Run@0.2` on the slim feminine body and `Walk@0.5` on the heavyset feminine body. At rest the sole wall is an even band the whole length. Measured on the shipped build (one-off, Review fixes 2, blocking 1; heights over the floor at `y = 0`, where the capture's floor is):
+
+    | Body, frame | Shoe tread at heel / ball / toe | Skin at heel / ball / toe | Toe sole wall over the floor (of its height at rest) |
+    |---|---|---|---|
+    | Feminine heavyset, slim and average, `Walk@12` | −6.9 / −15.4 / −18.8 mm | +2.3 / −13.8 / −14.8 mm | 4.6 to 4.8 mm (of 22.1 to 22.3) |
+    | Masculine average, `Walk@12` | −8.7 / −16.7 / −19.8 mm | −7.0 / −14.5 / −14.4 mm | 4.5 mm (of 22.9) |
+    | Masculine average, `Run@10` | −10.9 / −18.2 / −20.7 mm | −9.3 / −15.8 / −15.3 mm | 4.0 mm (of 22.9) |
+    | Feminine slim and average, `Run@10` | −8.0 / −15.9 / −18.6 mm | +1.3 / −14.0 / −14.7 mm | 5.3 mm |
+    | Feminine (all three), `Walk@14`, heel down | −31.7 / −7.8 / +4.8 mm | −17.3 / −3.7 / +8.2 mm | the heel's 30 mm wall is buried |
+    | Masculine average, `Walk@14` and `Run@12`, heel down | −38.7 and −39.8 mm at the heel | −33.5 and −31.0 mm at the heel | the heel's wall is buried |
+
+    **Cause.** The clip plants the bare foot under the floor: the toes' skin is 14 to 16 mm under it in mid-stance, and the heel's 17 to 34 mm under it with the heel down. The bare foot shows it too. At `Walk@0.2` only the toenails' tips are above the floor, and at `Walk@0.233` the heel's round is cut flat (`walk-stance-wedge.jpg`, right column). A bare foot hides it because the floor takes the bottom of a soft shape. A shoe's sole wall is a straight band, so the floor cuts it to a wedge. The shoe makes it worse by its own depth: its tread sits 3 to 5 mm under the skin at the toe. The sole itself doesn't bend: the toe band's top-to-bottom height is 23.4 to 24.6 mm in mid-stance against 22.1 to 22.9 mm at rest. That is a little more, from the band's tilt, not less. So the shoe's weights (the heel's shin share) are not the cause. The fix is outside this item: the clips' foot plant, or a foot-plant adjustment that lifts the body by the sole's thickness when shoes are worn. Neither is in this task's scope (no fit, render or Studio UI change; the clips are shared). No check measures it: `foot_report` measures the tread at rest only, so every walk report prints the rest tread. A tread-in-motion measure (the shoe's lowest point under the floor per frame, against the bare foot's) would be a new shared measure for the lead's ruling.
+12. **The eyelets read as pentagons in the close crops** (found by the second review; section 2 called them rings). Each is a closed ring of 5 segments, and at 3840 × 2160 every one of the 10 a shoe shows five straight sides and five corners (`eyelets-close.jpg`). Cost of rounder rings, against the 4,000-triangle budget for a pair (LOD0 is 3,940 today; the eyelets take 600 of them, 30 an eyelet across 20 eyelets): 6 segments make 4,060, which is over by 60, and 8 segments make 4,300, which is over by 300. 8 segments with a two-ring profile (32 triangles an eyelet) make 3,980, which is in budget. Taking 300 triangles from the laces (780 today) would also do it.
+13. **The laces end in cut faces at the eyelets** (seen in review fixes 2, in the same crops). Each criss-cross run stops at the eyelet ring's side in an angled flat cut. It doesn't pass into the hole and under the eyestay, so the open ends show at every eyelet. In the laces close-up, the bow's two ends and the top runs pile up as thick cords over the top two pairs of eyelets (item 3).
+14. **The collar's top line shows corners** in the side close-up under hard light (`close-studio-hard.jpg`, collar): a run of straight segments round the heel and under the ankle, where the references' collars curve smoothly. This is the same lack of geometry as item 1.
+15. **Evidence the sheets still lack** (the second review): no review under the warm, cool and outdoor lights (asset-quality §3 Materials and §2 Shading ask for all four; only studio and hard were captured); no LOD sheet (§2 LODs); and the shoe's inner side appears only in the reviewer's `Walk@0.2` `feet-side` capture and in `walk-stance-wedge.jpg`, bottom right, not in the rest sheets. The reviewer saw no defect on the inner side beyond the wedge.
 
 ## 6a. Decision 13: "correct footwear silhouette, clean toe construction and proper foot fit"
 
@@ -279,9 +299,9 @@ The first hand-back never judged this row. Each criterion, against the evidence 
 
 | Criterion | Met? | Why |
 |---|---|---|
-| Correct footwear silhouette | **No** | The lacing is short and set back (eyelets at 34% to 54% of the length against 41% to 65% on the unbranded side reference), and the vamp is long (46% of the length against 24% to 29%), so it reads as a slip-on or plimsoll (section 6 item 10). The sole's outline is faceted at the toe and the heel (item 1), the tongue's top stands as a flat plate (item 2), the collar's padding doesn't show (item 5), and the heel counter is tall and upright. |
-| Clean toe construction | **No** | The toe box is flat across its top and slightly pointed in plan (item 6), its sole outline faceted (item 1). The eyestay facing's edge zig-zags at the throat (item 4), and the toe cap is a baked overlay, not a panel. What does hold: the toe box is rigid, bending 0.00 mm in every pose, and no toe shows through at rest. |
-| Proper foot fit | **No** | The cast holds the feet at rest, in Idle and in the held poses. In the walk and the run, foot corners leave the shoe on all 18 cast bodies, up to 9.1 mm. On the body extremes the tread tilts and sinks up to 9.1 mm on the shortest and tallest bodies, and a corner leaves the shoe on the slim feminine body in Idle and with the knees bent, 5.69 mm (review fixes 1). |
+| Correct footwear silhouette | **No** | The lacing is short and set back (eyelets at 34% to 54% of the length against 41% to 65% on the unbranded side reference), and the vamp is long (46% of the length against 24% to 29%), so it reads as a slip-on or plimsoll (section 6 item 10). The sole's outline is faceted at the toe and the heel (item 1), the tongue's top stands as a flat plate (item 2), the collar's padding doesn't show (item 5), and the heel counter is tall and upright. In motion it is worse: in mid-stance of the walk and the run the toe's sole wall sinks to 4 to 5 mm over the floor (of 22 to 23 mm), and the shoe reads as a flat-toed wedge (item 11). |
+| Clean toe construction | **No** | The toe box is flat across its top and slightly pointed in plan (item 6), its sole outline faceted (item 1). The eyestay facing's edge zig-zags at the throat (item 4), and the toe cap is a baked overlay, not a panel. The eyelets read as pentagons and the laces end in cut faces at them (items 12 and 13). What does hold: the toe box is rigid, bending 0.00 mm in every pose, and no toe shows through at rest. |
+| Proper foot fit | **No** | The cast holds the feet at rest, in Idle and in the held poses. In the walk and the run, foot corners leave the shoe on all 18 cast bodies, up to 9.1 mm. On the body extremes the tread tilts and sinks up to 9.1 mm on the shortest and tallest bodies, and a corner leaves the shoe on the slim feminine body in Idle and with the knees bent, 5.69 mm (review fixes 1). Two corrections from review fixes 2. The stride readings are corners still inside the shoe, so they are not a foot out (section 5). The foot sinks 15 to 40 mm under the floor in the clips' stance, burying the sole's toe or heel (item 11). |
 
 ## 7. Files
 
@@ -318,7 +338,7 @@ No shared contract changed. Avatar schemas, `architecture.md` and the ADRs are u
 
 ## 8. Open issues
 
-1. **The stride.** Foot corners leave the shoe in the walk and the run on all 18 cast bodies, up to 9.1 mm (recorded). The likely next steps:
+1. **The stride.** The check reads foot corners out of the shoe in the walk and the run on all 18 cast bodies, up to 9.1 mm (recorded). Review fixes 2 found that every one of these readings is a corner still inside the shoe, 5 to 9 mm off its inner faces, whose way out stops meeting the shoe as the ankle turns (section 5, correction). Before that was known, the likely next steps were:
    - a feminine last of its own (a second build over the feminine foot, carried as the `Frame_Feminine` shape), not one affine map;
    - more room at the inner heel and the side of the ball;
    - for the collar-edge cases, a rule for the lead: a corner whose way out enters the shoe's collar from outside is not covered.
@@ -331,6 +351,9 @@ No shared contract changed. Avatar schemas, `architecture.md` and the ADRs are u
 8. **The references** (section 1): seven of the 12 used to model the shoe are branded products (proportions or construction only were taken), and no unbranded rear view was found. The lead's ruling is needed: keep them as disclosed, or have the set completed.
 9. **The body extremes** (review fixes 1): the tread tilts and sinks up to 9.1 mm on the shortest and tallest bodies, and a corner leaves the shoe on the slim feminine body (5.69 mm), recorded in `EXTREME_RECORDS`. The shoe follows the foot's size by one affine map per shape, which doesn't keep the tread flat when the foot's length changes.
 10. **The cover rule's own reach** (found in review fixes 1, not changed): the shared cover rule (`foot_cover`) counts a corner as covered when its way out meets *any* shoe face within 4 cm, the pair's other shoe included. A corner that left its own shoe facing the other foot, nearer than 4 cm in the stride, would still count as covered. `exposed` now ignores the other shoe (review fixes 1); applying the same side rule to the cover rule is the lead's call, since it changes `through` for every shoe.
+11. **The sole sinks under the floor in the stride** (section 6 item 11). The clips plant the bare foot 14 to 16 mm under the floor at the toes in mid-stance, and 17 to 34 mm at the heel with the heel down. The shoe's tread follows 3 to 5 mm lower, so in mid-stance 4 to 5 mm of the toe's 22 to 23 mm sole wall shows, and with the heel down the heel's wall is buried. The fix is the clips' foot plant, or a lift by the sole's thickness for shod feet. Either is outside this item. No check measures it (the tread is judged at rest only).
+12. **The eyelets read as pentagons** (section 6 item 12). Rounder rings need 360 more triangles at 8 segments, or a two-ring profile to stay within 4,000. **The laces end in cut faces at the eyelets** (item 13).
+13. **The cover rule counts corners still inside the shoe as `through`** (review fixes 2, non-blocking item 2). A corner followed from rest whose way out no longer meets the shoe within 4 cm away from a hem is counted out, at its distance to the shoe, even when it is still on the inside of the shoe's faces. That produces all of item 1's stride readings. A rule for the lead: count a followed corner as through only when it is on the outside of its nearest shoe face (that face facing the way the skin does, the corner in front of it), the same test `exposed` uses. It changes `through` for every shoe, so it needs a synthetic test that keeps a true foot-through caught, and the lead's ruling.
 
 ## 9. For the lead at merge
 
@@ -421,6 +444,78 @@ Against the references, the lacing ends at 54% where they end at 71% to 80%, and
 | The rest and held-pose tests over the 36 body extremes, one-off, before `EXTREME_RECORDS` | 6 run: 4 passed, 2 failed (the tread on six bodies, a corner out on one) |
 | `cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/sneakers_low\|footwear\|hold_the_feet\|garment_checks\|wardrobe_tests\|tee_crew\|fit_gate\|content_state\|character_capture/)'` | 79 run, 79 passed (8 slow), no ABORT |
 | `cargo nextest run -p axcenity-avatar -p axcenity-player --no-fail-fast` | 494 run, 494 passed (26 slow), 23 skipped; no FAIL, ABORT or TIMEOUT |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all -- --check` | clean |
+| `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings (staleness notes on pages this branch didn't touch) |
+
+## Review fixes 2
+
+The second review found two unreported visible defects (blocking) and eight non-blocking points. Both defects are now reported and measured. The item stays Draft and is not ready for sign-off. The model is unchanged: `Shoes_LowSneakers.glb` and its files are as they were, as the review asked. Nothing in the checks changed. The only code change is a comment on the stride records in `sneakers_low_tests.rs`.
+
+### Blocking 1: the sole sinks in mid-stance and the shoe reads as a wedge (reported and measured)
+
+The review is right. Its cause is not the shoe's build. It is now section 6 item 11, in section 6a's silhouette and foot-fit rows, section 8 item 11, Known-Limitations and `testing.md`.
+
+- **Seen.** I captured `feet-low`, `feet-side` and `feet-front` at `Walk@0.2`, `Walk@0.233` and `Run@0.167` under studio and hard light. Bodies: the heavyset feminine and average masculine bodies with the sneakers, and the heavyset feminine body bare at the same frames (`walk-stance-wedge.jpg`). At `Walk@0.2` the planted shoe's sole wall runs from its full height at the heel to a sliver at the toe. At `Walk@0.233` it is the other way round: the heel's wall is gone and the toe's tread shows. `Run@0.167` on the masculine body is the same as `Walk@0.2`.
+- **Measured.** A one-off test plays the clip on four bodies (heavyset, slim and average feminine; average masculine) and prints each shoe's tread and the skin at the heel, ball and toe for each frame. It is not committed; its source and output are in `axcenity-w5-sources/sneakers-scratch/rf2/diagnostics/`. Every walk frame from 2 to 44 in steps of 2 was printed, and every run frame from 2 to 35. In mid-stance (`Walk@12`, `Run@10`) the tread is 18.6 to 20.7 mm under the floor at the toe. The skin there is 14.4 to 15.3 mm under it. 4.0 to 5.3 mm of the toe's 22 to 23 mm sole wall shows. With the heel down (`Walk@14`, `Run@12`) the heel tread is 31.7 to 39.8 mm under the floor, and the skin 17.3 to 33.5 mm under it. The full table is in section 6 item 11.
+- **Cause.** The Walk and Run clips plant the bare foot under the floor. The bare foot shows it too: at `Walk@0.2` only the toenails' tips are above the floor, and at `Walk@0.233` the heel's round is cut flat. The review read the bare foot as standing normally. On the same frame I see it sunk, but a soft shape cut by the floor reads far less wrong than a straight sole band. The shoe adds 3 to 5 mm of its own depth under the skin. Two possible causes are ruled out:
+  - **The sole bending:** its toe band's height is 23.4 to 24.6 mm in mid-stance against 22.1 to 22.9 mm at rest, so it doesn't shrink.
+  - **The heel's shin share:** it would bend the sole, which doesn't happen.
+- **Why it isn't fixed here.** The fix is the clips' foot plant, or a lift by the sole's thickness for shod feet. Both are outside this task (no fit, render or Studio UI change; the clips are shared by every character).
+- **What no check sees.** `foot_report` judges the tread at rest only. A tread-in-motion measure would be a new shared measure for the lead's ruling: the shoe's lowest point against the floor per frame, judged against the bare foot's own sink.
+
+### Blocking 2: the eyelets read as pentagons (reported)
+
+Confirmed in the 3840 × 2160 laces and collar close-ups: every eyelet shows five straight sides (`eyelets-close.jpg`). Now in section 6 item 12, section 2, section 6a's toe-construction row, section 8 item 12 and Known-Limitations. The triangle cost, from the GLB:
+
+- **Today:** the eyelets are 600 of LOD0's 3,940 triangles (30 an eyelet, 20 eyelets).
+- **6 segments:** 4,060, which is over budget.
+- **8 segments:** 4,300, which is over by 300.
+- **8 segments with a two-ring profile:** 3,980, which is within budget. Taking the 300 from the laces' 780 would also work.
+
+Looking at the same crops found two defects the reviews didn't name, now items 13 and 14:
+
+- **Item 13:** each lace run ends at its eyelet in an angled flat cut instead of passing into the hole.
+- **Item 14:** the collar's top line shows corners under hard light.
+
+### Non-blocking items
+
+1. **Earlier blocking items:** the review confirms both are fixed. No change.
+2. **The 9.03 mm worst, located on the shipped build.** It is not a stride defect. The dump traced it to one corner of the heavyset feminine body's left foot. It is skin at the outer front of the ankle, 80.7 mm above the floor at 38% of the shoe's length, its normal pointing out and up.
+   - **At rest:** the nearest shoe face is 8.96 mm from it, and the corner is 8.10 mm inside that face (the collar's inner side). Its way out meets the shoe 11.7 mm away, so the cover rule follows it.
+   - **In the walk:** at `Walk@2` and `Walk@12` it is 9.03 mm from the shoe and 8.18 and 8.08 mm inside, so it hasn't moved relative to the shoe. Its way out now passes over the collar's top and meets nothing, so the rule counts it as through at 9.03 mm. That is why the reading is nearly constant across the stride and absent in Idle.
+   - **The average masculine body's worst (5.0 mm)** is the same kind: skin on the inner side of the heel, 34.7 mm up, 4.8 mm inside the shoe at rest and 4.4 mm inside at `Walk@12`. Its way out meets a triangle at the upper's lasted edge, which the cover rule skips as a hem.
+   - **All of them:** a second dump classed all 1,378 `through` readings on the 18 cast bodies by their nearest shoe face. That is every third frame of the walk and the run. Every reading is still inside the shoe: either in front of a face that faces the skin (the lining or an inner wall), or behind a face that faces the way the skin does (under the single-layer upper). None is on the outside of an outer face, the only case that is a foot out.
+   - **Caveat:** this classing is the dump's, not a committed measure. The captures agree: no skin shows through in any walk frame I or the reviewer captured.
+   - **What changed:** section 5 (the old debug-build places are corrected), section 6a, section 8 items 1 and 13, the records' comment, `testing.md` and Known-Limitations. The records stay: they are what the shared measure reads, and only the lead can rule on the rule. Section 8 item 13 proposes a rule, which would need its synthetic test.
+3. **Stale details, fixed:**
+   - `testing.md`'s `exposed` text now says only the same shoe counts over a corner, and names the negative-control test.
+   - Section 4 now says 11 tests and 3 synthetic tests.
+   - `references/clothing/README.md`, row 1cafb6c7, now links to section 6 item 10 of this hand-back.
+4. **"The soles weren't captured in the engine":** reworded (section 6 item 9). The engine draws them in walk frames, as the reviewer's `Walk@0.1` `feet-back` shows. The committed sheets still show the sole only in the Blender render.
+5. **Evidence gaps:** stated in section 6 item 15. There is no four-light review (warm, cool and outdoor are missing), no LOD sheet, and the inner side isn't in the rest sheets. `walk-stance-wedge.jpg` adds walk frames, both with sneakers and bare.
+6. **No TANGENT attribute:** the same as every realistic clothing item, as the review says. No change.
+7. **The review's mutation of `exposed`:** it confirms the measure and its records are live. No change.
+8. **Scope:** unchanged. No fit algorithm, hiding rule, render, Studio UI or clip change.
+
+### Files changed in review fixes 2
+
+- `docs/development/character-studio/refinement/wave5/sneakers-scratch.md`: sections 2, 4, 5, 6, 6a and 8, and this section.
+- `docs/development/character-studio/refinement/wave5/sneakers-scratch/walk-stance-wedge.jpg` and `eyelets-close.jpg` (new sheets; the folder is now 2.0 MB).
+- `crates/player/src/sneakers_low_tests.rs`: the stride records' comment only.
+- `docs/development/character-studio/testing.md`, `docs/development/character-studio/references/clothing/README.md` §10 (one link), `wiki/Roadmap/Known-Limitations.md`.
+
+### Tests run in review fixes 2
+
+No behaviour changed, so there is no red run. The one-off dumps were run on the release build with `cargo test -p axcenity-player --release -- --ignored <name> --nocapture` and removed from the source afterwards.
+
+| Command | Result |
+|---|---|
+| One-off: the sole in the stride (4 bodies; walk frames 2 to 44 in steps of 2, run frames 2 to 35) | 1 passed; the numbers in section 6 item 11 |
+| One-off: the worst corners at rest, `Walk@2` and `Walk@12` | 1 passed; the numbers in item 2 above |
+| One-off: every stride `through` reading on the 18 cast bodies, classed by its nearest face | 1 passed; 1,378 inside, 0 out |
+| Release captures (`capture_characters`): `Walk@0.2`, `Walk@0.233` and `Run@0.167`, `feet-low`/`feet-side`/`feet-front`, studio and hard, heavyset feminine (sneakers and bare) and average masculine | written outside the repo in `axcenity-w5-sources/sneakers-scratch/rf2/` |
+| `cargo nextest run -p axcenity-avatar -p axcenity-player --no-fail-fast` | 494 run, 494 passed (19 slow), 23 skipped; no FAIL, ABORT or TIMEOUT |
 | `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
 | `cargo fmt --all -- --check` | clean |
 | `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings (staleness notes on pages this branch didn't touch) |

@@ -311,7 +311,13 @@ fn the_sneakers_stay_steady_in_the_run() {
 // the collar that the cover rule counts as covered at rest (its way out
 // meets the collar's roll) moves away from the collar as the ankle turns.
 // The worst, 9.0 mm, is on the heavyset feminine body, in every third of
-// the stride and in the run.
+// the stride and in the run. Review fixes 2 corrected this: a one-off dump
+// on the shipped build found every one of these readings (1,378 over the
+// cast, every third frame) still inside the shoe, 5 to 9 mm off its inner
+// faces, its way out no longer meeting the shoe as the ankle turns (the
+// worst is skin at the outer front of the ankle, 8.1 mm inside the
+// collar at rest and in the walk alike). The records hold what the shared
+// cover rule reads; whether it should read them is the lead's ruling.
 const WALK_RECORDS: [Record; 1] = [Record {
     what: "Shoes_LowSneakers through",
     case: "Walk",
