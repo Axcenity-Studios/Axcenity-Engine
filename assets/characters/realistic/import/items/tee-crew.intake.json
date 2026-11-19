@@ -63,10 +63,16 @@
         1.08,
         1.16
       ],
-      "least_ease": 0.08
+      "least_ease": 0.08,
+      "sleeves": {
+        "least_ease": 0.04
+      }
     },
     "drape": {
       "pin_top": 0.04,
+      "pin_band": 0.025,
+      "smooth_push": 30,
+      "relax_edges": 6,
       "start_clearance": 0.004,
       "settings": {
         "frames": 60,

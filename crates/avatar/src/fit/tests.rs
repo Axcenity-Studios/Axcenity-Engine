@@ -826,3 +826,110 @@ fn a_loose_garment_keeps_its_ease_when_the_body_changes() {
         .fold(0.0f32, f32::max);
     assert!(most > 0.025, "{most}");
 }
+
+/// Review fixes 1: loose cloth's weights are smoothed more than cloth on
+/// the skin (`LOOSE_WEIGHT_ROUNDS`), so cloth hanging across a split
+/// between two bones (the armpit band, the hem between the legs) moves
+/// with both sides; cloth on the skin keeps the skin's weights.
+#[test]
+fn a_loose_garments_weights_mix_across_a_bone_split_and_cloth_on_the_skin_keeps_its_own() {
+    let body = tube_body();
+    let draped = FitOptions {
+        drape: true,
+        ..options()
+    };
+    // The tube's split: all Hips below 0.4 m, all Chest above 0.6 m.
+    let chest = |fitted: &Fitted| -> Vec<(f32, f32)> {
+        fitted
+            .garment
+            .positions()
+            .iter()
+            .zip(fitted.joints.iter().zip(&fitted.weights))
+            .map(|(p, (j, w))| {
+                let share: f32 = j
+                    .iter()
+                    .zip(w)
+                    .filter(|(j, _)| **j == 1)
+                    .map(|(_, w)| w)
+                    .sum();
+                (p.y, share)
+            })
+            .collect()
+    };
+    // Just past each end of the split, how far a corner's weights are
+    // from its own side's (Hips below, Chest above).
+    let mixed = |rows: &[(f32, f32)]| -> f32 {
+        rows.iter()
+            .filter(|(y, _)| (0.36..0.39).contains(y) || (0.61..0.64).contains(y))
+            .map(|(y, chest)| if *y < 0.5 { *chest } else { 1.0 - chest })
+            .fold(0.0f32, f32::max)
+    };
+    let loose_draped = fit_garment(&body, &sleeve(0.19, false), &draped).unwrap();
+    let loose_plain = fit_garment(&body, &sleeve(0.19, false), &options()).unwrap();
+    let (with, without) = (mixed(&chest(&loose_draped)), mixed(&chest(&loose_plain)));
+    // Measured: 1.7% of the other bone a ring past the split with drape,
+    // 0.12% without (the 2 rounds every garment gets).
+    assert!(
+        with > 0.01 && with > 5.0 * without,
+        "loose cloth's weights mixed {with} with drape against {without} without"
+    );
+    // On the skin: the same weights with drape as without.
+    let tight_draped = fit_garment(&body, &sleeve(0.153, false), &draped).unwrap();
+    let tight_plain = fit_garment(&body, &sleeve(0.153, false), &options()).unwrap();
+    for ((_, a), (_, b)) in chest(&tight_draped).iter().zip(&chest(&tight_plain)) {
+        assert!(
+            (a - b).abs() < 1e-4,
+            "cloth on the skin changed weights: {a} against {b}"
+        );
+    }
+}
+
+/// Review fixes 1: loose cloth takes in a bulge of the skin only as far as
+/// its ease allows (its distance off the skin less `ON_SKIN`); a bulge
+/// bigger than that carries the cloth out with it, so it stays about
+/// `ON_SKIN` off the bulged skin, not drawn down onto it at the margin.
+#[test]
+fn a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it() {
+    let mut body = tube_body();
+    // A 5 cm bulge (the 3 cm bump's shape, 5/3 as high) under a sleeve with
+    // 3 cm of ease: its allowance is 2 cm, so it must move 3 cm out.
+    let radial = |p: &Vec3| Vec3::new(p.x, 0.0, p.z).normalize_or_zero();
+    let big: Vec<Vec3> = body
+        .positions
+        .iter()
+        .map(|p| radial(p) * bump(p.y, p.z.atan2(p.x)) * (5.0 / 3.0))
+        .collect();
+    body.shapes.push(BodyShape {
+        name: "Corrective_BigBump".to_owned(),
+        corners: (0..body.positions.len() as u32).collect(),
+        offsets: big,
+        normals: vec![Vec3::ZERO; body.positions.len()],
+    });
+    let draped = FitOptions {
+        drape: true,
+        shapes: vec!["Fat".to_owned(), "Corrective_BigBump".to_owned()],
+        extremes: Vec::new(),
+        ..options()
+    };
+    let fitted = fit_garment(&body, &sleeve(0.18, false), &draped).unwrap();
+    let rest = fitted.garment.positions();
+    let moved: Vec<Vec3> = rest
+        .iter()
+        .zip(&fitted.shapes[1].offsets)
+        .map(|(p, o)| *p + *o)
+        .collect();
+    let surface = body.surface(&[("Corrective_BigBump".to_owned(), 1.0)]);
+    // Over the bulge's top (within 3 cm of its height, facing it).
+    let over: Vec<Vec3> = moved
+        .iter()
+        .zip(&rest)
+        .filter(|(_, p)| (p.y - 0.5).abs() < 0.03 && p.x > 0.17)
+        .map(|(m, _)| *m)
+        .collect();
+    assert!(!over.is_empty());
+    let clear = least(&clearances(&surface, &over));
+    assert!(
+        clear > 0.008,
+        "loose cloth over a bulge bigger than its ease is {clear} m off it"
+    );
+}

@@ -344,6 +344,8 @@ def changes_of(spec, work):
         out.append("posed to the realistic body's rest pose")
     if conformed.get("grade", {}).get("scale", 1.0) != 1.0:
         out.append(f"graded to the realistic body by its girths (up to x{conformed['grade']['scale']} across)")
+    for side, sleeve in sorted(conformed.get("grade", {}).get("sleeves", {}).items()):
+        out.append(f"its {side.lower()} sleeve graded round the arm (up to x{sleeve['scale']})")
     if "drape" in conformed:
         out.append("draped onto the realistic body by cloth simulation, hanging from its neck and shoulders")
     refined = report("refined.json") if os.path.exists(os.path.join(work, "refined.npz")) else {}

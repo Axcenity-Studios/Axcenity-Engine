@@ -54,3 +54,55 @@ AttributeError: module 'conform' has no attribute 'drape'
 AttributeError: module 'conform' has no attribute 'grade'
 Ran 3 tests in 0.002s
 FAILED (errors=3)
+
+Review fixes 1
+==============
+
+5. The intake's sleeve grade, the neck held at the highest height's grade, a height's own
+   ease, the smoothed push-out and the pinned neck band (conform.py), the tests written
+   first and run against the committed conform.py (a4d9f29c) (Blender's Python):
+
+python -I assets/characters/realistic/import/test_intake.py GradeReviewTest
+
+ERROR: test_a_height_can_ask_its_own_ease (__main__.GradeReviewTest.test_a_height_can_ask_its_own_ease)
+ValueError: operands could not be broadcast together with shapes (528,) (2,) 
+ERROR: test_what_is_left_to_push_out_moves_as_one_smooth_patch (__main__.GradeReviewTest.test_what_is_left_to_push_out_moves_as_one_smooth_patch)
+TypeError: push_out() got an unexpected keyword argument 'rounds'
+FAIL: test_a_small_sleeve_is_graded_round_its_arm (__main__.GradeReviewTest.test_a_small_sleeve_is_graded_round_its_arm)
+AssertionError: np.float64(0.03210050506338831) not greater than 0.055729577951308236
+FAIL: test_the_neck_keeps_the_grade_of_the_highest_height (__main__.GradeReviewTest.test_the_neck_keeps_the_grade_of_the_highest_height)
+AssertionError: 0.8790185940913677 != 1.002477796076938 within 0.006 delta (0.12345920198557025 difference)
+FAIL: test_the_whole_neck_band_is_pinned_where_it_was_graded (__main__.GradeReviewTest.test_the_whole_neck_band_is_pinned_where_it_was_graded)
+AssertionError: 
+Ran 5 tests in 0.630s
+FAILED (failures=3, errors=2)
+
+(The first red run used a body tube without rings at the graded heights; the fixtures
+were corrected to rings=11 and the sleeve test to 'at least its ease' before the green,
+and the run above is the corrected tests against the old conform.py.)
+
+6. The engine fit's drape mechanisms the review found untested (crates/avatar/src/fit/
+   transfer.rs), each new test run with its mechanism removed, then restored:
+
+LOOSE_WEIGHT_ROUNDS set to 0; cargo nextest run -p axcenity-avatar --no-fail-fast
+
+        FAIL [   0.414s] ( 66/209) axcenity-avatar fit::tests::a_loose_garments_weights_mix_across_a_bone_split_and_cloth_on_the_skin_keeps_its_own
+    loose cloth's weights mixed 0.001193583 with drape against 0.001193583 without
+     Summary [  26.961s] 209 tests run: 208 passed, 1 failed, 1 skipped
+        FAIL [   0.414s] ( 66/209) axcenity-avatar fit::tests::a_loose_garments_weights_mix_across_a_bone_split_and_cloth_on_the_skin_keeps_its_own
+
+The bulge clamp disabled ('if short > 0.0 && false'); cargo nextest run -p axcenity-avatar --no-fail-fast
+
+        FAIL [   0.119s] (  8/209) axcenity-avatar fit::tests::a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it
+    loose cloth over a bulge bigger than its ease is 0.002000004 m off it
+     Summary [  30.686s] 209 tests run: 208 passed (1 slow), 1 failed, 1 skipped
+        FAIL [   0.119s] (  8/209) axcenity-avatar fit::tests::a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it
+
+7. The free hems relaxed along themselves (conform.py relax_edges), written first:
+
+python -I assets/characters/realistic/import/test_intake.py GradeReviewTest.test_a_jagged_free_edge_is_relaxed_along_itself
+
+ERROR: test_a_jagged_free_edge_is_relaxed_along_itself (__main__.GradeReviewTest.test_a_jagged_free_edge_is_relaxed_along_itself)
+AttributeError: module 'conform' has no attribute 'relax_edges'
+Ran 1 test in 0.001s
+FAILED (errors=1)

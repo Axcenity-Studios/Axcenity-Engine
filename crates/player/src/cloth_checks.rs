@@ -1755,51 +1755,51 @@ mod records {
     ];
 
     pub const LICENSED_REST: [ClothRecord; 1] = [
-        rec("Shirt_TeeCrew", "rest", Kind::Hanging, 54, 3603, 0.0485),
+        rec("Shirt_TeeCrew", "rest", Kind::Hanging, 54, 3533, 0.0435),
     ];
     pub const LICENSED_IDLE: [ClothRecord; 3] = [
-        rec("Shirt_TeeCrew", "idle", Kind::Folded, 54, 3154, 179.5748),
-        rec("Shirt_TeeCrew", "idle", Kind::Hanging, 54, 3745, 0.0508),
-        rec("Shirt_TeeCrew", "idle", Kind::Stretched, 54, 4966, 19.7181),
+        rec("Shirt_TeeCrew", "idle", Kind::Folded, 54, 3044, 179.8587),
+        rec("Shirt_TeeCrew", "idle", Kind::Hanging, 54, 3974, 0.0458),
+        rec("Shirt_TeeCrew", "idle", Kind::Stretched, 54, 7354, 14.3378),
     ];
     pub const LICENSED_T_POSE: [ClothRecord; 3] = [
-        rec("Shirt_TeeCrew", "TPose", Kind::Folded, 54, 2479, 178.8014),
-        rec("Shirt_TeeCrew", "TPose", Kind::Hanging, 54, 3399, 0.0481),
-        rec("Shirt_TeeCrew", "TPose", Kind::Stretched, 54, 6685, 25.2103),
+        rec("Shirt_TeeCrew", "TPose", Kind::Folded, 54, 2729, 178.6898),
+        rec("Shirt_TeeCrew", "TPose", Kind::Hanging, 54, 3452, 0.0435),
+        rec("Shirt_TeeCrew", "TPose", Kind::Stretched, 54, 8533, 13.56),
     ];
     pub const LICENSED_ARMS_RAISED: [ClothRecord; 3] = [
-        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Folded, 54, 4723, 179.4328),
-        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Hanging, 54, 3823, 0.0481),
-        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Stretched, 54, 25387, 59.9451),
+        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Folded, 54, 5511, 179.8972),
+        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Hanging, 54, 4058, 0.0435),
+        rec("Shirt_TeeCrew", "ArmsRaised", Kind::Stretched, 54, 25274, 25.7453),
     ];
     pub const LICENSED_ARMS_FORWARD: [ClothRecord; 3] = [
-        rec("Shirt_TeeCrew", "ArmsForward", Kind::Folded, 54, 5588, 178.8418),
-        rec("Shirt_TeeCrew", "ArmsForward", Kind::Hanging, 54, 4950, 0.0495),
-        rec("Shirt_TeeCrew", "ArmsForward", Kind::Stretched, 54, 32446, 59.1596),
+        rec("Shirt_TeeCrew", "ArmsForward", Kind::Folded, 54, 6541, 179.8022),
+        rec("Shirt_TeeCrew", "ArmsForward", Kind::Hanging, 54, 4631, 0.0458),
+        rec("Shirt_TeeCrew", "ArmsForward", Kind::Stretched, 54, 32879, 31.7672),
     ];
     pub const LICENSED_ELBOWS_BENT: [ClothRecord; 3] = [
-        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Folded, 1, 1, 97.9423),
-        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Hanging, 54, 3571, 0.0484),
-        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Stretched, 22, 50, 1.7587),
+        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Folded, 2, 2, 93.1256),
+        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Hanging, 54, 3560, 0.0435),
+        rec("Shirt_TeeCrew", "ElbowsBent", Kind::Stretched, 54, 1418, 5.8921),
     ];
     pub const LICENSED_KNEES_BENT: [ClothRecord; 1] = [
-        rec("Shirt_TeeCrew", "KneesBent", Kind::Hanging, 16, 222, 0.0358),
+        rec("Shirt_TeeCrew", "KneesBent", Kind::Hanging, 1, 14, 0.0314),
     ];
     pub const LICENSED_WALK: [&[ClothRecord]; 3] = [
         &[
-            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1654, 179.6666),
-            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 1063, 0.0646),
-            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 5327, 29.2661),
+            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1690, 179.2202),
+            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 937, 0.0638),
+            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 6257, 14.3494),
         ],
         &[
-            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1356, 179.8506),
-            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 463, 0.0651),
-            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 4972, 26.8576),
+            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1487, 179.6643),
+            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 440, 0.07),
+            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 6216, 16.2222),
         ],
         &[
-            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1662, 179.4232),
-            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 1149, 0.0642),
-            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 5360, 29.5901),
+            rec("Shirt_TeeCrew", "Walk", Kind::Folded, 18, 1725, 179.7368),
+            rec("Shirt_TeeCrew", "Walk", Kind::Hanging, 18, 866, 0.0638),
+            rec("Shirt_TeeCrew", "Walk", Kind::Stretched, 18, 6357, 14.6612),
         ],
     ];
 
