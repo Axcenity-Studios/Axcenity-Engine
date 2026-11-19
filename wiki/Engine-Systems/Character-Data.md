@@ -4,9 +4,9 @@ type: system
 status: current
 implementation: partial
 crates: [avatar]
-source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, crates/avatar/src/content_state.rs, crates/avatar/src/skin.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
+source: [crates/avatar/src/lib.rs, crates/avatar/src/description.rs, crates/avatar/src/manifest.rs, crates/avatar/src/item.rs, crates/avatar/src/provenance.rs, crates/avatar/src/catalogue.rs, crates/avatar/src/library.rs, crates/avatar/src/material.rs, crates/avatar/src/migrate.rs, crates/avatar/src/resolve.rs, crates/avatar/src/model_check.rs, crates/avatar/src/preset.rs, crates/avatar/src/randomize.rs, crates/avatar/src/content_state.rs, crates/avatar/src/skin.rs, assets/characters/humanoid/manifests.py, assets/characters/realistic/manifests.py, assets/characters/realistic/anchors.py, assets/characters/realistic/presets.py, assets/characters/catalogue.py]
 docs: [docs/development/character-studio/architecture.md, crates/avatar/CLAUDE.md]
-verified: 2026-11-17
+verified: 2026-11-18
 verified_commit: 5b650d5d
 tags: [system/characters, formats]
 ---
@@ -46,6 +46,10 @@ The refinement's shared contracts (plan section 11.3, [ADR-0040](../Architecture
 - **Presets**: a format 2 description with a `preset` block, listed in the catalogue's `presets`; `apply_preset` sets only what its kind owns (`body`, `face`, `hair`, `outfit`, `skin`, `character`). The realistic package ships 29 (`realistic/presets/`, written by `presets.py`).
 - **Randomize**: `randomize(&Description, &Scope, locks, seed, &Library)`, deterministic, inside `random`, with the base's constraints and only compatible items, and since wave 5 only Production ones (below).
 - **Content states** (Paul's decision 12 of 2026-11-18, [ADR-0043](../Architecture/Architecture-Decisions/ADR-0043-Three-Content-States-Production-Legacy-Draft-In-The-Item-Manifest.md); `item.rs`, `content_state.rs`): an item manifest's `quality` is `production`, `legacy` or `draft`; `ItemManifest::state` reads unset as Legacy (written before the states: an older project's copies) and a state it doesn't know as Draft (`Quality::Other`), so a newer manifest still loads. Every shipped item says its state (`check_declared_state`, apart from `validate`): the stylized family's twelve and the realistic underwear are Legacy, the four wave-4 items Draft, none Production yet. `randomize` draws Production only (`production_slots`): a slot with none keeps what was worn, and worn underwear (layer 0) is never taken off. `resolve` ignores the state: a saved character wearing a Legacy or Draft item loads and draws it. A description never carries the state.
+
+## Provenance of imported items (wave 5)
+
+Paul's decision 11 (2026-11-18) makes licensed CC0 and CC BY assets the base of new character content. An item made from one says `source.origin: "imported"` and names a **provenance record** beside its manifest (`*.provenance.json`, `provenance.rs`: source page, author, licence and the address of its text, retrieval date, the files' SHA-256 as downloaded, what was changed, the attribution line, the MIT or Apache notice, the items it feeds). `check_provenance` fails an imported item without one, under a refused licence (share-alike, non-commercial, no-derivatives, unknown) or under CC BY, MIT or Apache-2.0 without its line, and an item under any licence but CC0 that doesn't say it was imported; `tests/shipped_provenance.rs` holds the repository's library to it. `character_credits` gathers what a game carries (each credit from the record's fields: line, licence and its address, source, changes, notice; the Apache License's terms once; every item not cleared, including one under a third party's licence that doesn't say it was imported): `project::pack_game` writes `CREDITS-CHARACTERS.txt` into every game whose library has an imported item, and Build Game writes it beside the game. The intake scripts that make such items are `assets/characters/realistic/import/` (`architecture.md` section 8a).
 
 ## What CO3 built on it
 

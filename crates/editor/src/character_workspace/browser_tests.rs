@@ -1385,7 +1385,7 @@ fn the_realistic_clothing_page_is_drawn_with_the_test_tee() {
         source_info: axcenity_avatar::Source {
             author: "Axcenity Engine contributors".to_owned(),
             licence: "CC0-1.0".to_owned(),
-            url: None,
+            ..axcenity_avatar::Source::default()
         },
         slot: None,
         layer: None,

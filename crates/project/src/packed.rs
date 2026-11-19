@@ -85,7 +85,9 @@ impl PackFile {
 
 /// Packs the runtime files of a project into one portable game file.
 ///
-/// Editor settings and unrelated documents are excluded. Textures go with
+/// Editor settings and unrelated documents are excluded. The credits of
+/// its character items made from imported assets go in at the top
+/// ([`crate::CHARACTER_CREDITS_FILE`]). Textures go with
 /// their current cooked copies (`.axcenity/imported/textures/`, roadmap L2),
 /// so the game uploads them as they are instead of decoding them, and
 /// models with their cached simpler copies (`.axcenity/imported/meshes/`)
@@ -161,6 +163,7 @@ pub fn pack_game_reporting(
         set_packed_developer_console(&mut files, on);
     }
     add_asset_index(folder, &mut files);
+    add_character_credits(folder, &mut files);
     files.sort_by(|a, b| a.name.cmp(&b.name));
     if files.len() > MAX_FILES {
         return Err(PackError::TooManyFiles);
@@ -451,6 +454,20 @@ fn collect_runtime_files(
         }
     }
     Ok(())
+}
+
+/// Adds [`crate::CHARACTER_CREDITS_FILE`], the attributions of the
+/// character items made from imported assets (Paul's decision 11), at the
+/// top of the game, when there are any.
+fn add_character_credits(root: &Path, files: &mut Vec<PackFile>) {
+    files.retain(|file| file.name != crate::CHARACTER_CREDITS_FILE);
+    if let Some((_, text)) = crate::character_credits(root) {
+        files.push(PackFile {
+            name: crate::CHARACTER_CREDITS_FILE.to_owned(),
+            contents: text.into_bytes(),
+            modified: 0,
+        });
+    }
 }
 
 /// Adds [`axcenity_assets::ASSET_INDEX_FILE`], each asset ID's path, so the

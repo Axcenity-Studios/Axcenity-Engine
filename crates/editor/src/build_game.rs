@@ -123,6 +123,10 @@ pub struct BuiltGame {
     pub report: BuildReport,
     /// Where the text report was written.
     pub report_path: PathBuf,
+    /// The credits of the character items made from imported assets
+    /// (`project::CHARACTER_CREDITS_FILE`, beside the game and inside it),
+    /// when there are any.
+    pub character_credits: Option<axcenity_avatar::CharacterCredits>,
 }
 
 /// The build profile a build uses (R13), by name and as its settings, and
@@ -239,12 +243,46 @@ fn asset_credits(folder: &Path) -> Result<Option<String>, String> {
     Ok(provenance::credits(&name, &snapshot.records()))
 }
 
+/// What the build says about its character credits (in its report and in
+/// Output): how many attributions it carries and where, after a warning
+/// first when an item isn't cleared for shipping. The build still
+/// succeeds (a test build may hold items being worked on); the warning
+/// leads the note so it isn't missed.
+pub fn credits_note(credits: &axcenity_avatar::CharacterCredits) -> String {
+    let file = project::CHARACTER_CREDITS_FILE;
+    let listed = credits.required.len() + credits.thanks.len();
+    let plural = |n: usize| if n == 1 { "" } else { "s" };
+    let mut parts = Vec::new();
+    if !credits.is_cleared() {
+        let n = credits.uncleared.len();
+        parts.push(format!(
+            "Warning: {n} character item{} {} not cleared for shipping (no sound licence or \
+             provenance record), listed in {file}: {}. Clear or remove {} before shipping the \
+             game.",
+            plural(n),
+            if n == 1 { "is" } else { "are" },
+            credits.uncleared.join("; "),
+            if n == 1 { "it" } else { "them" },
+        ));
+    }
+    if listed > 0 || parts.is_empty() {
+        parts.push(format!(
+            "{file} credits {listed} character asset{} (attribution required for {}); it is \
+             beside the game and inside game.axgame.",
+            plural(listed),
+            credits.required.len(),
+        ));
+    }
+    parts.join(" ")
+}
+
 /// Builds the game in the project at `folder` into `destination` for
 /// `target`, with the player at `player`: cooks textures that aren't yet,
 /// packs `game.axgame` and copies the player beside it (inside
 /// `AxcenityPlayer.app` for macOS, with the game in `Contents/Resources`),
 /// with `LICENSES.txt` (and `CREDITS.txt` when Toolbox assets need
-/// crediting). With `archive`,
+/// crediting, `CREDITS-CHARACTERS.txt` when character items made from
+/// imported assets do: `project::character_credits`). With `archive`,
 /// also writes those files as `AxcenityPlayer-<os>.zip` in `destination`.
 #[cfg(test)]
 pub fn build_game(
@@ -430,6 +468,20 @@ pub fn build_game_with(
             false,
         )?;
     }
+    // The character items made from imported assets (decision 11): the
+    // text the game file carries, also beside it, where whoever ships the
+    // game sees it.
+    let character_credits = match project::character_credits(folder) {
+        Some((listed, text)) => {
+            write(
+                credits.join(project::CHARACTER_CREDITS_FILE),
+                Contents::Bytes(text.as_bytes()),
+                false,
+            )?;
+            Some(listed)
+        }
+        None => None,
+    };
 
     // The copied player keeps only the linker's signature, which seals no
     // bundle: `codesign --verify --deep --strict` rejects the app ("code
@@ -457,6 +509,9 @@ pub fn build_game_with(
         .map(|(path, reason)| format!("{path}: {reason}"))
         .collect();
     build_report.notes = notes.clone();
+    if let Some(listed) = &character_credits {
+        build_report.notes.push(credits_note(listed));
+    }
     if let Some(reason) = &unsigned {
         build_report
             .notes
@@ -479,6 +534,7 @@ pub fn build_game_with(
         notes,
         report: build_report,
         report_path: destination.join(project::BUILD_REPORT_TEXT_FILE),
+        character_credits,
     })
 }
 
@@ -909,6 +965,135 @@ mod tests {
         let scratch = Scratch::new("no-credits");
         scratch.build(ExportTarget::Windows, false);
         assert!(!scratch.out("CREDITS.txt").exists());
+    }
+
+    /// Paul's decision 11: a build carries the attribution of every
+    /// character item made from an imported asset, beside the game and
+    /// inside it, and says so in its report.
+    #[test]
+    fn a_build_credits_the_imported_character_items() {
+        let scratch = Scratch::new("character-credits");
+        let library = scratch.root.join("project/assets/characters");
+        fs::create_dir_all(library.join("hat")).unwrap();
+        let line = "Bucket Hat by A. Modeller (https://example.org/hat), CC BY 4.0; fitted by Axcenity Engine contributors";
+        fs::write(
+            library.join("hat/Hat.item.json"),
+            r#"{ "format_version": 1, "id": "imported/hat", "label": "Bucket hat",
+                 "kind": "accessory", "slot": "hair", "bases": ["axcenity/realistic"],
+                 "model": { "file": "Hat.glb" }, "fit": { "method": "binding" },
+                 "source": { "author": "A. Modeller", "licence": "CC-BY-4.0",
+                             "origin": "imported", "provenance": "Hat.provenance.json" } }"#,
+        )
+        .unwrap();
+        fs::write(
+            library.join("hat/Hat.provenance.json"),
+            format!(
+                r#"{{ "format_version": 1, "asset": "Bucket Hat", "source_page": "https://example.org/hat",
+                     "author": "A. Modeller",
+                     "licence": {{ "id": "CC-BY-4.0", "url": "https://creativecommons.org/licenses/by/4.0/" }},
+                     "retrieved": "2026-11-18",
+                     "files": [{{ "name": "hat.glb", "sha256": "{}" }}],
+                     "changes": ["Fitted to the realistic body"],
+                     "attribution": "{line}", "items": ["imported/hat"] }}"#,
+                "ab".repeat(32)
+            ),
+        )
+        .unwrap();
+        fs::write(
+            library.join("catalogue.json"),
+            r#"{ "format_version": 1, "items": [{ "id": "imported/hat", "manifest": "hat/Hat.item.json",
+                 "label": "Bucket hat", "kind": "accessory", "slot": "hair", "tier": "built_in",
+                 "bases": ["axcenity/realistic"] }] }"#,
+        )
+        .unwrap();
+        let built = scratch.build(ExportTarget::Windows, false);
+        let beside = fs::read_to_string(scratch.out(project::CHARACTER_CREDITS_FILE)).unwrap();
+        assert!(beside.contains(line), "{beside}");
+        let credits = built.character_credits.as_ref().expect("credits");
+        assert_eq!(credits.required.len(), 1);
+        assert!(
+            built
+                .report
+                .notes
+                .iter()
+                .any(|note| note.contains(project::CHARACTER_CREDITS_FILE)),
+            "{:?}",
+            built.report.notes
+        );
+        let unpacked = scratch.root.join("unpacked");
+        project::unpack_game(&fs::read(scratch.out("game.axgame")).unwrap(), &unpacked).unwrap();
+        assert_eq!(
+            fs::read_to_string(unpacked.join(project::CHARACTER_CREDITS_FILE)).unwrap(),
+            beside
+        );
+    }
+
+    /// Review fix 1: a character item under a third party's licence that
+    /// doesn't say it was imported is listed as not cleared, and the
+    /// build's note about it is a warning that comes first.
+    #[test]
+    fn a_build_warns_of_a_character_item_that_isnt_cleared() {
+        let scratch = Scratch::new("uncleared-character");
+        let library = scratch.root.join("project/assets/characters");
+        fs::create_dir_all(library.join("tee")).unwrap();
+        // What `import_garment --licence CC-BY-4.0 --author X` writes.
+        fs::write(
+            library.join("tee/Tee.item.json"),
+            r#"{ "format_version": 1, "id": "imported/tee", "label": "Licensed tee",
+                 "kind": "garment", "slot": "top", "bases": ["axcenity/realistic"],
+                 "model": { "file": "Tee.glb" }, "fit": { "method": "binding" },
+                 "source": { "author": "A. Modeller", "licence": "CC-BY-4.0" } }"#,
+        )
+        .unwrap();
+        fs::write(
+            library.join("catalogue.json"),
+            r#"{ "format_version": 1, "items": [{ "id": "imported/tee", "manifest": "tee/Tee.item.json",
+                 "label": "Licensed tee", "kind": "garment", "slot": "top", "tier": "built_in",
+                 "bases": ["axcenity/realistic"] }] }"#,
+        )
+        .unwrap();
+        let built = scratch.build(ExportTarget::Windows, false);
+        let credits = built.character_credits.as_ref().expect("credits");
+        assert!(!credits.is_cleared(), "{credits:#?}");
+        let beside = fs::read_to_string(scratch.out(project::CHARACTER_CREDITS_FILE)).unwrap();
+        assert!(beside.contains("Not cleared"), "{beside}");
+        assert!(beside.contains("Licensed tee (imported/tee)"), "{beside}");
+        let note = built
+            .report
+            .notes
+            .iter()
+            .find(|note| note.contains(project::CHARACTER_CREDITS_FILE))
+            .expect("a note");
+        assert!(note.starts_with("Warning:"), "{note}");
+        assert!(note.contains("Licensed tee (imported/tee)"), "{note}");
+    }
+
+    /// The note reads as one sentence, without stray spaces.
+    #[test]
+    fn the_credits_note_says_where_the_file_is() {
+        let credits = axcenity_avatar::CharacterCredits {
+            thanks: vec![axcenity_avatar::Credit {
+                line: "\"Hat\" by A. Modeller".to_owned(),
+                items: vec!["Hat".to_owned()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let note = credits_note(&credits);
+        assert!(!note.contains("  "), "{note}");
+        assert!(!note.starts_with("Warning"), "{note}");
+        assert!(
+            note.contains("beside the game and inside game.axgame"),
+            "{note}"
+        );
+    }
+
+    #[test]
+    fn a_build_without_imported_character_items_has_no_character_credits() {
+        let scratch = Scratch::new("no-character-credits");
+        let built = scratch.build(ExportTarget::Windows, false);
+        assert!(built.character_credits.is_none());
+        assert!(!scratch.out(project::CHARACTER_CREDITS_FILE).exists());
     }
 
     #[test]

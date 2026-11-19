@@ -35,6 +35,7 @@ mod asset_refs;
 mod backup;
 pub mod branding;
 mod build_profiles;
+mod character_credits;
 mod character_library;
 mod collaborate_file;
 mod compat;
@@ -71,6 +72,7 @@ mod templates;
 mod ui_graphs;
 mod user_templates;
 
+pub use character_credits::{CHARACTER_CREDITS_FILE, character_credits};
 pub use character_library::{
     CHARACTER_LIBRARY_PATH, add_character_library, add_character_packages,
     built_in_character_library,

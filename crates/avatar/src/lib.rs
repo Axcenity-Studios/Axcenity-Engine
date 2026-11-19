@@ -18,6 +18,10 @@
 //! - A preset (`*.preset.json`) is a description with a `preset` block;
 //!   [`apply_preset`] copies what its kind owns. [`randomize`] draws a
 //!   character from a seed.
+//! - A [`Provenance`] record (`*.provenance.json`) says where an imported
+//!   item's asset came from and its licence; [`check_provenance`] fails
+//!   an imported item without one and [`character_credits`] gathers the
+//!   attributions a game carries.
 //!
 //! Nothing here draws, holds Instances or knows the editor: no camera,
 //! lighting, layout or undo is ever written into these files.
@@ -35,6 +39,7 @@ mod material;
 mod migrate;
 mod model_check;
 mod preset;
+mod provenance;
 mod randomize;
 mod resolve;
 mod skin;
@@ -51,7 +56,7 @@ pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{
     Adjust, ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, ItemParameter,
-    Limitation, Quality, Source, Variant,
+    Limitation, Origin, Quality, Source, Variant,
 };
 pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{
@@ -67,6 +72,12 @@ pub use migrate::{V1_BASE, V1_ITEMS};
 pub use model_check::{ModelContents, ModelRef};
 pub use preset::{
     PRESET_SUFFIX, PresetInfo, PresetKind, apply_preset, check_preset, matches_preset,
+};
+pub use provenance::{
+    ACCEPTED_LICENCES, CharacterCredits, Credit, LicenceRecord, LicenceTerms, ORIGINAL_LICENCE,
+    PROVENANCE_SUFFIX, PROVENANCE_VERSION, Provenance, SourceFile, apache_licence_text,
+    character_credits, check_item_provenance, check_provenance, is_imported, licence_page,
+    licence_terms, needs_notice, read_provenance,
 };
 pub use randomize::{Scope, random_span, randomize};
 pub use resolve::{

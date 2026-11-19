@@ -88,3 +88,5 @@ How it is built ([ADR-0043](../../../wiki/Architecture/Architecture-Decisions/AD
 | Procedural generation | Variations, adjustments, repetitive tasks |
 
 The wave-4 pipelines (the hair groom and card bake, the FreeSewing ports and drape, the fit) stay as tools for the last two rows; they are no longer the route to a Production item. No batch of items is made until the first of its kind passes.
+
+The Blender-scripts row is the intake (`assets/characters/realistic/import/`, wave 5): it refuses a licence not accepted, records the provenance, imports, reports and repairs topology, places or poses the asset onto the rest pose, weights it, makes the levels, runs section 2's checks per level, fits it with the engine's own import and exports a **draft** with its provenance record. It does not retopologize or rework a garment's construction: that is the second row, by a person.

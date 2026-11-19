@@ -1,0 +1,49 @@
+{
+  "about": "The licences the intake accepts for an imported asset, by SPDX ID (docs/development/character-studio/references/README.md, classes 1 and 2). Kept in step with axcenity_avatar::ACCEPTED_LICENCES, licence_page and needs_notice by crates/avatar/tests/shipped_provenance.rs. LicenseRef-PublicDomain is a work its source states is in the public domain without a licence. licence_pages is the page of each licence's own text, which a record's licence.url must be.",
+  "accepted": {
+    "public_domain": [
+      "CC0-1.0",
+      "CC-PDDC",
+      "LicenseRef-PublicDomain"
+    ],
+    "attribution": [
+      "CC-BY-3.0",
+      "CC-BY-4.0",
+      "MIT",
+      "Apache-2.0"
+    ]
+  },
+  "licence_pages": {
+    "CC0-1.0": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "CC-PDDC": "https://creativecommons.org/licenses/publicdomain/",
+    "CC-BY-3.0": "https://creativecommons.org/licenses/by/3.0/",
+    "CC-BY-4.0": "https://creativecommons.org/licenses/by/4.0/",
+    "MIT": "https://opensource.org/license/mit",
+    "Apache-2.0": "https://www.apache.org/licenses/LICENSE-2.0"
+  },
+  "notice_required": [
+    "MIT",
+    "Apache-2.0"
+  ],
+  "notice_about": "MIT asks for its copyright and permission notice in every copy, Apache-2.0 for its copyright notice and any NOTICE text: the record carries it word for word as given with the asset (spec: source.notice or source.notice_file), and a game carries it in full.",
+  "names": {
+    "CC0-1.0": "CC0 1.0",
+    "CC-PDDC": "Public Domain Dedication and Certification",
+    "LicenseRef-PublicDomain": "public domain",
+    "CC-BY-3.0": "CC BY 3.0",
+    "CC-BY-4.0": "CC BY 4.0",
+    "MIT": "MIT",
+    "Apache-2.0": "Apache 2.0"
+  },
+  "refused_examples": [
+    "CC-BY-SA-4.0",
+    "CC-BY-SA-3.0",
+    "CC-BY-NC-4.0",
+    "CC-BY-NC-SA-4.0",
+    "CC-BY-ND-4.0",
+    "CC-BY-2.0",
+    "GPL-3.0-only",
+    "LicenseRef-Sketchfab-Standard",
+    "NOASSERTION"
+  ]
+}
