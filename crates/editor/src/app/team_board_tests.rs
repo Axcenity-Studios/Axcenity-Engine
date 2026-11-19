@@ -116,17 +116,17 @@ fn a_task_is_made_assigned_and_moved_and_kept_as_a_file() {
 
 #[test]
 fn a_teammates_task_reaches_the_host_and_says_who_was_assigned() {
+    let team_board_host = team_folder("board-host");
+    let team_board_joiner = team_folder("board-joiner");
     let project = copy_of_example("hello-part", "team-board-host");
     let mut a = EditorApp::new(Some(&project));
     as_person(&mut a, "Paul");
-    let team_board_host = team_folder("board-host");
     let invite = over_loopback(
         a.host_network_session(Some(&team_board_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
     as_person(&mut b, "Sam");
-    let team_board_joiner = team_folder("board-joiner");
     b.join_network_session(&invite, Some(&team_board_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
@@ -374,6 +374,8 @@ fn rename(app: &mut EditorApp, id: axcenity_core::InstanceId, name: &str) {
 fn each_persons_saves_board_changes_and_session_edits_are_kept_and_shown() {
     use axcenity_teamwork::history::{History, What};
     use axcenity_teamwork::{Kind, Link};
+    let team_history_host = team_folder("history-host");
+    let team_history_joiner = team_folder("history-joiner");
     let project = copy_of_example("hello-part", "team-history");
     let mut a = EditorApp::new(Some(&project));
     as_person(&mut a, "Paul");
@@ -425,14 +427,12 @@ fn each_persons_saves_board_changes_and_session_edits_are_kept_and_shown() {
 
     // In a session the host records each member's edits from its log, and
     // the members record nothing themselves.
-    let team_history_host = team_folder("history-host");
     let invite = over_loopback(
         a.host_network_session(Some(&team_history_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
     as_person(&mut b, "Sam");
-    let team_history_joiner = team_folder("history-joiner");
     b.join_network_session(&invite, Some(&team_history_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());

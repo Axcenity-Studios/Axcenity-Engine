@@ -50,3 +50,16 @@ axcenity-test-dirs: couldn't remove <private temp>\axcenity-held-45956-0: The pr
 thread 'tests::a_file_still_open_for_a_moment_is_removed_once_it_is_let_go' panicked at crates\test-dirs\src\tests.rs:134:5:
 <private temp>\axcenity-held-45956-0 is still there
 Summary [   0.308s] 1 test run: 0 passed, 1 failed, 8 skipped
+
+5. Review fixes 1: the keep branch (cargo nextest run -p axcenity-test-dirs --no-fail-fast, private TMP/TEMP).
+   Drop's body moved into TestDir::release(keep); release was a stub with the keep branch removed
+   (it always removed the folder). The new test fails; every other test still passes, which is
+   what the review found: no test covered the keep branch before.
+
+FAIL [   0.022s] ( 4/10) axcenity-test-dirs tests::releasing_keeps_the_folder_when_asked_and_removes_it_otherwise
+thread 'tests::releasing_keeps_the_folder_when_asked_and_removes_it_otherwise' panicked at crates\test-dirs\src\tests.rs:121:5:
+<private temp>\axcenity-release-11440-0 was removed although keeping was asked for
+Summary [   0.322s] 10 tests run: 9 passed, 1 failed, 0 skipped
+
+   Before the fix, the same crate with AXCENITY_KEEP_TEST_DIRS=1 (the review's run):
+   9 tests run: 3 passed, 6 failed, and 8 entries left in temp.

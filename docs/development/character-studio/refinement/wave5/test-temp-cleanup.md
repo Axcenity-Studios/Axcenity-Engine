@@ -116,7 +116,7 @@ They found:
 
 ## Tests
 
-### New: `axcenity-test-dirs`, 9 unit tests and 1 doc test
+### New: `axcenity-test-dirs`, 10 unit tests and 1 doc test
 
 - `new_makes_an_empty_uniquely_named_folder_under_the_temp_folder`
 - `dropping_removes_the_folder_and_everything_in_it` (with a read-only file)
@@ -126,6 +126,7 @@ They found:
 - `at_stands_for_a_path_inside_and_still_removes_the_whole_folder`
 - `the_temp_folder_and_the_folders_above_it_are_never_removed`
 - `the_keep_variable_keeps_folders_when_set_to_a_true_value`
+- `releasing_keeps_the_folder_when_asked_and_removes_it_otherwise` (added in Review fixes 1)
 - `a_file_still_open_for_a_moment_is_removed_once_it_is_let_go` (Windows)
 
 Red runs are in [test-temp-cleanup-red-run.txt](test-temp-cleanup-red-run.txt):
@@ -227,3 +228,57 @@ Two production temp leftovers are recorded in `wiki/Roadmap/Known-Limitations.md
 - Run `cargo hakari generate` after merging dependency changes (no change from this branch).
 - Optional, for the open issue above: raise the slow-timeout for `collab_repo_tests` and `collab_scenario_tests`, then rerun the suite. The temp folder should then stay empty except for `axcenity-test-saves`.
 - To check on the shared machine: set `TMP` and `TEMP` to an empty folder, run `cargo nextest run --workspace --no-fail-fast`, and list that folder.
+
+## Review fixes 1
+
+The review found one blocking defect: the documented opt-out made the crate's own tests fail, and no test covered the keep branch of `Drop`. With `AXCENITY_KEEP_TEST_DIRS=1`, `cargo nextest run -p axcenity-test-dirs` ran 9 tests: 3 passed, 6 failed, and 8 entries were left in temp. Deleting the keep branch from `Drop` left all 9 green.
+
+### The fix
+
+- `crates/test-dirs/src/lib.rs`: the body of `Drop` is now `TestDir::release(&self, keep: bool)`. With `keep` it prints the kept path and returns; otherwise it removes the folder. `Drop` is one line: `self.release(keep_requested(std::env::var_os(KEEP_VARIABLE).as_deref()))`.
+- `crates/test-dirs/src/tests.rs`:
+  - New test `releasing_keeps_the_folder_when_asked_and_removes_it_otherwise`. It calls `release(true)` and checks that a file in the folder is still there, then calls `release(false)` and checks that the folder is gone. It doesn't read the variable, so it runs the same with or without it.
+  - The six tests that check that a drop removes something (`dropping_...`, `a_panicking_test_...`, `adopt_...`, `unmade_...`, `at_...`, `a_file_still_open_...`) now return early through a `keeping(test)` helper when the variable asks to keep. The helper prints why. nextest runs each test in its own process, so no test changes the environment.
+- `docs/development.md`: the opt-out bullet now says that drop calls `release(keep)` and that the crate's tests are green with or without the variable.
+
+**Red.** `release` was first a stub with the keep branch removed, so it always removed the folder. The new test failed (`... was removed although keeping was asked for`); the other 9 passed: `Summary [0.322s] 10 tests run: 9 passed, 1 failed, 0 skipped`. This is section 5 of [test-temp-cleanup-red-run.txt](test-temp-cleanup-red-run.txt).
+
+**Green.** Each run used a private `TMP`/`TEMP`:
+
+| `AXCENITY_KEEP_TEST_DIRS` | Summary | Left in temp |
+|---|---|---|
+| `0` | `10 tests run: 10 passed, 0 skipped` | nothing |
+| `1` | `10 tests run: 10 passed, 0 skipped` | 2 folders, `axcenity-unit-<pid>-0` and `-1`, kept on request by `new_makes_...`. This shows that `Drop` honours the variable. |
+| unset | `10 tests run: 10 passed, 0 skipped` | nothing |
+
+Doc test: `1 passed`.
+
+One limit remains: `Drop` itself still has no test that sets the variable. Setting an environment variable inside a test races with other threads under `cargo test`. `Drop` is now a single call to `release`, and the `=1` row above shows the wiring.
+
+### Non-blocking items
+
+- **Tuple order (fixed).** These helpers now return the `TestDir` first, and every caller destructures it first, so the folder drops after the app:
+  - `asset_refs_tests.rs` `project` returns `(TestDir, EditorApp, InstanceId)`;
+  - `find_tests.rs` `project`, `autorecover_tests.rs` `unsaved_work` and `plugin_api3_tests.rs` `opened` return `(TestDir, EditorApp)`;
+  - `team_tests.rs` `session_with_a_crate` returns `([TestDir; 2], EditorApp, EditorApp)`. The review didn't list this fifth helper, but it had the same order.
+
+  In `team_tests.rs` (23 bindings) and `team_board_tests.rs` (4), each `let x = team_folder(..)` moved to the start of its function body, after the function's `use` lines, so it drops after every app in the test. Each moved name is bound once per function, so no shadowing changed. Folder names and assertions are unchanged. In `idle_session_cost_on_s10k` (ignored, run by hand), the two `team_folder` calls are now made before its timers start rather than inside the timed part. The two calls only make empty folders.
+- **Debug pictures written and deleted in the same statement (left as is).** They are documented ("and debug picture") and kept with the opt-out. Making the writes conditional would change what those tests do, beyond a mechanical edit. Writing a PNG costs milliseconds.
+- **Fixed-name adopted paths (left, named for the lead).** The paths the review lists (assets `lib.rs`, `model/tests.rs`, `import.rs`, `fbx/tests.rs`, `migrate_shapes.rs`, scene `draw_list/tests.rs`, testing `crowd.rs` and `streaming_world.rs`, player `TempCopy::of`) keep the names they had before. Two concurrent runs on one machine already collided on them. Switching them to `TestDir::new` is a good follow-up. It renames folders in about ten files that other branches may touch, so it isn't in this fix.
+- **Two TestDirs on one path in `collab_repo_tests.rs` (left).** This is harmless: the second drop finds nothing.
+- **Per-process shared folders under plain `cargo test` (left, named).** `play_tests.rs` adopts `axcenity-editor-saves-<pid>` and `convert_tests.rs` adopts `axcenity-converted-<pid>`. These are safe under nextest's one process per test, which is the project's test command, but `cargo test -p axcenity-editor` could flake.
+- **`cargo hakari verify` exits 1.** It does so on `refinement-wave5` too, so this branch didn't cause it.
+
+### Tests run (Review fixes 1)
+
+- `cargo nextest run -p axcenity-test-dirs --no-fail-fast` with `AXCENITY_KEEP_TEST_DIRS` set to `0`, set to `1` and unset: 10 passed each time (see the table above). `cargo test -p axcenity-test-dirs --doc`: 1 passed.
+- `cargo nextest run -p axcenity-editor -p axcenity-test-dirs --no-fail-fast`, private temp: `Summary [107.658s] 1472 tests run: 1471 passed (14 slow), 1 failed, 11 skipped`. No ABORT or TIMEOUT lines. The failure was `collab_repo_tests::closing_the_editor_uploads_what_was_saved`: under load, an automatic checkpoint (`Some(Auto)`) landed before the closing one (`Some(Closing)`). It also failed in the review's run. Rerun alone: `1 test run: 1 passed`, and nothing was left in temp. Left after the full run: only the empty `axcenity-test-saves`. The three Collaborate tests that timed out in earlier full runs passed this time, so nothing of theirs was left.
+- `cargo clippy -p axcenity-test-dirs -p axcenity-editor --all-targets -- -D warnings`: clean. `cargo fmt --all`: applied, and `--check` is clean.
+- `python3 -I scripts/check-wiki.py`: `115 pages, 0 errors, 57 warnings` (the warnings were there before).
+
+Files changed in this fix:
+- `crates/test-dirs/src/lib.rs`, `crates/test-dirs/src/tests.rs`;
+- `crates/editor/src/app/{asset_refs_tests,find_tests,autorecover_tests,plugin_api3_tests,team_tests,team_board_tests}.rs`;
+- `docs/development.md`, this hand-back and the red-run file.
+
+At merge, a branch that adds a test calling `session_with_a_crate`, `unsaved_work`, `opened` or either `project` helper must destructure the `TestDir` first.

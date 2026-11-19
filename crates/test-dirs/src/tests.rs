@@ -2,6 +2,17 @@ use super::*;
 use std::ffi::OsString;
 use std::path::Path;
 
+/// Whether this run keeps test folders (`AXCENITY_KEEP_TEST_DIRS=1`). A test
+/// that checks that dropping removes a folder has nothing to check then, so
+/// it stops early; `releasing_...` checks both branches without the variable.
+fn keeping(test: &str) -> bool {
+    let keep = keep_requested(std::env::var_os(KEEP_VARIABLE).as_deref());
+    if keep {
+        eprintln!("{test}: skipped, {KEEP_VARIABLE} keeps folders on drop");
+    }
+    keep
+}
+
 #[test]
 fn new_makes_an_empty_uniquely_named_folder_under_the_temp_folder() {
     let first = TestDir::new("unit");
@@ -17,6 +28,9 @@ fn new_makes_an_empty_uniquely_named_folder_under_the_temp_folder() {
 
 #[test]
 fn dropping_removes_the_folder_and_everything_in_it() {
+    if keeping("dropping_removes_the_folder_and_everything_in_it") {
+        return;
+    }
     let dir = TestDir::new("drop");
     let path = dir.to_path_buf();
     std::fs::create_dir_all(dir.join("a/b")).unwrap();
@@ -34,6 +48,9 @@ fn dropping_removes_the_folder_and_everything_in_it() {
 
 #[test]
 fn a_panicking_test_still_removes_its_folder() {
+    if keeping("a_panicking_test_still_removes_its_folder") {
+        return;
+    }
     let mut seen = None;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let dir = TestDir::new("panics");
@@ -48,6 +65,9 @@ fn a_panicking_test_still_removes_its_folder() {
 
 #[test]
 fn adopt_removes_a_file_or_folder_the_test_named_itself() {
+    if keeping("adopt_removes_a_file_or_folder_the_test_named_itself") {
+        return;
+    }
     let file = std::env::temp_dir().join(format!("axcenity-adopt-{}.png", std::process::id()));
     std::fs::write(&file, "png").unwrap();
     drop(TestDir::adopt(&file));
@@ -64,6 +84,9 @@ fn adopt_removes_a_file_or_folder_the_test_named_itself() {
 
 #[test]
 fn unmade_leaves_making_the_folder_to_the_code_under_test() {
+    if keeping("unmade_leaves_making_the_folder_to_the_code_under_test") {
+        return;
+    }
     let dir = TestDir::unmade("unmade");
     assert!(!dir.exists());
     std::fs::create_dir_all(dir.join("made-later")).unwrap();
@@ -74,6 +97,9 @@ fn unmade_leaves_making_the_folder_to_the_code_under_test() {
 
 #[test]
 fn at_stands_for_a_path_inside_and_still_removes_the_whole_folder() {
+    if keeping("at_stands_for_a_path_inside_and_still_removes_the_whole_folder") {
+        return;
+    }
     let parent = TestDir::new("at");
     let root = parent.to_path_buf();
     let project = root.join("My Game");
@@ -83,6 +109,22 @@ fn at_stands_for_a_path_inside_and_still_removes_the_whole_folder() {
     assert!(dir.join("game.json").starts_with(&root));
     drop(dir);
     assert!(!root.exists(), "{} is still there", root.display());
+}
+
+/// What Drop does in each mode, checked directly: kept with the opt-out,
+/// removed without it. This runs the same with or without the variable set.
+#[test]
+fn releasing_keeps_the_folder_when_asked_and_removes_it_otherwise() {
+    let dir = TestDir::new("release");
+    std::fs::write(dir.join("debug.png"), "png").unwrap();
+    dir.release(true);
+    assert!(
+        dir.join("debug.png").is_file(),
+        "{} was removed although keeping was asked for",
+        dir.display()
+    );
+    dir.release(false);
+    assert!(!dir.exists(), "{} is still there", dir.display());
 }
 
 #[test]
@@ -115,6 +157,9 @@ fn the_keep_variable_keeps_folders_when_set_to_a_true_value() {
 #[cfg(windows)]
 #[test]
 fn a_file_still_open_for_a_moment_is_removed_once_it_is_let_go() {
+    if keeping("a_file_still_open_for_a_moment_is_removed_once_it_is_let_go") {
+        return;
+    }
     use std::os::windows::fs::OpenOptionsExt;
     let dir = TestDir::new("held");
     let path = dir.to_path_buf();

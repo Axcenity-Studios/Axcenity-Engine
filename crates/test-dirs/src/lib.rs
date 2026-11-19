@@ -110,15 +110,24 @@ impl AsRef<OsStr> for TestDir {
     }
 }
 
-impl Drop for TestDir {
-    fn drop(&mut self) {
-        if keep_requested(std::env::var_os(KEEP_VARIABLE).as_deref()) {
+impl TestDir {
+    /// What dropping does: removes the folder, or with `keep` leaves it and
+    /// prints its path. Drop passes whether [`KEEP_VARIABLE`] is set; a test
+    /// can call this directly to check either branch without setting it.
+    pub fn release(&self, keep: bool) {
+        if keep {
             if self.root.exists() {
                 eprintln!("{KEEP_VARIABLE}: kept {}", self.root.display());
             }
             return;
         }
         remove(&self.root);
+    }
+}
+
+impl Drop for TestDir {
+    fn drop(&mut self) {
+        self.release(keep_requested(std::env::var_os(KEEP_VARIABLE).as_deref()));
     }
 }
 
