@@ -2,7 +2,7 @@
 
 Branch `pose-correctives`, from `refinement-wave5` (main, waves 1 to 4, PR #428, Paul's decisions 11 to 14, wave 5 stages 1 and 2). Task: pose correctives for garments, baked from cloth simulation and driven by the joints like the body's own swing correctives, so a garment's folds and the cloth between the arm and the side behave in the shoulder, arm-swing, elbow, hip and knee poses.
 
-**In one paragraph.** The pipeline is built end to end and the engine drives it: an item can carry its own joint-driven shapes (an optional `correctives` in the item manifest, the same rules in its model's glTF extras, read into `MorphTarget::driver`, kept in cooked models, driven per frame on every body by `anim`), and a new intake step (`correctives.py` around `avatar::fit::cloth`) bakes them with Blender's cloth simulation. **The main goal is not met.** On the test tee the correctives lower the stride's poke-through in its second third (16.6 to 14.1 mm) and its corners under a flipped fold in every third (147, 199, 161 to 122, 136, 139), but the folds still flip, and the slit, the bra triangle and the arms-raised flaps look the same in 4K captures. They also make some cases worse: the bra through the tee in the first third (20 bodies, 10.8 mm to 21, 14.9 mm), one body more at Walk@18 for the tee and for the bra, and a bra case with the arms raised. Taking them into the gate would raise records, so the gate keeps its test tee without them and a new test module measures it with them, with its own exact records. On the licensed tee the correctives made the held poses much worse (the T-pose from 7 to 53 bodies, the arms raised from 14 to 54), so I didn't commit them. The cause I can see: the cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps (the arm sinks into the side), and it moves the bridge of cloth 5 to 10 cm in ways a blend between key poses can't follow. The frame cost is small (50 characters: +2% shape moves, about +0.02 ms of GPU posing).
+**In one paragraph.** The pipeline is built end to end and the engine drives it: an item can carry its own joint-driven shapes (an optional `correctives` in the item manifest, the same rules in its model's glTF extras, read into `MorphTarget::driver`, kept in cooked models, driven per frame on every body by `anim`), and a new intake step (`correctives.py` around `avatar::fit::cloth`) bakes them with Blender's cloth simulation. **The main goal is not met.** On the test tee the correctives lower the stride's poke-through in its second third (16.6 to 14.1 mm) and its corners under a flipped fold in every third (147, 199, 161 to 122, 136, 139), but the folds still flip, and the slit, the bra triangle and the arms-raised flaps look the same in 4K captures. They also make some cases worse: the bra through the tee in the first third (20 bodies, 10.8 mm to 21, 14.9 mm), one body more at Walk@18 for the tee and for the bra, and a bra case with the arms raised. Taking them into the gate would raise records, so the gate keeps its test tee without them and a new test module measures it with them, with its own exact records. On the licensed tee the correctives made the held poses much worse (the T-pose from 7 to 53 bodies, the arms raised from 14 to 54), so I didn't commit them. The cause I can see: the cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps (the arm sinks into the side), and it moves the bridge of cloth up to 12 cm, crumpled at a triangle's scale. Measured on the kept bake (review fixes 2), three things lose that move: blending between key poses (even shapes that meet each key pose exactly are off half way through the swings by a 95th percentile of 9 to 16 mm, where the cloth moves 16 to 19 mm), the smoothing, and the 6 mm hold, which the gate sweep chose. The frame cost is small (50 characters: +2% shape moves, about +0.02 ms of GPU posing).
 
 ## Files
 
@@ -119,7 +119,7 @@ Two more measures:
 
 **What the bake measured** (`solve.json`):
 - **Shapes:** 20 kept, each moving at most 2.6 to 6.3 mm (the 6 mm limit). The knees moved nothing over 0.5 mm and were dropped.
-- **The half-way checks** (every solved shape blended at its weight there, against the simulation; re-solved in review fixes 1): median 0.0 to 1.0 mm. The 95th percentile is 3.8 mm for hanging, 14.2 to 15.9 mm for the swings, 7.7 mm for level and 24.0 mm for raised. The worst corners are off by 24 to 103 mm. Table under review fixes 1.
+- **The half-way checks** (every solved shape blended at its weight there, against the simulation; re-solved in review fixes 1): median 0.0 to 1.0 mm. The 95th percentile is 3.8 mm for hanging, 14.2 to 15.9 mm for the swings, 7.7 mm for level and 24.0 mm for raised. The worst corners are off by 24 to 103 mm. Table under review fixes 1. These mix three losses (the hold, the smoothing and blending); review fixes 2 separates them, with the key poses' own figures beside them.
 - **Shapes over 6 mm:** the 6 mm limit holds a corner's move in the key pose; the stored shape is that divided by the rule's weight there (at least 0.5) and shared between the sides, so a stored offset can be a little over it (the most is 6.3 mm).
 - **Inside the skin:** the simulation's cloth ends up to 15 mm inside the skin at some swing and hang reads (`simulate.json`, up to 24 corners). That is where the arm overlaps the side.
 
@@ -251,7 +251,11 @@ Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
 
 1. **The main goal is not met.**
    - The stride's armpit folds still flip (397 corners under a flipped fold over the three thirds, from 507), and the slit, the bra triangle and the arms-raised flaps look the same.
-   - The cause: a cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps. The bridge moves 5 to 10 cm and folds differently in each key pose, which no blend of shapes follows between key poses (half-way 95th percentile 14 to 24 mm), so the shapes are held to 6 mm.
+   - The cause: a cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps. The bridge moves up to 12 cm (the worst corner at each shoulder key pose: 49 to 116 mm) and is crumpled at a triangle's scale. Three things lose that move, measured on the kept bake (review fixes 2):
+     - **blending between key poses:** shapes that meet every key pose exactly (whole, unsmoothed) are off half way through the swings by a 95th percentile of 9.0 to 16.1 mm, where the cloth itself moves 16.4 to 18.5 mm, and by 35 to 51 mm at the worst corners. Half way to the hanging arms the blend (95th percentile 9.6 mm) is further from the cloth than no shape at all (4.0 mm). Raised and level do blend (3.8 and 2.1 mm, where the cloth moves 30.9 and 9.6 mm);
+     - **the smoothing** (12 rounds) irons out the crumpling: whole smoothed moves miss the shoulder key poses by a 95th percentile of 6.5 to 12.9 mm;
+     - **the 6 mm hold**, which the gate sweep chose ("What I tried"), not blending, adds 1.3 to 4.3 mm to the 95th percentile at the hang's and the swings' key poses, 8.1 mm at level and 21.7 mm at raised.
+     - So on the stride's poses (the hang and the swings) blending alone leaves errors half way (9 to 16 mm) of the same size as the hold and the smoothing leave at the key poses (13.5 to 16.7 mm). No hold or smoothing setting would remove it: it needs more key poses or a blend that isn't linear (below).
    - What would help, each for the lead:
      - the drape-preserving fit and a garment with room under the arm (the parallel fit track);
      - the body's own armpit overlap fixed, with a corrective for the arm against the side;
@@ -319,7 +323,7 @@ Both tests pass, and so do the other two in the file.
 | hips-right, 33 | 0.04 / 2.62 / 8.6 | 0.04 / 2.21 / 7.3 |
 | knees, 33 | 0.00 / 0.02 / 0.6 | 0.00 / 0.02 / 0.6 |
 
-**What this means.** With the blend included, every check is a little closer to the simulation, but only a little. The 95th percentiles drop by 0.1 to 2.7 mm, and the worst corners are still 24 to 103 mm off. The shapes are held to 6 mm, while the simulation moves the underarm bridge by centimetres, differently in each key pose. So the conclusion in open issue 1 stands: between key poses no blend of these shapes follows the cloth at the armpit. Away from it (the elbows, hips and knees) the blend is within 0.3 mm at the 95th percentile.
+**What this means.** With the blend included, every check is a little closer to the simulation, but only a little. The 95th percentiles drop by 0.1 to 2.7 mm, and the worst corners are still 24 to 103 mm off. Away from the armpit (the elbows, hips and knees) the blend is within 2.2 mm at the 95th percentile. *(Corrected in review fixes 2: these figures are the committed bake's, whose shapes are held to 6 mm and smoothed, so they can't say how much of the gap comes from blending. The conclusion this paragraph drew, that no blend follows the cloth at the armpit, was not measured here; review fixes 2 measures it.)*
 
 ### 2. Visible defects at Walk@0.367 not reported
 
@@ -372,3 +376,107 @@ Now something does.
 - `crates/avatar/tests/fixtures/test-tee/TestTee.correctives.json`: its report only.
 - Docs: `assets/characters/realistic/import/correctives.py` (its docstring) and `README.md`, `architecture.md`, `testing.md`, ADR-0044, this hand-back and its red-run file.
 - Sheets: `pose-correctives/armpit-walk-0-367-3x.jpg` and `armpit-front-*.jpg` (5).
+
+## Review fixes 2
+
+The second review found one blocking problem: the stated cause, "a blend of shapes can't follow the bridge between key poses, so the shapes are held to 6 mm", rested on a figure from the buggy half-way check ("up to 10 cm" in `MOST_MOVE`'s comment). Review fixes 1 re-solved only the committed bake, whose shapes are held to 6 mm and smoothed, so its half-way figures mix three losses and can't show which one is blending's. The reviewer was right. This fix measures each loss on its own and corrects every sentence that stated the cause. No shape, no sidecar shape data and no record changed.
+
+### What changed in the solve
+
+- **The report now has the key poses' own figures** (`keys`) beside the half-way `checks`: the garment posed with every solved shape at its weight there, against the simulated cloth, computed the same way. Each entry also gives how far the simulation moved the cloth from skinning with no shape (`moved_p95_mm`, `moved_most_mm`), and the report states the hold (`hold_mm`).
+- **`solve_with(.., Solving)`** (`fit::cloth`): `Solving { hold, smooth_rounds }`. `solve` is `solve_with(.., Solving::SIDECAR)` (held to `MOST_MOVE`, smoothed `SMOOTH_ROUNDS` times), so the sidecar is solved exactly as before. `Solving::whole(rounds)` takes each key pose's move whole, for measuring only.
+- **`pose_correctives -- solve-whole <library> <ID> <work> <report.json> [rounds]`** writes only the report, never a sidecar. With 0 rounds every key pose is met exactly (0.0 mm, below), so whatever is left half way is what blending between key poses loses, and nothing else.
+
+**Red first** (`pose-correctives-red-run.txt`, `tests/cloth_correctives.rs`):
+- `the_report_measures_what_the_shapes_leave_at_each_key_pose` (a 4.47 mm move, under the hold, is met at the key pose) and `a_whole_move_solve_separates_the_blend_from_the_hold` (a 22.4 mm move: held, the key pose keeps 16.4 mm and half way about half of it, 8.18 mm; solved whole, both are met; solved whole against a cloth that doesn't move half way, off by the weight's share of 22.4 mm). **Both failed** on a stub without `keys`: 6 tests run, 4 passed, 2 failed.
+- `an_unsmoothed_whole_solve_meets_each_key_pose` (a 4 mm checkerboard crumple in 5 mm cells: smoothed, the key pose keeps over 2 mm; whole and unsmoothed, the key pose and half way are met). **It failed** on a stub that ignored the rounds ("the key pose keeps 3.7879 / 6.2642 mm"): 7 tests run, 6 passed, 1 failed.
+- All 7 pass after the change.
+
+**Re-solved on the kept bake** (the same work folder and gate library as review fixes 1):
+- `pose_correctives -- solve`: shapes, rules and fingerprint identical to the committed sidecar's, and the half-way checks identical to review fixes 1's table. `TestTee.correctives.json` changed only its report (it gained `keys`, `moved_*` and `hold_mm`).
+- `pose_correctives -- solve-whole ... 12` (whole, smoothed as the sidecar is) and `... 0` (whole, unsmoothed). I first ran the unsmoothed case with a temporary edit of `SMOOTH_ROUNDS` (restored at once); the command reproduces it exactly.
+
+### The three losses, separated (the test tee's kept bake)
+
+Each cell is the 95th percentile / the worst corner, in mm, of the garment as the runtime would pose it against the simulated cloth (less the move at rest). "The cloth's own move" is the same with no shape, so a figure above it means the shapes make that place worse.
+
+**Half way** (95th percentile / most, mm):
+
+| Run, frame | The cloth's own move (no shape) | Committed (held to 6 mm, smoothed) | Whole, smoothed | Whole, unsmoothed |
+|---|---|---|---|---|
+| hang, 33 | 4.0 / 25.4 | 3.8 / 24.6 | 5.7 / 22.8 | 9.6 / 39.5 |
+| swing-left, 55 | 17.0 / 85.7 | 15.9 / 82.9 | 14.4 / 71.5 | 15.9 / 50.8 |
+| swing-left, 109 | 18.5 / 103.2 | 15.7 / 103.1 | 13.3 / 99.4 | 10.7 / 45.1 |
+| swing-right, 55 | 16.4 / 84.3 | 15.6 / 81.8 | 14.3 / 69.1 | 16.1 / 47.0 |
+| swing-right, 109 | 17.3 / 88.4 | 14.2 / 85.3 | 11.9 / 72.1 | 9.0 / 35.0 |
+| level, 33 | 9.6 / 25.1 | 7.7 / 24.2 | 3.9 / 22.3 | 2.1 / 6.6 |
+| raised, 53 | 30.9 / 76.6 | 24.0 / 73.1 | 8.6 / 63.2 | 3.8 / 8.6 |
+| elbows, 33 | 0.3 / 3.1 | 0.2 / 2.6 | 0.3 / 3.2 | 0.2 / 8.6 |
+| hips-left, 33 | 2.6 / 8.6 | 2.2 / 7.2 | 2.1 / 6.4 | 0.9 / 5.0 |
+| hips-right, 33 | 2.6 / 8.6 | 2.2 / 7.3 | 2.1 / 6.5 | 0.8 / 4.8 |
+| knees, 33 | 0.0 / 0.6 | 0.0 / 0.6 | 0.0 / 0.6 | 0.0 / 0.3 |
+
+**At the key pose** (95th percentile / most, mm):
+
+| Run, frame | The cloth's own move (no shape) | Committed (held to 6 mm, smoothed) | Whole, smoothed | Whole, unsmoothed |
+|---|---|---|---|---|
+| hang, 63 | 19.1 / 97.7 | 16.7 / 95.2 | 12.9 / 77.3 | 0.0 / 0.0 |
+| swing-left, 85 | 16.2 / 80.2 | 13.8 / 76.8 | 11.7 / 62.0 | 0.0 / 0.0 |
+| swing-left, 139 | 20.6 / 98.0 | 15.8 / 96.4 | 11.5 / 85.5 | 0.0 / 0.0 |
+| swing-right, 85 | 16.2 / 72.4 | 13.5 / 69.3 | 12.2 / 60.7 | 0.0 / 0.0 |
+| swing-right, 139 | 20.6 / 115.5 | 15.5 / 115.8 | 11.3 / 107.5 | 0.0 / 0.0 |
+| level, 63 | 19.0 / 48.7 | 14.6 / 46.6 | 6.5 / 42.2 | 0.0 / 0.0 |
+| raised, 83 | 39.4 / 98.5 | 30.6 / 93.2 | 8.9 / 73.9 | 0.0 / 0.0 |
+| elbows, 63 | 0.7 / 14.1 | 0.5 / 13.1 | 0.5 / 11.7 | 0.0 / 0.0 |
+| hips-left, 63 | 5.0 / 18.6 | 3.8 / 14.7 | 3.6 / 12.1 | 0.0 / 0.0 |
+| hips-right, 63 | 5.1 / 16.7 | 3.9 / 13.2 | 3.8 / 11.7 | 0.0 / 0.0 |
+| knees, 63 | 0.0 / 0.6 | 0.0 / 0.6 | 0.0 / 0.6 | 0.0 / 0.0 |
+
+**What the numbers show.**
+- **Blending between key poses does lose the stride's armpit, measured without the hold or the smoothing.** Whole and unsmoothed, every key pose is met exactly, yet half way through the swings the blend is off by a 95th percentile of 9.0 to 16.1 mm, where the cloth itself moves 16.4 to 18.5 mm, and by 35 to 51 mm at the worst corners. At a quarter of the swing (frame 55, half way to the swing's first half) the linear blend barely helps (15.9 and 16.1 mm against 17.0 and 16.4 mm): the cloth there doesn't move like half of the half-swing's move. Half way to the hanging arms the blend is worse than no shape (9.6 mm against 4.0 mm; worst 39.5 against 25.4 mm), and so is the elbows' worst corner (8.6 against 3.1 mm).
+- **Elsewhere blending follows well:** raising the arms (3.8 mm against a move of 30.9 mm), level (2.1 against 9.6 mm) and the hips (0.8 to 0.9 against 2.6 mm).
+- **The smoothing loses a lot at the key poses themselves.** Whole and smoothed, the shoulder key poses are still off by a 95th percentile of 6.5 to 12.9 mm, and by 42 to 107.5 mm at the worst corners. The simulated move at the armpit is crumpled at a triangle's scale, which the smoothing is there to leave out (`SMOOTH_ROUNDS`).
+- **The 6 mm hold is the gate's choice, not blending's.** It adds 1.3 to 4.3 mm to the 95th percentile at the hang's and the swings' key poses, 8.1 mm at level and 21.7 mm at raised. The gate sweep chose it ("What I tried": whole moves gave the stride's first third 21.5 mm and 43 bodies at Walk@18; held to 6 mm, 13.4 mm and 39), not a measurement of blends of whole moves.
+- **So on the stride's poses** (the hang and the swings) blending alone leaves errors half way (9 to 16 mm) of the same size as the hold and the smoothing together leave at the key poses (13.5 to 16.7 mm). No hold or smoothing setting would remove that. More key poses (the swing in quarters) or a blend that isn't linear would be needed, as open issue 1 already lists.
+
+### Wording corrected
+
+- `MOST_MOVE`'s doc comment (`fit/cloth.rs`) now says the gate sweep chose 6 mm, gives the sweep's figures, and gives the measured blending loss with `Solving::whole(0)`. The "up to 10 cm" figure is gone. `SMOOTH_ROUNDS`'s comment gives the smoothing's loss.
+- This hand-back: the opening paragraph, "What the bake measured", open issue 1 (now the three losses with their figures) and review fixes 1's "What this means". That paragraph's conclusion is marked as not measured there. Its "within 0.3 mm at the 95th percentile" away from the armpit is corrected to 2.2 mm (the hips; its own table says 2.18 and 2.21).
+- `wiki/Roadmap/Known-Limitations.md`: the cause sentence now gives the measured blending loss and says the gate chose the hold.
+- `architecture.md` section 9, `import/README.md`, `correctives.py`'s docstring and `testing.md`: the report's `keys`, `solve_with` and `Solving`, and `solve-whole`.
+- The first fixes' acceptance row ("the corrected half-way figures confirm that the blend can't follow the underarm bridge") was in the structured hand-back, not in a file. For the stride's poses the claim holds, now on this measurement; for raised and level it doesn't.
+
+### Non-blocking points also taken
+
+- `wiki/Engine-Systems/Characters.md` no longer says "at most 6 mm a corner": the hold is 6 mm in the key pose, and a stored offset reaches 6.3 mm.
+
+**Not taken (left for the lead):**
+- caching `Correctives::driven` and skipping unchanged weights in `drive_own`;
+- a CPU bench of the walk;
+- a synthetic test of `under_flipped_folds` alone;
+- requiring the `Corrective_` prefix in `PoseCorrective::check`. The bake writes `Corrective_Cloth_*` names, and a check would be cheap, but it changes a manifest rule, which is the lead's call.
+
+### Tests
+
+| Run | Result |
+|---|---|
+| `cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(cloth_correctives)'` (red: no `keys`) | 6 tests run: 4 passed, 2 failed |
+| the same (red: the rounds ignored) | 7 tests run: 6 passed, 1 failed |
+| the same, after | **7 tests run: 7 passed** |
+| `cargo nextest run -p axcenity-avatar --no-fail-fast` | **218 tests run: 218 passed**, 1 skipped |
+| `cargo nextest run -p axcenity-avatar -p axcenity-gameplay -p axcenity-player --no-fail-fast` | **544 tests run: 544 passed** (22 slow), 23 skipped; no FAIL, ABORT or TIMEOUT lines (`pose_corrective_tests`, the gate, `tee_crew_tests`, `wardrobe_tests` and `garment_checks` all pass on their unchanged records) |
+| `cargo clippy -p axcenity-avatar -p axcenity-gameplay -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all -- --check` | clean |
+| `python3 -I scripts/check-wiki.py` | 116 pages, 0 errors, 57 warnings |
+| `pose_correctives -- solve` on the kept bake | shapes, rules and fingerprint identical to the committed sidecar; half-way checks identical to review fixes 1's |
+| `pose_correctives -- solve-whole ... 12` and `... 0` | the tables above; with 0 rounds every key pose 0.0 mm |
+
+**Files changed in this fix:**
+- `crates/avatar/src/fit/cloth.rs`: `Solving`, `solve_with`, the report's `keys`, `moved_*` and `hold_mm`; `MOST_MOVE` and `SMOOTH_ROUNDS` public, their comments corrected. `crates/avatar/src/fit/mod.rs`: the exports.
+- `crates/avatar/examples/pose_correctives.rs`: `solve-whole`.
+- `crates/avatar/tests/cloth_correctives.rs`: three new tests; `hang_bake` takes a move per corner and a `Solving`.
+- `crates/avatar/tests/fixtures/test-tee/TestTee.correctives.json`: its report only.
+- Docs: this hand-back and its red-run file, `architecture.md`, `testing.md`, `import/README.md`, `correctives.py`'s docstring, `wiki/Roadmap/Known-Limitations.md`, `wiki/Engine-Systems/Characters.md`.
+
+**Merge notes:** `fit::solve` keeps its signature; `solve_with`, `Solving`, `MOST_MOVE` and `SMOOTH_ROUNDS` are new exports. The sidecar's report has new fields (nothing reads the report). After the drape-preserving fit merges and the tee is baked again, run `solve-whole ... 0` on the new work folder to see whether blending still loses the stride.

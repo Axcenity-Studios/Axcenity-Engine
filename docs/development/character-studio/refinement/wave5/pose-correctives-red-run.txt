@@ -104,3 +104,18 @@ cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(a_simpler_copys_cor
       left: Vec3(0.01, 0.0, 0.0)
      right: Vec3(0.0, 0.0, 0.0)
      Summary [   0.335s] 1 test run: 0 passed, 1 failed, 214 skipped
+
+== Review fixes 2: the key-pose residual and a whole-move solve ==
+Stub: solve_held(.., hold) ignored the hold (always MOST_MOVE) and the report had no `keys`.
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(cloth_correctives)'
+        FAIL a_whole_move_solve_separates_the_blend_from_the_hold
+    the report has no `keys`: {"checks":[{"frame":33,"median_mm":8.17784309387207,"most_mm":8.180421829223633,...,"run":"hang"}],...}
+        FAIL the_report_measures_what_the_shapes_leave_at_each_key_pose
+    the report has no `keys`: {"checks":[{"frame":33,"median_mm":0.00006174746522447094,...,"run":"hang"}],...}
+     Summary [   0.443s] 6 tests run: 4 passed, 2 failed, 0 skipped
+
+Stub: Solving { hold, smooth_rounds } with solve_with honouring the hold but always smoothing SMOOTH_ROUNDS times.
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(cloth_correctives)'
+        FAIL an_unsmoothed_whole_solve_meets_each_key_pose
+    whole and unsmoothed, the key pose keeps 3.7879 / 6.2642 mm
+     Summary [   0.456s] 7 tests run: 6 passed, 1 failed, 0 skipped

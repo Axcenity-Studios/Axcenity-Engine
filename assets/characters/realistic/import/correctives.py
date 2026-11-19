@@ -10,7 +10,7 @@ Four steps, each also runnable alone with `--only`:
 |---|---|---|
 | dump | The engine's poses (`cargo run -p axcenity-avatar --release --example pose_correctives -- dump`): the body and the garment, and per run the skin posed in each frame and the garment as linear skinning poses it today | `bake.json`, `*.f32`, `*.u32` |
 | simulate | Blender's cloth simulation per run (bpy): the body a collider moving through the run's frames, the garment's cloth starting at rest and held towards its skinned place by a pin goal that lets go where skinning stretches or squeezes it (the bridge between the arm and the side); the cloth read at each of the run's reads | `<run>.sim.f32`, `simulate.json` |
-| solve | The shapes (`... -- solve`): at each key pose the simulated cloth less the skinned one, taken back to rest, less what the simulation moved at rest; then, with every shape solved, the garment posed with all of them half way to each key pose is checked against the simulation | `--out` (`<Object>.correctives.json`), `solve.json` |
+| solve | The shapes (`... -- solve`): at each key pose the simulated cloth less the skinned one, taken back to rest, less what the simulation moved at rest; then, with every shape solved, the garment posed with all of them is measured against the simulation half way to each key pose and at it | `--out` (`<Object>.correctives.json`), `solve.json` |
 | add | The shapes into the item's model and manifest (`... -- add`) | the item in `--library` |
 
     python -I correctives.py --library <library> --item <item ID> --work <folder> \\

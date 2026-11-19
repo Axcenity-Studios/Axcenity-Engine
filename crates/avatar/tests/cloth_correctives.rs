@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use axcenity_assets::{Assets, BoneTransform, Rig};
 use axcenity_avatar::PoseCorrective;
 use axcenity_avatar::fit::{
-    BodyMesh, CLOTH_PREFIX, CORRECTIVE_RULES, ClothRead, ClothRun, FitError, cloth_rules,
-    cloth_runs, corrective_weights, rule_weight, skin, skin_matrices, solve,
+    BodyMesh, CLOTH_PREFIX, CORRECTIVE_RULES, ClothRead, ClothRun, FitError, MOST_MOVE, Solving,
+    cloth_rules, cloth_runs, corrective_weights, rule_weight, skin, skin_matrices, solve_with,
 };
 use glam::{Quat, Vec3};
 
@@ -214,16 +214,18 @@ fn skinned(
 
 /// The bake's first run (the arms let down to hang) on the bra, solved
 /// from a simulation that moves the cloth as skinning does, but everywhere
-/// by a settle `drift` at rest, by `moved` at the key pose and by
-/// `at_check(w) * moved` half way, where `w` is the Lowered rules' weight
-/// there (all taken through each corner's skinning). Returns the shapes
-/// and `w`.
+/// by a settle `drift` at rest, by `moved(rest)` at the key pose and by
+/// `at_check(w) * moved(rest)` half way, where `w` is the Lowered rules'
+/// weight there (all taken through each corner's skinning), solved as
+/// `solving` says (`Solving::SIDECAR` as the committed bake). Returns the
+/// shapes and `w`.
 fn hang_bake(
     garment: &BodyMesh,
     rules: &[PoseCorrective],
     rig: &Rig,
-    moved: Vec3,
+    moved: &dyn Fn(Vec3) -> Vec3,
     at_check: &dyn Fn(f32) -> f32,
+    solving: Solving,
 ) -> (axcenity_avatar::fit::PoseShapes, f32) {
     let runs: Vec<ClothRun> = cloth_runs(rig, rules, Some(finish_pose))
         .into_iter()
@@ -251,20 +253,27 @@ fn hang_bake(
             .iter()
             .zip(&linear)
             .zip(&garment.positions)
-            .map(|((p, l), rest)| *p + *l * (drift(*rest) + moved * share))
+            .map(|((p, l), rest)| *p + *l * (drift(*rest) + moved(*rest) * share))
             .collect())
     };
     (
-        solve(garment, rules, &runs, &simulated).unwrap(),
+        solve_with(garment, rules, &runs, &simulated, solving).unwrap(),
         check_weight,
     )
 }
 
 /// The half-way check's figures (median, most; mm).
 fn check_mm(shapes: &axcenity_avatar::fit::PoseShapes) -> (f64, f64) {
-    let checks = shapes.report["checks"].as_array().unwrap();
-    assert_eq!(checks.len(), 1);
-    let mm = |key: &str| checks[0][key].as_f64().unwrap();
+    report_mm(shapes, "checks")
+}
+
+/// The one entry of the report's `list` (median, most; mm).
+fn report_mm(shapes: &axcenity_avatar::fit::PoseShapes, list: &str) -> (f64, f64) {
+    let entries = shapes.report[list]
+        .as_array()
+        .unwrap_or_else(|| panic!("the report has no `{list}`: {}", shapes.report));
+    assert_eq!(entries.len(), 1, "{list}");
+    let mm = |key: &str| entries[0][key].as_f64().unwrap();
     (mm("median_mm"), mm("most_mm"))
 }
 
@@ -281,7 +290,14 @@ fn a_simulated_move_comes_back_as_its_poses_shapes() {
     let rig = &body.rig;
     let rules = cloth_rules(rig);
     let moved = Vec3::new(0.0, 0.002, 0.004);
-    let (shapes, w) = hang_bake(&garment, &rules, rig, moved, &|_| 0.0);
+    let (shapes, w) = hang_bake(
+        &garment,
+        &rules,
+        rig,
+        &|_| moved,
+        &|_| 0.0,
+        Solving::SIDECAR,
+    );
     let names: Vec<&str> = shapes.shapes.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         names,
@@ -322,10 +338,128 @@ fn the_half_way_check_measures_the_blend_of_the_solved_shapes() {
     let rig = &body.rig;
     let rules = cloth_rules(rig);
     let moved = Vec3::new(0.0, 0.002, 0.004);
-    let (shapes, w) = hang_bake(&garment, &rules, rig, moved, &|w| w);
+    let (shapes, w) = hang_bake(&garment, &rules, rig, &|_| moved, &|w| w, Solving::SIDECAR);
     let (median, most) = check_mm(&shapes);
     assert!(
         median < 0.02 && most < 0.1,
         "the cloth moved {w} of the key pose's move half way, as the blend does; the check says median {median:.4}, most {most:.4} mm"
+    );
+}
+
+/// Beside each half-way check the report gives the key pose's own: the
+/// garment posed with every solved shape at its weight there, against the
+/// simulation. A move under the hold comes back whole, so nothing is left
+/// at the key pose.
+#[test]
+fn the_report_measures_what_the_shapes_leave_at_each_key_pose() {
+    let (body, garment) = body_and("Underwear_Bra");
+    let rig = &body.rig;
+    let rules = cloth_rules(rig);
+    let moved = Vec3::new(0.0, 0.002, 0.004);
+    let (shapes, _) = hang_bake(&garment, &rules, rig, &|_| moved, &|w| w, Solving::SIDECAR);
+    let (median, most) = report_mm(&shapes, "keys");
+    assert!(
+        median < 0.02 && most < 0.1,
+        "a 4.47 mm move is solved whole; the key pose's check says median {median:.4}, most {most:.4} mm"
+    );
+}
+
+/// A move larger than the hold (22.4 mm against 6 mm): held, the key pose
+/// keeps the rest (16.4 mm) and a linear blend half way keeps about half
+/// of it. Solved whole (no hold, for measuring only), the key pose is met
+/// and a simulation that moves by the rule's weight half way is met too;
+/// one that doesn't move half way is off by the weight's share of the
+/// whole move. So the whole-move solve separates what blending loses from
+/// what the hold loses. (A uniform move: smoothing keeps it.)
+#[test]
+fn a_whole_move_solve_separates_the_blend_from_the_hold() {
+    let (body, garment) = body_and("Underwear_Bra");
+    let rig = &body.rig;
+    let rules = cloth_rules(rig);
+    let moved = Vec3::new(0.0, 0.01, 0.02);
+    let whole = f64::from(moved.length() * 1000.0);
+    let held = whole - f64::from(MOST_MOVE * 1000.0);
+    let near = |got: f64, want: f64, slack: f64, what: &str| {
+        assert!(
+            (got - want).abs() < slack,
+            "{what}: {got:.3} mm, expected {want:.3}"
+        );
+    };
+
+    let (shapes, w) = hang_bake(&garment, &rules, rig, &|_| moved, &|w| w, Solving::SIDECAR);
+    let w = f64::from(w);
+    let (median, most) = report_mm(&shapes, "keys");
+    near(median, held, 0.2, "held, key pose median");
+    near(most, held, 0.3, "held, key pose most");
+    let (median, _) = check_mm(&shapes);
+    near(median, w * held, 0.2, "held, half way median");
+
+    let (shapes, _) = hang_bake(
+        &garment,
+        &rules,
+        rig,
+        &|_| moved,
+        &|w| w,
+        Solving::whole(Solving::SIDECAR.smooth_rounds),
+    );
+    let (median, most) = report_mm(&shapes, "keys");
+    assert!(
+        median < 0.05 && most < 0.2,
+        "whole, key pose: {median:.4} / {most:.4} mm"
+    );
+    let (median, most) = check_mm(&shapes);
+    assert!(
+        median < 0.05 && most < 0.2,
+        "whole, half way: {median:.4} / {most:.4} mm"
+    );
+
+    let (shapes, _) = hang_bake(
+        &garment,
+        &rules,
+        rig,
+        &|_| moved,
+        &|_| 0.0,
+        Solving::whole(Solving::SIDECAR.smooth_rounds),
+    );
+    let (median, most) = check_mm(&shapes);
+    near(median, w * whole, 0.1, "whole, still half way median");
+    near(most, w * whole, 0.2, "whole, still half way most");
+}
+
+/// A move crumpled at a few millimetres (a checkerboard of 5 mm cells, up
+/// and down by 4 mm, under the hold): the sidecar's smoothing irons it
+/// out, so the key pose is left about 4 mm off; solved whole and
+/// unsmoothed (for measuring only) the key pose is met exactly, so what
+/// is left half way is what blending alone loses.
+#[test]
+fn an_unsmoothed_whole_solve_meets_each_key_pose() {
+    let (body, garment) = body_and("Underwear_Bra");
+    let rig = &body.rig;
+    let rules = cloth_rules(rig);
+    let crumpled = |rest: Vec3| {
+        let cell = (rest.x * 200.0).floor() as i32 + (rest.y * 200.0).floor() as i32;
+        Vec3::new(
+            0.0,
+            if cell.rem_euclid(2) == 0 {
+                0.004
+            } else {
+                -0.004
+            },
+            0.0,
+        )
+    };
+    let (shapes, _) = hang_bake(&garment, &rules, rig, &crumpled, &|w| w, Solving::SIDECAR);
+    let (median, _) = report_mm(&shapes, "keys");
+    assert!(median > 2.0, "smoothed, the key pose keeps {median:.3} mm");
+    let (shapes, _) = hang_bake(&garment, &rules, rig, &crumpled, &|w| w, Solving::whole(0));
+    let (median, most) = report_mm(&shapes, "keys");
+    assert!(
+        median < 0.02 && most < 0.1,
+        "whole and unsmoothed, the key pose keeps {median:.4} / {most:.4} mm"
+    );
+    let (median, most) = check_mm(&shapes);
+    assert!(
+        median < 0.02 && most < 0.1,
+        "and half way a cloth that moves by the weight is met: {median:.4} / {most:.4} mm"
     );
 }

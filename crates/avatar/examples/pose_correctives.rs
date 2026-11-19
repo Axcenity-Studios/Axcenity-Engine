@@ -7,12 +7,20 @@
 //! cargo run -p axcenity-avatar --release --example pose_correctives -- dump <library> <item ID> <work folder>
 //! cargo run -p axcenity-avatar --release --example pose_correctives -- solve <library> <item ID> <work folder> <out .correctives.json>
 //! cargo run -p axcenity-avatar --release --example pose_correctives -- add <library> <item ID> <.correctives.json>
+//! cargo run -p axcenity-avatar --release --example pose_correctives -- solve-whole <library> <item ID> <work folder> <out report .json> [smoothing rounds]
 //! ```
 //!
 //! - `dump` writes the body, the garment and each run's frames (the skin
 //!   posed, the garment as skinning poses it) into the work folder.
 //! - `solve` reads the simulation's results (`<run>.sim.f32`, the cloth at
 //!   each of the run's reads in order) and writes the shapes.
+//! - `solve-whole` solves the same results with each key pose's move
+//!   taken whole (not held to `MOST_MOVE`), smoothed as the sidecar is or
+//!   the given number of rounds, and writes only the report: how far a
+//!   blend of whole moves is from the cloth half way and at the key poses.
+//!   With 0 rounds the key poses are met exactly, so what is left half way
+//!   is what blending loses. It is for measuring; it never writes a
+//!   sidecar.
 //! - `add` writes the shapes into the item's model and its manifest's
 //!   `correctives` (the item's model must be as exported, without any).
 
@@ -20,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use axcenity_avatar::fit::{
-    FitError, PoseShapes, add_to_item, cloth_rules, cloth_runs, item_meshes, solve,
+    FitError, PoseShapes, Solving, add_to_item, cloth_rules, cloth_runs, item_meshes, solve_with,
     write_bake_input,
 };
 use glam::Vec3;
@@ -31,7 +39,9 @@ fn finish(rig: &axcenity_assets::Rig, pose: &mut Vec<axcenity_assets::BoneTransf
 
 fn run(args: &[String]) -> Result<(), FitError> {
     let usage = || {
-        FitError::Model("usage: pose_correctives dump|solve|add <library> <item ID> ...".to_owned())
+        FitError::Model(
+            "usage: pose_correctives dump|solve|solve-whole|add <library> <item ID> ...".to_owned(),
+        )
     };
     let (command, library, id) = match args {
         [command, library, id, ..] => (command.as_str(), PathBuf::from(library), id.as_str()),
@@ -53,7 +63,12 @@ fn run(args: &[String]) -> Result<(), FitError> {
             );
             Ok(())
         }
-        ("solve", [work, out]) => {
+        ("solve", [work, out]) | ("solve-whole", [work, out, ..]) => {
+            let whole = command == "solve-whole";
+            let rounds = match args.get(5) {
+                Some(rounds) => rounds.parse().map_err(|_| usage())?,
+                None => Solving::SIDECAR.smooth_rounds,
+            };
             let (body, garment) = item_meshes(&library, id)?;
             let rules = cloth_rules(&body.rig);
             let runs = cloth_runs(&body.rig, &rules, Some(finish));
@@ -76,8 +91,18 @@ fn run(args: &[String]) -> Result<(), FitError> {
                     .map(|v| Vec3::new(v[0], v[1], v[2]))
                     .collect())
             };
-            let shapes = solve(&garment, &rules, &runs, &simulated)?;
-            std::fs::write(out, shapes.to_json()).map_err(|e| FitError::Write {
+            let solving = if whole {
+                Solving::whole(rounds)
+            } else {
+                Solving::SIDECAR
+            };
+            let shapes = solve_with(&garment, &rules, &runs, &simulated, solving)?;
+            let text = if whole {
+                serde_json::to_string_pretty(&shapes.report).unwrap_or_default()
+            } else {
+                shapes.to_json()
+            };
+            std::fs::write(out, text).map_err(|e| FitError::Write {
                 path: out.clone(),
                 message: e.to_string(),
             })?;

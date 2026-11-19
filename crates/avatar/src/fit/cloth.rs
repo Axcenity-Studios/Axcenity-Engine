@@ -66,18 +66,22 @@ const SIDE_BLEND: f32 = 0.04;
 
 /// How many rounds a solved shape is smoothed over the garment's surface:
 /// the simulation's small crinkles (a coarse mesh squeezed into folds a
-/// triangle wide) are left out, the cloth's larger move kept.
-const SMOOTH_ROUNDS: usize = 12;
+/// triangle wide) are left out, the cloth's larger move kept. At the
+/// test tee's shoulder key poses that leaves whole moves off the cloth by
+/// a 95th percentile of 6.5 to 12.9 mm (review fixes 2).
+pub const SMOOTH_ROUNDS: usize = 12;
 
-/// The most a key pose's shape moves a corner, in the pose (metres). The
-/// simulation lets the bridge of cloth under the arm move 5 to 10 cm, and
-/// folds it differently in each key pose, so that blends of whole moves
-/// are far from the cloth between the key poses (checked half way: up to
-/// 10 cm) and a shape the body's own shapes and other bodies' proportions
-/// change opens or shuts the armpit (the gate's T-pose and arms-raised
-/// cases). Measured on the test tee (pose-correctives.md): moves held to
-/// 4, 6 and 10 mm, and whole ones; 6 mm did best in the stride.
-const MOST_MOVE: f32 = 0.006;
+/// The most a key pose's shape moves a corner, in the pose (metres).
+/// Chosen by the fit gate on the test tee (pose-correctives.md, "What I
+/// tried"): the same simulations solved whole and held to 10, 6 and 4 mm;
+/// 6 mm did best in the stride (whole: worst 21.5 mm in its first third
+/// and 43 bodies at Walk@18; held to 6 mm: 13.4 mm and 39). It is not what
+/// keeps blends from the cloth between key poses: shapes that meet each
+/// key pose exactly (`Solving::whole(0)`) are still off the simulated
+/// cloth half way through the swings by a 95th percentile of 9 to 16 mm,
+/// where the cloth itself moves 16 to 19 mm (review fixes 2 in
+/// pose-correctives.md).
+pub const MOST_MOVE: f32 = 0.006;
 
 /// A shape that moves no corner further than this is dropped (metres).
 const LEAST_SHAPE: f32 = 0.0005;
@@ -772,16 +776,58 @@ fn side_share(x: f32, side: f32) -> f32 {
 
 /// Solves the shapes from the simulation's results: `simulated(run, read)`
 /// is the cloth (file space) at each of a run's reads in order. Shapes
-/// are solved in the runs' order, each on top of the ones before. Then,
-/// with every shape solved, each half-way check compares the garment as
-/// the runtime would pose it there (every shape at its rule's weight)
-/// with the simulated cloth.
+/// are solved in the runs' order, each on top of the ones before, each key
+/// pose's move held to `MOST_MOVE` a corner. Then, with every shape
+/// solved, the report compares the garment as the runtime would pose it
+/// (every shape at its rule's weight) with the simulated cloth, half way
+/// (`checks`) and at each key pose (`keys`).
 pub fn solve(
     garment: &BodyMesh,
     rules: &[PoseCorrective],
     runs: &[ClothRun],
     simulated: &dyn Fn(usize, usize) -> Result<Vec<Vec3>, FitError>,
 ) -> Result<PoseShapes, FitError> {
+    solve_with(garment, rules, runs, simulated, Solving::SIDECAR)
+}
+
+/// How [`solve_with`] makes a key pose's move into shapes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Solving {
+    /// The most a key pose's move moves a corner (posed space, metres),
+    /// or the whole move with `None`.
+    pub hold: Option<f32>,
+    /// How many rounds each shape is smoothed over the garment's surface.
+    pub smooth_rounds: usize,
+}
+
+impl Solving {
+    /// As a garment's sidecar is solved: held to [`MOST_MOVE`], smoothed
+    /// [`SMOOTH_ROUNDS`] times.
+    pub const SIDECAR: Solving = Solving {
+        hold: Some(MOST_MOVE),
+        smooth_rounds: SMOOTH_ROUNDS,
+    };
+
+    /// Whole moves smoothed `smooth_rounds` times: for measuring only (with
+    /// 0, the key poses are met exactly and what is left half way is what
+    /// blending between key poses loses). Never a sidecar.
+    pub const fn whole(smooth_rounds: usize) -> Solving {
+        Solving {
+            hold: None,
+            smooth_rounds,
+        }
+    }
+}
+
+/// [`solve`] as `solving` says.
+pub fn solve_with(
+    garment: &BodyMesh,
+    rules: &[PoseCorrective],
+    runs: &[ClothRun],
+    simulated: &dyn Fn(usize, usize) -> Result<Vec<Vec3>, FitError>,
+    solving: Solving,
+) -> Result<PoseShapes, FitError> {
+    let hold = solving.hold;
     let count = garment.positions.len();
     let world = garment.rig.world(&garment.rig.rest_pose());
     let side_of = |rule: &PoseCorrective| -> f32 {
@@ -805,7 +851,7 @@ pub fn solve(
     // The simulation's move at a read, less its move at rest (`drift`,
     // rest space), taken back to rest through each corner's skinning,
     // with the garment posed with `solved`; and each corner's linear part.
-    // A key pose's move is held to `MOST_MOVE` a corner (posed space).
+    // A key pose's move is held to `hold` a corner (posed space).
     let moved_back = |cloth: &[Vec3],
                       bones: &[BoneTransform],
                       solved: &BTreeMap<String, Vec<Vec3>>,
@@ -842,7 +888,7 @@ pub fn solve(
                 }
                 ClothRead::Solve { shapes, .. } => {
                     let cloth = read_cloth(r, k)?;
-                    let (back, _) = moved_back(&cloth, bones, &solved, &drift, Some(MOST_MOVE));
+                    let (back, _) = moved_back(&cloth, bones, &solved, &drift, hold);
                     for shape in shapes {
                         let Some(rule) = rules.iter().find(|r| r.shape == *shape) else {
                             continue;
@@ -860,40 +906,62 @@ pub fn solve(
                             .zip(&garment.positions)
                             .map(|(b, rest)| *b * (side_share(rest.x, side) / w))
                             .collect();
-                        solved.insert(shape.clone(), smooth(&neighbours, offsets));
+                        solved.insert(
+                            shape.clone(),
+                            smooth(&neighbours, offsets, solving.smooth_rounds),
+                        );
                     }
                 }
             }
         }
         drifts.push(drift);
     }
-    // Then the checks, with every shape: how far the cloth the runtime
-    // would show half way is from the simulated cloth (the whole move,
-    // not held to `MOST_MOVE`). A shape dropped below `LEAST_SHAPE` later
-    // is still in the blend here; it moves under half a millimetre.
+    // Then the report, with every shape: how far the cloth the runtime
+    // would show is from the simulated cloth (the whole move, not held),
+    // half way (`checks`: what blending between key poses, the hold and
+    // the smoothing lose together) and at the key poses (`keys`: what the
+    // hold and the smoothing lose). Beside each, how far the simulation moved the
+    // cloth from skinning (`moved_*`). A shape dropped below `LEAST_SHAPE`
+    // later is still in the blend here; it moves under half a millimetre.
     let mut checks = Vec::new();
+    let mut keys = Vec::new();
+    let no_shapes = BTreeMap::new();
     for (r, run) in runs.iter().enumerate() {
         for (k, read) in run.reads.iter().enumerate() {
-            if !matches!(read, ClothRead::Check { .. }) {
+            if matches!(read, ClothRead::Rest { .. }) {
                 continue;
             }
             let cloth = read_cloth(r, k)?;
             let bones = &run.frames[read.frame()];
-            let (back, linear) = moved_back(&cloth, bones, &solved, &drifts[r], None);
-            let mut errors: Vec<f32> = back
-                .iter()
-                .zip(&linear)
-                .map(|(b, l)| (*l * *b).length())
-                .collect();
-            errors.sort_by(f32::total_cmp);
-            let at = |q: f32| errors[((errors.len() - 1) as f32 * q) as usize] * 1000.0;
-            checks.push(json!({
+            let figures = |shapes: &BTreeMap<String, Vec<Vec3>>| {
+                let (back, linear) = moved_back(&cloth, bones, shapes, &drifts[r], None);
+                let mut errors: Vec<f32> = back
+                    .iter()
+                    .zip(&linear)
+                    .map(|(b, l)| (*l * *b).length())
+                    .collect();
+                errors.sort_by(f32::total_cmp);
+                let at = |q: f32| errors[((errors.len() - 1) as f32 * q) as usize] * 1000.0;
+                [at(0.5), at(0.95), at(1.0)]
+            };
+            let [median, p95, most] = figures(&solved);
+            let [_, moved_p95, moved_most] = figures(&no_shapes);
+            let mut entry = json!({
                 "run": run.name,
                 "frame": read.frame(),
-                "median_mm": at(0.5),
-                "p95_mm": at(0.95),
-                "most_mm": at(1.0),
-            }));
+                "median_mm": median,
+                "p95_mm": p95,
+                "most_mm": most,
+                "moved_p95_mm": moved_p95,
+                "moved_most_mm": moved_most,
+            });
+            match read {
+                ClothRead::Solve { shapes, .. } => {
+                    entry["shapes"] = json!(shapes);
+                    keys.push(entry);
+                }
+                _ => checks.push(entry),
+            }
         }
     }
     let mut shapes = Vec::new();
@@ -933,7 +1001,12 @@ pub fn solve(
         fingerprint: fingerprint(&garment.positions),
         rules: rules.to_vec(),
         shapes,
-        report: json!({"shapes": per_shape, "checks": checks}),
+        report: json!({
+            "hold_mm": hold.map(|h| h * 1000.0),
+            "shapes": per_shape,
+            "checks": checks,
+            "keys": keys,
+        }),
     })
 }
 
@@ -969,10 +1042,10 @@ fn neighbours(garment: &BodyMesh) -> Vec<Vec<u32>> {
     welded.iter().map(|&w| around[w as usize].clone()).collect()
 }
 
-/// `offsets` smoothed [`SMOOTH_ROUNDS`] times: each round a corner moves
+/// `offsets` smoothed `rounds` times: each round a corner moves
 /// half way to its neighbours' mean.
-fn smooth(neighbours: &[Vec<u32>], mut offsets: Vec<Vec3>) -> Vec<Vec3> {
-    for _ in 0..SMOOTH_ROUNDS {
+fn smooth(neighbours: &[Vec<u32>], mut offsets: Vec<Vec3>, rounds: usize) -> Vec<Vec3> {
+    for _ in 0..rounds {
         offsets = neighbours
             .iter()
             .zip(&offsets)
