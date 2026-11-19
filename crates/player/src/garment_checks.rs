@@ -653,7 +653,7 @@ fn foot_report(
 }
 
 /// The realistic cast (both frames) in the test tee over the underwear.
-fn realistic_cast() -> Vec<Description> {
+pub(super) fn realistic_cast() -> Vec<Description> {
     super::fit_gate_tests::bodies()
         .into_iter()
         .filter(|d| d.name.contains("-cast-"))

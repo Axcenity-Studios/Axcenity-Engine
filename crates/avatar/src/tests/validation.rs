@@ -237,3 +237,69 @@ fn a_description_with_mistakes_reports_each() {
     assert_problem(&lost.validate(&library), &["base", "test/nobody"]);
     assert_problem(&lost.validate(&Library::new()), &["base"]);
 }
+
+/// Pose correctives (wave 5): an item's file may carry shapes a joint
+/// drives; they read and write back as written, and a rule that can't
+/// drive anything is a problem.
+#[test]
+fn an_items_pose_correctives_read_back_and_bad_ones_are_reported() {
+    let mut item = fixtures::item(TEE);
+    assert!(
+        item.correctives.is_empty(),
+        "optional: older files have none"
+    );
+    assert!(!item.to_json().contains("correctives"));
+    let rule = |shape: &str, bone: &str, axis: [f32; 3], angles: [f32; 2]| crate::PoseCorrective {
+        shape: shape.to_owned(),
+        bone: bone.to_owned(),
+        axis,
+        angles,
+    };
+    item.correctives = vec![rule(
+        "Corrective_Cloth_Shoulder_Lowered_Left",
+        "LeftUpperArm",
+        [0.0, 0.37768, -0.92594],
+        [0.0, 35.0],
+    )];
+    assert_eq!(texts(&item.validate()), Vec::<String>::new());
+    let again = crate::ItemManifest::from_json(&item.to_json()).unwrap();
+    assert_eq!(again.correctives, item.correctives);
+    item.correctives.extend([
+        rule(
+            "Corrective_Cloth_Shoulder_Lowered_Left",
+            "LeftUpperArm",
+            [0.0, 0.0, 1.0],
+            [0.0, 35.0],
+        ),
+        rule(
+            "Corrective_Cloth_Elbow_Bent_Left",
+            "",
+            [0.0, 0.0, 1.0],
+            [0.0, 90.0],
+        ),
+        rule(
+            "Corrective_Cloth_Knee_Bent_Left",
+            "LeftLowerLeg",
+            [0.0, 0.0, 0.0],
+            [0.0, 90.0],
+        ),
+        rule(
+            "Corrective_Cloth_Hip_Forward_Left",
+            "LeftUpperLeg",
+            [1.0, 0.0, 0.0],
+            [30.0, 0.0],
+        ),
+        rule(
+            "Corrective_Cloth_Hip_Back_Left",
+            "LeftUpperLeg",
+            [2.0, 0.0, 0.0],
+            [0.0, 30.0],
+        ),
+    ]);
+    let problems = item.validate();
+    assert_problem(&problems, &["correctives[1]", "used twice"]);
+    assert_problem(&problems, &["correctives[2].bone", "empty"]);
+    assert_problem(&problems, &["correctives[3].axis"]);
+    assert_problem(&problems, &["correctives[4].angles"]);
+    assert_problem(&problems, &["correctives[5].axis", "unit"]);
+}

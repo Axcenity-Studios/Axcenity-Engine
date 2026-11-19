@@ -743,10 +743,12 @@ mod tests {
                 MorphTarget {
                     name: "Wide".to_owned(),
                     default_weight: 0.0,
+                    driver: None,
                 },
                 MorphTarget {
                     name: "Blink".to_owned(),
                     default_weight: 0.0,
+                    driver: None,
                 },
             ],
             identity_pose: Vec::new(),

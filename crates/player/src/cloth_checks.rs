@@ -1123,6 +1123,7 @@ mod synthetic {
             positions: Vec::new(),
             normals: Vec::new(),
             triangles: Vec::new(),
+            hidden: Vec::new(),
         };
         for j in 0..=cells {
             for i in 0..=cells {
@@ -1308,6 +1309,7 @@ mod synthetic {
             positions: Vec::new(),
             normals: Vec::new(),
             triangles: Vec::new(),
+            hidden: Vec::new(),
         };
         for y in [0.0, 0.15] {
             for i in 0..n {

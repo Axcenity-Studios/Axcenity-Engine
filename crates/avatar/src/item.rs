@@ -99,6 +99,50 @@ pub struct ItemManifest {
     /// [`ItemManifest::state`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality: Option<Quality>,
+    /// Its pose correctives (wave 5, `architecture.md` section 8): shapes
+    /// of its model, baked from cloth simulation, that a joint drives by
+    /// the rule the body's correctives use. Its model's file carries the
+    /// same rules (`extras.axcenity_correctives`), which the runtime reads;
+    /// none for an item without (it poses with the body's shapes alone).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub correctives: Vec<PoseCorrective>,
+}
+
+/// A pose corrective an item carries (wave 5): its shape's weight is
+/// `smoothstep((θ − start) / (full − start))`, θ the twist in degrees
+/// about `axis` (a unit vector in the space of the bone's parent at rest)
+/// of `bone`'s turn from rest. The body's correctives' rule
+/// (`architecture.md` section 7), in the same form.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PoseCorrective {
+    pub shape: String,
+    pub bone: String,
+    pub axis: [f32; 3],
+    pub angles: [f32; 2],
+}
+
+impl PoseCorrective {
+    /// Its problems, `at` its place in the manifest.
+    fn check(&self, at: &str, p: &mut Vec<Problem>) {
+        not_empty(p, &format!("{at}.bone"), &self.bone);
+        let length = self.axis.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if !length.is_finite() || (length - 1.0).abs() > 1e-3 {
+            p.push(Problem::new(
+                format!("{at}.axis"),
+                format!("is {:?}; it must be a unit vector", self.axis),
+            ));
+        }
+        let [start, full] = self.angles;
+        if !(start.is_finite() && full.is_finite() && start < full) {
+            p.push(Problem::new(
+                format!("{at}.angles"),
+                format!(
+                    "are {:?}; the start must be below the full angle",
+                    self.angles
+                ),
+            ));
+        }
+    }
 }
 
 /// A mask of what an item hides under it, triangle by triangle: an image
@@ -639,6 +683,10 @@ impl ItemManifest {
             not_empty(p, "source.licence", &source.licence);
         }
         self.check_capabilities(p);
+        unique(p, "correctives", self.correctives.iter().map(|c| &c.shape));
+        for (index, corrective) in self.correctives.iter().enumerate() {
+            corrective.check(&format!("correctives[{index}]"), p);
+        }
         problems
     }
 

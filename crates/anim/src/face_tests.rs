@@ -47,6 +47,7 @@ fn head(head_turn: Quat) -> Model {
         .map(|(name, default_weight)| MorphTarget {
             name: name.into(),
             default_weight,
+            driver: None,
         })
         .collect();
     model.rig = Some(Arc::new(Rig {

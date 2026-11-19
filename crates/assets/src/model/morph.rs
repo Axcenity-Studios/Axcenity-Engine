@@ -25,6 +25,61 @@ pub struct MorphTarget {
     pub name: String,
     /// The weight the file rests it at, usually 0.
     pub default_weight: f32,
+    /// The joint that drives it, for a pose corrective the model carries
+    /// its own rule for (a garment's shapes baked from cloth simulation,
+    /// wave 5): a glTF mesh's `extras.axcenity_correctives`. `None` for
+    /// every other shape, including the realistic body's correctives,
+    /// whose rules `anim` knows by name.
+    pub driver: Option<PoseDriver>,
+}
+
+/// How a joint drives a blend shape (the rule `anim::correctives` applies
+/// to the body's correctives): its weight is how far `bone` has turned
+/// from rest about `axis` (a unit vector in the space of the bone's
+/// parent at rest), eased from 0 at `start` degrees to 1 at `full`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PoseDriver {
+    pub bone: String,
+    pub axis: [f32; 3],
+    pub start: f32,
+    pub full: f32,
+}
+
+impl PoseDriver {
+    /// One rule as a glTF mesh's `extras.axcenity_correctives` (and an
+    /// item manifest's `correctives`) writes it: `{shape, bone, axis,
+    /// angles: [start, full]}`. `None` unless the bone is named, the axis
+    /// isn't zero and the angles rise.
+    pub fn from_json(rule: &serde_json::Value) -> Option<(String, PoseDriver)> {
+        let shape = rule.get("shape")?.as_str()?.to_owned();
+        let bone = rule.get("bone")?.as_str()?.to_owned();
+        let number = |value: &serde_json::Value| value.as_f64().map(|v| v as f32);
+        let axis = rule.get("axis")?.as_array()?;
+        let angles = rule.get("angles")?.as_array()?;
+        let axis = [
+            number(axis.first()?)?,
+            number(axis.get(1)?)?,
+            number(axis.get(2)?)?,
+        ];
+        let (start, full) = (number(angles.first()?)?, number(angles.get(1)?)?);
+        let length = Vec3::from(axis).length();
+        let usable = !shape.is_empty()
+            && !bone.is_empty()
+            && length.is_finite()
+            && length > 1e-6
+            && start.is_finite()
+            && full.is_finite()
+            && start < full;
+        usable.then_some((
+            shape,
+            PoseDriver {
+                bone,
+                axis,
+                start,
+                full,
+            },
+        ))
+    }
 }
 
 /// The corners one blend shape moves in one primitive, at weight 1.
@@ -85,9 +140,18 @@ impl MorphNames {
             } else {
                 0.0
             },
+            driver: None,
         });
         self.by_name.insert(name.to_owned(), index);
         Some(index)
+    }
+
+    /// Gives the target called `name`, if there is one, the joint that
+    /// drives it.
+    pub(super) fn drive(&mut self, name: &str, driver: PoseDriver) {
+        if let Some(&index) = self.by_name.get(name) {
+            self.targets[usize::from(index)].driver = Some(driver);
+        }
     }
 
     pub(super) fn clear(&mut self) {

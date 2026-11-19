@@ -56,7 +56,7 @@ pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{
     Adjust, ContentTier, Fit, Groom, HideMap, ITEM_VERSION, ItemKind, ItemManifest, ItemParameter,
-    Limitation, Origin, Quality, Source, Variant,
+    Limitation, Origin, PoseCorrective, Quality, Source, Variant,
 };
 pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{

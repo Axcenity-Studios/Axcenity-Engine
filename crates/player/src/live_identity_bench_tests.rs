@@ -27,12 +27,34 @@ use super::*;
 /// `count` realistic characters in a grid, each with its own randomized
 /// description, idling; baked when `baked`.
 fn distinct_characters(count: usize, baked: bool) {
+    distinct_characters_in(count, baked, &repository_library(), None);
+}
+
+/// [`distinct_characters`] from the character library `library`, each
+/// also wearing `item` when one is given (wave 5's pose correctives: the
+/// fit gate's test tee with and without them, `tee` and
+/// `tee-correctives`).
+fn distinct_characters_in(
+    count: usize,
+    baked: bool,
+    library_root: &std::path::Path,
+    item: Option<(&str, &str)>,
+) {
     let name = format!(
-        "bench_distinct_characters: {count} {}",
-        if baked { "baked" } else { "live" }
+        "bench_distinct_characters: {count} {}{}",
+        if baked { "baked" } else { "live" },
+        item.map(|(_, label)| format!(" {label}"))
+            .unwrap_or_default()
     );
-    let stage =
-        Stage::new(&format!("bench-{count}-{baked}"), &repository_library()).expect("the stage");
+    let stage = Stage::new(
+        &format!(
+            "bench-{count}-{baked}{}",
+            item.map(|(_, label)| format!("-{label}"))
+                .unwrap_or_default()
+        ),
+        library_root,
+    )
+    .expect("the stage");
     let shipped = library(&stage.assets);
     let default = default_description(&shipped, "axcenity/realistic");
     let mut world = World::new();
@@ -43,13 +65,16 @@ fn distinct_characters(count: usize, baked: bool) {
         let at = Vector3::new(column * 3.0 - 13.5, 0.0, -row * 3.0);
         let character = axcenity_project::default_character(&mut world, at);
         world.set_parent(character, Some(workspace)).unwrap();
-        let description = randomize(
+        let mut description = randomize(
             &default,
             &Scope::All,
             &BTreeSet::new(),
             index as u64 + 1,
             &shipped,
         );
+        if let Some((id, _)) = item {
+            description.items.push(axcenity_avatar::WornItem::new(id));
+        }
         let applied =
             apply_description(&mut world, &stage.assets, character, &description).expect("applied");
         identities.extend(axcenity_anim::identity_key(&world, applied.body));
@@ -120,7 +145,8 @@ fn stylized_characters(count: usize) {
 }
 
 /// The counts and modes to run: `AXCENITY_BENCH_COUNTS` (default
-/// `1,10,20,50`) and `AXCENITY_BENCH_MODES` (default `live,baked,stylized`).
+/// `1,10,20,50`) and `AXCENITY_BENCH_MODES` (default `live,baked,stylized`;
+/// also `tee` and `tee-correctives`, wave 5's pose correctives).
 fn bench_plan() -> (Vec<usize>, Vec<String>) {
     let counts = std::env::var("AXCENITY_BENCH_COUNTS").unwrap_or_else(|_| "1,10,20,50".into());
     let modes =
@@ -147,6 +173,18 @@ fn bench_distinct_characters() {
                 "live" => distinct_characters(count, false),
                 "baked" => distinct_characters(count, true),
                 "stylized" => stylized_characters(count),
+                "tee" => distinct_characters_in(
+                    count,
+                    false,
+                    super::fit_gate_tests::gate_library(),
+                    Some((super::fit_gate_tests::TEE, "tee")),
+                ),
+                "tee-correctives" => distinct_characters_in(
+                    count,
+                    false,
+                    super::fit_gate_tests::gate_library_with_correctives(),
+                    Some((super::fit_gate_tests::TEE, "tee-correctives")),
+                ),
                 other => panic!("unknown bench mode {other}"),
             }
         }

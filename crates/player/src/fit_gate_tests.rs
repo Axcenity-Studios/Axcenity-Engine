@@ -39,123 +39,148 @@ pub(super) const TEE: &str = "imported/test-tee";
 /// process while the others wait. Older ones are removed.
 pub(super) fn gate_library() -> &'static Path {
     static LIBRARY: OnceLock<PathBuf> = OnceLock::new();
+    LIBRARY.get_or_init(|| make_gate_library(None))
+}
+
+/// The gate's library with the test tee carrying its pose correctives,
+/// baked from cloth simulation (`TestTee.correctives.json` beside it;
+/// wave 5, `refinement/wave5/pose-correctives.md`): what
+/// `pose_corrective_tests` measures against [`gate_library`]. Refused when
+/// the tee's fit changed since the bake: bake them again
+/// (`assets/characters/realistic/import/correctives.py`).
+pub(super) fn gate_library_with_correctives() -> &'static Path {
+    static LIBRARY: OnceLock<PathBuf> = OnceLock::new();
     LIBRARY.get_or_init(|| {
-        let shipped = repository_library();
-        let (library, _, problems) = Library::read(&shipped);
-        assert!(problems.is_empty(), "{problems:?}");
-        let base = library.base("axcenity/realistic").unwrap();
-        let base_path = library.manifest_path(&base.id).unwrap();
-        let mut files = vec![
-            base_path.to_owned(),
-            library.path_of(&base.id, &base.model.file).unwrap(),
-            library
-                .path_of(&base.id, base.model.regions_map.as_deref().unwrap())
-                .unwrap(),
-        ];
-        let mut catalogue = Catalogue {
-            format_version: 1,
-            bases: vec![CatalogueBase::of(base_path, base)],
-            items: Vec::new(),
-            presets: Vec::new(),
-        };
-        for (id, item) in &library.items {
-            if item.bases.contains(&base.id) {
-                let path = library.manifest_path(id).unwrap();
-                files.push(path.to_owned());
-                catalogue.items.push(CatalogueItem::of(path, item));
-            }
-        }
-        files.sort();
-        let tee = tee_source();
-        let key = {
-            use std::hash::{Hash, Hasher};
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            let exe = std::env::current_exe().unwrap();
-            let made = std::fs::metadata(&exe).unwrap();
-            (made.len(), made.modified().ok()).hash(&mut hasher);
-            std::fs::read(&tee).unwrap().hash(&mut hasher);
-            for mask in TEE_MASKS {
-                std::fs::read(tee_fixtures().join(mask))
-                    .ok()
-                    .hash(&mut hasher);
-            }
-            for file in &files {
-                file.hash(&mut hasher);
-                std::fs::read(shipped.join(file)).unwrap().hash(&mut hasher);
-            }
-            format!("{:016x}", hasher.finish())
-        };
-        let cache = gate_cache();
-        shared_once(&cache, &key, |made| {
-            for file in &files {
-                let target = made.join(file);
-                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-                std::fs::copy(shipped.join(file), &target).unwrap();
-            }
-            std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
-            // Its masks trimmed to the runtime (wave 5, `hide_trim_tests`),
-            // when they are kept beside it, in place of the import's own
-            // (which take minutes to make: the import skips them).
-            let kept = TEE_MASKS.iter().any(|m| tee_fixtures().join(m).is_file());
-            let imported = import_garment_with(
-                &ImportRequest {
-                    source: tee.clone(),
-                    library: made.to_owned(),
-                    base: "axcenity/realistic".to_owned(),
-                    id: TEE.to_owned(),
-                    label: "Test tee".to_owned(),
-                    folder: "imported/test-tee".to_owned(),
-                    source_info: axcenity_avatar::Source {
-                        author: "Axcenity Engine contributors".to_owned(),
-                        licence: "CC0-1.0".to_owned(),
-                        ..axcenity_avatar::Source::default()
-                    },
-                    slot: None,
-                    layer: None,
-                    margin: 0.002,
-                    under: vec!["axcenity/realistic-sports-bra".to_owned()],
-                    about: None,
-                    finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
-                },
-                ImportOptions {
-                    skip_hiding: kept,
-                    ..ImportOptions::default()
-                },
-            )
-            .expect("the test tee imports");
-            if kept {
-                let path = made.join(&imported.manifest_path);
-                let mut manifest = imported.manifest.clone();
-                for (mask, under) in TEE_MASKS
-                    .iter()
-                    .zip([None, Some("axcenity/realistic-sports-bra")])
-                {
-                    if tee_fixtures().join(mask).is_file() {
-                        std::fs::copy(tee_fixtures().join(mask), made.join(TEE).join(mask))
-                            .unwrap();
-                        manifest.hide_maps.push(axcenity_avatar::HideMap {
-                            under: under.map(str::to_owned),
-                            map: (*mask).to_owned(),
-                        });
-                    }
-                }
-                std::fs::write(path, manifest.to_json()).unwrap();
-            }
-            // What it hides, and what it covers at rest but leaves drawn
-            // whole.
-            println!(
-                "the test tee hides {:?} and {:?}; not whole {:?}",
-                imported.manifest.hides,
-                imported.hiding,
-                imported
-                    .unhidden
-                    .iter()
-                    .map(|(id, out)| format!("{id} ({:.1} mm out)", out * 1000.0))
-                    .collect::<Vec<_>>()
-            );
-        });
-        cache.join(&key)
+        let text = std::fs::read_to_string(tee_source().with_extension("correctives.json"))
+            .expect("the test tee's correctives");
+        make_gate_library(Some(text))
     })
+}
+
+fn make_gate_library(correctives: Option<String>) -> PathBuf {
+    let shipped = repository_library();
+    let (library, _, problems) = Library::read(&shipped);
+    assert!(problems.is_empty(), "{problems:?}");
+    let base = library.base("axcenity/realistic").unwrap();
+    let base_path = library.manifest_path(&base.id).unwrap();
+    let mut files = vec![
+        base_path.to_owned(),
+        library.path_of(&base.id, &base.model.file).unwrap(),
+        library
+            .path_of(&base.id, base.model.regions_map.as_deref().unwrap())
+            .unwrap(),
+    ];
+    let mut catalogue = Catalogue {
+        format_version: 1,
+        bases: vec![CatalogueBase::of(base_path, base)],
+        items: Vec::new(),
+        presets: Vec::new(),
+    };
+    for (id, item) in &library.items {
+        if item.bases.contains(&base.id) {
+            let path = library.manifest_path(id).unwrap();
+            files.push(path.to_owned());
+            catalogue.items.push(CatalogueItem::of(path, item));
+        }
+    }
+    files.sort();
+    let tee = tee_source();
+    let key = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let exe = std::env::current_exe().unwrap();
+        let made = std::fs::metadata(&exe).unwrap();
+        (made.len(), made.modified().ok()).hash(&mut hasher);
+        std::fs::read(&tee).unwrap().hash(&mut hasher);
+        correctives.hash(&mut hasher);
+        for mask in TEE_MASKS {
+            std::fs::read(tee_fixtures().join(mask))
+                .ok()
+                .hash(&mut hasher);
+        }
+        for file in &files {
+            file.hash(&mut hasher);
+            std::fs::read(shipped.join(file)).unwrap().hash(&mut hasher);
+        }
+        format!("{:016x}", hasher.finish())
+    };
+    let cache = gate_cache();
+    shared_once(&cache, &key, |made| {
+        for file in &files {
+            let target = made.join(file);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::copy(shipped.join(file), &target).unwrap();
+        }
+        std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
+        // Its masks trimmed to the runtime (wave 5, `hide_trim_tests`),
+        // when they are kept beside it, in place of the import's own
+        // (which take minutes to make: the import skips them).
+        let kept = TEE_MASKS.iter().any(|m| tee_fixtures().join(m).is_file());
+        let imported = import_garment_with(
+            &ImportRequest {
+                source: tee.clone(),
+                library: made.to_owned(),
+                base: "axcenity/realistic".to_owned(),
+                id: TEE.to_owned(),
+                label: "Test tee".to_owned(),
+                folder: "imported/test-tee".to_owned(),
+                source_info: axcenity_avatar::Source {
+                    author: "Axcenity Engine contributors".to_owned(),
+                    licence: "CC0-1.0".to_owned(),
+                    ..axcenity_avatar::Source::default()
+                },
+                slot: None,
+                layer: None,
+                margin: 0.002,
+                under: vec!["axcenity/realistic-sports-bra".to_owned()],
+                about: None,
+                finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
+            },
+            ImportOptions {
+                skip_hiding: kept,
+                ..ImportOptions::default()
+            },
+        )
+        .expect("the test tee imports");
+        if kept {
+            let path = made.join(&imported.manifest_path);
+            let mut manifest = imported.manifest.clone();
+            for (mask, under) in TEE_MASKS
+                .iter()
+                .zip([None, Some("axcenity/realistic-sports-bra")])
+            {
+                if tee_fixtures().join(mask).is_file() {
+                    std::fs::copy(tee_fixtures().join(mask), made.join(TEE).join(mask))
+                        .unwrap();
+                    manifest.hide_maps.push(axcenity_avatar::HideMap {
+                        under: under.map(str::to_owned),
+                        map: (*mask).to_owned(),
+                    });
+                }
+            }
+            std::fs::write(path, manifest.to_json()).unwrap();
+        }
+        if let Some(text) = &correctives {
+            let shapes = axcenity_avatar::fit::PoseShapes::from_json(text)
+                .expect("the test tee's correctives read");
+            let added = axcenity_avatar::fit::add_to_item(made, TEE, &shapes)
+                .expect("the test tee's correctives are for its fit");
+            println!("the test tee carries {added} pose correctives");
+        }
+        // What it hides, and what it covers at rest but leaves drawn
+        // whole.
+        println!(
+            "the test tee hides {:?} and {:?}; not whole {:?}",
+            imported.manifest.hides,
+            imported.hiding,
+            imported
+                .unhidden
+                .iter()
+                .map(|(id, out)| format!("{id} ({:.1} mm out)", out * 1000.0))
+                .collect::<Vec<_>>()
+        );
+    });
+    cache.join(&key)
 }
 
 fn tee_source() -> PathBuf {
@@ -643,6 +668,51 @@ pub(super) fn poke_through_corners(
     (corners, worst)
 }
 
+/// How many of `under`'s corners [`poke_through`] counts out are under a
+/// flipped fold: their way out along the normal meets `garment` where its
+/// smooth normal faces out but its posed triangle faces the skin (the
+/// debug print's "outside, flipped"; wave 5, `tee-walk.md`: the armpit's
+/// fold flipping in the stride). The renderer culls that back face, so
+/// the skin under it shows.
+pub(super) fn under_flipped_folds(under: &Posed, garment: &Posed, covered: &[bool]) -> usize {
+    let surface = Surface::new(
+        garment.positions.clone(),
+        garment.normals.clone(),
+        garment.triangles.clone(),
+    );
+    let mut drawn = vec![false; under.positions.len()];
+    for t in &under.triangles {
+        for v in t {
+            drawn[*v as usize] = true;
+        }
+    }
+    let mut count = 0;
+    for (k, (p, n)) in under.positions.iter().zip(&under.normals).enumerate() {
+        if !drawn[k] || !covered.get(k).copied().unwrap_or(false) {
+            continue;
+        }
+        let Some(hit) = surface.closest(*p, POKE_REACH) else {
+            continue;
+        };
+        if n.dot(hit.normal) <= 0.0 {
+            continue;
+        }
+        let nearest = hit.signed(*p);
+        let out = if nearest > POKE {
+            enclosed(&surface, *p, *n).unwrap_or(nearest)
+        } else {
+            nearest
+        };
+        let flipped = surface
+            .cast(*p, *n, POKE_REACH)
+            .is_some_and(|ray| !from_inside(&surface, &ray, *n) && ray.normal.dot(*n) > 0.0);
+        if out > POKE && flipped {
+            count += 1;
+        }
+    }
+    count
+}
+
 /// How far from a corner the gate looks for the garment over it.
 const POKE_REACH: f32 = 0.05;
 
@@ -1122,8 +1192,14 @@ pub(super) fn check(label: &str, failures: &[Failure], known: &[Known]) {
 
 /// Runs the gate for `stance` on every body and reports every case.
 fn gate(stance: Stance, known: &[Known]) {
+    gate_in(gate_library(), stance, known);
+}
+
+/// [`gate`] on the gate's `library` (or its variant with the test tee's
+/// pose correctives, [`gate_library_with_correctives`]).
+pub(super) fn gate_in(library: &Path, stance: Stance, known: &[Known]) {
     let label = pose_name(stance);
-    let stage = Stage::new(&format!("fit-gate-{label}"), gate_library()).expect("the stage");
+    let stage = Stage::new(&format!("fit-gate-{label}"), library).expect("the stage");
     let mut failures = Vec::new();
     let mut checked = 0;
     let started = std::time::Instant::now();
@@ -1238,9 +1314,13 @@ pub(super) fn measure_walk(
 /// Runs the gate through the walk's `frames` ([`WALK_FRAMES`]) on every
 /// body: the walking fit test (Paul's decision 13).
 fn gate_walk(frames: &[u32], known: &[Known]) {
+    gate_walk_in(gate_library(), frames, known);
+}
+
+/// [`gate_walk`] on the gate's `library`.
+pub(super) fn gate_walk_in(library: &Path, frames: &[u32], known: &[Known]) {
     let label = format!("{WALK} {frames:?}");
-    let stage =
-        Stage::new(&format!("fit-gate-walk-{}", frames[0]), gate_library()).expect("the stage");
+    let stage = Stage::new(&format!("fit-gate-walk-{}", frames[0]), library).expect("the stage");
     let mut failures = Vec::new();
     let mut checked = 0;
     let started = std::time::Instant::now();
@@ -1306,7 +1386,7 @@ fn gate_walk(frames: &[u32], known: &[Known]) {
 // - The boxer briefs: none (`BESIDE_HEM`, wave 4).
 
 /// The name a lower layer coming through the tee is recorded under.
-const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
+pub(super) const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
 
 #[test]
 fn garments_cover_the_cast_at_rest() {
@@ -1340,7 +1420,7 @@ fn garments_cover_the_cast_walking() {
 }
 
 /// The test tee's and the bra's records in a third of the walk.
-const fn walk_records(tee: (usize, f32), bra: (usize, f32)) -> [Known; 2] {
+pub(super) const fn walk_records(tee: (usize, f32), bra: (usize, f32)) -> [Known; 2] {
     [
         Known {
             garment: "TestTee",

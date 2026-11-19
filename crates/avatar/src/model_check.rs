@@ -132,7 +132,8 @@ impl ItemManifest {
     /// Checks the item against its model (`item`, its contents; for a
     /// groom, every tier's together) and the body it fits (`body`): the
     /// materials listed are exactly the model's, the shapes it follows
-    /// exist on it and on the body, and its bones are the body's.
+    /// exist on it and on the body, its pose correctives' shapes are its
+    /// own and their bones the body's, and its bones are the body's.
     pub fn check_model(&self, item: &ModelContents, body: &ModelContents) -> Vec<Problem> {
         let mut problems = Vec::new();
         let p = &mut problems;
@@ -159,6 +160,22 @@ impl ItemManifest {
                         format!("the item has no shape `{}`", driver.shape),
                     ));
                 }
+            }
+        }
+        // Its pose correctives drive its own shapes by the body's bones
+        // (a misspelt one would be skipped at run time, not reported).
+        for (index, corrective) in self.correctives.iter().enumerate() {
+            if !item.shapes.contains(&corrective.shape) {
+                p.push(Problem::new(
+                    format!("correctives[{index}].shape"),
+                    format!("the item has no shape `{}`", corrective.shape),
+                ));
+            }
+            if !body.bones.contains(&corrective.bone) {
+                p.push(Problem::new(
+                    format!("correctives[{index}].bone"),
+                    format!("the body has no bone `{}`", corrective.bone),
+                ));
             }
         }
         for bone in item.bones.difference(&body.bones) {

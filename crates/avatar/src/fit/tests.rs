@@ -933,3 +933,141 @@ fn a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it() {
         "loose cloth over a bulge bigger than its ease is {clear} m off it"
     );
 }
+
+/// Pose correctives written into a fitted garment's file (wave 5) load as
+/// shapes the file says a joint drives, moving the corners they were
+/// baked for; a file that isn't the garment they were baked for, or that
+/// has them already, is refused.
+#[test]
+fn pose_correctives_written_into_a_garments_file_load_as_driven_shapes() {
+    let body = tube_body();
+    let fitted = fit_garment(&body, &sleeve(0.153, true), &options()).unwrap();
+    let bytes = write_fitted_glb(&FittedModel {
+        fitted: &fitted,
+        rig: &body.rig,
+        armature: "Armature",
+        object: "Sleeve",
+        shading: "cloth",
+    });
+    let rest = fitted.garment.positions();
+    let rule = |shape: &str| crate::PoseCorrective {
+        shape: shape.to_owned(),
+        bone: "Chest".to_owned(),
+        axis: [0.0, 0.0, 1.0],
+        angles: [0.0, 30.0],
+    };
+    let shapes = PoseShapes {
+        format_version: POSE_SHAPES_VERSION,
+        fingerprint: fingerprint(&rest),
+        rules: vec![
+            rule("Corrective_Cloth_Lean"),
+            // Baked to nothing, so dropped: no rule is written for it.
+            rule("Corrective_Cloth_Nothing"),
+        ],
+        shapes: vec![PoseShape {
+            name: "Corrective_Cloth_Lean".to_owned(),
+            corners: vec![3, 7],
+            offsets: vec![[0.0, 0.0, 0.01], [0.005, 0.0, 0.0]],
+        }],
+        report: serde_json::Value::Null,
+    };
+    let with = add_pose_shapes(&bytes, &shapes).expect("added");
+    let model = axcenity_assets::load_model(
+        &with,
+        std::path::Path::new("."),
+        axcenity_assets::ModelFormat::Gltf,
+    )
+    .expect("it loads");
+    let names: Vec<&str> = model
+        .morph_targets
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect();
+    assert_eq!(names, ["Fat", "Corrective_Bump", "Corrective_Cloth_Lean"]);
+    assert_eq!(
+        model.morph_targets[2].driver,
+        Some(axcenity_assets::PoseDriver {
+            bone: "Chest".to_owned(),
+            axis: [0.0, 0.0, 1.0],
+            start: 0.0,
+            full: 30.0,
+        })
+    );
+    assert_eq!(model.morph_targets[0].driver, None);
+    rules_match([&model], &shapes.kept_rules()).unwrap();
+    assert!(rules_match([&model], &shapes.rules).is_err());
+    let read = BodyMesh::from_model(&model).unwrap();
+    let lean = read.shapes[2].dense(rest.len());
+    for (k, offset) in lean.iter().enumerate() {
+        let expected = match k {
+            3 => Vec3::new(0.0, 0.0, 0.01),
+            7 => Vec3::new(0.005, 0.0, 0.0),
+            _ => Vec3::ZERO,
+        };
+        assert!(offset.distance(expected) < 1e-5, "corner {k}: {offset}");
+    }
+    // The rest is as it was.
+    for (a, b) in read.positions.iter().zip(&rest) {
+        assert!(a.distance(*b) < 1e-4);
+    }
+    let error = |result: Result<Vec<u8>, FitError>| result.err().map(|e| e.to_string());
+    assert!(
+        error(add_pose_shapes(&with, &shapes)).is_some_and(|e| e.contains("already")),
+        "added twice"
+    );
+    // A garment refitted (a corner moved a millimetre), or another one.
+    let mut moved = rest.clone();
+    moved[5].y += 0.001 * moved.len() as f32 / 40.0;
+    for other in [&moved[..], &rest[1..]] {
+        let stale = PoseShapes {
+            fingerprint: fingerprint(other),
+            ..shapes.clone()
+        };
+        assert!(!same_garment(&stale.fingerprint, &shapes.fingerprint));
+        assert!(error(add_pose_shapes(&bytes, &stale)).is_some_and(|e| e.contains("bake again")));
+    }
+    // A file's own rounding is the same garment.
+    let rounded: Vec<Vec3> = rest.iter().map(|p| *p + Vec3::splat(2e-7)).collect();
+    assert!(same_garment(&fingerprint(&rounded), &shapes.fingerprint));
+}
+
+/// A simpler copy's corner takes the pose correctives' offsets at the
+/// closest point of the full detail's surface; one with no surface within
+/// 5 cm takes none (not the full detail's first corner's).
+#[test]
+fn a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective() {
+    let surface = Surface::new(
+        vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.1, 0.0, 0.0),
+            Vec3::new(0.0, 0.1, 0.0),
+        ],
+        Vec::new(),
+        vec![[0, 1, 2]],
+    );
+    let dense = vec![vec![
+        Vec3::new(0.01, 0.0, 0.0),
+        Vec3::new(0.0, 0.01, 0.0),
+        Vec3::new(0.0, 0.0, 0.01),
+    ]];
+    let corners = [
+        // On the first corner, and half way along the first edge.
+        Vec3::new(0.0, 0.0, 0.001),
+        Vec3::new(0.05, 0.0, 0.0),
+        // A metre away.
+        Vec3::new(0.0, 0.0, 1.0),
+    ];
+    let offsets = super::cloth::lower_detail_offsets(&surface, &corners, &dense);
+    assert_eq!(offsets.len(), 1);
+    assert!(
+        offsets[0][0].distance(dense[0][0]) < 1e-6,
+        "{}",
+        offsets[0][0]
+    );
+    assert!(
+        offsets[0][1].distance((dense[0][0] + dense[0][1]) * 0.5) < 1e-6,
+        "{}",
+        offsets[0][1]
+    );
+    assert_eq!(offsets[0][2], Vec3::ZERO);
+}

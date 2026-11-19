@@ -323,7 +323,7 @@ fn normals_or_up(normals: &[Vec3], count: usize) -> Vec<Vec3> {
 }
 
 /// A `.glb` of `document` and its binary chunk.
-fn glb(document: &Value, bin: &[u8]) -> Vec<u8> {
+pub(super) fn glb(document: &Value, bin: &[u8]) -> Vec<u8> {
     let mut text = serde_json::to_vec(document).unwrap_or_default();
     while !text.len().is_multiple_of(4) {
         text.push(b' ');

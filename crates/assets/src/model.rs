@@ -34,7 +34,7 @@ pub use identity::{
 pub use lod::level_of as lod_level;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
 pub use maps::{MapSlot, TextureRole, texture_pack_name, texture_roles};
-pub use morph::{MorphTarget, PrimitiveMorph, apply as apply_morphs};
+pub use morph::{MorphTarget, PoseDriver, PrimitiveMorph, apply as apply_morphs};
 pub use objects::{ModelObject, Pick};
 pub use rig::{
     Blend, Bone, BoneTransform, Joint, Keys, Pose, Posed, PosedBone, PosedPrimitive, Rig, Take,
@@ -2011,13 +2011,21 @@ impl Reader<'_> {
         struct Extras {
             #[serde(rename = "targetNames")]
             target_names: Option<Vec<String>>,
+            /// Pose correctives the model carries its own rules for (a
+            /// garment's, baked from cloth simulation): `[{shape, bone,
+            /// axis, angles: [start, full]}]`.
+            axcenity_correctives: Option<Vec<serde_json::Value>>,
         }
-        let names = mesh
+        let extras = mesh
             .extras()
             .as_ref()
-            .and_then(|raw| serde_json::from_str::<Extras>(raw.get()).ok())
-            .and_then(|extras| extras.target_names)
-            .unwrap_or_default();
+            .and_then(|raw| serde_json::from_str::<Extras>(raw.get()).ok());
+        let (names, rules) = extras.map_or_else(Default::default, |extras| {
+            (
+                extras.target_names.unwrap_or_default(),
+                extras.axcenity_correctives.unwrap_or_default(),
+            )
+        });
         let defaults = mesh.weights().unwrap_or(&[]);
         let count = positions.len();
         let mut morphs = Vec::new();
@@ -2052,6 +2060,11 @@ impl Reader<'_> {
             ) {
                 morphs.push(morph);
             }
+        }
+        // The joints that drive shapes, for those the file names (a rule
+        // that can't drive anything is skipped).
+        for (name, driver) in rules.iter().filter_map(PoseDriver::from_json) {
+            self.morph_names.drive(&name, driver);
         }
         morphs
     }

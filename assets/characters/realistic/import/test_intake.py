@@ -686,5 +686,41 @@ class DistanceTest(unittest.TestCase):
         self.assertLess(float(np.max(np.abs(d))), 1e-9)
 
 
+class PoseCorrectivePins(unittest.TestCase):
+    """The bake's pin goal (`correctives.py`): cloth that skinning keeps
+    true is held, cloth it stretches or squeezes is let go, and the goal
+    changes smoothly between."""
+
+    def strip(self, n=30):
+        P = np.array([[x * 0.01, y * 0.01, 0.0] for y in range(2) for x in range(n)], float)
+        tris = []
+        for x in range(n - 1):
+            a, b, c, d = x, x + 1, n + x, n + x + 1
+            tris += [(a, b, d), (a, d, c)]
+        return P, np.array(tris)
+
+    def test_a_squeezed_end_is_let_go_and_a_true_one_held(self):
+        import correctives
+        P, tris = self.strip()
+        edges = correctives.edges_of(tris)
+        posed = P.copy()
+        # The last third squeezed to half its length.
+        far = P[:, 0] > 0.195
+        posed[far, 0] = 0.195 + (P[far, 0] - 0.195) * 0.5
+        w = correctives.pin_weights(P, [posed], edges, [0])
+        self.assertAlmostEqual(w[0], correctives.HOLD, places=6)
+        self.assertLess(w[29], correctives.HOLD - 0.1)
+        self.assertGreaterEqual(w.min(), correctives.FREE - 1e-9)
+        # No jump between neighbours bigger than the spread allows.
+        self.assertLess(np.abs(np.diff(w[:30])).max(), (correctives.HOLD - correctives.FREE) / 2)
+
+    def test_a_pose_skinning_keeps_true_holds_everything(self):
+        import correctives
+        P, tris = self.strip()
+        moved = P + np.array([0.0, 0.3, 0.1])
+        w = correctives.pin_weights(P, [moved], correctives.edges_of(tris), [0])
+        self.assertTrue(np.allclose(w, correctives.HOLD))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

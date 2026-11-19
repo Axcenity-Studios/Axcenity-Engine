@@ -134,12 +134,13 @@ pub struct Correctives(pub Vec<Found>);
 
 impl Correctives {
     /// The rules of [`CORRECTIVES`] whose shape `model` has and whose bone
-    /// `rig` has. Nearly every model has none, which costs a look at each
-    /// of its blend shapes' names.
+    /// `rig` has, and every shape the model says a joint drives
+    /// ([`Self::driven`]). Nearly every model has none, which costs a look
+    /// at each of its blend shapes' names.
     pub fn detect(model: &Model, rig: &Rig) -> Self {
-        let mut found = Vec::new();
+        let mut found = Self::driven(model, rig).0;
         for (morph, target) in model.morph_targets.iter().enumerate() {
-            if !target.name.starts_with(PREFIX) {
+            if !target.name.starts_with(PREFIX) || target.driver.is_some() {
                 continue;
             }
             let Some(&(_, bone, axis, start, full)) =
@@ -157,6 +158,31 @@ impl Correctives {
                 });
             }
         }
+        Self(found)
+    }
+
+    /// The shapes `model` itself says a joint drives
+    /// ([`axcenity_assets::MorphTarget::driver`]: a garment's pose
+    /// correctives, baked from cloth simulation, wave 5), whose bone `rig`
+    /// has. The rule is the body correctives' own, carried by the model
+    /// instead of known by name.
+    pub fn driven(model: &Model, rig: &Rig) -> Self {
+        let found = model
+            .morph_targets
+            .iter()
+            .enumerate()
+            .filter_map(|(morph, target)| {
+                let driver = target.driver.as_ref()?;
+                let bone = rig.bone(&driver.bone)?;
+                Some(Found {
+                    morph,
+                    bone,
+                    axis: Vec3::from(driver.axis).normalize_or_zero(),
+                    start: driver.start,
+                    full: driver.full,
+                })
+            })
+            .collect();
         Self(found)
     }
 
@@ -210,6 +236,25 @@ pub fn ramp(t: f32) -> f32 {
 /// without corrective shapes is left alone.
 pub fn drive(model: &Model, rig: &Rig, pose: &Pose, posed: &mut Posed) {
     let found = Correctives::detect(model, rig);
+    if found.is_empty() {
+        return;
+    }
+    let mut weights = posed.morph_weights().to_vec();
+    weights.resize(model.morph_targets.len(), 0.0);
+    for (morph, value) in found.weights(rig, pose) {
+        weights[morph] = value;
+    }
+    posed.set_morph_weights(&weights);
+}
+
+/// Leans `posed` (a part of a character, posed with `pose` of its own
+/// skeleton `rig`) on the shapes `model` says a joint drives
+/// ([`Correctives::driven`]), and on nothing else: a part's other shapes,
+/// the body's correctives among them, keep the weights it was given (its
+/// leader's, by name). A model without such shapes is left alone, so a
+/// garment without pose correctives poses as it did before them.
+pub fn drive_own(model: &Model, rig: &Rig, pose: &Pose, posed: &mut Posed) {
+    let found = Correctives::driven(model, rig);
     if found.is_empty() {
         return;
     }
@@ -518,6 +563,100 @@ mod tests {
         let mut posed = model.pose_shaped(&pose, &[]).unwrap();
         let version = posed.version;
         drive(&model, &rig, &pose, &mut posed);
+        assert_eq!(posed.version, version);
+    }
+
+    /// The shipped body with one of its shapes (`Frame_Feminine`, which
+    /// nothing drives by name) given a joint to drive it, as a garment's
+    /// file gives its pose correctives: the left elbow, about `axis`
+    /// (in the upper arm's space at rest), from 0 to 90 degrees.
+    fn with_a_driven_shape(axis: Vec3) -> (Model, usize) {
+        let mut model = shipped("Body");
+        let index = model
+            .morph_targets
+            .iter()
+            .position(|target| target.name == "Frame_Feminine")
+            .unwrap();
+        model.morph_targets[index].driver = Some(axcenity_assets::PoseDriver {
+            bone: "LeftLowerArm".to_owned(),
+            axis: axis.to_array(),
+            start: 0.0,
+            full: 90.0,
+        });
+        (model, index)
+    }
+
+    /// A shape the model says a joint drives leans in as that joint turns
+    /// about its axis, by the body correctives' own rule (half way at 45
+    /// of 90 degrees), on the pose path and for a part posed on its own.
+    #[test]
+    fn a_shape_the_model_says_a_joint_drives_leans_as_the_joint_turns() {
+        let axis = Vec3::new(0.3, 0.2, 0.9).normalize();
+        let (model, index) = with_a_driven_shape(axis);
+        let rig = model.rig.clone().unwrap();
+        assert_eq!(Correctives::driven(&model, &rig).0.len(), 1);
+        assert_eq!(
+            Correctives::detect(&model, &rig).0.len(),
+            CORRECTIVES.len() + 1
+        );
+        let elbow = rig.bone("LeftLowerArm").unwrap();
+        let mut pose = rig.rest_pose();
+        pose[elbow].rotation = turned(rig.bones[elbow].rest.rotation, axis, 45.0);
+        let posed = crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
+        assert!((posed.morph_weights()[index] - 0.5).abs() < 1e-3);
+        let mut own = model.pose_shaped(&pose, &[]).unwrap();
+        drive_own(&model, &rig, &pose, &mut own);
+        assert!((own.morph_weights()[index] - 0.5).abs() < 1e-3);
+        // Turned the other way, or not at all, it stays out.
+        let mut back = rig.rest_pose();
+        back[elbow].rotation = turned(rig.bones[elbow].rest.rotation, axis, -45.0);
+        let mut posed = model.pose_shaped(&back, &[]).unwrap();
+        drive_own(&model, &rig, &back, &mut posed);
+        assert_eq!(
+            posed.morph_weights().get(index).copied().unwrap_or(0.0),
+            0.0
+        );
+    }
+
+    /// A part drives only its own driven shapes: the weights it took from
+    /// its leader by name (the body's correctives among them) stay.
+    #[test]
+    fn a_part_drives_its_own_shapes_and_keeps_its_leaders_weights() {
+        let axis = Vec3::new(0.0, 0.0, 1.0);
+        let (model, index) = with_a_driven_shape(axis);
+        let rig = model.rig.clone().unwrap();
+        let elbow = rig.bone("LeftLowerArm").unwrap();
+        let mut pose = rig.rest_pose();
+        pose[elbow].rotation = turned(rig.bones[elbow].rest.rotation, axis, 90.0);
+        let mut posed = model.pose_shaped(&pose, &[]).unwrap();
+        // The leader's weights, by name: a corrective the rest pose
+        // wouldn't lean on at all.
+        let lowered = model
+            .morph_targets
+            .iter()
+            .position(|target| target.name == "Corrective_Shoulder_Lowered_Left")
+            .unwrap();
+        let mut leaders = vec![0.0; model.morph_targets.len()];
+        leaders[lowered] = 0.7;
+        posed.set_morph_weights(&leaders);
+        drive_own(&model, &rig, &pose, &mut posed);
+        assert_eq!(posed.morph_weights()[lowered], 0.7);
+        assert!((posed.morph_weights()[index] - 1.0).abs() < 1e-3);
+    }
+
+    /// A model without driven shapes (every garment before wave 5's cloth
+    /// correctives) is left exactly as it was posed.
+    #[test]
+    fn a_part_without_driven_shapes_is_left_alone() {
+        let model = shipped("Body");
+        let rig = model.rig.clone().unwrap();
+        assert!(Correctives::driven(&model, &rig).is_empty());
+        let arm = rig.bone("LeftUpperArm").unwrap();
+        let mut pose = rig.rest_pose();
+        pose[arm].rotation = turned(rig.bones[arm].rest.rotation, AXIS, 105.0);
+        let mut posed = model.pose_shaped(&pose, &[]).unwrap();
+        let version = posed.version;
+        drive_own(&model, &rig, &pose, &mut posed);
         assert_eq!(posed.version, version);
     }
 }

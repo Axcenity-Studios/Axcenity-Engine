@@ -79,6 +79,15 @@ fn key(library: &Library, owner: &str, model: &ModelRef) -> ModelKey {
 /// The contents of every model the library's manifests name, read with the
 /// engine's own loader, each file once.
 fn read_models(library: &Library) -> BTreeMap<ModelKey, ModelContents> {
+    load_named_models(library)
+        .into_iter()
+        .map(|(key, model)| (key, ModelContents::of(&model)))
+        .collect()
+}
+
+/// Every model the library's manifests name, loaded by the engine, each
+/// file once.
+fn load_named_models(library: &Library) -> BTreeMap<ModelKey, axcenity_assets::Model> {
     let mut by_file: BTreeMap<String, Vec<Option<String>>> = BTreeMap::new();
     for (owner, model) in named_models(library) {
         let (file, object) = key(library, &owner, &model);
@@ -99,12 +108,12 @@ fn read_models(library: &Library) -> BTreeMap<ModelKey, ModelContents> {
             .collect();
         let loaded = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks)
             .unwrap_or_else(|err| panic!("{file}: {err}"));
-        for (object, model) in objects.into_iter().zip(&loaded) {
+        for (object, model) in objects.into_iter().zip(loaded) {
             assert!(
                 !model.primitives.is_empty(),
                 "{object:?} picks nothing in {file}"
             );
-            out.insert((file.clone(), object), ModelContents::of(model));
+            out.insert((file.clone(), object), model);
         }
     }
     out
@@ -185,6 +194,24 @@ fn every_manifest_entry_names_shapes_bones_and_materials_its_model_has() {
                 "{} on {base_id}",
                 item.id
             );
+        }
+    }
+}
+
+/// An item's pose correctives (wave 5, ADR-0044) are in its manifest and,
+/// with the same rules, in its models' files, which the runtime reads: the
+/// two agree, and no model drives a shape its manifest doesn't list.
+#[test]
+fn every_items_pose_correctives_are_its_models() {
+    let library = read();
+    let models = load_named_models(&library);
+    for item in library.items.values() {
+        let own = item
+            .models()
+            .into_iter()
+            .map(|model| &models[&key(&library, &item.id, model)]);
+        if let Err(why) = axcenity_avatar::fit::rules_match(own, &item.correctives) {
+            panic!("{}: {why}", item.id);
         }
     }
 }
