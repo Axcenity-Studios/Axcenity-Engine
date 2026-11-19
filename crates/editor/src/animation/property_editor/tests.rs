@@ -152,11 +152,11 @@ fn a_keys_easing_changes_the_preview_and_plays_the_same_in_the_game() {
     assert!(shown < 0.0, "Back In pulls back first: {shown}");
 
     // The game plays the saved clip the same.
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-eased-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/animations")).unwrap();
     doc.write(&folder).unwrap();
@@ -340,11 +340,11 @@ fn bezier_handles_dragged_in_the_curves_view_are_saved_and_reloaded() {
         );
     }
 
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-bezier-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/animations")).unwrap();
     doc.write(&folder).unwrap();

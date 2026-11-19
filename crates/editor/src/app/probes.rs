@@ -216,11 +216,11 @@ mod tests {
 
     /// `hello-graphics` copied to a temporary folder, so bakes don't land
     /// in the example.
-    fn scratch_copy(name: &str) -> std::path::PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn scratch_copy(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-editor-probes-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         let source = super::super::tests::example("hello-graphics");
         for entry in walk(&source) {

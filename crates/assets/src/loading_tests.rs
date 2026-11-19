@@ -12,9 +12,10 @@ use super::*;
 /// How long a test waits for something that should happen right away.
 const LIMIT: Duration = Duration::from_secs(30);
 
-fn project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-loading-{name}-{}", std::process::id()));
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-loading-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(folder.join("assets/models")).unwrap();
     fs::create_dir_all(folder.join("assets/textures")).unwrap();
@@ -46,7 +47,7 @@ const A: &str = "assets/models/a.gltf";
 const B: &str = "assets/models/b.gltf";
 const C: &str = "assets/models/c.gltf";
 
-fn project_with_models(name: &str) -> PathBuf {
+fn project_with_models(name: &str) -> axcenity_test_dirs::TestDir {
     let folder = project(name);
     for path in [A, B, C] {
         write_triangle(&folder, path, 1.0);

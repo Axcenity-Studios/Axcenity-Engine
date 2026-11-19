@@ -134,8 +134,9 @@ mod tests {
 
     #[test]
     fn a_lookup_table_and_a_palette_come_from_the_projects_files() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-scene-grading-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-scene-grading-{}", std::process::id())),
+        );
         let grading_folder = folder.join("assets/grading");
         std::fs::create_dir_all(&grading_folder).unwrap();
         let mut cube = "LUT_3D_SIZE 2\n".to_owned();

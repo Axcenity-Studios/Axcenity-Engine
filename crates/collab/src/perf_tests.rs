@@ -159,7 +159,9 @@ fn presence_traffic_of_four_members() {
 #[test]
 #[ignore = "a measurement, run by hand"]
 fn a_look_at_the_s10k_folder() {
-    let folder = std::env::temp_dir().join(format!("axcenity-perf-look-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-perf-look-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     axcenity_testing::s10k::write(&folder).unwrap();
     let mut times = Vec::new();
@@ -191,7 +193,9 @@ fn a_look_at_the_s10k_folder() {
 fn an_idle_mirror_sync_on_s10k() {
     use crate::files::FolderStore;
     use crate::mirror::Mirror;
-    let base = std::env::temp_dir().join(format!("axcenity-perf-mirror-{}", std::process::id()));
+    let base = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-perf-mirror-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&base);
     let (project, theirs) = (base.join("project"), base.join("theirs"));
     axcenity_testing::s10k::write(&project).unwrap();

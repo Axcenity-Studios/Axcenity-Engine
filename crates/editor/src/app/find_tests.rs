@@ -11,7 +11,7 @@ const LUA: &str = "scripts/Watch.server.lua";
 const BLOCKS: &str = "scripts/pad.server.blocks.json";
 
 /// The blocks example, with a Lua script naming the same ball.
-fn project(test: &str) -> (EditorApp, PathBuf) {
+fn project(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-touched-blocks", test);
     fs::write(
         folder.join(LUA),
@@ -19,7 +19,7 @@ fn project(test: &str) -> (EditorApp, PathBuf) {
     )
     .unwrap();
     let app = EditorApp::new(Some(&folder));
-    (app, folder)
+    (folder, app)
 }
 
 fn block_text(app: &EditorApp) -> String {
@@ -36,7 +36,7 @@ fn block_text(app: &EditorApp) -> String {
 
 #[test]
 fn find_in_scripts_finds_a_name_in_lua_and_blocks_and_replace_all_undoes_in_one_step() {
-    let (mut app, folder) = project("find-and-replace");
+    let (folder, mut app) = project("find-and-replace");
     app.open_script(LUA, None);
     let lua_before = fs::read(folder.join(LUA)).unwrap();
     let blocks_before = fs::read(folder.join(BLOCKS)).unwrap();
@@ -147,7 +147,7 @@ fn find_in_scripts_finds_a_name_in_lua_and_blocks_and_replace_all_undoes_in_one_
 
 #[test]
 fn find_in_scripts_searches_unsaved_code_in_a_tab() {
-    let (mut app, folder) = project("find-unsaved");
+    let (folder, mut app) = project("find-unsaved");
     app.open_script(LUA, None);
     app.tabs
         .get_mut(LUA)

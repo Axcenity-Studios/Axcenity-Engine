@@ -240,8 +240,10 @@ fn publish(
     )
 }
 
-fn scratch(name: &str) -> PathBuf {
-    let root = std::env::temp_dir().join(format!("axcenity-e2e-{name}-{}", std::process::id()));
+fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+    let root = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-e2e-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
     root

@@ -361,11 +361,11 @@ mod tests {
         assert!(texture_packs(&["moss_color.png"]).is_empty());
     }
 
-    fn temp_project(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn temp_project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-texture-pack-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

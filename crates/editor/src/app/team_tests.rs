@@ -289,14 +289,14 @@ fn many_edits_from_both_editors_stay_identical() {
 
 /// A folder for one test's Collaborate files (identity, certificate,
 /// members), so each editor is its own computer.
-pub(super) fn team_folder(name: &str) -> std::path::PathBuf {
+pub(super) fn team_folder(name: &str) -> axcenity_test_dirs::TestDir {
     // A counter, not the time: names must be valid on Windows too.
     static FOLDERS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-team-{name}-{}-{}",
         std::process::id(),
         FOLDERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }
@@ -342,10 +342,12 @@ fn team_client(app: &EditorApp) -> Option<&axcenity_collab::Client> {
 
 #[test]
 fn two_editors_share_a_session_over_the_network() {
+    let team_host = team_folder("host");
+    let team_joiner = team_folder("joiner");
     let project = copy_of_example("hello-touched", "team-net-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
-        .host_network_session(Some(&team_folder("host")), 0)
+        .host_network_session(Some(&team_host), 0)
         .expect("hosting");
     // The project as it was is kept in Version History first (C5).
     assert!(
@@ -359,8 +361,9 @@ fn two_editors_share_a_session_over_the_network() {
         host: format!("127.0.0.1:{port}"),
         ..invite
     };
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "team-net-joiner")));
-    b.join_network_session(&invite, Some(&team_folder("joiner")))
+    let project_team_net_joiner = copy_of_example("hello-touched", "team-net-joiner");
+    let mut b = EditorApp::new(Some(&project_team_net_joiner));
+    b.join_network_session(&invite, Some(&team_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
         let seq = host_seq(a);
@@ -494,7 +497,10 @@ fn draw_panel(app: &mut EditorApp, name: &str) {
 
 #[test]
 fn the_panel_offers_share_and_join_then_shows_the_session() {
-    let mut a = EditorApp::new(Some(&copy_of_example("hello-touched", "team-panel-host")));
+    let team_panel_host = team_folder("panel-host");
+    let team_panel_joiner = team_folder("panel-joiner");
+    let project_team_panel_host = copy_of_example("hello-touched", "team-panel-host");
+    let mut a = EditorApp::new(Some(&project_team_panel_host));
     draw_panel(&mut a, "team-create-start");
     assert!(!a.in_team_session());
 
@@ -505,7 +511,7 @@ fn the_panel_offers_share_and_join_then_shows_the_session() {
     assert!(!a.in_team_session());
 
     let invite = a
-        .host_network_session(Some(&team_folder("panel-host")), 0)
+        .host_network_session(Some(&team_panel_host), 0)
         .expect("hosting");
     // The panel draws before the host has let this editor in.
     assert!(!a.team().unwrap().is_joined());
@@ -515,8 +521,9 @@ fn the_panel_offers_share_and_join_then_shows_the_session() {
         host: format!("127.0.0.1:{port}"),
         ..invite
     };
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "team-panel-joiner")));
-    b.join_network_session(&invite, Some(&team_folder("panel-joiner")))
+    let project_team_panel_joiner = copy_of_example("hello-touched", "team-panel-joiner");
+    let mut b = EditorApp::new(Some(&project_team_panel_joiner));
+    b.join_network_session(&invite, Some(&team_panel_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
         let seq = host_seq(a);
@@ -598,15 +605,17 @@ fn scripts(app: &EditorApp) -> Vec<(String, InstanceId, String)> {
 #[test]
 fn the_start_screen_joins_a_session_and_opens_its_files() {
     use crate::start::JoinProgress;
+    let team_start_host = team_folder("start-host");
+    let joiner = team_folder("start-joiner");
+    let team_start_refused = team_folder("start-refused");
     let project = copy_of_example("hello-touched", "team-start-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("start-host")), 0)
+        a.host_network_session(Some(&team_start_host), 0)
             .expect("hosting"),
     );
     // From the start screen: the Join dialog waits and says how it goes.
     let mut b = EditorApp::new(None);
-    let joiner = team_folder("start-joiner");
     b.join_from_start(&invite, Some(&joiner));
     b.follow_start_join();
     assert!(matches!(
@@ -625,7 +634,7 @@ fn the_start_screen_joins_a_session_and_opens_its_files() {
     // The invite worked once: another computer with it is refused, and
     // the dialog says why and asks for a link again.
     let mut c = EditorApp::new(None);
-    c.join_from_start(&invite, Some(&team_folder("start-refused")));
+    c.join_from_start(&invite, Some(&team_start_refused));
     let start = std::time::Instant::now();
     while c.team.is_some() {
         assert!(start.elapsed().as_secs() < 20, "never refused");
@@ -646,14 +655,16 @@ fn the_start_screen_joins_a_session_and_opens_its_files() {
 
 #[test]
 fn document_tabs_lock_while_edited_and_reload_what_a_teammate_saves() {
+    let team_docs_host = team_folder("docs-host");
+    let team_docs_joiner = team_folder("docs-joiner");
     let project = copy_of_example("hello-touched", "team-docs-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("docs-host")), 0)
+        a.host_network_session(Some(&team_docs_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
-    b.join_network_session(&invite, Some(&team_folder("docs-joiner")))
+    b.join_network_session(&invite, Some(&team_docs_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
 
@@ -705,14 +716,16 @@ fn document_tabs_lock_while_edited_and_reload_what_a_teammate_saves() {
 
 #[test]
 fn a_ui_graph_a_teammate_saves_runs_its_new_version_here() {
+    let team_graph_host = team_folder("graph-host");
+    let team_graph_joiner = team_folder("graph-joiner");
     let project = copy_of_example("hello-ui-graph", "team-graph-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("graph-host")), 0)
+        a.host_network_session(Some(&team_graph_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
-    b.join_network_session(&invite, Some(&team_folder("graph-joiner")))
+    b.join_network_session(&invite, Some(&team_graph_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
     let path = "ui/Menu.uigraph.json";
@@ -758,14 +771,15 @@ fn a_ui_graph_a_teammate_saves_runs_its_new_version_here() {
 
 #[test]
 fn a_joining_editor_gets_the_files_and_types_in_scripts_with_the_host() {
+    let team_files_host = team_folder("files-host");
+    let joiner = team_folder("files-joiner");
     let project = copy_of_example("hello-touched", "team-files-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
-        .host_network_session(Some(&team_folder("files-host")), 0)
+        .host_network_session(Some(&team_files_host), 0)
         .expect("hosting");
     // The joiner starts with no project: the session's opens.
     let mut b = EditorApp::new(None);
-    let joiner = team_folder("files-joiner");
     b.join_network_session(&over_loopback(invite), Some(&joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
@@ -868,13 +882,14 @@ fn a_joining_editor_gets_the_files_and_types_in_scripts_with_the_host() {
 
 #[test]
 fn an_import_reaches_everyone_as_one_step_with_its_files() {
+    let team_import_host = team_folder("import-host");
+    let joiner = team_folder("import-joiner");
     let project = copy_of_example("hello-touched", "team-import-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
-        .host_network_session(Some(&team_folder("import-host")), 0)
+        .host_network_session(Some(&team_import_host), 0)
         .expect("hosting");
     let mut b = EditorApp::new(None);
-    let joiner = team_folder("import-joiner");
     b.join_network_session(&over_loopback(invite), Some(&joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
@@ -924,15 +939,21 @@ fn has_named(world: &axcenity_core::World, name: &str) -> bool {
 }
 
 /// A hosted session from `project` with a joiner who has made a Part
-/// called "Crate", every copy caught up.
-fn session_with_a_crate(project: &std::path::Path, name: &str) -> (EditorApp, EditorApp) {
+/// called "Crate", every copy caught up, with the host's and the joiner's
+/// data folders (removed when dropped).
+fn session_with_a_crate(
+    project: &std::path::Path,
+    name: &str,
+) -> ([axcenity_test_dirs::TestDir; 2], EditorApp, EditorApp) {
+    let host_data = team_folder(&format!("{name}-host"));
+    let joiner_data = team_folder(&format!("{name}-joiner"));
     let mut a = EditorApp::new(Some(project));
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder(&format!("{name}-host"))), 0)
+        a.host_network_session(Some(&host_data), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
-    b.join_network_session(&invite, Some(&team_folder(&format!("{name}-joiner"))))
+    b.join_network_session(&invite, Some(&joiner_data))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
     b.insert(Insertable::Part(PartType::Block), None);
@@ -942,14 +963,14 @@ fn session_with_a_crate(project: &std::path::Path, name: &str) -> (EditorApp, Ed
         let seq = host_seq(a);
         caught_up(a, seq) && caught_up(b, seq) && has_named(&a.world, "Crate")
     });
-    (a, b)
+    ([host_data, joiner_data], a, b)
 }
 
 /// Hosts a session from `project` and stops the host's editor without
 /// ending it (a crash). Returns how many scripts the project had.
 #[inline(never)]
 fn crash_a_session(project: &std::path::Path) -> usize {
-    let (a, b) = session_with_a_crate(project, "recover");
+    let (_data, a, b) = session_with_a_crate(project, "recover");
     // The joiner's Part is a change to save in the host's project.
     assert!(!a.history.is_saved());
     let scripts = scripts(&a).len();
@@ -992,7 +1013,7 @@ fn a_session_ended_with_its_changes_saved_leaves_nothing_to_recover() {
 
 fn end_after_a_save() {
     let project = copy_of_example("hello-touched", "team-quit-saved");
-    let (mut a, b) = session_with_a_crate(&project, "quit-saved");
+    let (_data, mut a, b) = session_with_a_crate(&project, "quit-saved");
     drop(b);
     assert!(a.save());
     a.end_team_for_quit();
@@ -1013,7 +1034,7 @@ fn keep_until_a_save() {
 
 #[inline(never)]
 fn end_unsaved_then_save(project: &std::path::Path) {
-    let (mut a, b) = session_with_a_crate(project, "end-unsaved");
+    let (_data, mut a, b) = session_with_a_crate(project, "end-unsaved");
     drop(b);
     a.end_team_session();
     assert!(axcenity_collab::journal::has_recovery(project));
@@ -1028,7 +1049,7 @@ fn when_the_host_ends_the_session_the_joiner_stays_open_read_only() {
 
 fn host_ends_the_session() {
     let project = copy_of_example("hello-part", "team-host-leaves");
-    let (mut a, mut b) = session_with_a_crate(&project, "host-leaves");
+    let (_data, mut a, mut b) = session_with_a_crate(&project, "host-leaves");
     a.end_team_session();
     let start = std::time::Instant::now();
     while !matches!(
@@ -1063,14 +1084,15 @@ fn a_joiner_that_stops_while_offline_sends_its_edits_when_it_joins_again() {
 }
 
 fn stop_offline_then_join_again() {
+    let team_unsent_host = team_folder("unsent-host");
+    // The joiner's computer: its identity and folders, kept across runs.
+    let joiner = team_folder("unsent-joiner");
     let project = copy_of_example("hello-part", "team-unsent");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("unsent-host")), 0)
+        a.host_network_session(Some(&team_unsent_host), 0)
             .expect("hosting"),
     );
-    // The joiner's computer: its identity and folders, kept across runs.
-    let joiner = team_folder("unsent-joiner");
     let mut b = EditorApp::new(None);
     b.join_network_session(&invite, Some(&joiner))
         .expect("joining");
@@ -1250,13 +1272,14 @@ fn only_paths_of_instances_become_links() {
 #[test]
 fn the_owner_restores_a_checkpoint_for_everyone_from_the_panel() {
     use super::team_history::HistoryAction;
+    let team_history_host = team_folder("history-host");
+    let joiner = team_folder("history-joiner");
     let project = copy_of_example("hello-touched", "team-history-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
-        .host_network_session(Some(&team_folder("history-host")), 0)
+        .host_network_session(Some(&team_history_host), 0)
         .expect("hosting");
     let mut b = EditorApp::new(None);
-    let joiner = team_folder("history-joiner");
     b.join_network_session(&over_loopback(invite), Some(&joiner))
         .expect("joining");
     let checkpoints = |app: &EditorApp| team_client(app).map_or(0, |c| c.checkpoints().len());
@@ -1333,10 +1356,12 @@ fn the_owner_restores_a_checkpoint_for_everyone_from_the_panel() {
 #[ignore = "a measurement, run by hand"]
 fn idle_session_cost_on_s10k() {
     use std::time::{Duration, Instant};
-    let folder = std::env::temp_dir().join(format!(
+    let team_s10k_host = team_folder("s10k-host");
+    let team_s10k_joiner = team_folder("s10k-joiner");
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-s10k-collab-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     axcenity_testing::s10k::write(&folder).unwrap();
     let started = Instant::now();
@@ -1345,12 +1370,13 @@ fn idle_session_cost_on_s10k() {
     let parts = a.world.descendants(a.world.root()).len();
     let started = Instant::now();
     let invite = a
-        .host_network_session(Some(&team_folder("s10k-host")), 0)
+        .host_network_session(Some(&team_s10k_host), 0)
         .expect("hosting");
     let hosted = started.elapsed();
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "s10k-joiner")));
+    let project_s10k_joiner = copy_of_example("hello-touched", "s10k-joiner");
+    let mut b = EditorApp::new(Some(&project_s10k_joiner));
     let started = Instant::now();
-    b.join_network_session(&over_loopback(invite), Some(&team_folder("s10k-joiner")))
+    b.join_network_session(&over_loopback(invite), Some(&team_s10k_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
         let seq = host_seq(a);

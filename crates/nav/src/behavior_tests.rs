@@ -1,7 +1,5 @@
 //! Behavior trees: checking a tree file, and agents running them.
 
-use std::path::PathBuf;
-
 use axcenity_core::{ClassName, InstanceId, Value};
 
 use super::*;
@@ -86,11 +84,11 @@ fn tree(nodes: &[Node], wires: &[(u32, &str, u32)]) -> String {
 }
 
 /// A project folder of its own, with `files` written into it.
-fn project(name: &str, files: &[(&str, &str)]) -> (PathBuf, Assets) {
-    let folder = std::env::temp_dir().join(format!(
+fn project(name: &str, files: &[(&str, &str)]) -> (axcenity_test_dirs::TestDir, Assets) {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-nav-behavior-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     for (path, text) in files {
         let file = folder.join(path);

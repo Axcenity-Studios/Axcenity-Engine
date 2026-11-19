@@ -381,8 +381,10 @@ fn events_fire_once_per_pass_in_order() {
 }
 
 /// A temporary project with the example's noodle and `clips` (path, file).
-fn project(name: &str, clips: &[(&str, ClipFile)]) -> PathBuf {
-    let root = std::env::temp_dir().join(format!("axcenity-anim-{name}-{}", std::process::id()));
+fn project(name: &str, clips: &[(&str, ClipFile)]) -> axcenity_test_dirs::TestDir {
+    let root = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-anim-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("assets/models")).unwrap();
     std::fs::copy(

@@ -906,7 +906,9 @@ mod tests {
             }
         }
         for name in ["hello-pbr", "hello-character", "hello-roads"] {
-            let folder = std::env::temp_dir().join(format!("axcenity-cooked-only-{name}"));
+            let folder = axcenity_test_dirs::TestDir::adopt(
+                std::env::temp_dir().join(format!("axcenity-cooked-only-{name}")),
+            );
             let _ = fs::remove_dir_all(&folder);
             copy(&example(name), &folder);
             axcenity_cook::cook_project(&folder, &AtomicBool::new(false), |_, _| {});

@@ -236,7 +236,9 @@ mod tests {
 
     #[test]
     fn assets_read_a_sky_image_once_and_report_a_missing_one_once() {
-        let folder = std::env::temp_dir().join(format!("axcenity-sky-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-sky-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/sky")).unwrap();
         std::fs::write(folder.join("assets/sky/noon.hdr"), hdr_file(8, 4, [2.0; 3])).unwrap();
@@ -257,8 +259,9 @@ mod tests {
 
     #[test]
     fn in_the_background_a_sky_arrives_later_with_a_wake_up() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-sky-background-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-sky-background-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/sky")).unwrap();
         std::fs::write(

@@ -361,8 +361,10 @@ mod tests {
     use super::*;
     use crate::Assets;
 
-    fn temp_folder(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!("axcenity-assets-{name}"));
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-assets-{name}")),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

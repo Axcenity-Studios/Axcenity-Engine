@@ -1,7 +1,7 @@
 //! Tests for Phase 77: dialogues started by a ProximityPrompt or a script,
 //! QuestService, the quest state in save slots, and languages.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use axcenity_assets::{Assets, Cell, ColumnType, DataTable, write_data_table};
@@ -60,9 +60,10 @@ fn farmer_dialogue() -> serde_json::Value {
 
 /// A project with the farmer's dialogue and the apples quest: collect 5
 /// apples, then talk to the Farmer.
-fn project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-dialogue-{name}-{}", std::process::id()));
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-dialogue-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let dialogue = folder.join("assets/dialogue/Farmer.dialogue.json");
     std::fs::create_dir_all(dialogue.parent().unwrap()).unwrap();

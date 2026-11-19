@@ -15,9 +15,10 @@ fn example(name: &str) -> PathBuf {
 }
 
 /// An empty project folder for `name`.
-fn empty_project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-package-{name}-{}", std::process::id()));
+fn empty_project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-package-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     fs::write(

@@ -12,11 +12,12 @@ use super::*;
 
 const SIZE: egui::Vec2 = egui::vec2(320.0, 400.0);
 
-fn opened(test: &str) -> EditorApp {
+/// The copied project comes first, so it is removed after the app is dropped.
+fn opened(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-plugins", test);
     let mut app = EditorApp::new(None);
     app.open(&folder);
-    app
+    (folder, app)
 }
 
 fn part(app: &EditorApp, name: &str) -> InstanceId {
@@ -61,7 +62,7 @@ fn console(app: &EditorApp) -> Vec<String> {
 
 #[test]
 fn align_to_grid_snaps_the_selection_to_one_stud_as_one_undo_step() {
-    let mut app = opened("plugin-align");
+    let (_project, mut app) = opened("plugin-align");
     assert!(
         app.plugins
             .entries
@@ -316,7 +317,7 @@ fn element(app: &EditorApp, index: usize, id: InstanceId) -> (egui::Pos2, Option
 
 #[test]
 fn the_part_tools_tab_slider_and_button_work_and_restyle_through_css() {
-    let mut app = opened("plugin-dock");
+    let (_project, mut app) = opened("plugin-dock");
     let index = plugin_index(&app, "project/part-tools");
     app.plugins_frame(1.0 / 60.0);
     let view = &app.plugins.entries[index].widgets[0];
@@ -431,7 +432,7 @@ fn the_part_tools_tab_slider_and_button_work_and_restyle_through_css() {
 /// they go when the parts are aligned or the plugin is turned off.
 #[test]
 fn align_to_grid_draws_where_the_selection_would_snap_until_aligned() {
-    let mut app = opened("plugin-drawings");
+    let (_project, mut app) = opened("plugin-drawings");
     let index = plugin_index(&app, "project/align-to-grid");
     assert!(app.plugins.entries[index].drawings.is_empty());
     let crate_part = part(&app, "Crate");
@@ -471,7 +472,7 @@ fn align_to_grid_draws_where_the_selection_would_snap_until_aligned() {
 /// handle follows the part.
 #[test]
 fn dragging_part_tools_height_handle_resizes_the_part_as_one_undo_step() {
-    let mut app = opened("plugin-handles");
+    let (_project, mut app) = opened("plugin-handles");
     let index = plugin_index(&app, "project/part-tools");
     assert!(app.plugins.entries[index].handles.is_empty());
     let crate_part = part(&app, "Crate");
@@ -685,7 +686,7 @@ fn a_plugin_imports_its_kind_of_file_and_hears_of_other_imports() {
 
 #[test]
 fn turning_a_plugin_off_takes_its_tab_and_buttons_away() {
-    let mut app = opened("plugin-off");
+    let (_project, mut app) = opened("plugin-off");
     let index = plugin_index(&app, "project/part-tools");
     app.plugins_frame(1.0 / 60.0);
     let pane = app.plugins.entries[index].widgets[0].pane;

@@ -3,9 +3,10 @@ use crate::check_assets;
 use axcenity_anim::{Motion, StateDef};
 use axcenity_core::ClassName;
 
-fn scratch(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-asset-fix-{name}-{}", std::process::id()));
+fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-asset-fix-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     fs::write(

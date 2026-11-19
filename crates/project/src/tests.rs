@@ -129,7 +129,7 @@ fn project_loads_nested_css_files_in_stable_order() {
 }
 
 /// A project with a manifest, an empty world and these script files.
-fn project_with_scripts(name: &str, scripts: &[(&str, &[u8])]) -> PathBuf {
+fn project_with_scripts(name: &str, scripts: &[(&str, &[u8])]) -> axcenity_test_dirs::TestDir {
     let folder = temp_folder(name);
     fs::write(
         folder.join(MANIFEST_FILE),
@@ -486,8 +486,10 @@ fn a_new_project_loads_and_its_settings_can_change() {
 }
 
 /// An empty folder in the system's temporary folder, unique to this test run.
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-{name}-test-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-{name}-test-{}", std::process::id())),
+    );
     // Left over from an earlier run that failed partway, if it exists.
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
@@ -807,7 +809,9 @@ fn primitives_example_has_every_shape_and_material() {
 
 #[test]
 fn save_then_load_gives_the_same_world_file() {
-    let folder = std::env::temp_dir().join(format!("axcenity-save-test-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-save-test-{}", std::process::id())),
+    );
     fs::create_dir_all(&folder).unwrap();
     let world = load(&examples_folder().join("primitives")).unwrap().world;
 

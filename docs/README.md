@@ -24,7 +24,7 @@ Source and tests win when a doc is wrong. Update the topic file you used.
 | Cutscene sequences, the Sequence Instance, the Sequencer tab | [project/sequences.md](project/sequences.md) |
 | Platforms or file access | [architecture/portability.md](architecture/portability.md) |
 | The user-facing system requirements (supported systems, minimum and recommended processor, memory, graphics, network, storage) | [../documentation/reference/system-requirements.md](../documentation/reference/system-requirements.md) |
-| Build speed, test commands, or nextest settings | [development.md](development.md) |
+| Build speed, test commands, nextest settings, or temporary folders in tests (`TestDir`, `AXCENITY_KEEP_TEST_DIRS`) | [development.md](development.md) |
 | Scope and priorities: CI (off on purpose), target platforms, determinism, the Vector3 caveat, dedicated hosting, and the development policy | [development-policy.md](development-policy.md) |
 | Whole-frame benchmarks, the S10k scene, `--bench`, profiler spans and Tracy | [benchmarks.md](benchmarks.md) |
 | The competitive development roadmap (Paul's of 2026-11-12): each item's status against Unreal, Godot, s&box and Unity, the feature matrix, and the order of work (G items and R12–R20) | [research/competitive-development-roadmap.md](research/competitive-development-roadmap.md) |

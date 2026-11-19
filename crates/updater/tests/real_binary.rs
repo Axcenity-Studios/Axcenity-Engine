@@ -187,7 +187,9 @@ fn a_downloaded_archive_is_staged_handed_over_and_installed() {
         )
     };
 
-    let root = std::env::temp_dir().join(format!("axcenity-real-e2e-{}", std::process::id()));
+    let root = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-real-e2e-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&root);
     // The install: an "older" editor and updater (the same program; a file
     // only the old version has tells them apart), its marker and the

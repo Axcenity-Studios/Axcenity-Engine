@@ -1,7 +1,5 @@
 //! Phase 42: parts with a Fracture shattering into their pieces.
 
-use std::path::PathBuf;
-
 use axcenity_core::{ClassName, InstanceId, Value, Vector3, World};
 
 use super::*;
@@ -35,19 +33,30 @@ fn part(world: &mut World, name: &str, position: Vector3, size: Vector3) -> Inst
 }
 
 /// An empty project folder for this test.
-fn project(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-physics-fracture-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder
 }
 
 /// A world with an anchored floor and a 4×0.4×6 slab named `Slab` (with
-/// `pieces` pieces generated in its Fracture), and the project's assets.
-fn slab(name: &str, pieces: f64, at: Vector3) -> (World, Assets, InstanceId, InstanceId) {
+/// `pieces` pieces generated in its Fracture), the project's assets, and the
+/// project folder (removed when dropped).
+fn slab(
+    name: &str,
+    pieces: f64,
+    at: Vector3,
+) -> (
+    World,
+    Assets,
+    InstanceId,
+    InstanceId,
+    axcenity_test_dirs::TestDir,
+) {
     let folder = project(name);
     let mut world = World::new();
     let floor = part(&mut world, "Floor", v(0.0, -0.5, 0.0), v(40.0, 1.0, 40.0));
@@ -60,7 +69,7 @@ fn slab(name: &str, pieces: f64, at: Vector3) -> (World, Assets, InstanceId, Ins
     let assets = Assets::new(&folder);
     let path = axcenity_mesh_edit::generate(&world, &assets, &folder, fracture).unwrap();
     set(&mut world, fracture, "PiecesId", Value::String(path));
-    (world, assets, slab, fracture)
+    (world, assets, slab, fracture, folder)
 }
 
 fn run(physics: &mut Physics, world: &mut World, seconds: f64) {
@@ -71,7 +80,7 @@ fn run(physics: &mut Physics, world: &mut World, seconds: f64) {
 
 #[test]
 fn pieces_shattered_at_rest_fill_the_part_without_gaps_or_overlaps() {
-    let (mut world, assets, slab, fracture) = slab("rest", 30.0, v(0.0, 0.2, 0.0));
+    let (mut world, assets, slab, fracture, _project) = slab("rest", 30.0, v(0.0, 0.2, 0.0));
     let mut physics = Physics::with_assets(assets);
     run(&mut physics, &mut world, 0.5);
     let resting = vector(&world, slab, "Position");
@@ -107,7 +116,7 @@ fn pieces_shattered_at_rest_fill_the_part_without_gaps_or_overlaps() {
 #[test]
 fn a_slow_bump_leaves_the_part_and_a_fast_hit_shatters_it_where_it_hit() {
     let hit = |speed: f32| {
-        let (mut world, assets, slab, fracture) = slab("hit", 8.0, v(0.0, 5.0, 0.0));
+        let (mut world, assets, slab, fracture, _project) = slab("hit", 8.0, v(0.0, 5.0, 0.0));
         set(&mut world, slab, "Anchored", Value::Bool(true));
         set(&mut world, fracture, "Threshold", Value::Number(40.0));
         let ball = part(&mut world, "Ball", v(1.0, 6.5, 1.0), v(1.0, 1.0, 1.0));
@@ -136,7 +145,7 @@ fn a_slow_bump_leaves_the_part_and_a_fast_hit_shatters_it_where_it_hit() {
 
 #[test]
 fn shattered_pieces_fly_away_from_the_point() {
-    let (mut world, assets, slab, fracture) = slab("fly", 12.0, v(0.0, 10.0, 0.0));
+    let (mut world, assets, slab, fracture, _project) = slab("fly", 12.0, v(0.0, 10.0, 0.0));
     set(&mut world, slab, "Anchored", Value::Bool(true));
     let mut physics = Physics::with_assets(assets);
     physics.step(&mut world, 1.0 / 60.0);

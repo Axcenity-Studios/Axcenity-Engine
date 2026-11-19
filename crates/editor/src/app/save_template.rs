@@ -180,10 +180,10 @@ mod tests {
     /// where New Project lists it, and a project made from it has them.
     #[test]
     fn save_as_template_makes_a_template_new_project_lists() {
-        let parent = std::env::temp_dir().join(format!(
+        let parent = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-save-template-editor-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&parent);
         std::fs::create_dir_all(&parent).unwrap();
         let folder = axcenity_project::create_project(&parent, "Base Game").unwrap();

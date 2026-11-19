@@ -222,7 +222,9 @@ fn with_the_mouse_locked_in_the_centre_get_mouse_delta_turns_the_camera() {
 
 #[test]
 fn actions_read_the_input_map_and_a_rebind_survives_saving_and_loading_a_slot() {
-    let folder = std::env::temp_dir().join(format!("axcenity-input-rebind-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-input-rebind-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let mut world = World::new();
     let mut runtime = ScriptRuntime::new();

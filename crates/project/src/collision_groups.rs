@@ -103,11 +103,11 @@ mod tests {
     use super::*;
 
     /// An empty folder of its own for one test.
-    fn folder(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-collision-groups-{name}-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

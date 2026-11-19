@@ -563,10 +563,10 @@ mod tests {
 
     #[test]
     fn adding_it_writes_the_prefab_and_its_files_and_keeps_changed_ones() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-default-humanoid-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         assert_eq!(

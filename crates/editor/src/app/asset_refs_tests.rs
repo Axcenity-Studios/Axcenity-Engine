@@ -27,7 +27,7 @@ fn set(app: &mut EditorApp, id: InstanceId, property: &str, value: Value) {
 
 /// A project where `wood.png` is used by a material (on a Part), by a
 /// MeshPart's SurfaceAppearance and by a script that puts it on a sign.
-fn project(test: &str) -> (EditorApp, PathBuf, InstanceId) {
+fn project(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp, InstanceId) {
     let folder = copy_of_example("hello-touched", test);
     let examples = super::tests::example("");
     let copy = |from: &str, to: &str| {
@@ -101,7 +101,7 @@ fn project(test: &str) -> (EditorApp, PathBuf, InstanceId) {
     );
     add(&mut app, ClassName::SurfaceAppearance, sign, "Look");
     app.save();
-    (app, folder, look)
+    (folder, app, look)
 }
 
 /// How many items of `world`'s draw list have a color texture, with no
@@ -124,7 +124,7 @@ fn textured(app: &EditorApp, world: &World) -> usize {
 #[test]
 fn renaming_a_texture_used_by_a_material_a_mesh_part_and_a_script_keeps_all_three_working_in_play()
 {
-    let (mut app, folder, look) = project("rename-texture");
+    let (folder, mut app, look) = project("rename-texture");
 
     // Find References lists all three.
     app.find_asset_references(WOOD);
@@ -218,7 +218,7 @@ fn renaming_a_texture_used_by_a_material_a_mesh_part_and_a_script_keeps_all_thre
 
 #[test]
 fn the_unused_filter_knows_what_nothing_uses() {
-    let (mut app, folder, _) = project("unused-assets");
+    let (folder, mut app, _) = project("unused-assets");
     fs::write(folder.join("assets/textures/spare.png"), b"png").unwrap();
     app.find_unused_assets(&[WOOD.to_owned(), "assets/textures/spare.png".to_owned()]);
     let unused = app.asset_browser.unused_paths();
@@ -228,7 +228,7 @@ fn the_unused_filter_knows_what_nothing_uses() {
 
 #[test]
 fn a_rename_onto_a_taken_name_changes_nothing_and_says_why() {
-    let (mut app, folder, look) = project("rename-taken");
+    let (folder, mut app, look) = project("rename-taken");
     fs::write(folder.join("assets/textures/spare.png"), b"png").unwrap();
     let label = app.history.undo_label().map(str::to_owned);
     app.rename_asset(WOOD, "assets/textures/spare.png");

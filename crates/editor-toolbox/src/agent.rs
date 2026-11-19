@@ -352,7 +352,9 @@ mod tests {
 
     #[test]
     fn search_and_get_go_through_the_tabs_paths() {
-        let temp = std::env::temp_dir().join(format!("axcenity-agent-get-{}", std::process::id()));
+        let temp = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-agent-get-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&temp);
         let http = testing::fabric_on_ambientcg(true);
 

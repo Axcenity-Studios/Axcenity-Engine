@@ -33,7 +33,7 @@ fn age_snapshot(folder: &Path) {
 /// An editor on a copy of hello-touched with an unsaved part named
 /// "Recovered" and unsaved text in the pad script's tab, and AutoRecover's
 /// snapshot of it written.
-fn unsaved_work(test: &str) -> (EditorApp, PathBuf) {
+fn unsaved_work(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-touched", test);
     let mut app = EditorApp::new(Some(&folder));
     let part = inserted(&mut app, Insertable::Part(PartType::Block), None);
@@ -46,7 +46,7 @@ fn unsaved_work(test: &str) -> (EditorApp, PathBuf) {
     app.autorecover.last = None;
     app.autorecover_frame();
     finish_writing(&mut app);
-    (app, folder)
+    (folder, app)
 }
 
 fn has_recovered_part(app: &EditorApp) -> bool {
@@ -56,7 +56,7 @@ fn has_recovered_part(app: &EditorApp) -> bool {
 
 #[test]
 fn unsaved_work_is_kept_after_the_interval_and_save_removes_it() {
-    let (mut app, folder) = unsaved_work("autorecover-save");
+    let (folder, mut app) = unsaved_work("autorecover-save");
     let info = axcenity_project::recovery_info(&folder).expect("a snapshot");
     assert!(info.world);
     assert_eq!(info.files, vec![SCRIPT.to_owned()]);
@@ -83,7 +83,7 @@ fn a_left_behind_snapshot_is_offered_and_recover_brings_the_work_back_unsaved() 
 }
 
 fn recover_then_save() {
-    let (app, folder) = unsaved_work("autorecover-recover");
+    let (folder, app) = unsaved_work("autorecover-recover");
     let saved_script = std::fs::read_to_string(folder.join(SCRIPT)).unwrap();
     let saved_world = std::fs::read(folder.join("world.json")).unwrap();
     // The editor stops without saving or cleaning up (a crash).
@@ -142,7 +142,7 @@ fn discard_deletes_a_left_behind_snapshot() {
 }
 
 fn discard_then_open_again() {
-    let (app, folder) = unsaved_work("autorecover-discard");
+    let (folder, app) = unsaved_work("autorecover-discard");
     std::mem::forget(app);
     age_snapshot(&folder);
 
@@ -180,7 +180,7 @@ fn with_autorecover_off_nothing_is_written() {
 /// only let go by choosing Discard.
 #[test]
 fn the_recover_prompt_draws_and_escape_keeps_it() {
-    let (app, folder) = unsaved_work("autorecover-prompt");
+    let (folder, app) = unsaved_work("autorecover-prompt");
     std::mem::forget(app);
     age_snapshot(&folder);
     let mut app = EditorApp::new(Some(&folder));

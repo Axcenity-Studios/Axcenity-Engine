@@ -635,7 +635,8 @@ mod tests {
         let git = git();
         let project = temp("project");
         write(&project, "a.txt", "a");
-        let missing = format!("file://{}", temp("gone").join("nothing").display());
+        let gone = temp("gone");
+        let missing = format!("file://{}", gone.join("nothing").display());
         assert!(link(&git, &project, &spec(&missing), &author("Paul")).is_err());
         assert!(!project.join(".git").exists());
         assert!(!project.join(".gitignore").exists());

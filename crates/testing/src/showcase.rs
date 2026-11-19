@@ -409,7 +409,9 @@ mod tests {
 
     #[test]
     fn the_showcase_adds_lamps_a_pond_trees_and_a_held_camera() {
-        let root = std::env::temp_dir().join(format!("axcenity-showcase-{}", std::process::id()));
+        let root = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-showcase-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&root);
         let (source, folder) = (root.join("source"), root.join("showcase"));
         stand_in(&source);

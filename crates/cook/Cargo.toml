@@ -16,4 +16,5 @@ axcenity-workspace-hack.workspace = true
 workspace = true
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 png.workspace = true

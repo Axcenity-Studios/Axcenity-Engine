@@ -331,8 +331,9 @@ mod tests {
                 "assets/textures/Rock035/Rock035_2K-JPG_Color.jpg",
             )],
         );
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-texture-set-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-texture-set-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         let path = folder.join("Rock035.texture.json");
         write_texture_set(&path, &set).unwrap();

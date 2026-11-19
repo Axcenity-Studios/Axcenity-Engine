@@ -408,7 +408,12 @@ mod tests {
     use crate::repository::{self, Linked, RemoteSpec};
     use crate::testing::{author, bare_remote, git, temp, write};
 
-    fn linked_copy(git: &Git, url: &str, name: &str, files: &[(&str, &str)]) -> PathBuf {
+    fn linked_copy(
+        git: &Git,
+        url: &str,
+        name: &str,
+        files: &[(&str, &str)],
+    ) -> axcenity_test_dirs::TestDir {
         let dir = temp(name);
         for (path, text) in files {
             write(&dir, path, text);
@@ -508,7 +513,8 @@ mod tests {
         assert!(outcome.committed.is_some());
         assert!(!crate::repository::status(&git, &b, "main").merge_in_progress);
         // The remote still has Paul's.
-        let check = temp("check").join("c");
+        let check_dir = temp("check");
+        let check = check_dir.join("c");
         git.clone_repository(&url, &check, None).unwrap();
         assert_eq!(
             std::fs::read_to_string(check.join("world.json")).unwrap(),
@@ -537,7 +543,8 @@ mod tests {
         std::fs::rename(&away, &remote).unwrap();
         let outcome = sync_once(&git, &job(&a, Kind::Auto, "Paul"));
         assert_eq!(outcome.state, State::Synced);
-        let check = temp("check").join("c");
+        let check_dir = temp("check");
+        let check = check_dir.join("c");
         git.clone_repository(&url, &check, None).unwrap();
         assert_eq!(
             std::fs::read_to_string(check.join("a.txt")).unwrap(),

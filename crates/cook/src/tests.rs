@@ -21,8 +21,10 @@ fn gradient(width: u32, height: u32, alpha: u8) -> Vec<u8> {
         .collect()
 }
 
-fn project(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-cook-{name}-{}", std::process::id()));
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-cook-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(folder.join("assets/textures/stone")).unwrap();
     folder

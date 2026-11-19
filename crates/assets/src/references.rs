@@ -227,9 +227,10 @@ mod tests {
     use super::*;
     use crate::{encode_import_file, import_path};
 
-    fn project(name: &str) -> std::path::PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-refs-{name}-{}", std::process::id()));
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-refs-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(folder.join("assets/textures")).unwrap();
         folder

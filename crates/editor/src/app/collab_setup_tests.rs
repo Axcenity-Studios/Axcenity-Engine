@@ -126,10 +126,8 @@ fn draw(app: &mut EditorApp, name: &str) {
 
 #[test]
 fn every_wizard_page_draws_and_follows_tailscale() {
-    let mut app = EditorApp::new(Some(&copy_of_example(
-        "hello-touched",
-        "collab-setup-pages",
-    )));
+    let project = copy_of_example("hello-touched", "collab-setup-pages");
+    let mut app = EditorApp::new(Some(&project));
     // Join opens the wizard the first time.
     app.join_team_create();
     assert_eq!(app.team_panel.setup.open, Some(Purpose::Join));
@@ -167,10 +165,8 @@ fn every_wizard_page_draws_and_follows_tailscale() {
 
 #[test]
 fn start_session_hosts_with_the_name_in_the_invite() {
-    let mut app = EditorApp::new(Some(&copy_of_example(
-        "hello-touched",
-        "collab-setup-start",
-    )));
+    let project = copy_of_example("hello-touched", "collab-setup-start");
+    let mut app = EditorApp::new(Some(&project));
     // Once set up, Start goes straight to the dialog.
     app.team_panel.setup.done = true;
     app.share_with_team_create();
@@ -179,7 +175,9 @@ fn start_session_hosts_with_the_name_in_the_invite() {
     assert!(!start.name.is_empty(), "named after the project folder");
     start.name = "Castle Game".into();
     start.port = 0;
-    let folder = std::env::temp_dir().join(format!("axcenity-collab-setup-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-collab-setup-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     start.folder = Some(folder.clone());
     draw(&mut app, "collaborate-start-session");

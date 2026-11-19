@@ -14,6 +14,7 @@ axcenity-physics.workspace = true
 axcenity-workspace-hack.workspace = true
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 glam.workspace = true
 
 [lints]

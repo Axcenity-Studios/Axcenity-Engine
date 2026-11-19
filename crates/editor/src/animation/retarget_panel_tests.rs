@@ -7,11 +7,11 @@ use super::*;
 
 /// A project with the hello-animation example's noodle and its Walk clip,
 /// in a folder of its own.
-fn project(name: &str) -> PathBuf {
-    let root = std::env::temp_dir().join(format!(
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let root = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-retarget-panel-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&root);
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
     std::fs::create_dir_all(root.join("assets/models")).unwrap();

@@ -34,7 +34,9 @@ fn the_start_screen_draws_each_page_and_the_new_project_dialog() {
         })
         .collect();
     // One has a thumbnail: a bright picture, so its corners show.
-    let pictured = std::env::temp_dir().join(format!("axcenity-thumb-{}", std::process::id()));
+    let pictured = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-thumb-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&pictured).unwrap();
     let mut rgb = Vec::new();
     for y in 0..180u32 {
@@ -193,7 +195,9 @@ fn edit_times_read_like_people_say_them() {
 
 #[test]
 fn only_project_folders_can_be_deleted() {
-    let folder = std::env::temp_dir().join(format!("axcenity-delete-test-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-delete-test-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     assert!(delete_project(&folder).is_err());
@@ -389,8 +393,9 @@ fn the_learn_window_shows_tutorials_and_the_reference_over_a_project() {
 
 #[test]
 fn the_global_assets_page_lists_the_library_with_a_models_files_as_one_card() {
-    let library =
-        std::env::temp_dir().join(format!("axcenity-start-global-{}", std::process::id()));
+    let library = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-start-global-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&library);
     for file in [
         "assets/models/Hero/Hero.fbx",
@@ -1375,7 +1380,9 @@ fn team_record(name: &str, folder: &Path, hosted: bool) -> axcenity_collab::proj
 
 #[test]
 fn the_team_projects_page_lists_records_and_shares_projects() {
-    let here = std::env::temp_dir().join(format!("axcenity-team-page-test-{}", std::process::id()));
+    let here = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-team-page-test-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&here).unwrap();
     std::fs::write(here.join(axcenity_project::MANIFEST_FILE), "{}").unwrap();
     // "Castle" is a team project already; "Obby" isn't, so it's offered to share.
@@ -1513,10 +1520,10 @@ fn the_team_projects_page_lists_records_and_shares_projects() {
 /// makes a project from the one picked; Import… copies a template file in.
 #[test]
 fn new_project_lists_your_templates_and_makes_projects_from_them() {
-    let parent = std::env::temp_dir().join(format!(
+    let parent = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-start-user-templates-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&parent);
     std::fs::create_dir_all(&parent).unwrap();
     let source = axcenity_project::create_project(&parent, "Source").unwrap();

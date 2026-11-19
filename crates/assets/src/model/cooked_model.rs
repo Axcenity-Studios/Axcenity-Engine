@@ -879,7 +879,6 @@ fn decode_transform(input: &mut Input<'_>) -> Option<BoneTransform> {
 mod tests {
     use super::*;
     use crate::Assets;
-    use std::path::PathBuf;
 
     fn copy(from: &Path, to: &Path) {
         fs::create_dir_all(to).unwrap();
@@ -894,12 +893,12 @@ mod tests {
     }
 
     /// A project with some of the examples' models (and their textures).
-    fn project(name: &str) -> PathBuf {
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
         let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-cooked-model-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         for (example, folder) in [
             ("hello-pbr", "assets/models"),
@@ -1037,10 +1036,10 @@ mod tests {
 
     #[test]
     fn a_cooked_model_keeps_its_hair_and_cloth_materials() {
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-cooked-model-hair-cloth-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         let folder = project.join("assets/models");
         fs::create_dir_all(&folder).unwrap();
@@ -1086,10 +1085,10 @@ mod tests {
 
     #[test]
     fn a_cooked_model_keeps_its_collision_pieces() {
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-cooked-model-pieces-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         let folder = project.join("assets/models");
         let gltf = crate::model::tests::rock_with_pieces(&folder);
@@ -1106,10 +1105,10 @@ mod tests {
 
     #[test]
     fn a_cooked_model_keeps_its_blend_shapes() {
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-cooked-model-morphs-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         let folder = project.join("assets/models");
         let gltf = crate::model::tests::blinking_face(&folder);
@@ -1129,10 +1128,10 @@ mod tests {
     /// is kept, so a cooked body picks by region as its file does.
     #[test]
     fn a_cooked_model_keeps_its_region_map() {
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-cooked-model-regions-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         let model = "assets/models/body.glb";
         fs::create_dir_all(project.join("assets/models")).unwrap();

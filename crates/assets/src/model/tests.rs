@@ -496,7 +496,8 @@ fn uris_are_percent_decoded() {
 
 #[test]
 fn a_gltf_materials_maps_are_all_read() {
-    let folder = std::env::temp_dir().join("axcenity-gltf-maps");
+    let folder =
+        axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join("axcenity-gltf-maps"));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     // One triangle in the XY plane: positions, normals, then UVs.
@@ -571,7 +572,9 @@ fn a_gltf_materials_maps_are_all_read() {
 /// A glTF triangle whose base color texture has `transform` (its
 /// `KHR_texture_transform`, as JSON) and whose material is `double_sided`.
 fn transformed_triangle(name: &str, transform: &str, double_sided: bool) -> ModelMaterial {
-    let folder = std::env::temp_dir().join(format!("axcenity-gltf-{name}"));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-gltf-{name}")),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     let floats: [f32; 24] = [
@@ -676,7 +679,8 @@ fn missing_normals_are_worked_out_facing_outward() {
 
 #[test]
 fn a_files_own_lod1_object_is_the_simpler_copy_and_doesnt_size_the_model() {
-    let folder = std::env::temp_dir().join("axcenity-gltf-lods");
+    let folder =
+        axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join("axcenity-gltf-lods"));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     // A square in the XY plane (two triangles), then one triangle.
@@ -790,7 +794,9 @@ pub(super) fn rock_with_pieces(folder: &Path) -> &'static str {
 
 #[test]
 fn a_files_col_objects_are_its_collision_pieces_not_drawn_and_not_sizing_it() {
-    let folder = std::env::temp_dir().join(format!("axcenity-gltf-col-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-gltf-col-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let gltf = rock_with_pieces(&folder);
     let model = load_model(gltf.as_bytes(), &folder, ModelFormat::Gltf).unwrap();
@@ -953,7 +959,9 @@ pub(super) fn blinking_face(folder: &Path) -> &'static str {
 
 #[test]
 fn a_gltf_files_blend_shapes_are_read_and_shared_by_name() {
-    let folder = std::env::temp_dir().join(format!("axcenity-gltf-face-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-gltf-face-{}", std::process::id())),
+    );
     let gltf = blinking_face(&folder);
     let model = load_model(gltf.as_bytes(), &folder, ModelFormat::Gltf).unwrap();
     let names: Vec<&str> = model
@@ -1008,8 +1016,9 @@ fn a_gltf_files_blend_shapes_are_read_and_shared_by_name() {
 fn a_blend_shape_accessor_without_data_reads_as_no_moves() {
     // Blender writes a shape that doesn't move a primitive as an accessor
     // with no buffer view and no sparse values: all zeros, by the spec.
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-gltf-empty-shape-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-gltf-empty-shape-{}", std::process::id())),
+    );
     let gltf = blinking_face(&folder).replace(
         r#"{ "bufferView": 6, "componentType": 5126, "count": 3, "type": "VEC3",
               "min": [0, -1, 0], "max": [0, -1, 0] }"#,

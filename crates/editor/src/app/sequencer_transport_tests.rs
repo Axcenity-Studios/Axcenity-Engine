@@ -17,7 +17,7 @@ const OFF_TAB: egui::Pos2 = egui::pos2(100.0, 400.0);
 struct Tab {
     app: EditorApp,
     ctx: egui::Context,
-    folder: PathBuf,
+    folder: axcenity_test_dirs::TestDir,
     notes: String,
     time: f64,
 }

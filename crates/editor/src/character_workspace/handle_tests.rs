@@ -34,7 +34,7 @@ const FEATURES: [(&str, &str, ViewPreset, [f32; 2]); 7] = [
 struct Studio {
     ctx: egui::Context,
     workspace: CharacterWorkspace,
-    folder: PathBuf,
+    folder: axcenity_test_dirs::TestDir,
 }
 
 impl Studio {

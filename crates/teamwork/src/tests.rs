@@ -1,15 +1,13 @@
-use std::path::PathBuf;
-
 use crate::board::{is_board_path, item_path};
 use crate::*;
 
 /// An empty folder of its own under the temp folder.
-fn temp(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-teamwork-{name}-{}-{}",
         std::process::id(),
         new_id()
-    ));
+    )));
     std::fs::create_dir_all(&folder).unwrap();
     folder
 }

@@ -209,13 +209,17 @@ mod tests {
     /// back, and is gone after removing it.
     #[test]
     fn git_credentials_round_trip_through_a_helper() {
-        let home = std::env::temp_dir().join(format!("axcenity-repo-cred-{}", std::process::id()));
+        let home = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-repo-cred-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(&home).unwrap();
-        let file = home.join("store");
+        // Forward slashes: Git runs the helper through a shell, which takes
+        // Windows' backslashes as escapes and would write the store elsewhere.
+        let file = home.join("store").display().to_string().replace('\\', "/");
         let runner = crate::testing::ConfigRunner::new(vec![(
             "credential.helper".into(),
-            format!("store --file={}", file.display()),
+            format!("store --file={file}"),
         )]);
         let store = GitCredentials::new(Git::with_runner(std::sync::Arc::new(runner)));
         let credential = Credential {
@@ -226,7 +230,7 @@ mod tests {
         // A fresh store (a later run) finds it.
         let runner = crate::testing::ConfigRunner::new(vec![(
             "credential.helper".into(),
-            format!("store --file={}", file.display()),
+            format!("store --file={file}"),
         )]);
         let later = GitCredentials::new(Git::with_runner(std::sync::Arc::new(runner)));
         assert_eq!(later.get("example.com"), Some(credential));

@@ -101,7 +101,9 @@ fn textures(list: &DrawList) -> [Arc<dyn TextureSource>; 3] {
 
 #[test]
 fn a_texture_written_over_its_file_is_drawn_on_appearances_terrain_layers_and_image_labels() {
-    let folder = std::env::temp_dir().join(format!("axcenity-scene-reload-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-scene-reload-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
     std::fs::write(folder.join(TEXTURE), png(2)).unwrap();

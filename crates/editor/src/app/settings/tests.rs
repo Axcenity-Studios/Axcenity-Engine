@@ -162,7 +162,9 @@ fn changing_the_graphics_setting_changes_the_viewport_at_once() {
     let mut frame = 0;
     let mut seen = Vec::new();
     crate::snapshot::snapshot_rendered(
-        &std::env::temp_dir().join(format!("axcenity-graphics-{}.png", std::process::id())),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-graphics-{}.png", std::process::id())),
+        ),
         egui::vec2(320.0, 200.0),
         vec![Vec::new(); 3],
         |ui, render_state| {
@@ -206,7 +208,9 @@ fn exposure_and_tone_mapping_set_in_properties_change_the_viewport() {
     let mut frame = 0;
     let mut drawn = Vec::new();
     crate::snapshot::snapshot_rendered(
-        &std::env::temp_dir().join(format!("axcenity-look-{}.png", std::process::id())),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-look-{}.png", std::process::id())),
+        ),
         egui::vec2(320.0, 200.0),
         vec![Vec::new(); 3],
         |ui, render_state| {
@@ -265,7 +269,9 @@ fn a_local_scripts_graphics_change_lasts_until_stop() {
     let mut frame = 0;
     let mut seen = Vec::new();
     crate::snapshot::snapshot_rendered(
-        &std::env::temp_dir().join(format!("axcenity-play-graphics-{}.png", std::process::id())),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-play-graphics-{}.png", std::process::id())),
+        ),
         egui::vec2(320.0, 200.0),
         vec![Vec::new(); 3],
         |ui, render_state| {

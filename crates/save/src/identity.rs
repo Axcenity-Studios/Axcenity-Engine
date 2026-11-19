@@ -59,7 +59,9 @@ mod tests {
 
     #[test]
     fn an_install_keeps_its_user_id() {
-        let folder = std::env::temp_dir().join(format!("axcenity-user-id-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-user-id-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         let first = user_id_in(Some(&folder));
         assert!((1..=LARGEST).contains(&first));

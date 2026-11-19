@@ -40,9 +40,10 @@ fn the_example_passes_and_exits_with_success() {
 
 #[test]
 fn a_failure_exits_with_one_and_is_in_the_junit_xml() {
-    let folder = std::env::temp_dir()
-        .join("axcenity-testing-tests")
-        .join(format!("command-line-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
+        "axcenity-testing-tests-command-line-{}",
+        std::process::id()
+    )));
     let _ = fs::remove_dir_all(&folder);
     copy_folder(&example("hello-character"), &folder);
     let world = folder.join("world.json");

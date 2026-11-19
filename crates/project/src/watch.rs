@@ -397,11 +397,11 @@ mod tests {
 
     use super::*;
 
-    fn folder(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-watcher-{name}-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("scripts")).unwrap();
         folder

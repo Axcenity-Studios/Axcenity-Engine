@@ -84,6 +84,7 @@ profile-tracy = ["profiling/profile-with-tracy"]
 engine-dev = []
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 # `theme::test_context`, `theme::run` and `snapshot` for drawing tests.
 axcenity-editor-kit = { workspace = true, features = ["test-support"] }
 # `graphics_benchmark::testing::quick_report` for the benchmark window's tests.

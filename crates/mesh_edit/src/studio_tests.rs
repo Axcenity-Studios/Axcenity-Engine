@@ -188,9 +188,10 @@ fn scaling_a_face_moves_its_corners_and_reshades_its_neighbours() {
     }
 }
 
-fn temp_folder(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-studio-{name}-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-studio-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder

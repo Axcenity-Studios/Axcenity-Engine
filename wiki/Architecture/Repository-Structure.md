@@ -43,7 +43,7 @@ What each top-level folder holds and who reads it. Crate responsibilities are in
 ## Inside a crate
 
 - `src/lib.rs` (or `main.rs`), and big modules as **a parent file plus a folder of the same name** whose children hold one responsibility each and start with `use super::*;`. The table of where the big files split is in `docs/architecture/crates.md`.
-- Tests sit beside the code: `foo_tests.rs` or `tests.rs` next to `foo.rs`, or `tests/` for integration tests (`crates/server/tests/headless.rs`, `crates/render/src/renderer/tests/`).
+- Tests sit beside the code: `foo_tests.rs` or `tests.rs` next to `foo.rs`, or `tests/` for integration tests (`crates/server/tests/headless.rs`, `crates/render/src/renderer/tests/`). Files a test writes go in an `axcenity_test_dirs::TestDir` (`crates/test-dirs`, a dev-dependency), removed when the test ends.
 - `CLAUDE.md`: what the crate is, which topic file to open, local constraints.
 
 ## Inside a project (what the engine reads)

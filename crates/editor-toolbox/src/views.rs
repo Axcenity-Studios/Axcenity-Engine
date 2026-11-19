@@ -260,10 +260,10 @@ mod tests {
 
     #[test]
     fn this_project_lists_installs_and_the_snapshots_own_records() {
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-toolbox-view-project-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&project);
         fs::create_dir_all(project.join("assets/sky")).unwrap();
         fs::write(project.join("assets/sky/sunset_2k.hdr"), "x").unwrap();

@@ -238,8 +238,9 @@ mod tests {
 
     #[test]
     fn definitions_are_read_from_the_rigs_folder_and_broken_ones_reported() {
-        let project =
-            std::env::temp_dir().join(format!("axcenity-rig-definitions-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-rig-definitions-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&project);
         let made = definition(&[("Hips", "pelvis")]);
         write_rig_definition(&project, "assets/rigs/humans/hero.rig.json", &made).unwrap();

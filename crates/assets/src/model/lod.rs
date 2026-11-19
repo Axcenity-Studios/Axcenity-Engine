@@ -424,8 +424,9 @@ mod tests {
 
     #[test]
     fn a_project_model_keeps_its_copies_in_the_mesh_cache() {
-        let project =
-            std::env::temp_dir().join(format!("axcenity-lod-cache-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lod-cache-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&project);
         let model = project.join("assets/models/grid.glb");
         std::fs::create_dir_all(model.parent().unwrap()).unwrap();

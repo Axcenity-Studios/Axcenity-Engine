@@ -668,10 +668,10 @@ mod tests {
         assert_eq!(sets.hidden, HashSet::from([model, part]));
 
         // Kept in the project folder with the layers.
-        let project = std::env::temp_dir().join(format!(
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-editor-regions-test-{}",
             std::process::id()
-        ));
+        )));
         view.save(&project).unwrap();
         assert_eq!(LayerView::load(&project), view);
         view.unloaded.clear();

@@ -139,7 +139,9 @@ mod tests {
 
     #[test]
     fn entries_are_kept_in_a_file_and_read_back() {
-        let folder = std::env::temp_dir().join(format!("axcenity-audit-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-audit-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         let file = file_beside(&folder.join("abc.json"));

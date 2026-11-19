@@ -434,7 +434,7 @@ mod tests {
     use crate::app::tests::{copy_of_example, part};
     use axcenity_render::{Camera, glam::Vec3};
 
-    fn app_with_part(test: &str) -> (PathBuf, EditorApp, InstanceId) {
+    fn app_with_part(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp, InstanceId) {
         let folder = copy_of_example("hello-touched", test);
         let mut app = EditorApp::new(Some(&folder));
         let pad = part(&app, "Pad");
@@ -466,11 +466,11 @@ mod tests {
         }
     }
 
-    fn outside_folder(test: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn outside_folder(test: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-custom-material-{test}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         folder

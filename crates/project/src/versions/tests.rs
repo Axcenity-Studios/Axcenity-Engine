@@ -1,10 +1,10 @@
 use super::*;
 
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-versions-{name}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(folder.join("scripts")).unwrap();
     fs::write(folder.join(WORLD_FILE), "{\"format_version\":1}").unwrap();

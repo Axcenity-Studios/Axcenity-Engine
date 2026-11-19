@@ -247,10 +247,10 @@ mod tests {
 
     #[test]
     fn a_volume_lights_its_parts_box_and_a_missing_bake_falls_back_to_the_sky() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-scene-light-probes-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         let path = axcenity_assets::light_probes_path("Hall");
         let baked =

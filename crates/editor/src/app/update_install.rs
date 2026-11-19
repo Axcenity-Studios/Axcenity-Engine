@@ -448,9 +448,10 @@ mod tests {
         }
     }
 
-    fn scratch(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("axcenity-install-{name}-{}", std::process::id()));
+    fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+        let dir = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-install-{name}-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

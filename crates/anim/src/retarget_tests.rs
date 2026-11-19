@@ -891,8 +891,9 @@ fn a_clip_with_a_profile_retargets_even_onto_a_skeleton_named_like_its_own() {
 
 #[test]
 fn load_clip_reads_the_links_retarget_profile_or_says_why_it_cant() {
-    let project =
-        std::env::temp_dir().join(format!("axcenity-retarget-profile-{}", std::process::id()));
+    let project = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-retarget-profile-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(project.join("assets/rigs")).unwrap();
     std::fs::create_dir_all(project.join("assets/animations")).unwrap();

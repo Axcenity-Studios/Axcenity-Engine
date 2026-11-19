@@ -419,8 +419,9 @@ mod tests {
 
     #[test]
     fn a_file_database_reopens_and_refuses_a_newer_schema() {
-        let path =
-            std::env::temp_dir().join(format!("axcenity-toolbox-db-{}.db", std::process::id()));
+        let path = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-toolbox-db-{}.db", std::process::id())),
+        );
         let _ = std::fs::remove_file(&path);
         {
             let db = Database::open(&path).unwrap();

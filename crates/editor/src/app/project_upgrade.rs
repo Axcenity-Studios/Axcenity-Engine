@@ -175,9 +175,10 @@ fn too_new(name: &str, found: u32, saved_with: Option<&str>, needs: Option<&str>
 mod tests {
     use super::*;
 
-    fn temp(name: &str, manifest: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-upgrade-{name}-{}", std::process::id()));
+    fn temp(name: &str, manifest: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-upgrade-{name}-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         std::fs::write(folder.join(axcenity_project::MANIFEST_FILE), manifest).unwrap();

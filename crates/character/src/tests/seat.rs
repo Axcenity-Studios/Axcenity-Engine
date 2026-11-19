@@ -307,7 +307,9 @@ fn a_seat_on_an_unanchored_cart_carries_the_sitting_character() {
 
 #[test]
 fn a_sitting_character_plays_its_animators_sit_state_and_goes_back_after() {
-    let folder = std::env::temp_dir().join(format!("axcenity-seat-sit-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-seat-sit-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&folder).unwrap();
     let state = |name: &str| {
         format!(

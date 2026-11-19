@@ -23,6 +23,7 @@ axcenity-workspace-hack.workspace = true
 # does (its twist and helper bones, `axcenity_anim::twist::drive`); the
 # library itself has no animation code.
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 axcenity-anim.workspace = true
 
 [lints]

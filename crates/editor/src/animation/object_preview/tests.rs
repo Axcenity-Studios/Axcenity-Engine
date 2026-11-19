@@ -136,11 +136,11 @@ fn a_hinge_turn_recorded_in_the_preview_plays_the_same_in_the_game() {
         .property("Position")
         .cloned();
 
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-door-preview-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
-    ));
+    )));
     std::fs::create_dir_all(folder.join("assets/animations")).unwrap();
     std::fs::write(folder.join(path), doc.file.to_json()).unwrap();
     let assets = Assets::new(&folder);

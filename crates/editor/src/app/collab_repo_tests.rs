@@ -25,11 +25,12 @@ fn text(path: &std::path::Path) -> String {
     std::fs::read_to_string(path).unwrap().replace("\r\n", "\n")
 }
 
-pub(super) fn bare_remote(name: &str) -> String {
-    let dir = std::env::temp_dir().join(format!(
+/// A new bare repository, removed when its folder drops, and its URL.
+pub(super) fn bare_remote(name: &str) -> (axcenity_test_dirs::TestDir, String) {
+    let dir = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-remote-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let ok = Command::new("git")
@@ -39,14 +40,22 @@ pub(super) fn bare_remote(name: &str) -> String {
         .unwrap()
         .success();
     assert!(ok);
-    format!("file://{}", dir.to_string_lossy().replace('\\', "/"))
+    let url = format!("file://{}", dir.to_string_lossy().replace('\\', "/"));
+    (dir, url)
 }
 
 /// A copy of hello-part linked to a new bare remote, as connecting it in
-/// the panel would leave it.
-pub(super) fn linked_project(name: &str) -> (std::path::PathBuf, String) {
+/// the panel would leave it, the remote's URL, and the remote's folder
+/// (removed when dropped).
+pub(super) fn linked_project(
+    name: &str,
+) -> (
+    axcenity_test_dirs::TestDir,
+    String,
+    axcenity_test_dirs::TestDir,
+) {
     let folder = copy_of_example("hello-part", name);
-    let url = bare_remote(name);
+    let (remote, url) = bare_remote(name);
     let spec = RemoteSpec {
         url: url.clone(),
         branch: Some("main".into()),
@@ -70,7 +79,7 @@ pub(super) fn linked_project(name: &str) -> (std::path::PathBuf, String) {
         },
     )
     .unwrap();
-    (folder, url)
+    (folder, url, remote)
 }
 
 pub(super) fn manager() -> Arc<RepositoryManager> {
@@ -99,19 +108,25 @@ pub(super) fn frames_until(app: &mut EditorApp, want: &State) {
     }
 }
 
-pub(super) fn remote_log(url: &str, test: &str) -> Vec<checkpoint::Entry> {
-    let dest = std::env::temp_dir().join(format!(
+/// The remote's history, read from a fresh clone, and that clone's folder
+/// (`axcenity-editor-check-<test>-<process>`, removed when dropped).
+pub(super) fn remote_log(
+    url: &str,
+    test: &str,
+) -> (Vec<checkpoint::Entry>, axcenity_test_dirs::TestDir) {
+    let dest = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-check-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&dest);
     Git::system().clone_repository(url, &dest, None).unwrap();
-    checkpoint::history(&Git::system(), &dest, 20).unwrap()
+    let log = checkpoint::history(&Git::system(), &dest, 20).unwrap();
+    (log, dest)
 }
 
 #[test]
 fn saves_become_checkpoints_that_reach_the_repository() {
-    let (folder, url) = linked_project("repo-saves");
+    let (folder, url, _remote) = linked_project("repo-saves");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     // Opening a linked project uploads what's waiting (collaborate.json).
@@ -134,7 +149,7 @@ fn saves_become_checkpoints_that_reach_the_repository() {
     // …unless someone asks (the Console's `checkpoint`, for now).
     app.run_console_command("checkpoint Before lunch");
     frames_until(&mut app, &State::Synced);
-    let log = remote_log(&url, "repo-saves");
+    let (log, _check) = remote_log(&url, "repo-saves");
     assert_eq!(log[0].kind, Some(Kind::Manual));
     assert_eq!(log[0].title(), "Manual checkpoint: Before lunch");
     assert!(log.iter().any(|e| e.title() == "First checkpoint"));
@@ -156,7 +171,7 @@ fn a_project_without_a_repository_never_runs_git() {
 
 #[test]
 fn closing_the_editor_uploads_what_was_saved() {
-    let (folder, url) = linked_project("repo-close");
+    let (folder, url, _remote) = linked_project("repo-close");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     frames_until(&mut app, &State::Synced);
@@ -168,7 +183,7 @@ fn closing_the_editor_uploads_what_was_saved() {
     .unwrap();
     app.repo_changed();
     app.repo_close();
-    let log = remote_log(&url, "repo-close");
+    let (log, _check) = remote_log(&url, "repo-close");
     assert_eq!(log[0].kind, Some(Kind::Closing), "{:?}", log[0]);
     let _ = std::fs::remove_dir_all(&folder);
 }
@@ -187,15 +202,15 @@ fn sam_git(dir: &std::path::Path, args: &[&str]) {
 
 #[test]
 fn a_file_changed_on_both_sides_keeps_both_until_someone_chooses() {
-    let (folder, url) = linked_project("repo-conflict");
+    let (folder, url, _remote) = linked_project("repo-conflict");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     frames_until(&mut app, &State::Synced);
     // Sam changes the script elsewhere and uploads first.
-    let sam = std::env::temp_dir().join(format!(
+    let sam = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-sam-repo-conflict-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&sam);
     Git::system().clone_repository(&url, &sam, None).unwrap();
     std::fs::create_dir_all(sam.join("scripts")).unwrap();
@@ -247,12 +262,12 @@ fn a_file_changed_on_both_sides_keeps_both_until_someone_chooses() {
     frames_until(&mut app, &State::Synced);
     assert_eq!(text(&folder.join("notes.txt")), "sam\n");
     assert_eq!(text(&folder.join("scripts/Note.lua")), "return 'paul'\n");
-    let log = remote_log(&url, "repo-conflict");
+    let (log, _check) = remote_log(&url, "repo-conflict");
     assert_eq!(log[0].kind, Some(Kind::Merge), "{:?}", log[0]);
-    let check = std::env::temp_dir().join(format!(
+    let check = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-check-repo-conflict-{}",
         std::process::id()
-    ));
+    )));
     assert_eq!(text(&check.join(&copy)), "return 'sam'\n");
     let _ = std::fs::remove_dir_all(&folder);
     let _ = std::fs::remove_dir_all(&sam);
@@ -284,7 +299,7 @@ pub(super) fn task_done(app: &mut EditorApp, ctx: &egui::Context) {
 
 #[test]
 fn the_project_section_shows_the_repository_and_its_history() {
-    let (folder, _url) = linked_project("repo-panel");
+    let (folder, _url, _remote) = linked_project("repo-panel");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     frames_until(&mut app, &State::Synced);
@@ -349,14 +364,14 @@ fn a_project_without_a_repository_offers_to_connect_one_and_the_host_offer_is_ke
 
 #[test]
 fn the_resolve_window_merges_with_each_files_choice() {
-    let (folder, url) = linked_project("repo-resolve-window");
+    let (folder, url, _remote) = linked_project("repo-resolve-window");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     frames_until(&mut app, &State::Synced);
-    let sam = std::env::temp_dir().join(format!(
+    let sam = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-sam-repo-resolve-window-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&sam);
     Git::system().clone_repository(&url, &sam, None).unwrap();
     std::fs::write(sam.join("notes.txt"), "sam\n").unwrap();
@@ -421,7 +436,7 @@ fn has_part(app: &EditorApp, name: &str) -> bool {
 /// reached are kept as checkpoints here and upload when it's back.
 #[test]
 fn changes_made_offline_are_kept_and_upload_when_the_repository_is_back() {
-    let (folder, url) = linked_project("scenario-e");
+    let (folder, url, _remote) = linked_project("scenario-e");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     frames_until(&mut app, &State::Synced);
@@ -448,7 +463,7 @@ fn changes_made_offline_are_kept_and_upload_when_the_repository_is_back() {
     std::fs::rename(&away, &remote).unwrap();
     app.run_console_command("checkpoint");
     frames_until(&mut app, &State::Synced);
-    let log = remote_log(&url, "scenario-e");
+    let (log, _check) = remote_log(&url, "scenario-e");
     assert!(
         log.iter()
             .any(|e| e.title() == "Manual checkpoint: Offline work")
@@ -460,14 +475,14 @@ fn changes_made_offline_are_kept_and_upload_when_the_repository_is_back() {
 /// computers; neither version is overwritten, and keeping both works.
 #[test]
 fn the_same_scene_changed_on_two_computers_keeps_both() {
-    let (paul_folder, url) = linked_project("scenario-d");
+    let (paul_folder, url, _remote) = linked_project("scenario-d");
     let mut paul = EditorApp::new(Some(&paul_folder));
     paul.repo.manager = Some(manager());
     frames_until(&mut paul, &State::Synced);
-    let sam_folder = std::env::temp_dir().join(format!(
+    let sam_folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-scenario-d-sam-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&sam_folder);
     repository::clone_project(&Git::system(), &url, &sam_folder, None).unwrap();
     let mut sam = EditorApp::new(Some(&sam_folder));

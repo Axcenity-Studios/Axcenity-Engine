@@ -3,7 +3,7 @@
 //! beside the current one (in a built game too), and a slot that goes
 //! back to the level it was saved in.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use axcenity_core::{ClassName, InstanceId, Value, Vector3};
 
@@ -32,11 +32,11 @@ fn example_copy(test: &str) -> TempCopy {
     )
 }
 
-fn save_folder(test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn save_folder(test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-player-level-saves-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&folder);
     folder
 }
@@ -250,7 +250,8 @@ fn add_and_remove_the_dungeon(game: &mut Game) {
 #[test]
 fn add_level_streams_the_dungeon_in_beside_the_meadow_and_remove_level_takes_it_away() {
     let folder = example_copy("dungeon");
-    let mut game = Game::start(&folder, &save_folder("dungeon"));
+    let saves_dungeon = save_folder("dungeon");
+    let mut game = Game::start(&folder, &saves_dungeon);
     add_and_remove_the_dungeon(&mut game);
 }
 
@@ -258,17 +259,18 @@ fn add_level_streams_the_dungeon_in_beside_the_meadow_and_remove_level_takes_it_
 fn a_built_game_has_every_level_and_adds_the_dungeon_too() {
     let folder = example_copy("built");
     let packed = axcenity_project::pack_game(&folder).unwrap();
-    let unpacked = std::env::temp_dir().join(format!(
+    let unpacked = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-player-levels-unpacked-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&unpacked);
     axcenity_project::unpack_game(&packed, &unpacked).unwrap();
     assert_eq!(
         axcenity_project::level_names(&unpacked),
         ["Castle", "Dungeon"]
     );
-    let mut game = Game::start(&unpacked, &save_folder("built"));
+    let saves_built = save_folder("built");
+    let mut game = Game::start(&unpacked, &saves_built);
     add_and_remove_the_dungeon(&mut game);
     game.take_portal();
     assert_eq!(game.current_level(), "Castle");
@@ -322,7 +324,8 @@ fn continue_on_the_main_menu_goes_back_to_the_level_the_slot_was_saved_in() {
 #[test]
 fn a_level_load_shows_the_games_loading_screen_again() {
     let folder = example_copy("loading");
-    let mut game = Game::start(&folder, &save_folder("loading"));
+    let saves_loading = save_folder("loading");
+    let mut game = Game::start(&folder, &saves_loading);
     game.frames(3);
     let camera = FlyCamera::looking_at(START_CAMERA_POSITION, Vec3::ZERO);
     let mut app = App::new(

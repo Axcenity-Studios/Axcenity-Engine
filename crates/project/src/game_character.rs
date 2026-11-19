@@ -147,11 +147,11 @@ fn kept_description(world: &World, character: InstanceId) -> Option<InstanceId> 
 mod tests {
     use super::*;
 
-    fn temp(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-game-character-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

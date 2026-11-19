@@ -80,11 +80,11 @@ pub fn renamed_folder(parent: &Path, name: &str, old: &str) -> PathBuf {
 mod tests {
     use super::*;
 
-    fn temp(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
+    fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+        let path = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-collab-renamed-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
         path

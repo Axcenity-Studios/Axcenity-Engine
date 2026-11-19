@@ -1,17 +1,15 @@
 //! `GuiService` (the game UI settings), the `UI/…` settings and slots that
 //! keep them, `AccessibleName`, and reduced motion for UI tweens.
 
-use std::path::PathBuf;
-
 use axcenity_core::{ClassName, InstanceId, UiSettings, Value, World};
 
 use super::*;
 
-fn save_folder(test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn save_folder(test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-script-ui-settings-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }

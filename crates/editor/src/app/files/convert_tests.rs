@@ -34,7 +34,11 @@ def Xform "World"
 fn a_usd_file_is_converted_and_imported_as_a_glb_that_remembers_it() {
     let folder = copy_of_example("hello-part", "import-usd");
     let mut app = EditorApp::new(Some(&folder));
-    let usd = folder.join("..").join("import-usd-Crate.usda");
+    let usd = axcenity_test_dirs::TestDir::adopt(folder.join("..").join("import-usd-Crate.usda"));
+    // Where the conversion writes its .glb (`conversion_folder`, one per process).
+    let _converted = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-converted-{}", std::process::id())),
+    );
     fs::write(&usd, CRATE_USDA).unwrap();
 
     // Import… and dropping both come here.
@@ -79,7 +83,7 @@ fn a_usd_file_is_converted_and_imported_as_a_glb_that_remembers_it() {
 fn a_usd_file_that_cant_be_read_is_reported_not_imported() {
     let folder = copy_of_example("hello-part", "import-usd-bad");
     let mut app = EditorApp::new(Some(&folder));
-    let usd = folder.join("..").join("import-usd-bad.usda");
+    let usd = axcenity_test_dirs::TestDir::adopt(folder.join("..").join("import-usd-bad.usda"));
     fs::write(&usd, "#usda 1.0\ndef Xform \"World\" {\n").unwrap();
     app.import_files(vec![usd.clone()], axcenity_assets::PROJECT_TEXTURES_FOLDER);
     assert!(app.importing.is_none());

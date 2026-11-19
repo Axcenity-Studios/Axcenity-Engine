@@ -20,7 +20,9 @@ fn part(world: &mut World, properties: Vec<(&str, Value)>) -> InstanceId {
 
 #[test]
 fn a_normal_map_cooked_as_bc5_is_handed_over_as_bc5_only_as_a_normal_map() {
-    let folder = std::env::temp_dir().join(format!("axcenity-scene-bc5-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-scene-bc5-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets")).unwrap();
     let path = "assets/Stone_Normal.png";
@@ -72,7 +74,9 @@ fn ambient_occlusion_intensity_sets_the_ambient_lights_occlusion_within_0_to_2()
 
 #[test]
 fn lightings_sky_image_is_handed_to_the_renderer_read_once() {
-    let folder = std::env::temp_dir().join(format!("axcenity-scene-sky-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-scene-sky-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/sky")).unwrap();
     let pixels = vec![image::Rgb([3.0f32, 2.0, 1.0]); 8 * 4];
@@ -293,7 +297,8 @@ fn a_mesh_part_draws_its_model_with_the_files_material() {
 #[test]
 fn a_surface_appearance_replaces_its_materials_maps() {
     // A project with the pyramid imported, so its texture is a file in it.
-    let project = std::env::temp_dir().join("axcenity-scene-surface");
+    let project =
+        axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join("axcenity-scene-surface"));
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(&project).unwrap();
     let pyramid = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -364,10 +369,10 @@ fn a_mesh_part_without_a_model_is_a_grey_box_and_the_reason_is_reported() {
 
 #[test]
 fn a_part_draws_its_surface_appearance_color_map() {
-    let project = std::env::temp_dir().join(format!(
+    let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-scene-part-texture-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(project.join("assets/textures")).unwrap();
     let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([200, 40, 40, 255]));
@@ -405,7 +410,9 @@ fn linear_to_srgb_undoes_the_renderers_conversion() {
 
 #[test]
 fn a_reflection_probe_reflects_in_its_parts_box_and_a_missing_bake_falls_back_to_the_sky() {
-    let folder = std::env::temp_dir().join(format!("axcenity-scene-probe-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-scene-probe-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let path = axcenity_assets::probe_path("Hall");
     axcenity_assets::write_probe(&folder, &path, 2, &[0.5; 2 * 2 * 6 * 3]).unwrap();

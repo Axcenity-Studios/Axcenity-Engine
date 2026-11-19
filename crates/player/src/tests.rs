@@ -1153,9 +1153,10 @@ pub(super) fn test_gpu() -> Option<(axcenity_render::wgpu::Device, axcenity_rend
 
 /// A new, empty project folder for one test, with `stripes.png`: 64×64,
 /// red on its left half and blue on its right.
-fn stripes_project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-player-{name}-{}", std::process::id()));
+fn stripes_project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-player-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     let pixels: Vec<u8> = (0..64 * 64)
@@ -1517,13 +1518,14 @@ pub(super) fn start_example_in(name: &str) -> (World, ScriptRuntime, TempCopy) {
 /// A copy of a project for one test, in the temp folder, deleted when it's
 /// dropped: at the end of the test, or as a failing test unwinds. The
 /// examples' copies add up to gigabytes a run if they're left behind.
-pub(super) struct TempCopy(PathBuf);
+/// A `TestDir` (crates/test-dirs) does the removing.
+pub(super) struct TempCopy(axcenity_test_dirs::TestDir);
 
 impl TempCopy {
     /// The project files in `from` (see [`copy_folder`]), copied to the
     /// folder `name` in the temp folder, replacing what was there.
     pub(super) fn of(from: &Path, name: &str) -> Self {
-        let folder = std::env::temp_dir().join(name);
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(name));
         let _ = std::fs::remove_dir_all(&folder);
         copy_folder(from, &folder);
         Self(folder)
@@ -1536,13 +1538,13 @@ impl std::ops::Deref for TempCopy {
     type Target = Path;
 
     fn deref(&self) -> &Path {
-        &self.0
+        self.0.path()
     }
 }
 
 impl AsRef<Path> for TempCopy {
     fn as_ref(&self) -> &Path {
-        &self.0
+        self.0.path()
     }
 }
 
@@ -1550,12 +1552,6 @@ impl AsRef<Path> for TempCopy {
 impl AsRef<std::ffi::OsStr> for TempCopy {
     fn as_ref(&self) -> &std::ffi::OsStr {
         self.0.as_os_str()
-    }
-}
-
-impl Drop for TempCopy {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
@@ -2582,7 +2578,9 @@ fn script_lines(scripts: &mut ScriptRuntime) -> Vec<String> {
 #[test]
 fn hello_saves_saves_loads_and_restores_its_checkpoint_from_lua_and_blocks_outside_the_project() {
     use axcenity_core::KeyCode as K;
-    let saves = std::env::temp_dir().join(format!("axcenity-player-saves-{}", std::process::id()));
+    let saves = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-player-saves-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&saves);
     let (mut world, mut scripts, folder) = start_hello_saves("hello-saves", &saves);
     let project_files = files_in(&folder);
@@ -2682,8 +2680,9 @@ fn hello_saves_saves_loads_and_restores_its_checkpoint_from_lua_and_blocks_outsi
 #[test]
 fn hello_saves_loading_a_missing_slot_from_blocks_fails_and_leaves_the_world_alone() {
     use axcenity_core::KeyCode as K;
-    let saves =
-        std::env::temp_dir().join(format!("axcenity-player-no-saves-{}", std::process::id()));
+    let saves = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-player-no-saves-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&saves);
     let (mut world, mut scripts, _copy) = start_hello_saves("hello-saves-missing", &saves);
     script_lines(&mut scripts);

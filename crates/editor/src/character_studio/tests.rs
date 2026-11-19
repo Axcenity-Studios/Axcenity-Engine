@@ -119,7 +119,8 @@ fn a_waveform_is_the_loudest_sample_of_each_slice() {
 
 #[test]
 fn the_lip_sync_editor_plays_its_visemes_on_the_face() {
-    let assets = Assets::new(test_folder("lip-play"));
+    let folder = test_folder("lip-play");
+    let assets = Assets::new(folder.to_path_buf());
     let mut editor = LipSyncEditor::default();
     editor.open("voice/line.lipsync.json", line());
     let open = face_control("Mouth_Open").unwrap();
@@ -140,7 +141,8 @@ fn the_lip_sync_editor_plays_its_visemes_on_the_face() {
 
 #[test]
 fn expressions_preview_at_an_intensity_and_blend() {
-    let assets = Assets::new(test_folder("expressions"));
+    let folder = test_folder("expressions");
+    let assets = Assets::new(folder.to_path_buf());
     let mut editor = ExpressionEditor::default();
     editor.pick(&assets, "happy");
     assert_eq!(editor.picked.as_deref(), Some("happy"));

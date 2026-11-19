@@ -33,5 +33,8 @@ axcenity-workspace-hack.workspace = true
 # Sends profiler spans to Tracy (roadmap I1): `--features profile-tracy`.
 profile-tracy = ["profiling/profile-with-tracy"]
 
+[dev-dependencies]
+axcenity-test-dirs.workspace = true
+
 [lints]
 workspace = true

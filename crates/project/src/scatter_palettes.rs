@@ -311,8 +311,9 @@ mod tests {
 
     #[test]
     fn palettes_save_by_name_and_list_sorted_with_problems_apart() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-scatter-palettes-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-scatter-palettes-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         assert_eq!(list_scatter_palettes(&folder).0.len(), 0);
         let forest = palette();

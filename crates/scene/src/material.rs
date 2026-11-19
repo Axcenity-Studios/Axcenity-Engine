@@ -582,7 +582,7 @@ fn add_appearance(file: &mut MaterialFile, appearance: &Instance) {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use axcenity_assets::{MATERIALS_FOLDER, write_material_file};
     use axcenity_core::{Color3, Material as PartMaterial, Vector2};
@@ -614,11 +614,11 @@ mod tests {
     const BASE: &str = "assets/materials/brick.material.json";
 
     /// A new project folder with `assets/textures/swatch.png`, a 1×1 image.
-    fn project(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-scene-material-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         std::fs::create_dir_all(folder.join(MATERIALS_FOLDER)).unwrap();

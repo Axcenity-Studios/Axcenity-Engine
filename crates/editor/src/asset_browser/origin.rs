@@ -276,9 +276,10 @@ mod tests {
     /// material made from it, an Openverse sound, an imported sound, clips
     /// made here and one an animated import wrote, a prefab, and a material
     /// with no maps.
-    fn project(name: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-origins-{name}-{}", std::process::id()));
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-origins-{name}-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         for file in [
             "assets/models/Hero/Hero.fbx",

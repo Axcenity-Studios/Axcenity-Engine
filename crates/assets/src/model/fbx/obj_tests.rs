@@ -50,15 +50,17 @@ fn crates_obj(library: &str) -> String {
 const LIBRARY: &str =
     "newmtl Wood\nKd 0.8 0.6 0.4\nmap_Kd textures/wood.png\n\nnewmtl Paint\nKd 1 0 0\n";
 
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-obj-{name}-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-obj-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder
 }
 
 /// A folder with `crates.obj`, `crates.mtl` and `textures/wood.png`.
-fn crates_folder(name: &str) -> PathBuf {
+fn crates_folder(name: &str) -> axcenity_test_dirs::TestDir {
     let folder = temp_folder(name);
     std::fs::write(folder.join("crates.obj"), crates_obj("crates.mtl")).unwrap();
     std::fs::write(folder.join("crates.mtl"), LIBRARY).unwrap();

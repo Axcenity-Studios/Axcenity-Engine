@@ -1,15 +1,21 @@
 //! Conflicts between a project folder and its repository, over the real
 //! `git` with a bare `file://` remote.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::*;
 use crate::checkpoint::Kind;
 use crate::repository::{self, Linked, RemoteSpec};
 use crate::sync::{Job, State, sync_once};
 use crate::testing::{author, bare_remote, git, temp, write};
+use axcenity_test_dirs::TestDir;
 
-fn linked_copy(git: &Git, url: &str, name: &str, files: &[(&str, &str)]) -> PathBuf {
+fn linked_copy(
+    git: &Git,
+    url: &str,
+    name: &str,
+    files: &[(&str, &str)],
+) -> axcenity_test_dirs::TestDir {
     let dir = temp(name);
     for (path, text) in files {
         write(&dir, path, text);
@@ -48,14 +54,15 @@ fn read(dir: &Path, path: &str) -> Option<String> {
 }
 
 /// Paul and Sam start from the same files; Paul changes `paul` and
-/// uploads, Sam changes `sam` and syncs into a conflict.
+/// uploads, Sam changes `sam` and syncs into a conflict. Last, the remote's
+/// folder, removed when dropped.
 fn conflict(
     files: &[(&str, &str)],
     paul: &[(&str, Option<&str>)],
     sam: &[(&str, Option<&str>)],
-) -> (Git, String, PathBuf, PathBuf) {
+) -> (Git, String, TestDir, TestDir, TestDir) {
     let git = git();
-    let (_remote, url) = bare_remote(&git);
+    let (remote, url) = bare_remote(&git);
     let a = linked_copy(&git, &url, "Paul", files);
     let b = linked_copy(&git, &url, "Sam", &[]);
     for (dir, changes) in [(&a, paul), (&b, sam)] {
@@ -68,7 +75,7 @@ fn conflict(
     }
     assert_eq!(sync(&git, &a, "Paul"), State::Synced);
     assert!(matches!(sync(&git, &b, "Sam"), State::Conflict(_)));
-    (git, url, a, b)
+    (git, url, a, b, remote)
 }
 
 #[test]
@@ -89,7 +96,7 @@ fn a_copy_is_named_beside_the_file_before_its_extension() {
 
 #[test]
 fn a_conflict_writes_the_repositorys_version_beside_mine_and_never_uploads_it() {
-    let (git, url, _a, b) = conflict(
+    let (git, url, _a, b, _remote) = conflict(
         &[("world.json", "{\n\"x\": 0\n}\n")],
         &[("world.json", Some("{\n\"x\": 1\n}\n"))],
         &[("world.json", Some("{\n\"x\": 2\n}\n"))],
@@ -113,7 +120,8 @@ fn a_conflict_writes_the_repositorys_version_beside_mine_and_never_uploads_it() 
     // The copy isn't a change to checkpoint, and syncing again leaves it be.
     assert!(git.changes(&b).unwrap().is_empty());
     assert!(matches!(sync(&git, &b, "Sam"), State::Conflict(_)));
-    let check = temp("check").join("c");
+    let check_dir = temp("check");
+    let check = check_dir.join("c");
     git.clone_repository(&url, &check, None).unwrap();
     assert!(!check.join(&copy).exists());
     assert_eq!(read(&check, "world.json").unwrap(), "{\n\"x\": 1\n}\n");
@@ -128,7 +136,7 @@ fn each_file_is_resolved_as_chosen_and_the_merge_uploads() {
         ("d.txt", "d\n"),
         ("same.txt", "1\n"),
     ];
-    let (git, url, a, b) = conflict(
+    let (git, url, a, b, _remote) = conflict(
         &base,
         &[
             ("a.txt", Some("paul a\n")),
@@ -208,14 +216,15 @@ fn each_file_is_resolved_as_chosen_and_the_merge_uploads() {
     assert_eq!(sync(&git, &a, "Paul"), State::Synced);
     assert_eq!(read(&a, "a.txt").unwrap(), "sam a\n");
     assert_eq!(read(&a, &copy).unwrap(), "paul c\n");
-    let check = temp("check").join("c");
+    let check_dir = temp("check");
+    let check = check_dir.join("c");
     git.clone_repository(&url, &check, None).unwrap();
     assert_eq!(read(&check, "notes.txt").unwrap(), "sam's notes\n");
 }
 
 #[test]
 fn a_binary_file_is_never_merged_and_both_are_kept() {
-    let (git, _url, _a, b) = conflict(
+    let (git, _url, _a, b, _remote) = conflict(
         &[("texture.png", "PNG\0one")],
         &[("texture.png", Some("PNG\0paul"))],
         &[("texture.png", Some("PNG\0sam"))],
@@ -232,7 +241,7 @@ fn a_binary_file_is_never_merged_and_both_are_kept() {
 
 #[test]
 fn a_resolve_the_editor_never_finished_is_undone_and_asked_again() {
-    let (git, _url, _a, b) = conflict(
+    let (git, _url, _a, b, _remote) = conflict(
         &[("a.txt", "1\n")],
         &[("a.txt", Some("paul\n"))],
         &[("a.txt", Some("sam\n"))],

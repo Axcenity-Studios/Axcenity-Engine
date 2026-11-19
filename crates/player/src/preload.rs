@@ -186,10 +186,10 @@ mod tests {
 
     #[test]
     fn the_workspace_assets_load_ahead_and_textures_stay_in_the_background() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-player-preload-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         std::fs::write(folder.join("assets/textures/a.png"), png()).unwrap();

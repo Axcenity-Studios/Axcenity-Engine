@@ -3,7 +3,7 @@
 //! but protocol messages and that the server exits when stdin closes.
 
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use serde_json::{Value, json};
@@ -22,17 +22,18 @@ fn copy_folder(from: &Path, to: &Path) {
 }
 
 /// A copy of `examples/<name>`, so the server can't change the original.
-fn copy_of_example(name: &str) -> PathBuf {
+fn copy_of_example(name: &str) -> axcenity_test_dirs::TestDir {
     copy_of_example_for(name, "stdio")
 }
 
 /// A copy of `examples/<name>` of this test's own.
-fn copy_of_example_for(name: &str, test: &str) -> PathBuf {
+fn copy_of_example_for(name: &str, test: &str) -> axcenity_test_dirs::TestDir {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples")
         .join(name);
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-mcp-{test}-{name}-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-mcp-{test}-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     copy_folder(&example, &folder);
     folder

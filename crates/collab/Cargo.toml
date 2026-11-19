@@ -24,6 +24,7 @@ zstd.workspace = true
 axcenity-workspace-hack.workspace = true
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 # S10k, the standard measurement scene (C11's measurements).
 axcenity-testing.workspace = true
 

@@ -10,8 +10,9 @@ use crate::scripts::ScriptView;
 const SIZE: egui::Vec2 = egui::vec2(1500.0, 950.0);
 
 /// A project with a new Script switched to Blocks, its tab open, and the
-/// part "Block" selected. Returns the app, the script's path and its tab.
-fn block_script_open(test: &str) -> (EditorApp, String, u64) {
+/// part "Block" selected. Returns the copied project (first, so it is
+/// removed after the app is dropped), the app, the script's path and its tab.
+fn block_script_open(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp, String, u64) {
     let folder = copy_of_example("hello-part", test);
     let mut app = EditorApp::new(Some(&folder));
     app.insert_script(ClassName::Script);
@@ -30,7 +31,7 @@ fn block_script_open(test: &str) -> (EditorApp, String, u64) {
     assert_eq!(app.tabs.path_of(tab), Some(path.as_str()));
     let block = part(&app, "Block");
     app.select_clicked(Some(block), egui::Modifiers::NONE, None, false);
-    (app, path, tab)
+    (folder, app, path, tab)
 }
 
 fn stacks(app: &EditorApp, path: &str) -> usize {
@@ -88,7 +89,7 @@ fn key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
 
 #[test]
 fn ctrl_z_over_blocks_undoes_the_blocks_not_the_world() {
-    let (mut app, path, tab) = block_script_open("block-undo");
+    let (_project, mut app, path, tab) = block_script_open("block-undo");
     // A world edit first, which Ctrl+Z over the blocks must leave alone.
     let block = part(&app, "Block");
     app.apply(block, crate::properties::Edit::Name("Moved".to_owned()));
@@ -170,7 +171,7 @@ fn ctrl_z_over_blocks_undoes_the_blocks_not_the_world() {
 
 #[test]
 fn delete_and_ctrl_d_over_blocks_leave_the_selected_part_alone() {
-    let (mut app, _path, tab) = block_script_open("block-keys");
+    let (_project, mut app, _path, tab) = block_script_open("block-keys");
     let block = part(&app, "Block");
     let ctx = theme::test_context();
     let mut time = 0.0;

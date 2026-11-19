@@ -310,10 +310,10 @@ fn the_library_holds_presets_and_the_catalogue_lists_them() {
 
 #[test]
 fn a_library_folder_reads_its_presets() {
-    let root = std::env::temp_dir().join(format!(
+    let root = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-avatar-presets-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("test/presets")).unwrap();
     let mut library = Library::new();

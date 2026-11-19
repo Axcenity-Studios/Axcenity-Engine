@@ -12,7 +12,7 @@ use super::*;
 const SIZE: egui::Vec2 = egui::vec2(1400.0, 900.0);
 
 /// A copy of `examples/hello-part` in the temp folder.
-fn scratch_project(name: &str) -> PathBuf {
+fn scratch_project(name: &str) -> axcenity_test_dirs::TestDir {
     fn copy(from: &Path, to: &Path) {
         fs::create_dir_all(to).unwrap();
         for entry in fs::read_dir(from).unwrap().flatten() {
@@ -28,10 +28,10 @@ fn scratch_project(name: &str) -> PathBuf {
             }
         }
     }
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-history-{name}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&folder);
     copy(&example("hello-part"), &folder);
     folder
@@ -227,10 +227,10 @@ fn the_window_names_a_moved_part_and_an_edited_script_and_restores_only_when_ask
 #[test]
 fn a_checkpoint_backs_up_when_that_is_turned_on() {
     let folder = scratch_project("backup");
-    let backups = std::env::temp_dir().join(format!(
+    let backups = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-history-backups-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&backups);
     axcenity_project::save_backup_settings(
         &folder,

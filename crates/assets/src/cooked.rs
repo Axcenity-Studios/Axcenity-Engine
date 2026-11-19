@@ -803,9 +803,10 @@ mod tests {
         }
     }
 
-    fn folder(name: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-cooked-{name}-{}", std::process::id()));
+    fn folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-cooked-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(folder.join("assets/textures")).unwrap();
         folder

@@ -368,7 +368,9 @@ fn enter(pressed: bool) -> egui::Event {
 
 #[test]
 fn a_layer_opens_as_its_own_state_machine_and_saves_back_into_the_file() {
-    let project = std::env::temp_dir().join(format!("axcenity-layers-doc-{}", std::process::id()));
+    let project = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-layers-doc-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(project.join("assets/animations")).unwrap();
     let mut doc = doc();

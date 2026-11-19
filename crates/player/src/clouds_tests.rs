@@ -35,7 +35,9 @@ fn floor_world() -> World {
 /// `world` from high above the floor, `time` seconds in.
 fn frame(renderer: &mut TextureRenderer, world: &World, time: f32) -> Vec<u8> {
     // An empty project: these worlds read no files.
-    let folder = std::env::temp_dir().join(format!("axcenity-clouds-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-clouds-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&folder).unwrap();
     let assets = Assets::new(&folder);
     let camera = FlyCamera::looking_at(CLOUDY + Vec3::new(0.0, 600.0, 0.5), CLOUDY);
@@ -88,12 +90,16 @@ fn global_wind_carries_cloud_shadows_and_removing_clouds_changes_nothing() {
     set_wind(&mut world, 30.0);
     let blown = frame(&mut renderer, &world, 5.0);
     tests::write_png(
-        &std::env::temp_dir().join("axcenity-cloud-shadows.png"),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-cloud-shadows.png"),
+        ),
         &shaded,
         SIZE,
     );
     tests::write_png(
-        &std::env::temp_dir().join("axcenity-cloud-shadows-blown.png"),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-cloud-shadows-blown.png"),
+        ),
         &blown,
         SIZE,
     );

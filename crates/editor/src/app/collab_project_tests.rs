@@ -15,11 +15,11 @@ use super::*;
 use crate::properties::Edit;
 
 /// One computer's Collaborate data folder.
-fn data_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn data_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-collab-project-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }
@@ -107,7 +107,7 @@ fn a_project_keeps_its_members_and_id_across_hosts_and_members_rejoin_without_an
     let file = axcenity_project::load_collaborate_file(&project).unwrap();
     let id = file.project.expect("a project ID");
     let hosted = record(&data_a, &id);
-    assert_eq!(hosted.folder, project);
+    assert_eq!(hosted.folder, project.to_path_buf());
     assert_eq!(hosted.state, SessionState::Active);
     assert_eq!(hosted.members.as_ref().unwrap().members.len(), 1);
 

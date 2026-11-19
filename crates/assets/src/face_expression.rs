@@ -196,8 +196,9 @@ mod tests {
         assert!(FaceExpression::from_json(r#"{"format_version":2}"#).is_err());
         assert!(FaceExpression::from_json(r#"{"format_version":1,"control":{}}"#).is_err());
 
-        let project =
-            std::env::temp_dir().join(format!("axcenity-expressions-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-expressions-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&project);
         write_face_expression(
             &project,

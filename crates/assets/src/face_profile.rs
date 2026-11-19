@@ -340,8 +340,9 @@ mod tests {
 
     #[test]
     fn profiles_are_read_from_the_faces_folder_and_broken_ones_reported() {
-        let project =
-            std::env::temp_dir().join(format!("axcenity-face-profiles-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-face-profiles-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&project);
         let mut made = FaceProfile::new();
         made.controls

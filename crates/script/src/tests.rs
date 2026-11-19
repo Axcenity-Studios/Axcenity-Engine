@@ -1548,7 +1548,9 @@ fn face_controls_methods_set_expressions_overrides_and_layers() {
 
 #[test]
 fn face_controls_play_and_stop_lip_syncs() {
-    let folder = std::env::temp_dir().join(format!("axcenity-lua-lip-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-lua-lip-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(

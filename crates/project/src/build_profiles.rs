@@ -511,11 +511,11 @@ fn git_commit(folder: &Path) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn folder(name: &str) -> std::path::PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-build-profiles-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

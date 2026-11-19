@@ -278,7 +278,9 @@ mod tests {
 
     #[test]
     fn the_streaming_world_opens_with_streaming_on_and_every_part_on_the_map() {
-        let folder = std::env::temp_dir().join("axcenity-streaming-world");
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-streaming-world"),
+        );
         let _ = fs::remove_dir_all(&folder);
         write(&folder).unwrap();
         let project = axcenity_project::load(&folder).unwrap();

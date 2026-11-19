@@ -15,7 +15,9 @@ fn a_run_leaves_the_project_and_settings_alone_until_apply() {
     let before = app.graphics.clone();
     let mut finished = false;
     crate::snapshot::snapshot_rendered(
-        &std::env::temp_dir().join(format!("axcenity-benchmark-{}.png", std::process::id())),
+        &axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-benchmark-{}.png", std::process::id())),
+        ),
         egui::vec2(800.0, 600.0),
         vec![Vec::new(); 3],
         |ui, render_state| {

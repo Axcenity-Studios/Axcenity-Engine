@@ -37,7 +37,7 @@ plugin.Unloading:Connect(function()
 end)
 "#;
 
-fn opened(test: &str) -> (EditorApp, std::path::PathBuf) {
+fn opened(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-plugins", test);
     let tidy = folder.join("plugins").join("tidy");
     std::fs::create_dir_all(&tidy).unwrap();
@@ -50,7 +50,7 @@ fn opened(test: &str) -> (EditorApp, std::path::PathBuf) {
     let mut app = EditorApp::new(None);
     app.open(&folder);
     app.plugins_frame(1.0 / 60.0);
-    (app, folder)
+    (folder, app)
 }
 
 fn index(app: &EditorApp) -> usize {
@@ -78,7 +78,7 @@ fn command(app: &EditorApp, ctx: &egui::Context, title: &str) -> command_palette
 
 #[test]
 fn a_plugin_command_is_in_ctrl_k_and_runs_from_there_and_its_shortcut() {
-    let (mut app, folder) = opened("plugin-api3-commands");
+    let (folder, mut app) = opened("plugin-api3-commands");
     let ctx = theme::test_context();
     let tidy = command(&app, &ctx, "Tidy up");
     assert_eq!(tidy.entry.detail, "Plugin › Tidy");
@@ -119,7 +119,7 @@ fn a_plugin_command_is_in_ctrl_k_and_runs_from_there_and_its_shortcut() {
 
 #[test]
 fn a_plugin_explorer_item_gets_the_selection_and_undoes() {
-    let (mut app, folder) = opened("plugin-api3-explorer");
+    let (folder, mut app) = opened("plugin-api3-explorer");
     let plugin = index(&app);
     let items = app.plugins.explorer_actions();
     assert_eq!(items.len(), 1);
@@ -150,7 +150,7 @@ fn a_plugin_explorer_item_gets_the_selection_and_undoes() {
 
 #[test]
 fn model_imported_changes_are_part_of_the_import_undo_step() {
-    let (mut app, folder) = opened("plugin-api3-import");
+    let (folder, mut app) = opened("plugin-api3-import");
     let before = app.history.undo_label().map(str::to_owned);
     let count = |app: &EditorApp| app.world.descendants(app.world.workspace()).len();
     let children = count(&app);
@@ -182,7 +182,7 @@ fn model_imported_changes_are_part_of_the_import_undo_step() {
 
 #[test]
 fn unloading_saves_a_setting_when_the_plugin_reloads() {
-    let (mut app, folder) = opened("plugin-api3-unloading");
+    let (folder, mut app) = opened("plugin-api3-unloading");
     let plugin = index(&app);
     assert!(
         !app.plugins
