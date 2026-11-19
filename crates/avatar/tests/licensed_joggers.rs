@@ -7,8 +7,8 @@
 //! its provenance (the licence, the hashes, the evidence kept beside the
 //! record), the manifest (a draft until the review, colour roles,
 //! variants, cloth with sheen and 2K maps), the budget and three levels,
-//! even and dense texture coordinates that don't overlap, a sound mesh,
-//! and no single-layer edge. The fit on the cast, in motion and at the
+//! even and dense texture coordinates that don't overlap, a sound mesh
+//! with no face flipped or folded over, and no single-layer edge. The fit on the cast, in motion and at the
 //! knee and waist is the player's (`fleece_joggers_tests.rs`).
 
 use std::collections::{BTreeSet, HashMap};
@@ -404,7 +404,9 @@ fn welded(positions: &[[f32; 3]]) -> Vec<usize> {
 }
 
 /// §2 "Geometry" and "Skinning": no degenerate triangle, at most four
-/// normalized weights, no edge in three triangles, consistent normals.
+/// normalized weights, no edge in three triangles, neighbours wound the
+/// same way (whether faces fold over is
+/// `no_face_of_the_joggers_is_flipped_or_folded_over_at_rest`).
 #[test]
 fn the_joggers_mesh_is_sound() {
     let library = library();
@@ -441,6 +443,109 @@ fn the_joggers_mesh_is_sound() {
             }
         }
     }
+}
+
+/// How far two faces sharing an edge may turn from each other (degrees)
+/// before the edge counts as a fold-over: a fin, two faces back to back.
+/// The turned waistband and cuffs bend round their rounded fold over
+/// several rings, so no edge of a sound turn comes near this.
+const FIN: f32 = 140.0;
+
+/// §2 "Geometry": "normals consistent (no flipped faces)", at rest, at
+/// every level. `the_joggers_mesh_is_sound` checks only that neighbouring
+/// triangles wind the same way; a strip can wind consistently and still
+/// fold over, so this checks the surface itself: no triangle faces
+/// against its own corners' normals (the shading's), and no edge folds
+/// back on itself (a fin, its two faces turned more than [`FIN`] apart).
+#[test]
+fn no_face_of_the_joggers_is_flipped_or_folded_over_at_rest() {
+    use glam::Vec3;
+    let library = library();
+    let model = model(&library);
+    let unfit = model.rig.as_ref().map(|r| r.fit.inverse());
+    let mut failures = Vec::new();
+    for primitive in &model.primitives {
+        let levels = std::iter::once(primitive).chain(primitive.lods.iter());
+        for (level, mesh) in levels.enumerate() {
+            let name = format!("{} LOD{level}", primitive.material.name);
+            let world: Vec<Vec3> = positions(&model, mesh)
+                .into_iter()
+                .map(Vec3::from)
+                .collect();
+            let normals: Vec<Vec3> = mesh
+                .normals
+                .iter()
+                .map(|n| {
+                    let n = Vec3::from(*n);
+                    unfit
+                        .map_or(n, |m| m.transform_vector3(n))
+                        .normalize_or_zero()
+                })
+                .collect();
+            assert_eq!(normals.len(), world.len(), "{name}: a normal per corner");
+            // Triangles facing against their corners' normals.
+            let (mut flipped, mut flipped_area) = (Vec::new(), 0.0f32);
+            let mut faces = Vec::new();
+            for t in mesh.indices.chunks_exact(3) {
+                let [a, b, c] = [0, 1, 2].map(|k| world[t[k] as usize]);
+                let cross = (b - a).cross(c - a);
+                let face = cross.normalize_or_zero();
+                faces.push(face);
+                let shading = [0, 1, 2].map(|k| normals[t[k] as usize]);
+                let mean = (shading[0] + shading[1] + shading[2]).normalize_or_zero();
+                if face.dot(mean) < 0.0 {
+                    flipped_area += cross.length() / 2.0;
+                    flipped.push(((a + b + c) / 3.0, face.dot(mean), cross.length() * 5e5));
+                }
+            }
+            // Fins: edges whose two faces turn more than `FIN` apart.
+            let weld = welded(&world.iter().map(|p| p.to_array()).collect::<Vec<_>>());
+            let mut edges: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+            for (f, t) in mesh.indices.chunks_exact(3).enumerate() {
+                for k in 0..3 {
+                    let (a, b) = (weld[t[k] as usize], weld[t[(k + 1) % 3] as usize]);
+                    edges.entry((a.min(b), a.max(b))).or_default().push(f);
+                }
+            }
+            let limit = FIN.to_radians().cos();
+            let mut fins: Vec<(f32, Vec3)> = edges
+                .iter()
+                .filter(|(_, f)| f.len() == 2)
+                .map(|((a, b), f)| {
+                    let turn = faces[f[0]].dot(faces[f[1]]).clamp(-1.0, 1.0);
+                    (turn, (world[*a] + world[*b]) / 2.0)
+                })
+                .filter(|(turn, _)| *turn < limit)
+                .map(|(turn, at)| (turn.acos().to_degrees(), at))
+                .collect();
+            fins.sort_by(|x, y| y.0.total_cmp(&x.0));
+            let round = |p: Vec3| (p * 1000.0).round() / 1000.0;
+            println!(
+                "{name}: {} triangles against their normals ({:.0} mm²), {} fins over {FIN} degrees",
+                flipped.len(),
+                flipped_area * 1e6,
+                fins.len()
+            );
+            for (at, dot, area) in &flipped {
+                println!(
+                    "  flipped at {}: face against normal {dot:.2}, {area:.0} mm²",
+                    round(*at)
+                );
+            }
+            for (turn, at) in &fins {
+                println!("  fin {turn:.0} degrees at {}", round(*at));
+            }
+            if !flipped.is_empty() || !fins.is_empty() {
+                failures.push(format!(
+                    "{name}: {} flipped ({:.0} mm²), {} fins",
+                    flipped.len(),
+                    flipped_area * 1e6,
+                    fins.len()
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }
 
 /// §3 "Construction": no single-layer edge. Every open edge is the raw

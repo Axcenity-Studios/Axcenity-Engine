@@ -19,8 +19,10 @@ pockets and its proportions where they suit a jogger. What is made again:
    body: the pelvis as one tube from the waistband to the crotch, each leg
    as a tube from the crotch line to the hem, sharing the crotch seam.
    Rings are 2 to 3 cm apart on the thigh and shin and 1.5 cm through the
-   knee (seven loops within 6 cm of the joint), so the knee bends without
-   collapse; columns follow the arc length round each ring.
+   knee (seven loops within 6 cm of the joint), meant to let the knee bend
+   without collapse (not proven: the knee test checks only the front of
+   the bent knee, and the joggers have not been rebuilt without the loops
+   to compare); columns follow the arc length round each ring.
 2. **Shape:** each ring is the convex hull of the realistic body (with the
    boxer briefs: the joggers go over them) at its height, round each leg
    below the crotch, plus an ease (`EASE`): 8 mm at the waistband, 13 to
@@ -33,7 +35,7 @@ pockets and its proportions where they suit a jogger. What is made again:
    shoe's collar: shortened and tapered, not pooling.
 3. **Construction:** the waistband and both cuffs turned inside with 3 mm
    thickness and a rounded fold (a facing three rings deep: no single-layer
-   edge shows); the back patch pockets as closed pillows 2.5 mm thick at
+   edge shows); the back patch pockets as closed pillows 2.1 mm thick (`POCKET`) at
    the download's place; a drawcord (two cords out of metal eyelets at the
    front of the waistband, with aglets): the download has none.
 4. **Maps:** new texture coordinates (Blender's minimum-stretch unwrap of
@@ -1104,8 +1106,10 @@ def _image(path):
 
 # A tangent-space normal leaning further than this from the surface's own
 # (z, its cosine) faces into the cloth. The download's normal map has such
-# texels (71,519 in its islands, z <= 0); baked as they were, they render
-# black (the notch on the seat with the hips flexed, Review fixes 1).
+# texels (71,519 in its islands, z <= 0); baked as they were, they shade a
+# texel as if lit from behind the cloth, a fault of the map. (They were not
+# the dark notch on the seat with the hips flexed: that is the boxer briefs
+# through the joggers, Review fixes 2.)
 MIN_NORMAL_Z = 0.2
 
 
