@@ -1,0 +1,80 @@
+# Red run, sneakers-scratch (wave 5 stage 3), 2026-11-18
+# Before the item exists and before the footwear check's two new measures (exposed, toe box) are computed.
+
+$ cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(realistic_sneakers_low) | binary(content_states)'
+FAIL [   0.047s] ( 1/15) axcenity-avatar::realistic_sneakers_low the_sneakers_texture_coordinates_are_even_dense_and_do_not_overlap
+thread 'the_sneakers_texture_coordinates_are_even_dense_and_do_not_overlap' (25360) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+PASS [   0.057s] ( 2/15) axcenity-avatar::content_states a_character_wearing_legacy_and_draft_items_resolves
+PASS [   0.055s] ( 3/15) axcenity-avatar::content_states default_outfits_keep_their_legacy_items_and_wear_no_draft
+PASS [   0.057s] ( 4/15) axcenity-avatar::content_states every_shipped_item_declares_its_state
+FAIL [   0.070s] ( 5/15) axcenity-avatar::realistic_sneakers_low the_sneakers_are_shipped_as_a_fitted_built_in_draft_of_original_work
+thread 'the_sneakers_are_shipped_as_a_fitted_built_in_draft_of_original_work' (18964) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.075s] ( 6/15) axcenity-avatar::realistic_sneakers_low the_sneakers_follow_the_frame
+thread 'the_sneakers_follow_the_frame' (25656) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.076s] ( 7/15) axcenity-avatar::realistic_sneakers_low no_edge_of_the_sneakers_is_a_single_layer
+thread 'no_edge_of_the_sneakers_is_a_single_layer' (11876) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.082s] ( 8/15) axcenity-avatar::realistic_sneakers_low the_sneakers_meshes_are_sound
+thread 'the_sneakers_meshes_are_sound' (38896) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+PASS [   0.096s] ( 9/15) axcenity-avatar::content_states an_older_projects_library_without_states_still_loads
+FAIL [   0.096s] (10/15) axcenity-avatar::realistic_sneakers_low the_sneakers_keep_to_the_budget_with_three_levels_of_their_own
+thread 'the_sneakers_keep_to_the_budget_with_three_levels_of_their_own' (21168) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.096s] (11/15) axcenity-avatar::realistic_sneakers_low the_sneakers_materials_are_on_their_shading_models
+thread 'the_sneakers_materials_are_on_their_shading_models' (46988) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.109s] (12/15) axcenity-avatar::realistic_sneakers_low the_sneakers_are_skinned_to_the_feet_with_a_rigid_sole_and_toe_box
+thread 'the_sneakers_are_skinned_to_the_feet_with_a_rigid_sole_and_toe_box' (11044) panicked at crates\avatar\tests\realistic_sneakers_low.rs:60:28:
+the library has no `axcenity/realistic-sneakers-low`
+FAIL [   0.127s] (13/15) axcenity-avatar::content_states the_shipped_items_are_classified
+thread 'the_shipped_items_are_classified' (11704) panicked at crates\avatar\tests\content_states.rs:118:9:
+axcenity/realistic-sneakers-low ships
+PASS [   0.280s] (14/15) axcenity-avatar::content_states randomize_on_both_families_draws_no_legacy_or_draft_item
+PASS [   0.279s] (15/15) axcenity-avatar::content_states randomize_draws_a_production_item_once_there_is_one
+Summary [   0.285s] 15 tests run: 6 passed, 9 failed, 0 skipped
+FAIL [   0.047s] ( 1/15) axcenity-avatar::realistic_sneakers_low the_sneakers_texture_coordinates_are_even_dense_and_do_not_overlap
+FAIL [   0.070s] ( 5/15) axcenity-avatar::realistic_sneakers_low the_sneakers_are_shipped_as_a_fitted_built_in_draft_of_original_work
+FAIL [   0.075s] ( 6/15) axcenity-avatar::realistic_sneakers_low the_sneakers_follow_the_frame
+FAIL [   0.076s] ( 7/15) axcenity-avatar::realistic_sneakers_low no_edge_of_the_sneakers_is_a_single_layer
+FAIL [   0.082s] ( 8/15) axcenity-avatar::realistic_sneakers_low the_sneakers_meshes_are_sound
+FAIL [   0.096s] (10/15) axcenity-avatar::realistic_sneakers_low the_sneakers_keep_to_the_budget_with_three_levels_of_their_own
+FAIL [   0.096s] (11/15) axcenity-avatar::realistic_sneakers_low the_sneakers_materials_are_on_their_shading_models
+FAIL [   0.109s] (12/15) axcenity-avatar::realistic_sneakers_low the_sneakers_are_skinned_to_the_feet_with_a_rigid_sole_and_toe_box
+FAIL [   0.127s] (13/15) axcenity-avatar::content_states the_shipped_items_are_classified
+
+$ cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/footwear_check|sneakers_low/)'
+FAIL [   0.075s] ( 1/13) axcenity-player::bin/axcenity-player garment_checks::the_footwear_check_finds_a_toe_box_that_deforms
+thread 'garment_checks::the_footwear_check_finds_a_toe_box_that_deforms' (30232) panicked at crates\player\src\garment_checks.rs:1308:5:
+FootReport { character: "c", pose: "Walk@18", shoe: "Shoes_Box", covered: 90, through: 0, through_most: 0.0, exposed: 0, exposed_most: 0.0, toe_box_bend: 0.0, tread_low: 0.0, tread_high: 0.0 }
+PASS [   0.091s] ( 2/13) axcenity-player::bin/axcenity-player garment_checks::the_footwear_check_finds_a_foot_through_the_sole_and_a_tread_off_flat
+FAIL [   0.107s] ( 3/13) axcenity-player::bin/axcenity-player garment_checks::the_footwear_check_finds_a_toe_out_of_the_toe_box_at_rest
+thread 'garment_checks::the_footwear_check_finds_a_toe_out_of_the_toe_box_at_rest' (8048) panicked at crates\player\src\garment_checks.rs:1265:5:
+assertion `left == right` failed: FootReport { character: "c", pose: "rest", shoe: "Shoes_Box", covered: 0, through: 0, through_most: 0.0, exposed: 0, exposed_most: 0.0, toe_box_bend: 0.0, tread_low: 0.0, tread_high: 0.0 }
+left: 0
+right: 20
+FAIL [   1.490s] ( 4/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_at_rest_and_in_idle
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_at_rest_and_in_idle' (17472) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+realistic-feminine-cast-asymmetry: no Shoes_LowSneakers
+FAIL [   1.535s] ( 5/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_in_the_held_poses
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_in_the_held_poses' (45096) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+FAIL [   1.459s] ( 6/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_second_third
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_second_third' (7472) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+FAIL [   1.535s] ( 7/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_first_third
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_first_third' (28928) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+FAIL [   1.459s] ( 8/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_stay_steady_in_the_idle
+thread 'sneakers_low_tests::the_sneakers_stay_steady_in_the_idle' (41896) panicked at crates\player\src\sneakers_low_tests.rs:211:9:
+FAIL [   1.583s] ( 9/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_through_the_run
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_through_the_run' (24492) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+FAIL [   1.493s] (10/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_levels_of_detail_hold_the_feet_at_rest
+thread 'sneakers_low_tests::the_sneakers_levels_of_detail_hold_the_feet_at_rest' (27464) panicked at crates\player\src\sneakers_low_tests.rs:175:51:
+FAIL [   1.583s] (11/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_last_third
+thread 'sneakers_low_tests::the_sneakers_hold_the_feet_through_the_walk_last_third' (2636) panicked at crates\player\src\sneakers_low_tests.rs:51:5:
+FAIL [   1.067s] (12/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_stay_steady_in_the_run
+thread 'sneakers_low_tests::the_sneakers_stay_steady_in_the_run' (45996) panicked at crates\player\src\sneakers_low_tests.rs:211:9:
+FAIL [   1.040s] (13/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_stay_steady_in_the_walk
+thread 'sneakers_low_tests::the_sneakers_stay_steady_in_the_walk' (45692) panicked at crates\player\src\sneakers_low_tests.rs:211:9:
+Summary [   2.575s] 13 tests run: 1 passed, 12 failed, 287 skipped

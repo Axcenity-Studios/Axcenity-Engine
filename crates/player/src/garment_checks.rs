@@ -69,6 +69,26 @@ pub(crate) const SOLE_FLAT: f32 = 0.002;
 /// The deepest a foot corner may be outside its shoe (as the fit gate's
 /// poke-through, §3 "Poke-through").
 pub(crate) const FOOT_OUT: f32 = 0.001;
+/// How far inside a foot corner the shoe's outside is looked for: a corner
+/// the shoe doesn't cover, with the shoe's outer surface under it within
+/// this (along the way into the foot), has come out through the shoe. A
+/// toe out of the toe box at rest is found so, which the cover rule can't
+/// see (it only follows corners the shoe covers at rest).
+pub(crate) const EXPOSED_REACH: f32 = 0.02;
+/// How much farther than the shoe's nearest point the face under an
+/// exposed corner may be: it is the face the corner came out through.
+const EXPOSED_NEAREST: f32 = 0.002;
+/// How far out along an exposed corner's normal no shoe may be: it is
+/// outside, nothing of the shoe over it.
+const EXPOSED_CLEAR: f32 = 0.1;
+/// The toe box: the front of each shoe from this share of its length
+/// (heel 0, toe 1), ahead of the ball where a shoe flexes (the realistic
+/// foot's toe joint is at about 62% of its shoe's length).
+pub(crate) const TOE_BOX_FROM: f32 = 0.75;
+/// How much any two toe-box corners' distance apart may change in a pose:
+/// the toe box moves with the toes as one piece and bends only at the toe
+/// joint, behind it (§3 "Footwear").
+pub(crate) const TOE_BOX_RIGID: f32 = 0.001;
 
 /// What one garment did over a clip.
 #[derive(Clone, Debug, Default)]
@@ -471,6 +491,17 @@ pub(crate) struct FootReport {
     pub covered: usize,
     pub through: usize,
     pub through_most: f32,
+    /// Foot corners the shoe doesn't cover (at rest or now) with the
+    /// shoe's outside right under them ([`EXPOSED_REACH`]): out through it
+    /// by more than [`FOOT_OUT`], and the farthest (m). Counted in every
+    /// pose, rest included (`through` follows only corners covered at
+    /// rest, so it can't see a toe already out of the toe box at rest).
+    pub exposed: usize,
+    pub exposed_most: f32,
+    /// The most any two corners of a toe box ([`TOE_BOX_FROM`]) changed
+    /// their distance apart from rest (m): how far the toe box deformed
+    /// other than by turning with the toes.
+    pub toe_box_bend: f32,
     /// At rest: the tread's lowest and highest point above the floor (m;
     /// the floor is the file's `y = 0`, where the body stands).
     pub tread_low: f32,
@@ -500,6 +531,27 @@ impl FootReport {
                     "{} foot corners out of the shoe, the farthest {:.2} mm",
                     self.through,
                     self.through_most * 1000.0
+                ),
+            );
+        }
+        if self.exposed > 0 {
+            add(
+                "exposed",
+                self.exposed_most,
+                format!(
+                    "{} foot corners out through the shoe's outside, the farthest {:.2} mm",
+                    self.exposed,
+                    self.exposed_most * 1000.0
+                ),
+            );
+        }
+        if self.toe_box_bend > TOE_BOX_RIGID {
+            add(
+                "toe box",
+                self.toe_box_bend,
+                format!(
+                    "the toe box bends {:.2} mm away from the toe joint",
+                    self.toe_box_bend * 1000.0
                 ),
             );
         }
@@ -580,9 +632,56 @@ pub(crate) fn footwear(
         .collect()
 }
 
+/// The footwear check through a clip: `clip` played on `description` once
+/// and each of `frames` (sixtieths of a second from its start, at least
+/// 2) measured as [`footwear`] measures a pose, against the rest pose
+/// worked out once. One report per shoe part and frame, its pose named
+/// `<clip>@<frame>`.
+pub(crate) fn footwear_through(
+    assets: &Assets,
+    description: &Description,
+    clip: &'static str,
+    frames: &[u32],
+) -> Vec<FootReport> {
+    let (body_rest, garments_rest) = worn(assets, description, Stance::Rest);
+    let first = frames.iter().copied().min().unwrap_or(2).max(2);
+    let last = frames.iter().copied().max().unwrap_or(first);
+    let (mut world, mut animators) = stage_world(
+        assets,
+        description,
+        Stance::Clip {
+            name: clip,
+            frames: first,
+        },
+        &[],
+    )
+    .expect("the clip");
+    let mut out = Vec::new();
+    for frame in first..=last {
+        if frames.contains(&frame) {
+            let (body, garments, _) = worn_in(&world, assets, &animators);
+            let pose = format!("{clip}@{frame}");
+            for (shoe_rest, shoe) in garments_rest.iter().zip(&garments) {
+                if shoe.name.starts_with("Shoes_") {
+                    out.push(foot_report(
+                        &description.name,
+                        &pose,
+                        &body_rest,
+                        shoe_rest,
+                        &body,
+                        shoe,
+                    ));
+                }
+            }
+        }
+        animators.update(&mut world, assets, 1.0 / 60.0);
+    }
+    out
+}
+
 /// The footwear check of one shoe: `body_rest` and `shoe_rest` at rest,
 /// `body` and `shoe` in the pose named `pose` (`rest` for rest itself).
-fn foot_report(
+pub(crate) fn foot_report(
     character: &str,
     pose: &str,
     body_rest: &Posed,
@@ -615,6 +714,49 @@ fn foot_report(
             report.through_most = report.through_most.max(far);
         }
     }
+    // Exposed: a corner the cover rule doesn't follow (not covered at
+    // rest) and not covered now, with the shoe's outside under it (the way
+    // into the foot meets a shoe face that faces the way the skin does,
+    // away from the shoe's hems). A followed corner that comes out is
+    // `through`, counted once.
+    let hem = hem_corners(shoe);
+    let mut drawn = vec![false; body.positions.len()];
+    for t in &body.triangles {
+        for v in t {
+            drawn[*v as usize] = true;
+        }
+    }
+    for (k, (p, n)) in body.positions.iter().zip(&body.normals).enumerate() {
+        if !drawn[k] || covered[k] || still[k] || *n == Vec3::ZERO {
+            continue;
+        }
+        let Some(hit) = surface.cast(*p, -*n, EXPOSED_REACH) else {
+            continue;
+        };
+        let t = shoe.triangles[hit.triangle as usize];
+        if t.iter().any(|v| hem[*v as usize]) {
+            continue;
+        }
+        // ... and that face is the shoe's nearest to the corner, which is
+        // outside it there, with no shoe at all over the corner (a corner
+        // inside a shoe's cavity, its way out meeting the upper past the
+        // cover rule's reach or at a hem, can have the inner floor of the
+        // sole nearest under it).
+        let Some(near) = surface.closest(*p, EXPOSED_REACH) else {
+            continue;
+        };
+        if surface.cast(*p, *n, EXPOSED_CLEAR).is_some() {
+            continue;
+        }
+        if hit.normal.dot(*n) > 0.3
+            && hit.distance <= near.distance + EXPOSED_NEAREST
+            && near.signed(*p) > FOOT_OUT
+        {
+            report.exposed += 1;
+            report.exposed_most = report.exposed_most.max(hit.distance);
+        }
+    }
+    report.toe_box_bend = toe_box_bend(shoe_rest, shoe);
     // The tread: the shoe's faces that face the floor (within 25 degrees
     // of straight down) under the foot, at rest.
     let mut low = f32::MAX;
@@ -642,6 +784,57 @@ fn foot_report(
         report.tread_high = high;
     }
     report
+}
+
+/// How far each shoe's toe box ([`TOE_BOX_FROM`]) deformed from `rest`
+/// to `posed` (the same mesh): the most any two of its corners' distance
+/// apart changed (a rigid turn changes none). The pair's shoes are told
+/// apart by side (the left foot is at +X); each shoe's length runs along
+/// its corners' widest horizontal spread at rest, its toe the end towards
+/// +Z (where the body faces).
+fn toe_box_bend(rest: &Posed, posed: &Posed) -> f32 {
+    let mut most: f32 = 0.0;
+    for side in [1.0f32, -1.0] {
+        let ids: Vec<usize> = (0..rest.positions.len())
+            .filter(|k| rest.positions[*k].x * side > 0.0)
+            .collect();
+        if ids.len() < 3 {
+            continue;
+        }
+        // The horizontal (x, z) principal direction: the shoe's length.
+        let mean = ids.iter().map(|k| rest.positions[*k]).sum::<Vec3>() / ids.len() as f32;
+        let (mut xx, mut xz, mut zz) = (0.0f32, 0.0f32, 0.0f32);
+        for k in &ids {
+            let d = rest.positions[*k] - mean;
+            xx += d.x * d.x;
+            xz += d.x * d.z;
+            zz += d.z * d.z;
+        }
+        let angle = 0.5 * (2.0 * xz).atan2(xx - zz);
+        let mut along = Vec3::new(angle.cos(), 0.0, angle.sin());
+        if along.z < 0.0 {
+            along = -along;
+        }
+        let s: Vec<f32> = ids.iter().map(|k| rest.positions[*k].dot(along)).collect();
+        let (back, front) = (
+            s.iter().copied().fold(f32::MAX, f32::min),
+            s.iter().copied().fold(f32::MIN, f32::max),
+        );
+        let toe_box: Vec<usize> = ids
+            .iter()
+            .zip(&s)
+            .filter(|(_, s)| (**s - back) / (front - back) >= TOE_BOX_FROM)
+            .map(|(k, _)| *k)
+            .collect();
+        for (i, a) in toe_box.iter().enumerate() {
+            for b in &toe_box[i + 1..] {
+                let before = rest.positions[*a].distance(rest.positions[*b]);
+                let after = posed.positions[*a].distance(posed.positions[*b]);
+                most = most.max((after - before).abs());
+            }
+        }
+    }
+    most
 }
 
 /// The realistic cast (both frames) in the test tee over the underwear.
@@ -1125,6 +1318,104 @@ fn the_footwear_check_finds_a_foot_through_the_sole_and_a_tread_off_flat() {
     );
     let what: Vec<String> = tread.problems().into_iter().map(|p| p.what).collect();
     assert_eq!(what, ["Shoes_Box tread"]);
+}
+
+/// `mesh` moved by `by` (a box shoe and foot set on the left foot's
+/// side, +X, where the toe-box check looks for a left shoe).
+fn moved(mesh: &Posed, by: Vec3) -> Posed {
+    Posed {
+        positions: mesh.positions.iter().map(|p| *p + by).collect(),
+        ..mesh.clone()
+    }
+}
+
+/// A toe out of the shoe's front at rest (a patch 5 mm in front of the
+/// toe box, facing forward) is exposed: the cover rule can't see it (its
+/// ray out meets no shoe at rest, so it isn't followed), the new rule
+/// finds the shoe's outside 5 mm under it. A foot inside the shoe, and a
+/// toe 5 mm short of the front, are not.
+#[test]
+fn the_footwear_check_finds_a_toe_out_of_the_toe_box_at_rest() {
+    let shoe = box_shoe(0.0);
+    // The front of the box is at z = 0.12, facing +Z.
+    let toe = |z: f32| {
+        let mut positions = Vec::new();
+        let mut triangles = Vec::new();
+        for i in 0..5 {
+            for j in 0..4 {
+                positions.push(Vec3::new(
+                    -0.03 + 0.015 * i as f32,
+                    0.01 + 0.013 * j as f32,
+                    z,
+                ));
+            }
+        }
+        for i in 0..4u32 {
+            for j in 0..3u32 {
+                let a = i * 4 + j;
+                triangles.push([a, a + 4, a + 1]);
+                triangles.push([a + 1, a + 4, a + 5]);
+            }
+        }
+        Posed {
+            name: "Body".to_owned(),
+            normals: vec![Vec3::Z; positions.len()],
+            positions,
+            triangles,
+        }
+    };
+    let out = toe(0.125);
+    let report = foot_report("c", "rest", &out, &shoe, &out, &shoe);
+    assert_eq!(report.through, 0, "{report:?}");
+    assert_eq!(report.exposed, out.positions.len(), "{report:?}");
+    assert!((report.exposed_most - 0.005).abs() < 1e-4, "{report:?}");
+    let what: Vec<String> = report.problems().into_iter().map(|p| p.what).collect();
+    assert!(what.contains(&"Shoes_Box exposed".to_owned()), "{what:?}");
+    let inside = toe(0.115);
+    let report = foot_report("c", "rest", &inside, &shoe, &inside, &shoe);
+    assert_eq!(report.exposed, 0, "{report:?}");
+    let foot = box_foot(0.0);
+    let report = foot_report("c", "rest", &foot, &shoe, &foot, &shoe);
+    assert_eq!(report.exposed, 0, "{report:?}");
+    assert!(report.problems().is_empty(), "{:?}", report.problems());
+}
+
+/// A shoe that turns as one piece keeps its toe box; one whose toe box's
+/// sole corners are pushed 5 mm up (the front deformed, not turned) bends
+/// it 5 mm, and that is a problem.
+#[test]
+fn the_footwear_check_finds_a_toe_box_that_deforms() {
+    let side = Vec3::new(0.15, 0.0, 0.0);
+    let rest = moved(&box_shoe(0.0), side);
+    let foot = moved(&box_foot(0.0), side);
+    // The whole shoe turned 20 degrees about its heel's bottom edge (a
+    // heel raise) and moved: rigid, so nothing bends.
+    let heel = Vec3::new(0.15, 0.0, -0.12);
+    let turn = axcenity_render::glam::Quat::from_rotation_x(-20f32.to_radians());
+    let turned = Posed {
+        positions: rest
+            .positions
+            .iter()
+            .map(|p| heel + turn * (*p - heel) + Vec3::Y * 0.01)
+            .collect(),
+        ..rest.clone()
+    };
+    let report = foot_report("c", "Walk@18", &foot, &rest, &foot, &turned);
+    assert!(report.toe_box_bend < 1e-4, "{report:?}");
+    assert!(
+        !report
+            .problems()
+            .iter()
+            .any(|p| p.what.ends_with("toe box")),
+        "{:?}",
+        report.problems()
+    );
+    // The toe box's bottom corners 5 mm up: deformed.
+    let bent = moved(&box_shoe(0.005), side);
+    let report = foot_report("c", "Walk@18", &foot, &rest, &foot, &bent);
+    assert!((report.toe_box_bend - 0.005).abs() < 2e-4, "{report:?}");
+    let what: Vec<String> = report.problems().into_iter().map(|p| p.what).collect();
+    assert!(what.contains(&"Shoes_Box toe box".to_owned()), "{what:?}");
 }
 
 /// A record whose defect is gone, or which is well over it, is stale.

@@ -1,0 +1,160 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic-sneakers-low",
+  "label": "Low-top sneakers",
+  "kind": "garment",
+  "slot": "shoes",
+  "layer": 1,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/realistic"
+  ],
+  "model": {
+    "file": "Shoes_LowSneakers.glb",
+    "object": "AxcenityRealistic/Shoes_LowSneakers"
+  },
+  "hides": [],
+  "materials": [
+    {
+      "name": "Upper",
+      "shading": "standard",
+      "label": "Leather",
+      "role": "primary"
+    },
+    {
+      "name": "Lining",
+      "shading": "cloth",
+      "label": "Lining and footbed",
+      "role": "secondary"
+    },
+    {
+      "name": "Tongue",
+      "shading": "cloth",
+      "label": "Tongue",
+      "role": "secondary"
+    },
+    {
+      "name": "Laces",
+      "shading": "cloth",
+      "label": "Laces",
+      "role": "accent"
+    },
+    {
+      "name": "Eyelets",
+      "shading": "standard",
+      "label": "Eyelets"
+    },
+    {
+      "name": "Midsole",
+      "shading": "standard",
+      "label": "Sole"
+    },
+    {
+      "name": "Outsole",
+      "shading": "standard",
+      "label": "Tread"
+    }
+  ],
+  "variants": [
+    {
+      "id": "white",
+      "label": "White",
+      "materials": {
+        "Upper": {
+          "tint": "#ffffff"
+        },
+        "Lining": {
+          "tint": "#ffffff"
+        },
+        "Tongue": {
+          "tint": "#ffffff"
+        },
+        "Laces": {
+          "tint": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "black",
+      "label": "Black",
+      "materials": {
+        "Upper": {
+          "tint": "#2b2b2b"
+        },
+        "Lining": {
+          "tint": "#2b2b2b"
+        },
+        "Tongue": {
+          "tint": "#2b2b2b"
+        },
+        "Laces": {
+          "tint": "#2b2b2b"
+        },
+        "Midsole": {
+          "tint": "#e9e6df"
+        },
+        "Outsole": {
+          "tint": "#e9e6df"
+        }
+      }
+    },
+    {
+      "id": "navy",
+      "label": "Navy",
+      "materials": {
+        "Upper": {
+          "tint": "#2d3754"
+        },
+        "Lining": {
+          "tint": "#2d3754"
+        },
+        "Tongue": {
+          "tint": "#2d3754"
+        },
+        "Laces": {
+          "tint": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "tan",
+      "label": "Tan suede-look",
+      "materials": {
+        "Upper": {
+          "tint": "#b08a62"
+        },
+        "Tongue": {
+          "tint": "#b08a62"
+        },
+        "Laces": {
+          "tint": "#e9e2d4"
+        },
+        "Outsole": {
+          "tint": "#c79a62"
+        }
+      }
+    }
+  ],
+  "fit": {
+    "method": "binding",
+    "data": "Shoes_LowSneakers.binding.json",
+    "margin": 0.002
+  },
+  "tags": [
+    "sneakers",
+    "trainers",
+    "low-top",
+    "court",
+    "leather",
+    "casual"
+  ],
+  "thumbnail": "Shoes_LowSneakers.png",
+  "source": {
+    "author": "Axcenity Engine contributors; modelled from scratch over a last made from the realistic foot, against openly licensed reference photographs (looked at, not shipped); leather and textile from Poly Haven's Leather White and Cotton Jersey (CC0), sole rubber from ambientCG's Rubber004 (CC0)",
+    "licence": "CC0-1.0",
+    "url": "https://polyhaven.com/a/leather_white",
+    "origin": "original"
+  },
+  "about": "Plain low-top court sneakers: a leather upper with a toe cap, eyestays and heel counter, a padded collar and tongue, laces, and a stitched cupsole.",
+  "quality": "draft"
+}

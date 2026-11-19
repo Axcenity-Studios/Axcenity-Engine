@@ -24,10 +24,14 @@ const WAVE_4_DRAFTS: [&str; 4] = [
     "axcenity/realistic-sneakers",
 ];
 
-/// Wave 5's licensed items, drafts until the lead's review and Paul's
-/// sign-off of the first of each kind: the first licensed tee
-/// (`refinement/wave5/tee-licensed.md`).
-const WAVE_5_DRAFTS: [&str; 1] = ["axcenity/realistic-tee-crew"];
+/// Wave 5's items, drafts until the lead's review and Paul's sign-off of
+/// the first of each kind: the first licensed tee
+/// (`refinement/wave5/tee-licensed.md`) and the first sneakers made from
+/// scratch (`refinement/wave5/sneakers-scratch.md`).
+const WAVE_5_DRAFTS: [&str; 2] = [
+    "axcenity/realistic-tee-crew",
+    "axcenity/realistic-sneakers-low",
+];
 
 /// The realistic underwear, made before the standard (Legacy).
 const REALISTIC_UNDERWEAR: [&str; 3] = [
