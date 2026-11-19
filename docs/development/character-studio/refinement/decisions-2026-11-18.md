@@ -69,6 +69,14 @@ Paul's answers to the questions the wave-4 merge raised (progress.md, 2026-11-18
 >
 > The character creator is an important part of Axcenity's first impression. I would rather have 10 excellent clothing options than 100 mediocre ones.
 
+## Later the same day: stage 3
+
+After the wave-5 stage-2 report (the fit shrink-wraps loose garments; no usable licensed hair or sneaker without an account), Paul approved the stage-3 proposal (fit and deformation for loose clothing first) and added:
+
+> Ok go ahead and move to the next phase. use references and make models from scratch if neccesary using image sources from openverse.
+
+The plan records this as decision 14. The lead applies it so: where no licensed base is usable (today the hairstyle and the sneakers), the item is modelled from scratch in Blender against reference photographs found through Openverse (openverse.org, which indexes openly licensed images). References are looked at, never shipped: a reference image is not copied, traced into a texture or committed; its link, author and licence are recorded in the item's references list. CC0 and CC BY references are preferred; brand designs (logos, trademarked toe caps, stripes and swooshes) are never modelled.
+
 ## How the lead applies them
 
 - **Licences:** "CC0 / CC-BY" is read with the existing classes ([references/README.md](../references/README.md)): class 1 (CC0, public domain) and class 2 (CC BY 3.0 or 4.0, MIT, Apache-2.0, with attribution recorded). Share-alike (CC BY-SA), non-commercial (NC) and no-derivatives (ND) licences are not accepted: a game made with Axcenity ships the assets under its own terms, and an asset is always modified (fitted, rigged, re-materialed). "Compatible with the distribution model" means a game built with Axcenity carries every CC BY attribution of the items it ships, without the game's author having to find them.
