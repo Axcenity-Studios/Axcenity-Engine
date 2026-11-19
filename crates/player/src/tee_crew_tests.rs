@@ -309,6 +309,21 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // - The walk with the right arm back (Walk@0.367), masculine average,
 //   heavyset and muscular: a skin speck of 7 to 11 mm on the back of the
 //   right sleeve just above its hem.
+// - Arms raised, every cast body (front, side and back): flaps about 10
+//   to 15 cm long hang from both sleeves' undersides, the sleeve hems'
+//   turn-up stretched (323 to 374 triangles over twice their rest length,
+//   the longest edge 299 to 313 mm, on the ten cast bodies' dumps).
+// - Rest, the T-pose, the elbows bent, the arms raised and forward, every
+//   cast body (review fixes 2): the waist hem's centre back hangs in a point
+//   55 to 63 mm below the back hem beside the buttocks, into the cleft and
+//   free of the body below them; from the side it reads as a strip hanging
+//   behind the thighs (up to 26 to 34 mm behind the body's back edge). In
+//   the walk it is 11 to 54 mm, and it stands free of every cast body in 5
+//   of the 15 sampled frames (in 2 more on two). The engine fit made it: the
+//   refined hem is level (the point is 4 mm without the push-out's
+//   between-corners pass), and that pass pushes the hem's lower edge down along the
+//   cloth's normal there, round after round: 24 mm at rest, 67 mm after the
+//   extremes' lifts (`tee-licensed.md`, review fixes 2).
 
 const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
     Known {

@@ -32,7 +32,7 @@ No dependency added (Pillow is part of the Blender Python environment the intake
 - **Record:** `assets/characters/realistic/clothing/tee-crew/Shirt_TeeCrew.provenance.json`, written by the intake from the spec.
   - Asset "Plain T-shirt" by Introspective Mnisi; source page `https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/`; licence CC0-1.0 (`https://creativecommons.org/publicdomain/zero/1.0/`); retrieved 2026-11-18.
   - The file as downloaded: `bk-plain-t-shirt.glb`, 1,172,888 bytes, SHA-256 `a0bde896788e40219791bc79b16f67a3619d487c7d2ae8ba3fd20df48eaecc5f`.
-  - Changes, as the intake listed them: 112 split corners welded; placed on the realistic body; a rib band from the faces along the neck; turned hems (3 mm thick, 18 to 20 mm turned up) at every open edge; maps baked again from Poly Haven's Cotton Jersey (CC0), the source's own maps dropped; simpler copies by decimation; fitted, rigged and given the body's shapes by the engine's fit; materials rebuilt.
+  - Changes, as the intake listed them: 112 split corners welded; placed on the realistic body; texture coordinates laid out again (Blender's conformal unwrap along the source's own seams; listed since review fixes 1); a rib band from the faces along the neck; turned hems (3 mm thick, 18 to 20 mm turned up) at every open edge; maps baked again from Poly Haven's Cotton Jersey (CC0), the source's own maps dropped; simpler copies by decimation; fitted, rigged and given the body's shapes by the engine's fit; materials rebuilt.
 - **Evidence** (`docs/.../wave5/tee-licensed/evidence/`, kept byte for byte by a `.gitattributes`). The record's `evidence` quotes each page and gives its hash:
   - the asset's page as retrieved (`asset-page-2026-11-18.html`, SHA-256 `4fd43b0c…f2`): "license: Creative commons zero", the author, "published 17 Sep 2026". The URL redirects to the asset's base ID, `126dea9d-…`;
   - BlenderKit's API record of the asset (`api-record-2026-11-18.json`, `a2df1cf1…20`): `license: cc_zero`, `verificationStatus: validated`;
@@ -94,6 +94,7 @@ Each row is the intake run again and the tee's whole gate (54 bodies: rest, Idle
 | E5 | E4 with a one-row fold | 34 / 13.5 | 48 / 19.9 | 54 / 19.3, 54 / 19.6, 54 / 22.3 | 54 / 23.5 | 36 / 14.4 | 35 / 14.4 | 34 / 13.5 | |
 | E6 | E4 + a gate rule: a turned hem's fold is a hem edge, grown two rings like an open edge (not committed) | 0 | 51 / 19.9 | 54 / 19.3, 54 / 14.0, 54 / 22.3 | 54 / 30.5 | 5 / 3.7 | 1 / 24.6 | 0 | |
 | E7 | E4 + the fold rule without growing it (not committed) | 1 / 4.7 | | | | | | | |
+| E8 | Final + the between-corners pass limited to the sagitta a triangle that size can have over a 4 cm limb (review fixes 2, not committed) | 4 / 36.7 | 53 / 24.9 | 54 / 39.2, 54 / 40.1, 54 / 39.3 | 54 / 38.7 | 9 / 25.0 | 6 / 37.9 | 4 / 42.3, 4 / 36.7 | run within its record; LOD1 13 / 13.2, LOD2 10 / 34.5 |
 | **Final** | E4 with the texture coordinates unwrapped (committed) | 7 / 28.2 | 53 / 37.9 | 54 / 32.5, 54 / 31.3, 54 / 32.0 | 54 / 30.2 | 14 / 28.2 | 7 / 28.2 | 8, 7 / 28.2 | walk passes (1.3 mm), **run 6.0 mm** |
 
 **What the table says.**
@@ -155,7 +156,8 @@ Lower them as the item improves; a production item has none.
 - `tee-<pose>.jpg`: the eight cast bodies (masculine slim, average, heavyset, muscular, then the same feminine), a row each, front, side and back, studio light, cropped to the upper body.
 - `tee-<pose>-hard.jpg`: the two average bodies under the hard light.
 - `before-after-<pose>.jpg`: the wave-4 crew tee (left three) against the licensed tee (right three) on the average bodies.
-- `crops-<pose>.jpg`: full-size crops of the collar, hem, sleeve hem, armpit (front and side) and back.
+- `crops-<pose>.jpg`: full-size crops of the collar, hem, sleeve hem, armpit (front and side) and back; since review fixes 2 also `hem-side`, the waist hem's back seen from the side.
+- `hem-side.jpg` (review fixes 2): the waist hem's back from the side on the eight cast bodies at rest, in the T-pose, the walk's passing frame, the walk with the right arm back and the arms forward. `hem-tab-traced.jpg`: the gate's dump drawn flat, the hanging centre back in red.
 
 The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@0.183`), `walk-right-arm-back` (`Walk@0.367`), `arms-raised`, `arms-forward`, and since review fixes 1 `t-pose` (`tee-t-pose.jpg`, `-hard.jpg`, `before-after-t-pose.jpg`, `crops-t-pose.jpg`, cropped wider for the arms; its crops take the underarm from the front and the back).
 
@@ -165,6 +167,7 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
   - No skin through the cloth and no holes. The wave-4 tee next to it shows black holes at the waist on both bodies; the licensed tee has none.
   - **It is not natural.** Pushed out of the bodies from a smaller base, it hugs every form: the masculine pectorals, the scapulae and the spine's groove read through it like paint, and its back hem dips to a point over the buttocks.
   - On the feminine bodies the hem wraps the buttocks like a bodysuit (the back views).
+  - **The waist hem's centre back hangs in a point below the buttocks** on every cast body (found by the second review; measured in review fixes 2, below). From the side it reads as a strip hanging free behind the thighs (`hem-side.jpg`, `crops-rest.jpg` hem-side tiles).
   - **Small cloth tabs hang at the underarm** of every body, about 1 cm. Masculine average: the sleeve-hem crop (760, 215) and the armpit-front crop (1235, 215).
   - The neck band's rib and the hems' turned edges read. The neckline dips about 1 cm into a shallow V at the centre front (the collar crops).
   - The sleeve hem's edge on the masculine average shows a thin dark line where it meets the arm (the armpit-side crop, 1500 to 1560, 140).
@@ -173,7 +176,7 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
   - **Skin specks through the belly** on the four masculine bodies, about 6 mm, just above the navel. Front column, about (204, 276), (204, 666), (204, 1056) and (204, 1440) in the sheet.
   - **The hem rides up into the crotch and wraps the thighs and buttocks**, worst on the feminine bodies: the tee reads as a bodysuit. The hem's corners follow the upper legs' weights.
   - The other walk frames (`tee-walk-right-arm-forward.jpg`, `tee-walk-passing.jpg`) show the same armpit flaps and the hem's wrap.
-- **Arms raised** (`tee-arms-raised-hard.jpg`). **Long dark flaps hang from the sleeves' undersides** on both bodies: flipped cloth about 8 to 10 cm long, worst in the side views. That is mesh separation, which the gate doesn't count.
+- **Arms raised** (`tee-arms-raised.jpg`, `tee-arms-raised-hard.jpg`). **Long flaps hang from the sleeves' undersides on every cast body**, in the front, side and back views (corrected in review fixes 2; the first hand-back said "both bodies", meaning the two on the hard-light sheet): flipped cloth about 10 to 15 cm long, worst in the side views. In the gate's dumps of the ten cast bodies, 323 to 374 triangles stretch over twice their rest length, the longest edge 299 to 313 mm, and 95% or more of them have a corner within 25 mm of an open edge (the sleeve hems' turn-up). That is mesh separation, which the gate doesn't count.
 - **Arms forward**: the shoulder's top by the neck and the front armpit, as the gate says (54 bodies). Added in review fixes 1: **a white cloth spike sticks out at the side of the armpit** in the side view of every cast body (`tee-arms-forward.jpg`, side column, under the sleeve; `crops-arms-forward.jpg`, armpit-side and sleeve-hem tiles of both average bodies). The sleeve-hem crop is now framed on the sleeve in the side view, where its end faces the camera; the first sheet's tile was empty background.
 - **Added in review fixes 1** (the review found these in the sheets; the first hand-back didn't report them):
   - **T-pose, detached strips under both arms, every cast body** (`tee-t-pose.jpg`, front and back columns; `crops-t-pose.jpg`, underarm-front and underarm-back). Two or three long, thin strips hang diagonally from the sleeve's underside towards the side, with background between them and the body: mesh separation. Visible length about 15 cm on the masculine average body (106 px at 1.45 mm a pixel, scaled by the arm span) and up to 20 cm on the feminine ones. The gate's dumps (`AXCENITY_FIT_GATE_DUMP`, masculine and feminine average) say what they are: triangles 3202 to 3204, 3363 to 3444 and their neighbours, at the sleeve's end under the arm, with rest edges of 1.2 to 4.8 mm (the sleeve hems' fold and turn-up: 793 of the tee's 853 triangles with an edge under 5 mm are in the hems' range), stretched 3 to 111 times, the longest edge 167 mm (masculine) and 200 mm (feminine). 203 of the 4,080 triangles stretch over 2 times in the T-pose on the masculine average body, 82 over 5 times. The hem's corners nearest the side are 27 to 37 mm from the skin at rest, and the fit gives them the side's weights while the rest of the hem follows the arm. The wave-4 crew tee shows no strips in the same pose (`before-after-t-pose.jpg`; it shows its waist holes). No skin comes out, so the gate's T-pose record (7 bodies, the hem edges) doesn't count them.
@@ -194,7 +197,7 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
    - no simulated folds.
 5. **Authorship of the base isn't confirmed** (section 1).
 6. **No tint variants**: the intake's manifest writes none. Colour roles are declared.
-7. **Cloth-only defects the gate doesn't count** (review fixes 1, section 5): the T-pose underarm strips (every cast body, 15 to 20 cm), the arms-forward spike at the side of the armpit (every cast body), the dark lip above the rib at the back of the neck (every cast body, at rest and in the walk; a 1 cm tab with the right arm forward), and a 7 to 11 mm skin speck on the back of the right sleeve in the walk (three masculine bodies). The first two are the sleeve hems' fold triangles under the arm, weighted partly to the side: the sleeve's turn-up should take the sleeve's weights, not the nearest skin's. A stretch check in the gate (a garment triangle's edges posed against rest) would catch them; none exists.
+7. **Cloth-only defects the gate doesn't count** (review fixes 1 and 2, section 5): the waist hem's centre back hanging in a point 55 to 63 mm below the back hem, free of the body below the buttocks (every cast body, at rest, in the T-pose, with the elbows bent, the arms raised and forward, and in 5 of the walk's 15 sampled frames; made by the engine fit's between-corners pass, review fixes 2), the arms-raised flaps under both sleeves (every cast body, 10 to 15 cm), the T-pose underarm strips (every cast body, 15 to 20 cm), the arms-forward spike at the side of the armpit (every cast body), the dark lip above the rib at the back of the neck (every cast body, at rest and in the walk; a 1 cm tab with the right arm forward), and a 7 to 11 mm skin speck on the back of the right sleeve in the walk (three masculine bodies). The first two are the sleeve hems' fold triangles under the arm, weighted partly to the side: the sleeve's turn-up should take the sleeve's weights, not the nearest skin's. A stretch check in the gate (a garment triangle's edges posed against rest) would catch them; none exists.
 
 ## At merge
 
@@ -267,3 +270,89 @@ I regenerated the record with the intake's export: the command in section 2 with
 | `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings |
 
 **At merge.** Nothing new beyond the list above. If you rebuild `tee-crew/*` after the merge, the provenance record now has the unwrap line. The records and the gate are unchanged.
+
+## Review fixes 2
+
+The second review found one blocking problem: a visible defect nobody had reported, and a reported one understated. Both are now in section 5, Open issue 7, the records comment in `crates/player/src/tee_crew_tests.rs` and the Known-Limitations entry. **The tee still fails and stays Draft; it is not ready for sign-off.**
+
+**1. The tab below the waist hem.** It is real, on every cast body. One correction to the review: it isn't at the side seam. It is the waist hem's **centre back**, which hangs in a point into the cleft between the buttocks and below them. The side camera sees that point edge-on, as a thin strip hanging behind the thighs at the back of the silhouette. The gate's dump drawn flat with the hanging corners in red (`hem-tab-traced.jpg`) shows where it is: the red corners are all within 10 cm of the spine (x from -0.100 to +0.109 m on feminine average), none at a side seam. In the back view of the captures it is the hem's dip between the buttocks.
+
+How I measured it: the gate dumped every cast body (`AXCENITY_FIT_GATE_DUMP`, `AXCENITY_FIT_GATE_DUMP_ONLY=cast-`) at rest, in the T-pose, with the elbows bent, the arms raised and forward, and at all 15 sampled walk frames. On each dump I took the back hem's lowest point beside the buttocks (|x| 10 to 14 cm) and at the centre (|x| under 5 cm). I also drew the tee and the body as orthographic side silhouettes at 0.5 mm a pixel.
+
+| Pose (10 cast bodies) | Centre-back point below the back hem | Behind the body's back edge, side view |
+|---|---|---|
+| Rest, T-pose, elbows bent, arms raised | 55 to 63 mm (feminine 55 to 61, masculine 57 to 63) | up to 26 to 32 mm, over 62 to 104 mm of height |
+| Arms forward | 51 to 60 mm | up to 27 to 34 mm |
+| Walk, 15 sampled frames | 11 to 54 mm | free of every body in frames 11, 14, 32, 35 and 38 (18 to 32 mm); in frames 8 and 17 on two feminine bodies; lying on the leg in the other 8 |
+
+The reviewer read 6 to 7 cm on feminine average and 2 to 4 cm on the masculine bodies from the pictures. The dumps say the point drops about as far on both frames. On the masculine bodies it reads shorter because it hangs in front of the black boxer briefs (`hem-side.jpg`, masculine columns), not against the background.
+
+**What makes it: the engine fit, not the source or the refine.** I followed the hem's centre back through the intake. The texture coordinates matched 2,388 of the shipped LOD0's 2,407 corners to the refined mesh.
+- Conformed (the source as placed): the back hem is level, its lowest point between 0.859 and 0.862 m across the back.
+- Refined (hems added): the same, 0.857 to 0.861 m.
+- Shipped: the centre back at 0.791 m. 80 corners within 10 cm of the spine moved down by up to 67 mm, and 12 mm towards the body.
+
+I then ran the engine's import (`import_garment --placed`, the spec's margin and lower layers) on the refined `lod0.obj` with temporary switches in `avatar::fit`. They are not committed. The centre-back point below the back hem on the masculine base, with each change:
+
+| Fit | After the rest push-out | After the extremes' lifts | Shipped point |
+|---|---|---|---|
+| As committed | 0.834 m (24 mm down) | 0.791 m | 63 mm |
+| Without the between-corners pass | 0.856 m | 0.856 m | 4 mm (feminine frame 10 mm) |
+| Without the extremes' lifts | 0.834 m | — | 24 mm |
+| The pass limited to a triangle's sagitta (E8) | 0.857 m | 0.856 m | 4 mm (feminine frame 9 mm) |
+
+So the wave-5 between-corners pass in `needs()` (`transfer.rs`) makes the tab: the pass meant for skin between a coarse garment's corners. Below the hem, the underside of the buttocks faces down, the same way as the turned hem's lower edge. So the skin there passes the "facing" test (`OVER_FACING`) and counts as skin between the cloth's corners. The pass then pushes the edge down along the cloth's normal by up to `BETWEEN_CORNERS` (12 mm). The next round finds the next row of skin, and every extreme's lift round pushes again. That makes 24 mm at rest and 67 mm in all. The review's guess was the thigh's weights or the push-out; it is the push-out. Weights don't move a rest position.
+
+**A measured fix, not committed (E8 in section 3).** I limited the pass to the skin a triangle of that size can actually have between its corners: its sagitta over a 4 cm limb, longest edge² / (8 × 0.04 m), and never more than 12 mm. A turned hem's 1 to 5 mm triangles then can't be pushed, while the source's 24 to 50 mm panels still can. The point went from 63 mm to 4 mm, and every gate and wardrobe test that fits a garment at test time still passed (`fit_gate_tests`, `wardrobe_tests`: 34 of 34). But the re-exported tee's own gate got worse:
+- rest: 4 bodies at 36.7 mm, against the record of 7 at 28.2;
+- the walk thirds: 54 bodies at 39.2, 40.1 and 39.3 mm, against 32.5, 31.3 and 32.0;
+- the arms forward: 54 at 38.7 mm;
+- the elbows bent: 4 at 42.3 mm;
+- LOD1: 13 bodies at 13.2 mm.
+
+Records may only go down, so I put the tree back: `transfer.rs` from its saved copy, and the tee's files with `git checkout`. The diff and the re-exported tee are kept outside the repository. With the edge no longer pushed down, the skin just past the hem comes through further. The tab and the hem's poke-through are two sides of the same pass. A real fix needs the turned-hem gate rule (Open issue 3) together with a fit that knows a hem's fold from a panel. That is for the lead to decide.
+
+**2. The arms-raised flaps were understated.** The first hand-back said they hang "on both bodies", meaning the two average bodies on the hard-light sheet. The studio sheet `tee-arms-raised.jpg` shows them under both sleeves on all eight bodies, in the front, side and back views. I dumped the gate with the arms raised on the ten cast bodies and compared each triangle's edges with rest (`stretch.py`, as in review fixes 1):
+- 323 to 374 triangles stretch over twice their rest length;
+- the longest posed edge is 299 to 313 mm;
+- 95% or more of them have a corner within 25 mm of an open edge, the sleeve hems' turn-up.
+
+Section 5 now says "every cast body".
+
+**3. The crop sheets now inspect the side hem.** All five `crops-<pose>.jpg` have a `hem-side` tile: the waist hem's back seen from the side, on both average bodies. The tab shows in every one except `walk-right-arm-forward`, where the hand covers that place. `crops-walk-right-arm-forward.jpg`'s sleeve-hem tile was mostly background, so it is reframed onto the sleeve end; there it shows a white flap under the sleeve. `crops-rest.jpg` and `crops-walk-right-arm-forward.jpg` now take the sleeve hem where review fixes 1 framed it. Two sheets are new:
+- `hem-side.jpg`: the waist hem's back from the side on all eight cast bodies, in five poses;
+- `hem-tab-traced.jpg`: the gate dump drawn flat.
+
+The JPGs total 3.6 MB.
+
+What I saw, looked at whole and in crops:
+- **Rest, T-pose, arms forward:** a pale strip hangs below the back hem on all eight bodies.
+  - On the feminine bodies there is background between the strip and the thighs.
+  - On the masculine bodies it hangs in front of the boxer briefs' back edge.
+- **Walk, passing frame:** the same strip on all eight bodies.
+- **Walk, right arm back:** the hem's back curls under the buttock, with a small tab at its end on the feminine bodies.
+
+**Non-blocking items:**
+- Fixed:
+  - `intake.py`'s step table now says what `refine.py` makes: unwrap, bands, turned hems, maps. "Resolution" and "cloth laid on the skin" were experiment E2 and were never committed.
+  - Section 1's list of changes now names the unwrap, as the regenerated record does.
+  - Known-Limitations now lists the defects the hand-back reports that it had left out: the torn armpit flaps and the belly specks in the walk, the hem riding into the crotch, the arms-raised flaps, and the hem tab.
+- Settled by the review: the editor tests that the `needs()` change reaches. The reviewer ran `cargo nextest run -p axcenity-editor -E 'test(/character_workspace::/)'`: 151 run, 151 passed. This pass changes no code they use.
+- Corrected: section 4's "every existing gate and wardrobe record held with the fit change" proves something only for the garments the tests fit at test time: the gate's `TestTee` and the `fitting.rs` cases. Shipped items carry baked bindings and weren't imported again, so their records couldn't move. The same holds for the E8 run above.
+- The brown ovals in the review's elbows-bent captures: the reviewer found them to be the pose's own fingertips pressing into the chest and the cloth, not a tear in the tee. I haven't looked at them again.
+- Not done:
+  - A second source entry in the provenance record for the Poly Haven Cotton Jersey tile, with its URL, licence page and hash. That needs a change to `provenance.py`'s record and a regenerated record. The tile is covered at repository level by `clothing/fabrics.py` and `references/README`. For the lead to decide.
+  - The between-corners pass still builds a new cloth `Surface` on every call, and it still skips a turned hem's inner layer (`OVER_FACING`). Its effect on the hem is now measured (above).
+
+**Tests run:**
+
+| Run | Result |
+|---|---|
+| The gate dumps: `AXCENITY_FIT_GATE_DUMP=<folder> AXCENITY_FIT_GATE_DUMP_ONLY=cast- cargo nextest run -p axcenity-player -E 'test(/tee_crew_tests::the_licensed_tee_covers_the_cast_(at_rest\|with_the_elbows_bent\|with_the_arms_forward\|with_the_arms_out\|through_the_walk_first_third)$/)'`, then the arms raised and the walk's other thirds | 8 run, 8 passed; the dumps measured above |
+| E8 (temporary, reverted): `AXCENITY_FIT_SAGITTA=1 cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/tee_crew_tests::/) \| test(/fit_gate_tests::/) \| test(/wardrobe_tests::/)'` on the tee exported again | 45 run: 34 passed, 11 failed. All 11 are `tee_crew_tests` gate cases whose measurements no longer match their records (some above, some below); the numbers are above |
+| `cargo nextest run -p axcenity-avatar -p axcenity-player --no-fail-fast` (the tree as committed) | Summary [211.197s] 472 tests run: 472 passed (15 slow), 23 skipped; no ABORT lines |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all -- --check` | clean |
+| `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings |
+
+**At merge.** Nothing new. Only comments and docs changed in code: the records comment in `tee_crew_tests.rs` and `intake.py`'s step table. The tee's files, the gate and the records are as before. Five crop sheets were regenerated, and two sheets are new (`hem-side.jpg`, `hem-tab-traced.jpg`). **For the lead to decide:** the between-corners pass makes the hem tab, and the measured limit (E8) trades it for worse hem poke-through. Decide that together with the turned-hem gate rule (Open issue 3).

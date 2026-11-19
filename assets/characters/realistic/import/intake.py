@@ -13,7 +13,7 @@ The steps, in order (each also runs alone: `python -I <step>.py --help`):
 | load | `load.py` | `loaded.npz`, `textures/` |
 | topology | `topology.py` | `topology.npz` (report, fixes, retopology help) |
 | conform | `conform.py` | `conformed.npz` (placed, posed to the rest pose) |
-| refine | `refine.py` | `refined.npz` (only with a `refine` block: resolution, cloth laid on the skin, bands, turned hems) |
+| refine | `refine.py` | `refined.npz` (only with a `refine` block: unwrap, bands, turned hems, maps) |
 | weights | `skinning.py` | `weighted.npz` |
 | levels | `levels.py` | `lod0.npz`, `lod1.npz`, ... |
 | checks | `checks.py` | `checks.json` (asset-quality.md section 2) |
