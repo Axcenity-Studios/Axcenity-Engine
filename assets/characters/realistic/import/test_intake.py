@@ -328,6 +328,69 @@ class ConformTest(unittest.TestCase):
         np.testing.assert_allclose(still[0], [0.0, 1.2, 0.1], atol=1e-12)
 
 
+def round_tube(radius, y0, y1, sides=24, rings=9, closed=False):
+    """A tube of quads round Y (outward), from y0 to y1; with `closed`, a
+    fan at each end."""
+    P = []
+    for j in range(rings):
+        y = y0 + (y1 - y0) * j / (rings - 1)
+        for i in range(sides):
+            a = 2 * math.pi * i / sides
+            P.append([radius * math.cos(a), y, radius * math.sin(a)])
+    faces = []
+    for j in range(rings - 1):
+        for i in range(sides):
+            a, b = j * sides + i, j * sides + (i + 1) % sides
+            faces.append((a, a + sides, b + sides, b))
+    if closed:
+        for y, ring, flip in ((y0, 0, True), (y1, rings - 1, False)):
+            P.append([0.0, y, 0.0])
+            c = len(P) - 1
+            for i in range(sides):
+                a, b = ring * sides + i, ring * sides + (i + 1) % sides
+                faces.append((c, b, a) if flip else (c, a, b))
+    return WorkMesh.from_faces(np.array(P, float), faces)
+
+
+class DrapeTest(unittest.TestCase):
+    """Wave 5 stage 3 (`refinement/wave5/fit-drape.md`): a garment is graded
+    to the body by measured girths, then draped onto it by Blender's cloth
+    simulation, hanging from its pins, keeping its ease."""
+
+    def test_a_girth_is_the_slice_round_the_outside(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48)
+        self.assertAlmostEqual(conform.girth(body.P, 0.5, 0.02), 2 * math.pi * 0.15, delta=0.005)
+
+    def test_a_small_garment_is_graded_to_its_least_ease(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48, closed=True)
+        shirt = round_tube(0.14, 0.4, 0.9, sides=48, rings=11)
+        report = conform.grade(shirt, body, {"at": [0.5, 0.8], "least_ease": 0.06})
+        want = 2 * math.pi * 0.15 + 0.06
+        self.assertAlmostEqual(conform.girth(shirt.P, 0.5, 0.02), want, delta=0.006)
+        self.assertGreater(report["scale"], 1.1)
+        # A garment with enough ease isn't touched.
+        roomy = round_tube(0.2, 0.4, 0.9, sides=48, rings=11)
+        before = roomy.P.copy()
+        report = conform.grade(roomy, body, {"at": [0.5], "least_ease": 0.06})
+        self.assertEqual(report["scale"], 1.0)
+        np.testing.assert_allclose(roomy.P, before)
+
+    def test_a_loose_tube_hangs_from_its_pins_and_keeps_its_ease(self):
+        body = round_tube(0.15, 0.0, 1.2, sides=32, rings=13, closed=True)
+        # A loose tube round it, its top pinned: it hangs, it doesn't
+        # stretch down, it isn't drawn onto the body, and nothing of it is
+        # inside the body.
+        shirt = round_tube(0.2, 0.5, 1.0, sides=32, rings=11)
+        report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}})
+        bottom = shirt.P[:32]
+        self.assertGreater(bottom[:, 1].min(), 0.47)
+        radius = np.hypot(shirt.P[:, 0], shirt.P[:, 2])
+        self.assertGreater(np.median(radius), 0.18)
+        self.assertGreater(radius.min(), 0.15)
+        self.assertEqual(report["pinned"], 64)
+        self.assertIn("moved_m", report)
+
+
 class SettleTest(unittest.TestCase):
     def test_a_hat_comes_down_until_it_sits_its_clearance_off_the_head(self):
         head = cube(0.2)

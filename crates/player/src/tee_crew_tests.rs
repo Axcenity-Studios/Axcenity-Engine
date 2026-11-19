@@ -262,8 +262,8 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // The records: what the licensed tee, a draft, still fails (open
 // defects, not accepted behaviour; `refinement/wave5/tee-licensed.md`
 // says where each is and why). Lower them as the item improves; never
-// raise one; a production item has none. From the first run of the item
-// as committed (wave 5):
+// raise one; a production item has none. What the stage-2 item (wave 5)
+// failed, for the history; its successor's records are below:
 //
 // - The walk, Idle and the arms forward (every body): the armpit, as
 //   every tee before it. The cloth bridging the arm and the side, made
@@ -288,7 +288,8 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // - The run: the cloth at the front of the armpit jolts 6 mm in one frame
 //   as the arm swings through hanging (feminine slim, frame 10).
 //
-// Seen in the captures and **not counted by any record** (cloth-only
+// Seen in the stage-2 item's captures and then **not counted by any
+// record** (since stage 3 `cloth_checks` counts these kinds; cloth-only
 // defects, or skin the gate's records already hold elsewhere on the same
 // body; review fixes 1, `tee-licensed.md` section 5):
 //
@@ -338,61 +339,65 @@ const BOXERS: &str = "Underwear_BoxerBriefs through Shirt_TeeCrew";
 const BRA: &str = "Underwear_Bra through Shirt_TeeCrew";
 const BRIEFS: &str = "Underwear_Briefs through Shirt_TeeCrew";
 
-/// The hems' edges, in the poses that leave them where they are at rest.
-const fn at_the_hems(pose: &'static str, tee: usize) -> [Known; 3] {
-    [
-        known(PART, pose, tee, 0.0282),
-        known(BOXERS, pose, 1, 0.0151),
-        known(BRIEFS, pose, 11, 0.0179),
-    ]
-}
-
-const REST: [Known; 3] = at_the_hems("rest", 7);
-const T_POSE: [Known; 3] = at_the_hems("TPose", 7);
-const ELBOWS_BENT: [Known; 3] = at_the_hems("ElbowsBent", 8);
-const KNEES_BENT: [Known; 3] = at_the_hems("KneesBent", 7);
-const ARMS_RAISED: [Known; 4] = [
-    known(PART, "ArmsRaised", 14, 0.0282),
-    known(BOXERS, "ArmsRaised", 1, 0.0151),
-    known(BRA, "ArmsRaised", 1, 0.0031),
-    known(BRIEFS, "ArmsRaised", 11, 0.0179),
+// The re-intaken tee (wave 5 stage 3, graded and draped,
+// `refinement/wave5/fit-drape.md`), measured as committed. Fewer bodies
+// fail almost everywhere (rest 7 to 3, Idle 53 to 40, the simpler copies'
+// 10 and 54 to 0 and 8, the run's pop gone), but some worsts rose: the
+// arm's skin just past a sleeve's turned hem on the athletic and slim
+// bodies (the turned-hem rule, open issue 3 of `tee-licensed.md`), up to
+// 36.5 mm, and the sports bra at the neck's side and the front of the
+// armpit. These were set from the new item's first run, not to pass an
+// old one: the lead rules on them (the hand-back lists each one up).
+const REST: [Known; 3] = [
+    known(PART, "rest", 3, 0.0277),
+    known(BRA, "rest", 1, 0.0069),
+    known(BRIEFS, "rest", 1, 0.0183),
 ];
-const IDLE: [Known; 4] = [
-    known(PART, "idle", 53, 0.0380),
-    known(BOXERS, "idle", 1, 0.0145),
-    known(BRA, "idle", 17, 0.0041),
-    known(BRIEFS, "idle", 11, 0.0180),
+const T_POSE: [Known; 2] = [
+    known(PART, "TPose", 3, 0.0331),
+    known(BRIEFS, "TPose", 1, 0.0183),
 ];
-const WALK_FIRST: [Known; 4] = [
-    known(PART, WALK, 54, 0.0325),
-    known(BOXERS, WALK, 2, 0.0141),
-    known(BRA, WALK, 17, 0.0057),
-    known(BRIEFS, WALK, 12, 0.0185),
+const ELBOWS_BENT: [Known; 3] = [
+    known(PART, "ElbowsBent", 2, 0.0365),
+    known(BRA, "ElbowsBent", 1, 0.0069),
+    known(BRIEFS, "ElbowsBent", 1, 0.0183),
+];
+const KNEES_BENT: [Known; 3] = [
+    known(PART, "KneesBent", 3, 0.0277),
+    known(BRA, "KneesBent", 1, 0.0069),
+    known(BRIEFS, "KneesBent", 1, 0.0183),
+];
+const ARMS_RAISED: [Known; 3] = [
+    known(PART, "ArmsRaised", 19, 0.0347),
+    known(BRA, "ArmsRaised", 18, 0.0069),
+    known(BRIEFS, "ArmsRaised", 1, 0.0183),
+];
+const IDLE: [Known; 3] = [
+    known(PART, "idle", 40, 0.0274),
+    known(BRA, "idle", 2, 0.0076),
+    known(BRIEFS, "idle", 1, 0.0183),
+];
+const WALK_FIRST: [Known; 3] = [
+    known(PART, WALK, 54, 0.0342),
+    known(BRA, WALK, 5, 0.0081),
+    known(BRIEFS, WALK, 4, 0.0240),
 ];
 const WALK_SECOND: [Known; 4] = [
-    known(PART, WALK, 54, 0.0313),
-    known(BOXERS, WALK, 26, 0.0024),
-    known(BRA, WALK, 20, 0.0092),
-    known(BRIEFS, WALK, 13, 0.0227),
+    known(PART, WALK, 47, 0.0334),
+    known(BOXERS, WALK, 18, 0.0017),
+    known(BRA, WALK, 5, 0.0068),
+    known(BRIEFS, WALK, 4, 0.0138),
 ];
 const WALK_LAST: [Known; 4] = [
-    known(PART, WALK, 54, 0.0320),
-    known(BOXERS, WALK, 2, 0.0142),
-    known(BRA, WALK, 10, 0.0074),
-    known(BRIEFS, WALK, 12, 0.0183),
+    known(PART, WALK, 53, 0.0342),
+    known(BOXERS, WALK, 1, 0.0021),
+    known(BRA, WALK, 5, 0.0081),
+    known(BRIEFS, WALK, 4, 0.0241),
 ];
-const ARMS_FORWARD: [Known; 4] = [
-    known(PART, "ArmsForward", 54, 0.0302),
-    known(BOXERS, "ArmsForward", 1, 0.0140),
-    known(BRA, "ArmsForward", 19, 0.0032),
-    known(BRIEFS, "ArmsForward", 3, 0.0173),
+const ARMS_FORWARD: [Known; 3] = [
+    known(PART, "ArmsForward", 54, 0.0342),
+    known(BRA, "ArmsForward", 21, 0.0107),
+    known(BRIEFS, "ArmsForward", 4, 0.0183),
 ];
-const LODS: [Known; 2] = [
-    known("Shirt_TeeCrew LOD1", "rest", 10, 0.0120),
-    known("Shirt_TeeCrew LOD2", "rest", 54, 0.0307),
-];
-const MOTION_RUN: [Record; 1] = [Record {
-    what: "Shirt_TeeCrew pop",
-    case: "Run",
-    most: 0.0061,
-}];
+const LODS: [Known; 1] = [known("Shirt_TeeCrew LOD2", "rest", 8, 0.0068)];
+const MOTION_RUN: [Record; 0] = [];

@@ -5,12 +5,14 @@
 //! cargo run -p axcenity-avatar --release --example import_garment -- \
 //!     <garment.obj|.glb> <library folder> <base ID> <item ID> <label> <folder in the library> \
 //!     [--under <item ID>]... [--slot <slot>] [--layer <0-3>] [--margin <metres>] \
-//!     [--author <name>] [--licence <SPDX ID>] [--placed]
+//!     [--author <name>] [--licence <SPDX ID>] [--placed] [--drape]
 //! ```
 //!
 //! `--placed`: the file is already in metres and placed on the body (the
 //! licensed-asset intake places it), so it isn't aligned again
-//! (`ImportOptions::keep_placement`).
+//! (`ImportOptions::keep_placement`). `--drape`: it was draped onto the
+//! body by the intake's cloth simulation and hangs with ease of its own
+//! (`ImportOptions::drape`, `FitOptions::drape`).
 //!
 //! It aligns the garment to the base body, fits it (binding, weights,
 //! the body's identity and corrective shapes, push-out from the body and
@@ -28,6 +30,13 @@ use axcenity_avatar::fit::{ImportOptions, ImportRequest, import_garment_with};
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let placed = match args.iter().position(|a| a == "--placed") {
+        Some(at) => {
+            args.remove(at);
+            true
+        }
+        None => false,
+    };
+    let drape = match args.iter().position(|a| a == "--drape") {
         Some(at) => {
             args.remove(at);
             true
@@ -61,7 +70,7 @@ fn main() -> ExitCode {
         Ok(positional) => positional,
         Err(_) => {
             eprintln!(
-                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--under <item ID>]... [--slot <slot>] [--layer <n>] [--margin <m>] [--author <name>] [--licence <SPDX>] [--placed]"
+                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--under <item ID>]... [--slot <slot>] [--layer <n>] [--margin <m>] [--author <name>] [--licence <SPDX>] [--placed] [--drape]"
             );
             return ExitCode::FAILURE;
         }
@@ -90,6 +99,7 @@ fn main() -> ExitCode {
     let started = std::time::Instant::now();
     let options = ImportOptions {
         keep_placement: placed,
+        drape,
     };
     match import_garment_with(&request, options) {
         Ok(imported) => {

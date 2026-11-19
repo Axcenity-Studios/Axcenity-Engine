@@ -1,0 +1,56 @@
+Wave 5 stage 3, fit-drape: the RED run (2026-11-18).
+
+1. The cloth-defect check (crates/player/src/cloth_checks.rs), its measures stubbed
+   (stretched, folded, hanging and the hulls returning nothing), the synthetic tests
+   written first:
+
+cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+        PASS [   0.068s] (1/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_bones_name_the_parts
+        PASS [   0.084s] (2/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_cloth_check_holds_garments_to_their_records
+        FAIL [   0.084s] (3/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_tab_hanging_off_the_body_is_found
+        FAIL [   0.084s] (4/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_fold_turned_over_is_found
+        FAIL [   0.084s] (5/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_sheet_stretched_past_the_fabric_is_found
+     Summary [   0.092s] 5 tests run: 2 passed, 3 failed, 288 skipped
+
+(The two that pass are the bone-to-part names and the records' ratchet, written with
+their code; the three measures fail until they are written.)
+
+2. The hem pulled into a point (the licensed tee's centre-back tab, which the hull
+   measure alone doesn't reach: it hangs within the tee's ease of the buttocks), its
+   measure `hem_points` stubbed, its synthetic test written first:
+
+cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+        PASS [   0.076s] (1/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_fold_turned_over_is_found
+        PASS [   0.076s] (2/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_bones_name_the_parts
+        PASS [   0.076s] (3/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_cloth_check_holds_garments_to_their_records
+        FAIL [   0.075s] (4/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs
+        PASS [   0.090s] (5/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_sheet_stretched_past_the_fabric_is_found
+        PASS [   0.216s] (6/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_tab_hanging_off_the_body_is_found
+     Summary [   0.217s] 6 tests run: 5 passed, 1 failed, 321 skipped
+
+3. The drape-preserving engine fit (crates/avatar/src/fit/transfer.rs): a loose sleeve
+   (4 cm of ease) over a 3 cm bulge of the skin, written first against wave 4's fit:
+
+cargo nextest run -p axcenity-avatar -E 'test(/fit::tests::(a_loose|carried_shapes)/)' --no-fail-fast
+
+        PASS [   0.037s] (1/2) axcenity-avatar fit::tests::carried_shapes_follow_the_body_and_clear_it_at_full_weight
+        FAIL [   0.039s] (2/2) axcenity-avatar fit::tests::a_loose_garment_keeps_its_ease_when_the_body_changes
+    thread 'fit::tests::a_loose_garment_keeps_its_ease_when_the_body_changes' panicked at crates\avatar\src\fit\tests.rs:792:5:
+    the loose sleeve followed the bump 0.030000001
+     Summary [   0.040s] 2 tests run: 1 passed, 1 failed, 206 skipped
+
+(Every corner follows its own bound point's frame, so the sleeve, 4 cm off the skin,
+is drawn out over the whole 3 cm bump: the shrink-wrap.)
+
+4. The intake's grade and drape (assets/characters/realistic/import/conform.py), tests
+   written first (Blender's Python):
+
+python -I assets/characters/realistic/import/test_intake.py DrapeTest
+
+AttributeError: module 'conform' has no attribute 'girth'
+AttributeError: module 'conform' has no attribute 'drape'
+AttributeError: module 'conform' has no attribute 'grade'
+Ran 3 tests in 0.002s
+FAILED (errors=3)

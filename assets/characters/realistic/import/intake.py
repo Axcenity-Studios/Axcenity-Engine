@@ -12,7 +12,7 @@ The steps, in order (each also runs alone: `python -I <step>.py --help`):
 | record | `provenance.py` | `provenance.json` (licence checked, files hashed) |
 | load | `load.py` | `loaded.npz`, `textures/` |
 | topology | `topology.py` | `topology.npz` (report, fixes, retopology help) |
-| conform | `conform.py` | `conformed.npz` (placed, posed to the rest pose) |
+| conform | `conform.py` | `conformed.npz` (placed, posed to the rest pose, graded by girths and draped by cloth simulation) |
 | refine | `refine.py` | `refined.npz` (only with a `refine` block: unwrap, bands, turned hems, maps) |
 | weights | `skinning.py` | `weighted.npz` |
 | levels | `levels.py` | `lod0.npz`, `lod1.npz`, ... |

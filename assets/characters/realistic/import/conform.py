@@ -17,6 +17,27 @@
    (`skinning.transfer`, with the spec's `split`), and the item is posed
    back to the body's rest pose by the inverse of the same pose (linear
    blend skinning). Then the engine's fit takes over (`fit.py`).
+3. **Grade** (optional, wave 5 stage 3): the item's girth measured round
+   the body at the heights the spec gives (`grade.at`, metres: the chest,
+   waist and hips), against the body's there; where the item has less than
+   `grade.least_ease` (metres of girth) at any of them (the body's girth
+   taken across the item's width there and 3 cm past it, not round the
+   arms), it is scaled across there (X and Z, about the body's middle)
+   until it has, the scale going linearly between the heights and back to
+   1 at the item's top (its neck), before anything presses it onto the
+   skin.
+4. **Drape** (optional, wave 5 stage 3): the item hung on the body by
+   Blender's cloth simulation (`../clothing/drape.py`): every corner still
+   inside the body (or nearer than `drape.start_clearance`) is first moved
+   out along the body's normal, so the cloth starts outside it; the body
+   is a collision object at rest, the item's own edges are its springs' rest
+   lengths, its corners within `drape.pin_top` of its top are pinned
+   where they are (a tee's neck and shoulders; a pant's waistband), and
+   gravity does the rest. It keeps its ease and hangs (a tee's hem falls
+   from the chest and the shoulder blades, free below the seat) instead of
+   being pushed onto the skin. `drape.settings` are the cloth settings
+   (`drape.Settings`). The export then fits it with `--drape`
+   (`FitOptions::drape`), which keeps that ease as the body changes.
 
     python -I conform.py --spec <asset>.intake.json --work <folder>
 """
@@ -25,6 +46,7 @@ import argparse
 import json
 import math
 import os
+import sys
 
 import numpy as np
 
@@ -178,6 +200,168 @@ def place(mesh, body, spec):
     return report
 
 
+def _hull_perimeter(xz):
+    """The perimeter of the convex hull of 2D points (monotone chain)."""
+    pts = sorted(set(map(tuple, np.round(np.asarray(xz, float), 6))))
+    if len(pts) < 3:
+        return 0.0
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower, upper = [], []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    hull = np.array(lower[:-1] + upper[:-1])
+    return float(np.linalg.norm(hull - np.roll(hull, -1, axis=0), axis=1).sum())
+
+
+def _triangles(body):
+    """A body's triangles (a `bodyglb` body's, or a work mesh's)."""
+    tris = getattr(body, "tris", None)
+    return np.asarray(body.triangles() if tris is None else tris, np.int64)
+
+
+def girth(points, y, band=0.01, x_range=None):
+    """The girth round `points` at height `y`: the perimeter of the convex
+    hull of those within `band` of it, seen from above (a tape measure
+    round the outside). With `x_range` (lo, hi), only points across that
+    (the torso between the arms)."""
+    P = np.asarray(points, float)
+    sel = np.abs(P[:, 1] - y) <= band
+    if x_range is not None:
+        sel &= (P[:, 0] >= x_range[0]) & (P[:, 0] <= x_range[1])
+    return _hull_perimeter(P[sel][:, [0, 2]])
+
+
+def grade(mesh, body, spec):
+    """Grades the item across (X and Z, about the body's middle) so it has
+    at least `least_ease` of girth over the body's at every height in `at`
+    (see the module's note): each height's scale is what it needs (1 where
+    it has the ease), and between them, and up to the item's top (its
+    neck, where it is 1 again), the scale goes linearly; below the lowest
+    height it stays. Returns the girths and the scales."""
+    least = float(spec.get("least_ease", 0.0))
+    rows = []
+    knots = []
+    for y in spec.get("at", []):
+        sel = np.abs(mesh.P[:, 1] - y) <= 0.01
+        if not sel.any():
+            continue
+        # The body across the item's width there, and a little past it (an
+        # item too small for the body is narrower than it).
+        lo, hi = mesh.P[sel, 0].min() - 0.03, mesh.P[sel, 0].max() + 0.03
+        item = girth(mesh.P, y)
+        skin = girth(body.P, y, x_range=(lo, hi))
+        scale = max(1.0, (skin + least) / item) if item > 0 else 1.0
+        body_sel = (np.abs(body.P[:, 1] - y) <= 0.01) & (body.P[:, 0] >= lo) & (body.P[:, 0] <= hi)
+        around = body.P[body_sel] if body_sel.any() else mesh.P[sel]
+        centre = (around.min(axis=0) + around.max(axis=0)) / 2
+        knots.append((y, scale, centre))
+        rows.append({"at_m": y, "item_m": round(item, 4), "body_m": round(skin, 4),
+                     "ease_m": round(item - skin, 4), "scale": round(scale, 4)})
+    most = max([k[1] for k in knots], default=1.0)
+    if most > 1.0:
+        knots.sort(key=lambda k: k[0])
+        top = mesh.P[:, 1].max()
+        ys = [k[0] for k in knots] + [top]
+        ss = [k[1] for k in knots] + [1.0]
+        xs = [k[2][0] for k in knots] + [knots[-1][2][0]]
+        zs = [k[2][2] for k in knots] + [knots[-1][2][2]]
+        y = mesh.P[:, 1]
+        s = np.interp(y, ys, ss)
+        cx, cz = np.interp(y, ys, xs), np.interp(y, ys, zs)
+        mesh.P = mesh.P.copy()
+        mesh.P[:, 0] = cx + (mesh.P[:, 0] - cx) * s
+        mesh.P[:, 2] = cz + (mesh.P[:, 2] - cz) * s
+        for row in rows:
+            row["item_after_m"] = round(girth(mesh.P, row["at_m"]), 4)
+    return {"least_ease_m": least, "girths": rows, "scale": round(most, 4)}
+
+
+def push_out(mesh, body, clearance):
+    """Moves every corner of the item inside the body, or nearer it than
+    `clearance`, out along the body's normal at its nearest point, so the
+    cloth simulation starts outside the body; returns how many and how
+    far."""
+    import checks
+    tree = checks._tree(body.P, _triangles(body))
+    moved = []
+    P = mesh.P.copy()
+    for k, p in enumerate(P):
+        loc, normal, _, _ = tree.find_nearest(tuple(p))
+        if loc is None:
+            continue
+        n = np.array(normal)
+        off = float(np.dot(p - np.array(loc), n))
+        if off < clearance:
+            P[k] = p + n * (clearance - off)
+            moved.append(clearance - off)
+    mesh.P = P
+    return {"pushed": len(moved), "most_m": round(max(moved, default=0.0), 4)}
+
+
+def drape(mesh, body, spec):
+    """Hangs the item on the body by Blender's cloth simulation (see the
+    module's note); returns what it did."""
+    import bpy
+    sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "clothing"))
+    import drape as cloth  # the realistic wardrobe's cloth simulation
+    import checks
+
+    def to_blender(P):
+        return np.stack([P[:, 0], -P[:, 2], P[:, 1]], axis=1)
+
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    me = bpy.data.meshes.new("Body")
+    tris = _triangles(body)
+    me.from_pydata(to_blender(body.P).tolist(), [], tris.tolist())
+    me.update()
+    collider = bpy.data.objects.new("Body", me)
+    scene.collection.objects.link(collider)
+    collider.modifiers.new("Collision", "COLLISION")
+    collider.collision.thickness_outer = 0.002
+    collider.collision.thickness_inner = 0.02
+    collider.collision.damping = 0.5
+    collider.collision.cloth_friction = 5.0
+    pushed = push_out(mesh, body, float(spec.get("start_clearance", 0.004)))
+    top = mesh.P[:, 1].max()
+    pins = np.where(mesh.P[:, 1] >= top - float(spec.get("pin_top", 0.05)))[0]
+    settings = cloth.Settings(**spec.get("settings", {}))
+    before = mesh.P.copy()
+    out = cloth.simulate(to_blender(mesh.P), [list(map(int, f)) for f in mesh.faces()], [],
+                         settings, pins=pins, name="Item")
+    mesh.P = np.stack([out[:, 0], out[:, 2], -out[:, 1]], axis=1)
+    moved = np.linalg.norm(mesh.P - before, axis=1)
+    d = checks.distances(mesh.P, body.P, tris, signed=True)
+    # The rest lengths kept: each edge now against before.
+    edges = set()
+    for f in mesh.faces():
+        for a, b in zip(f, np.roll(f, -1)):
+            edges.add((min(a, b), max(a, b)))
+    edges = np.array(sorted(edges))
+    was = np.linalg.norm(before[edges[:, 0]] - before[edges[:, 1]], axis=1)
+    now = np.linalg.norm(mesh.P[edges[:, 0]] - mesh.P[edges[:, 1]], axis=1)
+    ratio = now / np.maximum(was, 1e-6)
+    return {
+        "pushed_out_first": pushed,
+        "pinned": int(len(pins)),
+        "frames": settings.frames,
+        "moved_m": {"most": round(float(moved.max()), 4), "median": round(float(np.median(moved)), 4)},
+        "clearance_m": {"least": round(float(d.min()), 4), "median": round(float(np.median(d)), 4),
+                        "inside_body": int((d < 0).sum())},
+        "edges_stretched": {"p95": round(float(np.percentile(ratio, 95)), 4),
+                            "most": round(float(ratio.max()), 4)},
+    }
+
+
 def step(spec, work, source="topology.npz", target="conformed.npz"):
     import bodyglb
     import skinning
@@ -207,6 +391,10 @@ def step(spec, work, source="topology.npz", target="conformed.npz"):
             "authored_leg_angle": legs,
             "moved_m": {"most": round(float(moved.max()), 4), "median": round(float(np.median(moved)), 4)},
         }
+    if options.get("grade"):
+        report["grade"] = grade(mesh, body, options["grade"])
+    if options.get("drape"):
+        report["drape"] = drape(mesh, body, options["drape"])
     mesh.save(os.path.join(work, target), report)
     return report
 

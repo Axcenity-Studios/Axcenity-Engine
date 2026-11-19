@@ -765,3 +765,64 @@ fn skin_between_a_coarse_garments_corners_stays_under_its_triangles() {
         );
     }
 }
+
+/// Wave 5 stage 3 (`refinement/wave5/fit-drape.md`): a garment with ease
+/// keeps it when the body changes. Fat (the whole body 2 cm wider) moves a
+/// loose sleeve out with it, as it moves a tight one; a local bulge of the
+/// skin (`Corrective_Bump`, 3 cm on one side) smaller than the sleeve's
+/// ease (4 cm) mostly stays inside it: the cloth isn't drawn over the bump
+/// as if shrink-wrapped, while a sleeve on the skin follows it. Only for a
+/// garment that says it is draped (`FitOptions::drape`).
+#[test]
+fn a_loose_garment_keeps_its_ease_when_the_body_changes() {
+    let body = tube_body();
+    let draped = FitOptions {
+        drape: true,
+        ..options()
+    };
+    let loose = fit_garment(&body, &sleeve(0.19, false), &draped).unwrap();
+    let rest = loose.garment.positions();
+    let radial = |p: &Vec3, o: &Vec3| o.dot(Vec3::new(p.x, 0.0, p.z).normalize());
+    // Fat: out with the skin, about 2 cm, everywhere.
+    for (p, o) in rest.iter().zip(&loose.shapes[0].offsets) {
+        let out = radial(p, o);
+        assert!((out - 0.02).abs() < 0.004, "Fat moved a loose corner {out}");
+    }
+    // The bump: the loose sleeve moves out by much less than the skin.
+    let most = rest
+        .iter()
+        .zip(&loose.shapes[1].offsets)
+        .map(|(p, o)| radial(p, o))
+        .fold(0.0f32, f32::max);
+    assert!(most < 0.012, "the loose sleeve followed the bump {most}");
+    // Still clear of the body with the bump on.
+    let surface = body.surface(&[("Corrective_Bump".to_owned(), 1.0)]);
+    let moved: Vec<Vec3> = rest
+        .iter()
+        .zip(&loose.shapes[1].offsets)
+        .map(|(p, o)| *p + *o)
+        .collect();
+    assert!(least(&clearances(&surface, &moved)) > 0.002 - 2e-4);
+    // A sleeve on the skin follows the bump all the way.
+    let tight = fit_garment(&body, &sleeve(0.153, false), &draped).unwrap();
+    let rest = tight.garment.positions();
+    let most = rest
+        .iter()
+        .zip(&tight.shapes[1].offsets)
+        .map(|(p, o)| radial(p, o))
+        .fold(0.0f32, f32::max);
+    assert!(
+        most > 0.025,
+        "the tight sleeve didn't follow the bump: {most}"
+    );
+    // Without `drape` (cloth made on the skin), the loose sleeve follows
+    // its bound points as before.
+    let undraped = fit_garment(&body, &sleeve(0.19, false), &options()).unwrap();
+    let rest = undraped.garment.positions();
+    let most = rest
+        .iter()
+        .zip(&undraped.shapes[1].offsets)
+        .map(|(p, o)| radial(p, o))
+        .fold(0.0f32, f32::max);
+    assert!(most > 0.025, "{most}");
+}

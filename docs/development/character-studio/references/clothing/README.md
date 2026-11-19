@@ -488,3 +488,14 @@ Every `path:line` in section 3 and section 6 was opened and matches, including: 
 ### Found and not added as rows
 
 Poly Haven's model catalogue also holds Garden Gloves 01 (6,822 polygons), a Life Jacket (8,968) and two pocket watches, all CC0 by the same licence page. They are props, like the four indexed. Worth a look when CO16 picks accessories.
+
+## 10. A worn T-shirt's ease and hang (wave 5 stage 3, decision 14)
+
+Looked at while judging the drape-preserving fit (`refinement/wave5/fit-drape.md`): how a plain crew-neck T-shirt with ordinary ease hangs on a standing man, and how it moves with the arms. Found through Openverse (openverse.org) on 2026-11-18; each licence read on the photo's own page as Openverse links it. Links only: no picture is in the repository, none is copied or traced into a texture, and the prints on the shirts are not modelled (only the cloth's hang is looked at).
+
+| Openverse page | Source page | Author | Licence | What it shows |
+|---|---|---|---|---|
+| [91dc9a0f](https://openverse.org/image/91dc9a0f-7fb3-44f7-ad7a-5ef33e53fdb2) | [Flickr 6450856615](https://www.flickr.com/photos/71401718@N00/6450856615) | Wonderlane | CC0 1.0 | A loose black tee, front, both forearms raised: the hem hangs level and free of the belly; the armpit folds rise into the sleeve. |
+| [35bbe976](https://openverse.org/image/35bbe976-93f9-42af-a756-b5b7d9f2ff82) | [Flickr 6450855363](https://www.flickr.com/photos/71401718@N00/6450855363) | Wonderlane | CC0 1.0 | The same tee, arms forward: the cloth under the arms bunches into soft folds; the side seam stays on the side. |
+| [7d2df657](https://openverse.org/image/7d2df657-4a29-4164-bd44-5469bcd60d75) | [Flickr 20876909820](https://www.flickr.com/photos/128305985@N02/20876909820) | Optimaz | CC BY 2.0 | A white tee, front, arms hanging (a mock-up photo with a print laid on): loose at the sides below the chest, the hem straight across the hips, the sleeves standing off the upper arm. |
+| [a6f72d52](https://openverse.org/image/a6f72d52-3d83-4151-b3e8-ca74798546ac) | [Flickr 4513522387](https://www.flickr.com/photos/10361931@N06/4513522387) | Horia Varlan | CC BY 2.0 | A dark tee from behind in a deep bowling stride, one arm swung up behind: the back panel follows the bent torso and the sleeve rides up the raised arm. Too dark to read the hem. |
