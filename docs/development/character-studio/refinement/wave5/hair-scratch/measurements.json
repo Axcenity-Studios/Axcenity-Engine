@@ -1,0 +1,1336 @@
+{
+ "style": "axcenity/realistic-hair-crop-taper",
+ "date": "2026-11-18",
+ "how": {
+  "blender": "python -I assets/characters/realistic/hair/qa_hair.py --style crop-taper --out <file> (bpy 5.3): counts, volume, coverage and ramp, texels, inside",
+  "engine": "AXCENITY_HAIR_STYLE=axcenity/realistic-hair-crop-taper cargo test -p axcenity-player --release -- --ignored measure_hair --nocapture --test-threads 1 (TAA, show-through; 1920x1080, studio)",
+  "review": "capture_characters: both frames x five cast bodies, 9 views, studio/hard/warm/outdoor, rest/Idle/Walk@0.5; 3840x2160 close-ups of the hairline, temple, crown, nape, top and back under the four lights"
+ },
+ "asset_quality_2": {
+  "texel_density": {
+   "limit_px_per_cm": 10,
+   "measured": {
+    "atlas": 2048,
+    "cap_px_per_cm_median": 40.0,
+    "cap_px_per_cm_p5": 39.9,
+    "cards_along_px_per_cm_median": 175.5,
+    "cards_across_px_per_cm_median": 166.6
+   },
+   "pass": true
+  }
+ },
+ "asset_quality_4": {
+  "budgets": {
+   "limit": {
+    "hero": 40000,
+    "gameplay": 25000,
+    "crowd": 3000
+   },
+   "measured": {
+    "hero": {
+     "triangles": 39370,
+     "vertices": 37662
+    },
+    "gameplay": {
+     "triangles": 19626,
+     "vertices": 20910
+    },
+    "crowd": {
+     "triangles": 2944,
+     "vertices": 3285
+    }
+   },
+   "pass": true
+  },
+  "volume": {
+   "declared_min_mm": 8.0,
+   "points": 27256,
+   "min_mm": 1.19,
+   "p5_mm": 10.86,
+   "median_mm": 15.16,
+   "below_declared_share": 0.0096,
+   "note": "Rays down the scalp's normals from 6 cm out, at points past the hairline's ramp (the nape's declared 16 mm taper included in the ramp): the outermost hair's stand-off. 'Everywhere it covers' is read as no point under the declared 8 mm.",
+   "pass": false
+  },
+  "scalp_coverage_geometric": {
+   "show_through_share": 0.003,
+   "mean_cover_inside": 0.9971,
+   "note": "Rays out along the scalp's normals from points past the ramp, through the cards by the atlas's alpha (hashed band 0.2-0.8); share with cover under 0.5",
+   "pass": true
+  },
+  "scalp_show_through_capture": {
+   "limit": 0.02,
+   "note": "Hair over a green then a red skin; a hair pixel whose colour follows the skin is skin seen through. 'core' leaves out pixels within 12 px of the hair's edge. Counts the hair's shadow on skin too. [all hair pixels, core]",
+   "masculine": {
+    "face-front": [
+     0.1241,
+     0.0626
+    ],
+    "face-side": [
+     0.0479,
+     0.0035
+    ],
+    "hair-back": [
+     0.0536,
+     0.0012
+    ],
+    "hair-top": [
+     0.0709,
+     0.0047
+    ]
+   },
+   "feminine": {
+    "face-front": [
+     0.1191,
+     0.0193
+    ],
+    "face-side": [
+     0.0408,
+     0.0012
+    ],
+    "hair-back": [
+     0.0624,
+     0.0034
+    ],
+    "hair-top": [
+     0.063,
+     0.0082
+    ]
+   },
+   "worst_core": 0.0626,
+   "pass": false
+  },
+  "hairline_ramp": {
+   "limit_mm": 8,
+   "front_mm": 9,
+   "temples_mm": 10,
+   "sides_back_mm": 12,
+   "profiles": {
+    "ramp_front": {
+     "-3": null,
+     "-2": 0.0,
+     "-1": 0.0,
+     "0": 0.094,
+     "1": 0.181,
+     "2": 0.133,
+     "3": 0.269,
+     "4": 0.312,
+     "5": 0.422,
+     "6": 0.582,
+     "7": 0.686,
+     "8": 0.766,
+     "9": 0.866,
+     "10": 0.956,
+     "11": 0.962,
+     "12": 0.965,
+     "13": 1.0,
+     "14": 1.0,
+     "15": 0.999,
+     "16": 1.0,
+     "17": 1.0,
+     "18": 1.0,
+     "19": 1.0,
+     "20": 1.0
+    },
+    "ramp_temples": {
+     "-3": null,
+     "-2": null,
+     "-1": 0.0,
+     "0": null,
+     "1": 0.22,
+     "2": 0.237,
+     "3": 0.152,
+     "4": 0.304,
+     "5": 0.211,
+     "6": 0.487,
+     "7": 0.712,
+     "8": 0.683,
+     "9": 0.811,
+     "10": 0.853,
+     "11": 0.926,
+     "12": 0.954,
+     "13": 0.952,
+     "14": 0.908,
+     "15": 0.995,
+     "16": 0.98,
+     "17": 0.996,
+     "18": 0.99,
+     "19": 1.0,
+     "20": 1.0
+    },
+    "ramp_sides_back": {
+     "-3": 0.0,
+     "-2": 0.114,
+     "-1": 0.182,
+     "0": 0.063,
+     "1": 0.178,
+     "2": 0.199,
+     "3": 0.268,
+     "4": 0.319,
+     "5": 0.472,
+     "6": 0.475,
+     "7": 0.669,
+     "8": 0.701,
+     "9": 0.791,
+     "10": 0.907,
+     "11": 0.881,
+     "12": 0.932,
+     "13": 0.944,
+     "14": 0.973,
+     "15": 0.972,
+     "16": 0.981,
+     "17": 0.985,
+     "18": 0.997,
+     "19": 0.984,
+     "20": 0.994
+    }
+   },
+   "note": "Cover from 10% to 90% in 1 mm bins; the review judges the edge (below)",
+   "pass": true
+  },
+  "taa_stability": {
+   "limit": "set at Paul's first sign-off; CO7's provisional 4.5 rms",
+   "measured": {
+    "masculine": {
+     "face-front": {
+      "hair_pixels": 77062,
+      "rms": 1.79,
+      "p99": 6.4
+     },
+     "hair-back": {
+      "hair_pixels": 185760,
+      "rms": 1.16,
+      "p99": 3.4
+     }
+    },
+    "feminine": {
+     "face-front": {
+      "hair_pixels": 73956,
+      "rms": 1.87,
+      "p99": 6.4
+     },
+     "hair-back": {
+      "hair_pixels": 173951,
+      "rms": 1.15,
+      "p99": 3.4
+     }
+    }
+   },
+   "worst_rms": 1.87,
+   "pass": "review"
+  },
+  "inside_head": {
+   "limit": "0 vertices more than 1 mm inside the head",
+   "over_1mm": 0,
+   "deepest_mm": 0.784,
+   "rest_and_parameters": {
+    "masculine/rest": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/head_size=0.88": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.616,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0374,
+       -0.003,
+       1.713
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.616,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0476,
+       -0.0724,
+       1.7033
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.613,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0324,
+       -0.0039,
+       1.7158
+      ]
+     }
+    },
+    "masculine/head_size=1.12": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.784,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0476,
+       0.0052,
+       1.7478
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.784,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0606,
+       -0.0831,
+       1.7355
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.78,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0412,
+       0.0041,
+       1.7513
+      ]
+     }
+    },
+    "masculine/temple_width=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.017,
+       0.0173,
+       1.7323
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/temple_width=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0542,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/forehead_height=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.704,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0739,
+       -0.0016,
+       1.6652
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.706,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0798,
+       -0.0489,
+       1.6679
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.605,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0682,
+       0.007,
+       1.6374
+      ]
+     }
+    },
+    "masculine/forehead_height=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0424,
+       0.0011,
+       1.7381
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.054,
+       -0.0778,
+       1.7261
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7414
+      ]
+     }
+    },
+    "masculine/forehead_slope=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0504,
+       0.032,
+       1.6384
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/forehead_slope=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0785,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/brow_ridge=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/brow_ridge=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/heavy": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/slim": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/muscular": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0541,
+       -0.0778,
+       1.7194
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "masculine/heavy_muscular": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.708,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0425,
+       0.0011,
+       1.7304
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.707,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0654,
+       -0.03,
+       1.7198
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.702,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0368,
+       0.0001,
+       1.7335
+      ]
+     }
+    },
+    "feminine/rest": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/head_size=0.88": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.616,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0348,
+       -0.0064,
+       1.6563
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.616,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0454,
+       -0.0743,
+       1.6475
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.613,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0311,
+       -0.0078,
+       1.6586
+      ]
+     }
+    },
+    "feminine/head_size=1.12": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.783,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0442,
+       0.0021,
+       1.6911
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.784,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0578,
+       -0.0842,
+       1.6798
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.78,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0396,
+       0.0004,
+       1.694
+      ]
+     }
+    },
+    "feminine/temple_width=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0148,
+       0.0125,
+       1.6746
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/temple_width=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.703,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0477,
+       0.0274,
+       1.5829
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/forehead_height=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.712,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0704,
+       -0.0758,
+       1.6114
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.701,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0748,
+       -0.0506,
+       1.6107
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.605,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0648,
+       0.0041,
+       1.5814
+      ]
+     }
+    },
+    "feminine/forehead_height=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0236,
+       0.0214,
+       1.6689
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.702,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0615,
+       -0.0322,
+       1.6688
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.698,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6842
+      ]
+     }
+    },
+    "feminine/forehead_slope=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0464,
+       0.0275,
+       1.5828
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/forehead_slope=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.705,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0108,
+       -0.1231,
+       1.6648
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.08,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/brow_ridge=-1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/brow_ridge=1.0": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/heavy": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/slim": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/muscular": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.699,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0516,
+       -0.0793,
+       1.6636
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    },
+    "feminine/heavy_muscular": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.705,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0395,
+       -0.0021,
+       1.6737
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.704,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0148,
+       0.0125,
+       1.6746
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0354,
+       -0.0037,
+       1.6763
+      ]
+     }
+    }
+   },
+   "motion": {
+    "masculine/Idle": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0414,
+       -0.0008,
+       1.7261
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0495,
+       -0.0801,
+       1.7151
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0378,
+       0.0017,
+       1.7293
+      ]
+     }
+    },
+    "masculine/Walk": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0485,
+       -0.0409,
+       1.7152
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0589,
+       -0.1196,
+       1.702
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0307,
+       -0.0408,
+       1.7189
+      ]
+     }
+    },
+    "masculine/Run": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0305,
+       -0.1399,
+       1.7008
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0325,
+       -0.2184,
+       1.6829
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0482,
+       -0.1315,
+       1.7043
+      ]
+     }
+    },
+    "feminine/Idle": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0365,
+       -0.0174,
+       1.6717
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0473,
+       -0.0815,
+       1.6595
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0363,
+       -0.0022,
+       1.6721
+      ]
+     }
+    },
+    "feminine/Walk": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0447,
+       -0.0417,
+       1.6595
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0556,
+       -0.1187,
+       1.6474
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.0302,
+       -0.0422,
+       1.6628
+      ]
+     }
+    },
+    "feminine/Run": {
+     "Hair_CropTaper": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0579,
+       -0.1312,
+       1.6542
+      ]
+     },
+     "Hair_CropTaper_LOD1": {
+      "deepest_mm": 0.7,
+      "over_1mm": 0,
+      "deepest_at": [
+       -0.0312,
+       -0.2119,
+       1.6307
+      ]
+     },
+     "Hair_CropTaper_LOD2": {
+      "deepest_mm": 0.697,
+      "over_1mm": 0,
+      "deepest_at": [
+       0.046,
+       -0.1277,
+       1.6504
+      ]
+     }
+    }
+   },
+   "notes": "Depth: how far a hair vertex is inside the body's posed surface (nearest face, along its normal), mm. Motion: the worst of 8 evenly spaced frames of each clip.",
+   "pass": true
+  },
+  "silhouette": {
+   "pass": false,
+   "note": "Side by side with c16d1119 (back), 57b04b17 (side), e293009a (front), 22eda146 (top): the volume on top matches within a few millimetres, but the back and sides read as a bowl, not a taper: the hair ends about level with the ears' tops and flares slightly outward at its lower edge, where the references narrow into the nape; from the front the fringe line is a rounded band rather than the reference's lifted, uneven front."
+  },
+  "card_edges_1080p": {
+   "pass": false,
+   "note": "At 1080p sheet size no single card edge stands out, but close (hair-temple at 1080p, every 4K crop) the clumps read as flat painted strokes with straight-sided facets, and the hairline and nape end in a jagged dark line of clump tips."
+  },
+  "hairline_review": {
+   "pass": false,
+   "note": "The measured ramp is 9 mm (front) and 10 mm (temples), but in the pictures the front ramp shows as scattered dark specks on skin under a dense edge of clump tips, and over the ears and down the nape the edge is a dark jagged line; no fine flyaways read at 1080p."
+  },
+  "crown_review": {
+   "pass": false,
+   "note": "No skin shows at the crown (the cap), but the whorl reads as a radiating burst of flat card facets with a busy, folded centre and, under the studio and outdoor light, a pale highlight spot at its middle."
+  },
+  "material_response": {
+   "pass": false,
+   "note": "Brown (variant `brown`) reads grey-brown under the studio and outdoor light, straw-grey on the lit side under the hard light, and brown only under the warm light: the Hair model's primary lobe and sky reflection over the head's smooth curve (CO7 and R6 saw the same). No shader was changed (out of this task); reported to the lead."
+  },
+  "slab_shadows": {
+   "pass": false,
+   "note": "No hair casts a solid sheet of shadow on the skin, but under the hard light the hair splits into a lit half and a flat black half along a sharp line over the crown and the back (the shell's terminator, `axcenity_hair_shell`, with little ambient there): it reads as two solid masses, not as many strands."
+  },
+  "motion_review": {
+   "pass": true,
+   "note": "Idle and the walk frame on all ten cast bodies: the hair follows the head; no clipping, tearing or separation seen at sheet size."
+  }
+ },
+ "review": {
+  "silhouette": {
+   "pass": false,
+   "note": "Side by side with c16d1119 (back), 57b04b17 (side), e293009a (front), 22eda146 (top): the volume on top matches within a few millimetres, but the back and sides read as a bowl, not a taper: the hair ends about level with the ears' tops and flares slightly outward at its lower edge, where the references narrow into the nape; from the front the fringe line is a rounded band rather than the reference's lifted, uneven front."
+  },
+  "card_edges_1080p": {
+   "pass": false,
+   "note": "At 1080p sheet size no single card edge stands out, but close (hair-temple at 1080p, every 4K crop) the clumps read as flat painted strokes with straight-sided facets, and the hairline and nape end in a jagged dark line of clump tips."
+  },
+  "hairline_review": {
+   "pass": false,
+   "note": "The measured ramp is 9 mm (front) and 10 mm (temples), but in the pictures the front ramp shows as scattered dark specks on skin under a dense edge of clump tips, and over the ears and down the nape the edge is a dark jagged line; no fine flyaways read at 1080p."
+  },
+  "crown_review": {
+   "pass": false,
+   "note": "No skin shows at the crown (the cap), but the whorl reads as a radiating burst of flat card facets with a busy, folded centre and, under the studio and outdoor light, a pale highlight spot at its middle."
+  },
+  "material_response": {
+   "pass": false,
+   "note": "Brown (variant `brown`) reads grey-brown under the studio and outdoor light, straw-grey on the lit side under the hard light, and brown only under the warm light: the Hair model's primary lobe and sky reflection over the head's smooth curve (CO7 and R6 saw the same). No shader was changed (out of this task); reported to the lead."
+  },
+  "slab_shadows": {
+   "pass": false,
+   "note": "No hair casts a solid sheet of shadow on the skin, but under the hard light the hair splits into a lit half and a flat black half along a sharp line over the crown and the back (the shell's terminator, `axcenity_hair_shell`, with little ambient there): it reads as two solid masses, not as many strands."
+  },
+  "motion_review": {
+   "pass": true,
+   "note": "Idle and the walk frame on all ten cast bodies: the hair follows the head; no clipping, tearing or separation seen at sheet size."
+  }
+ }
+}

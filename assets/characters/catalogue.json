@@ -198,6 +198,24 @@
       "thumbnail": "realistic/clothing/crew-tee/Shirt_CrewTee.png"
     },
     {
+      "id": "axcenity/realistic-hair-crop-taper",
+      "manifest": "realistic/items/realistic-hair-crop-taper.item.json",
+      "label": "Textured crop, tapered",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "short",
+        "straight",
+        "crop",
+        "textured",
+        "taper"
+      ]
+    },
+    {
       "id": "axcenity/realistic-hair-short-crop",
       "manifest": "realistic/items/realistic-hair-short-crop.item.json",
       "label": "Short textured crop",

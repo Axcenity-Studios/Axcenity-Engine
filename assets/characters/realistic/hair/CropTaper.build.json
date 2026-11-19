@@ -1,0 +1,408 @@
+{
+  "style": "crop-taper",
+  "levels": {
+    "0": {
+      "triangles": 39370,
+      "vertices": 37662,
+      "by_layer": {
+        "cap": 646,
+        "under": 10452,
+        "whorl": 1296,
+        "outer": 19552,
+        "hairline": 5788,
+        "fly": 1636
+      },
+      "roots_deepest_mm": 0.699
+    },
+    "1": {
+      "triangles": 19626,
+      "vertices": 20910,
+      "by_layer": {
+        "cap": 646,
+        "under": 7956,
+        "whorl": 972,
+        "outer": 6496,
+        "hairline": 3556
+      },
+      "roots_deepest_mm": 0.7
+    },
+    "2": {
+      "triangles": 2944,
+      "vertices": 3285,
+      "by_layer": {
+        "cap": 148,
+        "under": 1812,
+        "outer": 984
+      },
+      "roots_deepest_mm": 0.697
+    }
+  },
+  "head_centre": [
+    0.0,
+    -0.04014,
+    1.63305
+  ],
+  "crown": [
+    0.00855,
+    0.0207,
+    1.73137
+  ],
+  "shapes": [
+    "Brow_Lower_Left",
+    "Brow_Lower_Right",
+    "Brow_Raise_Left",
+    "Brow_Raise_Right",
+    "Face_Brow_Arch_Left",
+    "Face_Brow_Arch_Right",
+    "Face_Brow_Arch_Up_Left",
+    "Face_Brow_Arch_Up_Right",
+    "Face_Brow_Height_Left",
+    "Face_Brow_Height_Right",
+    "Face_Brow_Height_Up_Left",
+    "Face_Brow_Height_Up_Right",
+    "Face_Ear_Height_Left",
+    "Face_Ear_Height_Right",
+    "Face_Ear_Out_Left",
+    "Face_Ear_Out_Right",
+    "Face_Ear_Size_Left",
+    "Face_Ear_Size_Right",
+    "Face_Forehead_Height",
+    "Face_Forehead_Slope",
+    "Face_Head_Width",
+    "Feminine_Fat_Over_Muscle",
+    "Feminine_Fat_Soft",
+    "Feminine_Muscle_Down_Fat_Down",
+    "Feminine_Muscle_Down_Fat_Up",
+    "Feminine_Muscle_Up_Fat_Up",
+    "Frame_Feminine",
+    "Masculine_Fat_Down",
+    "Masculine_Fat_Over_Muscle",
+    "Masculine_Fat_Soft",
+    "Masculine_Fat_Up",
+    "Masculine_Muscle_Down",
+    "Masculine_Muscle_Down_Fat_Down",
+    "Masculine_Muscle_Down_Fat_Up",
+    "Masculine_Muscle_Up",
+    "Masculine_Muscle_Up_Fat_Down",
+    "Masculine_Muscle_Up_Fat_Up"
+  ],
+  "follows": [
+    "Face_Brow_Arch_Left",
+    "Face_Brow_Arch_Right",
+    "Face_Brow_Arch_Up_Left",
+    "Face_Brow_Arch_Up_Right",
+    "Face_Brow_Height_Left",
+    "Face_Brow_Height_Right",
+    "Face_Brow_Height_Up_Left",
+    "Face_Brow_Height_Up_Right",
+    "Face_Ear_Height_Left",
+    "Face_Ear_Height_Right",
+    "Face_Ear_Out_Left",
+    "Face_Ear_Out_Right",
+    "Face_Ear_Size_Left",
+    "Face_Ear_Size_Right",
+    "Face_Forehead_Height",
+    "Face_Forehead_Slope",
+    "Face_Head_Width",
+    "Feminine_Fat_Over_Muscle",
+    "Feminine_Fat_Soft",
+    "Feminine_Muscle_Down_Fat_Down",
+    "Feminine_Muscle_Down_Fat_Up",
+    "Feminine_Muscle_Up_Fat_Up",
+    "Frame_Feminine",
+    "Masculine_Fat_Down",
+    "Masculine_Fat_Over_Muscle",
+    "Masculine_Fat_Soft",
+    "Masculine_Fat_Up",
+    "Masculine_Muscle_Down",
+    "Masculine_Muscle_Down_Fat_Down",
+    "Masculine_Muscle_Down_Fat_Up",
+    "Masculine_Muscle_Up",
+    "Masculine_Muscle_Up_Fat_Down",
+    "Masculine_Muscle_Up_Fat_Up"
+  ],
+  "atlas": {
+    "size": 2048,
+    "islands": {
+      "under": 6,
+      "outer": 10,
+      "hairline": 10,
+      "fly": 12,
+      "cap": 1
+    },
+    "tiles": [
+      {
+        "kind": "under",
+        "x": 8,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "under",
+        "x": 256,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "under",
+        "x": 504,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "under",
+        "x": 752,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "under",
+        "x": 1000,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "under",
+        "x": 1248,
+        "y": 8,
+        "w": 240,
+        "h": 620
+      },
+      {
+        "kind": "outer",
+        "x": 1496,
+        "y": 8,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 1684,
+        "y": 8,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 8,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 196,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 384,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 572,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 760,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 948,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 1136,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "outer",
+        "x": 1324,
+        "y": 776,
+        "w": 180,
+        "h": 760
+      },
+      {
+        "kind": "hairline",
+        "x": 1512,
+        "y": 776,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 1610,
+        "y": 776,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 1708,
+        "y": 776,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 1806,
+        "y": 776,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 1904,
+        "y": 776,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 8,
+        "y": 1544,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 106,
+        "y": 1544,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 204,
+        "y": 1544,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 302,
+        "y": 1544,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "hairline",
+        "x": 400,
+        "y": 1544,
+        "w": 90,
+        "h": 360
+      },
+      {
+        "kind": "fly",
+        "x": 498,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 550,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 602,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 654,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 706,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 758,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 810,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 862,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 914,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 966,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 1018,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      },
+      {
+        "kind": "fly",
+        "x": 1070,
+        "y": 1544,
+        "w": 44,
+        "h": 420
+      }
+    ],
+    "cap": {
+      "x": 1122,
+      "y": 1544,
+      "w": 256,
+      "h": 256
+    }
+  }
+}

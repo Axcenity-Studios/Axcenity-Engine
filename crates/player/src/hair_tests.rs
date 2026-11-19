@@ -10,16 +10,24 @@ use super::character_capture::{
 };
 
 const STYLE: &str = "axcenity/realistic-hair-short-crop";
+/// The style made from scratch against references (wave 5, decision 14).
+const CROP_TAPER: &str = "axcenity/realistic-hair-crop-taper";
 
 fn character(file: &str) -> Description {
     let path = repository_library().join(format!("benchmarks/{file}.character.json"));
     Description::from_json(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 
-fn wearing_hair(description: &Description) -> Description {
+/// The style the ignored measurements and the benchmark wear:
+/// `AXCENITY_HAIR_STYLE` (an item id), or the first style.
+fn measured_style() -> String {
+    std::env::var("AXCENITY_HAIR_STYLE").unwrap_or_else(|_| STYLE.to_owned())
+}
+
+fn wearing(description: &Description, style: &str) -> Description {
     let mut dressed = description.clone();
     dressed.items.retain(|item| !item.id.contains("hair"));
-    let mut hair = WornItem::new(STYLE);
+    let mut hair = WornItem::new(style);
     hair.variant = Some("brown".to_owned());
     dressed.items.push(hair);
     dressed
@@ -92,11 +100,21 @@ fn rows(mask: &[bool], width: usize) -> Option<(usize, usize)> {
 /// shoulders, and its cards are drawn (a level of detail is reported).
 #[test]
 fn the_first_hairstyle_draws_on_both_frames() {
+    draws_on_both_frames(STYLE, "hair-frames");
+}
+
+/// The crop made from scratch draws on both frames, as the first style.
+#[test]
+fn the_crop_taper_draws_on_both_frames() {
+    draws_on_both_frames(CROP_TAPER, "hair-frames-crop-taper");
+}
+
+fn draws_on_both_frames(style: &str, name: &str) {
     if super::bench_tests::bench_gpu().is_none() {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     }
-    let stage = Stage::new("hair-frames", &repository_library()).expect("the stage");
+    let stage = Stage::new(name, &repository_library()).expect("the stage");
     let size = (480, 270);
     for file in [
         "realistic-masculine-cast-average",
@@ -104,7 +122,7 @@ fn the_first_hairstyle_draws_on_both_frames() {
     ] {
         let bald = character(file);
         let before = shots(&stage, &bald, "hair-back,face-front", size);
-        let after = shots(&stage, &wearing_hair(&bald), "hair-back,face-front", size);
+        let after = shots(&stage, &wearing(&bald, style), "hair-back,face-front", size);
         for (index, view) in ["hair-back", "face-front"].iter().enumerate() {
             let mask = differ(&before[index].0, &after[index].0, 12);
             let changed = share(&mask);
@@ -161,11 +179,22 @@ fn hair_width(mask: &[bool], width: usize) -> usize {
 /// 540 a pixel is about 0.8 mm there).
 #[test]
 fn the_first_hairstyle_follows_the_heads_width() {
+    follows_the_heads_width(STYLE, "hair-follows");
+}
+
+/// The crop made from scratch follows the head's width too, by the
+/// head's identity shapes it carries.
+#[test]
+fn the_crop_taper_follows_the_heads_width() {
+    follows_the_heads_width(CROP_TAPER, "hair-follows-crop-taper");
+}
+
+fn follows_the_heads_width(style: &str, name: &str) {
     if super::bench_tests::bench_gpu().is_none() {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     }
-    let stage = Stage::new("hair-follows", &repository_library()).expect("the stage");
+    let stage = Stage::new(name, &repository_library()).expect("the stage");
     let size = (960, 540);
     let bald = character("realistic-masculine-cast-average");
     let mut widths = Vec::new();
@@ -173,7 +202,7 @@ fn the_first_hairstyle_follows_the_heads_width() {
         let mut head = bald.clone();
         head.parameters.insert("temple_width".to_owned(), temple);
         let before = shots(&stage, &head, "hair-back", size);
-        let after = shots(&stage, &wearing_hair(&head), "hair-back", size);
+        let after = shots(&stage, &wearing(&head, style), "hair-back", size);
         let mask = differ(&before[0].0, &after[0].0, 12);
         widths.push(hair_width(&mask, size.0 as usize));
     }
@@ -216,7 +245,7 @@ fn hair_bench(count: usize, hair: bool, eye: [f32; 3], target: [f32; 3]) {
     let shipped = library(&stage.assets);
     let mut description = default_description(&shipped, "axcenity/realistic");
     if hair {
-        description = wearing_hair(&description);
+        description = wearing(&description, &measured_style());
     }
     let mut world = axcenity_core::World::new();
     let workspace = world.workspace();
@@ -312,7 +341,7 @@ fn measure_hair_stability_and_show_through() {
         "realistic-feminine-cast-average",
     ] {
         let bald = character(file);
-        let hair = wearing_hair(&bald);
+        let hair = wearing(&bald, &measured_style());
         for view in ["face-front", "hair-back"] {
             let mask = differ(&draw(&bald, view, 48), &draw(&hair, view, 48), 12);
             let pictures: Vec<Vec<u8>> =

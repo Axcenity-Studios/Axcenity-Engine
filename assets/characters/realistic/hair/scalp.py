@@ -246,7 +246,13 @@ class Hairline:
     def ramp(self, points):
         phi, _, _ = self.head.angles(points)
         front = 1.0 - smoothstep(55.0, 80.0, np.abs(phi))
-        return self.style["ramp_side"] + front * (self.style["ramp_front"] - self.style["ramp_side"])
+        ramp = self.style["ramp_side"] + front * (self.style["ramp_front"] - self.style["ramp_side"])
+        # A tapered nape (optional, `ramp_back`): the density and length
+        # fade over a longer band at the back of the neck.
+        if "ramp_back" in self.style:
+            back = smoothstep(120.0, 160.0, np.abs(phi))
+            ramp = ramp + back * (self.style["ramp_back"] - ramp)
+        return ramp
 
     def density(self, points):
         f = self.signed(points)
