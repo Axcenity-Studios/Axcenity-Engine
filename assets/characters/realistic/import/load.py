@@ -15,13 +15,18 @@ decimetres, millimetres and inches that makes the item between 3 cm and
 metres); a number is a scale to metres. `"up": "z"` reads an OBJ made Z
 up (OBJ's usual is Y up).
 
+Texture coordinates: the active UV layer, or with `"uv": "textures"` the
+layer the base colour map is drawn with (a glTF can carry a second set
+that its maps use, as BlenderKit's Grey sweat pants do). A map in a
+format the engine doesn't read (WebP) is written as PNG.
+
     python -I load.py --spec <asset>.intake.json --downloads <folder> --work <folder>
 """
 
 import argparse
+import io
 import json
 import os
-import shutil
 
 import bpy
 import numpy as np
@@ -70,20 +75,57 @@ def _upstream_image(socket, seen=None):
     return None
 
 
+# The map formats the engine reads, as written.
+KEPT = {"JPEG": ".jpg", "PNG": ".png"}
+
+
 def _save_image(image, folder, name):
+    """The image's file as it came when the engine reads its format;
+    anything else (WebP) decoded and written as PNG (Pillow)."""
     os.makedirs(folder, exist_ok=True)
     source = bpy.path.abspath(image.filepath) if image.filepath else ""
-    if image.packed_file is None and source and os.path.isfile(source):
-        ext = os.path.splitext(source)[1].lower()
-        out = os.path.join(folder, name + ext)
-        shutil.copyfile(source, out)
-        return os.path.basename(out)
     if image.packed_file is not None:
-        ext = {"JPEG": ".jpg", "PNG": ".png"}.get(image.file_format, ".png")
-        out = os.path.join(folder, name + ext)
-        with open(out, "wb") as f:
-            f.write(image.packed_file.data)
-        return os.path.basename(out)
+        data = image.packed_file.data
+    elif source and os.path.isfile(source):
+        with open(source, "rb") as f:
+            data = f.read()
+    else:
+        return None
+    from PIL import Image
+    with Image.open(io.BytesIO(data)) as decoded:
+        if decoded.format in KEPT:
+            out = os.path.join(folder, name + KEPT[decoded.format])
+            with open(out, "wb") as f:
+                f.write(data)
+        else:
+            out = os.path.join(folder, name + ".png")
+            decoded.save(out, "PNG")
+    return os.path.basename(out)
+
+
+def texture_uv_layer(material):
+    """The UV layer the material's base colour map is drawn with (a UV Map
+    node feeding the image's vector), or None for the active one."""
+    if material is None or not material.use_nodes:
+        return None
+    bsdf = next((n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        return None
+    image_node = None
+    for link in bsdf.inputs["Base Color"].links:
+        node = link.from_node
+        if node.type == "TEX_IMAGE":
+            image_node = node
+    if image_node is None:
+        return None
+    for link in image_node.inputs["Vector"].links:
+        node = link.from_node
+        # glTF's importer puts a Mapping node between when the texture is
+        # transformed; follow it to the UV Map node.
+        while node.type != "UVMAP" and node.inputs and node.inputs[0].links:
+            node = node.inputs[0].links[0].from_node
+        if node.type == "UVMAP" and node.uv_map:
+            return node.uv_map
     return None
 
 
@@ -105,8 +147,9 @@ def material_maps(material, folder):
     return out
 
 
-def to_workmesh(objects, folder):
-    """The objects joined, in the engine's space, with their materials."""
+def to_workmesh(objects, folder, uv_from=None):
+    """The objects joined, in the engine's space, with their materials.
+    `uv_from="textures"` reads the UV layer the maps are drawn with."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     Ps, corners, sizes, uvs, face_material = [], [], [], [], []
     materials, by_name = [], {}
@@ -121,8 +164,12 @@ def to_workmesh(objects, folder):
         # A mirrored transform turns the faces inside out: put them back.
         mirrored = np.linalg.det(M[:3, :3]) < 0
         Ps.append(np.stack([P[:, 0], P[:, 2], -P[:, 1]], axis=1))
-        uv_layer = me.uv_layers.active
         slots = [s.material for s in obj.material_slots]
+        uv_layer = me.uv_layers.active
+        if uv_from == "textures":
+            named = next((texture_uv_layer(m) for m in slots if texture_uv_layer(m)), None)
+            if named and named in me.uv_layers:
+                uv_layer = me.uv_layers[named]
         for poly in me.polygons:
             loops = list(poly.loop_indices)
             verts = [me.loops[k].vertex_index + offset for k in loops]
@@ -159,7 +206,7 @@ def step(spec, downloads, work):
     objects = open_file(path, options.get("up"))
     if not objects:
         raise SystemExit(f"`{spec['source']['model']}` has no mesh")
-    mesh = to_workmesh(objects, os.path.join(work, "textures"))
+    mesh = to_workmesh(objects, os.path.join(work, "textures"), options.get("uv"))
     units = units_of(mesh, options.get("units", "auto"))
     mesh.P = mesh.P * units
     size = mesh.P.max(axis=0) - mesh.P.min(axis=0)

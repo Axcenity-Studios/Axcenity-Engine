@@ -1,0 +1,107 @@
+# Red run: the first licensed joggers (wave 5), tests written before the item, the refinement step, the loader's fix and the hip-flex pose
+# 2026-11-19T01:32Z
+
+$ cargo nextest run -p axcenity-avatar --test licensed_joggers --no-fail-fast
+        FAIL [   0.145s] (1/6) axcenity-avatar::licensed_joggers the_joggers_keep_to_the_budget_with_three_levels_of_their_own
+    test the_joggers_keep_to_the_budget_with_three_levels_of_their_own ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.14s
+    thread 'the_joggers_keep_to_the_budget_with_three_levels_of_their_own' (29812) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+        FAIL [   0.145s] (2/6) axcenity-avatar::licensed_joggers the_joggers_are_an_imported_draft_with_a_sound_provenance_record
+    test the_joggers_are_an_imported_draft_with_a_sound_provenance_record ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+    thread 'the_joggers_are_an_imported_draft_with_a_sound_provenance_record' (43520) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+        FAIL [   0.145s] (3/6) axcenity-avatar::licensed_joggers no_edge_of_the_joggers_is_a_single_layer
+    test no_edge_of_the_joggers_is_a_single_layer ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+    thread 'no_edge_of_the_joggers_is_a_single_layer' (42412) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+        FAIL [   0.145s] (4/6) axcenity-avatar::licensed_joggers the_joggers_texture_coordinates_are_even_dense_and_do_not_overlap
+    test the_joggers_texture_coordinates_are_even_dense_and_do_not_overlap ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.13s
+    thread 'the_joggers_texture_coordinates_are_even_dense_and_do_not_overlap' (41528) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+        FAIL [   0.145s] (5/6) axcenity-avatar::licensed_joggers the_joggers_have_colour_roles_variants_and_cloth_with_sheen
+    test the_joggers_have_colour_roles_variants_and_cloth_with_sheen ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.12s
+    thread 'the_joggers_have_colour_roles_variants_and_cloth_with_sheen' (27516) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+        FAIL [   0.145s] (6/6) axcenity-avatar::licensed_joggers the_joggers_mesh_is_sound
+    test the_joggers_mesh_is_sound ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.14s
+    thread 'the_joggers_mesh_is_sound' (35248) panicked at crates\avatar\tests\licensed_joggers.rs:56:28:
+    `axcenity/realistic-fleece-joggers` isn't in the library
+
+$ cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/fleece_joggers|hips_flexed/)'
+        FAIL [   1.132s] ( 1/16) axcenity-player::bin/axcenity-player character_capture::the_hips_flexed_pose_raises_the_thighs_level_and_hangs_the_shins
+    thread 'character_capture::the_hips_flexed_pose_raises_the_thighs_level_and_hangs_the_shins' (18628) panicked at crates\player\src\character_capture.rs:1802:5:
+        FAIL [   1.754s] ( 2/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_at_rest
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_at_rest' (31768) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   1.770s] ( 3/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_in_idle
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_in_idle' (17472) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   1.831s] ( 4/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_bend_at_the_knee_without_collapsing
+    thread 'fleece_joggers_tests::the_fleece_joggers_bend_at_the_knee_without_collapsing' (33184) panicked at crates\player\src\fleece_joggers_tests.rs:378:66:
+        FAIL [   1.026s] ( 5/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_walking
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_walking' (17068) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   0.980s] ( 6/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_raised
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_raised' (38080) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   1.013s] ( 7/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_out_and_forward
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_out_and_forward' (30892) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   1.013s] ( 8/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_hips_flexed
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_hips_flexed' (29224) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   1.108s] ( 9/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_knees_bent
+    thread 'fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_knees_bent' (19384) panicked at crates\player\src\fleece_joggers_tests.rs:62:9:
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   0.997s] (10/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_levels_of_detail_stay_clear_of_the_body
+    thread 'fleece_joggers_tests::the_fleece_joggers_levels_of_detail_stay_clear_of_the_body' (34804) panicked at crates\player\src\fleece_joggers_tests.rs:206:9:
+        FAIL [   1.073s] (11/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_stay_steady_in_the_idle_walk_and_run
+    thread 'fleece_joggers_tests::the_fleece_joggers_stay_steady_in_the_idle_walk_and_run' (38940) panicked at crates\player\src\fleece_joggers_tests.rs:244:9:
+    realistic-feminine-cast-asymmetry: no joggers
+        FAIL [   1.043s] (12/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_waistband_stays_closed_in_the_walk_and_the_hip_flex
+    thread 'fleece_joggers_tests::the_fleece_joggers_waistband_stays_closed_in_the_walk_and_the_hip_flex' (36056) panicked at crates\player\src\fleece_joggers_tests.rs:409:53:
+        PASS [   4.401s] (13/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_first_third
+        PASS [   4.525s] (14/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_second_third
+        PASS [   4.602s] (15/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_last_third
+        FAIL [   9.906s] (16/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_hips_flexed
+    thread 'fit_gate_tests::garments_cover_the_cast_with_the_hips_flexed' (14088) panicked at crates\player\src\fit_gate_tests.rs:309:76:
+     Summary [   9.908s] 16 tests run: 3 passed, 13 failed, 274 skipped
+        FAIL [   1.132s] ( 1/16) axcenity-player::bin/axcenity-player character_capture::the_hips_flexed_pose_raises_the_thighs_level_and_hangs_the_shins
+        FAIL [   1.754s] ( 2/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_at_rest
+        FAIL [   1.770s] ( 3/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_in_idle
+        FAIL [   1.831s] ( 4/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_bend_at_the_knee_without_collapsing
+        FAIL [   1.026s] ( 5/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_walking
+        FAIL [   0.980s] ( 6/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_raised
+        FAIL [   1.013s] ( 7/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_arms_out_and_forward
+        FAIL [   1.013s] ( 8/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_hips_flexed
+        FAIL [   1.108s] ( 9/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_with_the_knees_bent
+        FAIL [   0.997s] (10/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_levels_of_detail_stay_clear_of_the_body
+        FAIL [   1.073s] (11/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_stay_steady_in_the_idle_walk_and_run
+        FAIL [   1.043s] (12/16) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_waistband_stays_closed_in_the_walk_and_the_hip_flex
+        FAIL [   9.906s] (16/16) axcenity-player::bin/axcenity-player fit_gate_tests::garments_cover_the_cast_with_the_hips_flexed
+
+# The walk thirds passed above with no joggers worn (nothing asserted they were): they now assert it, and fail:
+$ cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/fleece_joggers_tests::.*walk_.*third/)'
+        FAIL [   0.906s] (1/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_second_third
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   0.906s] (2/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_first_third
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+        FAIL [   0.908s] (3/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_last_third
+    realistic-blend-body-default: ["Underwear_BoxerBriefs"]
+     Summary [   0.909s] 3 tests run: 0 passed, 3 failed, 287 skipped
+        FAIL [   0.906s] (1/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_second_third
+        FAIL [   0.906s] (2/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_first_third
+        FAIL [   0.908s] (3/3) axcenity-player::bin/axcenity-player fleece_joggers_tests::the_fleece_joggers_cover_the_cast_through_the_walk_last_third
+
+$ python -I assets/characters/realistic/import/test_refine.py   (Blender Python)
+Traceback (most recent call last):
+  File "<worktree>\assets\characters\realistic\import\test_refine.py", line 18, in <module>
+    import refine_joggers as rj  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'refine_joggers'

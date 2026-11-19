@@ -215,6 +215,9 @@ def assemble(spec, fitted, maps, out, placed=None):
         doc["nodes"][armature]["children"].append(len(doc["nodes"]) - 1)
     names = [m["name"] for m in spec["_materials"]]
     doc["materials"] = []
+    # A map several materials share is stored once.
+    textures = {}
+    sheen_used = False
     for m in spec["_materials"]:
         options = item.get("materials", {}).get(m["name"], {})
         # Section 2: no surface is seen from both sides unless it is a
@@ -226,8 +229,10 @@ def assemble(spec, fitted, maps, out, placed=None):
         mime = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
         for key in ("base_color", "normal", "orm"):
             if key in found:
-                tex = wardrobe.image(doc, binary, found[key],
-                                     mime[os.path.splitext(found[key])[1].lower()])
+                if found[key] not in textures:
+                    textures[found[key]] = wardrobe.image(doc, binary, found[key],
+                                                          mime[os.path.splitext(found[key])[1].lower()])
+                tex = textures[found[key]]
                 if key == "base_color":
                     mat["pbrMetallicRoughness"]["baseColorTexture"] = {"index": tex}
                 elif key == "normal":
@@ -240,11 +245,21 @@ def assemble(spec, fitted, maps, out, placed=None):
             mat["pbrMetallicRoughness"]["roughnessFactor"] = 0.8
         if options.get("shading", "standard") != "standard":
             mat["extras"] = {"axcenity_shading": options["shading"]}
+        if "sheen" in options:
+            # Cloth's sheen (docs/rendering/cloth.md), as the wardrobe writes it.
+            mat["extensions"] = {"KHR_materials_sheen": {
+                "sheenColorFactor": [float(options["sheen"])] * 3,
+                "sheenRoughnessFactor": float(options.get("sheen_roughness", 0.5))}}
+            sheen_used = True
         doc["materials"].append(mat)
     for mesh in doc["meshes"]:
         for prim in mesh["primitives"]:
             if isinstance(prim["material"], str):
                 prim["material"] = names.index(prim["material"]) if prim["material"] in names else 0
+    if sheen_used:
+        used = doc.setdefault("extensionsUsed", [])
+        if "KHR_materials_sheen" not in used:
+            used.append("KHR_materials_sheen")
     doc["asset"]["generator"] = "Axcenity Engine licensed-asset intake (assets/characters/realistic/import)"
     binary = bytearray(binary)
     rigid = None
@@ -325,6 +340,8 @@ def changes_of(spec, work):
         out.append(f"decimated to {topo['decimate']['triangles_after']} triangles")
     if "remesh" in topo:
         out.append("remeshed (voxel)")
+    refined = report("refined.json")
+    out += refined.get("changes", [])
     conformed = report("conformed.json")
     if "place" in conformed:
         place = conformed["place"]
@@ -398,6 +415,8 @@ def step(spec, work, out_root):
                            **({"role": item["materials"][m["name"]]["role"]}
                               if "role" in item.get("materials", {}).get(m["name"], {}) else {}))
                       for m in loaded.materials],
+        # Colour variants the spec gives (tints per material slot).
+        "variants": item.get("variants"),
         "fit": {"method": "binding", "data": f"{obj}.binding.json",
                 "margin": spec.get("fit", {}).get("margin", 0.002)},
         "tags": item.get("tags", []),

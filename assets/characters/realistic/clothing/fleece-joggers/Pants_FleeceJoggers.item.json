@@ -1,0 +1,141 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic-fleece-joggers",
+  "label": "Fleece joggers",
+  "kind": "garment",
+  "slot": "bottom",
+  "tier": "built_in",
+  "bases": [
+    "axcenity/realistic"
+  ],
+  "model": {
+    "file": "Pants_FleeceJoggers.glb",
+    "object": "AxcenityRealistic/Pants_FleeceJoggers"
+  },
+  "hides": [],
+  "materials": [
+    {
+      "name": "Fleece",
+      "shading": "cloth",
+      "label": "Joggers",
+      "role": "primary"
+    },
+    {
+      "name": "Rib",
+      "shading": "cloth",
+      "label": "Waistband and cuffs",
+      "role": "secondary"
+    },
+    {
+      "name": "Cord",
+      "shading": "cloth",
+      "label": "Drawcord",
+      "role": "accent"
+    },
+    {
+      "name": "Aglet",
+      "shading": "standard",
+      "label": "Aglets and eyelets"
+    }
+  ],
+  "variants": [
+    {
+      "id": "heather-grey",
+      "label": "Heather grey",
+      "materials": {
+        "Fleece": {
+          "tint": "#c7c7c7"
+        },
+        "Rib": {
+          "tint": "#c7c7c7"
+        },
+        "Cord": {
+          "tint": "#c7c7c7"
+        }
+      }
+    },
+    {
+      "id": "charcoal",
+      "label": "Charcoal",
+      "materials": {
+        "Fleece": {
+          "tint": "#56585d"
+        },
+        "Rib": {
+          "tint": "#56585d"
+        },
+        "Cord": {
+          "tint": "#56585d"
+        }
+      }
+    },
+    {
+      "id": "black",
+      "label": "Black",
+      "materials": {
+        "Fleece": {
+          "tint": "#2a2a2c"
+        },
+        "Rib": {
+          "tint": "#2a2a2c"
+        },
+        "Cord": {
+          "tint": "#2a2a2c"
+        }
+      }
+    },
+    {
+      "id": "navy",
+      "label": "Navy",
+      "materials": {
+        "Fleece": {
+          "tint": "#2c3552"
+        },
+        "Rib": {
+          "tint": "#2c3552"
+        },
+        "Cord": {
+          "tint": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "olive",
+      "label": "Olive",
+      "materials": {
+        "Fleece": {
+          "tint": "#5c6146"
+        },
+        "Rib": {
+          "tint": "#5c6146"
+        },
+        "Cord": {
+          "tint": "#5c6146"
+        }
+      }
+    }
+  ],
+  "fit": {
+    "method": "binding",
+    "data": "Pants_FleeceJoggers.binding.json",
+    "margin": 0.002
+  },
+  "tags": [
+    "joggers",
+    "sweatpants",
+    "fleece",
+    "casual",
+    "licensed"
+  ],
+  "thumbnail": "Pants_FleeceJoggers.png",
+  "source": {
+    "author": "Introspective Mnisi; fitted by Axcenity Engine contributors",
+    "licence": "CC0-1.0",
+    "url": "https://www.blendkit.com/asset-gallery-detail/e46f029b-7877-41fd-a870-60b98fc2a259/",
+    "origin": "imported",
+    "provenance": "Pants_FleeceJoggers.provenance.json"
+  },
+  "about": "Grey fleece joggers with an elastic waistband and drawcord, gathered cuffs at the ankle and two back patch pockets, from BlenderKit's Grey sweat pants (CC0).",
+  "quality": "draft",
+  "layer": 1
+}

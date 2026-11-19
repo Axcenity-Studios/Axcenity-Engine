@@ -24,6 +24,10 @@ const WAVE_4_DRAFTS: [&str; 4] = [
     "axcenity/realistic-sneakers",
 ];
 
+/// Wave 5's licensed items, Draft until the lead's review and Paul's
+/// sign-off of the first of their kind (`refinement/wave5/`).
+const WAVE_5_DRAFTS: [&str; 1] = ["axcenity/realistic-fleece-joggers"];
+
 /// The realistic underwear, made before the standard (Legacy).
 const REALISTIC_UNDERWEAR: [&str; 3] = [
     "axcenity/realistic-boxer-briefs",
@@ -88,15 +92,16 @@ fn every_shipped_item_declares_its_state() {
 fn the_shipped_items_are_classified() {
     let library = read();
     for (id, item) in &library.items {
-        let expected = if WAVE_4_DRAFTS.contains(&id.as_str()) {
-            Quality::Draft
-        } else if REALISTIC_UNDERWEAR.contains(&id.as_str())
-            || item.bases.iter().any(|b| b == V1_BASE)
-        {
-            Quality::Legacy
-        } else {
-            panic!("`{id}` isn't classified here: add it");
-        };
+        let expected =
+            if WAVE_4_DRAFTS.contains(&id.as_str()) || WAVE_5_DRAFTS.contains(&id.as_str()) {
+                Quality::Draft
+            } else if REALISTIC_UNDERWEAR.contains(&id.as_str())
+                || item.bases.iter().any(|b| b == V1_BASE)
+            {
+                Quality::Legacy
+            } else {
+                panic!("`{id}` isn't classified here: add it");
+            };
         assert_eq!(item.state(), expected, "{id}");
     }
     for id in WAVE_4_DRAFTS.iter().chain(&REALISTIC_UNDERWEAR) {

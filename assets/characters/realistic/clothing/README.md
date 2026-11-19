@@ -7,8 +7,11 @@ The garment pipeline of the realistic family (Character Studio R7, milestone CO1
 | Crew-neck T-shirt | `crew-tee/` | `axcenity/realistic-crew-tee` | Pattern (FreeSewing `teagan`), sewn and draped | draft |
 | Joggers | `joggers/` | `axcenity/realistic-joggers` | Pattern (FreeSewing `paco` on `titan`), sewn and draped, gathered on elastic | draft |
 | Court sneakers | `sneakers/` | `axcenity/realistic-sneakers` | Shell over the foot, a cemented sole | draft |
+| Fleece joggers (wave 5, licensed) | `fleece-joggers/` | `axcenity/realistic-fleece-joggers` | BlenderKit's Grey sweat pants (CC0, from MakeHuman's CC0 male_casualsuit06) through the licensed-asset intake (`../import/`, its `refine_joggers.py` recipe); not made by this pipeline | draft |
 
-All three are **drafts**: what each still fails, with numbers, is in `docs/development/character-studio/refinement/wave4/r7-wardrobe-first.md` and in the tests' records (`crates/avatar/tests/realistic_wardrobe.rs`, `crates/player/src/wardrobe_tests.rs`). Drafts are never in a preset or drawn by Randomize (`avatar::randomize` skips an item that says `quality: "draft"`).
+The fleece joggers are made by the intake, not by this pipeline: their spec is `../import/specs/fleece-joggers.intake.json`, their provenance record and the asset page as retrieved are beside the model, and what they fail is in `docs/development/character-studio/refinement/wave5/joggers-licensed.md`. The three wave-4 items above stay the drafts they are.
+
+All three wave-4 items are **drafts**: what each still fails, with numbers, is in `docs/development/character-studio/refinement/wave4/r7-wardrobe-first.md` and in the tests' records (`crates/avatar/tests/realistic_wardrobe.rs`, `crates/player/src/wardrobe_tests.rs`). Drafts are never in a preset or drawn by Randomize (`avatar::randomize` skips an item that says `quality: "draft"`).
 
 Each folder holds the item's model (`<Object>.glb`: the garment and its two simpler copies `<Object>_LOD1`, `_LOD2`, skinned to the realistic skeleton, with the body's identity and corrective shapes as morph targets, and the 2048 px maps on Cloth or Standard materials), its binding (`<Object>.binding.json`), a thumbnail and its manifest. They are generated: rebuild them with the commands below, never edit them.
 

@@ -198,6 +198,25 @@
       "thumbnail": "realistic/clothing/crew-tee/Shirt_CrewTee.png"
     },
     {
+      "id": "axcenity/realistic-fleece-joggers",
+      "manifest": "realistic/clothing/fleece-joggers/Pants_FleeceJoggers.item.json",
+      "label": "Fleece joggers",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "joggers",
+        "sweatpants",
+        "fleece",
+        "casual",
+        "licensed"
+      ],
+      "thumbnail": "realistic/clothing/fleece-joggers/Pants_FleeceJoggers.png"
+    },
+    {
       "id": "axcenity/realistic-hair-short-crop",
       "manifest": "realistic/items/realistic-hair-short-crop.item.json",
       "label": "Short textured crop",

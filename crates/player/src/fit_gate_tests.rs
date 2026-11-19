@@ -636,7 +636,7 @@ pub(super) const HOLES: &str = "hidden skin showing";
 /// Layered pairs the gate checks: (the lower layer, the upper one). A
 /// lower layer never comes through the upper one where the upper one
 /// covers it at rest.
-const LAYERS: [(&str, &str); 7] = [
+const LAYERS: [(&str, &str); 9] = [
     // The realistic sports bra under the test tee.
     ("Underwear_Bra", "TestTee"),
     // The stylized cargo pants' waistband under the tee's hem, and the
@@ -649,6 +649,10 @@ const LAYERS: [(&str, &str); 7] = [
     ("Underwear_Bra", "Shirt_CrewTee"),
     ("Underwear_BoxerBriefs", "Pants_Joggers"),
     ("Underwear_Briefs", "Pants_Joggers"),
+    // The first licensed joggers (wave 5, `fleece_joggers_tests`) over the
+    // underwear.
+    ("Underwear_BoxerBriefs", "Pants_FleeceJoggers"),
+    ("Underwear_Briefs", "Pants_FleeceJoggers"),
 ];
 
 /// The cover each garment of `garments` gives at rest: (garment name,
@@ -1204,6 +1208,14 @@ fn garments_cover_the_cast_with_the_elbows_bent() {
 #[test]
 fn garments_cover_the_cast_with_the_knees_bent() {
     gate(Stance::Held(HeldPose::KneesBent), &[]);
+}
+
+/// The hips flexed (wave 5): the thighs raised level, the knees bent 90
+/// degrees, as sitting. The gate's own garments in it: the underwear (on
+/// each frame) and the test tee.
+#[test]
+fn garments_cover_the_cast_with_the_hips_flexed() {
+    gate(Stance::Held(HeldPose::HipFlex), &[]);
 }
 
 /// The ratchet: a garment and pose recorded in `known` passes at its

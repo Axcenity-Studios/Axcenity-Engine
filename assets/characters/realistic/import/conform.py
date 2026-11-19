@@ -178,6 +178,12 @@ def place(mesh, body, spec):
     return report
 
 
+def source_of(spec):
+    """The step's input: the refinement's mesh when the spec names a
+    recipe (`refine.py`), else the topology step's."""
+    return "refined.npz" if spec.get("refine") else "topology.npz"
+
+
 def step(spec, work, source="topology.npz", target="conformed.npz"):
     import bodyglb
     import skinning
@@ -218,7 +224,7 @@ def main():
     args = parser.parse_args()
     with open(args.spec, encoding="utf-8") as f:
         spec = json.load(f)
-    print(json.dumps(step(spec, args.work), indent=1))
+    print(json.dumps(step(spec, args.work, source=source_of(spec)), indent=1))
 
 
 if __name__ == "__main__":

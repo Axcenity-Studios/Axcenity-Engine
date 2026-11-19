@@ -409,6 +409,12 @@ pub(crate) enum HeldPose {
     /// (wave 5, Paul's decision 13). Not in [`HeldPose::ALL`], so the body
     /// suite's sheets keep their rows; `AXCENITY_CAPTURE_POSE` takes it.
     ArmsForward,
+    /// The hips flexed: each thigh raised forward to level (90 degrees of
+    /// flexion) and the knee bent 90 degrees, the shin hanging: sitting,
+    /// without a seat. A bottom's waistband, seat and crotch are judged in
+    /// it (asset-quality.md §3 "Sleeves and waist", wave 5). Not in
+    /// [`HeldPose::ALL`] either; `AXCENITY_CAPTURE_POSE=hip-flex`.
+    HipFlex,
 }
 
 impl HeldPose {
@@ -426,6 +432,7 @@ impl HeldPose {
             HeldPose::ElbowsBent => "elbows-bent",
             HeldPose::KneesBent => "knees-bent",
             HeldPose::ArmsForward => "arms-forward",
+            HeldPose::HipFlex => "hip-flex",
         }
     }
 }
@@ -444,6 +451,23 @@ pub(crate) fn held_pose(rig: &Rig, pose: HeldPose) -> Vec<(usize, BoneTransform)
         // (the bone turned, the bone at its tail, the axis, degrees, which
         // way the tail should go)
         let joint = match pose {
+            HeldPose::HipFlex => {
+                let (Some(upper), Some(lower), Some(foot)) =
+                    (bone("UpperLeg"), bone("LowerLeg"), bone("Foot"))
+                else {
+                    continue;
+                };
+                // The thigh raised 90 degrees about the axis across the body,
+                // the knee coming forward; then the knee bent 90 degrees, the
+                // shin going back from the thigh's line (both about the rest
+                // pose, as a clip's keys are): it hangs down again.
+                turned.push((
+                    upper,
+                    bend(rig, &world, upper, head(lower), Vec3::X, 90.0, FORWARD),
+                ));
+                let shin = (head(foot) - head(lower)).normalize();
+                (lower, foot, shin.cross(FORWARD), 90.0, -FORWARD)
+            }
             HeldPose::ArmsForward => {
                 let (Some(upper), Some(lower)) = (bone("UpperArm"), bone("LowerArm")) else {
                     continue;
@@ -583,7 +607,7 @@ pub(crate) fn stance_named(text: &str) -> Result<Stance, String> {
     let text = text.trim();
     if let Some(pose) = HeldPose::ALL
         .into_iter()
-        .chain([HeldPose::ArmsForward])
+        .chain([HeldPose::ArmsForward, HeldPose::HipFlex])
         .find(|pose| pose.name() == text)
     {
         return Ok(Stance::Held(pose));
@@ -1764,6 +1788,7 @@ fn held_poses_turn_each_joint_to_its_angle_on_the_realistic_body() {
                 }
                 HeldPose::ElbowsBent => ("LowerArm", "Hand"),
                 HeldPose::KneesBent => ("LowerLeg", "Foot"),
+                HeldPose::HipFlex => unreachable!("not in the loop"),
             };
             let before = at(&rest, &bone(to)) - at(&rest, &bone(from));
             let after = at(&world, &bone(to)) - at(&world, &bone(from));
@@ -1775,6 +1800,59 @@ fn held_poses_turn_each_joint_to_its_angle_on_the_realistic_body() {
                 _ => assert!(forward < 0.0, "{side} shin goes back"),
             }
         }
+    }
+}
+
+/// The hips flexed (wave 5): on each side the thigh is raised forward to
+/// level (90 degrees from hanging, the knee in front of the hip) and the
+/// knee bent 90 degrees, the shin hanging straight down again; nothing
+/// else turns.
+#[test]
+fn the_hips_flexed_pose_raises_the_thighs_level_and_hangs_the_shins() {
+    let stage = Stage::new("held-hips", &repository_library()).expect("the stage");
+    let rig = realistic_rig(&stage);
+    let rest = rig.world(&rig.rest_pose());
+    let at = |world: &[Mat4], name: &str| world[rig.bone(name).unwrap()].w_axis.truncate();
+    let degrees = |a: Vec3, b: Vec3| a.normalize().angle_between(b.normalize()).to_degrees();
+    let turned = held_pose(&rig, HeldPose::HipFlex);
+    assert_eq!(turned.len(), 4, "the hip and the knee a side");
+    let mut posed = rig.rest_pose();
+    for (bone, transform) in &turned {
+        posed[*bone] = *transform;
+    }
+    let world = rig.world(&posed);
+    for side in ["Left", "Right"] {
+        let bone = |name: &str| format!("{side}{name}");
+        let thigh = at(&world, &bone("LowerLeg")) - at(&world, &bone("UpperLeg"));
+        let shin = at(&world, &bone("Foot")) - at(&world, &bone("LowerLeg"));
+        let rest_thigh = at(&rest, &bone("LowerLeg")) - at(&rest, &bone("UpperLeg"));
+        // Raised 90 degrees, forward, about level (the rest pose's thigh
+        // leans back a few degrees, so it ends a few under level).
+        let flexion = degrees(thigh, rest_thigh);
+        assert!((flexion - 90.0).abs() < 1.0, "{side} hip: {flexion}");
+        let below_level = thigh
+            .angle_between(Vec3::new(thigh.x, 0.0, thigh.z))
+            .to_degrees();
+        assert!(thigh.z > 0.0 && below_level < 8.0, "{side} thigh: {thigh}");
+        // The knee bent 90 degrees: the shin against where the thigh's turn
+        // alone (90 degrees about the axis across the body) would carry it.
+        let rest_shin = at(&rest, &bone("Foot")) - at(&rest, &bone("LowerLeg"));
+        let raise = [90.0f32, -90.0]
+            .map(|d| Quat::from_axis_angle(Vec3::X, d.to_radians()))
+            .into_iter()
+            .find(|q| (*q * rest_thigh).z > 0.0)
+            .unwrap();
+        let knee = degrees(raise * rest_shin, shin);
+        assert!((knee - 90.0).abs() < 1.0, "{side} knee: {knee}");
+        assert!(
+            shin.y < 0.0 && shin.z.abs() < shin.y.abs() * 0.15,
+            "{side} shin hangs: {shin}"
+        );
+        // The feet stay with the shins; the spine doesn't move.
+        assert!(
+            at(&world, "Spine").distance(at(&rest, "Spine")) < 1e-4,
+            "the spine stays"
+        );
     }
 }
 

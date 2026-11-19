@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "asset": "Grey sweat pants",
+  "source_page": "https://www.blendkit.com/asset-gallery-detail/e46f029b-7877-41fd-a870-60b98fc2a259/",
+  "author": "Introspective Mnisi",
+  "licence": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "retrieved": "2026-11-18",
+  "files": [
+    {
+      "name": "bk-grey-sweat-pants.glb",
+      "sha256": "04abe82b560270bc7612f0bbc8ae05209917bbf3476949c9dd3588804f1fa235",
+      "bytes": 451156
+    }
+  ],
+  "changes": [
+    "topology repaired: 259 welded",
+    "retopologized as quads in rings round the body, with seven edge loops within 6 cm of the knee",
+    "refitted to the Axcenity realistic body (with its boxer briefs): shortened and tapered to the ankle, the hem at 8.5 cm with a 5 cm cuff gathered round it, the drop crotch raised to the body's",
+    "the waistband raised over the underwear's band and closed round the waist (8 mm over the body and underwear), turned inside with 3 mm thickness, the cuffs turned likewise",
+    "back patch pockets rebuilt as closed pockets 2.1 mm thick at the download's place",
+    "a drawcord added (two cords out of metal eyelets, with aglets)",
+    "new texture coordinates and the download's maps baked onto them; colour taken out of the albedo for tints; the roughness map rebuilt as occlusion-roughness-metal",
+    "simpler copies made by decimation (levels of detail)",
+    "fitted, rigged and given the body's shapes by the Axcenity engine's fit",
+    "materials rebuilt for the Axcenity engine"
+  ],
+  "attribution": "\"Grey sweat pants\" by Introspective Mnisi (https://www.blendkit.com/asset-gallery-detail/e46f029b-7877-41fd-a870-60b98fc2a259/), licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/); changed: topology repaired: 259 welded; retopologized as quads in rings round the body, with seven edge loops within 6 cm of the knee; refitted to the Axcenity realistic body (with its boxer briefs): shortened and tapered to the ankle, the hem at 8.5 cm with a 5 cm cuff gathered round it, the drop crotch raised to the body's; the waistband raised over the underwear's band and closed round the waist (8 mm over the body and underwear), turned inside with 3 mm thickness, the cuffs turned likewise; back patch pockets rebuilt as closed pockets 2.1 mm thick at the download's place; a drawcord added (two cords out of metal eyelets, with aglets); new texture coordinates and the download's maps baked onto them; colour taken out of the albedo for tints; the roughness map rebuilt as occlusion-roughness-metal; simpler copies made by decimation (levels of detail); fitted, rigged and given the body's shapes by the Axcenity engine's fit; materials rebuilt for the Axcenity engine, by Axcenity Engine contributors",
+  "items": [
+    "axcenity/realistic-fleece-joggers"
+  ],
+  "evidence": "The asset's page (blendkit.com/asset-gallery-detail/e46f029b-7877-41fd-a870-60b98fc2a259, retrieved 2026-11-18, saved as retrieved: SHA-256 be9c0222e32926087fe8c5dcbd5c09b0366a48cab44fb48c7b41ab68518720a6) names the asset 'Grey Sweat Pants', the author 'Introspective Mnisi' and the licence 'Creative commons zero', and describes it as 'Low poly, retopologized and game-ready sweat pants for that easy going look.' The public API record (blenderkit.com/api/v1/assets/e46f029b-7877-41fd-a870-60b98fc2a259/, saved as retrieved: SHA-256 309b20cbe252885ba8b33e3fa5829fbd83cdbc45364dfc7b489ea1a70474ddc7) gives \"license\": \"cc_zero\", \"isFree\": true, verificationStatus \"validated\", created 2026-09-07. BlenderKit's licensing FAQ (blendkit.com/docs/licenses/licensing-faq/, saved: SHA-256 c7db5b389d7e46709d6af79d8be9588a543a268099c0af56dd73c21ba4c231ff) says the CC0 licence 'technically allows you to do anything with the assets'. Derivation: the glTF's mesh is named 'male_casualsuit06.001'. MakeHuman's system asset male_casualsuit06 (makehuman_system_assets_cc0.zip, its .mhclo SHA-256 9cebda22a0fa57fc556a1a77723f59b176724dc7e987c01214283677444ddcc5) says in its header: 'This asset was explicitly released as CC0 in september 2020', its copyright holders at the release Data Collection AB and two MakeHuman developers; MakeHuman's LICENSE.md (github.com/makehumancommunity/makehuman) says 'These assets have been released under CC0 1.0 Universal', lists 'Clothes (any MHCLO-based asset)' and points to LICENSE.ASSETS.md, the CC0 1.0 legal code. Compared at MakeHuman's scale (decimetres to metres), the pants lie a median 17 to 20 mm from the suit's surface: the same garment, retopologized, lengthened and loosened. So both the upload and what it was made from are CC0. Authorship of the upload: the uploader is a new BlendKit author (the asset was created 2026-09-07) and the page says nothing of MakeHuman; that the uploader made it could not be confirmed. BlenderKit's position on CC0 models says authors may later ask to exclude assets from redistribution; the page as retrieved is kept beside the record (Pants_FleeceJoggers.source-page.txt)."
+}

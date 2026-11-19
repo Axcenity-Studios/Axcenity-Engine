@@ -12,6 +12,7 @@ The steps, in order (each also runs alone: `python -I <step>.py --help`):
 | record | `provenance.py` | `provenance.json` (licence checked, files hashed) |
 | load | `load.py` | `loaded.npz`, `textures/` |
 | topology | `topology.py` | `topology.npz` (report, fixes, retopology help) |
+| refine | `refine.py` | `refined.npz`, `textures/` (only when the spec names a recipe) |
 | conform | `conform.py` | `conformed.npz` (placed, posed to the rest pose) |
 | weights | `skinning.py` | `weighted.npz` |
 | levels | `levels.py` | `lod0.npz`, `lod1.npz`, ... |
@@ -32,7 +33,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-STEPS = ["record", "load", "topology", "conform", "weights", "levels", "checks", "export"]
+STEPS = ["record", "load", "topology", "refine", "conform", "weights", "levels", "checks", "export"]
 
 
 def run(name, spec, args):
@@ -48,9 +49,14 @@ def run(name, spec, args):
     if name == "topology":
         import topology
         return topology.step(spec, args.work)
+    if name == "refine":
+        if not spec.get("refine"):
+            return {"skipped": "the spec names no refinement recipe"}
+        import refine
+        return refine.step(spec, args.work)
     if name == "conform":
         import conform
-        return conform.step(spec, args.work)
+        return conform.step(spec, args.work, source=conform.source_of(spec))
     if name == "weights":
         import skinning
         return skinning.step(spec, args.work)

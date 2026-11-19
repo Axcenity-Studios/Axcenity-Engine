@@ -1,0 +1,92 @@
+{
+ "download": {
+  "split_m": 0.662,
+  "pockets": [
+   155,
+   155
+  ],
+  "panel_triangles": 5613
+ },
+ "made": {
+  "faces": 2664,
+  "quads": 2616,
+  "quad_share": 0.982,
+  "triangles": 5280,
+  "pelvis_columns": 32,
+  "leg_columns": 24,
+  "rings": {
+   "pelvis": 15,
+   "leg": 31
+  },
+  "knee_loops_within_6_cm": 7,
+  "knee_loop_spacing_mm": 15.0,
+  "girths_left_leg_and_pelvis": {
+   "0.620": {
+    "cloth_mm": 581,
+    "body_hull_mm": 477
+   },
+   "0.500": {
+    "cloth_mm": 464,
+    "body_hull_mm": 365
+   },
+   "0.155": {
+    "cloth_mm": 299,
+    "body_hull_mm": 219
+   },
+   "0.135": {
+    "cloth_mm": 247,
+    "body_hull_mm": 216
+   },
+   "0.085": {
+    "cloth_mm": 296,
+    "body_hull_mm": 265
+   },
+   "1.035": {
+    "cloth_mm": 892,
+    "body_hull_mm": 848
+   },
+   "0.995": {
+    "cloth_mm": 922,
+    "body_hull_mm": 878
+   }
+  },
+  "ease_mm": {
+   "0.085": 5.5,
+   "0.135": 5.5,
+   "0.150": 12.0,
+   "0.165": 16.0,
+   "0.200": 17.0,
+   "0.350": 15.0,
+   "0.500": 16.0,
+   "0.650": 18.0,
+   "0.740": 18.0,
+   "0.800": 17.0,
+   "0.860": 15.0,
+   "0.920": 13.0,
+   "0.975": 9.0,
+   "0.995": 8.0,
+   "1.035": 8.0
+  },
+  "hem_m": 0.085,
+  "cuff_top_m": 0.135,
+  "waist_top_m": 1.035,
+  "crotch_line_lowest_m": 0.7493
+ },
+ "pieces_turned_outward": 0,
+ "bake": {
+  "texels": 2992016,
+  "atlas_used": 0.7133,
+  "rays_missed": 2733,
+  "source_albedo_mean": 0.6239,
+  "roughness_mean": 0.71,
+  "heather_grey_tint": "#c7c7c7"
+ },
+ "changes": [
+  "retopologized as quads in rings round the body, with seven edge loops within 6 cm of the knee",
+  "refitted to the Axcenity realistic body (with its boxer briefs): shortened and tapered to the ankle, the hem at 8.5 cm with a 5 cm cuff gathered round it, the drop crotch raised to the body's",
+  "the waistband raised over the underwear's band and closed round the waist (8 mm over the body and underwear), turned inside with 3 mm thickness, the cuffs turned likewise",
+  "back patch pockets rebuilt as closed pockets 2.1 mm thick at the download's place",
+  "a drawcord added (two cords out of metal eyelets, with aglets)",
+  "new texture coordinates and the download's maps baked onto them; colour taken out of the albedo for tints; the roughness map rebuilt as occlusion-roughness-metal"
+ ]
+}

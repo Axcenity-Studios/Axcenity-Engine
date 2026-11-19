@@ -1,0 +1,81 @@
+{
+ "folder": "realistic/clothing/fleece-joggers",
+ "levels": {
+  "Pants_FleeceJoggers": {
+   "triangles": 5280,
+   "texture_coordinates": false,
+   "skinning": {
+    "vertices": 3207,
+    "most_influences": 4,
+    "over_four": 0,
+    "not_normalized": 0,
+    "unweighted": 0,
+    "far_from_their_bone": 2350
+   },
+   "limits": {
+    "four_influences_at_most": true,
+    "weights_normalized": true,
+    "no_weight_past_the_next_joint": false
+   }
+  },
+  "Pants_FleeceJoggers_LOD1": {
+   "triangles": 2640,
+   "texture_coordinates": false,
+   "skinning": {
+    "vertices": 1734,
+    "most_influences": 4,
+    "over_four": 0,
+    "not_normalized": 0,
+    "unweighted": 0,
+    "far_from_their_bone": 1374
+   },
+   "limits": {
+    "four_influences_at_most": true,
+    "weights_normalized": true,
+    "no_weight_past_the_next_joint": false
+   }
+  },
+  "Pants_FleeceJoggers_LOD2": {
+   "triangles": 1319,
+   "texture_coordinates": false,
+   "skinning": {
+    "vertices": 945,
+    "most_influences": 4,
+    "over_four": 0,
+    "not_normalized": 0,
+    "unweighted": 0,
+    "far_from_their_bone": 795
+   },
+   "limits": {
+    "four_influences_at_most": true,
+    "weights_normalized": true,
+    "no_weight_past_the_next_joint": false
+   }
+  }
+ },
+ "rigid": null,
+ "import": [
+  [
+   "imported `build/intake-lod0` as build/intake-lod0/PantsFleeceJoggersLod0.item.json in 9.5 s",
+   "slot bottom, layer Some(1), hides []",
+   "alignment Alignment { scale: 1.0, offset: Vec3(0.0, 0.0, 0.0), units: 1.0, spread_before: 0.0, spread_after: 0.0 }",
+   "coverage [(\"head\", 0.0), (\"neck\", 0.0), (\"torso\", 0.0), (\"waist\", 0.4765625), (\"hips\", 1.0), (\"upper_arms_top\", 0.0), (\"upper_arms_low\", 0.0), (\"forearms\", 0.0), (\"hands\", 0.0), (\"thighs_top\", 1.0), (\"thighs_low\", 1.0), (\"shins_top\", 1.0), (\"shins_low\", 0.9434629), (\"feet\", 0.0070093456), (\"upper_arms_mid\", 0.0)]"
+  ],
+  [
+   "imported `build/intake-lod1` as build/intake-lod1/PantsFleeceJoggersLod1.item.json in 5.9 s",
+   "slot bottom, layer Some(1), hides []",
+   "alignment Alignment { scale: 1.0, offset: Vec3(0.0, 0.0, 0.0), units: 1.0, spread_before: 0.0, spread_after: 0.0 }",
+   "coverage [(\"head\", 0.0), (\"neck\", 0.0), (\"torso\", 0.0), (\"waist\", 0.453125), (\"hips\", 1.0), (\"upper_arms_top\", 0.0), (\"upper_arms_low\", 0.0), (\"forearms\", 0.0), (\"hands\", 0.0), (\"thighs_top\", 1.0), (\"thighs_low\", 1.0), (\"shins_top\", 1.0), (\"shins_low\", 0.93374556), (\"feet\", 0.006775701), (\"upper_arms_mid\", 0.0)]"
+  ],
+  [
+   "imported `build/intake-lod2` as build/intake-lod2/PantsFleeceJoggersLod2.item.json in 3.1 s",
+   "slot bottom, layer Some(1), hides []",
+   "alignment Alignment { scale: 1.0, offset: Vec3(0.0, 0.0, 0.0), units: 1.0, spread_before: 0.0, spread_after: 0.0 }",
+   "coverage [(\"head\", 0.0), (\"neck\", 0.0), (\"torso\", 0.0), (\"waist\", 0.45703125), (\"hips\", 1.0), (\"upper_arms_top\", 0.0), (\"upper_arms_low\", 0.0), (\"forearms\", 0.0), (\"hands\", 0.0), (\"thighs_top\", 1.0), (\"thighs_low\", 1.0), (\"shins_top\", 1.0), (\"shins_low\", 0.9275618), (\"feet\", 0.0070093456), (\"upper_arms_mid\", 0.0)]"
+  ]
+ ],
+ "catalogue": {
+  "bases": 2,
+  "items": 20
+ }
+}

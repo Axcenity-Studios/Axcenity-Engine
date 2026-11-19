@@ -1,0 +1,158 @@
+{
+ "lod0": {
+  "geometry": {
+   "vertices": 2691,
+   "faces": 2664,
+   "quads": 2616,
+   "triangle_faces": 48,
+   "ngons": 0,
+   "quad_share": 0.982,
+   "triangles": 5280,
+   "degenerate": 0,
+   "non_manifold_edges": 0,
+   "boundary_edges": 80,
+   "flipped_edges": 0,
+   "loose_vertices": 0
+  },
+  "uvs": {
+   "map_size": 2048,
+   "overlap_share": 0.0,
+   "covered_share": 0.7133,
+   "stretched_share": 0.0401,
+   "stretch_p95": 0.0932,
+   "texel_density_px_per_cm": {
+    "median": 16.46,
+    "p5": 15.99
+   },
+   "degenerate_uv_triangles": 224
+  },
+  "skinning": {
+   "vertices": 2691,
+   "most_influences": 4,
+   "over_four": 0,
+   "not_normalized": 0,
+   "unweighted": 0,
+   "far_from_their_bone": 1838
+  },
+  "clearance_m": {
+   "inside_body": 0,
+   "least": 0.0007,
+   "median": 0.0153
+  },
+  "limits": {
+   "no_degenerate_faces": true,
+   "no_non_manifold_edges": true,
+   "normals_consistent": true,
+   "no_uv_overlap": true,
+   "stretch_under_10_percent_on_95_percent": true,
+   "texel_density": true,
+   "four_influences_at_most": true,
+   "weights_normalized": true,
+   "no_weight_past_the_next_joint": false
+  }
+ },
+ "lod1": {
+  "geometry": {
+   "vertices": 1361,
+   "faces": 1855,
+   "quads": 785,
+   "triangle_faces": 1070,
+   "ngons": 0,
+   "quad_share": 0.4232,
+   "triangles": 2640,
+   "degenerate": 0,
+   "non_manifold_edges": 0,
+   "boundary_edges": 60,
+   "flipped_edges": 0,
+   "loose_vertices": 0
+  },
+  "uvs": {
+   "map_size": 2048,
+   "overlap_share": 0.0,
+   "covered_share": 0.7021,
+   "stretched_share": 0.31,
+   "stretch_p95": 0.4654,
+   "texel_density_px_per_cm": {
+    "median": 16.43,
+    "p5": 14.95
+   },
+   "degenerate_uv_triangles": 102
+  },
+  "skinning": {
+   "vertices": 1361,
+   "most_influences": 4,
+   "over_four": 0,
+   "not_normalized": 0,
+   "unweighted": 0,
+   "far_from_their_bone": 958
+  },
+  "clearance_m": {
+   "inside_body": 0,
+   "least": 0.0006,
+   "median": 0.0153
+  },
+  "limits": {
+   "no_degenerate_faces": true,
+   "no_non_manifold_edges": true,
+   "normals_consistent": true,
+   "no_uv_overlap": true,
+   "stretch_under_10_percent_on_95_percent": false,
+   "texel_density": true,
+   "four_influences_at_most": true,
+   "weights_normalized": true,
+   "no_weight_past_the_next_joint": false
+  }
+ },
+ "lod2": {
+  "geometry": {
+   "vertices": 691,
+   "faces": 1093,
+   "quads": 226,
+   "triangle_faces": 867,
+   "ngons": 0,
+   "quad_share": 0.2068,
+   "triangles": 1319,
+   "degenerate": 0,
+   "non_manifold_edges": 0,
+   "boundary_edges": 41,
+   "flipped_edges": 0,
+   "loose_vertices": 0
+  },
+  "uvs": {
+   "map_size": 2048,
+   "overlap_share": 0.0,
+   "covered_share": 0.6866,
+   "stretched_share": 0.5218,
+   "stretch_p95": 0.7501,
+   "texel_density_px_per_cm": {
+    "median": 16.35,
+    "p5": 13.31
+   },
+   "degenerate_uv_triangles": 50
+  },
+  "skinning": {
+   "vertices": 691,
+   "most_influences": 4,
+   "over_four": 0,
+   "not_normalized": 0,
+   "unweighted": 0,
+   "far_from_their_bone": 471
+  },
+  "clearance_m": {
+   "inside_body": 0,
+   "least": 0.0008,
+   "median": 0.0154
+  },
+  "limits": {
+   "no_degenerate_faces": true,
+   "no_non_manifold_edges": true,
+   "normals_consistent": true,
+   "no_uv_overlap": true,
+   "stretch_under_10_percent_on_95_percent": false,
+   "texel_density": true,
+   "four_influences_at_most": true,
+   "weights_normalized": true,
+   "no_weight_past_the_next_joint": false
+  }
+ }
+}

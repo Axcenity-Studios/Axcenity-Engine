@@ -1,0 +1,174 @@
+Evidence for the provenance record Pants_FleeceJoggers.provenance.json (the first licensed joggers, wave 5).
+
+The asset's page as retrieved
+- Address: https://www.blendkit.com/asset-gallery-detail/e46f029b-7877-41fd-a870-60b98fc2a259/
+- Retrieved: 2026-11-18
+- The page's HTML as retrieved: 857425 bytes, SHA-256 be9c0222e32926087fe8c5dcbd5c09b0366a48cab44fb48c7b41ab68518720a6 (kept outside the repository; the page is a web application, so its visible text is below)
+- The asset's block of the page's visible text, as retrieved, line by line:
+
+Free
+model
+Grey Sweat Pants
+Get this model
+Low poly, retopologized and game-ready sweat pants for that easy going look.
+show more
+score
+210.0
+quality
+7.0
+complexity
+3.0
+file size
+8.9 MiB
+Polygon count
+3,073
+license
+Creative commons zero
+published
+10 Sep 2026
+tags
+Textures
+clothing
+character
+urban
+Report this asset
+Introspective Mnisi
+Share on Twitter
+Share on Facebook
+Share on Reddit
+Share link
+
+The licence
+- The page states the licence as "Creative commons zero" (above).
+- BlendKit's licensing FAQ (https://www.blendkit.com/docs/licenses/licensing-faq/, retrieved 2026-11-18, 92513 bytes, SHA-256 c7db5b389d7e46709d6af79d8be9588a543a268099c0af56dd73c21ba4c231ff) says the CC0 licence "technically allows you to do anything with the assets."
+- BlendKit's position on CC0 models says authors may later ask to exclude assets from redistribution, which is why the page as retrieved is kept here.
+
+The public API record of the asset, as retrieved
+- Address: https://www.blenderkit.com/api/v1/assets/e46f029b-7877-41fd-a870-60b98fc2a259/
+- Retrieved: 2026-11-18, 12679 bytes, SHA-256 309b20cbe252885ba8b33e3fa5829fbd83cdbc45364dfc7b489ea1a70474ddc7
+- Its fields below, except the uploader's profile (picture, links, self-description), the thumbnails' addresses and the repeated parameter list, which are left out of the repository; the file's hash above is of the whole record.
+
+{
+ "pk": 255338,
+ "url": "https://www.blenderkit.com/api/v1/assets/e46f029b-7877-41fd-a870-60b98fc2a259/",
+ "id": "e46f029b-7877-41fd-a870-60b98fc2a259",
+ "assetBaseId": "18a63327-b118-40d6-8fd2-2a0f8e7b8f40",
+ "versionNumber": 1,
+ "author": {
+  "id": 905320,
+  "fullName": "Introspective Mnisi"
+ },
+ "name": "Grey sweat pants",
+ "displayName": "Grey sweat pants",
+ "description": "Low poly, retopologized and game-ready sweat pants for that easy going look.",
+ "descriptionHtml": "<p>Low poly, retopologized and game-ready sweat pants for that easy going look.</p>",
+ "assetType": "model",
+ "category": "man-clothing",
+ "isFree": true,
+ "isForSale": false,
+ "basePrice": null,
+ "tags": [
+  "Textures",
+  "clothing",
+  "character",
+  "urban"
+ ],
+ "license": "cc_zero",
+ "sourceAppName": "blender",
+ "sourceAppVersion": "5.1.0",
+ "addonVersion": "3.18.1",
+ "created": "2026-09-07T10:49:26.148646+02:00",
+ "lastUserInteraction": "2026-09-10T18:39:46.208112+02:00",
+ "verificationStatus": "validated",
+ "isPrivate": false,
+ "files": [
+  {
+   "fileType": "blend",
+   "fileUploadSize": 9305971,
+   "created": "2026-10-14T17:24:26.201930+02:00"
+  },
+  {
+   "fileType": "gltf",
+   "fileUploadSize": 451156,
+   "created": "2026-10-14T17:24:42.052779+02:00"
+  },
+  {
+   "fileType": "gltf_godot",
+   "fileUploadSize": 596692,
+   "created": "2026-10-14T17:24:43.680753+02:00"
+  },
+  {
+   "fileType": "resolution_0_5K",
+   "fileUploadSize": 593287,
+   "created": "2026-10-14T17:24:37.033423+02:00"
+  },
+  {
+   "fileType": "resolution_1K",
+   "fileUploadSize": 1276430,
+   "created": "2026-10-14T17:24:36.134042+02:00"
+  },
+  {
+   "fileType": "resolution_2K",
+   "fileUploadSize": 4002920,
+   "created": "2026-10-14T17:24:35.299358+02:00"
+  },
+  {
+   "fileType": "thumbnail",
+   "fileUploadSize": 1240493,
+   "created": "2026-09-07T10:49:32.510420+02:00"
+  }
+ ],
+ "filesSize": 17466949,
+ "showMarketingLabels": true,
+ "webpGeneratedTimestamp": 1788770984,
+ "score": 210.0,
+ "ratingsMedian": {
+  "bookmarks": 1.0,
+  "workingHours": 3.0,
+  "quality": 7.0,
+  "virtualPrice": null
+ },
+ "ratingsAverage": {
+  "bookmarks": 0.95,
+  "workingHours": 3.0,
+  "quality": 7.0,
+  "virtualPrice": null
+ },
+ "ratingsCount": {
+  "bookmarks": 20,
+  "workingHours": 1,
+  "quality": 1,
+  "virtualPrice": 0
+ },
+ "ratingsSum": {
+  "bookmarks": 19.0,
+  "workingHours": 3.0,
+  "quality": 7.0,
+  "virtualPrice": null,
+  "score": 210.0
+ },
+ "pageBlocks": null,
+ "access": "free",
+ "accessLabel": "Free",
+ "videoLink": "",
+ "lastGltfUpload": "2026-10-14T15:24:42.052779Z",
+ "lastGltfGodotUpload": "2026-10-14T15:24:43.680753Z",
+ "lastPhotoThumbnailUpload": null,
+ "lastAnimatedThumbnailUpload": null,
+ "lastPrxcUpload": null,
+ "lastZipFileUpload": null,
+ "lastResolutionUpload": "2026-10-14T15:24:37.033423Z",
+ "lastWireThumbnailUpload": null,
+ "lastBlendUpload": "2026-10-14T15:24:26.201930Z",
+ "lastVideoUpload": null,
+ "lastThumbnailUpload": "2026-09-07T08:49:32.510420Z"
+}
+
+What the download was made from
+- The glTF's mesh is named "male_casualsuit06.001".
+- MakeHuman's system asset male_casualsuit06 (makehuman_system_assets_cc0.zip, its male_casualsuit06.mhclo SHA-256 9cebda22a0fa57fc556a1a77723f59b176724dc7e987c01214283677444ddcc5, male_casualsuit06.obj SHA-256 9a86386435d7557a520320b8db4cd0ffe4755040044d1925c2b5730b864a603e) begins: "This asset was explicitly released as CC0 in september 2020. The license text for CC0 can be found in the root of this repository. The copyright holders at the point of the release to CC0 were: Copyright (C) 2020 Data Collection AB, https://www.datacollection.se; [and two MakeHuman developers, named in the file]."
+- MakeHuman's LICENSE.md (https://github.com/makehumancommunity/makehuman/blob/master/LICENSE.md, read 2026-11-18): "These assets have been released under CC0 1.0 Universal", listing "Clothes (any MHCLO-based asset)", the legal code in LICENSE.ASSETS.md (the CC0 1.0 Universal text).
+- Compared at MakeHuman's scale (decimetres), the download's pants lie a median 17 to 20 mm (90th percentile 35 to 38 mm) from the suit's surface, the bottoms aligned: the same garment, retopologized (6,143 triangles against the suit's 3,584 quads for shirt and trousers), lengthened and loosened.
+
+Who made the upload
+- The uploader is a new BlendKit author (the asset was created 2026-09-07); the page says nothing of MakeHuman. That the uploader made the pants could not be confirmed. Both the upload (CC0, stated on its page) and what it was made from (CC0, stated in MakeHuman's files) are CC0, so the item is cleared either way.

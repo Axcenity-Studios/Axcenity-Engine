@@ -1565,6 +1565,8 @@ mod face_preset_tests;
 #[cfg(test)]
 mod fit_gate_tests;
 #[cfg(test)]
+mod fleece_joggers_tests;
+#[cfg(test)]
 mod garment_checks;
 #[cfg(test)]
 mod hair_tests;
