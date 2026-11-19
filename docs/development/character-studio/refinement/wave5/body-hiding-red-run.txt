@@ -41,3 +41,16 @@ The three that pass test format and geometry helpers the stubs leave alone (the 
     realistic-masculine-cast-average: 0 hidden, at least 1
     thread 'wardrobe_tests::the_wardrobe_hides_the_skin_and_underwear_it_encloses' (6004) panicked at crates\player\src\wardrobe_tests.rs:73:9:
     realistic-masculine-cast-average: 0 hidden, at least 1
+
+Review fixes 1 (2026-11-19): the capture's see-through items (AXCENITY_CAPTURE_UNDRAWN), with `undraw` stubbed to change nothing:
+
+cargo nextest run -p axcenity-player -E 'test(undrawn_items)' --no-fail-fast
+        FAIL [   1.104s] (1/1) axcenity-player::bin/axcenity-player character_capture::undrawn_items_are_see_through_and_keep_hiding
+    thread 'character_capture::undrawn_items_are_see_through_and_keep_hiding' panicked at crates\player\src\character_capture.rs:1719:5:
+    assertion `left == right` failed: (changed 0, expected 2; every part's Transparency still 0)
+     Summary [   1.105s] 1 test run: 0 passed, 1 failed, 322 skipped
+
+The new synthetic test `fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views` pins the gate's existing limit (no behaviour change), so it passes as written; it was seen failing against a mutation instead: with GRAZE set to FINE_GRAZE (0.05),
+        FAIL [   0.036s] (1/1) axcenity-avatar fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views
+     Summary [   0.037s] 1 test run: 0 passed, 1 failed, 218 skipped
+(the gate's views then find the ring; the constant was restored with git checkout).

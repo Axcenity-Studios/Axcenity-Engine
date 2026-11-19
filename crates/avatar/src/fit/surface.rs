@@ -180,7 +180,9 @@ impl Surface {
         let reach = reach.min(exit);
         // The triangles already tried, in a set kept per thread (casting is
         // done millions of times when hiding under clothing is worked out:
-        // `enclosure`), hashed cheaply.
+        // `enclosure`), hashed cheaply. The set is borrowed for the whole
+        // walk, so `keep` must not cast on this thread itself (a nested
+        // cast would panic on the second borrow); no caller does.
         thread_local! {
             static SEEN: std::cell::RefCell<std::collections::HashSet<u32, Cheap>> =
                 std::cell::RefCell::new(std::collections::HashSet::default());

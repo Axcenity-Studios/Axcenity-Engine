@@ -76,6 +76,18 @@ fn heights(placed: &Placed, triangles: &[[u32; 3]]) -> Vec<f32> {
 
 /// The proof: no hidden place shows in `case` from any view direction.
 fn holes_in(case: &HideCase, under: &[[u32; 3]], garment: &[[u32; 3]], hidden: &[bool]) -> usize {
+    holes_from(case, under, garment, hidden, Views::new).len()
+}
+
+/// The hidden places of `case` that show from the views `views` makes of
+/// the garment's openings.
+fn holes_from(
+    case: &HideCase,
+    under: &[[u32; 3]],
+    garment: &[[u32; 3]],
+    hidden: &[bool],
+    views: fn(&[&Openings]) -> Views,
+) -> Vec<SeenHole> {
     let cloth = garment_surface(&case.garment, garment);
     let skin = drawn_surface(&case.under[0], under, hidden);
     let openings = Openings::new(&case.garment.positions, garment);
@@ -91,9 +103,8 @@ fn holes_in(case: &HideCase, under: &[[u32; 3]], garment: &[[u32; 3]], hidden: &
         &case.under[0].normals,
         &[&skin, &cloth],
         &[&cloth],
-        &Views::new(&[&openings]),
+        &views(&[&openings]),
     )
-    .len()
 }
 
 /// A tube of cloth 1.5 cm off the skin, 40 cm long: the skin it encloses
@@ -213,6 +224,43 @@ fn a_gap_that_opens_in_a_pose_keeps_the_skin_round_it_drawn() {
     let all: Vec<bool> = z.iter().map(|z| (-0.12..0.25).contains(z)).collect();
     assert!(holes_in(&cases[1], &under, &garment, &all) > 0);
     assert_eq!(holes_in(&cases[0], &under, &garment, &all), 0);
+}
+
+/// The gate's limit (review fix): a ring of hidden skin 10 cm up a
+/// sleeve 1.5 cm off it can be seen only along the sleeve, through its
+/// end, at most about 8.5 degrees off the axis: 81.5 degrees or more off
+/// the skin's normal. The gate's views ([`Views::new`]) don't count a
+/// place seen past 78 degrees ([`GRAZE`]), so they find nothing; the
+/// trim's ([`Views::fine`], to 87 degrees, [`FINE_GRAZE`]) find it. Drawn,
+/// such a place is a sliver at a close camera (the licensed tee's first
+/// masks showed one inside the back hem, 4 x 9 mm), which is why a
+/// shipped item's masks are trimmed, or checked, with the fine views.
+#[test]
+fn a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views() {
+    let (skin, under) = arm();
+    let (cloth, garment) = tube(0.115, -0.2, 0.2, 40, false);
+    let case = HideCase {
+        under: vec![skin.clone()],
+        garment: cloth,
+        rest: true,
+    };
+    let ring: Vec<bool> = heights(&skin, &under)
+        .iter()
+        .map(|z| (0.09..0.11).contains(z))
+        .collect();
+    assert!(ring.iter().any(|h| *h));
+    assert!(holes_from(&case, &under, &garment, &ring, Views::new).is_empty());
+    let fine = holes_from(&case, &under, &garment, &ring, Views::fine);
+    assert!(!fine.is_empty());
+    for hole in &fine {
+        let normal = Vec3::new(hole.at.x, hole.at.y, 0.0).normalize();
+        let cosine = normal.dot(hole.toward);
+        assert!(
+            (FINE_GRAZE..GRAZE).contains(&cosine),
+            "seen at {:.1} degrees off its normal",
+            cosine.acos().to_degrees()
+        );
+    }
 }
 
 /// Cloth whose triangles face the skin (a fold flipped in a pose) isn't

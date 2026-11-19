@@ -91,10 +91,11 @@ fn the_wardrobe_hides_the_skin_and_underwear_it_encloses() {
 
 /// How many body triangles the crew tee and joggers hide at least
 /// (masculine, feminine average), and of the underwear: what the masks hid
-/// when made (wave 5, `refinement/wave5/body-hiding.md`). They change only
+/// when made and trimmed with the fine views (wave 5, review fixes 1,
+/// `refinement/wave5/body-hiding.md`). They change only
 /// when the masks are made again.
-const HIDES_SKIN: (usize, usize) = (1142, 1142);
-const HIDES_UNDER: (usize, usize) = (149, 132);
+const HIDES_SKIN: (usize, usize) = (709, 709);
+const HIDES_UNDER: (usize, usize) = (149, 104);
 
 /// Runs the gate for `stance` on every realistic cast and body benchmark
 /// dressed in the three, on the shipped library.

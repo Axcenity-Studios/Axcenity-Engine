@@ -12,8 +12,16 @@
 //! hand after the masks are made:
 //!
 //! ```text
-//! [AXCENITY_TRIM_VIEWS=gate] [AXCENITY_TRIM_ONLY=<body>] AXCENITY_TRIM=tee-crew|wardrobe|test-tee cargo test -p axcenity-player --release -- --ignored trim_hide_maps --nocapture
+//! [AXCENITY_TRIM_VIEWS=gate] [AXCENITY_TRIM_ONLY=<body>] [AXCENITY_TRIM_POSES=sample] AXCENITY_TRIM=tee-crew|wardrobe|test-tee cargo test -p axcenity-player --release -- --ignored trim_hide_maps --nocapture
 //! ```
+//!
+//! The gate's views don't count a place seen more than 78 degrees off its
+//! normal (`avatar::fit::GRAZE`), and a close camera can still see such a
+//! place as a sliver: an item trimmed with `AXCENITY_TRIM_VIEWS=gate` is
+//! checked again with the fine views (the default), at least with
+//! `AXCENITY_TRIM_POSES=sample` (rest, the arms raised and every third
+//! frame of the walk, as the gate's walk thirds) on the cast
+//! (`AXCENITY_TRIM_ONLY=-cast-`). That check trims what it finds too.
 
 use std::collections::{HashMap, HashSet};
 
@@ -56,13 +64,15 @@ fn triangles_of(model: &axcenity_assets::Model) -> Vec<[u32; 3]> {
 }
 
 /// Every hidden place that shows on `dressed` in `stance`, played on to
-/// each frame of `frames` for a clip.
+/// each frame of `frames` for a clip and looked at every `step`th frame
+/// from its start.
 fn seen_in(
     assets: &Assets,
     dressed: &Description,
     bare: &Description,
     stance: Stance,
     frames: std::ops::Range<u32>,
+    step: u32,
     out: &mut Vec<FoundHole>,
 ) {
     let (rest_world, rest_animators) =
@@ -74,8 +84,10 @@ fn seen_in(
     let hidden = hidden_triangles(&bare_body, &dressed_body);
     let (mut world, mut animators) = stage_world(assets, dressed, stance, &[]).expect("the pose");
     for frame in frames.clone() {
-        let (body, garments, _) = worn_in(&world, assets, &animators);
-        out.extend(holes_found(&body, &hidden, &garments, fine_views()));
+        if (frame - frames.start).is_multiple_of(step) {
+            let (body, garments, _) = worn_in(&world, assets, &animators);
+            out.extend(holes_found(&body, &hidden, &garments, fine_views()));
+        }
         if frame + 1 < frames.end {
             animators.update(&mut world, assets, 1.0 / 60.0);
         }
@@ -87,6 +99,13 @@ fn seen_in(
 /// so many openings that the fine views take hours a body).
 fn fine_views() -> bool {
     std::env::var("AXCENITY_TRIM_VIEWS").as_deref() != Ok("gate")
+}
+
+/// Whether to play only a sample of the poses (`AXCENITY_TRIM_POSES=sample`:
+/// rest, the arms raised and every third frame of the walk) instead of
+/// everything the gate and the motion check play.
+fn sampled() -> bool {
+    std::env::var("AXCENITY_TRIM_POSES").as_deref() == Ok("sample")
 }
 
 #[test]
@@ -118,31 +137,44 @@ fn trim_hide_maps_to_the_runtime() {
             }
             let bare = undressed(&description);
             let before = seen.len();
-            let held = [
-                Stance::Rest,
-                Stance::Idle,
-                Stance::Held(HeldPose::TPose),
-                Stance::Held(HeldPose::ArmsRaised),
-                Stance::Held(HeldPose::ElbowsBent),
-                Stance::Held(HeldPose::KneesBent),
-                Stance::Held(HeldPose::ArmsForward),
-            ];
+            let held = if sampled() {
+                vec![Stance::Rest, Stance::Held(HeldPose::ArmsRaised)]
+            } else {
+                vec![
+                    Stance::Rest,
+                    Stance::Idle,
+                    Stance::Held(HeldPose::TPose),
+                    Stance::Held(HeldPose::ArmsRaised),
+                    Stance::Held(HeldPose::ElbowsBent),
+                    Stance::Held(HeldPose::KneesBent),
+                    Stance::Held(HeldPose::ArmsForward),
+                ]
+            };
             for stance in held {
-                seen_in(&stage.assets, &dressed, &bare, stance, 0..1, &mut seen);
+                seen_in(&stage.assets, &dressed, &bare, stance, 0..1, 1, &mut seen);
             }
             // The walk's whole stride on every body; the idle and run as
-            // the motion check plays them, on the cast.
-            let mut clips = vec![("Walk", 2..45)];
-            if description.name.contains("-cast-") {
-                clips.push(("Run", 2..35));
-                clips.push(("Idle", 2..62));
+            // the motion check plays them, on the cast. Sampled: the
+            // walk's frames 2, 5, 8, ... only.
+            let mut clips = vec![("Walk", 2..45, if sampled() { 3 } else { 1 })];
+            if description.name.contains("-cast-") && !sampled() {
+                clips.push(("Run", 2..35, 1));
+                clips.push(("Idle", 2..62, 1));
             }
-            for (clip, frames) in clips {
+            for (clip, frames, step) in clips {
                 let stance = Stance::Clip {
                     name: clip,
                     frames: frames.start,
                 };
-                seen_in(&stage.assets, &dressed, &bare, stance, frames, &mut seen);
+                seen_in(
+                    &stage.assets,
+                    &dressed,
+                    &bare,
+                    stance,
+                    frames,
+                    step,
+                    &mut seen,
+                );
             }
             println!(
                 "{name} {}: {} places seen ({:.0} s)",

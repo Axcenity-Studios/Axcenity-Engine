@@ -210,7 +210,7 @@ fn the_licensed_tee_hides_the_skin_and_underwear_it_encloses() {
 /// 5, `refinement/wave5/body-hiding.md`), less nothing. They change only
 /// when the masks are made again.
 const HIDES_SKIN: (usize, usize) = (25, 25);
-const HIDES_BRA: usize = 74;
+const HIDES_BRA: usize = 72;
 
 /// The body and the tee's part at rest, the tee at its level of detail
 /// `level`.

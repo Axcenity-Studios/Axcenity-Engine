@@ -356,7 +356,9 @@ fn corner_verdict(
 /// way out, its smooth normal too (the garment's outside, seen from
 /// outside). Cloth facing back towards the skin on the way (a lining, the
 /// inner wall of cloth made with thickness, a fold flipped towards the
-/// skin) is passed through: it isn't drawn from outside.
+/// skin) is passed through: from outside it shows the garment's inside
+/// (culled for a single-sided garment, the inside face for a double-sided
+/// one), which encloses nothing.
 pub fn encloses(cloth: &Surface, p: Vec3, n: Vec3, reach: f32) -> bool {
     cloth
         .cast_where(p, n, reach, |t| face_of(cloth, t).dot(n) > 0.0)
@@ -381,8 +383,11 @@ fn face_of(surface: &Surface, triangle: u32) -> Vec3 {
 /// Skin facing away from the viewer would be culled even drawn, so its
 /// place shows nothing new; skin seen at a graze ([`GRAZE`]) is left out
 /// too. Otherwise the place is covered when the way to the viewer meets
-/// a drawn triangle facing the viewer (back faces aren't drawn: a fold
-/// flipped towards the skin is seen through). Where it doesn't, what is
+/// a drawn triangle facing the viewer. A triangle facing away doesn't
+/// cover: a fold flipped towards the skin shows the garment's inside, a
+/// hole by the brief's definition whether its back faces are drawn
+/// (`doubleSided`, the crew tee and the joggers) or culled. Where it
+/// doesn't, what is
 /// seen is what lies behind the place:
 ///
 /// - cloth facing the viewer within [`BEHIND`]: the skin had come out
