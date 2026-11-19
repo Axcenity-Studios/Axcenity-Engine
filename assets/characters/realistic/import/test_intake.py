@@ -391,6 +391,21 @@ class RefineTest(unittest.TestCase):
         out, _ = refine.unwrap(mesh, {"method": "CONFORMAL", "margin": 0.01})
         self.assertLess(checks.uvs(out)["stretched_share"], 0.05)
 
+    def test_the_record_lists_the_unwrap(self):
+        """Wave 5 review: the provenance record lists every change the
+        refine step made, the texture coordinates laid out again too
+        (asset-quality.md section 2: 'what was changed')."""
+        import fit
+        with tempfile.TemporaryDirectory() as work:
+            with open(os.path.join(work, "refined.json"), "w", encoding="utf-8") as f:
+                json.dump({"unwrap": {"method": "ANGLE_BASED", "islands_kept": True}}, f)
+            open(os.path.join(work, "refined.npz"), "wb").close()
+            changes = fit.changes_of({}, work)
+        unwrap = [c for c in changes if "texture coordinates" in c]
+        self.assertEqual(len(unwrap), 1, changes)
+        self.assertIn("angle-based", unwrap[0])
+        self.assertIn("the source's own seams", unwrap[0])
+
 
 class LoadTest(unittest.TestCase):
     def test_a_packed_webp_map_is_saved_as_a_png(self):

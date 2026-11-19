@@ -1,5 +1,5 @@
 {
-  "about": "The first licensed T-shirt (wave 5, Paul's decision 13): BlenderKit's Plain T-shirt (CC0) through the intake, refined by refine_tee.py, onto the realistic body. A draft until the lead's review and Paul's sign-off. The hand-back is docs/development/character-studio/refinement/wave5/tee-licensed.md.",
+  "about": "The first licensed T-shirt (wave 5, Paul's decision 13): BlenderKit's Plain T-shirt (CC0) through the intake, refined by refine.py, onto the realistic body. A draft until the lead's review and Paul's sign-off. The hand-back is docs/development/character-studio/refinement/wave5/tee-licensed.md.",
   "item": {
     "id": "axcenity/realistic-tee-crew",
     "label": "Crew-neck T-shirt (licensed)",

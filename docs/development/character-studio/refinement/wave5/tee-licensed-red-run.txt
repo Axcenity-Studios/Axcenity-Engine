@@ -99,3 +99,12 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 287 filtered out; fi
 ```
 
 (The message reads "comes -8.6 mm from the cloth": the skin was 8.6 mm outside it.)
+
+## Review fixes 1: the provenance record leaves out the unwrap (test_intake.py RefineTest), before changes_of() read refined.json's 'unwrap'
+
+```
+FAIL: test_the_record_lists_the_unwrap (__main__.RefineTest.test_the_record_lists_the_unwrap)
+AssertionError: 0 != 1 : ["fitted, rigged and given the body's shapes by the Axcenity engine's fit", 'materials rebuilt for the Axcenity engine']
+Ran 3 tests in 0.698s
+FAILED (failures=1)
+```

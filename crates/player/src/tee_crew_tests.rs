@@ -3,8 +3,10 @@
 //! `axcenity/realistic-tee-crew`, BlenderKit's Plain T-shirt (CC0) through
 //! the licensed-asset intake, worn over the underwear by every realistic
 //! cast and body benchmark, as a game poses it. It is held to
-//! `docs/development/character-studio/asset-quality.md` §1 to §3 with **no
-//! record**: a defect found here fails it.
+//! `docs/development/character-studio/asset-quality.md` §1 to §3. It is a
+//! draft that fails them, so each case carries a record of what it fails
+//! now (below); `check` fails a case that gets worse or better than its
+//! record, and a production item has none.
 //!
 //! - **Poke-through** (the fit gate's rule, `fit_gate_tests`): no body
 //!   corner more than 1 mm outside the tee where the tee covers it at rest,
@@ -285,6 +287,28 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // - The simpler copies: LOD2's 1,020 triangles cut inside the skin.
 // - The run: the cloth at the front of the armpit jolts 6 mm in one frame
 //   as the arm swings through hanging (feminine slim, frame 10).
+//
+// Seen in the captures and **not counted by any record** (cloth-only
+// defects, or skin the gate's records already hold elsewhere on the same
+// body; review fixes 1, `tee-licensed.md` section 5):
+//
+// - T-pose, every cast body: detached strips about 15 to 20 cm long hang
+//   diagonally from both underarms (mesh separation). They are the sleeve
+//   hems' fold and turn-up triangles under the arm (rest edges 1.2 to
+//   4.8 mm), stretched 3 to 111 times between corners that follow the arm
+//   and corners that stay with the side (167 mm on masculine average,
+//   200 mm on feminine average, from the gate's dumps).
+// - Arms forward, every cast body's side view: the same triangles stick
+//   out as a white spike at the side of the armpit (177 mm on masculine
+//   average, 149 mm on feminine average).
+// - Rest and the walk, every cast body: a dark lip about 4 cm long shows
+//   above the rib at the back of the neck, right of the spine seen from
+//   behind (the character's right), with a light tick at its end; with
+//   the right arm forward in the walk it stands up as a light tab of about
+//   1 cm. Not a clean back.
+// - The walk with the right arm back (Walk@0.367), masculine average,
+//   heavyset and muscular: a skin speck of 7 to 11 mm on the back of the
+//   right sleeve just above its hem.
 
 const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
     Known {

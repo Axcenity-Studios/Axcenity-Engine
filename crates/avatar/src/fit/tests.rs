@@ -760,8 +760,8 @@ fn skin_between_a_coarse_garments_corners_stays_under_its_triangles() {
         }
         assert!(
             worst <= -0.002 + 2e-4,
-            "at {weights:?} the skin comes {:.1} mm from the cloth (the margin is 2 mm)",
-            -worst * 1000.0
+            "at {weights:?} the skin comes {:.1} mm outside the cloth (it must be 2 mm inside)",
+            worst * 1000.0
         );
     }
 }

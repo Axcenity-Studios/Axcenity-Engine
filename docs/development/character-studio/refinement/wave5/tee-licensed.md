@@ -102,7 +102,7 @@ Each row is the intake run again and the tee's whole gate (54 bodies: rest, Idle
 - **The turned hems interact with the gate's hem rule** (E4 to E7).
   - The gate takes two rings of triangles in from an **open** edge as the hem. A turned hem's open edge is inside, at the end of its turn-up, and its rings are 1.5 to 18 mm wide. So the fold, and the panel just above it, count as covering the skin just past the fold.
   - With the hems, rest fails on 7 bodies at 28.2 mm, and the briefs on 11 at 17.9 mm. These are corners 15 mm below the waist hem and below a sleeve's end. Their nearest cloth is the fold's underside, and their way out meets nothing.
-  - In the poses the same misreading adds to the armpit's real failures: the walk goes from 13 to 32 mm.
+  - In the poses the misreading is not the whole story (corrected in review fixes 1). With the fold taken as a hem edge (E6), the arms forward still fail on 54 bodies at 30.5 mm against 7.7 mm without hems (E1), Idle on 51 at 19.9 against 38 at 11.1, and the T-pose on 1 at 24.6. **The turned hems as built also make the cloth itself worse in motion**: the sleeve hems' fold triangles under the arm stretch into the T-pose strips and the arms-forward spike (section 5). Look at the turn-up's inner layer in the poses before choosing a gate rule.
   - **Two gate rules were measured and not committed.** Taking the fold as an edge (E6) passes the tee at rest. It also lowers fourteen records of other items, among them the stylized briefs' visible buttock patch in the walk, which it stops seeing: that is too much. Taking only the fold (E7) leaves the tee 1 body at 4.7 mm at rest. It raises the crew tee's rest count from 51 to 52 bodies, a record I may not raise.
   - The gate is unchanged. The hem-edge cases are recorded as this draft's open defects, with this explanation. A rule for turned hems is the lead's decision; the diff is kept outside the repository and can be handed over.
 - **Routes not tried:**
@@ -149,7 +149,7 @@ The refine tests (`RefineTest`) were written after `refine.py`, not before it.
 
 Lower them as the item improves; a production item has none.
 
-## 5. Visual evidence (`tee-licensed/`, 3.9 MB of JPG)
+## 5. Visual evidence (`tee-licensed/`, 3.3 MB of JPG with the T-pose sheets)
 
 **The sheets.** Engine captures at 2560 × 1440.
 - `tee-<pose>.jpg`: the eight cast bodies (masculine slim, average, heavyset, muscular, then the same feminine), a row each, front, side and back, studio light, cropped to the upper body.
@@ -157,7 +157,7 @@ Lower them as the item improves; a production item has none.
 - `before-after-<pose>.jpg`: the wave-4 crew tee (left three) against the licensed tee (right three) on the average bodies.
 - `crops-<pose>.jpg`: full-size crops of the collar, hem, sleeve hem, armpit (front and side) and back.
 
-The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@0.183`), `walk-right-arm-back` (`Walk@0.367`), `arms-raised`, `arms-forward`.
+The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@0.183`), `walk-right-arm-back` (`Walk@0.367`), `arms-raised`, `arms-forward`, and since review fixes 1 `t-pose` (`tee-t-pose.jpg`, `-hard.jpg`, `before-after-t-pose.jpg`, `crops-t-pose.jpg`, cropped wider for the arms; its crops take the underarm from the front and the back).
 
 **What I saw** (looked at whole and zoomed; positions are in the sheet named):
 
@@ -174,7 +174,12 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
   - **The hem rides up into the crotch and wraps the thighs and buttocks**, worst on the feminine bodies: the tee reads as a bodysuit. The hem's corners follow the upper legs' weights.
   - The other walk frames (`tee-walk-right-arm-forward.jpg`, `tee-walk-passing.jpg`) show the same armpit flaps and the hem's wrap.
 - **Arms raised** (`tee-arms-raised-hard.jpg`). **Long dark flaps hang from the sleeves' undersides** on both bodies: flipped cloth about 8 to 10 cm long, worst in the side views. That is mesh separation, which the gate doesn't count.
-- **Arms forward**: the shoulder's top by the neck and the front armpit, as the gate says (54 bodies).
+- **Arms forward**: the shoulder's top by the neck and the front armpit, as the gate says (54 bodies). Added in review fixes 1: **a white cloth spike sticks out at the side of the armpit** in the side view of every cast body (`tee-arms-forward.jpg`, side column, under the sleeve; `crops-arms-forward.jpg`, armpit-side and sleeve-hem tiles of both average bodies). The sleeve-hem crop is now framed on the sleeve in the side view, where its end faces the camera; the first sheet's tile was empty background.
+- **Added in review fixes 1** (the review found these in the sheets; the first hand-back didn't report them):
+  - **T-pose, detached strips under both arms, every cast body** (`tee-t-pose.jpg`, front and back columns; `crops-t-pose.jpg`, underarm-front and underarm-back). Two or three long, thin strips hang diagonally from the sleeve's underside towards the side, with background between them and the body: mesh separation. Visible length about 15 cm on the masculine average body (106 px at 1.45 mm a pixel, scaled by the arm span) and up to 20 cm on the feminine ones. The gate's dumps (`AXCENITY_FIT_GATE_DUMP`, masculine and feminine average) say what they are: triangles 3202 to 3204, 3363 to 3444 and their neighbours, at the sleeve's end under the arm, with rest edges of 1.2 to 4.8 mm (the sleeve hems' fold and turn-up: 793 of the tee's 853 triangles with an edge under 5 mm are in the hems' range), stretched 3 to 111 times, the longest edge 167 mm (masculine) and 200 mm (feminine). 203 of the 4,080 triangles stretch over 2 times in the T-pose on the masculine average body, 82 over 5 times. The hem's corners nearest the side are 27 to 37 mm from the skin at rest, and the fit gives them the side's weights while the rest of the hem follows the arm. The wave-4 crew tee shows no strips in the same pose (`before-after-t-pose.jpg`; it shows its waist holes). No skin comes out, so the gate's T-pose record (7 bodies, the hem edges) doesn't count them.
+  - **Arms forward, the spike above is the same triangles**: 419 triangles stretch over 2 times on the masculine average body, the longest edge 177 mm (feminine average 149 mm), triangles 3414 to 3425 at the sleeve's end under the arm.
+  - **A dark lip at the back of the neck, at rest and in the walk, every cast body** (back views; a strip of the eight back necks is in my working folder, not committed). A dark grey sliver about 4 cm long and 2 to 3 mm tall shows above the rib, right of the spine as seen from behind, which is the character's right (the back camera looks along -Z from +Z, so +X, the right, is on the right of the picture; the review said left), with a small light tick at its end. With the right arm forward in the walk (`Walk@0.7`) it stands up as a light tab of about 1 cm on all eight bodies. The neckline stands 8 to 10 mm off the skin (median) on both sides of the back, so it isn't a gap on one side; I haven't traced which layer it is (probably the band's turn-up). Decision 13's "clean back" fails here.
+  - **A skin speck on the back of the right sleeve with the right arm swung back** (`Walk@0.367`; `crops-walk-right-arm-back.jpg`, back tile, right edge; also the armpit-side tile): 7 to 11 mm, just above the sleeve's hem, on masculine average, heavyset and muscular; none on masculine slim or the feminine bodies. The walk's records (54 bodies) already hold skin on these bodies, so it adds no count.
 
 ## Open issues
 
@@ -189,6 +194,7 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
    - no simulated folds.
 5. **Authorship of the base isn't confirmed** (section 1).
 6. **No tint variants**: the intake's manifest writes none. Colour roles are declared.
+7. **Cloth-only defects the gate doesn't count** (review fixes 1, section 5): the T-pose underarm strips (every cast body, 15 to 20 cm), the arms-forward spike at the side of the armpit (every cast body), the dark lip above the rib at the back of the neck (every cast body, at rest and in the walk; a 1 cm tab with the right arm forward), and a 7 to 11 mm skin speck on the back of the right sleeve in the walk (three masculine bodies). The first two are the sleeve hems' fold triangles under the arm, weighted partly to the side: the sleeve's turn-up should take the sleeve's weights, not the nearest skin's. A stretch check in the gate (a garment triangle's edges posed against rest) would catch them; none exists.
 
 ## At merge
 
@@ -198,3 +204,66 @@ The poses: `rest`, `walk-right-arm-forward` (`Walk@0.7`), `walk-passing` (`Walk@
 - **The fit change** (`needs` both ways) changes how every future import fits. No shipped item's file changed, and every record held. Re-importing the wave-4 items would change them; they weren't re-imported.
 - **Decisions for you:** a turned-hem gate rule; route (c); the base's authorship; whether this base is worth more work, given open issue 2.
 - **The state stays Draft.** Not ready for the lead's review and Paul's sign-off.
+
+## Review fixes 1
+
+The review found two blocking problems. Both are fixed. **The tee still fails and stays Draft; it is not ready for sign-off.**
+
+**1. Visible defects the hand-back didn't report.** All four are real; I looked at each at full size and measured them. Section 5 ("Added in review fixes 1"), Open issue 7, the records comment in `crates/player/src/tee_crew_tests.rs` and the Known-Limitations entry now give each one's body, pose and place:
+- the T-pose's detached strips under both arms, on every cast body;
+- the arms-forward spike at the side of the armpit;
+- the dark lip at the back of the neck;
+- the skin speck on the back of the right sleeve in the walk.
+
+New captures: the T-pose on the eight cast bodies and both wave-4 crew tees. The command is the section 5 command with `AXCENITY_CAPTURE_POSE=t-pose`. From them, four new sheets: `tee-t-pose.jpg`, `tee-t-pose-hard.jpg`, `before-after-t-pose.jpg` and `crops-t-pose.jpg`.
+
+I also redid two crop sheets:
+- `crops-arms-forward.jpg`: the sleeve-hem tile is now framed on the sleeve, in the side view.
+- `crops-walk-right-arm-back.jpg`: its sleeve-hem tile was mostly background too.
+
+**What the strips and the spike are, measured.** I dumped the posed tee with the gate (`AXCENITY_FIT_GATE_DUMP`, the masculine and feminine average bodies, at rest, in the T-pose and with the arms forward). Then I compared each triangle's edges in the pose against rest.
+- The strips are the sleeve hems' fold and turn-up triangles under the arm. At rest their edges are 1.2 to 4.8 mm.
+- In the pose they stretch 3 to 111 times, to a longest edge of 167 mm on the masculine body and 200 mm on the feminine.
+- The arms-forward spike is the same triangles: 177 mm and 149 mm.
+- The hem corners nearest the side are 27 to 37 mm from the skin at rest. They take the side's weights, while the rest of the hem follows the arm.
+- The wave-4 crew tee has no strips in the T-pose.
+
+**What would fix them:**
+- weight the sleeve's turn-up from the sleeve, not from the nearest skin;
+- add a stretch check in the gate, so cloth-only defects are counted (none exists).
+
+I didn't change the weights in this pass. That would re-import the item and re-record every case. The lip at the back neck isn't a stand-off on one side: the neckline is 8 to 10 mm off the skin at the median on both sides. I haven't traced which layer it is.
+
+**This also answers the review's non-blocking note on the hems.** The turned hems as built make the cloth itself worse in motion, not only the gate's reading. Section 3 is corrected.
+
+**2. The provenance record left out the re-unwrap.** Fixed red first:
+- `test_intake.py` `RefineTest.test_the_record_lists_the_unwrap` failed (0 lines on the unwrap; `tee-licensed-red-run.txt`).
+- `fit.changes_of()` now writes "texture coordinates laid out again (Blender's conformal unwrap along the source's own seams)" when `refined.json` has an `unwrap` report. Its report reader also closes its files now.
+
+I regenerated the record with the intake's export: the command in section 2 with `--from export`, run on a copy of the final work folder. Only `Shirt_TeeCrew.provenance.json` changed: its `changes` and `attribution` now name the unwrap. The `.glb`, binding, thumbnail, `item.json` and `catalogue.json` came out byte-identical.
+
+**Non-blocking items:**
+- Fixed:
+  - the module doc of `tee_crew_tests.rs` (it said "no record");
+  - `refine_tee.py` → `refine.py` in the intake spec's `about` (that text isn't copied into a generated file);
+  - the sign in the red test's failure message (now "comes 8.6 mm outside the cloth (it must be 2 mm inside)");
+  - stale docs: the Known-Limitations intake entry now says one accessory and one draft garment went through the intake, and that the arm-side split's effect on a real garment was measured only in experiments. asset-quality.md section 6 now says what the `refine` step adds and that it doesn't change the cut. Nothing was loosened.
+- Not done:
+  - the editor tests (the `needs()` change reaches the editor's runtime garment import);
+  - a second source entry for the Poly Haven jersey tile;
+  - timing of the new between-corners pass;
+  - the between-corners pass skipping skin whose nearest cloth is a turned hem's inner layer;
+  - the brown ovals in the review's elbows-bent captures.
+
+**Tests run:**
+
+| Run | Result |
+|---|---|
+| `python -I assets/characters/realistic/import/test_intake.py RefineTest` (Blender's Python), before the fix | 3 run, 1 failed (the red) |
+| `python -I assets/characters/realistic/import/test_intake.py` (Blender's Python), after the fix | Ran 30 tests, OK |
+| `cargo nextest run -p axcenity-avatar -p axcenity-player --no-fail-fast` | 472 tests run: 465 passed, 6 failed, 1 timed out, 23 skipped; no ABORT lines. The 6 were `makeup_tests::*` ("turned off changed the picture") and the timeout `skin_value_tests::skin_tone_values_change_the_picture_the_way_they_mean`, all picture comparisons, while another worktree's `axcenity_player` held the GPU. Run alone after it exited: `-E 'test(/makeup_tests::/) \| test(/skin_value_tests::/)'` 19 run, 19 passed. Every `tee_crew_tests`, `fit_gate_tests` and `wardrobe_tests` record held. |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | clean |
+| `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings |
+
+**At merge.** Nothing new beyond the list above. If you rebuild `tee-crew/*` after the merge, the provenance record now has the unwrap line. The records and the gate are unchanged.
