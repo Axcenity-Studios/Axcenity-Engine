@@ -52,7 +52,8 @@
 //!   `face-side`, `skin-close`; from [`HAIR_VIEWS`], R6: `hair-back`,
 //!   `hair-top`, `hair-hairline`, `hair-temple`, `hair-crown`,
 //!   `hair-nape`; from [`OPENING_VIEWS`], wave 5: `hem-up-front`,
-//!   `hem-up-back`, `neck-down`, `sleeve-up`, `cuff-up`, `cuff-close`). The sheet has a row per light and a column per view,
+//!   `hem-up-back`, `neck-down`, `sleeve-up`, `cuff-up`, `cuff-close`,
+//!   `hem-up-under`). The sheet has a row per light and a column per view,
 //!   as before.
 //! - `AXCENITY_CAPTURE_POSE` also takes the held poses of the brief's body
 //!   tests ([`HeldPose`]): `t-pose`, `arms-raised`, `elbows-bent`,
@@ -226,7 +227,7 @@ pub(crate) const HAIR_VIEWS: [View; 6] = [
 /// the back, down the neck from above, up a sleeve from below at the
 /// character's right side, and up the left trouser leg's cuff from in
 /// front just above the floor, from a metre and from under it.
-pub(crate) const OPENING_VIEWS: [View; 6] = [
+pub(crate) const OPENING_VIEWS: [View; 7] = [
     View {
         name: "hem-up-front",
         eye: [0.0, 0.9, -2.6],
@@ -264,6 +265,16 @@ pub(crate) const OPENING_VIEWS: [View; 6] = [
         eye: [0.3, 0.08, -0.34],
         target: [0.3, 0.5, 0.0],
         fov: 50.0,
+    },
+    // From the floor between the feet, steeply up under the front hem at
+    // the chest's underside: the direction the gate saw the crew tee's
+    // hidden bra from, worn without the joggers, in the walk (review
+    // fixes 2).
+    View {
+        name: "hem-up-under",
+        eye: [0.33, 0.2, 0.35],
+        target: [-0.1, 3.4, -0.6],
+        fov: 60.0,
     },
 ];
 

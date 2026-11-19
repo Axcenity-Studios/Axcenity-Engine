@@ -550,6 +550,18 @@ fn poke_through_counting(
     covered: &[bool],
     hidden_too: bool,
 ) -> (usize, f32) {
+    let (out, worst) = poke_through_corners(label, under, garment, covered, hidden_too);
+    (out.len(), worst)
+}
+
+/// The corners of `under` [`poke_through_counting`] counts, and the worst.
+pub(super) fn poke_through_corners(
+    label: &str,
+    under: &Posed,
+    garment: &Posed,
+    covered: &[bool],
+    hidden_too: bool,
+) -> (Vec<usize>, f32) {
     let surface = Surface::new(
         garment.positions.clone(),
         garment.normals.clone(),
@@ -576,7 +588,7 @@ fn poke_through_counting(
     // alone), `AXCENITY_FIT_GATE_CLOSEST_ONLY=1`: never for a record.
     let closest_only = std::env::var_os("AXCENITY_FIT_GATE_CLOSEST_ONLY").is_some();
 
-    let mut count = 0;
+    let mut corners = Vec::new();
     let mut worst = f32::NEG_INFINITY;
     for (k, (p, n)) in under.positions.iter().zip(&under.normals).enumerate() {
         if !drawn[k] || !covered.get(k).copied().unwrap_or(false) {
@@ -598,7 +610,7 @@ fn poke_through_counting(
         };
         worst = worst.max(out);
         if out > POKE {
-            count += 1;
+            corners.push(k);
             if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
                 // Where the way out along the normal first meets the
                 // garment, and from which side (`enclosed`).
@@ -628,7 +640,7 @@ fn poke_through_counting(
             }
         }
     }
-    (count, worst)
+    (corners, worst)
 }
 
 /// How far from a corner the gate looks for the garment over it.
@@ -858,7 +870,7 @@ const LAYERS: [(&str, &str); 10] = [
 /// ([`LAYERS`]), the lower layer's corners the upper one covers.
 pub(super) struct Cover {
     pub body: Vec<(String, Vec<bool>)>,
-    layers: Vec<(&'static str, &'static str, Vec<bool>)>,
+    pub layers: Vec<(&'static str, &'static str, Vec<bool>)>,
     /// The body triangles the worn items hide ([`hidden_triangles`]),
     /// checked for holes in every pose.
     pub hidden: Vec<[u32; 3]>,

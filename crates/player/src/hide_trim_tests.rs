@@ -12,7 +12,7 @@
 //! hand after the masks are made:
 //!
 //! ```text
-//! [AXCENITY_TRIM_VIEWS=gate] [AXCENITY_TRIM_ONLY=<body>] [AXCENITY_TRIM_POSES=sample] AXCENITY_TRIM=tee-crew|wardrobe|test-tee cargo test -p axcenity-player --release -- --ignored trim_hide_maps --nocapture
+//! [AXCENITY_TRIM_VIEWS=gate] [AXCENITY_TRIM_ONLY=<body>] [AXCENITY_TRIM_POSES=sample] AXCENITY_TRIM=tee-crew|wardrobe|crew-tee|joggers|test-tee cargo test -p axcenity-player --release -- --ignored trim_hide_maps --nocapture
 //! ```
 //!
 //! The gate's views don't count a place seen more than 78 degrees off its
@@ -43,6 +43,12 @@ fn outfit(name: &str) -> Vec<&'static str> {
             super::wardrobe_tests::JOGGERS,
             super::wardrobe_tests::SNEAKERS,
         ],
+        // Each of the wardrobe's items worn without the others (review
+        // fixes 2): the joggers' waistband blocks the view up the tee's
+        // hem, and the sneakers the view up the cuffs, so masks trimmed
+        // only for the whole outfit can show with one item alone.
+        "crew-tee" => vec![super::wardrobe_tests::TEE],
+        "joggers" => vec![super::wardrobe_tests::JOGGERS],
         other => panic!("no outfit `{other}`"),
     }
 }

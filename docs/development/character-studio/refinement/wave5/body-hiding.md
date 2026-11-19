@@ -2,7 +2,7 @@
 
 Branch `body-hiding`, from `refinement-wave5`. Task: hide the body (and the underwear) under clothing wherever no hole can show, the usual game approach, so skin and underwear can't come through a garment by construction; prove no hole shows; count poke-through only on skin that is drawn; prove it on the licensed tee, the wave-4 crew tee, the joggers and the test tee.
 
-**In one paragraph.** The rule, the masks, the drawing and the proof are built and hold: no hidden place shows in any gate pose, walk frame or motion-check frame on any gate body, and the before and after captures are identical, pixel for pixel within 24 of 255, in all 640 pictures compared after review fixes 1 (the licensed tee and the wardrobe, eight cast bodies, five poses, the standard views and six new views into the openings, two of them at the joggers' cuff). **But it doesn't reach the defects.** Skin and underwear come through the tees where the cloth flips at the armpit and at the turned hems, and that skin is seen: past the flipped cloth (which would show the garment's inside, a hole, whether its back faces are drawn or not) or up a hem or a sleeve. Hiding it would show a hole there, so the rule keeps it drawn. What the masks hide is skin nobody sees and nothing came through: the licensed tee hides 25 of the body's 22,184 triangles (a patch at the sternum and one between the shoulder blades), 72 of the sports bra's, 14 of the briefs' and 11 of the boxer briefs'; the joggers hide 666 (the thighs and shins inside them) and the crew tee 43 (all after review fixes 1's trim with the fine views). **No poke-through record changed** on any of the four garments; the stylized wardrobe's records are unchanged. Two findings for the lead: the view-based hole check sees the test tee's hidden waist region from below (51 bodies at rest), so imports no longer hide whole regions; and a mask made in the fit's poses is not enough: the runtime's walk shows a few hidden places the fit's walk didn't (the belly seen up the front hem), so a shipped item's masks are trimmed to the runtime's poses by an offline step.
+**In one paragraph.** The rule, the masks, the drawing and the proof are built and hold: no hidden place shows in any gate pose, walk frame or motion-check frame on any gate body, and the before and after captures are identical, pixel for pixel within 24 of 255, in all 640 pictures compared after review fixes 1 (the licensed tee and the wardrobe, eight cast bodies, five poses, the standard views and six new views into the openings, two of them at the joggers' cuff). **But it doesn't reach the defects.** Skin and underwear come through the tees where the cloth flips at the armpit and at the turned hems, and the rule keeps that skin drawn. Measured corner by corner on the licensed tee's cast (review fixes 2): of 793 body and underwear corners through it in the gate's poses, 465 (59%) come within the rule's 4 cm of an opening in some pose, 121 (15%) aren't enclosed at rest, 161 (20%) would be seen if hidden (past the flipped cloth, which would show the garment's inside, a hole whether its back faces are drawn or not, or up a hem), and 46 (6%) would be seen in no gate pose but are kept by the rule's own fit-pose cases or the trim. What the masks hide is skin nobody sees and nothing came through: the licensed tee hides 25 of the body's 22,184 triangles (a patch at the sternum and one between the shoulder blades), 72 of the sports bra's, 14 of the briefs' and 11 of the boxer briefs'; the joggers hide 469 (the thighs and shins inside them) and the crew tee 28 (after review fixes 2's trims, which also cover each item worn alone). **No poke-through record changed** on any of the four garments; the stylized wardrobe's records are unchanged. Two findings for the lead: the view-based hole check sees the test tee's hidden waist region from below (51 bodies at rest), so imports no longer hide whole regions; and a mask made in the fit's poses is not enough: the runtime's walk shows a few hidden places the fit's walk didn't (the belly seen up the front hem), so a shipped item's masks are trimmed to the runtime's poses by an offline step.
 
 ## Files
 
@@ -60,15 +60,15 @@ The cases: rest and `hide_poses` (the fit's ten poses, the arms raised forward, 
 |---|---|---|---|
 | Licensed tee, body | 191 | 25 (163 after a trim by the gate's views, 117 by the fine views at 78 degrees, 25 by the fine views at 87 degrees; unchanged by review fixes 1) | 972 s, 1,846 cases an outfit, 2 outfits |
 | its sports bra / briefs / boxer briefs | 164 / 21 / 171 | 72 / 14 / 11 (74 / 14 / 19 before review fixes 1) | |
-| Wave-4 crew tee, body | 151 | 43 (128 with the gate's views; 68 after the fine sampled check, 43 after the fine full trim) | 1,668 s, 4 outfits |
-| its sports bra / boxer briefs | 118 / 7 | 80 / 7 (108 / 7 with the gate's views) | |
-| Joggers, body | 1,046 | 666 (1,014 with the gate's views; 803, then 666) | 592 s, 2 outfits |
-| their briefs / boxer briefs | 24 / 144 | 24 / 142 | |
+| Wave-4 crew tee, body | 151 | 28 (128 with the gate's views; 68 after the fine sampled check, 43 after the fine full trim; 28 after review fixes 2's trim for the tee worn alone) | 1,668 s, 4 outfits |
+| its sports bra / boxer briefs | 118 / 7 | 58 / 7 (108 / 7 with the gate's views, 80 / 7 after review fixes 1) | |
+| Joggers, body | 1,046 | 469 (1,014 with the gate's views; 803, then 666; 469 after review fixes 2's trim for the joggers worn alone) | 592 s, 2 outfits |
+| their briefs / boxer briefs | 24 / 144 | 14 / 74 (24 / 142 before review fixes 2) | |
 | Test tee (the import), body / sports bra | 83 / 211 | 11 / 48 (11 / 60 before review fixes 1) | in the gate's library build (the gate now takes the kept masks and skips this) |
 
-The crew tee and joggers worn together hide 709 body triangles on the masculine and feminine average bodies (1,142 before review fixes 1), 149 of the boxer briefs' and 104 of the bra's and briefs' (132 before).
+The crew tee and joggers worn together hide 497 body triangles on the masculine and feminine average bodies (1,142 before review fixes 1, 709 before review fixes 2), 81 of the boxer briefs' and 72 of the bra's and briefs' (149 and 104 before review fixes 2).
 
-Where (`body-hiding/tee-what-is-hidden.jpg`, the tee not drawn and the masks applied): the licensed tee hides a patch over the sternum and a strip down to the navel, a patch between the shoulder blades, small patches on the shoulder tops and the upper arms' backs, the bra's centre and side panels and the briefs' and boxer briefs' waistband sides. Nothing at the armpit, the neck, the hems or the sleeves.
+Where (`body-hiding/tee-what-is-hidden.jpg`, the tee drawn see-through with its masks applied, after review fixes 1's fine trim): the licensed tee hides a patch over the sternum (about 6 x 8 cm), a strip about 9 x 1.5 cm under the left pectoral on the masculine bodies, a patch about 6 x 6 cm between the shoulder blades, the bra's centre back and part of the briefs' seat (seen at the hip in the walk); the boxer briefs' 11 hidden triangles are too small to pick out in the sheet. Nothing at the armpit, the neck, the hems or the sleeves. (This paragraph listed more, from the first masks, before review fixes 2 corrected it: 25 body triangles can't cover a strip to the navel or the shoulder tops.)
 
 **The gate, licensed tee** (records as committed before this branch, the corrected measure): every pose and every third of the stride **unchanged** (rest 7 bodies 28.2 mm; Idle 53, 37.9; the walk 54 every third, up to 32.5 mm; arms forward 54, 30.2; T-pose 7; arms raised 14; elbows 8; knees 7; the underwear through it as recorded). Holes: **0** in every pose and walk frame after the trim (before the trim: 1 body at rest and in four held poses, 0.4 mm from the cloth; 4 to 12 bodies a third of the walk). With `AXCENITY_FIT_GATE_COUNT_HIDDEN=1` (hidden skin counted, as before) the bodies and the worst are the same at rest and with the arms forward, and for the wardrobe at rest: the skin that comes through isn't where anything is hidden.
 
@@ -127,16 +127,16 @@ New tests: `avatar` `fit::enclosure::tests` (7), `tests::hiding_under_clothing` 
 ## Commands
 
 - An item's masks: `AXCENITY_HIDE_RULE` unset, `cargo run -p axcenity-avatar --release --example hide_under_clothing -- assets/characters <item> --outfit <layers,...>... --bodies assets/characters/benchmarks` (the licensed tee: `--outfit axcenity/realistic-sports-bra,axcenity/realistic-briefs --outfit axcenity/realistic-boxer-briefs`; the joggers: `--outfit axcenity/realistic-briefs --outfit axcenity/realistic-boxer-briefs`; the crew tee: those two and each with `axcenity/realistic-joggers`). Then the manifest's `hide_maps` from its output (I set them with a small script keeping the build's layout; `wardrobe.py` and `import/fit.py` now carry an import's masks themselves).
-- The trim: `AXCENITY_TRIM=tee-crew|wardrobe|test-tee cargo test -p axcenity-player -- --ignored trim_hide_maps --nocapture` (`AXCENITY_TRIM_VIEWS=gate` is faster but leaves the gate's 78-degree blind spot, so every shipped item is trimmed with the default fine views: the wardrobe's full fine trim took 1 h 55 min on a release build; `AXCENITY_TRIM_ONLY=<body>` for some bodies). About 80 minutes for the licensed tee, 2 hours for the wardrobe with the gate's views, 30 minutes for the test tee. I ran: the licensed tee three times (the gate's views, the fine views, the fine views at 87 degrees), the test tee twice, the wardrobe once with the gate's views and once for the feminine heavy body.
+- The trim: `AXCENITY_TRIM=tee-crew|wardrobe|crew-tee|joggers|test-tee cargo test -p axcenity-player -- --ignored trim_hide_maps --nocapture` (`AXCENITY_TRIM_VIEWS=gate` is faster but leaves the gate's 78-degree blind spot, so every shipped item is trimmed with the default fine views: the wardrobe's full fine trim took 1 h 55 min on a release build; `AXCENITY_TRIM_ONLY=<body>` for some bodies). About 80 minutes for the licensed tee, 2 hours for the wardrobe with the gate's views, 30 minutes for the test tee. I ran: the licensed tee three times (the gate's views, the fine views, the fine views at 87 degrees), the test tee twice, the wardrobe once with the gate's views and once for the feminine heavy body.
 
 ## Open issues
 
-1. **Hiding doesn't fix the tees.** The skin and underwear that come through are seen, through flipped folds or up a hem. The fit (the drape-preserving specialist's work) has to stop the cloth flipping; then this rule hides what the cloth keeps covered.
+1. **Hiding doesn't fix the tees.** The skin and underwear that come through are mostly near an opening (59% of the licensed tee's corners through it), not enclosed at rest (15%) or seen if hidden, through flipped folds or up a hem (20%): review fixes 2's measurement. The fit (the drape-preserving specialist's work) has to stop the cloth flipping; then this rule hides what the cloth keeps covered.
 2. **The masks depend on the fit.** A garment fitted again needs its masks made and trimmed again (an hour or more each); the gate's hole check catches stale masks. The test tee's trimmed masks are kept beside its source and replace its import's.
 3. **Other animations aren't proven.** The masks are trimmed to the gate's poses and the motion check's three clips. A jump, crouch or sit may look up a hem at a hidden place. Bone proportions (the gate's tallest, shortest, widest-hips bodies) are in the trim but not in the rule.
-4. **Masks are per item.** Two items worn together hide the union of what each hides alone; the wardrobe outfit is checked together by the gate, other combinations aren't.
+4. **Masks are per item.** Two items worn together hide the union of what each hides alone. Trimmed and checked by the gate (since review fixes 2): each item worn alone over the underwear (the licensed tee, the test tee, the crew tee, the joggers barefoot) and the crew tee, joggers and sneakers together. Other combinations (the licensed tee over the joggers, the crew tee or joggers with the sneakers but not each other, anything over other clothes) are not trimmed or checked; the second review measured the licensed tee over the joggers with the gate's views on the cast: 0 holes.
 5. **The motion check's holes run every third frame** (see Time).
-6. **The masks are made in hours, not seconds,** and the gate's hole tests for an outfit that hides much (the joggers) are split thirty ways to stay inside the runner's two minutes.
+6. **The masks are made in hours, not seconds,** and the gate's hole tests for an outfit that hides much (the joggers) are split thirty ways to stay inside the runner's two minutes (and, since review fixes 2, twenty-one more for the crew tee and the joggers each worn alone).
 7. **The test tee's masks are kept in the repository** (`crates/avatar/tests/fixtures/test-tee/`), not made by the gate: if its fit changes, delete them, let the gate's import make them (minutes) and run `AXCENITY_TRIM=test-tee`.
 
 ## Merge notes
@@ -209,3 +209,165 @@ Commands: `AXCENITY_TRIM=wardrobe AXCENITY_TRIM_POSES=sample AXCENITY_TRIM_ONLY=
 
 - Masks changed: `Shirt_CrewTee.hide.png`, `Shirt_CrewTee.hide.realistic-sports-bra.png`, `Pants_Joggers.hide.png`, `Shirt_TeeCrew.hide.realistic-sports-bra.png`, `Shirt_TeeCrew.hide.realistic-boxer-briefs.png`, and `crates/avatar/tests/fixtures/test-tee/TestTee.hide.realistic-sports-bra.png`. No manifest, GLB, catalogue or preset changed.
 - `OPENING_VIEWS` has six views (adds `cuff-up` and `cuff-close`). There is a new capture variable, `AXCENITY_CAPTURE_UNDRAWN`, and a new trim variable, `AXCENITY_TRIM_POSES=sample`.
+
+## Review fixes 2
+
+The second review found one blocking problem, measured: the crew tee worn **without the joggers** fails the gate's own hole check. Every trim and every hole test wore the crew tee, the joggers and the sneakers together, and the joggers' waistband blocks the view up the tee's front hem. The review was right, and the problem was wider than it measured on the cast.
+
+### The blocking item: each wardrobe item worn alone
+
+**Tests first.** `wardrobe_holes` now takes the items worn (`wearing(description, items)`; the outfit is `OUTFIT`), and a new `holes_held(items, part, parts)` runs the gate's hole check at rest, in Idle and in the five held poses. The new tests run on **every gate body** (54, not only the cast), split by bodies:
+
+- `the_crew_tee_alone_shows_no_hidden_place_held_1..3` and `..._through_the_walk_1..3` (every third frame of the stride);
+- `the_joggers_alone_show_no_hidden_place_held_1..6` and `..._through_the_walk_1..9` (barefoot, no top).
+
+**Red** (`body-hiding-red-run.txt`), on review fixes 1's masks: 21 run, 17 passed, **4 failed**.
+
+- **Crew tee alone:** the hidden bra or skin shows in the walk on **9 bodies**. Four are the feminine cast bodies the review found: asymmetry and broad-face, 4.77 mm at Walk@32; muscular, 1.07 mm; slim, 4.90 mm at Walk@35. Five are body benchmarks: blend lean-muscular, 24.17 mm; feminine tallest, 16.78 mm (both hidden skin); blend slight, 19.37 mm; feminine lean-muscular, 6.96 mm; feminine narrowest-hips, 4.77 mm.
+- **Joggers alone:** they fail too, on two body benchmarks that the review's cast-only check didn't include: blend shortest at Walk@2 (10.10 mm) and feminine heavy-soft at Walk@23 (18.77 mm).
+- **Held poses:** clean for both items.
+
+**The trim.** `hide_trim_tests::outfit` gains `crew-tee` and `joggers`, each worn alone. The joggers are trimmed barefoot, since the sneakers would block the cuffs. Both items were trimmed with the fine views in every pose the trim plays: the gate's held poses and every walk frame on all 54 bodies, plus the Run and Idle on the cast. The build was a release build.
+
+| Item worn alone | Places seen | Drawn again | Masks after (before) | Time |
+|---|---|---|---|---|
+| Crew tee | 2 to 103 a body | body 15, bra 22 | body 28 (43), bra 58 (80), boxer briefs 7 (7) | 383 s |
+| Joggers | 15 to 269 a body | body 197, briefs 10, boxer briefs 67, then 1 more in the check | body 469 (666), briefs 14 (24), boxer briefs 74 (142) | 2,698 s |
+
+The trim only removes triangles from the masks, so the outfit worn together (trimmed in review fixes 1) is still covered: drawing a triangle only covers more.
+
+**The final fine check.** Each trim was run again with the fine views, the item worn alone, on all 54 bodies and in every pose the trim plays:
+
+- crew tee: **0 places on 54 of 54 bodies** (365 s; masks unchanged);
+- joggers: 53 of 54 bodies at 0 places (2,024 s). One place showed on `realistic-masculine-body-shortest`, so one more boxer-briefs triangle was drawn again (75 to 74). A third pass on the 21 masculine bodies (the ones that wear the boxer briefs) found **0 places on 21 of 21** (764 s). Drawing a triangle should only cover more, so the second pass shouldn't have found anything new. I didn't find why it did. It may be a near-tie in the ray casts. For the lead: an item's trim should be run until a pass finds 0, not trusted after one pass.
+
+**Green.** All 21 new tests pass. The outfit's 30 hole tests and its gate still pass (see the tests table). The hidden-count floors are lowered to the new masks. They record how much the masks hide, not quality.
+
+- `wardrobe_tests` `HIDES_SKIN`: (709, 709) to **(497, 497)**. 497 is the joggers' 469 plus the crew tee's 28.
+- `HIDES_UNDER`: (149, 104) to **(81, 72)**.
+
+**Which combinations are trimmed and checked.** Known-Limitations, open issue 4 and asset-quality §3 are corrected to say this. Known-Limitations said "each checked alone", which was false for these two items until now.
+
+- Trimmed and checked: each item worn alone over the underwear (the licensed tee, the test tee, the crew tee, the joggers barefoot), and the crew tee, joggers and sneakers together.
+- Not trimmed or checked:
+  - the licensed tee over the joggers (the review measured 0 holes with the gate's views on the cast);
+  - the crew tee or the joggers with the sneakers but not with each other;
+  - anything over other clothes.
+
+### Non-blocking items addressed
+
+**The cause, measured corner by corner.**
+
+- **The diagnostic.** `tee_crew_tests::why_the_licensed_tees_poke_through_stays_drawn` is new (ignored; run by hand). `fit_gate_tests::poke_through_corners` now returns the corners the gate counts. The diagnostic takes every body and underwear corner that comes through the licensed tee, on the 18 cast bodies, in any gate pose: rest, Idle, the held poses and every third walk frame. For each corner it names the first part of the hiding rule that keeps it drawn. It applies the parts in the rule's order, in the runtime's poses.
+- **Result: 793 corners.**
+
+  | What keeps it drawn | Corners | Share |
+  |---|---|---|
+  | Within the rule's 4 cm of an opening (hems, sleeve ends, neck) in some pose | 465 | 59% |
+  | Not enclosed at rest: its way out along the normal meets no outward cloth within 8 cm | 121 | 15% |
+  | Would be seen if hidden: past flipped cloth or up a hem | 161 | 20% |
+  | Seen in no gate pose: kept drawn only by the rule's own cases (the fit's poses and body states) or by the trim's other frames | 46 | 6% |
+
+- **By what comes through:**
+  - body 717: 92 open, 427 near an opening, 158 seen, 40 hideable;
+  - bra 60: 22 open, 38 near an opening;
+  - briefs 7: all open;
+  - boxer briefs 9: 3 seen, 6 hideable.
+- **What this changes.** The earlier wording, "seen through flipped cloth or up a hem", named the smaller cause. Most of the poke-through is within the opening margin, which the rule keeps drawn by design. The summary, open issue 1 and Known-Limitations now say this.
+- **The margin.** A narrower opening margin would hide more. But the margin is what keeps a hidden place from showing past a hem in poses the gate doesn't play, so I left it at 4 cm. A rule change is for the lead to decide.
+
+**Other non-blocking items fixed:**
+
+- **The stale "Where" paragraph** (Measurements) is rewritten to match `tee-what-is-hidden.jpg`: a sternum patch, a strip under the left pectoral, a patch between the shoulder blades, the bra's centre back and part of the briefs' seat.
+- **The wardrobe test's comment** no longer says the outfit hides the joggers' waistband. The crew tee has no mask for the joggers.
+- **wiki Characters** now describes the gate's holes as view-based, not as "hidden skin out from under the cloth, the same rule".
+
+**Not addressed; still open, for the lead:**
+
+- Numbered underwear masks carry no triangle count or hash.
+- No hole check runs at the body's levels of detail.
+- `HIDE_RULE`'s values are stated, not taken from a measured distribution. The breakdown above is the nearest measurement: the opening margin keeps 59% of the poke-through drawn.
+- The motion check samples holes only every third frame.
+- There is no ADR for `hide_maps`.
+- `RegionHiding::key` hashes mask paths, not their contents.
+- The `cuff-close` camera doesn't follow the ankle in the walk.
+
+### Visual evidence (review fixes 2)
+
+There are two new sheets in `body-hiding/`. The folder is now 14.7 MB.
+
+**`crew-tee-alone.jpg`.** The crew tee worn alone at Walk@32, studio light, on 8 cast bodies: the four feminine bodies the review found and four masculine ones.
+
+- The first columns use a new view, `hem-up-under`. It looks from the floor between the feet, steeply up under the front hem, in the direction the gate saw the bra from. It is shown with review fixes 1's masks and with the new masks.
+- Then two difference columns at 8x: old masks against new, and no masks against new.
+- Then the new masks from `hem-up-front`, front and back.
+- Below are 4x crops where the old and new masks differ.
+
+**`joggers-alone.jpg`.** The joggers worn alone (barefoot, no top), with the new masks.
+
+- Bodies: the two body benchmarks that failed (blend shortest, feminine heavy-soft) and six cast bodies.
+- Columns: Walk@23 front, back, `cuff-up`, `cuff-close` and `hem-up-front`; no masks minus new masks at 8x; and Walk@2 `cuff-up` and `cuff-close`.
+
+**Measured.**
+
+- **No masks against the new masks: every picture matches, with a difference of 0 of 255.** That is 80 pictures of the crew tee alone (64 at Walk@32 and Walk@35 from front, side, back and `hem-up-front`, plus 16 from `hem-up-under`) and 96 of the joggers alone (6 views, 2 frames, 8 bodies).
+- **Review fixes 1's masks against the new ones.**
+  - The crew tee's `hem-up-under` pictures differ on the four feminine bodies the review named, by **1 to 12 pixels** a picture (largest channel difference 65 of 255), at Walk@32 and Walk@35. No other picture differs.
+  - The joggers' pictures don't differ, because their failing places aren't in these views.
+
+**What I saw.**
+
+- **The `hem-up-under` camera is badly framed.** It looks up between the thighs, which fill most of the frame; the hem's edge and the bra band take a small part of it.
+  - With the old masks, the hole is a dark sliver of a few pixels at the front hem's edge above the briefs, about 2 x 6 px at 1280 x 720.
+  - With the new masks, that sliver is the bra's or the tee's colour, as with no masks.
+  - At this size the picture is weak evidence. The geometric check and the pixel counts are the proof.
+- **Fit defects of the crew tee worn alone.** They were there before this branch and are identical with no masks.
+  - On every masculine body at Walk@32, **dark ragged tears run across the lower front**: four or five patches, each about 3 to 5 cm across. The tee's inside shows, and the boxer briefs' waistband is seen through them.
+  - On the feminine bodies, smaller tears at the lower right front show skin through them.
+  - **Dark specks of about 1 cm sit at the upper chest** on the feminine bodies.
+  - The hem hangs in a ragged, uneven line.
+- **Fit defects of the joggers worn alone.** Also there before this branch and identical with no masks.
+  - On the masculine bodies, **dark tears run down the front of the crotch**: a streak about 10 to 15 cm long, seen in `hem-up-front` and the front view.
+  - The rib cuffs still have the sawtooth edge.
+  - On the masculine bodies, the low back waist shows the boxer briefs (back view).
+  - The cuff views show the bare ankle and foot under the cuff, with no hole.
+  - In these walk frames, the `cuff-close` camera frames the cuff only at the edge of the picture (non-blocking, as the review said).
+- **The outfit was not recaptured.** The earlier wardrobe sheets were made with review fixes 1's masks. The new masks hide a subset of those triangles, so the outfit can only be more covered than in those sheets.
+
+### Tests (review fixes 2)
+
+| Run | Result |
+|---|---|
+| Red: `cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/alone_show/)'` on review fixes 1's masks | 21 run: 17 passed, 4 failed (crew tee walk 1 and 2, joggers walk 2 and 3) |
+| Trims, release build: `AXCENITY_TRIM=crew-tee`, `AXCENITY_TRIM=joggers` | 383 s and 2,698 s, `test result: ok` |
+| Final fine check, the same runs again | crew tee: 0 places on 54 bodies (365 s); joggers: 1 place on 1 body of 54, trimmed (2,024 s), then 0 on the 21 masculine bodies (764 s) |
+| Green: `cargo nextest run -p axcenity-player -E 'test(/alone_show/)'` | 21 tests run: 21 passed (also inside the full run); `test(/wardrobe_tests::/)` on the final masks: 68 tests run, 68 passed |
+| `cargo nextest run -p axcenity-avatar -p axcenity-assets -p axcenity-gameplay -p axcenity-project -p axcenity-player --no-fail-fast` | **1061 tests run: 1061 passed** (40 slow), 26 skipped; no FAIL, ABORT or TIMEOUT (443.7 s). This run was before the last boxer-briefs triangle; `wardrobe_tests` was run again after it (68 passed) |
+| `cargo clippy -p axcenity-avatar -p axcenity-assets -p axcenity-gameplay -p axcenity-project -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | done |
+| `python3 -I scripts/check-wiki.py` | 115 pages, 0 errors, 57 warnings (staleness on other pages) |
+| Diagnostic: `cargo test -p axcenity-player -- --ignored why_the_licensed_tees_poke_through --nocapture` | 793 corners: 465 near an opening, 121 open at rest, 161 seen, 46 hideable in every gate pose (30 s) |
+
+**Capture command.** The usual capture command, with these variables:
+
+- `AXCENITY_CAPTURE_LIBRARY`: a copy of `assets/characters` without the crew tee's and joggers' `hide_maps`, or with review fixes 1's masks;
+- `AXCENITY_CAPTURE_DESCRIPTIONS`: the cast wearing only the crew tee, or only the joggers;
+- `AXCENITY_CAPTURE_POSE=Walk@0.5333` (also 0.5833, 0.0333 and 0.3833);
+- `AXCENITY_CAPTURE_LIGHTS=studio`;
+- `AXCENITY_CAPTURE_VIEWS=front,side,back,hem-up-front,hem-up-under` (`cuff-up` and `cuff-close` for the joggers).
+
+### Merge notes (review fixes 2)
+
+- **Masks regenerated** by the documented trim (`AXCENITY_TRIM=crew-tee` and `AXCENITY_TRIM=joggers`):
+  - `Shirt_CrewTee.hide.png`;
+  - `Shirt_CrewTee.hide.realistic-sports-bra.png`;
+  - `Pants_Joggers.hide.png`;
+  - `Pants_Joggers.hide.realistic-briefs.png`;
+  - `Pants_Joggers.hide.realistic-boxer-briefs.png` (75 triangles after the trim, 74 after the check).
+
+  No manifest, GLB, catalogue or preset changed.
+- **Views:** `OPENING_VIEWS` now has seven views; `hem-up-under` is new. The existing views, the lights and `Settings::default` are unchanged.
+- **Trim:** two new outfits, `crew-tee` and `joggers`.
+- **Gate code:** `fit_gate_tests::Cover::layers` is now `pub`, because the diagnostic reads it. `poke_through_corners` is new. `poke_through`'s results are unchanged.
+- **Hole tests:** the wardrobe now has 51 (30 for the outfit, 21 for the items worn alone). Each of the new tests took 4 to 33 s when run alone.
+- **If the fit-drape branch refits the crew tee or the joggers,** their masks must be made again and trimmed for the outfit **and** for each item alone (`AXCENITY_TRIM=wardrobe,crew-tee,joggers`, about 3 hours).

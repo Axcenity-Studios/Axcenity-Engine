@@ -54,3 +54,25 @@ The new synthetic test `fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_l
         FAIL [   0.036s] (1/1) axcenity-avatar fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views
      Summary [   0.037s] 1 test run: 0 passed, 1 failed, 218 skipped
 (the gate's views then find the ring; the constant was restored with git checkout).
+
+Review fixes 2 (2026-11-19): each wardrobe item worn alone (the crew tee without the joggers; the joggers barefoot without a top), the gate's hole check on every gate body, before trimming the masks for these outfits:
+
+cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/alone_show/)'
+        FAIL [  21.761s] ( 7/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_crew_tee_alone_shows_no_hidden_place_through_the_walk_1
+        FAIL [  30.301s] (11/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_crew_tee_alone_shows_no_hidden_place_through_the_walk_2
+        FAIL [  30.433s] (14/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_joggers_alone_show_no_hidden_place_through_the_walk_2
+        FAIL [  32.485s] (15/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_joggers_alone_show_no_hidden_place_through_the_walk_3
+     Summary [  68.457s] 21 tests run: 17 passed (5 slow), 4 failed, 323 skipped
+
+The bodies that fail (the walk tests, rerun alone):
+      realistic-blend-body-lean-muscular Walk@32 Walk hidden skin showing: 2 vertices out, worst 24.17 mm
+      realistic-blend-body-shortest Walk@2 Walk hidden skin showing: 1 vertices out, worst 10.10 mm
+      realistic-blend-body-slight Walk@29 Walk hidden skin showing: 1 vertices out, worst 19.37 mm
+      realistic-feminine-body-heavy-soft Walk@23 Walk hidden skin showing: 1 vertices out, worst 18.77 mm
+      realistic-feminine-body-lean-muscular Walk@32 Walk hidden skin showing: 3 vertices out, worst 6.96 mm
+      realistic-feminine-body-narrowest-hips Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-body-tallest Walk@32 Walk hidden skin showing: 1 vertices out, worst 16.78 mm
+      realistic-feminine-cast-asymmetry Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-cast-broad-face Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-cast-muscular Walk@32 Walk hidden skin showing: 1 vertices out, worst 1.07 mm
+      realistic-feminine-cast-slim Walk@35 Walk hidden skin showing: 1 vertices out, worst 4.90 mm

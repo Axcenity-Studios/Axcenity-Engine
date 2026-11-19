@@ -440,3 +440,200 @@ const MOTION_RUN: [Record; 1] = [Record {
     case: "Run",
     most: 0.0061,
 }];
+
+/// Wave 5, hiding under clothing, review fixes 2: why the licensed tee's
+/// poke-through stays drawn, measured corner by corner on the cast. Every
+/// body or underwear corner the gate counts through the tee in any of the
+/// gate's poses (rest, Idle, the held poses and every third walk frame)
+/// is put under the first part of the hiding rule (`avatar::fit::HIDE_RULE`)
+/// that keeps it drawn, in the rule's order but in the runtime's poses:
+///
+/// - open at rest: its way out along its normal meets no outward cloth
+///   within `enclose`;
+/// - near an opening: within `opening` of the tee's open edges in some
+///   pose;
+/// - seen: hiding it, with every other corner left, leaves a place one of
+///   the gate's views sees in some pose (`holes_seen`);
+/// - hideable in every gate pose: none of these. Only the rule's own cases
+///   (the fit's poses and body states, where the cloth lies differently,
+///   and its `near`), or the trim (every walk frame, the run, the idle),
+///   keep it drawn.
+///
+/// A diagnostic, not a check, run by hand:
+///
+/// ```text
+/// cargo test -p axcenity-player -- --ignored why_the_licensed_tees_poke_through --nocapture
+/// ```
+#[test]
+#[ignore = "a diagnostic: run by hand"]
+fn why_the_licensed_tees_poke_through_stays_drawn() {
+    use std::collections::{BTreeMap, HashSet};
+
+    use axcenity_avatar::fit::{HIDE_RULE, Openings, Surface, Views, encloses, holes_seen};
+
+    use super::fit_gate_tests::poke_through_corners;
+
+    let stage = Stage::new("tee-crew-why", &repository_library()).expect("the stage");
+    let mut stances = vec![
+        Stance::Rest,
+        Stance::Idle,
+        Stance::Held(HeldPose::TPose),
+        Stance::Held(HeldPose::ArmsRaised),
+        Stance::Held(HeldPose::ElbowsBent),
+        Stance::Held(HeldPose::KneesBent),
+        Stance::Held(HeldPose::ArmsForward),
+    ];
+    for frames in WALK_FRAMES.iter().flat_map(|f| f.iter().copied()) {
+        stances.push(Stance::Clip {
+            name: "Walk",
+            frames,
+        });
+    }
+    // (what comes through, verdict) -> corners (each counted once a body).
+    let mut tally: BTreeMap<(String, &str), usize> = BTreeMap::new();
+    let surface = |p: &Posed, triangles: Vec<[u32; 3]>| {
+        Surface::new(p.positions.clone(), p.normals.clone(), triangles)
+    };
+    for description in bodies().into_iter().filter(|d| d.name.contains("-cast-")) {
+        let dressed = dressed(&description);
+        let (rest_body, rest_garments) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let cover = cover_at_rest(&rest_body, &rest_garments, &bare);
+        let rest_tee = rest_garments.iter().find(|g| g.name == PART).unwrap();
+        let rest_cloth = surface(rest_tee, rest_tee.triangles.clone());
+        // What the gate measures through the tee: the body, and each
+        // underwear layer under it (by name, with its covered corners).
+        let mut pairs: Vec<(String, &[bool])> = Vec::new();
+        if let Some((_, covered)) = cover.body.iter().find(|(n, _)| n == PART) {
+            pairs.push((rest_body.name.clone(), covered));
+        }
+        for (lower, upper, covered) in &cover.layers {
+            if *upper == PART {
+                pairs.push(((*lower).to_owned(), covered));
+            }
+        }
+        let posed: Vec<(Posed, Vec<Posed>)> = stances
+            .iter()
+            .map(|stance| worn(&stage.assets, &dressed, *stance))
+            .collect();
+        let mesh = |(body, garments): &(Posed, Vec<Posed>), name: &str| -> Posed {
+            if body.name == name {
+                body.clone()
+            } else {
+                garments.iter().find(|g| g.name == name).unwrap().clone()
+            }
+        };
+        for (name, covered) in pairs {
+            let rest_under = mesh(&(rest_body.clone(), rest_garments.clone()), &name);
+            // Every corner through the tee in some pose, and whether one
+            // of the tee's openings came near it in some pose.
+            let mut through: HashSet<usize> = HashSet::new();
+            for at in &posed {
+                let tee = at.1.iter().find(|g| g.name == PART).unwrap();
+                let (corners, _) = poke_through_corners("", &mesh(at, &name), tee, covered, false);
+                through.extend(corners);
+            }
+            let mut near_opening: HashSet<usize> = HashSet::new();
+            for at in &posed {
+                let tee = at.1.iter().find(|g| g.name == PART).unwrap();
+                let mut whole = tee.triangles.clone();
+                whole.extend_from_slice(&tee.hidden);
+                let openings = Openings::new(&tee.positions, &whole);
+                let under = mesh(at, &name);
+                for k in &through {
+                    if openings.within(under.positions[*k], HIDE_RULE.opening) {
+                        near_opening.insert(*k);
+                    }
+                }
+            }
+            let mut verdicts: Vec<(usize, &str)> = Vec::new();
+            for k in &through {
+                let verdict = if !encloses(
+                    &rest_cloth,
+                    rest_under.positions[*k],
+                    rest_under.normals[*k],
+                    HIDE_RULE.enclose,
+                ) {
+                    "open at rest"
+                } else if near_opening.contains(k) {
+                    "near an opening"
+                } else {
+                    "to look at"
+                };
+                verdicts.push((*k, verdict));
+            }
+            // Hide every corner still to look at together, then see which
+            // places show in any pose.
+            let look: HashSet<u32> = verdicts
+                .iter()
+                .filter(|(_, v)| *v == "to look at")
+                .map(|(k, _)| *k as u32)
+                .collect();
+            let mut seen: HashSet<u32> = HashSet::new();
+            if !look.is_empty() {
+                for at in &posed {
+                    let (body, garments) = at;
+                    let under = mesh(at, &name);
+                    let (hidden, kept): (Vec<[u32; 3]>, Vec<[u32; 3]>) = under
+                        .triangles
+                        .iter()
+                        .partition(|t| t.iter().any(|v| look.contains(v)));
+                    let cloth: Vec<Surface> = garments
+                        .iter()
+                        .filter(|g| g.name != name)
+                        .map(|g| surface(g, g.triangles.clone()))
+                        .collect();
+                    let skin = if name == body.name {
+                        surface(body, kept.clone())
+                    } else {
+                        surface(body, body.triangles.clone())
+                    };
+                    let layer = (name != body.name).then(|| surface(&under, kept.clone()));
+                    let mut drawn: Vec<&Surface> = cloth.iter().collect();
+                    drawn.push(&skin);
+                    drawn.extend(layer.as_ref());
+                    let cloth_refs: Vec<&Surface> = cloth.iter().collect();
+                    let openings: Vec<Openings> = garments
+                        .iter()
+                        .map(|g| {
+                            let mut whole = g.triangles.clone();
+                            whole.extend_from_slice(&g.hidden);
+                            Openings::new(&g.positions, &whole)
+                        })
+                        .collect();
+                    let refs: Vec<&Openings> = openings.iter().collect();
+                    let views = Views::new(&refs);
+                    for hole in holes_seen(
+                        &hidden,
+                        &under.positions,
+                        &under.normals,
+                        &drawn,
+                        &cloth_refs,
+                        &views,
+                    ) {
+                        if let Some(k) = hole.corner {
+                            seen.insert(k);
+                        }
+                    }
+                }
+            }
+            for (k, verdict) in verdicts {
+                let verdict = match verdict {
+                    "to look at" if seen.contains(&(k as u32)) => "seen",
+                    "to look at" => "hideable in every gate pose",
+                    other => other,
+                };
+                *tally.entry((name.clone(), verdict)).or_default() += 1;
+            }
+        }
+        println!("{} done", description.name);
+    }
+    for ((name, verdict), count) in &tally {
+        println!("{name} through {PART}: {verdict}: {count}");
+    }
+    let mut totals: BTreeMap<&str, usize> = BTreeMap::new();
+    for ((_, verdict), count) in &tally {
+        *totals.entry(verdict).or_default() += count;
+    }
+    println!("all: {totals:?}");
+}

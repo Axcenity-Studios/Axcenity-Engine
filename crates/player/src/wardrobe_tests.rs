@@ -34,9 +34,18 @@ const PARTS: [&str; 3] = ["Shirt_CrewTee", "Pants_Joggers", "Shoes_CourtSneakers
 /// `description` wearing the three items (over the underwear its frame
 /// wears by default).
 fn dressed(description: &Description) -> Description {
+    wearing(description, &OUTFIT)
+}
+
+/// The three items worn together.
+const OUTFIT: [&str; 3] = [TEE, JOGGERS, SNEAKERS];
+
+/// `description` wearing `items` (over the underwear its frame wears by
+/// default).
+fn wearing(description: &Description, items: &[&str]) -> Description {
     let mut out = description.clone();
-    for id in [TEE, JOGGERS, SNEAKERS] {
-        out.items.push(WornItem::new(id));
+    for id in items {
+        out.items.push(WornItem::new(*id));
     }
     out
 }
@@ -49,8 +58,8 @@ fn ours(failure: &Failure) -> bool {
 }
 
 /// Wave 5, hiding under clothing: wearing the crew tee and the joggers
-/// leaves out the skin they enclose, the underwear under them and the
-/// joggers' waistband under the tee's hem where it is enclosed; taking
+/// leaves out the skin they enclose and the underwear under them (the
+/// tee hides nothing of the joggers: it has no mask for them); taking
 /// them off puts it back.
 #[test]
 fn the_wardrobe_hides_the_skin_and_underwear_it_encloses() {
@@ -91,11 +100,11 @@ fn the_wardrobe_hides_the_skin_and_underwear_it_encloses() {
 
 /// How many body triangles the crew tee and joggers hide at least
 /// (masculine, feminine average), and of the underwear: what the masks hid
-/// when made and trimmed with the fine views (wave 5, review fixes 1,
-/// `refinement/wave5/body-hiding.md`). They change only
-/// when the masks are made again.
-const HIDES_SKIN: (usize, usize) = (709, 709);
-const HIDES_UNDER: (usize, usize) = (149, 104);
+/// when made and trimmed with the fine views, for the outfit and for each
+/// item worn alone (wave 5, review fixes 2, `refinement/wave5/body-hiding.md`).
+/// They change only when the masks are made again.
+const HIDES_SKIN: (usize, usize) = (497, 497);
+const HIDES_UNDER: (usize, usize) = (81, 72);
 
 /// Runs the gate for `stance` on every realistic cast and body benchmark
 /// dressed in the three, on the shipped library.
@@ -728,11 +737,18 @@ const FOOTWEAR: [Record; 2] = [
 /// thousand triangles of the legs, and each place is looked at from
 /// about 150 directions. The gate and motion tests above leave holes to
 /// these.
-fn wardrobe_holes(clip: &'static str, frames: &[u32], cast_only: bool, part: usize, parts: usize) {
+fn wardrobe_holes(
+    items: &[&str],
+    clip: &'static str,
+    frames: &[u32],
+    cast_only: bool,
+    part: usize,
+    parts: usize,
+) {
     use super::fit_gate_tests::{HOLES, hidden_triangles, holes, worn_in};
-    let label = format!("wardrobe holes {clip} {part}/{parts}");
+    let label = format!("{} holes {clip} {part}/{parts}", outfit_name(items));
     let stage = Stage::new(
-        &format!("wardrobe-holes-{clip}-{part}"),
+        &format!("{}-holes-{clip}-{part}", outfit_name(items)),
         &repository_library(),
     )
     .expect("the stage");
@@ -743,7 +759,7 @@ fn wardrobe_holes(clip: &'static str, frames: &[u32], cast_only: bool, part: usi
     let size = chosen.len().div_ceil(parts);
     let mut failures = Vec::new();
     for description in chosen.iter().skip(part * size).take(size) {
-        let dressed = dressed(description);
+        let dressed = wearing(description, items);
         let (body, _) = worn(&stage.assets, &dressed, Stance::Rest);
         let (bare, _) = worn(&stage.assets, &undressed(description), Stance::Rest);
         let hidden = hidden_triangles(&bare, &body);
@@ -794,150 +810,320 @@ fn motion_frames(clip: &str) -> Vec<u32> {
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_1() {
-    wardrobe_holes("Walk", &walk_frames(), false, 0, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 0, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_2() {
-    wardrobe_holes("Walk", &walk_frames(), false, 1, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 1, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_3() {
-    wardrobe_holes("Walk", &walk_frames(), false, 2, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 2, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_4() {
-    wardrobe_holes("Walk", &walk_frames(), false, 3, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 3, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_5() {
-    wardrobe_holes("Walk", &walk_frames(), false, 4, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 4, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_6() {
-    wardrobe_holes("Walk", &walk_frames(), false, 5, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 5, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_7() {
-    wardrobe_holes("Walk", &walk_frames(), false, 6, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 6, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_8() {
-    wardrobe_holes("Walk", &walk_frames(), false, 7, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 7, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_9() {
-    wardrobe_holes("Walk", &walk_frames(), false, 8, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 8, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_10() {
-    wardrobe_holes("Walk", &walk_frames(), false, 9, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 9, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_11() {
-    wardrobe_holes("Walk", &walk_frames(), false, 10, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 10, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_12() {
-    wardrobe_holes("Walk", &walk_frames(), false, 11, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 11, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_13() {
-    wardrobe_holes("Walk", &walk_frames(), false, 12, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 12, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_14() {
-    wardrobe_holes("Walk", &walk_frames(), false, 13, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 13, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_15() {
-    wardrobe_holes("Walk", &walk_frames(), false, 14, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 14, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_16() {
-    wardrobe_holes("Walk", &walk_frames(), false, 15, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 15, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_17() {
-    wardrobe_holes("Walk", &walk_frames(), false, 16, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 16, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_through_the_walk_18() {
-    wardrobe_holes("Walk", &walk_frames(), false, 17, 18);
+    wardrobe_holes(&OUTFIT, "Walk", &walk_frames(), false, 17, 18);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_1() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 0, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 0, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_2() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 1, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 1, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_3() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 2, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 2, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_4() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 3, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 3, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_5() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 4, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 4, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_idle_6() {
-    wardrobe_holes("Idle", &motion_frames("Idle"), true, 5, 6);
+    wardrobe_holes(&OUTFIT, "Idle", &motion_frames("Idle"), true, 5, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_1() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 0, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 0, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_2() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 1, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 1, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_3() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 2, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 2, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_4() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 3, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 3, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_5() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 4, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 4, 6);
 }
 
 #[test]
 fn the_wardrobe_shows_no_hidden_place_in_the_run_6() {
-    wardrobe_holes("Run", &motion_frames("Run"), true, 5, 6);
+    wardrobe_holes(&OUTFIT, "Run", &motion_frames("Run"), true, 5, 6);
+}
+
+/// A short name for an item list, for labels and stage folders.
+fn outfit_name(items: &[&str]) -> String {
+    if items == OUTFIT {
+        return "wardrobe".to_owned();
+    }
+    items
+        .iter()
+        .map(|id| id.rsplit('/').next().unwrap_or(id))
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Wave 5, hiding under clothing, review fixes 2: the hole check for
+/// `items` worn without the rest of the wardrobe, at rest, in Idle and in
+/// the gate's held poses, on every gate body (split by bodies like
+/// [`wardrobe_holes`]). A player can wear the crew tee without the
+/// joggers, whose waistband would otherwise block the view up the tee's
+/// hem, and the joggers barefoot and without a top.
+fn holes_held(items: &[&str], part: usize, parts: usize) {
+    use super::fit_gate_tests::{HOLES, hidden_triangles, holes};
+    let name = outfit_name(items);
+    let label = format!("{name} holes held {part}/{parts}");
+    let stage =
+        Stage::new(&format!("{name}-holes-held-{part}"), &repository_library()).expect("the stage");
+    let chosen = bodies();
+    let size = chosen.len().div_ceil(parts);
+    let mut failures = Vec::new();
+    for description in chosen.iter().skip(part * size).take(size) {
+        let dressed = wearing(description, items);
+        let (body, _) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bare, _) = worn(&stage.assets, &undressed(description), Stance::Rest);
+        let hidden = hidden_triangles(&bare, &body);
+        let mut worst: Option<Failure> = None;
+        for stance in [
+            Stance::Rest,
+            Stance::Idle,
+            Stance::Held(HeldPose::TPose),
+            Stance::Held(HeldPose::ArmsRaised),
+            Stance::Held(HeldPose::ElbowsBent),
+            Stance::Held(HeldPose::KneesBent),
+            Stance::Held(HeldPose::ArmsForward),
+        ] {
+            let (body, garments) = worn(&stage.assets, &dressed, stance);
+            let at = format!("{} {}", description.name, pose_name(stance));
+            let (count, most) = holes(&at, &body, &hidden, &garments);
+            if count > 0 && worst.as_ref().is_none_or(|w| most > w.worst) {
+                worst = Some(Failure {
+                    garment: HOLES.to_owned(),
+                    pose: pose_name(stance),
+                    body: at,
+                    count,
+                    worst: most,
+                });
+            }
+        }
+        failures.extend(worst);
+    }
+    check(&label, &failures, &[]);
+}
+
+/// The crew tee alone, over the underwear.
+const TEE_ALONE: [&str; 1] = [TEE];
+/// The joggers alone, barefoot and without a top.
+const JOGGERS_ALONE: [&str; 1] = [JOGGERS];
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_held_1() {
+    holes_held(&TEE_ALONE, 0, 3);
+}
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_held_2() {
+    holes_held(&TEE_ALONE, 1, 3);
+}
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_held_3() {
+    holes_held(&TEE_ALONE, 2, 3);
+}
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_through_the_walk_1() {
+    wardrobe_holes(&TEE_ALONE, "Walk", &walk_frames(), false, 0, 3);
+}
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_through_the_walk_2() {
+    wardrobe_holes(&TEE_ALONE, "Walk", &walk_frames(), false, 1, 3);
+}
+
+#[test]
+fn the_crew_tee_alone_shows_no_hidden_place_through_the_walk_3() {
+    wardrobe_holes(&TEE_ALONE, "Walk", &walk_frames(), false, 2, 3);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_1() {
+    holes_held(&JOGGERS_ALONE, 0, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_2() {
+    holes_held(&JOGGERS_ALONE, 1, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_3() {
+    holes_held(&JOGGERS_ALONE, 2, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_4() {
+    holes_held(&JOGGERS_ALONE, 3, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_5() {
+    holes_held(&JOGGERS_ALONE, 4, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_held_6() {
+    holes_held(&JOGGERS_ALONE, 5, 6);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_1() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 0, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_2() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 1, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_3() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 2, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_4() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 3, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_5() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 4, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_6() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 5, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_7() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 6, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_8() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 7, 9);
+}
+
+#[test]
+fn the_joggers_alone_show_no_hidden_place_through_the_walk_9() {
+    wardrobe_holes(&JOGGERS_ALONE, "Walk", &walk_frames(), false, 8, 9);
 }
