@@ -22,6 +22,14 @@ const SPREAD_RINGS: usize = 6;
 /// Body triangles farther than this from the garment's box are left out
 /// of the push-out checks (they can't be close to it).
 const NEAR: f32 = 0.10;
+/// The farthest skin may be past the cloth over it for the push-out to
+/// take it as skin between a coarse garment's corners (the sagitta of a
+/// 5 cm triangle over the arm is about 7 mm); farther, the cloth found is
+/// another part of the garment, not the cloth over it.
+const BETWEEN_CORNERS: f32 = 0.012;
+/// How closely the cloth over a body corner must face the way the skin
+/// does (the cosine of the angle between their normals).
+const OVER_FACING: f32 = 0.7;
 /// How many rounds the transferred weights are smoothed over the
 /// garment.
 const WEIGHT_ROUNDS: usize = 2;
@@ -368,7 +376,7 @@ pub fn fit_garment(
     // 1. At rest: out of the body and the lower layers.
     let at_rest = obstacles(body, &near, &options.under, &[]);
     for _ in 0..options.rounds.max(1) {
-        let (need, by) = needs(&at_rest, &rest, margin);
+        let (need, by) = needs(&at_rest, &rest, &triangles, margin);
         if need.iter().all(|n| *n == Vec3::ZERO) {
             break;
         }
@@ -431,7 +439,7 @@ pub fn fit_garment(
             let state = obstacles(body, &near, &options.under, &weights);
             for _ in 0..options.rounds.max(1) {
                 let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
-                let (need, by) = needs(&state, &now, margin);
+                let (need, by) = needs(&state, &now, &triangles, margin);
                 if need.iter().all(|n| *n == Vec3::ZERO) {
                     break;
                 }
@@ -475,7 +483,7 @@ pub fn fit_garment(
         let mut lift = vec![Vec3::ZERO; count];
         let mut any = 0;
         let wanted = par_map(&checking, |extreme| {
-            extreme_need(body, &near, options, &rest, &shapes, extreme)
+            extreme_need(body, &near, options, &rest, &triangles, &shapes, extreme)
         });
         let mut again = Vec::new();
         for (need, extreme) in wanted.into_iter().zip(checking) {
@@ -521,7 +529,7 @@ pub fn fit_garment(
                 let state = obstacles(body, &near, &options.under, &weights);
                 for _ in 0..options.rounds.max(1) {
                     let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
-                    let (need, by) = needs(&state, &now, margin);
+                    let (need, by) = needs(&state, &now, &triangles, margin);
                     if need.iter().all(|n| *n == Vec3::ZERO) {
                         break;
                     }
@@ -726,12 +734,13 @@ fn extreme_need(
     near: &[[u32; 3]],
     options: &FitOptions,
     rest: &[Vec3],
+    triangles: &[[u32; 3]],
     shapes: &[CarriedShape],
     extreme: &[(String, f32)],
 ) -> Vec<Vec3> {
     let now = garment_at(rest, shapes, extreme);
     let state = obstacles(body, near, &options.under, extreme);
-    needs(&state, &now, options.margin).0
+    needs(&state, &now, triangles, options.margin).0
 }
 
 /// The body's triangles near the garment's box (the rest are too far to
@@ -776,7 +785,22 @@ fn obstacles(
 /// along the garment's own normal could push it into the next obstacle:
 /// a sleeve's underside, pushed out of the arm, into the torso), the
 /// biggest move wanted, and which obstacle wants it.
-fn needs(state: &Obstacles, points: &[Vec3], margin: f32) -> (Vec<Vec3>, Vec<usize>) {
+///
+/// Then the other way round (wave 5, the licensed tee): an obstacle's
+/// corner the cloth's `triangles` cover is kept `margin` under them too. A
+/// garment much coarser than the body (a licensed base at 2,800
+/// triangles) can have every corner clear while its flat triangles cut
+/// through the skin between them, 6 to 10 mm on the realistic arm. Where
+/// such a corner is less than `margin` under the cloth over it, the
+/// triangle's corners are moved out along the cloth's normal there, each
+/// by its share of the point (its barycentric weight over the sum of their
+/// squares, so the point itself moves by what is wanted).
+fn needs(
+    state: &Obstacles,
+    points: &[Vec3],
+    triangles: &[[u32; 3]],
+    margin: f32,
+) -> (Vec<Vec3>, Vec<usize>) {
     let mut need = vec![Vec3::ZERO; points.len()];
     let mut by = vec![0usize; points.len()];
     for (k, &p) in points.iter().enumerate() {
@@ -795,6 +819,58 @@ fn needs(state: &Obstacles, points: &[Vec3], margin: f32) -> (Vec<Vec3>, Vec<usi
             if push.length() > need[k].length() {
                 need[k] = push;
                 by[k] = *layer;
+            }
+        }
+    }
+    let cloth = Surface::new(
+        points.to_vec(),
+        super::surface::vertex_normals(points, triangles),
+        triangles.to_vec(),
+    );
+    for (layer, surface, _) in &state.surfaces {
+        let mut seen = vec![false; surface.positions.len()];
+        for t in &surface.triangles {
+            for &v in t {
+                let v = v as usize;
+                if std::mem::replace(&mut seen[v], true) {
+                    continue;
+                }
+                let (q, n) = (surface.positions[v], surface.normals[v]);
+                let Some(hit) = cloth.closest(q, margin + 0.03) else {
+                    continue;
+                };
+                // Only skin the cloth lies over, facing the same way (not
+                // a sleeve's inner wall beside the chest, nor past a hem).
+                if n.dot(hit.normal) < OVER_FACING || !hit.is_over(q) {
+                    continue;
+                }
+                let under = -hit.signed(q);
+                if under >= margin || -under > BETWEEN_CORNERS {
+                    continue;
+                }
+                // Skin whose way out meets the cloth from inside is
+                // enclosed by another part of it (the fit gate's
+                // `enclosed`): that part is the cloth over it.
+                if let Some(out) = cloth.cast(q, n, BETWEEN_CORNERS)
+                    && out.normal.dot(n) > 0.0
+                    && out.distance >= margin
+                {
+                    continue;
+                }
+                let want = margin - under;
+                let bary = hit.bary.to_array();
+                let squares: f32 = bary.iter().map(|b| b * b).sum();
+                if squares <= 0.0 {
+                    continue;
+                }
+                for (corner, b) in cloth.triangles[hit.triangle as usize].iter().zip(bary) {
+                    let push = hit.normal * (want * b / squares);
+                    let c = *corner as usize;
+                    if push.length() > need[c].length() {
+                        need[c] = push;
+                        by[c] = *layer;
+                    }
+                }
             }
         }
     }

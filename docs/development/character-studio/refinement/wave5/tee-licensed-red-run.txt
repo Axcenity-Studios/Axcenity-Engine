@@ -1,0 +1,110 @@
+# Red run: the first licensed tee (wave 5, tee-licensed), 2026-11-18
+
+## 1. The intake's load step (assets/characters/realistic/import/test_intake.py LoadTest), before the fix in load.py
+
+BlenderKit's glTF packs its maps as WebP; load.py wrote the WebP bytes under a .png name, and the engine refused the model ("Format error decoding Png: Invalid PNG signature").
+
+```
+A glTF may pack its maps as WebP (BlenderKit's do); the engine
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<repository>\assets\characters\realistic\import\test_intake.py", line 362, in test_a_packed_webp_map_is_saved_as_a_png
+    self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: b'RIFF6\x02\x00\x00' != b'\x89PNG\r\n\x1a\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 2.997s
+
+FAILED (failures=1)
+```
+
+## 2. The licensed tee's gate (crates/player/src/tee_crew_tests.rs), on the intake's first output (placed, engine fit as it was; no refinement)
+
+`cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/tee_crew_tests::/)' --no-capture`
+
+```
+  tee rest measured: Shirt_TeeCrew rest: 52 bodies, worst 10.08 mm
+  tee rest measured: Underwear_BoxerBriefs through Shirt_TeeCrew rest: 7 bodies, worst 1.88 mm
+  tee rest measured: Underwear_Bra through Shirt_TeeCrew rest: 20 bodies, worst 3.62 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 4.19s
+        FAIL [   4.269s] ( 1/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_at_rest
+  tee idle measured: Shirt_TeeCrew idle: 52 bodies, worst 9.03 mm
+  tee idle measured: Underwear_BoxerBriefs through Shirt_TeeCrew idle: 10 bodies, worst 2.12 mm
+  tee idle measured: Underwear_Bra through Shirt_TeeCrew idle: 21 bodies, worst 3.72 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 6.87s
+        FAIL [   6.955s] ( 2/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_in_idle
+  tee Walk [2, 5, 8, 11, 14] measured: Shirt_TeeCrew Walk: 54 bodies, worst 13.05 mm
+  tee Walk [2, 5, 8, 11, 14] measured: Underwear_BoxerBriefs through Shirt_TeeCrew Walk: 33 bodies, worst 4.05 mm
+  tee Walk [2, 5, 8, 11, 14] measured: Underwear_Bra through Shirt_TeeCrew Walk: 21 bodies, worst 3.71 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 7.25s
+        FAIL [   7.326s] ( 3/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_through_the_walk_first_third
+  tee Walk [32, 35, 38, 41, 44] measured: Shirt_TeeCrew Walk: 54 bodies, worst 12.61 mm
+  tee Walk [32, 35, 38, 41, 44] measured: Underwear_BoxerBriefs through Shirt_TeeCrew Walk: 33 bodies, worst 4.17 mm
+  tee Walk [32, 35, 38, 41, 44] measured: Underwear_Bra through Shirt_TeeCrew Walk: 21 bodies, worst 4.28 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 7.77s
+        FAIL [   7.857s] ( 4/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_through_the_walk_last_third
+  tee Walk [17, 20, 23, 26, 29] measured: Shirt_TeeCrew Walk: 54 bodies, worst 8.82 mm
+  tee Walk [17, 20, 23, 26, 29] measured: Underwear_BoxerBriefs through Shirt_TeeCrew Walk: 33 bodies, worst 5.72 mm
+  tee Walk [17, 20, 23, 26, 29] measured: Underwear_Bra through Shirt_TeeCrew Walk: 21 bodies, worst 7.17 mm
+  tee Walk [17, 20, 23, 26, 29] measured: Underwear_Briefs through Shirt_TeeCrew Walk: 2 bodies, worst 1.18 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 7.27s
+        FAIL [   7.340s] ( 5/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_through_the_walk_second_third
+  tee ArmsForward measured: Shirt_TeeCrew ArmsForward: 54 bodies, worst 11.53 mm
+  tee ArmsForward measured: Underwear_BoxerBriefs through Shirt_TeeCrew ArmsForward: 23 bodies, worst 2.37 mm
+  tee ArmsForward measured: Underwear_Bra through Shirt_TeeCrew ArmsForward: 21 bodies, worst 5.34 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 5.16s
+        FAIL [   5.242s] ( 6/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_with_the_arms_forward
+  tee TPose measured: Shirt_TeeCrew TPose: 51 bodies, worst 11.14 mm
+  tee TPose measured: Underwear_BoxerBriefs through Shirt_TeeCrew TPose: 7 bodies, worst 1.88 mm
+  tee TPose measured: Underwear_Bra through Shirt_TeeCrew TPose: 20 bodies, worst 3.62 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 4.94s
+        FAIL [   5.018s] ( 7/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_with_the_arms_out
+  tee ArmsRaised measured: Shirt_TeeCrew ArmsRaised: 52 bodies, worst 11.94 mm
+  tee ArmsRaised measured: Underwear_BoxerBriefs through Shirt_TeeCrew ArmsRaised: 7 bodies, worst 1.88 mm
+  tee ArmsRaised measured: Underwear_Bra through Shirt_TeeCrew ArmsRaised: 20 bodies, worst 3.91 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 4.84s
+        FAIL [   4.922s] ( 8/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_with_the_arms_raised
+  tee ElbowsBent measured: Shirt_TeeCrew ElbowsBent: 52 bodies, worst 10.08 mm
+  tee ElbowsBent measured: Underwear_BoxerBriefs through Shirt_TeeCrew ElbowsBent: 7 bodies, worst 1.88 mm
+  tee ElbowsBent measured: Underwear_Bra through Shirt_TeeCrew ElbowsBent: 20 bodies, worst 3.62 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 4.44s
+        FAIL [   4.516s] ( 9/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_with_the_elbows_bent
+  tee KneesBent measured: Shirt_TeeCrew KneesBent: 52 bodies, worst 10.08 mm
+  tee KneesBent measured: Underwear_BoxerBriefs through Shirt_TeeCrew KneesBent: 7 bodies, worst 1.88 mm
+  tee KneesBent measured: Underwear_Bra through Shirt_TeeCrew KneesBent: 20 bodies, worst 3.62 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 5.06s
+        FAIL [   5.134s] (10/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_covers_the_cast_with_the_knees_bent
+  tee levels of detail measured: Shirt_TeeCrew LOD1 rest: 54 bodies, worst 11.60 mm
+  tee levels of detail measured: Shirt_TeeCrew LOD2 rest: 54 bodies, worst 15.53 mm
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 3.44s
+        FAIL [   3.523s] (11/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_levels_of_detail_stay_clear_of_the_body
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 287 filtered out; finished in 13.14s
+        PASS [  13.227s] (12/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_stays_steady_in_the_idle
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 7.46s
+        FAIL [   7.525s] (13/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_stays_steady_in_the_run
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 287 filtered out; finished in 8.99s
+        PASS [   9.070s] (14/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_stays_steady_in_the_walk
+     Summary [  91.926s] 14 tests run: 2 passed, 12 failed, 274 skipped
+```
+
+## 3. The fit's push-out on a coarse garment (crates/avatar/src/fit/tests.rs), before needs() kept the body's corners under the cloth's triangles
+
+```
+        FAIL [   0.022s] (1/1) axcenity-avatar fit::tests::skin_between_a_coarse_garments_corners_stays_under_its_triangles
+    thread 'fit::tests::skin_between_a_coarse_garments_corners_stays_under_its_triangles' (38936) panicked at crates\avatar\src\fit\tests.rs:761:9:
+    at [] the skin comes -8.6 mm from the cloth (the margin is 2 mm)
+     Summary [   0.023s] 1 test run: 0 passed, 1 failed, 206 skipped
+        FAIL [   0.022s] (1/1) axcenity-avatar fit::tests::skin_between_a_coarse_garments_corners_stays_under_its_triangles
+```
+
+(The message reads "comes -8.6 mm from the cloth": the skin was 8.6 mm outside it.)
+
+## Review fixes 1: the provenance record leaves out the unwrap (test_intake.py RefineTest), before changes_of() read refined.json's 'unwrap'
+
+```
+FAIL: test_the_record_lists_the_unwrap (__main__.RefineTest.test_the_record_lists_the_unwrap)
+AssertionError: 0 != 1 : ["fitted, rigged and given the body's shapes by the Axcenity engine's fit", 'materials rebuilt for the Axcenity engine']
+Ran 3 tests in 0.698s
+FAILED (failures=1)
+```

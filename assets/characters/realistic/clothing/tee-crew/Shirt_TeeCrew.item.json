@@ -1,0 +1,53 @@
+{
+  "format_version": 1,
+  "id": "axcenity/realistic-tee-crew",
+  "label": "Crew-neck T-shirt (licensed)",
+  "kind": "garment",
+  "slot": "top",
+  "tier": "built_in",
+  "bases": [
+    "axcenity/realistic"
+  ],
+  "model": {
+    "file": "Shirt_TeeCrew.glb",
+    "object": "AxcenityRealistic/Shirt_TeeCrew"
+  },
+  "hides": [],
+  "materials": [
+    {
+      "name": "Jersey",
+      "shading": "cloth",
+      "label": "Shirt",
+      "role": "primary"
+    },
+    {
+      "name": "Rib",
+      "shading": "cloth",
+      "label": "Neck band",
+      "role": "secondary"
+    }
+  ],
+  "fit": {
+    "method": "binding",
+    "data": "Shirt_TeeCrew.binding.json",
+    "margin": 0.002
+  },
+  "tags": [
+    "tee",
+    "t-shirt",
+    "jersey",
+    "casual",
+    "licensed"
+  ],
+  "thumbnail": "Shirt_TeeCrew.png",
+  "source": {
+    "author": "Introspective Mnisi; fitted by Axcenity Engine contributors",
+    "licence": "CC0-1.0",
+    "url": "https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/",
+    "origin": "imported",
+    "provenance": "Shirt_TeeCrew.provenance.json"
+  },
+  "about": "A short-sleeved cotton jersey T-shirt with a rib crew neck and turned hems, made from a CC0 licensed base.",
+  "quality": "draft",
+  "layer": 1
+}

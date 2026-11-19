@@ -122,10 +122,13 @@ def transfer(body, points, split=None, influences=4):
     return joints, weights
 
 
-def step(spec, work, source="conformed.npz", target="weighted.npz"):
-    """Weights the conformed item from the body at rest."""
+def step(spec, work, source=None, target="weighted.npz"):
+    """Weights the conformed item (refined, when `refine.py` ran) from the
+    body at rest."""
     import bodyglb
     from workmesh import WorkMesh
+    if source is None:
+        source = "refined.npz" if os.path.exists(os.path.join(work, "refined.npz")) else "conformed.npz"
     body = bodyglb.load(spec.get("body"))
     mesh = WorkMesh.load(os.path.join(work, source))
     split = spec.get("weights", {}).get("split")

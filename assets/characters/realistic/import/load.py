@@ -71,20 +71,41 @@ def _upstream_image(socket, seen=None):
 
 
 def _save_image(image, folder, name):
+    """Copies `image` into `folder` as `name` plus its extension. The
+    engine reads PNG and JPEG, so any other format (a glTF's packed WebP,
+    a TGA beside an FBX) is written as a PNG (Pillow), never its bytes
+    under a `.png` name."""
     os.makedirs(folder, exist_ok=True)
     source = bpy.path.abspath(image.filepath) if image.filepath else ""
     if image.packed_file is None and source and os.path.isfile(source):
         ext = os.path.splitext(source)[1].lower()
-        out = os.path.join(folder, name + ext)
-        shutil.copyfile(source, out)
-        return os.path.basename(out)
+        if ext in (".png", ".jpg", ".jpeg"):
+            out = os.path.join(folder, name + ext)
+            shutil.copyfile(source, out)
+            return os.path.basename(out)
+        with open(source, "rb") as f:
+            return _as_png(f.read(), folder, name)
     if image.packed_file is not None:
-        ext = {"JPEG": ".jpg", "PNG": ".png"}.get(image.file_format, ".png")
+        data = image.packed_file.data
+        ext = {"JPEG": ".jpg", "PNG": ".png"}.get(image.file_format)
+        if ext is None:
+            return _as_png(data, folder, name)
         out = os.path.join(folder, name + ext)
         with open(out, "wb") as f:
-            f.write(image.packed_file.data)
+            f.write(data)
         return os.path.basename(out)
     return None
+
+
+def _as_png(data, folder, name):
+    """`data` (an image file's bytes in any format Pillow reads) written as
+    `name.png` in `folder`."""
+    import io
+
+    from PIL import Image
+    out = os.path.join(folder, name + ".png")
+    Image.open(io.BytesIO(data)).save(out, "PNG")
+    return os.path.basename(out)
 
 
 def material_maps(material, folder):

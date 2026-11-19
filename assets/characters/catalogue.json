@@ -265,6 +265,25 @@
       ]
     },
     {
+      "id": "axcenity/realistic-tee-crew",
+      "manifest": "realistic/clothing/tee-crew/Shirt_TeeCrew.item.json",
+      "label": "Crew-neck T-shirt (licensed)",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "tee",
+        "t-shirt",
+        "jersey",
+        "casual",
+        "licensed"
+      ],
+      "thumbnail": "realistic/clothing/tee-crew/Shirt_TeeCrew.png"
+    },
+    {
       "id": "axcenity/sneakers",
       "manifest": "humanoid/items/sneakers.item.json",
       "label": "Sneakers",

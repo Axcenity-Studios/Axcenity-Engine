@@ -13,6 +13,7 @@ The steps, in order (each also runs alone: `python -I <step>.py --help`):
 | load | `load.py` | `loaded.npz`, `textures/` |
 | topology | `topology.py` | `topology.npz` (report, fixes, retopology help) |
 | conform | `conform.py` | `conformed.npz` (placed, posed to the rest pose) |
+| refine | `refine.py` | `refined.npz` (only with a `refine` block: unwrap, bands, turned hems, maps) |
 | weights | `skinning.py` | `weighted.npz` |
 | levels | `levels.py` | `lod0.npz`, `lod1.npz`, ... |
 | checks | `checks.py` | `checks.json` (asset-quality.md section 2) |
@@ -32,7 +33,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-STEPS = ["record", "load", "topology", "conform", "weights", "levels", "checks", "export"]
+STEPS = ["record", "load", "topology", "conform", "refine", "weights", "levels", "checks", "export"]
 
 
 def run(name, spec, args):
@@ -51,6 +52,15 @@ def run(name, spec, args):
     if name == "conform":
         import conform
         return conform.step(spec, args.work)
+    if name == "refine":
+        refined = os.path.join(args.work, "refined.npz")
+        if not spec.get("refine"):
+            # Nothing to refine: the weights read the conformed mesh.
+            if os.path.exists(refined):
+                os.remove(refined)
+            return {"skipped": "no refine block"}
+        import refine
+        return refine.step(spec, args.work)
     if name == "weights":
         import skinning
         return skinning.step(spec, args.work)

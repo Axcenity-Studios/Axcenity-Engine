@@ -481,6 +481,9 @@ place(&Binding, positions, normals, triangles) -> Vec<Vec3>
 carried_shapes(&BaseManifest, &BodyMesh) -> Vec<String>          // identity (parameters, corners) + Corrective_*, no Mask_*
 fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds, poses, pose_states }) -> Result<Fitted, FitError>
     // weights from the skin under each corner (both sides of a crease), the bound point's where none; normals turned with the push-out
+    // push-out both ways (wave 5): each garment corner `margin` out of the body and lower layers, and each body or
+    // lower-layer corner its triangles cover (facing the same way, within 12 mm past them, not enclosed) `margin`
+    // under them, the triangle's corners moved by their barycentric share: a coarse licensed base can't cut the skin
 Fitted { garment, joints, weights, shapes: Vec<CarriedShape>, binding, report: FitReport { layers: Vec<LayerOffset>, inside_most, .. } }
 triangle_regions(&BodyMesh, &RegionMap) -> Vec<u8>;  coverage(&BodyMesh, &regions, &Surface) -> Coverage
 hidden_regions(&BaseManifest, &Coverage) -> Vec<String>;  classify(&BaseManifest, &Coverage) -> Option<SlotGuess>
