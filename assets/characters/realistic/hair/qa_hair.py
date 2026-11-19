@@ -185,6 +185,15 @@ def surface_measures(style):
     # Texel density.
     cap = []
     along, across = [], []
+    # Where the cap is mapped: the wave-4 style's islands at the atlas's top
+    # (rows above 484 px), a guide-groomed style's cap patch (its build
+    # report's `atlas.cap`, pixels).
+    cap_rect = (0, 0, size, 484)
+    report = os.path.join(PACKAGE, "hair", style["file"].replace(".glb", ".build.json"))
+    if style.get("method") == "guides" and os.path.exists(report):
+        with open(report) as f:
+            c = json.load(f)["atlas"]["cap"]
+        cap_rect = (c["x"], c["y"], c["x"] + c["w"], c["y"] + c["h"])
     for k, tri in enumerate(tris):
         a, b, c = co[tri]
         area = 0.5 * np.linalg.norm(np.cross(b - a, c - a)) * 1e4  # cm²
@@ -193,9 +202,9 @@ def surface_measures(style):
         ta, tb, tc = uv[k] * size
         uv_area = 0.5 * abs((tb[0] - ta[0]) * (tc[1] - ta[1]) - (tc[0] - ta[0]) * (tb[1] - ta[1]))
         density_px = math.sqrt(uv_area / area)
-        # The cap's triangles are mapped to the islands at the atlas's top
-        # (`atlas.layout`: rows above 484 px); Blender's V is up.
-        if (uv[k][:, 1] > 1.0 - 484.0 / size).all():
+        # Blender's V is up.
+        px, py = uv[k][:, 0] * size, (1.0 - uv[k][:, 1]) * size
+        if ((px >= cap_rect[0]) & (px <= cap_rect[2]) & (py >= cap_rect[1]) & (py <= cap_rect[3])).all():
             cap.append(density_px)
             continue
         # Along: the edge whose UV moves most in V.

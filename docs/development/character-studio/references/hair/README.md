@@ -310,3 +310,38 @@ Every `path:line` in section 1 was opened and holds. One limit was added (ray-tr
 - Nothing from a commercial game, a commercial character tool, a marketplace or a portfolio site is above class 4. Epic, Autodesk, SideFX and Reallusion documentation rows are class 4 and used for numbers and method only.
 - The folder holds this file only. No image or asset was downloaded into the repository.
 - No personal details or local paths. Authors named are those of public articles and papers. Quotes are a sentence or less, each beside its source.
+
+## 10. The crop-taper references (wave 5, decision 14)
+
+The style `axcenity/realistic-hair-crop-taper` was modelled from scratch against these photographs (Paul's decision 14: no licensed hair is usable without an account). Found through the Openverse API on 2026-11-18 (`license=cc0,by,pdm`); every picture was looked at before it was kept. **References only (class 4 for this use):** looked at, never shipped, copied, traced or committed. The pictures are kept outside the repository (`axcenity-w5-sources/references/hair-scratch/`, with each file's SHA-256 in its `meta.json`). Every one is CC BY 2.0, so nothing here needs a game credit: no part of any picture is in the asset.
+
+| Key | What it shows | Openverse page | Source page | Author | Licence |
+|---|---|---|---|---|---|
+| e293009a | Front: short textured crop, top pushed up and forward, short sides | https://openverse.org/image/e293009a-648d-4a90-892a-9350da23c20f | https://www.flickr.com/photos/53445623@N05/4939371581 | hairmagicbymila | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 09a27a73 | Front: short crop, fine hairline at the forehead | https://openverse.org/image/09a27a73-cd59-4e7a-887a-481e12b473f4 | https://www.flickr.com/photos/125615321@N04/14682027997 | Julien.Belli | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 057acfa7 | Front: a fresh short cut, temples and the front's density | https://openverse.org/image/057acfa7-f67b-4b00-aaae-fc8ef1c9345d | https://www.flickr.com/photos/81677556@N00/23482139132 | sebilden | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 57b04b17 | Side (profile): textured top, scissor-tapered sides over the ear | https://openverse.org/image/57b04b17-a236-4996-b928-ff72e6ced218 | https://www.flickr.com/photos/35034348378@N01/93304499 | sillygwailo | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 79cb8d63 | Side, three-quarter: short top, taper above the ear, sideburn | https://openverse.org/image/79cb8d63-82c5-4334-9354-2c714e16b18b | https://www.flickr.com/photos/13867043@N08/1405929984 | thcsarchive | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 977130a5 | Close: the temple's hairline (fine hairs over about 1 cm), piecey top 35 to 45 mm | https://openverse.org/image/977130a5-feaa-4eea-bb8f-b968df3a5751 | https://www.flickr.com/photos/26813255@N00/24155520 | bsdfm | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 2dc8c34d | Close, side and top: a very short crop's hairline ramp and texture | https://openverse.org/image/2dc8c34d-2df0-44cd-8ac5-2a257a61a519 | https://www.flickr.com/photos/9139977@N05/6104438871 | rockbadger | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| c16d1119 | Back: the silhouette, rounded crown, tapered nape ending in a soft rounded line | https://openverse.org/image/c16d1119-60d6-4376-ab8f-e56f06ed43fc | https://www.flickr.com/photos/46319796@N00/3232968751 | Josh (broma) | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| a34e7d9b | Back, three-quarter: short crop with a taper behind the ear | https://openverse.org/image/a34e7d9b-d12d-4988-adf6-511016007406 | https://www.flickr.com/photos/26558498@N00/94795084 | markguim | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 2eed5bf2 | Close: a tapered nape (short layered hair fading to the neck) | https://openverse.org/image/2eed5bf2-9728-491e-8927-9062acd27e7d | https://www.flickr.com/photos/34756977@N00/4626047442 | Rochelle Hartman | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| 22eda146 | Top (heads bowed): the crown's whorl off the middle, short crop from above | https://openverse.org/image/22eda146-6eef-4b18-b889-9e9912b39fc9 | https://www.flickr.com/photos/30182398@N00/11590336574 | ecastro | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+| fc53331e | Top, close: the crown and the front hairline from above | https://openverse.org/image/fc53331e-1c44-4c92-8ffd-d9cea9d39c85 | https://www.flickr.com/photos/11721791@N00/73401766 | dkaz | CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) |
+
+**The style, measured from them** (lengths from the pictures against the ear, about 60 mm tall, and the eye; to about ±5 mm):
+
+| Zone | Length | Lie |
+|---|---|---|
+| Front top | 40 to 46 mm | Pushed forward and up, the ends lifted and piecey (e293009a, 977130a5); the fringe stops at or just inside the hairline |
+| Top and crown | 33 to 42 mm | Away from the whorl, forward over the top |
+| Crown whorl | One, clockwise, about 2/3 of the way back over the top, a little off the middle (22eda146) | The hair spirals out of it and lies flatter there |
+| Upper sides | 26 to 36 mm | Down and a little back |
+| Over the ears | 16 to 21 mm, scissor-tapered | Close to the head; the line clears the ear by about 9 mm (57b04b17, 79cb8d63) |
+| Back | 28 to 36 mm | Down |
+| Nape | Tapering from about 23 mm to 10 mm over a soft band about 16 mm deep; the nape line is rounded (c16d1119, 2eed5bf2) | Down and a little toward the middle |
+| Parting | None | |
+| Hairline | Front about 6 cm above the brows, temples a little recessed; fine hairs over about 1 cm (977130a5, 2dc8c34d) | |
+
+Silhouette: a rounded crop that stands about 12 to 16 mm off the head on top and 10 to 12 mm at the sides; no helmet (the sides hug the head below the temples), the ears clear. The values the build uses are in `assets/characters/realistic/hair/styles.py` (`CROP_TAPER`).

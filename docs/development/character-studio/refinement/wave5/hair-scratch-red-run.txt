@@ -1,0 +1,32 @@
+# hair-scratch red run (2026-11-18): the tests written before the style exists
+
+$ cargo nextest run -p axcenity-avatar --no-fail-fast -E "binary(realistic_hair_crop_taper)"
+FAIL [   0.008s] (1/6) axcenity-avatar::realistic_hair_crop_taper its_references_are_recorded_with_accepted_licences
+FAIL [   0.010s] (2/6) axcenity-avatar::realistic_hair_crop_taper its_model_is_hair_cut_out_two_sided_a_shell_and_within_the_budgets
+FAIL [   0.014s] (3/6) axcenity-avatar::realistic_hair_crop_taper it_stays_a_draft_while_a_measured_check_fails
+FAIL [   0.017s] (4/6) axcenity-avatar::realistic_hair_crop_taper its_limitations_claim_only_what_its_measurements_show
+FAIL [   0.019s] (5/6) axcenity-avatar::realistic_hair_crop_taper its_atlas_tiles_end_in_tapered_tips_not_straight_cuts
+FAIL [   0.022s] (6/6) axcenity-avatar::realistic_hair_crop_taper the_crop_is_a_new_card_groom_for_the_realistic_base_that_follows_the_head
+Summary [   0.022s] 6 tests run: 0 passed, 6 failed, 0 skipped
+a section for the crop's references
+error: test run failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+stdout ───
+the library has no `axcenity/realistic-hair-crop-taper`
+thread 'it_stays_a_draft_while_a_measured_check_fails' (10348) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:46:28:
+thread 'its_atlas_tiles_end_in_tapered_tips_not_straight_cuts' (17048) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:46:28:
+thread 'its_limitations_claim_only_what_its_measurements_show' (21368) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:46:28:
+thread 'its_model_is_hair_cut_out_two_sided_a_shell_and_within_the_budgets' (21696) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:46:28:
+thread 'its_references_are_recorded_with_accepted_licences' (18348) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:266:10:
+thread 'the_crop_is_a_new_card_groom_for_the_realistic_base_that_follows_the_head' (16096) panicked at crates\avatar\tests\realistic_hair_crop_taper.rs:46:28:
+
+$ cargo nextest run -p axcenity-player --no-fail-fast -E "test(/hair_tests::the_crop_taper/)"
+FAIL [  22.115s] (1/2) axcenity-player::bin/axcenity-player hair_tests::the_crop_taper_draws_on_both_frames
+left out: items[1]: the library has no item `axcenity/realistic-hair-crop-taper`
+thread 'hair_tests::the_crop_taper_draws_on_both_frames' (46068) panicked at crates\player\src\hair_tests.rs:134:13:
+realistic-masculine-cast-average: the hair is drawn
+FAIL [  29.902s] (2/2) axcenity-player::bin/axcenity-player hair_tests::the_crop_taper_follows_the_heads_width
+hair width from the back: temple_width -1 0 px, 1 0 px
+thread 'hair_tests::the_crop_taper_follows_the_heads_width' (18104) panicked at crates\player\src\hair_tests.rs:213:5:
+the hair is drawn (0 px)
+Summary [  29.902s] 2 tests run: 0 passed, 2 failed, 288 skipped

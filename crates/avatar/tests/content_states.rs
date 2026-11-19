@@ -27,7 +27,10 @@ const WAVE_4_DRAFTS: [&str; 4] = [
 /// Wave 5's licensed items, drafts until the lead's review and Paul's
 /// sign-off of the first of each kind: the first licensed tee
 /// (`refinement/wave5/tee-licensed.md`).
-const WAVE_5_DRAFTS: [&str; 1] = ["axcenity/realistic-tee-crew"];
+const WAVE_5_DRAFTS: [&str; 2] = [
+    "axcenity/realistic-tee-crew",
+    "axcenity/realistic-hair-crop-taper",
+];
 
 /// The realistic underwear, made before the standard (Legacy).
 const REALISTIC_UNDERWEAR: [&str; 3] = [

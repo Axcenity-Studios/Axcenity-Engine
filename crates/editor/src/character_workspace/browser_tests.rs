@@ -340,7 +340,8 @@ fn an_empty_page_says_what_is_hidden() {
         );
         browser::empty_message(&listing, Shelf::Hair, filters)
     };
-    // The realistic body's own hairstyle (the short crop) is a draft, and
+    // The realistic body's own hairstyles (the short crop and the crop
+    // taper) are drafts, and
     // the fixtures' two are production: the page has tiles.
     assert!(hair(Shown::default(), &Filters::default()).is_none());
     let searching = Filters {
@@ -369,7 +370,7 @@ fn an_empty_page_says_what_is_hidden() {
     assert_eq!(title, "No production hairstyles yet");
     assert_eq!(
         sentence,
-        "Legacy items: 2 (turn on Legacy items to show them). Drafts: 1 (content review only)."
+        "Legacy items: 2 (turn on Legacy items to show them). Drafts: 2 (content review only)."
     );
     let clothing = browser::list(
         &only_old,
@@ -1258,8 +1259,8 @@ fn the_realistic_pages_say_what_they_have() {
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::PickCategory(Category::Hair));
     let texts = draw(&mut workspace, Vec::new());
-    // Its one hairstyle, the short crop (R6), is a draft: no production
-    // hairstyle yet, and the page says so.
+    // Its two hairstyles, the short crop (R6) and the crop taper (wave 5),
+    // are drafts: no production hairstyle yet, and the page says so.
     assert!(
         texts.iter().any(|t| t == "No production hairstyles yet"),
         "{texts:?}"
@@ -1267,7 +1268,7 @@ fn the_realistic_pages_say_what_they_have() {
     assert!(
         texts
             .iter()
-            .any(|t| t == "Drafts: 1 (content review only)."),
+            .any(|t| t == "Drafts: 2 (content review only)."),
         "{texts:?}"
     );
     // With no tile to point at, no "Trying on" bar.

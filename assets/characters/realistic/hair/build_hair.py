@@ -27,10 +27,12 @@ import numpy as np  # noqa: E402
 
 import atlas  # noqa: E402
 import cards  # noqa: E402
+import clump_cards  # noqa: E402
 import glb  # noqa: E402
 import scalp  # noqa: E402
 import styles  # noqa: E402
 from groom import Groom  # noqa: E402
+from guides import GuideGroom  # noqa: E402
 
 PACKAGE = os.path.dirname(HERE)
 LEVELS = ("", "_LOD1", "_LOD2")
@@ -73,18 +75,29 @@ def main():
     parser.add_argument("--style", default="short-crop", choices=sorted(styles.STYLES))
     parser.add_argument("--parts", default=os.path.join(PACKAGE, "RealisticParts.glb"))
     parser.add_argument("--out", default=PACKAGE)
+    parser.add_argument("--guides-blend", default="",
+                        help="also write a guide-groomed style's guide curves to this .blend, for editing by hand")
     args = parser.parse_args()
     style = styles.STYLES[args.style]
     body = scalp.Body(args.parts)
-    groom = Groom(body, style)
+    # A style groomed from guide curves by zone (wave 5) or the wave-4 comb.
+    guided = style.get("method") == "guides"
+    groom = GuideGroom(body, style) if guided else Groom(body, style)
     skeleton = glb.Skeleton(args.parts)
     report = {"style": style["id"], "levels": {}, "head_centre": [round(float(x), 5) for x in groom.head.centre],
               "crown": [round(float(x), 5) for x in groom.crown]}
+    if guided and args.guides_blend:
+        write_guides(groom, args.guides_blend)
     with tempfile.TemporaryDirectory() as tmp:
-        islands, maps = atlas.bake(style["seed"], tmp, style["object"])
+        tiles = None
+        if guided:
+            islands, maps, tiles, cap_tile = clump_cards.bake(style, tmp, style["object"])
+        else:
+            islands, maps = atlas.bake(style["seed"], tmp, style["object"])
         built = []
         for level in range(3):
-            pos, nrm, uv, tris, layers, roots = cards.build(groom, islands, level).arrays()
+            mesh = clump_cards.build(groom, islands, level) if guided else cards.build(groom, islands, level)
+            pos, nrm, uv, tris, layers, roots = mesh.arrays()
             binding = scalp.Binding(body, pos)
             order, weights = binding.weights()
             built.append((level, pos, nrm, uv, tris, layers, binding, order, weights))
@@ -106,12 +119,19 @@ def main():
         material = {"name": "Hair", "alphaMode": "MASK", "alphaCutoff": 0.5, "doubleSided": True,
                     "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": style["roughness"]},
                     "normal_scale": 0.5}
+        if guided:
+            # Every layer lies on the head: a shell (docs/rendering/hair.md).
+            material["extras"] = {"axcenity_hair_shell": True}
         out_glb = os.path.join(args.out, "hair", style["file"])
         glb.write(out_glb, skeleton, meshes, material, maps)
     follows = [n for n in names if n == "Frame_Feminine" or not is_expression(n)]
     report["shapes"] = sorted(names)
     report["follows"] = sorted(follows)
     report["atlas"] = {"size": atlas.SIZE, "islands": {k: len(v) for k, v in islands.items()}}
+    if tiles is not None:
+        # Each card tile's place (pixels, root at the top), for the tests.
+        report["atlas"]["tiles"] = tiles
+        report["atlas"]["cap"] = cap_tile
     with open(os.path.join(args.out, "hair", style["file"].replace(".glb", ".build.json")), "w", newline="\n") as f:
         json.dump(report, f, indent=2)
         f.write("\n")
@@ -121,6 +141,23 @@ def main():
         json.dump(item, f, indent=2)
         f.write("\n")
     print(json.dumps(report["levels"], indent=1))
+
+
+def write_guides(groom, path):
+    """The style's guide curves as a Blender curve object (`<object>_Guides`)
+    in a new .blend at `path`, beside the body: for a person to look at and
+    edit by hand. The build reads the zones in `styles.py`, not this file."""
+    data = bpy.data.curves.new(groom.style["object"] + "_Guides", "CURVE")
+    data.dimensions = "3D"
+    for points, *_ in groom.guides():
+        spline = data.splines.new("POLY")
+        spline.points.add(len(points) - 1)
+        for point, p in zip(spline.points, points):
+            point.co = (float(p[0]), float(p[1]), float(p[2]), 1.0)
+    obj = bpy.data.objects.new(data.name, data)
+    bpy.context.scene.collection.objects.link(obj)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(path))
+    print("guides written to", path)
 
 
 def is_expression(name):
