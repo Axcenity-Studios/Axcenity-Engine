@@ -125,6 +125,7 @@ mod tests {
         model.morph_targets = vec![MorphTarget {
             name: "Build".into(),
             default_weight: 0.0,
+            driver: None,
         }];
         model
     }

@@ -1012,6 +1012,49 @@ fn a_gltf_files_blend_shapes_are_read_and_shared_by_name() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// The blinking face with its `Smile` driven by a joint, as a garment
+/// carries its pose correctives (wave 5): the mesh's
+/// `extras.axcenity_correctives`, `[{shape, bone, axis, angles}]`.
+pub(super) fn blinking_face_with_a_driver(folder: &Path) -> String {
+    let gltf = blinking_face(folder);
+    let mut file: serde_json::Value = serde_json::from_str(gltf).unwrap();
+    file["meshes"][0]["extras"]["axcenity_correctives"] = serde_json::json!([
+        { "shape": "Smile", "bone": "Jaw", "axis": [0.0, 0.0, 1.0], "angles": [10.0, 40.0] },
+        // Not usable (the angles fall): ignored.
+        { "shape": "Blink_Left", "bone": "Jaw", "axis": [1.0, 0.0, 0.0], "angles": [30.0, 0.0] },
+        // A shape the mesh hasn't: ignored.
+        { "shape": "Frown", "bone": "Jaw", "axis": [1.0, 0.0, 0.0], "angles": [0.0, 30.0] }
+    ]);
+    file.to_string()
+}
+
+/// A shape the file says a joint drives keeps that rule (the joint, the
+/// axis and the angles); every other shape has none.
+#[test]
+fn a_gltf_meshs_extras_say_which_joint_drives_a_shape() {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-gltf-driver-{}", std::process::id())),
+    );
+    let gltf = blinking_face_with_a_driver(&folder);
+    let model = load_model(gltf.as_bytes(), &folder, ModelFormat::Gltf).unwrap();
+    let names: Vec<&str> = model
+        .morph_targets
+        .iter()
+        .map(|target| target.name.as_str())
+        .collect();
+    assert_eq!(names, ["Blink_Left", "Smile"]);
+    assert_eq!(
+        model.morph_targets[1].driver,
+        Some(PoseDriver {
+            bone: "Jaw".to_owned(),
+            axis: [0.0, 0.0, 1.0],
+            start: 10.0,
+            full: 40.0,
+        })
+    );
+    assert_eq!(model.morph_targets[0].driver, None);
+}
+
 #[test]
 fn a_blend_shape_accessor_without_data_reads_as_no_moves() {
     // Blender writes a shape that doesn't move a primitive as an accessor

@@ -1,0 +1,77 @@
+# Pose correctives (wave 5, stage 3): the red runs
+
+## 1. The contract and the runtime, before they were built (stubs: the glTF rules not read, Correctives::driven empty, PoseCorrective::check empty)
+
+cargo nextest run -p axcenity-assets -p axcenity-anim -p axcenity-avatar --no-fail-fast -E 'test(/drives_a_shape|joints_that_drive|joint_drives|driven_shapes|own_shapes|pose_correctives|cloth|simulated_move|run_solves|garment_gets_the_bodys/)'
+
+FAIL [   0.032s] ( 5/15) axcenity-assets model::cooked_model::tests::a_cooked_model_keeps_the_joints_that_drive_its_shapes
+FAIL [   0.034s] ( 6/15) axcenity-assets model::tests::a_gltf_meshs_extras_say_which_joint_drives_a_shape
+FAIL [   0.051s] ( 8/15) axcenity-avatar tests::validation::an_items_pose_correctives_read_back_and_bad_ones_are_reported
+FAIL [   0.057s] ( 9/15) axcenity-avatar fit::tests::pose_correctives_written_into_a_garments_file_load_as_driven_shapes
+FAIL [   0.365s] (10/15) axcenity-anim correctives::tests::a_shape_the_model_says_a_joint_drives_leans_as_the_joint_turns
+FAIL [   0.389s] (12/15) axcenity-avatar::cloth_correctives each_run_solves_its_shapes_at_full_weight_on_top_of_those_before
+FAIL [   0.399s] (13/15) axcenity-anim correctives::tests::a_part_drives_its_own_shapes_and_keeps_its_leaders_weights
+PASS [   0.016s] ( 1/15) axcenity-avatar fit::hiding::tests::hidden_skin_past_a_hem_or_through_the_cloth_is_a_hole
+PASS [   0.019s] ( 2/15) axcenity-avatar material::tests::hair_and_cloth_have_the_values_their_shading_models_draw
+PASS [   0.022s] ( 3/15) axcenity-assets model::cooked_model::tests::a_cooked_model_keeps_its_hair_and_cloth_materials
+PASS [   0.023s] ( 4/15) axcenity-assets model::tests::a_cloths_sheen_and_anisotropy_are_read_from_khr_extensions
+PASS [   0.048s] ( 7/15) axcenity-assets model::tests::a_gltf_materials_extras_mark_it_hair_or_cloth_and_name_a_hair_atlas_s_maps
+PASS [   0.380s] (11/15) axcenity-anim correctives::tests::a_part_without_driven_shapes_is_left_alone
+PASS [   0.420s] (14/15) axcenity-avatar::cloth_correctives a_garment_gets_the_bodys_shoulder_rules_and_its_limbs_bends
+PASS [   0.433s] (15/15) axcenity-avatar::cloth_correctives a_simulated_move_comes_back_as_its_poses_shape
+Summary [   0.435s] 15 tests run: 8 passed, 7 failed, 612 skipped
+assertion `left == right` failed
+assertion failed: (posed.morph_weights()[index] - 1.0).abs() < 1e-3
+assertion failed: first.morph_targets[1].driver.is_some()
+left: 0
+left: None
+right: 1
+right: Some(PoseDriver { bone: "Chest", axis: [0.0, 0.0, 1.0], start: 0.0, full: 30.0 })
+right: Some(PoseDriver { bone: "Jaw", axis: [0.0, 0.0, 1.0], start: 10.0, full: 40.0 })
+thread 'correctives::tests::a_part_drives_its_own_shapes_and_keeps_its_leaders_weights' (25868) panicked at crates\anim\src\correctives.rs:626:9:
+thread 'correctives::tests::a_shape_the_model_says_a_joint_drives_leans_as_the_joint_turns' (34808) panicked at crates\anim\src\correctives.rs:582:9:
+thread 'each_run_solves_its_shapes_at_full_weight_on_top_of_those_before' (17156) panicked at crates\avatar\tests\cloth_correctives.rs:135:13:
+thread 'fit::tests::pose_correctives_written_into_a_garments_file_load_as_driven_shapes' (9396) panicked at crates\avatar\src\fit\tests.rs:819:5:
+thread 'model::cooked_model::tests::a_cooked_model_keeps_the_joints_that_drive_its_shapes' (13004) panicked at crates\assets\src\model\cooked_model.rs:1168:9:
+thread 'model::tests::a_gltf_meshs_extras_say_which_joint_drives_a_shape' (20624) panicked at crates\assets\src\model\tests.rs:1046:5:
+thread 'tests::validation::an_items_pose_correctives_read_back_and_bad_ones_are_reported' (12876) panicked at crates\avatar\src\tests\validation.rs:275:5:
+
+(each_run_solves_its_shapes_at_full_weight_on_top_of_those_before failed on the test's own float comparison, fixed in the test: 'hang: read at 27 while moving' on identical quaternions.)
+
+## 2. The player tests, before their records were measured (all records 0)
+
+cargo nextest run -p axcenity-player --no-fail-fast --no-capture -E 'test(/pose_corrective_tests::/)'
+
+"TestTee ArmsForward: 43 bodies failing, worst 7.15 mm (recorded 0, 0.00 mm)",
+"TestTee ArmsRaised: 1 bodies failing, worst 2.45 mm (recorded 0, 0.00 mm)",
+"TestTee Walk: 54 bodies failing, worst 13.40 mm (recorded 0, 0.00 mm)",
+"TestTee Walk: 54 bodies failing, worst 14.06 mm (recorded 0, 0.00 mm)",
+"TestTee Walk: 54 bodies failing, worst 14.45 mm (recorded 0, 0.00 mm)",
+"TestTee Walk@18: 39 bodies failing, worst 8.97 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee ArmsForward: 6 bodies failing, worst 2.93 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee ArmsRaised: 1 bodies failing, worst 2.29 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 20 bodies failing, worst 10.40 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 20 bodies failing, worst 11.53 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk: 21 bodies failing, worst 14.87 mm (recorded 0, 0.00 mm)",
+"Underwear_Bra through TestTee Walk@18: 7 bodies failing, worst 10.13 mm (recorded 0, 0.00 mm)",
+FAIL [   4.652s] (12/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_with_the_arms_raised
+FAIL [   4.657s] (10/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_with_the_arms_forward
+FAIL [   4.664s] ( 9/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_walking
+FAIL [   8.079s] ( 8/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_through_the_walk_second_third
+FAIL [   8.131s] ( 7/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_through_the_walk_last_third
+FAIL [   8.684s] ( 6/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_through_the_walk_first_third
+FAIL [  20.494s] ( 2/14) axcenity-player::bin/axcenity-player pose_corrective_tests::the_strides_armpit_folds_flip_less_with_correctives_last_third
+FAIL [  20.748s] ( 3/14) axcenity-player::bin/axcenity-player pose_corrective_tests::the_strides_armpit_folds_flip_less_with_correctives_second_third
+FAIL [  45.072s] ( 1/14) axcenity-player::bin/axcenity-player pose_corrective_tests::the_strides_armpit_folds_flip_less_with_correctives_first_third
+PASS [   1.861s] ( 4/14) axcenity-player::bin/axcenity-player pose_corrective_tests::the_test_tee_leans_on_its_cloth_correctives_in_the_walk
+PASS [   4.141s] ( 5/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_at_rest
+PASS [   4.572s] (11/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_with_the_arms_out
+PASS [   5.243s] (13/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_with_the_elbows_bent
+PASS [   6.781s] (14/14) axcenity-player::bin/axcenity-player pose_corrective_tests::with_correctives_the_tee_covers_the_cast_with_the_knees_bent
+Summary [ 147.782s] 14 tests run: 5 passed, 9 failed, 288 skipped
+walk third 0: 122 body corners through the tee under a flipped fold with its correctives, 147 without
+walk third 1: 136 body corners through the tee under a flipped fold with its correctives, 199 without
+walk third 2: 139 body corners through the tee under a flipped fold with its correctives, 161 without
+with: 122 under a flipped fold, recorded 0
+with: 136 under a flipped fold, recorded 0
+with: 139 under a flipped fold, recorded 0

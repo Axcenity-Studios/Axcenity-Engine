@@ -759,6 +759,10 @@ impl Animators {
                         }
                     }
                 }
+                // Its own pose correctives (a garment's, baked from cloth
+                // simulation, wave 5), driven by its pose's joints like the
+                // body's; nothing for a part without them.
+                crate::correctives::drive_own(&model, &own, &follows, &mut made);
                 if let Some(live) = &live {
                     live.dress(&mut made);
                 }

@@ -96,6 +96,14 @@ The harness now moves and scales the eye bones by the parameters' `bones` driver
 
 **No threshold or measure was changed.** Whether to sign by the nearest feature's pseudo-normal is Paul's decision.
 
+## Tests that exist (wave 5, stage 3: pose correctives from cloth simulation)
+
+- `assets`: `a_gltf_meshs_extras_say_which_joint_drives_a_shape`, `a_cooked_model_keeps_the_joints_that_drive_its_shapes`.
+- `anim` `correctives::tests`: a shape the model says a joint drives leans as the joint turns; a part drives only its own and keeps its leader's weights; a part without them is left alone.
+- `avatar`: `tests/cloth_correctives.rs` (the garment rules, the runs, the solve of a known move), `fit::tests::pose_correctives_written_into_a_garments_file_load_as_driven_shapes`, `tests::validation::an_items_pose_correctives_read_back_and_bad_ones_are_reported`; the intake's `test_intake.py` (`PoseCorrectivePins`).
+- `player` `pose_corrective_tests` (17): the runtime drives the test tee's correctives in the walk; the fit gate on the test tee with them (`fit_gate_tests::gate_library_with_correctives`), with exact records of its own; the stride's flipped-fold counts with and without (exact, fewer with); the motion check with them. The gate's own records stay those of the tee without them.
+- The bench: `AXCENITY_BENCH_COUNTS=50 AXCENITY_BENCH_MODES=tee,tee-correctives cargo test -p axcenity-player --release -- --ignored bench_distinct_characters --nocapture --test-threads 1`.
+
 ## Tests that exist (wave 5: the first licensed tee)
 
 - `player` `tee_crew_tests` (`refinement/wave5/tee-licensed.md`): `axcenity/realistic-tee-crew` over the underwear on every realistic cast and body benchmark, at rest, in Idle, through the walk's whole stride (three thirds), with the arms raised, forward and out and the elbows and knees bent; its simpler copies at rest; the motion check in Idle, Walk and Run. A draft: what it fails is a record per garment and pose (the armpit in motion, the turned hems' edges) that can only come down. The gate's layered pairs include the underwear under it.

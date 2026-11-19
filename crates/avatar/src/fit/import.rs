@@ -397,7 +397,10 @@ fn weights_of(
 
 /// The library's base manifest `id`, its manifest's path and the body's
 /// `MeshId` inside the library.
-fn base_of<'a>(library: &'a Library, id: &str) -> Result<(&'a BaseManifest, String), FitError> {
+pub(super) fn base_of<'a>(
+    library: &'a Library,
+    id: &str,
+) -> Result<(&'a BaseManifest, String), FitError> {
     let base = library
         .base(id)
         .ok_or_else(|| library_error(format!("the library has no base model `{id}`")))?;
@@ -628,6 +631,7 @@ pub fn import_garment_with(
         limitations: Vec::new(),
         adjust: None,
         quality: Some(Quality::Draft),
+        correctives: Vec::new(),
     };
     let mut problems = manifest.validate();
     problems.extend(manifest.check_against(base));

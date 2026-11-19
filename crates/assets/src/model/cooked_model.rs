@@ -23,8 +23,8 @@ use glam::{Mat4, Quat, Vec3};
 use super::stamped::Cache;
 use super::{
     AlphaMode, Anisotropy, Bone, BoneTransform, Channel, ChannelTexture, Image, ImageOrigin, Joint,
-    Model, ModelMaterial, ModelShading, MorphTarget, Primitive, PrimitiveMorph, Rig, Sheen,
-    new_key,
+    Model, ModelMaterial, ModelShading, MorphTarget, PoseDriver, Primitive, PrimitiveMorph, Rig,
+    Sheen, new_key,
 };
 use crate::cooked::{self, SourceStamp, content_hash};
 
@@ -161,10 +161,24 @@ fn encode(model: &Model) -> Option<Vec<u8>> {
     for MorphTarget {
         name,
         default_weight,
+        driver,
     } in morph_targets
     {
         body.text(name);
         body.floats(&[*default_weight]);
+        match driver {
+            Some(PoseDriver {
+                bone,
+                axis,
+                start,
+                full,
+            }) => {
+                body.u8(1);
+                body.text(bone);
+                body.floats(&[axis[0], axis[1], axis[2], *start, *full]);
+            }
+            None => body.u8(0),
+        }
     }
     out.u32(images.list.len() as u32);
     for image in &images.list {
@@ -599,9 +613,22 @@ fn decode(input: &mut Input<'_>, project: &Path, relative: &str) -> Option<Model
     let target_count = input.count(8)?;
     let mut morph_targets = Vec::with_capacity(target_count);
     for _ in 0..target_count {
+        let name = input.text()?;
+        let default_weight = input.f32()?;
+        let driver = match input.u8()? {
+            0 => None,
+            1 => Some(PoseDriver {
+                bone: input.text()?,
+                axis: [input.f32()?, input.f32()?, input.f32()?],
+                start: input.f32()?,
+                full: input.f32()?,
+            }),
+            _ => return None,
+        };
         morph_targets.push(MorphTarget {
-            name: input.text()?,
-            default_weight: input.f32()?,
+            name,
+            default_weight,
+            driver,
         });
     }
     if primitives
@@ -1121,6 +1148,27 @@ mod tests {
         assert_eq!(describe(&again), describe(&first));
         assert_eq!(again.morph_targets, first.morph_targets);
         assert_eq!(again.primitives[0].morphs, first.primitives[0].morphs);
+        let _ = fs::remove_dir_all(project);
+    }
+
+    /// A shape a joint drives (a garment's pose corrective, wave 5) keeps
+    /// its rule in the cooked copy.
+    #[test]
+    fn a_cooked_model_keeps_the_joints_that_drive_its_shapes() {
+        let project = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
+            "axcenity-cooked-model-drivers-{}",
+            std::process::id()
+        )));
+        let _ = fs::remove_dir_all(&project);
+        let folder = project.join("assets/models");
+        let gltf = crate::model::tests::blinking_face_with_a_driver(&folder);
+        fs::write(folder.join("face.gltf"), gltf).unwrap();
+        let model = "assets/models/face.gltf";
+        let first = Assets::new(&project).model_blocking(model).unwrap();
+        assert!(first.morph_targets[1].driver.is_some());
+        assert!(read(&project, model, "").is_some());
+        let again = Assets::new(&project).model_blocking(model).unwrap();
+        assert_eq!(again.morph_targets, first.morph_targets);
         let _ = fs::remove_dir_all(project);
     }
 

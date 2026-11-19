@@ -119,7 +119,7 @@ pub const CORRECTIVE_RULES: [CorrectiveRule; 10] = [
 
 /// A rotation's twist about `axis` (radians, the short way round): how
 /// far it turns about that axis alone.
-fn twist_angle(rotation: Quat, axis: Vec3) -> f32 {
+pub(super) fn twist_angle(rotation: Quat, axis: Vec3) -> f32 {
     let along = Vec3::new(rotation.x, rotation.y, rotation.z).dot(axis);
     let angle = 2.0 * along.atan2(rotation.w);
     if angle > std::f32::consts::PI {

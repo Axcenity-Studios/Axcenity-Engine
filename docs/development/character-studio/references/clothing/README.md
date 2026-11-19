@@ -173,6 +173,14 @@ Attachment conventions, sizing, and meshes that could ship.
 | A-10 FreeSewing: accessory designs | https://codeberg.org/freesewing/freesewing/src/branch/develop/designs | FreeSewing | 2026-11-16 | Pattern-built soft accessories | Opened (each `package.json`). `florent` (flat cap), `holmes` (deerstalker hat), `hortensia` (handbag), `magde` (messenger bag), `florence` (face mask) | Class 2, MIT (G-01) | data |
 | A-11 Ready Player Me: glasses asset page | https://docs.readyplayer.me/ready-player-me/customizing-guides/create-custom-assets/glasses | Ready Player Me | 2026-11-16 | Glasses requirements on a web avatar platform | Not opened: the host no longer resolves (see G-30) | Class 4, and gone | visual guidance |
 
+### Openverse references for pose correctives (wave 5, decision 14)
+
+Looked at, never shipped (links only; `refinement/wave5/pose-correctives.md`): how a plain T-shirt's sleeve and underarm hang on a person with the arm down.
+
+| What | Openverse | Source page | Author | Licence |
+|---|---|---|---|---|
+| A man in a plain grey crew-neck tee, arms hanging, three-quarter view: the sleeve hangs loose off the upper arm and the underarm makes one soft fold, with no tight bridge to the side | https://openverse.org/image/0828727f-4725-4c4f-a024-c1664c20e6bf | https://www.flickr.com/photos/45776673@N04/19837504423 | Steven Pisano | CC BY 2.0 |
+
 ## 5. Categories, production approach and the first wave
 
 ### 5.1 How each garment is built

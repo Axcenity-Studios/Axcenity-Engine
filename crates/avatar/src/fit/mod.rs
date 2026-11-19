@@ -29,6 +29,7 @@
 //! character facing +Z), not the engine's fitted 1×1×1 space.
 
 mod bind;
+mod cloth;
 mod coverage;
 mod glb;
 mod hiding;
@@ -48,6 +49,11 @@ use axcenity_assets::{Model, Rig};
 use glam::{Mat3, Mat4, Vec3};
 
 pub use bind::{Binding, Bound, bind, place};
+pub use cloth::{
+    CLOTH_PREFIX, ClothRead, ClothRun, POSE_SHAPES_VERSION, PoseShape, PoseShapes, add_pose_shapes,
+    add_to_item, cloth_rules, cloth_runs, fingerprint, item_meshes, posed_body, rule_weight,
+    rules_match, same_garment, solve, write_bake_input,
+};
 pub use coverage::{
     Coverage, HIDE_SHARE, RegionMap, SlotGuess, classify, coverage, hidden_regions,
     triangle_regions,
