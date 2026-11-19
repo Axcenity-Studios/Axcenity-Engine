@@ -26,8 +26,9 @@
 //!    cloth and the skinned one, taken back to rest through each corner's
 //!    own skinning, less what the simulation moved at rest, is the pose's
 //!    shape ([`PoseShapes`]); a shape made on top of another (the swing
-//!    on the hanging arm) has that one's share taken off first. Half way
-//!    to each key pose the blended shapes are checked against the
+//!    on the hanging arm) has that one's share taken off first. Then, with
+//!    every shape solved, half way to each key pose the garment posed with
+//!    all of them at their weights there is checked against the
 //!    simulation (smoothness between poses).
 //!
 //! [`add_pose_shapes`] then writes the shapes into the garment's `.glb`,
@@ -72,7 +73,7 @@ const SMOOTH_ROUNDS: usize = 12;
 /// simulation lets the bridge of cloth under the arm move 5 to 10 cm, and
 /// folds it differently in each key pose, so that blends of whole moves
 /// are far from the cloth between the key poses (checked half way: up to
-/// 9 cm) and a shape the body's own shapes and other bodies' proportions
+/// 10 cm) and a shape the body's own shapes and other bodies' proportions
 /// change opens or shuts the armpit (the gate's T-pose and arms-raised
 /// cases). Measured on the test tee (pose-correctives.md): moves held to
 /// 4, 6 and 10 mm, and whole ones; 6 mm did best in the stride.
@@ -216,8 +217,9 @@ pub enum ClothRead {
     Rest { frame: usize },
     /// A key pose: these shapes are solved here.
     Solve { frame: usize, shapes: Vec<String> },
-    /// Half way to a key pose: the shapes solved, blended at their
-    /// weights here, are checked against the simulation.
+    /// Half way to a key pose: once every shape is solved, the garment
+    /// posed with all of them at their weights here is checked against the
+    /// simulation.
     Check { frame: usize },
 }
 
@@ -770,7 +772,10 @@ fn side_share(x: f32, side: f32) -> f32 {
 
 /// Solves the shapes from the simulation's results: `simulated(run, read)`
 /// is the cloth (file space) at each of a run's reads in order. Shapes
-/// are solved in the runs' order, each on top of the ones before.
+/// are solved in the runs' order, each on top of the ones before. Then,
+/// with every shape solved, each half-way check compares the garment as
+/// the runtime would pose it there (every shape at its rule's weight)
+/// with the simulated cloth.
 pub fn solve(
     garment: &BodyMesh,
     rules: &[PoseCorrective],
@@ -786,62 +791,58 @@ pub fn solve(
             .map_or(0.0, |b| world[b].w_axis.x.signum())
     };
     let neighbours = neighbours(garment);
+    let read_cloth = |r: usize, k: usize| -> Result<Vec<Vec3>, FitError> {
+        let cloth = simulated(r, k)?;
+        if cloth.len() != count {
+            return Err(FitError::Model(format!(
+                "{}: the simulation has {} corners, the garment {count}",
+                runs[r].name,
+                cloth.len()
+            )));
+        }
+        Ok(cloth)
+    };
+    // The simulation's move at a read, less its move at rest (`drift`,
+    // rest space), taken back to rest through each corner's skinning,
+    // with the garment posed with `solved`; and each corner's linear part.
+    // A key pose's move is held to `MOST_MOVE` a corner (posed space).
+    let moved_back = |cloth: &[Vec3],
+                      bones: &[BoneTransform],
+                      solved: &BTreeMap<String, Vec<Vec3>>,
+                      drift: &[Vec3],
+                      most: Option<f32>|
+     -> (Vec<Vec3>, Vec<Mat3>) {
+        let (_, posed, linear) = posed_garment(garment, bones, rules, solved);
+        let back = cloth
+            .iter()
+            .zip(&posed)
+            .zip(&linear)
+            .zip(drift)
+            .map(|(((c, p), l), d)| {
+                let m = *c - *p - *l * *d;
+                invert(*l) * most.map_or(m, |most| m.clamp_length_max(most))
+            })
+            .collect();
+        (back, linear)
+    };
+    // First the shapes, each on top of those solved before it; the half-
+    // way checks wait for the second pass (a check needs the shape it is
+    // half way to, which its run solves after it).
     let mut solved: BTreeMap<String, Vec<Vec3>> = BTreeMap::new();
-    let mut checks = Vec::new();
+    let mut drifts = Vec::with_capacity(runs.len());
     for (r, run) in runs.iter().enumerate() {
         let mut drift = vec![Vec3::ZERO; count];
         for (k, read) in run.reads.iter().enumerate() {
-            let cloth = simulated(r, k)?;
-            if cloth.len() != count {
-                return Err(FitError::Model(format!(
-                    "{}: the simulation has {} corners, the garment {count}",
-                    run.name,
-                    cloth.len()
-                )));
-            }
             let bones = &run.frames[read.frame()];
-            let (_, posed, linear) = posed_garment(garment, bones, rules, &solved);
-            // The simulation's move here, less its move at rest; a key
-            // pose's at most `MOST_MOVE` a corner (posed space). A check
-            // compares the blend with the whole move.
-            let moves: Vec<Vec3> = cloth
-                .iter()
-                .zip(&posed)
-                .zip(&linear)
-                .zip(&drift)
-                .map(|(((c, p), l), d)| {
-                    let m = *c - *p - *l * *d;
-                    if matches!(read, ClothRead::Solve { .. }) {
-                        m.clamp_length_max(MOST_MOVE)
-                    } else {
-                        m
-                    }
-                })
-                .collect();
-            let back: Vec<Vec3> = moves
-                .iter()
-                .zip(&linear)
-                .map(|(m, l)| invert(*l) * *m)
-                .collect();
             match read {
-                ClothRead::Rest { .. } => drift = back,
-                ClothRead::Check { .. } => {
-                    let mut errors: Vec<f32> = back
-                        .iter()
-                        .zip(&linear)
-                        .map(|(b, l)| (*l * *b).length())
-                        .collect();
-                    errors.sort_by(f32::total_cmp);
-                    let at = |q: f32| errors[((errors.len() - 1) as f32 * q) as usize] * 1000.0;
-                    checks.push(json!({
-                        "run": run.name,
-                        "frame": read.frame(),
-                        "median_mm": at(0.5),
-                        "p95_mm": at(0.95),
-                        "most_mm": at(1.0),
-                    }));
+                ClothRead::Check { .. } => {}
+                ClothRead::Rest { .. } => {
+                    let cloth = read_cloth(r, k)?;
+                    drift = moved_back(&cloth, bones, &solved, &vec![Vec3::ZERO; count], None).0;
                 }
                 ClothRead::Solve { shapes, .. } => {
+                    let cloth = read_cloth(r, k)?;
+                    let (back, _) = moved_back(&cloth, bones, &solved, &drift, Some(MOST_MOVE));
                     for shape in shapes {
                         let Some(rule) = rules.iter().find(|r| r.shape == *shape) else {
                             continue;
@@ -863,6 +864,36 @@ pub fn solve(
                     }
                 }
             }
+        }
+        drifts.push(drift);
+    }
+    // Then the checks, with every shape: how far the cloth the runtime
+    // would show half way is from the simulated cloth (the whole move,
+    // not held to `MOST_MOVE`). A shape dropped below `LEAST_SHAPE` later
+    // is still in the blend here; it moves under half a millimetre.
+    let mut checks = Vec::new();
+    for (r, run) in runs.iter().enumerate() {
+        for (k, read) in run.reads.iter().enumerate() {
+            if !matches!(read, ClothRead::Check { .. }) {
+                continue;
+            }
+            let cloth = read_cloth(r, k)?;
+            let bones = &run.frames[read.frame()];
+            let (back, linear) = moved_back(&cloth, bones, &solved, &drifts[r], None);
+            let mut errors: Vec<f32> = back
+                .iter()
+                .zip(&linear)
+                .map(|(b, l)| (*l * *b).length())
+                .collect();
+            errors.sort_by(f32::total_cmp);
+            let at = |q: f32| errors[((errors.len() - 1) as f32 * q) as usize] * 1000.0;
+            checks.push(json!({
+                "run": run.name,
+                "frame": read.frame(),
+                "median_mm": at(0.5),
+                "p95_mm": at(0.95),
+                "most_mm": at(1.0),
+            }));
         }
     }
     let mut shapes = Vec::new();
@@ -1114,34 +1145,45 @@ pub fn add_pose_shapes(bytes: &[u8], shapes: &PoseShapes) -> Result<Vec<u8>, Fit
         let offsets: Vec<Vec<Vec3>> = if mesh.index == meshes[full].index {
             dense.clone()
         } else {
-            let positions = mesh.positions();
-            let places: Vec<(Vec3, [u32; 3])> = positions
-                .iter()
-                .map(|p| {
-                    surface
-                        .closest(*p, 0.05)
-                        .map_or((Vec3::X, [0, 0, 0]), |hit| {
-                            (hit.bary, surface.triangles[hit.triangle as usize])
-                        })
-                })
-                .collect();
-            dense
-                .iter()
-                .map(|d| {
-                    places
-                        .iter()
-                        .map(|(bary, t)| {
-                            d[t[0] as usize] * bary.x
-                                + d[t[1] as usize] * bary.y
-                                + d[t[2] as usize] * bary.z
-                        })
-                        .collect()
-                })
-                .collect()
+            lower_detail_offsets(&surface, &mesh.positions(), &dense)
         };
         out.add(mesh, &shapes.shapes, &offsets, &rules);
     }
     Ok(super::glb::glb(&document, &bin))
+}
+
+/// Each shape's offsets (`dense`, per corner of the full detail whose
+/// surface is `surface`) at `positions`, a simpler copy's corners: the
+/// offsets at the closest point of the full detail's surface, or none for
+/// a corner with no surface within 5 cm.
+pub(super) fn lower_detail_offsets(
+    surface: &Surface,
+    positions: &[Vec3],
+    dense: &[Vec<Vec3>],
+) -> Vec<Vec<Vec3>> {
+    let places: Vec<Option<(Vec3, [u32; 3])>> = positions
+        .iter()
+        .map(|p| {
+            surface
+                .closest(*p, 0.05)
+                .map(|hit| (hit.bary, surface.triangles[hit.triangle as usize]))
+        })
+        .collect();
+    dense
+        .iter()
+        .map(|d| {
+            places
+                .iter()
+                .map(|place| {
+                    place.map_or(Vec3::ZERO, |(bary, t)| {
+                        d[t[0] as usize] * bary.x
+                            + d[t[1] as usize] * bary.y
+                            + d[t[2] as usize] * bary.z
+                    })
+                })
+                .collect()
+        })
+        .collect()
 }
 
 fn read_indices(document: &Value, bin: &[u8], index: usize) -> Result<Vec<u32>, FitError> {
@@ -1322,30 +1364,36 @@ pub fn add_to_item(library: &Path, id: &str, shapes: &PoseShapes) -> Result<usiz
     Ok(shapes.shapes.len())
 }
 
-/// The cloth correctives of `rules` a model carries, by name, if any:
-/// whether every shape has a rule there and every rule a shape.
-pub fn rules_match(model: &axcenity_assets::Model, rules: &[PoseCorrective]) -> Result<(), String> {
-    let driven: Vec<(&str, &axcenity_assets::PoseDriver)> = model
-        .morph_targets
-        .iter()
+/// Whether `models` (an item's, each loaded by the engine) drive exactly
+/// the shapes of `rules` (its manifest's `correctives`), each by its rule:
+/// every rule has a driven shape there, every driven shape a rule, and a
+/// shape driven in several meshes (its levels) is driven the same in each.
+/// The runtime reads only the models' rules, so the shipped-library check
+/// (`tests/shipped_library.rs`) holds the two equal with this.
+pub fn rules_match<'a>(
+    models: impl IntoIterator<Item = &'a axcenity_assets::Model>,
+    rules: &[PoseCorrective],
+) -> Result<(), String> {
+    let driven: Vec<(&str, &axcenity_assets::PoseDriver)> = models
+        .into_iter()
+        .flat_map(|model| &model.morph_targets)
         .filter_map(|t| t.driver.as_ref().map(|d| (t.name.as_str(), d)))
         .collect();
     for rule in rules {
-        let Some((_, driver)) = driven.iter().find(|(name, _)| *name == rule.shape) else {
+        if !driven.iter().any(|(name, _)| *name == rule.shape) {
             return Err(format!("the model has no driven shape `{}`", rule.shape));
+        }
+    }
+    for (name, driver) in &driven {
+        let Some(rule) = rules.iter().find(|r| r.shape == *name) else {
+            return Err(format!("the model drives `{name}`, the manifest doesn't"));
         };
         if driver.bone != rule.bone
             || driver.axis != rule.axis
             || [driver.start, driver.full] != rule.angles
         {
-            return Err(format!("`{}` is driven otherwise in the model", rule.shape));
+            return Err(format!("`{name}` is driven otherwise in the model"));
         }
-    }
-    if let Some((name, _)) = driven
-        .iter()
-        .find(|(name, _)| rules.iter().all(|r| r.shape != *name))
-    {
-        return Err(format!("the model drives `{name}`, the manifest doesn't"));
     }
     Ok(())
 }

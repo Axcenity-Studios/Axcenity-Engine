@@ -107,3 +107,37 @@ fn every_shape_bone_and_material_an_item_names_must_exist() {
     item.bones.insert("Tail".to_owned());
     assert_problem(&tee.check_model(&item, &body_contents()), &["bone", "Tail"]);
 }
+
+/// An item's pose correctives (wave 5, ADR-0044) name shapes of its own
+/// model, driven by bones of the body it fits: a misspelt shape or bone
+/// is a problem, not a corrective skipped at run time.
+#[test]
+fn an_items_pose_correctives_name_its_shapes_and_the_bodys_bones() {
+    let mut tee = fixtures::item(TEE);
+    tee.correctives = vec![crate::PoseCorrective {
+        shape: "Corrective_Cloth_Shoulder_Lowered_Left".to_owned(),
+        bone: "LeftUpperArm".to_owned(),
+        axis: [0.0, 0.0, 1.0],
+        angles: [0.0, 35.0],
+    }];
+    let shirt = contents(&["Corrective_Cloth_Shoulder_Lowered_Left"], &["Shirt"]);
+    assert_eq!(
+        texts(&tee.check_model(&shirt, &body_contents())),
+        Vec::<String>::new()
+    );
+    assert_problem(
+        &tee.check_model(&contents(&[], &["Shirt"]), &body_contents()),
+        &[
+            "correctives[0].shape",
+            "Corrective_Cloth_Shoulder_Lowered_Left",
+        ],
+    );
+    let mut body = body_contents();
+    body.bones.remove("LeftUpperArm");
+    let mut shirt = shirt.clone();
+    shirt.bones.remove("LeftUpperArm");
+    assert_problem(
+        &tee.check_model(&shirt, &body),
+        &["correctives[0].bone", "LeftUpperArm"],
+    );
+}

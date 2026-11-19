@@ -75,3 +75,32 @@ walk third 2: 139 body corners through the tee under a flipped fold with its cor
 with: 122 under a flipped fold, recorded 0
 with: 136 under a flipped fold, recorded 0
 with: 139 under a flipped fold, recorded 0
+
+== Review fixes 1: the half-way check (cloth_correctives.rs, before the fix in fit::cloth::solve) ==
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(cloth_correctives)'
+
+    thread 'the_half_way_check_measures_the_blend_of_the_solved_shapes' panicked at crates\avatar\tests\cloth_correctives.rs:324:5:
+    the cloth moved 0.50000024 of the key pose's move half way, as the blend does; the check says median 2.2359, most 2.2361 mm
+    thread 'a_simulated_move_comes_back_as_its_poses_shapes' panicked at crates\avatar\tests\cloth_correctives.rs:307:5:
+    the blend is off by 2.236 mm half way; the check says median 0.0000, most 0.0001
+     Summary [   0.748s] 4 tests run: 2 passed, 2 failed, 0 skipped
+        FAIL [   0.628s] (2/4) axcenity-avatar::cloth_correctives the_half_way_check_measures_the_blend_of_the_solved_shapes
+        FAIL [   0.723s] (3/4) axcenity-avatar::cloth_correctives a_simulated_move_comes_back_as_its_poses_shapes
+
+== Review fixes 1: an item's correctives against its model (models.rs, before ItemManifest::check_model checked them) ==
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(an_items_pose_correctives_name_its_shapes_and_the_bodys_bones) | binary(cloth_correctives)'
+
+    thread 'tests::models::an_items_pose_correctives_name_its_shapes_and_the_bodys_bones' panicked at crates\avatar\src\tests\models.rs:128:5:
+    no problem mentions ["correctives[0].shape", "Corrective_Cloth_Shoulder_Lowered_Left"]: []
+     Summary [   0.767s] 5 tests run: 4 passed, 1 failed, 209 skipped
+        FAIL [   0.088s] (1/5) axcenity-avatar tests::models::an_items_pose_correctives_name_its_shapes_and_the_bodys_bones
+(The four cloth_correctives tests pass here: the two-pass solve was already in.)
+
+== Review fixes 1: a simpler copy's corner far from the full detail (fit/tests.rs, with the old fallback put back in lower_detail_offsets) ==
+cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective)'
+
+    thread 'fit::tests::a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective' panicked at crates\avatar\src\fit\tests.rs:900:5:
+    assertion `left == right` failed
+      left: Vec3(0.01, 0.0, 0.0)
+     right: Vec3(0.0, 0.0, 0.0)
+     Summary [   0.335s] 1 test run: 0 passed, 1 failed, 214 skipped

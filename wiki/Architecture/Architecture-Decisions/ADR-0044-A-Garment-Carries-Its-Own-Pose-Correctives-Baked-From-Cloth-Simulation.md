@@ -32,7 +32,7 @@ A fitted garment takes the body's skin weights and copies of its shapes, so in a
 ## Decision
 
 - **An item may carry pose correctives:** the item manifest's optional `correctives`, `[{shape, bone, axis, angles: [start, full]}]`, the form architecture.md section 7 gave the body correctives' rule. No version bump; an older engine ignores the field.
-- **Its model carries the same rules** in each garment mesh's glTF `extras.axcenity_correctives`. `assets` reads them into `MorphTarget::driver` (`PoseDriver`; a rule naming no shape of the mesh, or whose angles don't rise, is skipped) and keeps them in cooked models. `fit::rules_match` holds model and manifest equal.
+- **Its model carries the same rules** in each garment mesh's glTF `extras.axcenity_correctives`. `assets` reads them into `MorphTarget::driver` (`PoseDriver`; a rule naming no shape of the mesh, or whose angles don't rise, is skipped) and keeps them in cooked models. The shipped-library check holds model and manifest equal (`fit::rules_match`, `tests/shipped_library.rs`), and `ItemManifest::check_model` that each rule names a shape of the item and a bone of the body.
 - **`anim` drives them by the body correctives' rule** (the bone's twist about the axis, eased): `Correctives::detect` takes a model's own driven shapes before the constant rules; a follower drives only its own (`drive_own`), after taking the leader's weights by name and before its identity. Their names start `Corrective_Cloth_`: live shapes, never identity.
 - **They are baked from cloth simulation** by the intake's `correctives.py` around `avatar::fit::cloth` (architecture.md section 9), as a separable step after the fit. A garment without them poses exactly as before.
 

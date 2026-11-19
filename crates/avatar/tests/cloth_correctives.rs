@@ -212,43 +212,76 @@ fn skinned(
     (posed, linear)
 }
 
-/// A simulation that moves the cloth as skinning does, but at the hanging
-/// arms' key pose moves all of it by `moved` (taken through each corner's
-/// skinning), and everywhere by a settle `drift` at rest: the solve gives
-/// `moved` back split between the two sides' Lowered shapes (each the
-/// whole of it well on its own side, none well on the other, the two
-/// adding up to it everywhere), and takes the drift off.
-#[test]
-fn a_simulated_move_comes_back_as_its_poses_shapes() {
-    let (body, garment) = body_and("Underwear_Bra");
-    let rig = &body.rig;
-    let rules = cloth_rules(rig);
-    let runs: Vec<ClothRun> = cloth_runs(rig, &rules, Some(finish_pose))
+/// The bake's first run (the arms let down to hang) on the bra, solved
+/// from a simulation that moves the cloth as skinning does, but everywhere
+/// by a settle `drift` at rest, by `moved` at the key pose and by
+/// `at_check(w) * moved` half way, where `w` is the Lowered rules' weight
+/// there (all taken through each corner's skinning). Returns the shapes
+/// and `w`.
+fn hang_bake(
+    garment: &BodyMesh,
+    rules: &[PoseCorrective],
+    rig: &Rig,
+    moved: Vec3,
+    at_check: &dyn Fn(f32) -> f32,
+) -> (axcenity_avatar::fit::PoseShapes, f32) {
+    let runs: Vec<ClothRun> = cloth_runs(rig, rules, Some(finish_pose))
         .into_iter()
         .take(1)
         .collect();
-    let moved = Vec3::new(0.0, 0.002, 0.004);
+    let lowered = rule(rules, "Corrective_Cloth_Shoulder_Lowered_Left");
+    let check_weight = runs[0]
+        .reads
+        .iter()
+        .find(|read| matches!(read, ClothRead::Check { .. }))
+        .map(|read| rule_weight(rig, &runs[0].frames[read.frame()], lowered))
+        .unwrap();
     let drift = |p: Vec3| Vec3::new(0.0, -0.001, 0.0) * (p.y - 1.0).abs();
     let simulated = |r: usize, k: usize| -> Result<Vec<Vec3>, FitError> {
         let run = &runs[r];
         let read = &run.reads[k];
         let bones = &run.frames[read.frame()];
-        let (posed, linear) = skinned(&garment, &rules, bones, &[]);
-        let solving = matches!(read, ClothRead::Solve { .. });
+        let (posed, linear) = skinned(garment, rules, bones, &[]);
+        let share = match read {
+            ClothRead::Rest { .. } => 0.0,
+            ClothRead::Check { .. } => at_check(check_weight),
+            ClothRead::Solve { .. } => 1.0,
+        };
         Ok(posed
             .iter()
             .zip(&linear)
             .zip(&garment.positions)
-            .map(|((p, l), rest)| {
-                let mut back = drift(*rest);
-                if solving {
-                    back += moved;
-                }
-                *p + *l * back
-            })
+            .map(|((p, l), rest)| *p + *l * (drift(*rest) + moved * share))
             .collect())
     };
-    let shapes = solve(&garment, &rules, &runs, &simulated).unwrap();
+    (
+        solve(garment, rules, &runs, &simulated).unwrap(),
+        check_weight,
+    )
+}
+
+/// The half-way check's figures (median, most; mm).
+fn check_mm(shapes: &axcenity_avatar::fit::PoseShapes) -> (f64, f64) {
+    let checks = shapes.report["checks"].as_array().unwrap();
+    assert_eq!(checks.len(), 1);
+    let mm = |key: &str| checks[0][key].as_f64().unwrap();
+    (mm("median_mm"), mm("most_mm"))
+}
+
+/// A simulation that moves all the cloth by `moved` at the hanging arms'
+/// key pose (and by a settle drift at rest, everywhere): the solve gives
+/// `moved` back split between the two sides' Lowered shapes (each the
+/// whole of it well on its own side, none well on the other, the two
+/// adding up to it everywhere), and takes the drift off. Half way the
+/// simulation doesn't move, so the check finds the blend (the shapes at
+/// the rules' weight there) off by that weight's share of `moved`.
+#[test]
+fn a_simulated_move_comes_back_as_its_poses_shapes() {
+    let (body, garment) = body_and("Underwear_Bra");
+    let rig = &body.rig;
+    let rules = cloth_rules(rig);
+    let moved = Vec3::new(0.0, 0.002, 0.004);
+    let (shapes, w) = hang_bake(&garment, &rules, rig, moved, &|_| 0.0);
     let names: Vec<&str> = shapes.shapes.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         names,
@@ -270,8 +303,29 @@ fn a_simulated_move_comes_back_as_its_poses_shapes() {
         }
     }
     assert_eq!(shapes.kept_rules().len(), 2);
-    // The half-way check measured how far the blend is from the cloth.
-    let checks = shapes.report["checks"].as_array().unwrap();
-    assert_eq!(checks.len(), 1);
-    assert!(checks[0]["most_mm"].as_f64().unwrap() > 0.0);
+    // Half way the rule leans part way (smoothstep at mid-range: a half).
+    assert!((w - 0.5).abs() < 0.01, "the check's weight {w}");
+    let expected = f64::from(w * moved.length() * 1000.0);
+    let (median, most) = check_mm(&shapes);
+    assert!(
+        (median - expected).abs() < 0.05 && (most - expected).abs() < 0.1,
+        "the blend is off by {expected:.3} mm half way; the check says median {median:.4}, most {most:.4}"
+    );
+}
+
+/// A simulation whose cloth half way has moved by the rules' weight there
+/// times the key pose's move is what the blend of the solved shapes gives:
+/// the check finds it on the cloth (about 0 mm).
+#[test]
+fn the_half_way_check_measures_the_blend_of_the_solved_shapes() {
+    let (body, garment) = body_and("Underwear_Bra");
+    let rig = &body.rig;
+    let rules = cloth_rules(rig);
+    let moved = Vec3::new(0.0, 0.002, 0.004);
+    let (shapes, w) = hang_bake(&garment, &rules, rig, moved, &|w| w);
+    let (median, most) = check_mm(&shapes);
+    assert!(
+        median < 0.02 && most < 0.1,
+        "the cloth moved {w} of the key pose's move half way, as the blend does; the check says median {median:.4}, most {most:.4} mm"
+    );
 }

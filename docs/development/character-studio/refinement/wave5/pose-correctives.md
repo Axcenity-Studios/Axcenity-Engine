@@ -66,7 +66,7 @@ The bake runs on the base body (no identity).
    - split between the two sides' shapes across ±4 cm of the middle;
    - solved on top of the shapes before it.
 
-   A shape that moves nothing over 0.5 mm is dropped. The half-way checks compare the blend with the simulation (`solve.json`).
+   A shape that moves nothing over 0.5 mm is dropped. Then, with every shape solved, each half-way check poses the garment with all the shapes at their weights there and compares it with the simulation (`solve.json`). (Before review fixes 1 a check ran before the shape it is half way to was solved; see below.)
 4. **Add** (Rust). The shapes go into every level of the model (a simpler copy's corner takes the full detail's offsets at its closest point) and into the manifest. A model whose rest corners have another fingerprint is refused ("bake again"), and so is one that already has the shapes.
 
 ## Tests (red first: `pose-correctives-red-run.txt`)
@@ -119,7 +119,8 @@ Two more measures:
 
 **What the bake measured** (`solve.json`):
 - **Shapes:** 20 kept, each moving at most 2.6 to 6.3 mm (the 6 mm limit). The knees moved nothing over 0.5 mm and were dropped.
-- **The half-way checks** (the blend against the simulation): median 0.0 to 1.5 mm. The 95th percentile is 4.0 mm for hanging, 15 to 16 mm for the swings, 9.6 mm for level and 26.7 mm for raised. The worst corners are off by 25 to 103 mm.
+- **The half-way checks** (every solved shape blended at its weight there, against the simulation; re-solved in review fixes 1): median 0.0 to 1.0 mm. The 95th percentile is 3.8 mm for hanging, 14.2 to 15.9 mm for the swings, 7.7 mm for level and 24.0 mm for raised. The worst corners are off by 24 to 103 mm. Table under review fixes 1.
+- **Shapes over 6 mm:** the 6 mm limit holds a corner's move in the key pose; the stored shape is that divided by the rule's weight there (at least 0.5) and shared between the sides, so a stored offset can be a little over it (the most is 6.3 mm).
 - **Inside the skin:** the simulation's cloth ends up to 15 mm inside the skin at some swing and hang reads (`simulate.json`, up to 24 corners). That is where the arm overlaps the side.
 
 ### What I tried, on the test tee (each a full gate run with the same measure)
@@ -194,6 +195,8 @@ These are in-engine captures (release, studio light, 2560 × 1440) of the gate's
 - `test-tee-<pose>.jpg` (2700 × 1360): one body a row. Columns: front before, front after, side before, side after, back before, back after. Each tile is 900 × 680 px of the capture drawn at 450 × 340.
 - `armpit-<pose>.jpg` (1800 × 1800): side and back, before and after. Each tile is 300 px of the capture drawn at 450 (400 or 560 px for the arms raised).
 - `armpit-walk-0-633-3x.jpg`: 150 px at 3×, one tile each for masculine average, feminine average and feminine heavyset, before then after.
+- `armpit-walk-0-367-3x.jpg` (review fixes 1): the side view's armpit at Walk@0.367, 150 px of the capture (x 1150 to 1300, y 455 to 605) at 3× (nearest), one row a body, before then after.
+- `armpit-front-<pose>.jpg` (review fixes 1): the front view's chest and both armpits, before and after, 520 × 320 px of the capture (560 × 345 for the arms raised) drawn at 1.5×, one row a body.
 - `bake-hang-armpit-skinned-vs-simulated.jpg`: Blender renders from the bake itself, not the engine. The left armpit with the arms hanging, front then side, the skinned goal (blue) beside the simulated cloth (orange).
 
 Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
@@ -204,6 +207,24 @@ Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
   - the slit of skin at the front of the armpit on masculine average is there before (about 6 × 5 mm, at 165 to 210, 135 to 175) and after (the same size, at 595 to 640, 135 to 175, its edges shifted);
   - the black bra triangle on feminine heavyset is about 5 × 4 mm before (1915 to 1955, 170 to 200) and a little lower and flatter after (2350 to 2395, 170 to 195);
   - feminine average shows no hole in either.
+- **Walk, the second third** (`armpit-walk-0-367.jpg`, `armpit-walk-0-367-3x.jpg`; added in review fixes 1, measured in the captures at 2.5 px a millimetre, ±30%). Each defect is in the side view, at the front of the armpit, where the arm swung back meets the side:
+  - **feminine average, a black bra triangle** about 1.6 × 1.8 mm before (capture x 1201 to 1204, y 526 to 530; 10 pixels under a luminance of 40). **After, it is gone** (no pixel under 40 in the armpit window). It is an improvement, but a small one: it is one triangle of the bra.
+  - **feminine average, a light speck** about 2.2 × 0.8 mm (capture x 1224 to 1229, y 540 to 542) before, and about 2.0 × 0.6 mm and fainter after (x 1220 to 1225). **It is not a see-through gap to the background.** Its brightest pixel is (69, 78, 92) before and (66, 75, 89) after. That is blue over red by 23, the tee's own lit colour (119, 130, 146 on the open cloth). The studio background behind the body is neutral and brighter (131, 134, 140). So the speck is tee cloth, a fold's far side lit through a crease in the near fold. That is the flipped fold the gate counts, not a hole through the garment.
+  - **feminine heavyset, a black bra triangle** about 7 × 3.5 mm before (x 1208 to 1225, y 529 to 537; 78 pixels under a luminance of 40) and 6.4 × 2.8 mm after (x 1208 to 1223, y 530 to 536; 47 pixels). It is still there, a little smaller.
+  - **feminine heavyset, a light sliver** below that triangle, about 2.4 × 1.4 mm before (x 1207 to 1213, y 539 to 543; brightest (114, 125, 139)) and 2.8 × 0.8 mm and darker after (brightest (81, 90, 103)). By colour it is tee cloth in a crease, not background, as on feminine average.
+  - **both masculine bodies, a pinched cone** at the top of the armpit's fold, before and after:
+    - masculine average: a dark tip about 2 × 2 mm (x 1221 to 1226, y 475 to 481), unchanged after;
+    - masculine heavyset: a cone about 15 × 13 mm whose facet edges show as light ridge lines. The lines are a little softer after. These are the flipped folds `under_flipped_folds` counts.
+  - **back view, all four bodies:** the small cloth spikes at the back of the near shoulder (`tee-walk.md`), before and after the same. On the masculine bodies the boxer briefs show under a hem drawn up into the seat (the shrink-wrapped fit's bodysuit look, `tee-walk.md`), unchanged.
+- **Front views** (`armpit-front-<pose>.jpg`, review fixes 1):
+  - **every pose, before and after alike:** the collar's edge is wavy by a few millimetres (`TestTee` README), and a sharp lit ridge crosses the chest above the bust (about 6 cm), the cloth bridging between the chest's two sides.
+  - **arms forward:** a dark flat flap stands out beside the torso under each sleeve on every body (about 12 × 16 mm, masculine average at capture x 1123 to 1153, y 427 to 467), the same before and after.
+  - **arms forward, feminine average: a stippled strip that the correctives make worse.** A checkered dotting lies on the lit slope beside the near sleeve. Before it is faint, about 4 × 6 mm (capture x 1322 to 1331, y 407 to 422). After it is plain, about 7 × 25 mm (x 1292 to 1310, y 395 to 457).
+    - Counted as pixels whose luminance differs from their 3 × 3 mean by more than 4 (capture x 1285 to 1340, y 380 to 470): 123 before, 352 after. The other bodies are 111 to 119 (feminine heavyset, both) and 19 to 35 (masculine).
+    - The dots are tee-coloured (mean 89, 97, 111), not the near-black bra. So this is the tee shading itself, not the bra through it. My reading: either shadow acne where the corrective lays the sleeve's underside at a grazing angle, or two layers of the tee nearly touching.
+    - It is a visible defect the correctives add; arms forward isn't in the stride.
+  - **arms raised:** the crumpled folds and side flaps are the same shapes, their edges shifted by 2 to 4 mm. On both feminine bodies, the back view's flap has a row of small dark dots along its inner edge (about 12 mm), before and after.
+  - **the walk's three thirds:** the armpits are behind the arms; nothing new.
 - **Walk, the near arm forward** (`armpit-walk-0-183.jpg`): the arm covers the armpit in the side view. The back view shows nothing new: no spike, flap or hole added.
 - **Arms raised** (`armpit-arms-raised.jpg`):
   - the large dark triangular flaps under the arm on both feminine bodies (about 2.5 × 5 cm: feminine average at 255 to 330, 990 to 1130 before and 705 to 780 after) are the same;
@@ -230,7 +251,7 @@ Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
 
 1. **The main goal is not met.**
    - The stride's armpit folds still flip (397 corners under a flipped fold over the three thirds, from 507), and the slit, the bra triangle and the arms-raised flaps look the same.
-   - The cause: a cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps. The bridge moves 5 to 10 cm and folds differently in each key pose, which no blend of shapes follows between key poses (half-way 95th percentile 15 to 27 mm), so the shapes are held to 6 mm.
+   - The cause: a cloth simulation can't put cloth between a hanging arm and the side where the body's own skin overlaps. The bridge moves 5 to 10 cm and folds differently in each key pose, which no blend of shapes follows between key poses (half-way 95th percentile 14 to 24 mm), so the shapes are held to 6 mm.
    - What would help, each for the lead:
      - the drape-preserving fit and a garment with room under the arm (the parallel fit track);
      - the body's own armpit overlap fixed, with a corrective for the arm against the side;
@@ -241,7 +262,7 @@ Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
 4. **Baked for one fit.** Any refit, including the drape-preserving fit track's, makes `TestTee.correctives.json` stale. `add_pose_shapes` then refuses it, and every `pose_corrective_tests` case fails with "bake again". The fingerprint catches a refit that moves the garment as a whole (a mean or spread change of 5 µm), not a single corner moved.
 5. **Baked on the base body only** and added to every body's identity shapes. A feminine or heavy body gets the masculine average's correction.
 6. **The bake's repeatability is not checked.** I didn't run one setting twice, and Blender's cloth is sensitive: settings a step apart moved the swings' worsts by several millimetres (the table above). The committed sidecar is the one measured; a re-bake on another machine or Blender version must be measured again.
-7. **The engine doesn't check the manifest against the model.** `rules_match` exists and is tested, but no shipped item has correctives, so the shipped-library check doesn't call it yet.
+7. ~~The engine doesn't check the manifest against the model.~~ Fixed in review fixes 1: the shipped-library check calls `rules_match` for every item, and `check_model` checks each rule's shape and bone.
 
 ## At merge
 
@@ -261,3 +282,93 @@ Sizes are measured in sheet pixels at about 25 capture px a centimetre (±30%).
   - whether the gate's test tee takes its correctives (open issue 2);
   - the route for the armpit (open issue 1);
   - ADR-0044.
+
+## Review fixes 1
+
+The review found three blocking problems. All three are fixed. No record changed, and the shapes are byte-for-byte the same.
+
+### 1. The half-way check ran before the shape it checks
+
+**The bug.** `solve` took a run's reads in order. Each run's check (half way) comes before its key pose (where the shape is solved), so a check posed the garment only with the shapes solved earlier. Most checks therefore measured the simulation against skinning plus earlier shapes, not the blend. The reviewer measured 0.0001 mm where the blend is 2.24 mm off.
+
+**Red first.** Two tests in `tests/cloth_correctives.rs` (`pose-correctives-red-run.txt`):
+- `a_simulated_move_comes_back_as_its_poses_shapes` now also asserts that a simulation which doesn't move half way gives a check of the rule's weight times the move: 0.5 × 4.47 = 2.236 mm. **It failed:** median 0.0000, most 0.0001.
+- `the_half_way_check_measures_the_blend_of_the_solved_shapes` (new): a simulation that moves the cloth by the weight times the move half way must give about 0 mm. **It failed:** median 2.2359, most 2.2361.
+
+**The fix** (`fit::cloth::solve`): two passes.
+- The first pass solves every shape in run order, each on top of those before, and keeps each run's move at rest.
+- The second pass takes each check with the complete set of shapes. It poses the garment with every shape at its rule's weight there and compares that with the simulated cloth, less the move at rest.
+
+Both tests pass, and so do the other two in the file.
+
+**Re-solved** on the kept work folder (`--only solve`: `cargo run -p axcenity-avatar --release --example pose_correctives -- solve <the gate library the bake used> imported/test-tee <work> <out>`).
+- The shapes, rules and fingerprint are identical to the committed sidecar's, and so are the per-shape figures. Only the report's `checks` changed.
+- The new report is in `TestTee.correctives.json`. Each cell gives median / 95th percentile / most, in mm:
+
+| Check | Before the fix (skinning plus earlier shapes) | After (the blend of every shape) |
+|---|---|---|
+| hang, frame 33 | 0.25 / 3.98 / 25.4 | 0.27 / 3.83 / 24.7 |
+| swing-left, 55 (half of the first half) | 0.65 / 15.98 / 83.4 | 0.52 / 15.89 / 82.9 |
+| swing-left, 109 | 0.89 / 16.37 / 103.2 | 0.74 / 15.69 / 103.2 |
+| swing-right, 55 | 0.65 / 15.70 / 82.5 | 0.52 / 15.64 / 81.8 |
+| swing-right, 109 | 0.87 / 15.05 / 85.7 | 0.73 / 14.18 / 85.3 |
+| level, 33 | 0.67 / 9.61 / 25.1 | 0.39 / 7.72 / 24.2 |
+| raised, 53 | 1.49 / 26.69 / 74.5 | 0.98 / 23.96 / 73.1 |
+| elbows, 33 | 0.00 / 0.31 / 3.1 | 0.00 / 0.25 / 2.6 |
+| hips-left, 33 | 0.04 / 2.55 / 8.7 | 0.04 / 2.18 / 7.2 |
+| hips-right, 33 | 0.04 / 2.62 / 8.6 | 0.04 / 2.21 / 7.3 |
+| knees, 33 | 0.00 / 0.02 / 0.6 | 0.00 / 0.02 / 0.6 |
+
+**What this means.** With the blend included, every check is a little closer to the simulation, but only a little. The 95th percentiles drop by 0.1 to 2.7 mm, and the worst corners are still 24 to 103 mm off. The shapes are held to 6 mm, while the simulation moves the underarm bridge by centimetres, differently in each key pose. So the conclusion in open issue 1 stands: between key poses no blend of these shapes follows the cloth at the armpit. Away from it (the elbows, hips and knees) the blend is within 0.3 mm at the 95th percentile.
+
+### 2. Visible defects at Walk@0.367 not reported
+
+They are now in **What I saw**, under "Walk, the second third", with places, sizes and before against after. There is a new 3× crop, `armpit-walk-0-367-3x.jpg`.
+- **Feminine average:** the bra triangle (about 1.6 × 1.8 mm) is gone after the correctives.
+- **The light specks are not gaps to the background.** Their colour is the tee's (blue over red by about 23), not the neutral background, so they are tee cloth seen in a crease.
+- **Feminine heavyset:** the bra triangle shrinks from about 7 × 3.5 mm to 6.4 × 2.8 mm.
+
+While checking every capture pair for differences (the largest 32-pixel cell differences, per pose, body and view), I also found **a defect the correctives add**. At arms forward on feminine average, a stippled strip beside the near sleeve grows from 123 to 352 pixels (about 7 × 25 mm). It is reported under "Front views".
+
+The reviewer's non-blocking point about close crops: the front view's armpits are now in `armpit-front-<pose>.jpg`, for all five poses.
+
+### 3. The docs claimed that `rules_match` enforces the match, but nothing called it
+
+Now something does.
+- **`fit::rules_match`** takes all of an item's models (`impl IntoIterator<Item = &Model>`). Every rule must have a driven shape there, every driven shape a rule, and a shape driven in several meshes must be driven the same in each.
+- **`tests/shipped_library.rs` `every_items_pose_correctives_are_its_models`** calls it for every shipped item. Today that is a no-op, because no item has correctives.
+  - To check it bites, I temporarily gave `Shirt_TeeCrew.item.json` a `correctives` entry. The test then failed with "axcenity/realistic-tee-crew: the model has no driven shape `Corrective_Cloth_Shoulder_Lowered_Left`".
+  - `every_manifest_entry_names_shapes_bones_and_materials_its_model_has` failed too. I restored the file with `git checkout`.
+- **`ItemManifest::check_model`** now reports a corrective whose shape isn't the item's, or whose bone isn't the body's (`tests::models::an_items_pose_correctives_name_its_shapes_and_the_bodys_bones`, seen red first). That also covers the reviewer's non-blocking point that a misspelt bone was skipped silently at run time.
+- **architecture.md** section 8 and the `fit` listing, **ADR-0044** and `testing.md` now say this. Open issue 7 is closed.
+
+### Non-blocking points also taken
+
+- **`add_pose_shapes`:** a simpler copy's corner with no full-detail surface within 5 cm now takes no offset. Before, it took corner 0's offsets. The logic moved into `lower_detail_offsets`, tested by `fit::tests::a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective`, which was seen red against the old fallback. The test tee's levels have no such corner, so its records are unchanged (the player run below).
+- **"At most 6 mm" is now worded exactly:** the limit is on the move in the key pose, and a stored offset can be up to 6.3 mm (under "What the bake measured").
+
+**Not taken (left for the lead):**
+- caching `Correctives::driven` per model key;
+- a CPU bench of the walk;
+- a synthetic test of `under_flipped_folds` alone.
+
+### Tests
+
+| Run | Result |
+|---|---|
+| `cargo nextest run -p axcenity-avatar --no-fail-fast -E 'binary(cloth_correctives)'` (red, before the fix) | 4 tests run: 2 passed, 2 failed |
+| `cargo nextest run -p axcenity-avatar --no-fail-fast -E 'test(an_items_pose_correctives_name_its_shapes_and_the_bodys_bones) or ...'` (red) | 5 tests run: 4 passed, 1 failed |
+| `... -E 'test(a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective)'` (red, old fallback put back) | 1 test run: 0 passed, 1 failed |
+| `cargo nextest run -p axcenity-avatar --no-fail-fast` | **215 tests run: 215 passed** (2 slow), 1 skipped |
+| `cargo nextest run -p axcenity-avatar -p axcenity-gameplay -p axcenity-player --no-fail-fast` | **541 tests run: 541 passed** (25 slow), 23 skipped; no ABORT lines (`pose_corrective_tests`, the gate, `tee_crew_tests`, `wardrobe_tests` and `garment_checks` all pass on their records) |
+| `cargo clippy -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings` | clean |
+| `cargo fmt --all -- --check` | clean |
+| `python3 -I scripts/check-wiki.py` | 0 errors |
+
+**Files changed in this fix:**
+- `crates/avatar/src/fit/cloth.rs`: `solve` in two passes, `lower_detail_offsets`, `rules_match` over all of an item's models.
+- `crates/avatar/src/model_check.rs`.
+- Tests: `crates/avatar/src/fit/tests.rs`, `src/tests/models.rs`, `tests/cloth_correctives.rs`, `tests/shipped_library.rs`.
+- `crates/avatar/tests/fixtures/test-tee/TestTee.correctives.json`: its report only.
+- Docs: `assets/characters/realistic/import/correctives.py` (its docstring) and `README.md`, `architecture.md`, `testing.md`, ADR-0044, this hand-back and its red-run file.
+- Sheets: `pose-correctives/armpit-walk-0-367-3x.jpg` and `armpit-front-*.jpg` (5).

@@ -826,8 +826,8 @@ fn pose_correctives_written_into_a_garments_file_load_as_driven_shapes() {
         })
     );
     assert_eq!(model.morph_targets[0].driver, None);
-    rules_match(&model, &shapes.kept_rules()).unwrap();
-    assert!(rules_match(&model, &shapes.rules).is_err());
+    rules_match([&model], &shapes.kept_rules()).unwrap();
+    assert!(rules_match([&model], &shapes.rules).is_err());
     let read = BodyMesh::from_model(&model).unwrap();
     let lean = read.shapes[2].dense(rest.len());
     for (k, offset) in lean.iter().enumerate() {
@@ -861,4 +861,45 @@ fn pose_correctives_written_into_a_garments_file_load_as_driven_shapes() {
     // A file's own rounding is the same garment.
     let rounded: Vec<Vec3> = rest.iter().map(|p| *p + Vec3::splat(2e-7)).collect();
     assert!(same_garment(&fingerprint(&rounded), &shapes.fingerprint));
+}
+
+/// A simpler copy's corner takes the pose correctives' offsets at the
+/// closest point of the full detail's surface; one with no surface within
+/// 5 cm takes none (not the full detail's first corner's).
+#[test]
+fn a_simpler_copys_corner_far_from_the_full_detail_takes_no_corrective() {
+    let surface = Surface::new(
+        vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.1, 0.0, 0.0),
+            Vec3::new(0.0, 0.1, 0.0),
+        ],
+        Vec::new(),
+        vec![[0, 1, 2]],
+    );
+    let dense = vec![vec![
+        Vec3::new(0.01, 0.0, 0.0),
+        Vec3::new(0.0, 0.01, 0.0),
+        Vec3::new(0.0, 0.0, 0.01),
+    ]];
+    let corners = [
+        // On the first corner, and half way along the first edge.
+        Vec3::new(0.0, 0.0, 0.001),
+        Vec3::new(0.05, 0.0, 0.0),
+        // A metre away.
+        Vec3::new(0.0, 0.0, 1.0),
+    ];
+    let offsets = super::cloth::lower_detail_offsets(&surface, &corners, &dense);
+    assert_eq!(offsets.len(), 1);
+    assert!(
+        offsets[0][0].distance(dense[0][0]) < 1e-6,
+        "{}",
+        offsets[0][0]
+    );
+    assert!(
+        offsets[0][1].distance((dense[0][0] + dense[0][1]) * 0.5) < 1e-6,
+        "{}",
+        offsets[0][1]
+    );
+    assert_eq!(offsets[0][2], Vec3::ZERO);
 }
