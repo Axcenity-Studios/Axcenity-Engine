@@ -105,3 +105,50 @@ Traceback (most recent call last):
     import refine_joggers as rj  # noqa: E402
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ModuleNotFoundError: No module named 'refine_joggers'
+
+# ---- Review fixes 1 ----
+
+# 1. The knee. The reviewer pointed the old convex-hull knee test at the wave-4 joggers (no knee loops): it PASSED, ratios 1.27 to 1.61, so it could not fail.
+# Measures tried and rejected (both garments, every cast body, knees bent 135 degrees), because none tells the two garments apart:
+#   - ordered (non-convex) section loop in the skin ring's least-spread plane: skin ratio 2.8 to 4.8 itself, cloth 2.2 to 3.4 (wave 4) and 3.0 to 3.4 (fleece); on heavy bodies no loop encloses the centre (0)
+#   - the same in the knee's mitre plane (thigh and shin directions): ratios 1.8 to 14, the thigh and calf merge
+#   - share of knee-band area whose triangles fold over (face against the skinned corner normals): wave 4 5.0 to 10.7%, fleece 5.9 to 9.7%, the body's own skin 3.5 to 7.6%
+#   - cloth surface inside the skin at the back of the bent knee: wave 4 up to 11.5 mm, fleece up to 14.6 mm (the crease the calf and thigh close)
+# Kept: the cloth surface over the knee's FRONT, 7 samples a triangle, more than 1 mm inside the skin. Red on the garment without knee loops:
+$ cargo nextest run -p axcenity-player -E 'test(/knee_measure_catches/)' --success-output immediate
+Pants_Joggers on realistic-feminine-cast-athletic side 1: 0 of 749 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-feminine-cast-athletic side -1: 3 of 721 samples over the knee's front more than 1 mm inside the skin, deepest 3.2 mm
+Pants_Joggers on realistic-feminine-cast-average side 1: 0 of 805 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-feminine-cast-average side -1: 3 of 735 samples over the knee's front more than 1 mm inside the skin, deepest 2.6 mm
+Pants_Joggers on realistic-feminine-cast-heavyset side 1: 0 of 840 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-feminine-cast-heavyset side -1: 3 of 819 samples over the knee's front more than 1 mm inside the skin, deepest 3.1 mm
+Pants_Joggers on realistic-feminine-cast-muscular side 1: 0 of 749 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-feminine-cast-muscular side -1: 4 of 721 samples over the knee's front more than 1 mm inside the skin, deepest 3.3 mm
+Pants_Joggers on realistic-feminine-cast-slim side 1: 0 of 770 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-feminine-cast-slim side -1: 3 of 686 samples over the knee's front more than 1 mm inside the skin, deepest 2.4 mm
+Pants_Joggers on realistic-masculine-cast-athletic side 1: 0 of 756 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-masculine-cast-athletic side -1: 4 of 742 samples over the knee's front more than 1 mm inside the skin, deepest 2.3 mm
+Pants_Joggers on realistic-masculine-cast-average side 1: 0 of 805 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-masculine-cast-average side -1: 2 of 770 samples over the knee's front more than 1 mm inside the skin, deepest 2.6 mm
+Pants_Joggers on realistic-masculine-cast-heavyset side 1: 0 of 770 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-masculine-cast-heavyset side -1: 6 of 742 samples over the knee's front more than 1 mm inside the skin, deepest 3.5 mm
+Pants_Joggers on realistic-masculine-cast-muscular side 1: 0 of 756 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-masculine-cast-muscular side -1: 4 of 721 samples over the knee's front more than 1 mm inside the skin, deepest 2.7 mm
+Pants_Joggers on realistic-masculine-cast-slim side 1: 0 of 819 samples over the knee's front more than 1 mm inside the skin, deepest 0.0 mm
+Pants_Joggers on realistic-masculine-cast-slim side -1: 2 of 763 samples over the knee's front more than 1 mm inside the skin, deepest 2.6 mm
+# (the wave-4 joggers fail on the right knee of every cast body: 2 to 6 samples, up to 3.5 mm; that test asserts the failure, so it passes)
+# Green on the fleece joggers: 0 samples on every cast body and both knees (the_fleece_joggers_wrap_the_front_of_the_bent_knee passes).
+
+# 2. The bake's inward normals (test first):
+$ python -I test_refine.py   (Blender Python)
+======================================================================
+ERROR: test_a_normal_facing_into_the_cloth_is_read_as_flat (__main__.BakeTest.test_a_normal_facing_into_the_cloth_is_read_as_flat)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<worktree>\assets\characters\realistic\import\test_refine.py", line 123, in test_a_normal_facing_into_the_cloth_is_read_as_flat
+    out = rj.outward(xyz)
+          ^^^^^^^^^^
+AttributeError: module 'refine_joggers' has no attribute 'outward'
+----------------------------------------------------------------------
+Ran 11 tests in 6.104s
+FAILED (errors=1)

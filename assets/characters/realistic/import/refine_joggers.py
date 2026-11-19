@@ -1102,6 +1102,22 @@ def _image(path):
         return np.asarray(im.convert("RGB"), np.float32) / 255.0
 
 
+# A tangent-space normal leaning further than this from the surface's own
+# (z, its cosine) faces into the cloth. The download's normal map has such
+# texels (71,519 in its islands, z <= 0); baked as they were, they render
+# black (the notch on the seat with the hips flexed, Review fixes 1).
+MIN_NORMAL_Z = 0.2
+
+
+def outward(xyz):
+    """Tangent-space normals (n, 3) with each one facing into the cloth
+    (z under `MIN_NORMAL_Z`) read as flat: such a texel is a fault of the
+    map, not a fold."""
+    out = np.array(xyz, np.float32, copy=True)
+    out[out[:, 2] < MIN_NORMAL_Z] = (0.0, 0.0, 1.0)
+    return out
+
+
 def _bilinear(img, uv):
     """`img` read at texture coordinates `uv` (Blender's: v up)."""
     h, w = img.shape[:2]
@@ -1297,7 +1313,7 @@ def bake(mesh, faces, corners, uv, download, sections, maps, out_folder):
         old_uv = np.einsum("nk,nkd->nd", w, download.tri_uv[hit_tri])
         colour = _bilinear(albedo, old_uv).astype(np.float32)
         rgh = _bilinear(rough[..., None], old_uv)[:, 0].astype(np.float32)
-        xyz = (_bilinear(normal_map, old_uv) * 2 - 1).astype(np.float32)
+        xyz = outward(_bilinear(normal_map, old_uv) * 2 - 1)
         nrm = np.tile(np.array([0.0, 0.0, 1.0], np.float32), (m, 1))
         # The normal turned from the download's texture frame into the new
         # one where the texel shows the cloth's outside (the facings, folds

@@ -113,6 +113,21 @@ class ClosedPartsTest(unittest.TestCase):
         self.assertLess(fold[:, 1].max(), 0.10, "the fold rounds below the hem")
 
 
+class BakeTest(unittest.TestCase):
+    def test_a_normal_facing_into_the_cloth_is_read_as_flat(self):
+        # Review fixes 1: the download's normal map has texels facing into
+        # the surface (tangent z <= 0); baked as they were, they render
+        # black (the notch on the seat with the hips flexed).
+        xyz = np.array([[0.3, 0.1, 0.9], [0.6, -0.2, -0.4], [0.9, 0.0, 0.1], [0.0, 0.0, 1.0]],
+                       np.float32)
+        out = rj.outward(xyz)
+        np.testing.assert_allclose(out[0], xyz[0])
+        np.testing.assert_allclose(out[3], xyz[3])
+        np.testing.assert_allclose(out[1], [0.0, 0.0, 1.0])
+        np.testing.assert_allclose(out[2], [0.0, 0.0, 1.0])
+        self.assertTrue((out[:, 2] >= rj.MIN_NORMAL_Z).all())
+
+
 class LoaderTest(unittest.TestCase):
     def test_the_textures_uv_layer_is_read_and_a_webp_map_becomes_png(self):
         import bpy

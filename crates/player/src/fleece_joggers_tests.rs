@@ -12,9 +12,11 @@
 //!   pose (the hips flexed too), a walk frame and the whole stride.
 //! - **Levels of detail**: the same at rest for each simpler copy.
 //! - **Stability in motion**: Idle, Walk and Run (`garment_checks`).
-//! - **The knee bends without collapse**: the joggers' section through
-//!   the knee keeps at least the body's own limit of its area (the
-//!   body's `knee_135` ring area ratio, 0.6) with the knees bent.
+//! - **The knee wraps the bent knee's front**: with the knees bent, no
+//!   point of the cloth's surface over the front of the knee lies more
+//!   than 1 mm inside the skin (sampled inside the triangles, not only at
+//!   corners). The measure fails the wave-4 joggers, so it can fail. It
+//!   doesn't judge the back of the knee (see `knee_front_failures`).
 //! - **The waistband stays closed**: its top edge stays near the skin all
 //!   round in the walk and with the hips flexed (§3 "Sleeves and waist").
 
@@ -263,148 +265,122 @@ fn the_fleece_joggers_stay_steady_in_the_idle_walk_and_run() {
     }
 }
 
-/// The body's own limit at the knee (`assets/characters/realistic/qa/
-/// thresholds.json`, `knee_135/ring_area_ratio`): what a section through
-/// the bent knee keeps of its area at rest.
-const KNEE_RING_RATIO: f32 = 0.6;
 /// The rest pose's knee joint height (m, the masculine and feminine frames
 /// share the skeleton: `LeftLowerLeg`'s head).
 const KNEE_HEIGHT: f32 = 0.50;
+/// The knee's band: cloth whose rest height is within this of the knee.
+const KNEE_BAND: f32 = 0.08;
+/// How far inside the skin the cloth's surface may lie: the fit gate's
+/// poke-through limit (`fit_gate_tests`).
+const KNEE_CUT: f32 = 0.001;
 
-/// The area of the convex hull of `points` (in a plane through `centre`
-/// with normal `normal`).
-fn hull_area(points: &[Vec3], centre: Vec3, normal: Vec3) -> f32 {
-    let u = normal.any_orthonormal_vector();
-    let v = normal.cross(u);
-    let mut flat: Vec<(f32, f32)> = points
-        .iter()
-        .map(|p| ((*p - centre).dot(u), (*p - centre).dot(v)))
-        .collect();
-    flat.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
-    let cross = |o: (f32, f32), a: (f32, f32), b: (f32, f32)| {
-        (a.0 - o.0) * (b.1 - o.1) - (a.1 - o.1) * (b.0 - o.0)
-    };
-    let mut hull: Vec<(f32, f32)> = Vec::new();
-    for pass in 0..2 {
-        let start = hull.len();
-        let points: Vec<(f32, f32)> = if pass == 0 {
-            flat.clone()
-        } else {
-            flat.iter().rev().copied().collect()
-        };
-        for p in points {
-            while hull.len() >= start + 2
-                && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0
-            {
-                hull.pop();
-            }
-            hull.push(p);
+/// Points across a triangle, as barycentric weights: its middle, its
+/// edges' middles, and one between the middle and each corner. The gate
+/// checks corners; a long triangle across a bend cuts the corner of the
+/// bend between its corners, so this samples inside the triangles.
+const SAMPLES: [[f32; 3]; 7] = [
+    [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+    [0.5, 0.5, 0.0],
+    [0.0, 0.5, 0.5],
+    [0.5, 0.0, 0.5],
+    [0.6, 0.2, 0.2],
+    [0.2, 0.6, 0.2],
+    [0.2, 0.2, 0.6],
+];
+
+/// Over the front of one knee (`side` +1 or -1: the cloth whose rest
+/// height is within [`KNEE_BAND`] of the knee and whose rest face looks
+/// forward), the cloth's surface as `posed` against the posed `body`:
+/// how many of its sample points lie more than [`KNEE_CUT`] inside the
+/// skin, of how many, and the deepest (m).
+fn knee_front_cut(rest: &Posed, posed: &Posed, body: &Posed, side: f32) -> (usize, usize, f32) {
+    let skin = Surface::new(
+        body.positions.clone(),
+        body.normals.clone(),
+        body.triangles.clone(),
+    );
+    let (mut total, mut inside, mut deepest) = (0, 0, 0.0f32);
+    for t in &rest.triangles {
+        let r = t.map(|k| rest.positions[k as usize]);
+        let middle = (r[0] + r[1] + r[2]) / 3.0;
+        let forward = (r[1] - r[0]).cross(r[2] - r[0]).z > 0.0;
+        if (middle.y - KNEE_HEIGHT).abs() > KNEE_BAND || middle.x * side < 0.03 || !forward {
+            continue;
         }
-        hull.pop();
-    }
-    let mut area = 0.0;
-    for k in 0..hull.len() {
-        let (a, b) = (hull[k], hull[(k + 1) % hull.len()]);
-        area += a.0 * b.1 - b.0 * a.1;
-    }
-    area.abs() / 2.0
-}
-
-/// Where the plane through `centre` with `normal` cuts `mesh`'s
-/// triangles, keeping the crossings within `reach` of `centre`.
-fn section(mesh: &Posed, centre: Vec3, normal: Vec3, reach: f32) -> Vec<Vec3> {
-    let mut out = Vec::new();
-    for t in &mesh.triangles {
-        let p = t.map(|v| mesh.positions[v as usize]);
-        for k in 0..3 {
-            let (a, b) = (p[k], p[(k + 1) % 3]);
-            let (da, db) = ((a - centre).dot(normal), (b - centre).dot(normal));
-            if da * db < 0.0 {
-                let at = a + (b - a) * (da / (da - db));
-                if at.distance(centre) < reach {
-                    out.push(at);
+        let p = t.map(|k| posed.positions[k as usize]);
+        for [a, b, c] in SAMPLES {
+            let q = p[0] * a + p[1] * b + p[2] * c;
+            total += 1;
+            if let Some(hit) = skin.closest(q, 0.05) {
+                let depth = -hit.signed(q);
+                if depth > KNEE_CUT {
+                    inside += 1;
+                    deepest = deepest.max(depth);
                 }
             }
         }
     }
-    out
+    (total, inside, deepest)
 }
 
-/// The knee's section on each side, from the body's own corners: the skin
-/// corners within 1 cm of the knee's height at rest (one leg), as posed;
-/// the plane through them (its normal the leg's direction there: the
-/// least spread of the corners) and their middle.
-fn knee_plane(rest: &Posed, posed: &Posed, side: f32) -> (Vec3, Vec3) {
-    let ring: Vec<usize> = rest
-        .positions
-        .iter()
-        .enumerate()
-        .filter(|(_, p)| (p.y - KNEE_HEIGHT).abs() < 0.01 && p.x * side > 0.03)
-        .map(|(k, _)| k)
-        .collect();
-    assert!(ring.len() > 8, "the knee's skin ring");
-    let points: Vec<Vec3> = ring.iter().map(|k| posed.positions[*k]).collect();
-    let centre = points.iter().copied().sum::<Vec3>() / points.len() as f32;
-    // The plane's normal: the direction of least spread (the smallest
-    // eigenvector of the covariance), by power iteration on its inverse's
-    // stand-in: the largest of (trace - covariance).
-    let mut c = [[0.0f32; 3]; 3];
-    for p in &points {
-        let d = *p - centre;
-        let d = [d.x, d.y, d.z];
-        for i in 0..3 {
-            for j in 0..3 {
-                c[i][j] += d[i] * d[j];
-            }
-        }
-    }
-    let trace = c[0][0] + c[1][1] + c[2][2];
-    let mut n = Vec3::new(0.3, 1.0, 0.2).normalize();
-    for _ in 0..64 {
-        let m = |r: usize| {
-            Vec3::new(
-                if r == 0 { trace } else { 0.0 } - c[r][0],
-                if r == 1 { trace } else { 0.0 } - c[r][1],
-                if r == 2 { trace } else { 0.0 } - c[r][2],
-            )
-        };
-        n = Vec3::new(m(0).dot(n), m(1).dot(n), m(2).dot(n)).normalize();
-    }
-    (centre, n)
-}
-
-/// "Proper leg deformation" (decision 13): with the knees bent 135 degrees
-/// (the body suite's pose), the joggers' section through each knee keeps
-/// at least [`KNEE_RING_RATIO`] of its area at rest, as the body must, on
-/// every cast body.
-#[test]
-fn the_fleece_joggers_bend_at_the_knee_without_collapsing() {
-    let stage = Stage::new("joggers-knee", &repository_library()).expect("the stage");
-    let mut problems = Vec::new();
+/// "Proper leg deformation" at the knee for `item` (drawn as `part`): with
+/// the knees bent 135 degrees (the body suite's pose), on every cast body,
+/// the cloth wraps the front of each knee: no sample of its surface lies
+/// more than [`KNEE_CUT`] inside the skin. Returns the knees that fail.
+///
+/// This is the side a bend stretches, where too few rings across the knee
+/// show as cloth cutting the kneecap's corner. The back of the bent knee
+/// is not judged: there the calf meets the thigh and the body's own skin
+/// closes the crease, so any cloth in it lies inside the skin (up to 15 mm
+/// for these joggers and the wave-4 ones alike) and none of it shows.
+fn knee_front_failures(item: &str, part: &str) -> Vec<String> {
+    let stage =
+        Stage::new(&format!("knee-front-{part}"), &repository_library()).expect("the stage");
+    let mut failures = Vec::new();
     for description in bodies().into_iter().filter(|d| d.name.contains("-cast-")) {
-        let dressed = dressed(&description);
-        let (rest_body, rest_garments) = worn(&stage.assets, &dressed, Stance::Rest);
-        let (bent_body, bent_garments) =
-            worn(&stage.assets, &dressed, Stance::Held(HeldPose::KneesBent));
-        let rest = rest_garments.iter().find(|g| g.name == PART).unwrap();
-        let bent = bent_garments.iter().find(|g| g.name == PART).unwrap();
-        for side in [1.0, -1.0] {
-            let (c0, n0) = knee_plane(&rest_body, &rest_body, side);
-            let (c1, n1) = knee_plane(&rest_body, &bent_body, side);
-            let skin = |b: &Posed, c, n| hull_area(&section(b, c, n, 0.12), c, n);
-            let cloth = |g: &Posed, c, n| hull_area(&section(g, c, n, 0.15), c, n);
-            let skin_ratio = skin(&bent_body, c1, n1) / skin(&rest_body, c0, n0);
-            let ratio = cloth(bent, c1, n1) / cloth(rest, c0, n0);
+        let mut dressed = description.clone();
+        dressed.items.push(WornItem::new(item));
+        let (_, rest) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bent_body, bent) = worn(&stage.assets, &dressed, Stance::Held(HeldPose::KneesBent));
+        let rest = rest.iter().find(|g| g.name == part).unwrap();
+        let bent = bent.iter().find(|g| g.name == part).unwrap();
+        for side in [1.0f32, -1.0] {
+            let (total, inside, deepest) = knee_front_cut(rest, bent, &bent_body, side);
             println!(
-                "{} side {side}: the joggers' knee section keeps {:.3} of its area (the skin's {:.3})",
-                description.name, ratio, skin_ratio
+                "{part} on {} side {side}: {inside} of {total} samples over the knee's front more than 1 mm inside the skin, deepest {:.1} mm",
+                description.name,
+                deepest * 1000.0
             );
-            if ratio < KNEE_RING_RATIO {
-                problems.push(format!("{} side {side}: {ratio:.3}", description.name));
+            assert!(total > 100, "the knee's front has cloth");
+            if inside > 0 {
+                failures.push(format!(
+                    "{} side {side}: {inside} samples, {:.1} mm",
+                    description.name,
+                    deepest * 1000.0
+                ));
             }
         }
     }
-    assert!(problems.is_empty(), "{problems:#?}");
+    failures
+}
+
+#[test]
+fn the_fleece_joggers_wrap_the_front_of_the_bent_knee() {
+    let failures = knee_front_failures(JOGGERS, PART);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The knee measure can fail: the wave-4 joggers (`axcenity/realistic-
+/// joggers`, a Draft kept as it is), whose knee isn't ringed, cut the
+/// front of the bent right knee. If they are ever remade, point this at
+/// another garment without knee loops rather than deleting it.
+#[test]
+fn the_knee_measure_catches_the_wave_4_joggers() {
+    let failures = knee_front_failures("axcenity/realistic-joggers", "Pants_Joggers");
+    assert!(
+        !failures.is_empty(),
+        "the measure passed a garment without knee loops"
+    );
 }
 
 /// How far the waistband's top edge may stand off the skin in a pose
