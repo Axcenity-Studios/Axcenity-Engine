@@ -58,7 +58,15 @@ fn current_page(world: &World, pages: InstanceId) -> String {
 
 /// The hello-ui-graph example open in the editor, and its Menu, Pages and
 /// Settings button.
-fn hello_ui_graph(test: &str) -> (PathBuf, EditorApp, InstanceId, InstanceId, InstanceId) {
+fn hello_ui_graph(
+    test: &str,
+) -> (
+    axcenity_test_dirs::TestDir,
+    EditorApp,
+    InstanceId,
+    InstanceId,
+    InstanceId,
+) {
     let folder = copy_of_example("hello-ui-graph", test);
     let app = EditorApp::new(Some(&folder));
     let menu = child(&app.world, app.world.workspace(), "Menu");

@@ -353,8 +353,9 @@ mod tests {
 
     #[test]
     fn asset_paths_are_found_in_any_of_their_spellings() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-convert-files-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-convert-files-{}", std::process::id())),
+        );
         std::fs::create_dir_all(folder.join("textures")).unwrap();
         std::fs::write(folder.join("textures/wood.png"), b"wood").unwrap();
         let files = Files::new(&folder.join("scene.usda"), &[]);

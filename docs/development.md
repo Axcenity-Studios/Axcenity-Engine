@@ -38,6 +38,27 @@ nextest prints a test's output only when it fails, unless you pass `--no-capture
 
 Keep single tests short. `axcenity-player`'s `every_example_renders` draws every example on up to four threads sharing one GPU device (15 s one at a time, 5 s now).
 
+### Temporary folders in tests
+
+A test that writes files makes its folder with `axcenity_test_dirs::TestDir` (the `axcenity-test-dirs` crate, `crates/test-dirs`, a dev-dependency of any crate; standard library only):
+
+```rust
+let project = axcenity_test_dirs::TestDir::new("my-test"); // empty, made now
+std::fs::write(project.join("game.json"), "{}").unwrap();
+let assets = Assets::new(project.clone()); // an owned PathBuf copy of the path
+// The folder and everything in it go when `project` drops: at the end of the
+// test, or as a failing test unwinds.
+```
+
+- `TestDir::new(name)` makes an empty folder `axcenity-{name}-{process id}-{n}` under the system temp folder. `TestDir::unmade(name)` names one without making it, for code that must make it itself. `TestDir::adopt(path)` takes charge of a path the test chose (a folder or a file, such as a saved picture). `dir.at(path)` stands for a path inside the folder (a project a helper made in it) and still removes the whole folder.
+- It derefs to `PathBuf`, so a helper that returned a `PathBuf` can return a `TestDir` and its callers keep `&folder`, `folder.join(..)` and `folder.clone()` (a plain `PathBuf` copy that removes nothing).
+- **Keep the value alive while anything uses the folder.** Bind it to a name (`let folder = ..`), never `let _ = ..`, and never chain on a temporary (`scratch("x").join("file")` removes the folder at the end of that statement). A helper that returns an app, a world or a URL that still uses its folder returns the `TestDir` too: first in the tuple, so the caller's binding drops after the app (bindings drop in reverse order). A test that checks something survives a restart keeps one `TestDir` for the whole test.
+- Removal clears read-only flags (Git's object files) and, on Windows, retries for about three seconds while a process the test started (luau-lsp, the updater) still holds a file. It never removes the temp folder itself or a folder above it. What it can't remove it names on standard error; it never panics.
+- **`AXCENITY_KEEP_TEST_DIRS=1`** keeps every test folder (and debug picture) for debugging; each kept path is printed to standard error (`--no-capture` shows it).
+- Never write a test folder with `std::env::temp_dir()` and no cleanup: one full run used to leave over a thousand folders (33.5 GB), and weeks of runs filled a disk with 1.4 TB.
+- A test stopped by nextest's 2-minute timeout is killed, so its drop never runs and its folder stays. Such folders are named `axcenity-*` in the temp folder and are safe to delete when no test is running. The game-test runner (`testing`'s `SaveFolder`, not test code) keeps one empty `axcenity-test-saves` folder there.
+- To see what a run leaves, give it a temp folder of its own: on Windows set `TMP` and `TEMP` (on Linux `TMPDIR`) to an empty folder for `cargo nextest run`, then list that folder.
+
 ## Checking another platform
 
 GitHub Actions runs only for releases. The CI workflow (`.github/workflows/ci.yml`: format, the workspace-hack check, and build, the player having no editor code, clippy and every test on Windows, macOS and Linux) runs only when started by hand (**Actions > CI > Run workflow**), never on pushes or pull requests. The Release workflow runs for release tags ([releases.md](project/releases.md#cutting-a-release)). The priority is stability and development speed over keeping CI infrastructure running, and minutes are spent only on purpose ([development policy](development-policy.md#continuous-integration)). Don't add jobs to `ci.yml`; check any workflow change locally with `python3 scripts/check-workflows.py` first.

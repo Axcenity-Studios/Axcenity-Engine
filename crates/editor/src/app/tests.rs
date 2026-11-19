@@ -17,11 +17,11 @@ pub(super) fn last_line(app: &EditorApp) -> &OutputLine {
 }
 
 /// A project folder in the temp directory with these files in it.
-fn temp_project(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn temp_project(name: &str, files: &[(&str, &str)]) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-{name}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     for (file, text) in files {
@@ -1048,7 +1048,7 @@ pub(super) fn with_big_stack(test: impl FnOnce() + Send + 'static) {
 /// Leaves out `.axcenity`: what an editor opened on the example kept there
 /// (Version History, AutoRecover) isn't part of it, and would change what
 /// the tests see.
-pub(super) fn copy_of_example(name: &str, test: &str) -> PathBuf {
+pub(super) fn copy_of_example(name: &str, test: &str) -> axcenity_test_dirs::TestDir {
     fn copy_folder(from: &Path, to: &Path) {
         std::fs::create_dir_all(to).unwrap();
         for entry in std::fs::read_dir(from).unwrap() {
@@ -1064,10 +1064,10 @@ pub(super) fn copy_of_example(name: &str, test: &str) -> PathBuf {
             }
         }
     }
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-{test}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     copy_folder(&example(name), &folder);
     folder

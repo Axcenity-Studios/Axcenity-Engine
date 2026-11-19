@@ -305,8 +305,9 @@ mod tests {
 
     #[test]
     fn a_reloaded_model_is_drawn_with_new_meshes_and_the_old_one_is_let_go() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-mesh-cache-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-mesh-cache-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/models")).unwrap();
         let file = std::fs::read(examples().join("hello-mesh").join(PYRAMID)).unwrap();

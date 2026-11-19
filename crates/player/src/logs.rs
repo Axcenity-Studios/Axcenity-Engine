@@ -207,11 +207,11 @@ mod tests {
 
     #[test]
     fn a_forced_panic_leaves_a_log_with_the_panic_and_says_where_the_log_is() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-player-logs-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         // Six runs: the last five logs are kept, newest as latest.log.
         for run in 1..=6 {

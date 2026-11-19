@@ -348,6 +348,8 @@ fn saving_during_play_writes_the_players_data_not_the_project_and_stop_restores_
     let folder = copy_of_example("hello-saves", "saves-play");
     let saves = super::session::play_save_folder("Hello Saves").unwrap();
     let _ = std::fs::remove_dir_all(&saves);
+    // Play's save folder for this test process (`axcenity-editor-saves-<process>`).
+    let _saves_root = axcenity_test_dirs::TestDir::adopt(saves.parent().unwrap());
     let mut app = EditorApp::new(Some(&folder));
     let hero = app
         .world

@@ -3,7 +3,6 @@
 //! everywhere, and the person hosting is asked about a new joiner.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use axcenity_collab::access::Invite;
@@ -57,11 +56,11 @@ fn a_host_that_cant_listen_on_its_address_listens_everywhere() {
     assert_eq!(binds, [SocketAddr::from(([0, 0, 0, 0], port))]);
 }
 
-fn data_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn data_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-collab-trust-{name}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }
@@ -102,7 +101,8 @@ fn joined(app: &EditorApp) -> bool {
 #[test]
 fn the_host_is_asked_about_a_new_joiner_and_lets_them_in() {
     let (data_a, data_b) = (data_folder("paul"), data_folder("sam"));
-    let mut a = EditorApp::new(Some(&copy_of_example("hello-part", "collab-trust-host")));
+    let project_collab_trust_host = copy_of_example("hello-part", "collab-trust-host");
+    let mut a = EditorApp::new(Some(&project_collab_trust_host));
     a.team_panel.trust = Trust::AskNewMembers;
     let invite = a.host_network_session(Some(&data_a), 0).expect("hosting");
     let port = invite.host.rsplit(':').next().unwrap().to_owned();

@@ -508,8 +508,9 @@ fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
 
 #[test]
 fn face_controls_set_a_still_models_blend_shapes() {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-face-controls-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-face-controls-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     // A square with two shapes and no skeleton.
@@ -748,7 +749,9 @@ fn expressions_overrides_and_blinks_reach_the_shapes() {
 
 #[test]
 fn a_lip_sync_keeps_time_with_its_sound_and_fades_out_when_it_stops() {
-    let folder = std::env::temp_dir().join(format!("axcenity-lip-sync-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-lip-sync-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("voice")).unwrap();
     std::fs::write(

@@ -619,9 +619,10 @@ pub fn project_files(folder: &std::path::Path, endings: &[&str]) -> Vec<String> 
 
 /// A folder for tests to make project files in.
 #[cfg(test)]
-pub fn test_folder(name: &str) -> std::path::PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-studio-{name}-{}", std::process::id()));
+pub fn test_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-studio-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder

@@ -175,11 +175,11 @@ pub fn terrain_folder_path(folder: &Path, data_folder: &str) -> PathBuf {
 mod tests {
     use super::*;
 
-    fn temp_folder(name: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-project-terrain-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

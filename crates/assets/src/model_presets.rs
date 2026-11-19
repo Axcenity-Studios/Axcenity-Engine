@@ -306,11 +306,11 @@ mod tests {
     use super::*;
     use crate::PRESETS_FILE;
 
-    fn project(name: &str) -> std::path::PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-model-presets-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

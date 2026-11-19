@@ -733,9 +733,10 @@ mod tests {
         ));
     }
 
-    fn temp_folder(name: &str) -> PathBuf {
-        let path =
-            std::env::temp_dir().join(format!("axcenity-pack-{name}-{}", std::process::id()));
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let path = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-pack-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         path

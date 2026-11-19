@@ -2,17 +2,18 @@
 //! against small release folders written to a scratch directory.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::history::{HitKind, IssueState, QueryError, SearchQuery};
 use crate::prepare::{self, PrepareError};
 use crate::records::{Category, Evidence, Subsystem, VersionRef};
 use crate::{History, Version};
 
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir()
-        .join("axcenity-release-tests")
-        .join(format!("{name}-{}", std::process::id()));
+fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+    let dir = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
+        "axcenity-release-tests-{name}-{}",
+        std::process::id()
+    )));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     dir
@@ -30,7 +31,7 @@ fn v(text: &str) -> Version {
 
 /// A small, consistent history: two releases, an unreleased fix, three
 /// features and three issues.
-fn sample(name: &str) -> PathBuf {
+fn sample(name: &str) -> axcenity_test_dirs::TestDir {
     let root = scratch(name);
     write(
         &root,
@@ -210,7 +211,8 @@ fn a_consistent_history_has_no_problems() {
 
 #[test]
 fn an_empty_folder_is_an_empty_history() {
-    let history = History::load(&scratch("empty")).unwrap();
+    let scratch_empty = scratch("empty");
+    let history = History::load(&scratch_empty).unwrap();
     assert!(history.releases().is_empty());
     assert!(history.validate().is_empty());
 }
@@ -635,7 +637,7 @@ fn search_finds_ranks_filters_and_pages() {
 
 // ---- check and prepare ----
 
-fn repo(name: &str, version: &str) -> PathBuf {
+fn repo(name: &str, version: &str) -> axcenity_test_dirs::TestDir {
     let root = scratch(name);
     let releases = sample(&format!("{name}-releases"));
     copy_dir(&releases, &root.join("releases"));
@@ -1014,7 +1016,7 @@ fn the_history_file_holds_only_public_released_entries() {
 }
 
 /// The packages a release's `dist/` holds, and the history file.
-fn dist(name: &str, version: &str) -> PathBuf {
+fn dist(name: &str, version: &str) -> axcenity_test_dirs::TestDir {
     let dir = scratch(name);
     for (file, text) in [
         (

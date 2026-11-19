@@ -26,6 +26,7 @@ default = ["parallel"]
 parallel = ["rapier3d/parallel", "dep:rayon"]
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 # Tests generate Fractures' pieces to shatter.
 axcenity-mesh-edit.workspace = true
 # The terrain volume spike (PW8) collides its chunk meshes.

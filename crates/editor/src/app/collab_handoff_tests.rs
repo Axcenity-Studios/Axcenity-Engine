@@ -1,7 +1,6 @@
 //! The session going on in the editor when its host leaves or is lost
 //! (Collaborate 2.0, P4): three editors over real sockets on 127.0.0.1.
 
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use axcenity_collab::Role;
@@ -13,11 +12,11 @@ use super::tests::copy_of_example;
 use super::*;
 use crate::properties::Edit;
 
-pub(super) fn data_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+pub(super) fn data_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-collab-handoff-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }
@@ -115,8 +114,13 @@ pub(super) fn on_loopback(app: &mut EditorApp) {
 /// loopback port, with short timings.
 pub(super) fn session(
     name: &str,
-) -> (Box<EditorApp>, Box<EditorApp>, Box<EditorApp>, Vec<PathBuf>) {
-    let folders: Vec<PathBuf> = ["paul", "sam", "kim"]
+) -> (
+    Box<EditorApp>,
+    Box<EditorApp>,
+    Box<EditorApp>,
+    Vec<axcenity_test_dirs::TestDir>,
+) {
+    let folders: Vec<axcenity_test_dirs::TestDir> = ["paul", "sam", "kim"]
         .iter()
         .map(|who| data_folder(&format!("{name}-{who}")))
         .collect();

@@ -38,16 +38,17 @@ fn file(app: &EditorApp, path: &str) -> Option<String> {
     std::fs::read_to_string(app.project.as_ref().unwrap().folder.join(path)).ok()
 }
 
-fn opened(test: &str) -> EditorApp {
+/// The copied project comes first, so it is removed after the app is dropped.
+fn opened(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-part", test);
     let mut app = EditorApp::new(None);
     app.open(&folder);
-    app
+    (folder, app)
 }
 
 #[test]
 fn applying_a_copys_colour_reaches_the_other_copies_and_undo_takes_it_back() {
-    let mut app = opened("prefab-apply");
+    let (_project, mut app) = opened("prefab-apply");
     let workspace = app.world.workspace();
     let first = new_in(&mut app, ClassName::Part, "Crate", workspace);
     let path = save_as_prefab(&mut app, first);
@@ -80,7 +81,7 @@ fn applying_a_copys_colour_reaches_the_other_copies_and_undo_takes_it_back() {
 
 #[test]
 fn apply_one_revert_one_revert_all_and_unpack_each_do_one_thing() {
-    let mut app = opened("prefab-menu");
+    let (_project, mut app) = opened("prefab-menu");
     let workspace = app.world.workspace();
     let first = new_in(&mut app, ClassName::Part, "Crate", workspace);
     let path = save_as_prefab(&mut app, first);
@@ -122,7 +123,7 @@ fn apply_one_revert_one_revert_all_and_unpack_each_do_one_thing() {
 
 #[test]
 fn changing_the_wheel_prefab_updates_the_wheels_inside_every_car_copy() {
-    let mut app = opened("prefab-nested");
+    let (_project, mut app) = opened("prefab-nested");
     let workspace = app.world.workspace();
     let wheel = new_in(&mut app, ClassName::Part, "Wheel", workspace);
     let wheel_path = save_as_prefab(&mut app, wheel);
@@ -173,7 +174,7 @@ fn changing_the_wheel_prefab_updates_the_wheels_inside_every_car_copy() {
 
 #[test]
 fn a_red_enemy_variant_keeps_its_colour_and_takes_the_bases_max_health() {
-    let mut app = opened("prefab-variant");
+    let (_project, mut app) = opened("prefab-variant");
     let workspace = app.world.workspace();
     let enemy = new_in(&mut app, ClassName::Model, "Enemy", workspace);
     let body = new_in(&mut app, ClassName::Part, "Body", enemy);
@@ -204,7 +205,7 @@ fn a_red_enemy_variant_keeps_its_colour_and_takes_the_bases_max_health() {
 
 #[test]
 fn renaming_a_prefab_keeps_its_copies_linked() {
-    let mut app = opened("prefab-rename");
+    let (_project, mut app) = opened("prefab-rename");
     let workspace = app.world.workspace();
     let first = new_in(&mut app, ClassName::Part, "Crate", workspace);
     let path = save_as_prefab(&mut app, first);
@@ -236,7 +237,7 @@ fn drop_prefab_at(app: &mut EditorApp, path: &str, ui: Option<InstanceId>) {
 
 #[test]
 fn a_screengui_with_its_script_saves_as_a_prefab_and_places_as_a_linked_copy() {
-    let mut app = opened("prefab-ui-gui");
+    let (_project, mut app) = opened("prefab-ui-gui");
     let workspace = app.world.workspace();
     let gui = new_in(&mut app, ClassName::ScreenGui, "Hud", workspace);
     let panel = new_in(&mut app, ClassName::Frame, "Panel", gui);
@@ -271,7 +272,7 @@ fn a_screengui_with_its_script_saves_as_a_prefab_and_places_as_a_linked_copy() {
 
 #[test]
 fn a_dropped_ui_element_prefab_goes_into_the_ui_or_a_new_screengui() {
-    let mut app = opened("prefab-ui-element");
+    let (_project, mut app) = opened("prefab-ui-element");
     let workspace = app.world.workspace();
     let gui = new_in(&mut app, ClassName::ScreenGui, "Hud", workspace);
     let button = new_in(&mut app, ClassName::TextButton, "Play", gui);

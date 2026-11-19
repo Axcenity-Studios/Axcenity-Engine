@@ -41,7 +41,9 @@ mod tests {
 
     #[test]
     fn a_budget_is_kept_in_the_manifest_and_read_back() {
-        let temp = std::env::temp_dir().join(format!("axcenity-budget-{}", std::process::id()));
+        let temp = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-budget-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         let folder = crate::create_project(&temp, "Budgeted").unwrap();

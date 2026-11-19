@@ -267,8 +267,9 @@ mod tests {
 
     #[test]
     fn a_sound_dragged_from_the_toolbox_onto_a_part_lands_inside_it() {
-        let temp =
-            std::env::temp_dir().join(format!("axcenity-toolbox-drop-{}", std::process::id()));
+        let temp = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-toolbox-drop-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         let folder = axcenity_project::create_project(&temp, "Toolbox Drop").unwrap();

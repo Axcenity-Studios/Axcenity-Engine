@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use axcenity_core::{ClassName, InstanceId, Value, World};
 
 use super::*;
@@ -62,11 +60,11 @@ fn slider(world: &World, name: &str) -> InstanceId {
     world.find_first_child(panel, name).unwrap()
 }
 
-fn save_folder(test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn save_folder(test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-script-audio-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }

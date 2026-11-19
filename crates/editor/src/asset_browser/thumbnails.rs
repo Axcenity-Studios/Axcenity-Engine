@@ -224,7 +224,9 @@ mod tests {
 
     #[test]
     fn thumbnails_are_kept_while_their_files_exist() {
-        let folder = std::env::temp_dir().join(format!("axcenity-thumbs-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-thumbs-{}", std::process::id())),
+        );
         std::fs::create_dir_all(folder.join("assets/set")).unwrap();
         std::fs::write(folder.join("assets/set/color.png"), b"").unwrap();
         let mut thumbnails = Thumbnails::default();

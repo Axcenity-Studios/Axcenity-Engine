@@ -12,13 +12,8 @@ use super::{Headless, TOOLS, run, tools_for};
 
 pub(super) struct Opened {
     pub(super) app: Headless,
-    folder: std::path::PathBuf,
-}
-
-impl Drop for Opened {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.folder);
-    }
+    // Removed when dropped, after `app` (fields drop in order).
+    folder: axcenity_test_dirs::TestDir,
 }
 
 pub(super) fn open(example: &str, test: &str) -> Opened {
@@ -1593,8 +1588,10 @@ fn asset_find_lists_assets_by_kind_name_and_use() {
 
 /// A folder outside the project with `files` copied from the examples, as
 /// a user's downloads would be.
-fn import_folder(test: &str, files: &[&str]) -> std::path::PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-mcp-import-{test}"));
+fn import_folder(test: &str, files: &[&str]) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-mcp-import-{test}")),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
@@ -2692,10 +2689,10 @@ fn view_capture_draws_the_scene_as_a_png_from_the_camera_an_object_or_a_point() 
 #[test]
 fn toolbox_search_and_get_bring_an_asset_in_as_one_undo_step() {
     let mut opened = open("hello-part", "mcp-toolbox");
-    let assets = std::env::temp_dir().join(format!(
+    let assets = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-mcp-toolbox-assets-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&assets);
     let project = opened.folder.clone();
     let host = &mut opened.app;
@@ -2796,10 +2793,10 @@ fn the_open_editor_keeps_drawing_while_a_toolbox_download_runs() {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     let folder = copy_of_example("hello-part", "mcp-live-toolbox");
-    let assets = std::env::temp_dir().join(format!(
+    let assets = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-mcp-live-toolbox-assets-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&assets);
     let mut app = EditorApp::new(Some(&folder));
     let mut live = Live::start(&folder, axcenity_mcp::Waker(Arc::new(|| {}))).unwrap();

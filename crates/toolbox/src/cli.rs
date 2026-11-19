@@ -521,8 +521,10 @@ mod tests {
     }"#;
     const ID: &str = "4bd0a3e8-1111-2222-3333-444455556666";
 
-    fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("axcenity-cli-{name}-{}", std::process::id()));
+    fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+        let dir = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-cli-{name}-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

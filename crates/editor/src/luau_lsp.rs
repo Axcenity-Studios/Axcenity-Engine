@@ -272,7 +272,9 @@ mod tests {
 
     #[test]
     fn a_download_that_doesnt_match_the_pinned_hash_is_never_unpacked() {
-        let data = std::env::temp_dir().join(format!("axcenity-lsp-dl-{}", std::process::id()));
+        let data = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lsp-dl-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&data);
         let mut fake = zip_with(program_name(), b"not luau-lsp");
         // The pinned size, so only the hash tells it apart.
@@ -294,7 +296,9 @@ mod tests {
 
     #[test]
     fn a_program_already_downloaded_is_used_without_fetching() {
-        let data = std::env::temp_dir().join(format!("axcenity-lsp-have-{}", std::process::id()));
+        let data = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lsp-have-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&data);
         let program = downloaded(&data);
         fs::create_dir_all(program.parent().unwrap()).unwrap();
@@ -324,7 +328,9 @@ mod tests {
         if std::env::var_os("AXCENITY_LUAU_LSP_DOWNLOAD").is_none() && archive.is_none() {
             return;
         }
-        let data = std::env::temp_dir().join(format!("axcenity-lsp-real-{}", std::process::id()));
+        let data = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lsp-real-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&data);
         let download = match archive {
             Some(archive) => {

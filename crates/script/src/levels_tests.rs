@@ -180,10 +180,10 @@ fn an_unknown_level_is_an_error_naming_the_levels_and_changes_nothing() {
 #[test]
 fn a_slot_saved_in_another_level_with_one_added_goes_back_to_them() {
     let (mut world, mut runtime) = game();
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-script-levels-slot-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     runtime.set_save_folder(Some(folder.clone()));
     runtime
@@ -201,7 +201,7 @@ fn a_slot_saved_in_another_level_with_one_added_goes_back_to_them() {
 
     // A new game, in the start level.
     let (mut world, mut runtime) = game();
-    runtime.set_save_folder(Some(folder));
+    runtime.set_save_folder(Some(folder.to_path_buf()));
     runtime
         .run_command(
             &mut world,

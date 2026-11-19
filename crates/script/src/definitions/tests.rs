@@ -544,7 +544,9 @@ fn described_fields_and_methods_exist() {
     let mut world = World::new();
     let mut runtime = ScriptRuntime::new();
     // A project with a data table, for the DataTable and DataRow samples.
-    let folder = std::env::temp_dir().join(format!("axcenity-definitions-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-definitions-{}", std::process::id())),
+    );
     let mut table = axcenity_assets::DataTable::default();
     table.add_row("row", None);
     axcenity_assets::write_data_table(&folder.join("assets/data/sample.data.json"), &table)

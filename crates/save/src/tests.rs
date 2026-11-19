@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use axcenity_core::{
     Color3, Material, PartType, ParticleType, TextureChannel, UDim2, UiSettings, Vector2,
 };
@@ -7,8 +5,10 @@ use axcenity_core::{
 use super::*;
 
 /// An empty folder of its own for one test's slots.
-fn folder(test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-save-{test}-{}", std::process::id()));
+fn folder(test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-save-{test}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     folder
 }
@@ -157,7 +157,7 @@ fn loading_into_the_running_game_keeps_the_instances_scripts_hold() {
         coin,
         ..
     } = level();
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves.save(&world, 4).unwrap();
     world
         .set_property(
@@ -187,7 +187,7 @@ fn a_slot_keeps_each_data_layers_state() {
     world.set_parent(layer, Some(service)).unwrap();
     world.add_tag(coin, "Treasure").unwrap();
     let workspace = world.workspace();
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
 
     // Saved with the layer off: the coin isn't in the Workspace, and
     // loading over a game with it on sets it aside again rather than
@@ -373,7 +373,7 @@ fn scripts_and_screen_guis_are_not_world_state() {
     );
 
     // Loading a save without them leaves them where they are.
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     let made_later = world.create(ClassName::LocalScript).unwrap();
     world.set_parent(made_later, Some(workspace)).unwrap();
     saves.load(&mut world, 1).unwrap();
@@ -431,7 +431,7 @@ fn a_restored_material_keeps_the_metalness_it_was_saved_with() {
     world
         .set_property(block, "Metalness", Value::Number(0.3))
         .unwrap();
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves.save(&world, 1).unwrap();
     world
         .set_property(block, "Material", Value::Material(Material::Plastic))
@@ -598,7 +598,7 @@ fn two_checkpoints_with_the_same_name_are_told_apart() {
         world.set_parent(checkpoint, Some(workspace)).unwrap();
         checkpoints.push(checkpoint);
     }
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves.set_checkpoint(&world, checkpoints[1]).unwrap();
     saves.save(&world, 1).unwrap();
     saves.set_checkpoint(&world, checkpoints[0]).unwrap();
@@ -622,7 +622,7 @@ fn a_newer_slot_is_refused_and_its_file_is_unchanged() {
     fs::write(&slot, &newer).unwrap();
     let Level { mut world, .. } = level();
     let before = snapshot(&world);
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves
         .player_data
         .insert("Coins".to_owned(), Value::Number(1.0));
@@ -643,7 +643,7 @@ fn a_current_slot_round_trips_without_a_migration_step() {
     let folder = folder("current");
     let level = v1_level();
     let mut world = level.world.clone();
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     play_the_v1_save(&level, &mut world, &mut saves);
     let path = saves.save(&world, 1).unwrap();
 
@@ -710,7 +710,7 @@ fn attributes_tags_and_value_objects_survive_a_slot_round_trip() {
     world
         .set_property(score, "Value", Value::Number(7.0))
         .unwrap();
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves.save(&world, 1).unwrap();
 
     // Changed after saving: all of it goes back on load.
@@ -803,7 +803,7 @@ fn a_slot_captures_a_characters_health_and_puts_it_back() {
     ] {
         world.set_property(health, name, value).unwrap();
     }
-    let mut saves = Saves::new(Some(folder));
+    let mut saves = Saves::new(Some(folder.to_path_buf()));
     saves.save(&world, 1).unwrap();
     world
         .set_property(health, "Health", Value::Number(0.0))
@@ -922,7 +922,7 @@ fn a_slot_keeps_the_levels_and_one_without_them_reads_as_none() {
     assert_eq!(file.levels, saves.levels);
 
     // Loading one without levels keeps the game's; one with them notes them.
-    let mut loaded = Saves::new(Some(folder));
+    let mut loaded = Saves::new(Some(folder.to_path_buf()));
     let mut world = World::new();
     loaded.levels = Some(SavedLevels {
         current: "Meadow".to_owned(),

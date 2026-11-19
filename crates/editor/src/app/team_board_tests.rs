@@ -119,13 +119,15 @@ fn a_teammates_task_reaches_the_host_and_says_who_was_assigned() {
     let project = copy_of_example("hello-part", "team-board-host");
     let mut a = EditorApp::new(Some(&project));
     as_person(&mut a, "Paul");
+    let team_board_host = team_folder("board-host");
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("board-host")), 0)
+        a.host_network_session(Some(&team_board_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
     as_person(&mut b, "Sam");
-    b.join_network_session(&invite, Some(&team_folder("board-joiner")))
+    let team_board_joiner = team_folder("board-joiner");
+    b.join_network_session(&invite, Some(&team_board_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
     // The host's board is read before anything arrives.
@@ -423,13 +425,15 @@ fn each_persons_saves_board_changes_and_session_edits_are_kept_and_shown() {
 
     // In a session the host records each member's edits from its log, and
     // the members record nothing themselves.
+    let team_history_host = team_folder("history-host");
     let invite = over_loopback(
-        a.host_network_session(Some(&team_folder("history-host")), 0)
+        a.host_network_session(Some(&team_history_host), 0)
             .expect("hosting"),
     );
     let mut b = EditorApp::new(None);
     as_person(&mut b, "Sam");
-    b.join_network_session(&invite, Some(&team_folder("history-joiner")))
+    let team_history_joiner = team_folder("history-joiner");
+    b.join_network_session(&invite, Some(&team_history_joiner))
         .expect("joining");
     settle_net(&mut a, &mut b, |_, b| b.project.is_some());
     let joiner = b

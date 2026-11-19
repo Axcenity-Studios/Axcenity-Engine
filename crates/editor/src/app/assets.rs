@@ -868,8 +868,9 @@ mod tests {
 
     #[test]
     fn dropping_a_global_asset_copies_it_into_the_project_first() {
-        let temp =
-            std::env::temp_dir().join(format!("axcenity-drop-global-{}", std::process::id()));
+        let temp = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-drop-global-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&temp);
         let library = temp.join("library");
         std::fs::create_dir_all(library.join("assets/audio")).unwrap();
@@ -906,8 +907,9 @@ mod tests {
 
     #[test]
     fn deleting_a_model_folder_removes_its_files_and_undo_puts_them_back() {
-        let temp =
-            std::env::temp_dir().join(format!("axcenity-delete-assets-{}", std::process::id()));
+        let temp = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-delete-assets-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         let folder = project::create_project(&temp, "Deletes").unwrap();

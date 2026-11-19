@@ -256,7 +256,8 @@ mod tests {
 
     #[test]
     fn the_crowd_scene_opens_and_runs_its_characters_and_bodies() {
-        let folder = std::env::temp_dir().join("axcenity-crowd-scene");
+        let folder =
+            axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join("axcenity-crowd-scene"));
         let _ = fs::remove_dir_all(&folder);
         write(&folder).unwrap();
         let project = axcenity_project::load(&folder).unwrap();

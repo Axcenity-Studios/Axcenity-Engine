@@ -69,10 +69,10 @@ fn scene(list: &DrawList) -> String {
 
 #[test]
 fn hello_accessibility_changes_the_menu_and_not_the_world_and_keeps_the_settings_in_a_slot() {
-    let saves = std::env::temp_dir().join(format!(
+    let saves = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-player-accessibility-saves-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&saves);
     let (mut world, mut scripts, folder) = start(&saves);
     let project = axcenity_project::load(&folder).unwrap();

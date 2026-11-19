@@ -221,9 +221,10 @@ mod tests {
         }
     }
 
-    fn scratch(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("axcenity-download-{name}-{}", std::process::id()));
+    fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+        let dir = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-download-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&dir);
         dir
     }
@@ -232,7 +233,8 @@ mod tests {
     fn a_dropped_download_resumes_where_it_stopped() {
         let body: Vec<u8> = (0..200_000u32).map(|i| i as u8).collect();
         let artifact = artifact_of(&body);
-        let to = scratch("resume").join("update.zip");
+        let dir = scratch("resume");
+        let to = dir.join("update.zip");
         let server = memory(&body, true, Some(70_000));
         let cancel = AtomicBool::new(false);
         let mut seen = 0;
@@ -279,7 +281,8 @@ mod tests {
     fn a_server_without_ranges_starts_over() {
         let body = b"0123456789".repeat(1000);
         let artifact = artifact_of(&body);
-        let to = scratch("norange").join("update.zip");
+        let dir = scratch("norange");
+        let to = dir.join("update.zip");
         fs::create_dir_all(to.parent().unwrap()).unwrap();
         fs::write(part_path(&to), &body[..3000]).unwrap();
         let server = memory(&body, false, None);
@@ -300,7 +303,8 @@ mod tests {
         let body = b"payload".repeat(100);
         let mut artifact = artifact_of(&body);
         artifact.sha256 = "00".repeat(32);
-        let to = scratch("hash").join("update.zip");
+        let dir = scratch("hash");
+        let to = dir.join("update.zip");
         let server = memory(&body, true, None);
         let cancel = AtomicBool::new(false);
         assert!(matches!(
@@ -329,7 +333,8 @@ mod tests {
     fn cancel_deletes_the_partial_file() {
         let body = vec![7u8; 300_000];
         let artifact = artifact_of(&body);
-        let to = scratch("cancel").join("update.zip");
+        let dir = scratch("cancel");
+        let to = dir.join("update.zip");
         let server = memory(&body, true, None);
         let cancel = AtomicBool::new(false);
         let result = download(

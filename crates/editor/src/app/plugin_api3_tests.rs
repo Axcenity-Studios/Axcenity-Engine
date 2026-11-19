@@ -37,7 +37,7 @@ plugin.Unloading:Connect(function()
 end)
 "#;
 
-fn opened(test: &str) -> (EditorApp, std::path::PathBuf) {
+fn opened(test: &str) -> (EditorApp, axcenity_test_dirs::TestDir) {
     let folder = copy_of_example("hello-plugins", test);
     let tidy = folder.join("plugins").join("tidy");
     std::fs::create_dir_all(&tidy).unwrap();

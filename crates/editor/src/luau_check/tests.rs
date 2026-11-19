@@ -51,8 +51,9 @@ fn results_count_only_for_the_text_they_were_found_in() {
 
 #[test]
 fn the_newest_luau_extension_in_vs_code_is_found() {
-    let extensions =
-        std::env::temp_dir().join(format!("axcenity-luau-extensions-{}", std::process::id()));
+    let extensions = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-luau-extensions-{}", std::process::id())),
+    );
     let server = if cfg!(windows) {
         "server.exe"
     } else {
@@ -83,7 +84,8 @@ fn luau_lsp_checks_a_script_against_the_engine_api() {
         eprintln!("skipped: no luau-lsp");
         return;
     };
-    let checker = Checker::start(program).unwrap();
+    let folder = axcenity_test_dirs::TestDir::unmade("luau-checker");
+    let checker = Checker::start_in(program, folder.to_path_buf()).unwrap();
     let text = "\
 local part = Instance.new(\"Part\")
 part.Anchored = true
@@ -126,7 +128,9 @@ game:GetService(\"Players\").PlayerAdded:Connect(function(player) print(player.N
 /// (both the pinned version), before the PATH's and VS Code's.
 #[test]
 fn the_shipped_luau_lsp_is_used_before_the_paths() {
-    let folder = std::env::temp_dir().join(format!("axcenity-lsp-find-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-lsp-find-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let name = crate::luau_lsp::program_name();
     let make = |relative: &str| {

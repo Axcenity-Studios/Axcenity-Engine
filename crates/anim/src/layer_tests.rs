@@ -308,11 +308,11 @@ fn reload_clip() -> ClipFile {
 /// A temporary project: the noodle, its Run clip, a Reload clip, and a state
 /// machine that runs on its base layer and has an `UpperBody` layer
 /// (masked to `Top`) that rests in an empty state until `Reload`.
-fn layered_project(name: &str) -> std::path::PathBuf {
-    let root = std::env::temp_dir().join(format!(
+fn layered_project(name: &str) -> axcenity_test_dirs::TestDir {
+    let root = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-anim-layers-{name}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("assets/models")).unwrap();
     std::fs::create_dir_all(root.join("assets/animations/noodle")).unwrap();

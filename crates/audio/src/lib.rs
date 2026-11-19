@@ -1440,8 +1440,9 @@ mod tests {
 
     #[test]
     fn a_changed_sound_file_is_decoded_again_and_a_broken_one_is_kept() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-audio-reload-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-audio-reload-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/audio")).unwrap();
         let example = |name: &str| {

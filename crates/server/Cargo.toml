@@ -33,6 +33,7 @@ serde_json.workspace = true
 axcenity-workspace-hack.workspace = true
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 # An in-process relay for `tests/relay.rs` (MP5).
 axcenity-relay.workspace = true
 

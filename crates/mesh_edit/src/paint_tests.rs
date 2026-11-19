@@ -391,7 +391,9 @@ fn saving_flattens_each_map_to_a_png_named_by_its_role_that_the_glb_uses() {
     assert_eq!(slots(names[1]), [MapSlot::Roughness, MapSlot::Metalness]);
 
     // Loaded from the `.glb` as a game does, the material uses them.
-    let folder = std::env::temp_dir().join(format!("axcenity-paint-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-paint-{}", std::process::id())),
+    );
     let models = folder.join("assets/models");
     std::fs::create_dir_all(models.join("textures")).unwrap();
     for (path, bytes) in &files {

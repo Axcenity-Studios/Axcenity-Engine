@@ -2,7 +2,6 @@
 //! with nothing in Output but what its scripts print, and its game tests
 //! pass in the Tests panel with the results `axcenity-test` gives.
 
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use axcenity_core::input::{InputEvent, InputKind};
@@ -16,15 +15,16 @@ use crate::game_tests::TestState;
 use crate::output::OutputKind;
 
 /// A new project made from `template` in a fresh temporary folder.
-fn new_project(template: Template, test: &str) -> PathBuf {
-    let parent = std::env::temp_dir().join(format!(
+fn new_project(template: Template, test: &str) -> axcenity_test_dirs::TestDir {
+    let parent = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-editor-{test}-{}-{}",
         template.folder().unwrap(),
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&parent);
     std::fs::create_dir_all(&parent).unwrap();
-    axcenity_project::create_project_from(&parent, "My Game", template).unwrap()
+    let project = axcenity_project::create_project_from(&parent, "My Game", template).unwrap();
+    parent.at(project)
 }
 
 /// Output's warnings and errors.

@@ -44,7 +44,7 @@ fn undo_depth(workspace: &CharacterWorkspace) -> usize {
 /// A workspace on the realistic default character whose eyes differ
 /// side to side: size, tilt and the eye corner set one way on the left and
 /// another on the right.
-fn uneven_eyes(name: &str) -> (std::path::PathBuf, CharacterWorkspace) {
+fn uneven_eyes(name: &str) -> (axcenity_test_dirs::TestDir, CharacterWorkspace) {
     let folder = test_folder(name);
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     workspace.apply(Intent::PickCategory(Category::Face));

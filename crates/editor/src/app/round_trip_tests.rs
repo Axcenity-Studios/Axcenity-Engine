@@ -129,8 +129,9 @@ fn insert_character_places_the_realistic_character_with_both_families() {
 /// realistic family when a character is inserted.
 #[test]
 fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
-    let parent =
-        std::env::temp_dir().join(format!("axcenity-round-trip-older-{}", std::process::id()));
+    let parent = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-round-trip-older-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&parent);
     std::fs::create_dir_all(&parent).unwrap();
     let folder = super::tests::copy_of_example("hello-character", "round-trip-older");

@@ -1,0 +1,14 @@
+[package]
+name = "axcenity-test-dirs"
+description = "Temporary folders for tests: uniquely named under the system temp folder and removed when dropped, also when a test panics. Tests only (a dev-dependency)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+axcenity-workspace-hack.workspace = true
+
+[lints]
+workspace = true

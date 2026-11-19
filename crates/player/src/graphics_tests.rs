@@ -230,7 +230,9 @@ fn a_local_script_changes_shadows_anti_aliasing_exposure_and_tone_mapping() {
         return;
     };
     let (mut world, mut scripts, assets, camera, _copy) = hello_graphics();
-    let data = std::env::temp_dir().join(format!("axcenity-graphics-data-{}", std::process::id()));
+    let data = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-graphics-data-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&data);
     let mut renderer = TextureRenderer::new(&device, &queue, 160, 90);
     let capabilities = *renderer.capabilities();

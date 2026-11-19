@@ -13,7 +13,7 @@ const GREETER: &str = "scripts/Greeter.server.lua";
 
 /// hello-touched, with a script that prints Hello twice a second and one
 /// that slides an anchored `Mover` part along X every frame.
-fn project_with_greeter(test: &str) -> PathBuf {
+fn project_with_greeter(test: &str) -> axcenity_test_dirs::TestDir {
     let folder = copy_of_example("hello-touched", test);
     std::fs::write(
         folder.join(GREETER),

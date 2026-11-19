@@ -553,8 +553,9 @@ mod tests {
         assert_eq!((link.start, link.end), (1.0, 2.0));
         assert!(!clips[1].1.looping);
 
-        let project =
-            std::env::temp_dir().join(format!("axcenity-anim-import-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-anim-import-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&project);
         let (paths, controller) = write_animation(&project, "noodle", &clips, true).unwrap();
         assert_eq!(

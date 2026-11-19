@@ -77,7 +77,9 @@ fn names_drop_the_extension() {
 
 #[test]
 fn the_folder_is_walked_for_assets() {
-    let folder = std::env::temp_dir().join(format!("axcenity-assets-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-assets-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     for file in [
         "assets/models/a.glb",
@@ -105,10 +107,10 @@ fn the_folder_is_walked_for_assets() {
 #[test]
 fn a_global_asset_shows_in_every_project_and_is_copied_in_when_used() {
     let temp = |name: &str| {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-panel-global-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         folder
@@ -220,8 +222,9 @@ fn the_search_matches_every_word_in_the_path_or_kind() {
 fn a_toolbox_assets_tooltip_says_where_it_came_from_and_its_licence() {
     use axcenity_toolbox::provenance::{Snapshot, SourcedFile};
     use axcenity_toolbox::{AssetRecord, Kind};
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-assets-sources-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-assets-sources-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/audio")).unwrap();
     std::fs::write(folder.join("assets/audio/rain-1a2b.mp3"), b"").unwrap();
@@ -265,10 +268,10 @@ fn a_toolbox_assets_tooltip_says_where_it_came_from_and_its_licence() {
 /// picking it reports the asset's path.
 #[test]
 fn a_plugins_item_in_an_assets_menu_reports_its_path() {
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-assets-plugin-menu-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/audio")).unwrap();
     std::fs::write(folder.join("assets/audio/wind.ogg"), b"").unwrap();
@@ -365,8 +368,9 @@ fn a_plugins_item_in_an_assets_menu_reports_its_path() {
 
 #[test]
 fn loose_texture_maps_offer_organize_and_each_set_is_one_tile_after() {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-assets-organize-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-assets-organize-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let terrain = folder.join("assets/textures/terrain");
     std::fs::create_dir_all(&terrain).unwrap();

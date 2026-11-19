@@ -311,7 +311,9 @@ mod tests {
             "Hero"
         );
 
-        let project = std::env::temp_dir().join(format!("axcenity-lipsync-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lipsync-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&project);
         write_viseme_map(
             &project,

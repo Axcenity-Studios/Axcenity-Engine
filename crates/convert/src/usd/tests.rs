@@ -1,11 +1,13 @@
 //! USD scenes converted and read back by the engine's own glTF reader.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use axcenity_assets::{ModelFormat, list_objects, load_model};
 
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-usd-{name}-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-usd-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder
@@ -135,7 +137,7 @@ def Xform "World"
     )
 }
 
-fn kitchen_folder(name: &str) -> PathBuf {
+fn kitchen_folder(name: &str) -> axcenity_test_dirs::TestDir {
     let folder = temp_folder(name);
     std::fs::write(folder.join("kitchen.usda"), kitchen_usda()).unwrap();
     std::fs::create_dir_all(folder.join("textures")).unwrap();

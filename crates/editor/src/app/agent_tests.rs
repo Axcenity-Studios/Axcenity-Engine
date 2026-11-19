@@ -20,7 +20,15 @@ fn near(a: Vector3, x: f32, z: f32) -> bool {
 /// hello-agent with a new Agent inserted from the toolbar with nothing
 /// selected, its Body moved to (-20, 0, -20) and its Destination set to
 /// (20, 0, -20), behind the wall, both from Properties.
-fn agent_sent_round_the_wall(test: &str) -> (EditorApp, InstanceId, InstanceId) {
+/// The copied project comes first, so it is removed after the app is dropped.
+fn agent_sent_round_the_wall(
+    test: &str,
+) -> (
+    axcenity_test_dirs::TestDir,
+    EditorApp,
+    InstanceId,
+    InstanceId,
+) {
     let folder = copy_of_example("hello-agent", test);
     let mut app = EditorApp::new(Some(&folder));
     let agent = inserted(&mut app, Insertable::NavigationAgent, None);
@@ -31,7 +39,7 @@ fn agent_sent_round_the_wall(test: &str) -> (EditorApp, InstanceId, InstanceId) 
         agent,
         Edit::Property("Destination", vector(20.0, 0.0, -20.0)),
     );
-    (app, agent, body)
+    (folder, app, agent, body)
 }
 
 #[test]
@@ -62,7 +70,7 @@ fn an_inserted_agent_starts_where_it_stands_and_stays_there_in_play() {
 
 #[test]
 fn an_agent_walks_round_the_wall_to_a_destination_set_in_properties() {
-    let (mut app, agent, body) = agent_sent_round_the_wall("agent-walk");
+    let (_project, mut app, agent, body) = agent_sent_round_the_wall("agent-walk");
     app.play();
     // The wall runs from Z = -24 to 12; its -Z end is nearer.
     let mut nearest_z = f32::INFINITY;
@@ -90,7 +98,7 @@ fn an_agent_walks_round_the_wall_to_a_destination_set_in_properties() {
 
 #[test]
 fn an_unreachable_destination_is_reported_in_output_and_the_agent_stays() {
-    let (mut app, agent, body) = agent_sent_round_the_wall("agent-unreachable");
+    let (_project, mut app, agent, body) = agent_sent_round_the_wall("agent-unreachable");
     app.apply(agent, Edit::Property("Destination", vector(0.0, 0.0, 50.0)));
     app.play();
     play_for(&mut app, 1.0);
@@ -129,8 +137,8 @@ fn drawing_agent_paths_does_not_change_the_route() {
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1280.0, 720.0));
     let screen = Screen::new(camera, rect);
 
-    let (mut drawn, _, body) = agent_sent_round_the_wall("agent-drawn");
-    let (mut plain, _, _) = agent_sent_round_the_wall("agent-plain");
+    let (_project, mut drawn, _, body) = agent_sent_round_the_wall("agent-drawn");
+    let (_project, mut plain, _, _) = agent_sent_round_the_wall("agent-plain");
     drawn.overlays.agent_paths = true;
     drawn.play();
     plain.play();

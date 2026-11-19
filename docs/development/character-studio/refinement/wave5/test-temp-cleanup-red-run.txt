@@ -1,0 +1,52 @@
+Test temp-folder cleanup (wave 5): the RED run, before the implementation.
+
+1. axcenity-test-dirs (cargo nextest run -p axcenity-test-dirs, with a private TMP/TEMP folder).
+   TestDir's Drop was a stub that removed nothing, and keep_requested always said false.
+
+PASS [   0.011s] (1/6) axcenity-test-dirs tests::new_makes_an_empty_uniquely_named_folder_under_the_temp_folder
+FAIL [   0.013s] (2/6) axcenity-test-dirs tests::adopt_removes_a_file_or_folder_the_test_named_itself
+thread 'tests::adopt_removes_a_file_or_folder_the_test_named_itself' panicked at crates\test-dirs\src\tests.rs:53:5:
+assertion failed: !file.exists()
+FAIL [   0.018s] (3/6) axcenity-test-dirs tests::a_panicking_test_still_removes_its_folder
+thread 'tests::a_panicking_test_still_removes_its_folder' panicked at crates\test-dirs\src\tests.rs:41:9:
+thread 'tests::a_panicking_test_still_removes_its_folder' panicked at crates\test-dirs\src\tests.rs:45:5:
+<private temp>\axcenity-panics-34512-0 is still there
+FAIL [   0.022s] (4/6) axcenity-test-dirs tests::unmade_leaves_making_the_folder_to_the_code_under_test
+thread 'tests::unmade_leaves_making_the_folder_to_the_code_under_test' panicked at crates\test-dirs\src\tests.rs:71:5:
+assertion failed: !path.exists()
+FAIL [   0.026s] (5/6) axcenity-test-dirs tests::the_keep_variable_keeps_folders_when_set_to_a_true_value
+thread 'tests::the_keep_variable_keeps_folders_when_set_to_a_true_value' panicked at crates\test-dirs\src\tests.rs:82:5:
+assertion failed: keep("1")
+FAIL [   0.032s] (6/6) axcenity-test-dirs tests::dropping_removes_the_folder_and_everything_in_it
+thread 'tests::dropping_removes_the_folder_and_everything_in_it' panicked at crates\test-dirs\src\tests.rs:31:5:
+<private temp>\axcenity-drop-26960-0 is still there
+Summary [   0.032s] 6 tests run: 1 passed, 5 failed, 0 skipped
+
+Left in the private temp folder by the stubbed tests:
+  axcenity-adopt-23368.png, axcenity-drop-26960-0, axcenity-panics-34512-0,
+  axcenity-unit-23556-0, axcenity-unit-23556-1, axcenity-unmade-15000-0
+
+2. The workspace before the fix: see "Before" in test-temp-cleanup.md (what one full
+   cargo nextest run --workspace --no-fail-fast left in a private temp folder).
+
+3. The guard added during the conversion (cargo nextest run -p axcenity-test-dirs -E 'test(never_removed)').
+   is_protected was a stub that always said false. The conversion script had wrapped five
+   `let folder = std::env::temp_dir();` lines in TestDir::adopt, which would have emptied the
+   whole temp folder on drop; the run was stopped before any test ran, the lines were put back,
+   and Drop now refuses the temp folder, any folder above it, and a root.
+
+FAIL [   0.006s] (1/1) axcenity-test-dirs tests::the_temp_folder_and_the_folders_above_it_are_never_removed
+thread 'tests::the_temp_folder_and_the_folders_above_it_are_never_removed' panicked at crates\test-dirs\src\tests.rs:91:5:
+assertion failed: is_protected(temp, temp)
+Summary [   0.009s] 1 test run: 0 passed, 1 failed, 7 skipped
+
+4. Retrying a removal (cargo nextest run -p axcenity-test-dirs -E 'test(let_go)', Windows), with
+   REMOVE_ATTEMPTS = 1. The first workspace run after the conversion left luau-lsp's and the
+   updater's folders behind ("being used by another process", "Access is denied"): the process
+   the test started was still exiting when the test's folder dropped.
+
+FAIL [   0.308s] (1/1) axcenity-test-dirs tests::a_file_still_open_for_a_moment_is_removed_once_it_is_let_go
+axcenity-test-dirs: couldn't remove <private temp>\axcenity-held-45956-0: The process cannot access the file because it is being used by another process. (os error 32)
+thread 'tests::a_file_still_open_for_a_moment_is_removed_once_it_is_let_go' panicked at crates\test-dirs\src\tests.rs:134:5:
+<private temp>\axcenity-held-45956-0 is still there
+Summary [   0.308s] 1 test run: 0 passed, 1 failed, 8 skipped

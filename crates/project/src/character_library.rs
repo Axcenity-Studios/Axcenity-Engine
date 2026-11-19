@@ -265,10 +265,10 @@ mod tests {
 
     #[test]
     fn the_library_written_into_a_project_reads_back_sound() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-character-library-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         add_character_library(&folder).unwrap();
         let root = folder.join(CHARACTER_LIBRARY_PATH);
@@ -289,10 +289,10 @@ mod tests {
 
     #[test]
     fn the_shipped_packages_are_copied_beside_the_built_in_one() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-character-packages-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         add_character_library(&folder).unwrap();
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
@@ -354,10 +354,10 @@ mod tests {
     /// are left alone, and so are its own catalogue entries.
     #[test]
     fn an_older_copy_of_a_shipped_package_is_brought_up_to_date() {
-        let folder = std::env::temp_dir().join(format!(
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-character-packages-update-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         add_character_library(&folder).unwrap();
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
@@ -451,10 +451,10 @@ mod tests {
     /// with it into a project, so the game's credits can be made there.
     #[test]
     fn an_imported_items_provenance_record_is_copied_with_it() {
-        let root = std::env::temp_dir().join(format!(
+        let root = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-character-packages-provenance-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&root);
         let shipped = root.join("shipped");
         fs::create_dir_all(shipped.join("hats")).unwrap();

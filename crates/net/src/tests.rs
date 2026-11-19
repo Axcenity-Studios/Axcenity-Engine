@@ -467,7 +467,9 @@ fn the_release_files_list_this_network_protocol() {
 
 #[test]
 fn a_secured_host_keeps_its_certificate_and_its_join_link_joins_it() {
-    let folder = std::env::temp_dir().join(format!("axcenity-net-cert-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-net-cert-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let mut host = Game::new("1.0", 47926);
     host.network.set_data_folder(Some(folder.clone()));

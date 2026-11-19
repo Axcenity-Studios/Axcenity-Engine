@@ -4,7 +4,7 @@
 //! hosted as `--host` does on a UDP port with two players joined as
 //! `--join` does, keeps each player's team, character, menu and stats.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use axcenity_character::MoveInput;
 use axcenity_core::input::{InputEvent, InputKind};
@@ -17,18 +17,18 @@ const FRAME: f32 = 1.0 / 60.0;
 const VIEW: (u32, u32) = (1280, 720);
 
 /// A fresh temporary folder for `test`.
-fn temp(test: &str, what: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn temp(test: &str, what: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-player-template-{test}-{what}-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     folder
 }
 
 /// A project made from `template`, built with Build Game and unpacked.
-fn built_game(template: Template, test: &str) -> PathBuf {
+fn built_game(template: Template, test: &str) -> axcenity_test_dirs::TestDir {
     let parent = temp(test, "source");
     let source = axcenity_project::create_project_from(&parent, "My Game", template).unwrap();
     let packed = axcenity_project::pack_game(&source).unwrap();

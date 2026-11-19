@@ -393,8 +393,9 @@ mod tests {
 
     #[test]
     fn each_volume_is_baked_stale_unbaked_or_missing_and_the_legend_counts_them() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-probe-overlay-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-probe-overlay-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         let bake = LightProbes::new([2, 1, 1], 7, vec![[[0.5; 3]; 4]; 2]).unwrap();
         axcenity_assets::write_light_probes(&folder, "assets/probes/a.lightprobes.json", &bake)

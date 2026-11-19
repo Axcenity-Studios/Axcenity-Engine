@@ -2,7 +2,7 @@
 //! turns it on, `timescale`, a game's registered command, and none in a
 //! shipped game with it off.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use axcenity_core::Value;
 use winit::keyboard::KeyCode;
@@ -23,13 +23,13 @@ print("a second of game time")
 /// `hello-part` with a script that registers `heal`, built into a
 /// `game.axgame` as File > Build Game does, with the Developer Console
 /// setting `on` or off. Returns the built game's path.
-fn built_game(name: &str, on: bool) -> PathBuf {
+fn built_game(name: &str, on: bool) -> axcenity_test_dirs::TestDir {
     let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-part");
-    let root = std::env::temp_dir().join(format!(
+    let root = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-player-console-{name}-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&root);
     let project = root.join("project");
     copy_folder(&example, &project);
@@ -38,7 +38,7 @@ fn built_game(name: &str, on: bool) -> PathBuf {
     let game = root.join("build").join(GAME_FILE);
     std::fs::create_dir_all(game.parent().unwrap()).unwrap();
     std::fs::write(&game, axcenity_project::pack_game(&project).unwrap()).unwrap();
-    game
+    root.at(game)
 }
 
 /// Opens a built game as the player does: unpacked to a folder of its

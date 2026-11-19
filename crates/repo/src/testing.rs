@@ -3,26 +3,30 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::git::{Author, Git, Invocation, Output, Runner, SystemRunner};
 use crate::secret::Secret;
+use axcenity_test_dirs::TestDir;
 
 /// The real `git` with no global or system settings, plus `config`.
 pub struct ConfigRunner {
     inner: SystemRunner,
     config: Vec<(String, String)>,
     global: PathBuf,
+    /// The folder `global` is in, removed with the runner.
+    _global_dir: TestDir,
 }
 
 impl ConfigRunner {
     pub fn new(config: Vec<(String, String)>) -> ConfigRunner {
-        let global = temp("gitconfig").join("config");
+        let global_dir = temp("gitconfig");
+        let global = global_dir.join("config");
         std::fs::write(&global, "").unwrap();
         ConfigRunner {
             inner: SystemRunner::default(),
             config,
             global,
+            _global_dir: global_dir,
         }
     }
 }
@@ -59,20 +63,14 @@ pub fn git() -> Git {
     ])))
 }
 
-/// A new empty folder of its own under this test run's temp folder
-/// (`axcenity-repo-<process>`; folders left by earlier runs whose process
-/// is gone are removed the first time).
-pub fn temp(name: &str) -> PathBuf {
-    static NEXT: AtomicU32 = AtomicU32::new(0);
+/// A new empty folder of its own under the temp folder
+/// (`axcenity-repo-<name>-<process>-<n>`), removed when dropped. Folders
+/// `axcenity-repo-<process>` that runs before `TestDir` left are removed the
+/// first time.
+pub fn temp(name: &str) -> TestDir {
     static SWEEP: std::sync::Once = std::sync::Once::new();
-    let base = std::env::temp_dir();
-    SWEEP.call_once(|| sweep_old_runs(&base));
-    let path = base
-        .join(format!("axcenity-repo-{}", std::process::id()))
-        .join(format!("{name}-{}", NEXT.fetch_add(1, Ordering::Relaxed)));
-    let _ = std::fs::remove_dir_all(&path);
-    std::fs::create_dir_all(&path).unwrap();
-    path
+    SWEEP.call_once(|| sweep_old_runs(&std::env::temp_dir()));
+    TestDir::new(&format!("repo-{name}"))
 }
 
 /// Removes `axcenity-repo-<process>` folders of test runs that ended (on
@@ -108,7 +106,7 @@ fn sweep_old_runs(base: &Path) {
 }
 
 /// A bare repository to push to, and its `file://` URL.
-pub fn bare_remote(git: &Git) -> (PathBuf, String) {
+pub fn bare_remote(git: &Git) -> (TestDir, String) {
     let dir = temp("remote");
     git.run(
         &dir,

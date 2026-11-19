@@ -11,11 +11,11 @@ use crate::output::{Location, OutputKind};
 use crate::rebuild::EngineSource;
 
 /// Writes `app`'s handoff into a fresh folder, as Relaunch does.
-fn hand_off(app: &EditorApp, test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn hand_off(app: &EditorApp, test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-handoff-{test}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     app.handoff(&folder).unwrap().write(&folder).unwrap();
@@ -225,11 +225,11 @@ fn restart_now_hands_off_to_this_editor_without_a_rebuild() {
 
 /// A Cargo workspace in a temporary folder, with one tiny package named
 /// like the editor, whose `main.rs` is `main`.
-pub(super) fn tiny_workspace(test: &str, main: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+pub(super) fn tiny_workspace(test: &str, main: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-rebuild-{test}-test-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("crates/editor/src")).unwrap();
     std::fs::write(
@@ -267,7 +267,8 @@ fn a_compile_error_is_listed_with_links_and_fixing_it_rebuilds_and_offers_relaun
         "fn main() {\n    let x: u32 = \"not a number\";\n}\n",
     );
     let ctx = theme::test_context();
-    let mut app = EditorApp::new(Some(&copy_of_example("hello-touched", "rebuild-errors")));
+    let project_rebuild_errors = copy_of_example("hello-touched", "rebuild-errors");
+    let mut app = EditorApp::new(Some(&project_rebuild_errors));
     app.rebuilds = Rebuilds {
         source: EngineSource::at(&workspace),
         on_change: true,

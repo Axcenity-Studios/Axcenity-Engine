@@ -313,11 +313,11 @@ mod tests {
     /// A format 2 project: a noodle with an Animator playing a controller
     /// directly in `assets/animations`, its clips in a folder, and a door
     /// with an Animation of a property clip and no Animator.
-    fn old_project(name: &str) -> std::path::PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn old_project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-migrate-anim-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         let write = |path: &str, text: &str| {
             let path = folder.join(path);

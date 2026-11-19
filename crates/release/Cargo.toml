@@ -16,5 +16,8 @@ thiserror.workspace = true
 toml.workspace = true
 axcenity-workspace-hack.workspace = true
 
+[dev-dependencies]
+axcenity-test-dirs.workspace = true
+
 [lints]
 workspace = true

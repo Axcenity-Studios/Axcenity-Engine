@@ -380,16 +380,17 @@ mod tests {
     use crate::{WORLD_FILE, load, read_manifest, record_version, save_world, set_description};
     use axcenity_core::ClassName;
 
-    fn temp_folder(name: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-migrate-{name}-{}", std::process::id()));
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-migrate-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder
     }
 
     struct OldProject {
-        folder: PathBuf,
+        folder: axcenity_test_dirs::TestDir,
         manifest: String,
         world: String,
         script: &'static str,
@@ -579,7 +580,7 @@ mod tests {
         assert_eq!(manifest_after, manifest);
         assert!(!copied);
     }
-    fn v4_project(name: &str, world: &str) -> PathBuf {
+    fn v4_project(name: &str, world: &str) -> axcenity_test_dirs::TestDir {
         let folder = temp_folder(name);
         fs::write(
             folder.join(MANIFEST_FILE),

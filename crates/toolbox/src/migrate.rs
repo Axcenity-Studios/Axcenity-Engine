@@ -445,11 +445,11 @@ fn bring_across(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
-    fn temp(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("axcenity-migrate-{name}-{}", std::process::id()));
+    fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+        let dir = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-migrate-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -466,7 +466,7 @@ mod tests {
     /// A small library as the Blender pipeline writes it: one good texture,
     /// one with a missing map, one whose map changed size, a model with
     /// nested files, a Freesound sound and an unreadable record.
-    fn old_library(name: &str) -> PathBuf {
+    fn old_library(name: &str) -> axcenity_test_dirs::TestDir {
         let old = temp(name);
         write(
             &old,

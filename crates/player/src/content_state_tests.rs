@@ -97,10 +97,10 @@ fn a_saved_character_wearing_legacy_and_draft_items_draws_on_both_families() {
 /// item is Legacy, and the default character draws its whole outfit.
 #[test]
 fn an_older_projects_library_without_states_still_draws() {
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-content-states-old-project-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     axcenity_project::add_default_humanoid(&folder).unwrap();

@@ -2,7 +2,7 @@
 //! holds a file open, so "the script is still paused" is checked while the
 //! load can't possibly have finished, without relying on timing.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Sender};
 use std::time::{Duration, Instant};
@@ -15,9 +15,10 @@ use crate::{OutputKind, ScriptRuntime};
 const LIMIT: Duration = Duration::from_secs(30);
 const MODEL: &str = "assets/models/tri.gltf";
 
-fn project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-preload-{name}-{}", std::process::id()));
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-preload-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/models")).unwrap();
     write_triangle(&folder, MODEL);

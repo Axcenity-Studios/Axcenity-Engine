@@ -27,7 +27,7 @@ fn set(app: &mut EditorApp, id: InstanceId, property: &str, value: Value) {
 
 /// A project where `wood.png` is used by a material (on a Part), by a
 /// MeshPart's SurfaceAppearance and by a script that puts it on a sign.
-fn project(test: &str) -> (EditorApp, PathBuf, InstanceId) {
+fn project(test: &str) -> (EditorApp, axcenity_test_dirs::TestDir, InstanceId) {
     let folder = copy_of_example("hello-touched", test);
     let examples = super::tests::example("");
     let copy = |from: &str, to: &str| {

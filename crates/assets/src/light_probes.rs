@@ -254,8 +254,9 @@ mod tests {
 
     #[test]
     fn a_bake_round_trips_through_its_file() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-light-probes-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-light-probes-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         let path = light_probes_path("Hall");
         assert_eq!(path, "assets/probes/Hall.lightprobes.json");

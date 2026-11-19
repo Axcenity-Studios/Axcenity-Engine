@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -23,9 +23,10 @@ pub fn example(name: &str) -> String {
     format!("{}/../../examples/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-pub fn scratch(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-bots-test-{name}-{}", std::process::id()));
+pub fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-bots-test-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
     folder

@@ -58,7 +58,9 @@ fn set_clock(world: &mut World, hours: f64) {
 /// `world` from `camera`: its draw list and the frame drawn.
 fn frame(renderer: &mut TextureRenderer, world: &World, camera: &FlyCamera) -> (DrawList, Vec<u8>) {
     // An empty project: these worlds read no files.
-    let folder = std::env::temp_dir().join(format!("axcenity-time-of-day-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-time-of-day-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&folder).unwrap();
     let assets = Assets::new(&folder);
     let list = axcenity_scene::build_draw_list(world, &assets, camera.to_render_camera());
@@ -124,7 +126,11 @@ fn from_noon_to_dusk_the_sun_and_sky_redden_and_shadows_lengthen() {
         ("dusk-above", &dusk_above),
         ("dusk-west", &dusk_west),
     ] {
-        tests::write_png(&folder.join(format!("axcenity-{name}.png")), pixels, SIZE);
+        tests::write_png(
+            &axcenity_test_dirs::TestDir::adopt(folder.join(format!("axcenity-{name}.png"))),
+            pixels,
+            SIZE,
+        );
     }
 
     // The sun reddens as it sinks...
@@ -165,7 +171,7 @@ fn at_midnight_the_atmospheres_sky_is_dark_and_the_moon_lights_the_world() {
     set_clock(&mut world, 0.0);
     let (night_list, night) = frame(&mut renderer, &world, &up);
     tests::write_png(
-        &std::env::temp_dir().join("axcenity-midnight.png"),
+        &axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join("axcenity-midnight.png")),
         &night,
         SIZE,
     );

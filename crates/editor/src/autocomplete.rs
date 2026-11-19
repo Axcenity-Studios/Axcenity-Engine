@@ -245,16 +245,15 @@ fn write(folder: &Path, file: &str, text: &str) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
 
     use super::*;
 
     /// An empty folder in the temp directory, for one test.
-    fn empty_folder(test: &str) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn empty_folder(test: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-autocomplete-{test}-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder

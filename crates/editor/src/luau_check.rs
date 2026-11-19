@@ -403,6 +403,12 @@ impl Checker {
         let number = CHECKERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let folder =
             std::env::temp_dir().join(format!("axcenity-luau-{}-{number}", std::process::id()));
+        Checker::start_in(program, folder)
+    }
+
+    /// Like [`Checker::start`], in `folder` (made if missing; removed when the
+    /// checker's thread ends). Tests pass a folder that is removed with them.
+    pub fn start_in(program: PathBuf, folder: PathBuf) -> io::Result<Checker> {
         std::fs::create_dir_all(&folder)?;
         std::fs::write(folder.join("axcenity.d.luau"), checker_definitions())?;
         std::fs::write(folder.join("settings.json"), SETTINGS)?;

@@ -727,7 +727,7 @@ fn stylized_items() -> Vec<ItemManifest> {
 }
 
 /// A workspace on the stylized body with [`stylized_items`] in its library.
-fn stylized_workspace(name: &str) -> (PathBuf, CharacterWorkspace) {
+fn stylized_workspace(name: &str) -> (axcenity_test_dirs::TestDir, CharacterWorkspace) {
     let folder = test_folder(name);
     let mut workspace =
         CharacterWorkspace::open_new(&folder, &Start::Family(V1_BASE.to_owned())).unwrap();
@@ -924,7 +924,10 @@ fn production_is_listed_legacy_on_request_and_drafts_only_for_review() {
 /// A realistic workspace whose base has a "Wrist" accessories slot and one
 /// watch for it in `quality`: the shipped bases have no accessories slot
 /// yet (R8), so the Accessories page's states are tested on this one.
-fn accessory_workspace(name: &str, quality: &str) -> (PathBuf, CharacterWorkspace) {
+fn accessory_workspace(
+    name: &str,
+    quality: &str,
+) -> (axcenity_test_dirs::TestDir, CharacterWorkspace) {
     let folder = test_folder(name);
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let root = folder.join(LIBRARY_FOLDER);

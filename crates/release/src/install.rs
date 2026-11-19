@@ -85,7 +85,9 @@ mod tests {
 
     #[test]
     fn the_marker_names_how_it_was_installed() {
-        let dir = std::env::temp_dir().join(format!("axcenity-install-{}", std::process::id()));
+        let dir = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-install-{}", std::process::id())),
+        );
         std::fs::create_dir_all(&dir).unwrap();
         assert_eq!(InstallKind::of_folder(&dir), InstallKind::Source);
 

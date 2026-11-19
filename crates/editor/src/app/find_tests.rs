@@ -11,7 +11,7 @@ const LUA: &str = "scripts/Watch.server.lua";
 const BLOCKS: &str = "scripts/pad.server.blocks.json";
 
 /// The blocks example, with a Lua script naming the same ball.
-fn project(test: &str) -> (EditorApp, PathBuf) {
+fn project(test: &str) -> (EditorApp, axcenity_test_dirs::TestDir) {
     let folder = copy_of_example("hello-touched-blocks", test);
     fs::write(
         folder.join(LUA),

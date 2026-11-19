@@ -1,14 +1,12 @@
-use std::path::PathBuf;
-
 use axcenity_core::{ClassName, InstanceId, Value, Vector3, World};
 
 use super::*;
 
-fn save_folder(test: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!(
+fn save_folder(test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-script-saves-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }
@@ -124,7 +122,7 @@ print(SaveService:HasSlot(1), SaveService:GetCheckpoint())
     // A new run of the game loads it.
     let (mut fresh, fresh_crate, body) = level();
     let mut runtime = ScriptRuntime::new();
-    runtime.set_save_folder(Some(folder));
+    runtime.set_save_folder(Some(folder.to_path_buf()));
     run(
         &mut runtime,
         &mut fresh,
@@ -166,7 +164,7 @@ fn loading_a_missing_slot_is_an_error_at_its_line_and_changes_nothing() {
         )
         .unwrap();
     let mut runtime = ScriptRuntime::new();
-    runtime.set_save_folder(Some(folder));
+    runtime.set_save_folder(Some(folder.to_path_buf()));
     run(
         &mut runtime,
         &mut world,

@@ -33,7 +33,7 @@ fn age_snapshot(folder: &Path) {
 /// An editor on a copy of hello-touched with an unsaved part named
 /// "Recovered" and unsaved text in the pad script's tab, and AutoRecover's
 /// snapshot of it written.
-fn unsaved_work(test: &str) -> (EditorApp, PathBuf) {
+fn unsaved_work(test: &str) -> (EditorApp, axcenity_test_dirs::TestDir) {
     let folder = copy_of_example("hello-touched", test);
     let mut app = EditorApp::new(Some(&folder));
     let part = inserted(&mut app, Insertable::Part(PartType::Block), None);

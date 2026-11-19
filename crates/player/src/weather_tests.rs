@@ -50,7 +50,9 @@ fn floor_brightness(
     world: &World,
     seconds: f32,
 ) -> u32 {
-    let folder = std::env::temp_dir().join(format!("axcenity-weather-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-weather-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&folder).unwrap();
     let assets = Assets::new(&folder);
     // Particles move at most a quarter of a second a frame.

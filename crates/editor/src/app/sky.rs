@@ -247,10 +247,10 @@ mod tests {
     /// yes sets it and the sun to match as one undo step.
     #[test]
     fn the_default_sky_is_added_to_the_project_and_moves_the_sun() {
-        let parent = std::env::temp_dir().join(format!(
+        let parent = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-default-sky-editor-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&parent);
         std::fs::create_dir_all(&parent).unwrap();
         // A genre template has no default sky of its own.

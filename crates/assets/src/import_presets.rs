@@ -246,9 +246,10 @@ mod tests {
     use super::*;
     use crate::read_asset_id;
 
-    fn folder(name: &str) -> std::path::PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-presets-{name}-{}", std::process::id()));
+    fn folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-presets-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(folder.join("assets/images/icons")).unwrap();
         folder

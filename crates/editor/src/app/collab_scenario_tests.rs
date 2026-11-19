@@ -74,8 +74,8 @@ fn folder_of(app: &EditorApp) -> PathBuf {
 #[test]
 fn when_everyone_leaves_the_project_waits_in_its_repository() {
     let ctx = theme::test_context();
-    let (folder, url) = linked_project("scenario-c");
-    let data: Vec<PathBuf> = ["paul", "sam", "kim", "lee"]
+    let (folder, url, _remote) = linked_project("scenario-c");
+    let data: Vec<axcenity_test_dirs::TestDir> = ["paul", "sam", "kim", "lee"]
         .iter()
         .map(|who| data_folder(&format!("scenario-c-{who}")))
         .collect();
@@ -125,10 +125,8 @@ fn when_everyone_leaves_the_project_waits_in_its_repository() {
     sam.end_team_session();
     assert!(sam.team.is_none());
     uploaded(&mut sam, &sams, Kind::Ended, &ctx);
-    let kinds: Vec<Option<Kind>> = remote_log(&url, "scenario-c")
-        .iter()
-        .map(|e| e.kind)
-        .collect();
+    let (log, _check) = remote_log(&url, "scenario-c");
+    let kinds: Vec<Option<Kind>> = log.iter().map(|e| e.kind).collect();
     assert!(kinds.contains(&Some(Kind::Handoff)) && kinds.contains(&Some(Kind::Ended)));
 
     // Later, Kim gets the project from the repository.
@@ -159,7 +157,11 @@ fn when_everyone_leaves_the_project_waits_in_its_repository() {
     });
     lee.leave_team_session();
     kim.end_team_session();
-    for folder in data.iter().chain([&folder, &kims]) {
+    for folder in data
+        .iter()
+        .map(|d| d.as_path())
+        .chain([folder.as_path(), kims.as_path()])
+    {
         let _ = std::fs::remove_dir_all(folder);
     }
 }

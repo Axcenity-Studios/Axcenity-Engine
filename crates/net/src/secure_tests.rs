@@ -2,7 +2,6 @@
 //! TLS, players check the certificate, and netcode encrypts the rest.
 
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crate::rejoin_tests::game;
@@ -43,11 +42,13 @@ fn refused(result: Result<renet_netcode::ConnectToken, FetchError>) -> String {
     }
 }
 
-fn temp_file(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-secure-{name}-{}", std::process::id()));
+fn temp_file(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-secure-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
-    folder.join("known-servers.json")
+    let file = folder.join("known-servers.json");
+    folder.at(file)
 }
 
 #[test]
@@ -117,7 +118,8 @@ fn a_remembered_server_with_a_new_certificate_is_refused() {
 
 #[test]
 fn a_server_certificate_is_kept_in_its_folder() {
-    let path = temp_file("cert").with_file_name("server-certificate.json");
+    let known = temp_file("cert");
+    let path = known.with_file_name("server-certificate.json");
     let made = ServerCert::load_or_make(&path).unwrap();
     let again = ServerCert::load_or_make(&path).unwrap();
     assert_eq!(made.fingerprint(), again.fingerprint());

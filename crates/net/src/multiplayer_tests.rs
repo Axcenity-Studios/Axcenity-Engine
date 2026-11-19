@@ -8,8 +8,10 @@ use axcenity_script::ScriptRuntime;
 use super::*;
 use crate::replication_tests::{Device, castle, frames, info};
 
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-net-{name}-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-net-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }

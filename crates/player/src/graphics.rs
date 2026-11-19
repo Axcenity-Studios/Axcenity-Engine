@@ -104,9 +104,10 @@ mod tests {
         Quality, RayTracedShadows, ReflectionQuality, ShadowQuality, TextureQuality,
     };
 
-    fn temp_folder(test: &str) -> std::path::PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-graphics-{test}-{}", std::process::id()));
+    fn temp_folder(test: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-graphics-{test}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         folder
     }

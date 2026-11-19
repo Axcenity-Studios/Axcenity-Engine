@@ -144,7 +144,9 @@ mod tests {
 
     #[test]
     fn a_texture_added_while_the_project_is_open_is_cooked_when_asked() {
-        let folder = std::env::temp_dir().join(format!("axcenity-cooker-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-cooker-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         let (passes, passed) = mpsc::channel();

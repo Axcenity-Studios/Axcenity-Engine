@@ -33,7 +33,9 @@ fn s10k_has_its_counts_and_runs_frames_without_errors() {
     assert!(memory.total.count >= parts.len());
     assert!(memory.total.count <= world.len());
 
-    let folder = std::env::temp_dir().join(format!("axcenity-s10k-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-s10k-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     s10k::write(&folder).unwrap();
     let mut runner = Runner::open(&folder).unwrap();

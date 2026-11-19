@@ -145,8 +145,10 @@ fn part(world: &mut World, name: &str, class: ClassName, size: Vec3, at: Vec3) -
     id
 }
 
-fn temp_project(name: &str) -> std::path::PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-csg-{name}-{}", std::process::id()));
+fn temp_project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-csg-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).expect("a temp folder");
     folder

@@ -410,8 +410,9 @@ mod tests {
 
     #[test]
     fn rust_sources_manifests_and_shaders_under_crates_are_watched() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-engine-files-test-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-engine-files-test-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         for file in [
             "Cargo.toml",
@@ -440,7 +441,10 @@ mod tests {
                 "crates/render/src/shaders/mesh.wgsl"
             ]
         );
-        assert_eq!(source.map(|source| source.workspace), Some(folder));
+        assert_eq!(
+            source.map(|source| source.workspace),
+            Some(folder.to_path_buf())
+        );
     }
 
     #[test]

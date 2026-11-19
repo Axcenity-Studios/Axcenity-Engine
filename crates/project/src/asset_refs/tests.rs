@@ -1,12 +1,11 @@
-use std::path::PathBuf;
-
 use super::*;
 use crate::world_file::write_prefab;
 use axcenity_core::Value;
 
-fn scratch(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-asset-refs-{name}-{}", std::process::id()));
+fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-asset-refs-{name}-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     fs::write(
@@ -38,7 +37,7 @@ const WOOD: &str = "assets/textures/wood.png";
 
 /// A project naming `wood.png` from a SurfaceAppearance in the open world,
 /// a prefab, a material, a Lua script and a block script.
-fn project(name: &str) -> (PathBuf, World, InstanceId) {
+fn project(name: &str) -> (axcenity_test_dirs::TestDir, World, InstanceId) {
     let folder = scratch(name);
     write(&folder, WOOD, "png");
     write(&folder, "assets/textures/unused.png", "png");

@@ -85,11 +85,11 @@ pub fn save_collaborate_file(folder: &Path, file: &CollaborateFile) -> Result<()
 mod tests {
     use super::*;
 
-    fn temp(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!(
+    fn temp(name: &str) -> axcenity_test_dirs::TestDir {
+        let dir = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-collab-file-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

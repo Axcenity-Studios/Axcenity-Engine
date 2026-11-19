@@ -146,8 +146,9 @@ fn a_damaged_preset_changes_nothing_and_a_newer_one_is_refused() {
 
 #[test]
 fn presets_save_to_a_folder_and_list_by_name() {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-world-presets-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-world-presets-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let (world, terrain) = setup(100.0);
     for name in ["Tundra", "alpine: high"] {

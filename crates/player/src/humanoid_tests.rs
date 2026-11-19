@@ -452,8 +452,9 @@ fn a_model_with_only_the_pieces_works_the_same_as_one_with_a_humanoid() {
 
 #[test]
 fn a_humanoid_plays_its_animators_idle_walk_run_jump_and_fall_states() {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-humanoid-states-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-humanoid-states-{}", std::process::id())),
+    );
     std::fs::create_dir_all(&folder).unwrap();
     // The states Insert ▸ Character's state machine has, with empty clips.
     let states: Vec<String> = ["Idle", "Walk", "Run", "Jump", "Fall", "Sit"]

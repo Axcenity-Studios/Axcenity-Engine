@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use axcenity_assets::{Assets, ModelFormat, Pick, load_models};
 use axcenity_core::{ClassName, PartType, Value, Vector3, World};
@@ -408,9 +407,10 @@ fn written_pieces_load_back_where_they_were() {
 }
 
 /// An empty folder of its own for a test project.
-fn temp_project(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-mesh-edit-{name}-{}", std::process::id()));
+fn temp_project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-mesh-edit-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).expect("a temp folder");
     folder

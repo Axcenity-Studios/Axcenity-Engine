@@ -5,15 +5,17 @@ use axcenity_core::Value;
 use super::*;
 
 /// An empty folder in the system's temporary folder, unique to this test run.
-fn temp_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-{name}-test-{}", std::process::id()));
+fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-{name}-test-{}", std::process::id())),
+    );
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     folder
 }
 
 /// A project with a manifest and these files.
-fn project(name: &str, files: &[(&str, &str)]) -> PathBuf {
+fn project(name: &str, files: &[(&str, &str)]) -> axcenity_test_dirs::TestDir {
     let folder = temp_folder(name);
     fs::write(
         folder.join(MANIFEST_FILE),
@@ -51,7 +53,7 @@ const WORLD: &str = r#"{ "format_version": 2,
         { "class": "Script", "name": "Spin",
           "properties": { "SourceFile": "objects/Coin/Spin.server.lua" } } ] } ] } }"#;
 
-fn door_project(name: &str) -> PathBuf {
+fn door_project(name: &str) -> axcenity_test_dirs::TestDir {
     project(
         name,
         &[

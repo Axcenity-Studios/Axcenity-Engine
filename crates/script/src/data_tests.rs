@@ -1,6 +1,6 @@
 //! Tests for unified Phase 33: `DataService` and read-only data tables.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use axcenity_assets::{AssetType, Assets, Cell, ColumnType, DataTable, write_data_table};
 use axcenity_core::{ClassName, World};
@@ -9,8 +9,10 @@ use super::*;
 
 /// A project folder with a `weapons` table (Damage, Range, Icon, Ammo,
 /// Tint, Offset, Kind) and an `ammo` table.
-fn project(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("axcenity-data-{name}-{}", std::process::id()));
+fn project(name: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-data-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     write_weapons(&folder, 10.0);
     let mut ammo = DataTable::default();

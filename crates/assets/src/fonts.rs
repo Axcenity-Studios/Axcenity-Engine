@@ -65,8 +65,9 @@ mod tests {
 
     #[test]
     fn font_files_are_found_anywhere_but_hidden_folders() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-assets-fonts-test-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-assets-fonts-test-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         for (path, data) in [
             ("assets/fonts/Title.TTF", "a"),

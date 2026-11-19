@@ -68,12 +68,13 @@ impl Default for LuauChecks {
 }
 
 impl LuauChecks {
-    /// Uses luau-lsp at `program` (tests).
+    /// Uses luau-lsp at `program`, with the checker's files in `folder`
+    /// (tests).
     #[cfg(test)]
-    pub(crate) fn start_with(&mut self, program: std::path::PathBuf) {
+    pub(crate) fn start_with(&mut self, program: std::path::PathBuf, folder: std::path::PathBuf) {
         self.enabled = true;
         self.looked = true;
-        self.checker = Checker::start(program).ok();
+        self.checker = Checker::start_in(program, folder).ok();
     }
 }
 
@@ -424,8 +425,10 @@ mod tests {
             return;
         };
         let folder = copy_of_example("hello-touched", "luau-checks");
+        // Before the app, so it is removed after the app's checker stops.
+        let checker_files = axcenity_test_dirs::TestDir::unmade("luau-checker");
         let mut app = EditorApp::new(Some(&folder));
-        app.luau.start_with(program);
+        app.luau.start_with(program, checker_files.to_path_buf());
         let path = "scripts/pad.server.lua";
         app.open_script(path, None);
         let mut now = 0.0;
@@ -531,8 +534,10 @@ mod tests {
             return;
         };
         let folder = copy_of_example("hello-modules", "luau-requires");
+        // Before the app, so it is removed after the app's checker stops.
+        let checker_files = axcenity_test_dirs::TestDir::unmade("luau-checker");
         let mut app = EditorApp::new(Some(&folder));
-        app.luau.start_with(program);
+        app.luau.start_with(program, checker_files.to_path_buf());
 
         // The sourcemap puts each module where `require` looks for it.
         let project = app.project_files();
@@ -599,7 +604,8 @@ print(#steps)
             eprintln!("skipped: no luau-lsp");
             return;
         };
-        let checker = Checker::start(program).unwrap();
+        let folder = axcenity_test_dirs::TestDir::unmade("luau-checker");
+        let checker = Checker::start_in(program, folder.to_path_buf()).unwrap();
         let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
         let mut checked = 0;
         let mut errors = Vec::new();

@@ -1306,8 +1306,9 @@ mod tests {
 
     #[test]
     fn project_files_can_be_read_without_leaving_the_asset_folder() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-audio-asset-test-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-audio-asset-test-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/audio")).unwrap();
         std::fs::write(folder.join("assets/audio/tone.wav"), b"audio data").unwrap();
@@ -1335,7 +1336,9 @@ mod tests {
 
     #[test]
     fn textures_load_once_and_failures_are_reported_once() {
-        let folder = std::env::temp_dir().join("axcenity-assets-textures");
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-assets-textures"),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         std::fs::write(
@@ -1359,7 +1362,9 @@ mod tests {
 
     #[test]
     fn background_textures_arrive_later_with_progress_and_a_wake_up() {
-        let folder = std::env::temp_dir().join("axcenity-assets-background");
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-assets-background"),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         std::fs::write(

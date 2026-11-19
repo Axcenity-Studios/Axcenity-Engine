@@ -313,8 +313,9 @@ mod tests {
         let plain = parse(&[folder]).unwrap();
         assert_eq!(plain.watched_folder(), None);
         // Nor is a built game: a game file, or the one next to the player.
-        let game =
-            std::env::temp_dir().join(format!("axcenity-watch-{}.axgame", std::process::id()));
+        let game = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-watch-{}.axgame", std::process::id())),
+        );
         fs::write(&game, b"packed").unwrap();
         assert_eq!(
             parse(&[WATCH_FLAG, game.to_str().unwrap()])
@@ -344,8 +345,9 @@ mod tests {
     #[test]
     fn a_graphics_file_holds_the_run_to_its_settings() {
         use axcenity_render::RayTracedShadows;
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-graphics-arg-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-graphics-arg-{}", std::process::id())),
+        );
         std::fs::create_dir_all(&folder).unwrap();
         let file = folder.join("rt.json");
         std::fs::write(
@@ -531,8 +533,9 @@ mod tests {
 
     #[test]
     fn with_watch_a_changed_model_and_clip_reload_while_the_game_runs() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-player-watch-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-player-watch-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-door");
         fs::create_dir_all(folder.join("assets/animations/Door")).unwrap();

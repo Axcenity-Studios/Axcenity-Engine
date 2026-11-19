@@ -250,8 +250,9 @@ mod tests {
 
     #[test]
     fn icons_and_banners_are_checked_for_format_size_and_shape() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-branding-test-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-branding-test-{}", std::process::id())),
+        );
         std::fs::create_dir_all(folder.join("assets")).unwrap();
         for (name, bytes) in [
             ("icon.png", png(256, 256)),

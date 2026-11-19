@@ -1321,7 +1321,9 @@ mod tests {
     #[test]
     fn particles_show_their_flipbook_frame_of_a_texture() {
         const IMAGE: &str = "assets/textures/flip.png";
-        let folder = std::env::temp_dir().join(format!("axcenity-flipbook-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-flipbook-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
         image::RgbaImage::new(4, 4)

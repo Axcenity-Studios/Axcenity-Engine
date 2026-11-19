@@ -250,11 +250,11 @@ mod tests {
     use super::*;
 
     /// A folder in the temp directory with these files in it.
-    fn folder_with(name: &str, files: &[(&str, &str)]) -> PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn folder_with(name: &str, files: &[(&str, &str)]) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-global-{name}-test-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         for (file, text) in files {

@@ -747,9 +747,10 @@ fn an_animated_mesh_part_is_drawn_posed_then_still_again() {
 
 /// A project folder with `file` copied in from the examples, deleted by
 /// the caller.
-fn project_with(name: &str, source: &Path, file: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-retained-{name}-{}", std::process::id()));
+fn project_with(name: &str, source: &Path, file: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-retained-{name}-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     let target = folder.join(file);
     std::fs::create_dir_all(target.parent().unwrap()).unwrap();
@@ -845,8 +846,9 @@ fn a_texture_finishing_loading_on_a_worker_appears_on_a_kept_item() {
 #[test]
 fn editing_a_material_file_or_forgetting_a_texture_updates_kept_items() {
     const PATH: &str = "assets/materials/test.material.json";
-    let folder =
-        std::env::temp_dir().join(format!("axcenity-retained-material-{}", std::process::id()));
+    let folder = axcenity_test_dirs::TestDir::adopt(
+        std::env::temp_dir().join(format!("axcenity-retained-material-{}", std::process::id())),
+    );
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(folder.join("assets/materials")).unwrap();
     let mut world = World::new();

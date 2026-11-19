@@ -12,10 +12,11 @@ fn example(name: &str) -> PathBuf {
 
 /// A copy of the example `name` in a fresh temporary folder, for a test
 /// that changes it.
-fn copy_of(name: &str, test: &str) -> PathBuf {
-    let folder = std::env::temp_dir()
-        .join("axcenity-testing-tests")
-        .join(format!("{test}-{}", std::process::id()));
+fn copy_of(name: &str, test: &str) -> axcenity_test_dirs::TestDir {
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
+        "axcenity-testing-tests-{test}-{}",
+        std::process::id()
+    )));
     let _ = fs::remove_dir_all(&folder);
     copy_folder(&example(name), &folder);
     folder
@@ -442,9 +443,10 @@ fn exported_games_never_include_tests() {
     let folder = example("hello-character");
     assert!(!spec_files(&folder).is_empty());
     let bytes = axcenity_project::pack_game(&folder).unwrap();
-    let unpacked = std::env::temp_dir()
-        .join("axcenity-testing-tests")
-        .join(format!("export-{}", std::process::id()));
+    let unpacked = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
+        "axcenity-testing-tests-export-{}",
+        std::process::id()
+    )));
     let _ = fs::remove_dir_all(&unpacked);
     axcenity_project::unpack_game(&bytes, &unpacked).unwrap();
     assert!(unpacked.join("world.json").is_file());

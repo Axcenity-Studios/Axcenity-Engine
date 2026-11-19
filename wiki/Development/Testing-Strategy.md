@@ -4,7 +4,7 @@ type: guide
 status: current
 verified: 2026-11-11
 verified_commit: 19c7179d
-source: [.config/nextest.toml, crates/testing/src/game.rs, crates/testing/src/runner.lua, crates/player/src/tests.rs, scripts/check-platform.ps1]
+source: [.config/nextest.toml, crates/test-dirs/src/lib.rs, crates/testing/src/game.rs, crates/testing/src/runner.lua, crates/player/src/tests.rs, scripts/check-platform.ps1]
 docs: [docs/development.md, docs/project/game-tests.md, docs/development-policy.md, .claude/skills/implement/references/verification.md]
 tags: [development, testing]
 ---
@@ -48,6 +48,7 @@ After a dependency change, `cargo hakari generate` first. After a script API cha
 - For caches and fast paths, prove equivalence with the slow path (randomized where possible).
 - For parallel code, prove the output doesn't depend on thread count.
 - Never pass `std::env::temp_dir()` itself to `Assets::new` in a test (it scans the whole temp folder); use a fresh subfolder.
+- Make a test's files in an `axcenity_test_dirs::TestDir` (`crates/test-dirs`, a dev-dependency): a unique folder under the temp folder, removed when dropped, also when the test panics; `AXCENITY_KEEP_TEST_DIRS=1` keeps them. Folders made with a bare `temp_dir()` and left behind once filled a disk (1.4 TB). See `docs/development.md`, "Temporary folders in tests".
 - Keep single tests short; nextest marks a test SLOW after 30 s and kills it after 2 minutes.
 
 ## Known noise

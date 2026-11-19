@@ -318,7 +318,9 @@ mod tests {
 
     #[test]
     fn the_step_rewrites_old_clips_and_first_format_block_conditions_only() {
-        let folder = std::env::temp_dir().join("axcenity-migrate-shapes");
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-migrate-shapes"),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(folder.join("assets/animations/Door")).unwrap();
         fs::create_dir_all(folder.join("scripts")).unwrap();
@@ -407,7 +409,9 @@ mod tests {
             .collect();
         names.sort();
         assert!(names.len() > 50, "{names:?}");
-        let root = std::env::temp_dir().join("axcenity-examples-at-format-5");
+        let root = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join("axcenity-examples-at-format-5"),
+        );
         let _ = fs::remove_dir_all(&root);
         for name in names {
             let folder = root.join(&name);

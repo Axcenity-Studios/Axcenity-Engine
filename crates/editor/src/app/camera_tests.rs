@@ -46,12 +46,13 @@ fn frame(app: &mut EditorApp, input: &[InputEvent]) {
     app.play_frame(FRAME, input, None, None);
 }
 
-fn playing(test: &str) -> EditorApp {
+/// The copied project comes first, so it is removed after the app is dropped.
+fn playing(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp) {
     let folder = copy_of_example("hello-camera", test);
     let mut app = EditorApp::new(Some(&folder));
     app.viewport.set_pixel_size(SIZE);
     app.play();
-    app
+    (folder, app)
 }
 
 fn done(app: &EditorApp) -> bool {
@@ -86,7 +87,7 @@ fn position_of(app: &EditorApp, name: &str) -> Vector3 {
 
 #[test]
 fn a_scriptable_flyover_plays_as_in_the_player_and_stop_brings_the_editor_camera_back() {
-    let mut app = playing("camera-flyover");
+    let (_project, mut app) = playing("camera-flyover");
     let fly = app.viewport.camera_view();
     for step in 1..=60 {
         frame(&mut app, &[]);
@@ -129,7 +130,7 @@ fn a_scriptable_flyover_plays_as_in_the_player_and_stop_brings_the_editor_camera
 
 #[test]
 fn part_under_the_mouse_and_the_beacon_tag_line_up_with_what_the_viewport_draws() {
-    let mut app = playing("camera-mouse");
+    let (_project, mut app) = playing("camera-mouse");
     let mut moved = 0;
     let mut last = None;
     while !done(&app) {

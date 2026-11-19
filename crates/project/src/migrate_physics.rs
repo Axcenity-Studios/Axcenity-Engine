@@ -79,8 +79,9 @@ mod tests {
 
     #[test]
     fn an_upgrade_keeps_old_metal_parts_physics_and_leaves_the_rest() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-migrate-physics-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-migrate-physics-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(folder.join("assets/prefabs")).unwrap();
         fs::write(

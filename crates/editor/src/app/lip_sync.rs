@@ -171,8 +171,9 @@ pub(super) mod tests {
 
     #[test]
     fn a_wav_becomes_a_lip_sync_beside_it() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-lipsync-cmd-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-lipsync-cmd-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("voice")).unwrap();
         let wav = hum_wav();

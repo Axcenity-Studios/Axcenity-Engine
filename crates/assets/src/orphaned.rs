@@ -161,8 +161,9 @@ mod tests {
 
     #[test]
     fn copies_of_files_that_are_gone_are_deleted_and_the_rest_kept() {
-        let project =
-            std::env::temp_dir().join(format!("axcenity-orphaned-{}", std::process::id()));
+        let project = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-orphaned-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&project);
         fs::create_dir_all(project.join("assets/textures")).unwrap();
         fs::write(project.join("assets/textures/Kept.png"), b"png").unwrap();

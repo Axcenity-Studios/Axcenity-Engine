@@ -540,11 +540,11 @@ fn update_controller(
 mod tests {
     use super::*;
     use axcenity_anim::files::StateDef;
-    use std::path::PathBuf;
 
-    fn project(name: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-store-{name}-{}", std::process::id()));
+    fn project(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-store-{name}-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         folder

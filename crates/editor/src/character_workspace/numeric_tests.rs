@@ -32,7 +32,7 @@ const CTRL: egui::Modifiers = egui::Modifiers {
 struct Studio {
     ctx: egui::Context,
     workspace: CharacterWorkspace,
-    folder: PathBuf,
+    folder: axcenity_test_dirs::TestDir,
     size: Vec2,
 }
 

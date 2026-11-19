@@ -20,6 +20,7 @@ zip.workspace = true
 axcenity-workspace-hack.workspace = true
 
 [dev-dependencies]
+axcenity-test-dirs.workspace = true
 # `theme::test_context`, `theme::run` and `snapshot` for drawing tests.
 axcenity-editor-kit = { workspace = true, features = ["test-support"] }
 

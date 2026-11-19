@@ -67,11 +67,11 @@ pub fn load_starter_character(
 mod tests {
     use super::*;
 
-    fn temp_folder(name: &str) -> std::path::PathBuf {
-        let folder = std::env::temp_dir().join(format!(
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
             "axcenity-starter-character-{name}-{}",
             std::process::id()
-        ));
+        )));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/prefabs")).unwrap();
         folder

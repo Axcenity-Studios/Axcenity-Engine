@@ -1236,15 +1236,16 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
     }
 
-    fn temp_folder(name: &str) -> PathBuf {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-validate-{name}-{}", std::process::id()));
+    fn temp_folder(name: &str) -> axcenity_test_dirs::TestDir {
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-validate-{name}-{}", std::process::id())),
+        );
         let _ = fs::remove_dir_all(&folder);
         fs::create_dir_all(&folder).unwrap();
         folder
     }
 
-    fn scratch(name: &str) -> PathBuf {
+    fn scratch(name: &str) -> axcenity_test_dirs::TestDir {
         let folder = temp_folder(name);
         fs::write(
             folder.join(crate::MANIFEST_FILE),

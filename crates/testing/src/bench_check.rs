@@ -497,7 +497,9 @@ mod tests {
 
     #[test]
     fn a_project_copy_leaves_out_the_local_cache() {
-        let root = std::env::temp_dir().join(format!("bench-check-copy-{}", std::process::id()));
+        let root = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("bench-check-copy-{}", std::process::id())),
+        );
         let (from, to) = (root.join("from"), root.join("to"));
         std::fs::create_dir_all(from.join(".axcenity/imported")).unwrap();
         std::fs::create_dir_all(from.join("assets")).unwrap();

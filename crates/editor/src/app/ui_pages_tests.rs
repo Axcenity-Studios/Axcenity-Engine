@@ -26,7 +26,7 @@ fn child(world: &World, parent: InstanceId, name: &str) -> InstanceId {
 
 /// hello-ui-graph open in the editor: its Menu, Pages, and the Home and
 /// Settings pages.
-fn menu(test: &str) -> (PathBuf, EditorApp, [InstanceId; 4]) {
+fn menu(test: &str) -> (axcenity_test_dirs::TestDir, EditorApp, [InstanceId; 4]) {
     let folder = copy_of_example("hello-ui-graph", test);
     let app = EditorApp::new(Some(&folder));
     let menu = child(&app.world, app.world.workspace(), "Menu");

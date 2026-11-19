@@ -630,8 +630,9 @@ mod tests {
     /// `assets-panel-<view>.png`).
     #[test]
     fn an_imported_models_files_show_as_one_folder_that_opens() {
-        let folder =
-            std::env::temp_dir().join(format!("axcenity-asset-folders-{}", std::process::id()));
+        let folder = axcenity_test_dirs::TestDir::adopt(
+            std::env::temp_dir().join(format!("axcenity-asset-folders-{}", std::process::id())),
+        );
         let _ = std::fs::remove_dir_all(&folder);
         for file in [
             "assets/models/Hero/Hero.fbx",

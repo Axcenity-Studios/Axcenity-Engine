@@ -16,7 +16,7 @@ fn has(world: &World, name: &str) -> bool {
 }
 
 /// A copy of hello-levels in a folder of its own.
-fn copy(test: &str) -> PathBuf {
+fn copy(test: &str) -> axcenity_test_dirs::TestDir {
     fn copy_folder(from: &Path, to: &Path) {
         fs::create_dir_all(to).unwrap();
         for entry in fs::read_dir(from).unwrap() {
@@ -29,10 +29,10 @@ fn copy(test: &str) -> PathBuf {
             }
         }
     }
-    let folder = std::env::temp_dir().join(format!(
+    let folder = axcenity_test_dirs::TestDir::adopt(std::env::temp_dir().join(format!(
         "axcenity-project-levels-{test}-{}",
         std::process::id()
-    ));
+    )));
     let _ = fs::remove_dir_all(&folder);
     copy_folder(&example("hello-levels"), &folder);
     folder
