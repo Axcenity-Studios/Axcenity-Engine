@@ -30,6 +30,7 @@
 
 mod bind;
 mod coverage;
+mod enclosure;
 mod glb;
 mod hiding;
 mod import;
@@ -52,6 +53,12 @@ pub use coverage::{
     Coverage, HIDE_SHARE, RegionMap, SlotGuess, classify, coverage, hidden_regions,
     triangle_regions,
 };
+pub use enclosure::{
+    BEHIND, BODY_MASK, FINE_GRAZE, GRAZE, HIDE_RULE, HideCase, HideInput, HideReport, HideRule,
+    LAYER_MASK, NUMBERED_WIDTH, Openings, Placed, SeenHole, Views, encloses, hidden_under,
+    hide_under, holes_seen, layer_masks, mask_texels, numbered_texels, shows, shows_at,
+    view_directions, write_hide_maps, write_mask,
+};
 pub use glb::{FittedModel, write_fitted_glb};
 pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides};
 pub use import::{
@@ -59,8 +66,8 @@ pub use import::{
     import_garment_with, pose_states_of,
 };
 pub use pose::{
-    CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses, skin,
-    skin_matrices,
+    CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses,
+    hide_poses, skin, skin_matrices,
 };
 pub use posed::PoseReport;
 pub use surface::{Hit, Surface, closest_on_triangle, vertex_normals};

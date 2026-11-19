@@ -20,10 +20,10 @@ use axcenity_core::{ClassName, Value};
 
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
 use super::fit_gate_tests::{
-    Failure, Known, Posed, WALK, WALK_FRAMES, bodies, check, cover_at_rest, measure, measure_walk,
-    poke_through, pose_name, posed_at, undressed, worn,
+    Failure, HOLES, Known, Posed, WALK, WALK_FRAMES, bodies, check, cover_at_rest, hidden_at_rest,
+    measure, measure_walk, poke_through, pose_name, posed_at, undressed, worn,
 };
-use super::garment_checks::{Record, check_motion, footwear, stale, unrecorded};
+use super::garment_checks::{Record, check_motion_with, footwear, frames_of, stale, unrecorded};
 
 pub(super) const TEE: &str = "axcenity/realistic-crew-tee";
 pub(super) const JOGGERS: &str = "axcenity/realistic-joggers";
@@ -41,10 +41,60 @@ fn dressed(description: &Description) -> Description {
     out
 }
 
-/// A failure that is one of the three items' (or a layer through one).
+/// A failure that is one of the three items' (or a layer through one),
+/// or hidden skin showing (wave 5: the tee and the joggers hide what they
+/// enclose).
 fn ours(failure: &Failure) -> bool {
-    PARTS.iter().any(|p| failure.garment.contains(p))
+    PARTS.iter().any(|p| failure.garment.contains(p)) || failure.garment == HOLES
 }
+
+/// Wave 5, hiding under clothing: wearing the crew tee and the joggers
+/// leaves out the skin they enclose, the underwear under them and the
+/// joggers' waistband under the tee's hem where it is enclosed; taking
+/// them off puts it back.
+#[test]
+fn the_wardrobe_hides_the_skin_and_underwear_it_encloses() {
+    let stage = Stage::new("wardrobe-hiding", &repository_library()).expect("the stage");
+    for (name, skin_least, under_least) in [
+        (
+            "realistic-masculine-cast-average",
+            HIDES_SKIN.0,
+            HIDES_UNDER.0,
+        ),
+        (
+            "realistic-feminine-cast-average",
+            HIDES_SKIN.1,
+            HIDES_UNDER.1,
+        ),
+    ] {
+        let description = bodies().into_iter().find(|d| d.name == name).unwrap();
+        let (skin, parts) = hidden_at_rest(&stage.assets, &description, &dressed(&description));
+        println!("{name}: {skin} body triangles hidden; parts {parts:?}");
+        assert!(
+            skin >= skin_least,
+            "{name}: {skin} hidden, at least {skin_least}"
+        );
+        let under: usize = parts
+            .iter()
+            .filter(|(part, _)| part.starts_with("Underwear_"))
+            .map(|(_, n)| *n)
+            .sum();
+        assert!(
+            under >= under_least,
+            "{name}: underwear {under} hidden, at least {under_least}"
+        );
+        let (again, parts) = hidden_at_rest(&stage.assets, &description, &description);
+        assert_eq!(again, 0);
+        assert!(parts.iter().all(|(_, n)| *n == 0), "{parts:?}");
+    }
+}
+
+/// How many body triangles the crew tee and joggers hide at least
+/// (masculine, feminine average), and of the underwear: what the masks hid
+/// when made (wave 5, `refinement/wave5/body-hiding.md`). They change only
+/// when the masks are made again.
+const HIDES_SKIN: (usize, usize) = (1142, 1142);
+const HIDES_UNDER: (usize, usize) = (149, 132);
 
 /// Runs the gate for `stance` on every realistic cast and body benchmark
 /// dressed in the three, on the shipped library.
@@ -103,7 +153,9 @@ fn wardrobe_gate_walk(frames: &[u32], known: &[Known]) {
         let dressed = dressed(&description);
         let (body, garments) = worn(&stage.assets, &dressed, Stance::Rest);
         let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
-        let cover = cover_at_rest(&body, &garments, &bare);
+        let mut cover = cover_at_rest(&body, &garments, &bare);
+        // Holes in the walk are `the_wardrobe_shows_no_hidden_place_through_the_walk_*`.
+        cover.holes = false;
         checked += measure_walk(
             &stage.assets,
             &description.name,
@@ -301,19 +353,19 @@ fn cast(stage: &Stage) -> Vec<Description> {
 #[test]
 fn the_wardrobe_stays_steady_in_the_idle() {
     let stage = Stage::new("wardrobe-motion-idle", &repository_library()).expect("the stage");
-    check_motion(&stage, &cast(&stage), "Idle", &MOTION_IDLE);
+    check_motion_with(&stage, &cast(&stage), "Idle", &MOTION_IDLE, false);
 }
 
 #[test]
 fn the_wardrobe_stays_steady_in_the_walk() {
     let stage = Stage::new("wardrobe-motion-walk", &repository_library()).expect("the stage");
-    check_motion(&stage, &cast(&stage), "Walk", &MOTION_WALK);
+    check_motion_with(&stage, &cast(&stage), "Walk", &MOTION_WALK, false);
 }
 
 #[test]
 fn the_wardrobe_stays_steady_in_the_run() {
     let stage = Stage::new("wardrobe-motion-run", &repository_library()).expect("the stage");
-    check_motion(&stage, &cast(&stage), "Run", &MOTION_RUN);
+    check_motion_with(&stage, &cast(&stage), "Run", &MOTION_RUN, false);
 }
 
 /// The sneakers on the realistic cast (the body extremes too would take
@@ -666,3 +718,225 @@ const FOOTWEAR: [Record; 2] = [
         most: 0.0099,
     },
 ];
+
+/// Wave 5, hiding under clothing: no place the three hide shows (the
+/// gate's hole check, `fit_gate_tests::holes`), through the walk's whole
+/// stride (every third frame) on every gate body, and every third frame
+/// of the motion check's idle and run on the cast. Split by bodies, so
+/// each test stays inside the runner's two minutes: the joggers hide a
+/// thousand triangles of the legs, and each place is looked at from
+/// about 150 directions. The gate and motion tests above leave holes to
+/// these.
+fn wardrobe_holes(clip: &'static str, frames: &[u32], cast_only: bool, part: usize, parts: usize) {
+    use super::fit_gate_tests::{HOLES, hidden_triangles, holes, worn_in};
+    let label = format!("wardrobe holes {clip} {part}/{parts}");
+    let stage = Stage::new(
+        &format!("wardrobe-holes-{clip}-{part}"),
+        &repository_library(),
+    )
+    .expect("the stage");
+    let chosen: Vec<Description> = bodies()
+        .into_iter()
+        .filter(|d| !cast_only || d.name.contains("-cast-"))
+        .collect();
+    let size = chosen.len().div_ceil(parts);
+    let mut failures = Vec::new();
+    for description in chosen.iter().skip(part * size).take(size) {
+        let dressed = dressed(description);
+        let (body, _) = worn(&stage.assets, &dressed, Stance::Rest);
+        let (bare, _) = worn(&stage.assets, &undressed(description), Stance::Rest);
+        let hidden = hidden_triangles(&bare, &body);
+        let first = frames[0];
+        let last = *frames.last().unwrap();
+        let (mut world, mut animators) = stage_world(
+            &stage.assets,
+            &dressed,
+            Stance::Clip {
+                name: clip,
+                frames: first,
+            },
+            &[],
+        )
+        .expect("the clip");
+        let mut worst: Option<Failure> = None;
+        for frame in first..=last {
+            if frames.contains(&frame) {
+                let (body, garments, _) = worn_in(&world, &stage.assets, &animators);
+                let at = format!("{} {clip}@{frame}", description.name);
+                let (count, most) = holes(&at, &body, &hidden, &garments);
+                if count > 0 && worst.as_ref().is_none_or(|w| most > w.worst) {
+                    worst = Some(Failure {
+                        garment: HOLES.to_owned(),
+                        pose: clip.to_owned(),
+                        body: at,
+                        count,
+                        worst: most,
+                    });
+                }
+            }
+            animators.update(&mut world, &stage.assets, 1.0 / 60.0);
+        }
+        failures.extend(worst);
+    }
+    check(&label, &failures, &[]);
+}
+
+/// Every third frame of the walk's stride (frames 2 to 44).
+fn walk_frames() -> Vec<u32> {
+    WALK_FRAMES.iter().flat_map(|f| f.iter().copied()).collect()
+}
+
+/// Every third frame (2, 5, 8, ...) of a clip as the motion check plays it.
+fn motion_frames(clip: &str) -> Vec<u32> {
+    frames_of(clip).filter(|f| f % 3 == 2).collect()
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_1() {
+    wardrobe_holes("Walk", &walk_frames(), false, 0, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_2() {
+    wardrobe_holes("Walk", &walk_frames(), false, 1, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_3() {
+    wardrobe_holes("Walk", &walk_frames(), false, 2, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_4() {
+    wardrobe_holes("Walk", &walk_frames(), false, 3, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_5() {
+    wardrobe_holes("Walk", &walk_frames(), false, 4, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_6() {
+    wardrobe_holes("Walk", &walk_frames(), false, 5, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_7() {
+    wardrobe_holes("Walk", &walk_frames(), false, 6, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_8() {
+    wardrobe_holes("Walk", &walk_frames(), false, 7, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_9() {
+    wardrobe_holes("Walk", &walk_frames(), false, 8, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_10() {
+    wardrobe_holes("Walk", &walk_frames(), false, 9, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_11() {
+    wardrobe_holes("Walk", &walk_frames(), false, 10, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_12() {
+    wardrobe_holes("Walk", &walk_frames(), false, 11, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_13() {
+    wardrobe_holes("Walk", &walk_frames(), false, 12, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_14() {
+    wardrobe_holes("Walk", &walk_frames(), false, 13, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_15() {
+    wardrobe_holes("Walk", &walk_frames(), false, 14, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_16() {
+    wardrobe_holes("Walk", &walk_frames(), false, 15, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_17() {
+    wardrobe_holes("Walk", &walk_frames(), false, 16, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_through_the_walk_18() {
+    wardrobe_holes("Walk", &walk_frames(), false, 17, 18);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_1() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 0, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_2() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 1, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_3() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 2, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_4() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 3, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_5() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 4, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_idle_6() {
+    wardrobe_holes("Idle", &motion_frames("Idle"), true, 5, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_1() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 0, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_2() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 1, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_3() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 2, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_4() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 3, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_5() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 4, 6);
+}
+
+#[test]
+fn the_wardrobe_shows_no_hidden_place_in_the_run_6() {
+    wardrobe_holes("Run", &motion_frames("Run"), true, 5, 6);
+}

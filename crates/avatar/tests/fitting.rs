@@ -207,8 +207,9 @@ fn a_garment_not_made_from_the_body_imports_as_a_fitted_draft() {
     assert_eq!(manifest.quality, Some(Quality::Draft));
     assert!(manifest.is_draft());
     assert!(matches!(manifest.fit, Fit::Binding { .. }));
-    // It hides what it covers whole (the waist) and nothing it covers
-    // only in part (the torso region runs up the neck, past a crew neck).
+    // It covers the waist whole, but hides no whole region (wave 5: the
+    // waist is seen from below up the hem); it hides the skin it encloses
+    // triangle by triangle instead, a mask beside it.
     let share = |id: &str| {
         imported
             .coverage
@@ -216,14 +217,16 @@ fn a_garment_not_made_from_the_body_imports_as_a_fitted_draft() {
             .find(|(region, _)| region == id)
             .map_or(0.0, |(_, share)| *share)
     };
+    assert!(manifest.hides.is_empty(), "{:?}", manifest.hides);
     assert!(
-        manifest.hides.contains(&"waist".to_owned()),
+        imported.unhidden.iter().any(|(id, _)| id == "waist"),
         "{:?}",
-        manifest.hides
+        imported.unhidden
     );
-    for region in &manifest.hides {
-        assert!(share(region) >= 0.995, "{region}: {}", share(region));
-    }
+    assert!(share("waist") >= 0.995, "{:?}", imported.coverage);
+    assert_eq!(manifest.hide_maps.len(), 1, "{:?}", manifest.hide_maps);
+    assert_eq!(manifest.hide_maps[0].under, None);
+    assert!(imported.hiding.hidden[0] > 0, "{:?}", imported.hiding);
     assert!(share("torso") > 0.6, "{:?}", imported.coverage);
     // Aligned as it was made: on the body, in metres.
     assert_eq!(imported.alignment.scale, 1.0);
@@ -287,7 +290,16 @@ fn a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme() {
     let root = scratch_library("layers");
     let bra_id = "axcenity/realistic-sports-bra";
     let started = std::time::Instant::now();
-    let imported = import_garment(&request(&root, "imported/test-tee", &[bra_id])).unwrap();
+    // Its masks aren't wanted here (they take a minute): wave 5.
+    let skip = axcenity_avatar::fit::ImportOptions {
+        skip_hiding: true,
+        ..Default::default()
+    };
+    let imported = axcenity_avatar::fit::import_garment_with(
+        &request(&root, "imported/test-tee", &[bra_id]),
+        skip,
+    )
+    .unwrap();
     println!("imported in {:.1} s", started.elapsed().as_secs_f32());
     assert!(
         imported.report.layers.iter().any(|l| l.layer == bra_id),

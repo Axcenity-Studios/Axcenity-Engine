@@ -3,7 +3,7 @@
 //! motion" and "Footwear", §4 "Motion"), as helpers a content track calls
 //! on its own items, and the tests that hold the shipped items to them.
 //!
-//! - [`motion`]: a clip played on a character, consecutive frames sampled
+//! - [`motion_with`]: a clip played on a character, consecutive frames sampled
 //!   as a game poses them (`character_capture`'s stage). No **popping**:
 //!   a garment corner's jolt (the change in its frame-to-frame step, its
 //!   second difference) is no more than [`LEVER`] times the most any skin
@@ -17,8 +17,8 @@
 //!   No **tearing**: corners made at one place (a seam
 //!   split for its normals or texture) stay within [`TEAR`]. And no hair
 //!   corner goes more than [`HAIR_INSIDE`] inside the head. No **holes**:
-//!   skin a worn item hides stays under the cloth in every frame (the fit
-//!   gate's `holes`).
+//!   no place a worn item hides is seen, every third frame (the fit
+//!   gate's `holes`, by views since wave 5).
 //! - [`footwear`]: a shoe on a character in a pose: no covered foot corner
 //!   through the sole or the upper (a corner the shoe covers at rest, whose
 //!   ray out along its normal meets the shoe then, meets no shoe in the
@@ -26,7 +26,7 @@
 //!   within [`SOLE_FLAT`].
 //!
 //! A content specialist checks an item with these on a stage of their own
-//! library: `motion(&stage.assets, &description, "Walk", 2..44)` and
+//! library: `motion_with(&stage.assets, &description, "Walk", 2..44, true)` and
 //! `footwear(&stage.assets, &description, stance)`, then asserts the
 //! report's [`MotionReport::problems`] or [`FootReport::problems`] is
 //! empty.
@@ -325,11 +325,14 @@ fn step(
 /// Plays `clip` (a starter clip, `Walk`, `Run`, `Idle`) on `description`
 /// and samples `frames` (sixtieths of a second from its start, at least
 /// 2): see the module's notes.
-pub(crate) fn motion(
+/// Holes are looked for only when `holes_too` (an outfit that hides much
+/// checks them in tests of its own: `wardrobe_tests`).
+pub(crate) fn motion_with(
     assets: &Assets,
     description: &Description,
     clip: &'static str,
     frames: Range<u32>,
+    holes_too: bool,
 ) -> MotionReport {
     let first = frames.start.max(2);
     let (mut world, mut animators) = stage_world(
@@ -351,7 +354,7 @@ pub(crate) fn motion(
     // still at one place (a seam already split in the first frame sampled
     // would be two places there, and never be seen to tear).
     let (rest_body, rest_garments) = worn(assets, description, Stance::Rest);
-    // The skin the worn items hide, checked for holes in every frame.
+    // The skin the worn items hide, checked for holes every third frame.
     let (bare, _) = worn(assets, &undressed(description), Stance::Rest);
     let hidden = hidden_triangles(&bare, &rest_body);
     // Per garment: the skin near each corner, its welds and its last two
@@ -405,7 +408,12 @@ pub(crate) fn motion(
         if skin_last.len() > 2 {
             skin_last.remove(0);
         }
-        if !hidden.is_empty() {
+        // Holes every third frame (2, 5, 8, ..., as the gate's walk), since
+        // wave 5's view-based hole check: it looks at each hidden place
+        // from about 150 directions, too slow for every frame of three
+        // clips on the cast in a test's two minutes.
+        let hidden_seen = garments.iter().any(|g| !g.hidden.is_empty());
+        if holes_too && (!hidden.is_empty() || hidden_seen) && frame % 3 == 2 {
             let label = format!("{} {clip}@{frame}", description.name);
             let (count, most) = holes(&label, &body, &hidden, &garments);
             report.holes += count;
@@ -690,7 +698,7 @@ fn stylized_cast() -> Vec<Description> {
 /// A clip's frames for the checks: one stride of the walk and the run
 /// from their start (the clip played alone holds its last frame from
 /// about frame 44 on), and a second of the idle.
-fn frames_of(clip: &str) -> Range<u32> {
+pub(super) fn frames_of(clip: &str) -> Range<u32> {
     match clip {
         "Idle" => 2..62,
         "Run" => 2..35,
@@ -704,9 +712,20 @@ pub(super) fn check_motion(
     clip: &'static str,
     records: &[Record],
 ) {
+    check_motion_with(stage, cast, clip, records, true);
+}
+
+/// [`check_motion`], looking for holes only when `holes_too`.
+pub(super) fn check_motion_with(
+    stage: &Stage,
+    cast: &[Description],
+    clip: &'static str,
+    records: &[Record],
+    holes_too: bool,
+) {
     let mut problems = Vec::new();
     for description in cast {
-        let report = motion(&stage.assets, description, clip, frames_of(clip));
+        let report = motion_with(&stage.assets, description, clip, frames_of(clip), holes_too);
         println!(
             "{} {clip}: {} frames; {}; hair inside {} (deepest {:.2} mm); holes {} ({:.2} mm)",
             report.character,
@@ -894,12 +913,14 @@ fn the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head() {
         ],
         normals: vec![Vec3::Z; 5],
         triangles: vec![[0, 1, 2], [1, 3, 2]],
+        hidden: Vec::new(),
     };
     let garment = Posed {
         name: "Cloth".to_owned(),
         positions: vec![Vec3::new(0.04, 1.64, 0.003), Vec3::new(0.04, 1.64, 0.003)],
         normals: vec![Vec3::Z; 2],
         triangles: vec![],
+        hidden: Vec::new(),
     };
     // The skin near the cloth: the square's four corners, not the far one
     // (1.64 m below it).
@@ -947,7 +968,7 @@ fn the_motion_checks_catch_a_pop_a_tear_and_hair_in_the_head() {
 /// A garment that moves with the skin passes a frame; one corner thrown
 /// 1 cm out of line for one frame is a pop; corners made at one place
 /// coming 1 mm apart are a tear (`step`, the frame-by-frame core of
-/// [`motion`]).
+/// [`motion_with`]).
 #[test]
 fn a_frame_with_a_corner_thrown_out_of_line_is_a_pop_and_a_split_seam_a_tear() {
     // Skin and cloth both speeding up the same way: they jolt alike.
@@ -1064,6 +1085,7 @@ fn box_shoe(tilt: f32) -> Posed {
         positions,
         normals,
         triangles,
+        hidden: Vec::new(),
     }
 }
 
@@ -1099,6 +1121,7 @@ fn box_foot(drop: f32) -> Posed {
         positions,
         normals,
         triangles,
+        hidden: Vec::new(),
     }
 }
 

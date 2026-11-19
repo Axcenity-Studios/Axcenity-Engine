@@ -5,6 +5,7 @@
 mod content_states;
 mod contracts;
 mod formats;
+mod hiding_under_clothing;
 mod migration;
 mod models;
 mod presets;

@@ -203,6 +203,9 @@ impl Library {
             if let Some(thumbnail) = &item.thumbnail {
                 self.check_inside(&mut problems, id, "thumbnail", thumbnail);
             }
+            for (k, hide) in item.hide_maps.iter().enumerate() {
+                self.check_inside(&mut problems, id, &format!("hide_maps[{k}].map"), &hide.map);
+            }
             for variant in &item.variants {
                 if let Some(thumbnail) = &variant.thumbnail {
                     let at = format!("variants.{}.thumbnail", variant.id);

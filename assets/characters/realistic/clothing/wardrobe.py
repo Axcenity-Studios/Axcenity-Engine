@@ -1,7 +1,8 @@
 """Makes the realistic wardrobe's items from their built sources: each
 level of detail is fitted to the realistic body by the engine's own
 import (`avatar::fit`, `cargo run -p axcenity-avatar --example
-import_garment`: binding, the body's shapes, push-out, region hiding),
+import_garment`: binding, the body's shapes, push-out, region hiding, and the
+masks of what it hides under it, `hide_maps`),
 then the three fitted levels and the baked maps are put together into
 the item's model, with its manifest (colour roles, variants, quality,
 source). Plain Python (no Blender):
@@ -265,6 +266,23 @@ def library(scratch):
     subprocess.run([sys.executable, "-I", os.path.join(scratch, "catalogue.py")], check=True)
 
 
+def hide_maps(imported, lod0, src, out_dir, obj):
+    """The masks the import made of what the item hides under it (wave 5,
+    hiding the body under clothing: `<src>.hide*.png` beside the level-0
+    import), copied beside the item as `<obj>.hide*.png`, and the
+    manifest's `hide_maps` naming them. Stale masks of an earlier make are
+    removed first."""
+    for name in os.listdir(out_dir):
+        if name.startswith(f"{obj}.hide") and name.endswith(".png"):
+            os.remove(os.path.join(out_dir, name))
+    maps = []
+    for entry in imported.get("hide_maps", []):
+        name = obj + entry["map"][len(src):]
+        shutil.copy(os.path.join(lod0, entry["map"]), os.path.join(out_dir, name))
+        maps.append(dict(entry, map=name))
+    return maps
+
+
 def run_import(item, obj, scratch, label, folder, under):
     cmd = ["cargo", "run", "-q", "-p", "axcenity-avatar", "--release", "--example", "import_garment", "--",
            obj, scratch, BASE, f"build/{folder}", label, f"build/{folder}",
@@ -316,6 +334,7 @@ def make(key, built_root, scratch):
         "bases": [BASE],
         "model": {"file": f"{obj}.glb", "object": f"AxcenityRealistic/{obj}"},
         "hides": imported.get("hides", []),
+        "hide_maps": hide_maps(imported, lod0, src, out_dir, obj),
         "materials": [dict({"name": n, "shading": m.get("shading", "cloth"), "label": m["label"]},
                            **({"role": m["role"]} if "role" in m else {}))
                       for n, m in item["materials"].items()],
@@ -331,6 +350,8 @@ def make(key, built_root, scratch):
     }
     if imported.get("also_fills"):
         manifest["also_fills"] = imported["also_fills"]
+    if not manifest["hide_maps"]:
+        del manifest["hide_maps"]
     with open(os.path.join(out_dir, f"{obj}.item.json"), "w", newline="\n") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")

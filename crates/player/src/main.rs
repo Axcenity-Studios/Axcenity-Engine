@@ -1571,6 +1571,8 @@ mod hair_tests;
 #[cfg(test)]
 mod handle_tests;
 #[cfg(test)]
+mod hide_trim_tests;
+#[cfg(test)]
 mod live_identity_bench_tests;
 #[cfg(test)]
 mod makeup_tests;

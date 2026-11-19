@@ -14,6 +14,19 @@
     "object": "AxcenityRealistic/Pants_Joggers"
   },
   "hides": [],
+  "hide_maps": [
+    {
+      "map": "Pants_Joggers.hide.png"
+    },
+    {
+      "under": "axcenity/realistic-briefs",
+      "map": "Pants_Joggers.hide.realistic-briefs.png"
+    },
+    {
+      "under": "axcenity/realistic-boxer-briefs",
+      "map": "Pants_Joggers.hide.realistic-boxer-briefs.png"
+    }
+  ],
   "materials": [
     {
       "name": "Fleece",

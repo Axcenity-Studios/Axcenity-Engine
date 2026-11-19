@@ -12,6 +12,7 @@ pub(crate) mod cooked_model;
 mod fbx;
 mod gltf_takes;
 mod hide;
+pub use hide::TriangleAt;
 mod identity;
 mod lod;
 mod lod_cache;

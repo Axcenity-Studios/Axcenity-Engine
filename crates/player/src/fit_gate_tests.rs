@@ -16,7 +16,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use axcenity_assets::{Assets, Model};
-use axcenity_avatar::fit::{Hit, ImportRequest, Surface, import_garment, outside_cloth};
+use axcenity_avatar::fit::{
+    Hit, ImportOptions, ImportRequest, Openings, Surface, Views, holes_seen, import_garment_with,
+};
 use axcenity_avatar::{Catalogue, CatalogueBase, CatalogueItem, Description, Library, WornItem};
 use axcenity_core::{ClassName, InstanceId, Value, World};
 use axcenity_render::glam::{Mat3, Vec3};
@@ -72,6 +74,11 @@ pub(super) fn gate_library() -> &'static Path {
             let made = std::fs::metadata(&exe).unwrap();
             (made.len(), made.modified().ok()).hash(&mut hasher);
             std::fs::read(&tee).unwrap().hash(&mut hasher);
+            for mask in TEE_MASKS {
+                std::fs::read(tee_fixtures().join(mask))
+                    .ok()
+                    .hash(&mut hasher);
+            }
             for file in &files {
                 file.hash(&mut hasher);
                 std::fs::read(shipped.join(file)).unwrap().hash(&mut hasher);
@@ -86,31 +93,60 @@ pub(super) fn gate_library() -> &'static Path {
                 std::fs::copy(shipped.join(file), &target).unwrap();
             }
             std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
-            let imported = import_garment(&ImportRequest {
-                source: tee.clone(),
-                library: made.to_owned(),
-                base: "axcenity/realistic".to_owned(),
-                id: TEE.to_owned(),
-                label: "Test tee".to_owned(),
-                folder: "imported/test-tee".to_owned(),
-                source_info: axcenity_avatar::Source {
-                    author: "Axcenity Engine contributors".to_owned(),
-                    licence: "CC0-1.0".to_owned(),
-                    ..axcenity_avatar::Source::default()
+            // Its masks trimmed to the runtime (wave 5, `hide_trim_tests`),
+            // when they are kept beside it, in place of the import's own
+            // (which take minutes to make: the import skips them).
+            let kept = TEE_MASKS.iter().any(|m| tee_fixtures().join(m).is_file());
+            let imported = import_garment_with(
+                &ImportRequest {
+                    source: tee.clone(),
+                    library: made.to_owned(),
+                    base: "axcenity/realistic".to_owned(),
+                    id: TEE.to_owned(),
+                    label: "Test tee".to_owned(),
+                    folder: "imported/test-tee".to_owned(),
+                    source_info: axcenity_avatar::Source {
+                        author: "Axcenity Engine contributors".to_owned(),
+                        licence: "CC0-1.0".to_owned(),
+                        ..axcenity_avatar::Source::default()
+                    },
+                    slot: None,
+                    layer: None,
+                    margin: 0.002,
+                    under: vec!["axcenity/realistic-sports-bra".to_owned()],
+                    about: None,
+                    finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
                 },
-                slot: None,
-                layer: None,
-                margin: 0.002,
-                under: vec!["axcenity/realistic-sports-bra".to_owned()],
-                about: None,
-                finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
-            })
+                ImportOptions {
+                    skip_hiding: kept,
+                    ..ImportOptions::default()
+                },
+            )
             .expect("the test tee imports");
+            if kept {
+                let path = made.join(&imported.manifest_path);
+                let mut manifest = imported.manifest.clone();
+                for (mask, under) in TEE_MASKS
+                    .iter()
+                    .zip([None, Some("axcenity/realistic-sports-bra")])
+                {
+                    if tee_fixtures().join(mask).is_file() {
+                        std::fs::copy(tee_fixtures().join(mask), made.join(TEE).join(mask))
+                            .unwrap();
+                        manifest.hide_maps.push(axcenity_avatar::HideMap {
+                            under: under.map(str::to_owned),
+                            map: (*mask).to_owned(),
+                        });
+                    }
+                }
+                std::fs::write(path, manifest.to_json()).unwrap();
+            }
             // What it hides, and what it covers at rest but leaves drawn
-            // because the skin comes out from under it in a fit pose.
+            // whole.
             println!(
-                "the test tee hides {:?}; not {:?}",
+                "the test tee hides {:?} and {:?}; not whole {:?}",
                 imported.manifest.hides,
+                imported.hiding,
                 imported
                     .unhidden
                     .iter()
@@ -123,8 +159,18 @@ pub(super) fn gate_library() -> &'static Path {
 }
 
 fn tee_source() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee/TestTee.obj")
+    tee_fixtures().join("TestTee.obj")
 }
+
+/// The test tee's folder (`avatar`'s `tests/fixtures/test-tee`).
+pub(super) fn tee_fixtures() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee")
+}
+
+/// The test tee's masks (its import's, trimmed to the runtime by
+/// `hide_trim_tests` and kept beside it).
+pub(super) const TEE_MASKS: [&str; 2] =
+    ["TestTee.hide.png", "TestTee.hide.realistic-sports-bra.png"];
 
 /// Where the gate's libraries are kept: beside this test binary's
 /// profile folder (`target/debug/fit-gate`), not the system's temporary
@@ -235,6 +281,9 @@ pub(super) struct Posed {
     pub positions: Vec<Vec3>,
     pub normals: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
+    /// The triangles its model leaves out (hidden regions, or what the
+    /// items over it hide: wave 5), over the same corners.
+    pub hidden: Vec<[u32; 3]>,
 }
 
 fn posed(
@@ -270,6 +319,13 @@ pub(super) fn posed_at(
         positions: Vec::new(),
         normals: Vec::new(),
         triangles: Vec::new(),
+        hidden: Vec::new(),
+    };
+    // The model it is made from with nothing left out, when it leaves
+    // some triangles out.
+    let whole: Option<std::sync::Arc<Model>> = match axcenity_assets::split_hidden(&mesh_id) {
+        (base, Some(_)) => assets.model_blocking(base),
+        _ => None,
     };
     for (index, primitive) in model.primitives.iter().enumerate() {
         let start = out.positions.len() as u32;
@@ -296,6 +352,23 @@ pub(super) fn posed_at(
                 .chunks_exact(3)
                 .map(|t| [t[0] + start, t[1] + start, t[2] + start]),
         );
+        if let Some(whole) = whole.as_ref().and_then(|w| w.primitives.get(index)) {
+            let all = if level == 0 {
+                &whole.indices
+            } else {
+                &whole.lods[level - 1].indices
+            };
+            let drawn: std::collections::HashSet<[u32; 3]> = indices
+                .chunks_exact(3)
+                .map(|t| [t[0], t[1], t[2]])
+                .collect();
+            out.hidden.extend(
+                all.chunks_exact(3)
+                    .map(|t| [t[0], t[1], t[2]])
+                    .filter(|t| !drawn.contains(t))
+                    .map(|t| t.map(|v| v + start)),
+            );
+        }
     }
     out
 }
@@ -466,6 +539,17 @@ pub(super) fn poke_through(
     garment: &Posed,
     covered: &[bool],
 ) -> (usize, f32) {
+    poke_through_counting(label, under, garment, covered, count_hidden())
+}
+
+/// [`poke_through`], counting hidden corners too when `hidden_too`.
+fn poke_through_counting(
+    label: &str,
+    under: &Posed,
+    garment: &Posed,
+    covered: &[bool],
+    hidden_too: bool,
+) -> (usize, f32) {
     let surface = Surface::new(
         garment.positions.clone(),
         garment.normals.clone(),
@@ -475,6 +559,17 @@ pub(super) fn poke_through(
     for t in &under.triangles {
         for v in t {
             drawn[*v as usize] = true;
+        }
+    }
+    // Hidden skin (or a hidden part of a lower layer) can't be seen, so it
+    // isn't counted (wave 5: hiding under clothing; the hole check holds
+    // it). For comparison with the count before, which counted it,
+    // `AXCENITY_FIT_GATE_COUNT_HIDDEN=1`: never for a record.
+    if hidden_too {
+        for t in &under.hidden {
+            for v in t {
+                drawn[*v as usize] = true;
+            }
         }
     }
     // For comparing with the measure before wave 5 (the closest point
@@ -539,6 +634,12 @@ pub(super) fn poke_through(
 /// How far from a corner the gate looks for the garment over it.
 const POKE_REACH: f32 = 0.05;
 
+/// Whether poke-through counts hidden skin too (the count before wave 5's
+/// hiding under clothing), for comparison: `AXCENITY_FIT_GATE_COUNT_HIDDEN`.
+fn count_hidden() -> bool {
+    std::env::var_os("AXCENITY_FIT_GATE_COUNT_HIDDEN").is_some()
+}
+
 /// Where the way out from a corner at `p` along its normal `n` first meets
 /// `garment` (within [`POKE_REACH`]) from the garment's inside, the corner
 /// is enclosed there: how far it is out along that cloth's normal
@@ -588,46 +689,142 @@ pub(super) fn hidden_triangles(bare: &Posed, dressed: &Posed) -> Vec<[u32; 3]> {
         .collect()
 }
 
-/// Holes: how many corners of the body's `hidden` triangles (left out of
-/// the drawing by the worn items, [`hidden_triangles`]) are more than
-/// `POKE` outside every garment in this pose (`avatar::fit::outside_cloth`,
-/// the rule the import hides regions by), and the worst. Hiding a region takes its skin out of [`poke_through`]'s count,
-/// so this is what keeps hiding honest: hidden skin the cloth doesn't
-/// cover in a pose is a hole a player sees through.
+/// Holes (wave 5, hiding under clothing): how many places of the body's
+/// `hidden` triangles (left out of the drawing by the worn items,
+/// [`hidden_triangles`]), and of the triangles each garment's own model
+/// leaves out (a lower layer the items over it hide), show in this pose:
+/// seen from any view direction round the character, up and down, and up
+/// and down each garment's openings, their place isn't behind cloth or
+/// drawn skin facing the viewer (`avatar::fit::holes_seen`: the
+/// background, or the inside of a garment, would show where skin should
+/// be). Places are each hidden triangle's corners and middle. The worst
+/// is the farthest such place from the nearest cloth. Hidden skin isn't
+/// counted by [`poke_through`], so this is what keeps hiding honest.
 pub(super) fn holes(
     label: &str,
     body: &Posed,
     hidden: &[[u32; 3]],
     garments: &[Posed],
 ) -> (usize, f32) {
-    let surfaces: Vec<Surface> = garments
-        .iter()
-        .filter(|g| !is_footwear(g))
-        .map(|g| Surface::new(g.positions.clone(), g.normals.clone(), g.triangles.clone()))
-        .collect();
-    let mut all = body.triangles.clone();
-    all.extend_from_slice(hidden);
-    let skin = Surface::new(body.positions.clone(), body.normals.clone(), all);
-    let mut corners: Vec<u32> = hidden.iter().flatten().copied().collect();
-    corners.sort_unstable();
-    corners.dedup();
-    let mut count = 0;
+    let seen = holes_found(body, hidden, garments, false);
     let mut worst = f32::NEG_INFINITY;
-    for k in corners {
-        let (p, n) = (body.positions[k as usize], body.normals[k as usize]);
-        let out = outside_cloth(&surfaces, &skin, p, n);
-        worst = worst.max(out);
-        if out > POKE {
-            count += 1;
-            if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
-                println!(
-                    "  {label} hole: hidden corner {k} out {:.1} mm at {p} (normal {n})",
-                    out * 1000.0
-                );
-            }
+    for hole in &seen {
+        worst = worst.max(hole.depth);
+        if std::env::var_os("AXCENITY_FIT_GATE_DEBUG").is_some() {
+            println!(
+                "  {label} hole: hidden {} at {} seen from {} ({:.1} mm from the cloth)",
+                hole.mesh,
+                hole.seen.at,
+                hole.seen.toward,
+                hole.depth * 1000.0
+            );
         }
     }
-    (count, worst)
+    (seen.len(), worst)
+}
+
+/// A hidden place that shows ([`holes_found`]): the mesh it is on (the
+/// body or a garment, by name), where and how it shows, the hidden
+/// triangles (of that mesh's) whose place it is (a corner's every hidden
+/// triangle, or the one whose middle it is), and how far it is from the
+/// nearest cloth.
+pub(super) struct FoundHole {
+    pub mesh: String,
+    pub seen: axcenity_avatar::fit::SeenHole,
+    pub triangles: Vec<[u32; 3]>,
+    pub depth: f32,
+}
+
+/// The hidden places of [`holes`] that show, each with its triangles;
+/// with `fine`, from more views than the gate's (`Views::fine`).
+pub(super) fn holes_found(
+    body: &Posed,
+    hidden: &[[u32; 3]],
+    garments: &[Posed],
+    fine: bool,
+) -> Vec<FoundHole> {
+    let cloth: Vec<Surface> = garments
+        .iter()
+        .map(|g| Surface::new(g.positions.clone(), g.normals.clone(), g.triangles.clone()))
+        .collect();
+    let skin = Surface::new(
+        body.positions.clone(),
+        body.normals.clone(),
+        body.triangles.clone(),
+    );
+    let mut drawn: Vec<&Surface> = cloth.iter().collect();
+    drawn.push(&skin);
+    let cloth_refs: Vec<&Surface> = cloth.iter().collect();
+    let openings: Vec<Openings> = garments
+        .iter()
+        .map(|g| {
+            let mut whole = g.triangles.clone();
+            whole.extend_from_slice(&g.hidden);
+            Openings::new(&g.positions, &whole)
+        })
+        .collect();
+    let refs: Vec<&Openings> = openings.iter().collect();
+    let views = if fine {
+        Views::fine(&refs)
+    } else {
+        Views::new(&refs)
+    };
+    let mut seen = Vec::new();
+    let layers = garments
+        .iter()
+        .map(|g| (g.name.as_str(), g, g.hidden.as_slice()));
+    for (name, posed, hidden) in std::iter::once((body.name.as_str(), body, hidden)).chain(layers) {
+        if hidden.is_empty() {
+            continue;
+        }
+        let found = holes_seen(
+            hidden,
+            &posed.positions,
+            &posed.normals,
+            &drawn,
+            &cloth_refs,
+            &views,
+        );
+        for hole in found {
+            let triangles = match (hole.corner, hole.middle) {
+                (Some(k), _) => hidden.iter().copied().filter(|t| t.contains(&k)).collect(),
+                (None, Some(t)) => vec![hidden[t]],
+                _ => Vec::new(),
+            };
+            let depth = cloth_refs
+                .iter()
+                .filter_map(|c| c.closest(hole.at, 1.0))
+                .map(|hit| hit.distance)
+                .fold(f32::INFINITY, f32::min);
+            seen.push(FoundHole {
+                mesh: name.to_owned(),
+                seen: hole,
+                triangles,
+                depth,
+            });
+        }
+    }
+    seen
+}
+
+/// What wearing `dressed` hides at rest (wave 5, hiding under clothing):
+/// how many body triangles `bare` (the same body with nothing worn over its
+/// underwear) draws and `dressed` doesn't, and each worn part's own hidden
+/// triangles (a lower layer under a garment), by name.
+pub(super) fn hidden_at_rest(
+    assets: &Assets,
+    bare: &Description,
+    dressed: &Description,
+) -> (usize, Vec<(String, usize)>) {
+    let (body, _) = worn(assets, bare, Stance::Rest);
+    let (worn_body, garments) = worn(assets, dressed, Stance::Rest);
+    (
+        hidden_triangles(&body, &worn_body).len(),
+        garments
+            .iter()
+            .map(|g| (g.name.clone(), g.hidden.len()))
+            .collect(),
+    )
 }
 
 /// The name holes are recorded under in the gate.
@@ -664,7 +861,11 @@ pub(super) struct Cover {
     layers: Vec<(&'static str, &'static str, Vec<bool>)>,
     /// The body triangles the worn items hide ([`hidden_triangles`]),
     /// checked for holes in every pose.
-    hidden: Vec<[u32; 3]>,
+    pub hidden: Vec<[u32; 3]>,
+    /// Whether [`measure`] checks holes (an outfit that hides much checks
+    /// them in tests of their own, `wardrobe_tests`: too slow beside the
+    /// rest in a test's two minutes).
+    pub holes: bool,
 }
 
 /// `bare` is the same body at rest with nothing worn, to find the skin
@@ -672,6 +873,7 @@ pub(super) struct Cover {
 pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed], bare: &Posed) -> Cover {
     let find = |name: &str| garments.iter().find(|g| g.name == name);
     Cover {
+        holes: true,
         hidden: hidden_triangles(bare, body),
         body: garments
             .iter()
@@ -807,8 +1009,8 @@ pub(super) fn measure(
         checked += 1;
         fail(&format!("{lower} through {upper}"), count, worst);
     }
-    // Holes: skin the worn items hide that their cloth doesn't cover here.
-    if !cover.hidden.is_empty() {
+    // Holes: skin (or a lower layer) the worn items hide that shows here.
+    if cover.holes && (!cover.hidden.is_empty() || garments.iter().any(|g| !g.hidden.is_empty())) {
         let label = format!("{name} {}", pose_name(stance));
         let (count, worst) = holes(&label, body, &cover.hidden, garments);
         checked += 1;
@@ -1262,6 +1464,7 @@ fn sheet(name: &str, size: f32, cells: u32, z: f32) -> Posed {
         positions: Vec::new(),
         normals: Vec::new(),
         triangles: Vec::new(),
+        hidden: Vec::new(),
     };
     for j in 0..=cells {
         for i in 0..=cells {
@@ -1291,6 +1494,7 @@ fn skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered() {
         positions: vec![Vec3::new(0.0, 0.0, -0.025)],
         normals: vec![Vec3::Z],
         triangles: Vec::new(),
+        hidden: Vec::new(),
     };
     let cloth = sheet("Cloth", 0.2, 10, 0.0);
     assert_eq!(covered(&skin, &cloth, 0.04), [true]);
@@ -1324,6 +1528,7 @@ fn corner(at: Vec3, normal: Vec3) -> Posed {
         positions: vec![at],
         normals: vec![normal.normalize()],
         triangles: vec![[0, 0, 0]],
+        hidden: Vec::new(),
     }
 }
 
@@ -1394,32 +1599,72 @@ fn skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out() {
     assert!((worst - 0.005).abs() < 1e-4, "{worst}");
 }
 
+/// Wave 5, hiding under clothing: skin a garment hides isn't counted
+/// through it (it can't be seen), unless the count before is asked for;
+/// hidden skin under cloth facing out shows nowhere, and under cloth
+/// flipped towards it (back faces aren't drawn) it shows: a hole.
+#[test]
+fn hidden_skin_isnt_counted_through_the_cloth_and_shows_only_through_a_hole() {
+    // Skin: a 10 cm square, its middle cell's two triangles hidden, its
+    // middle corner 5 mm out through the cloth 1 cm over it.
+    let mut skin = sheet("Body", 0.1, 2, 0.0);
+    skin.positions[4].z = 0.015;
+    let middle: Vec<[u32; 3]> = skin
+        .triangles
+        .iter()
+        .copied()
+        .filter(|t| t.contains(&4))
+        .collect();
+    skin.triangles.retain(|t| !t.contains(&4));
+    skin.hidden = middle.clone();
+    let cloth = sheet("Cloth", 0.3, 6, 0.01);
+    let covered = vec![true; skin.positions.len()];
+    let (count, _) = poke_through_counting("hidden", &skin, &cloth, &covered, false);
+    assert_eq!(count, 0);
+    let (count, worst) = poke_through_counting("counted", &skin, &cloth, &covered, true);
+    assert_eq!(count, 1);
+    assert!((worst - 0.005).abs() < 1e-4, "{worst}");
+
+    // Holes: none under the cloth facing out.
+    let (count, _) = holes("cloth", &skin, &middle, std::slice::from_ref(&cloth));
+    assert_eq!(count, 0);
+    // The cloth flipped towards the skin isn't drawn from above: its
+    // places show.
+    let mut flipped = cloth.clone();
+    for t in &mut flipped.triangles {
+        t.swap(1, 2);
+    }
+    flipped.normals.fill(-Vec3::Z);
+    let (count, _) = holes("flipped", &skin, &middle, std::slice::from_ref(&flipped));
+    assert!(count > 0);
+    // A lower layer's own hidden triangles (the bra under a tee) are
+    // checked too: the skin drawn whole, the cloth as a layer whose
+    // middle is hidden, under nothing.
+    let mut layer = cloth.clone();
+    layer.name = "Underwear".to_owned();
+    let hidden_layer: Vec<[u32; 3]> = layer.triangles.drain(..4).collect();
+    layer.hidden = hidden_layer;
+    let whole = sheet("Body", 0.1, 2, 0.0);
+    let (count, _) = holes("layer", &whole, &[], std::slice::from_ref(&layer));
+    assert!(count > 0);
+}
+
 /// Wearing the tee leaves the regions it covers whole, in every fit pose,
 /// out of the body drawn (a model with hidden regions, made live), and
 /// taking it off puts them back.
 #[test]
-fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
+fn wearing_the_tee_hides_the_skin_it_encloses_and_taking_it_off_shows_it() {
     let stage = Stage::new("fit-gate-hiding", gate_library()).expect("the stage");
     let library = Library::read(gate_library()).0;
     let tee = library.item(TEE).unwrap();
     // The tee covers the torso, the waist and the upper arm under its
-    // sleeve (`upper_arms_top`, `upper_arms_mid`) whole at rest, but hides
-    // only the waist (review fixes 2): in the fit's poses the torso's skin
-    // comes out at the front of the armpit and the side under the arm, and
-    // the upper arm's past the sleeve's end as it rides up, so hiding them
-    // left holes (`avatar::fit::pose_safe_hides`). Never the rest of the
-    // upper arm, nor the neck.
-    assert!(tee.hides.contains(&"waist".to_owned()), "{:?}", tee.hides);
-    for region in [
-        "torso",
-        "upper_arms_top",
-        "upper_arms_mid",
-        "neck",
-        "upper_arms_low",
-        "forearms",
-    ] {
-        assert!(!tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
-    }
+    // sleeve whole at rest, but hides no whole region (wave 5: the waist,
+    // which the pose-safe rule hid, is seen from below up the hem); it
+    // hides what it encloses and can't be seen triangle by triangle, the
+    // body's and the sports bra's (`hide_maps`).
+    assert!(tee.hides.is_empty(), "{:?}", tee.hides);
+    let unders: Vec<Option<&str>> = tee.hide_maps.iter().map(|m| m.under.as_deref()).collect();
+    assert_eq!(unders, [None, Some("axcenity/realistic-sports-bra")]);
     let mut description = bodies()
         .into_iter()
         .find(|d| d.name == "realistic-masculine-cast-average")
@@ -1433,7 +1678,9 @@ fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
         bare.triangles.len(),
         dressed.triangles.len()
     );
-    assert!(hidden >= 200, "{hidden} triangles hidden");
+    // What its masks hide, trimmed to the runtime (wave 5): 11 triangles.
+    // They change only when the masks are made again.
+    assert!(hidden >= 11, "{hidden} triangles hidden");
     // The corners stay the same: only what is drawn changes.
     assert_eq!(bare.positions.len(), dressed.positions.len());
     description.items.retain(|worn| worn.id != TEE);

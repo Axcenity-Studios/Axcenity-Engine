@@ -1,0 +1,43 @@
+Red run, wave 5 body-hiding (2026-11-19): the new tests against the implementation stubbed out
+(hidden_under hides nothing, holes_seen finds nothing, masks aren't read, resolve lists no masks,
+hide_maps aren't checked, the gate counts no hole and never counts hidden skin).
+cargo nextest run -p axcenity-avatar -p axcenity-assets -p axcenity-player --no-fail-fast -E 'test(enclosure::) | test(hiding_under_clothing) | test(a_mask_leaves) | test(hidden_skin_isnt) | test(the_licensed_tee_hides) | test(the_wardrobe_hides)'
+The three that pass test format and geometry helpers the stubs leave alone (the round trip, the mask's texels, the openings).
+
+        FAIL [   0.008s] ( 1/14) axcenity-avatar fit::enclosure::tests::skin_seen_up_an_opening_stays_drawn
+        FAIL [   0.011s] ( 2/14) axcenity-avatar fit::enclosure::tests::cloth_flipped_towards_the_skin_hides_nothing
+        FAIL [   0.013s] ( 3/14) axcenity-avatar fit::enclosure::tests::a_tube_over_a_cylinder_hides_the_skin_it_encloses_away_from_its_openings
+        PASS [   0.016s] ( 4/14) axcenity-avatar tests::hiding_under_clothing::hide_maps_round_trip_and_an_item_without_them_reads_as_before
+        PASS [   0.021s] ( 5/14) axcenity-avatar fit::enclosure::tests::a_masks_middles_read_each_triangles_own_value
+        FAIL [   0.024s] ( 6/14) axcenity-avatar fit::enclosure::tests::a_gap_that_opens_in_a_pose_keeps_the_skin_round_it_drawn
+        FAIL [   0.027s] ( 7/14) axcenity-avatar fit::enclosure::tests::skin_out_through_the_cloth_is_hidden_and_the_cloth_behind_it_is_seen
+        FAIL [   0.031s] ( 8/14) axcenity-avatar tests::hiding_under_clothing::a_worn_items_masks_resolve_for_the_body_and_the_layers_worn_under_it
+        PASS [   0.037s] ( 9/14) axcenity-avatar fit::enclosure::tests::a_tubes_openings_are_its_ends
+        FAIL [   0.039s] (10/14) axcenity-avatar tests::hiding_under_clothing::a_hide_map_must_be_a_path_name_another_item_and_be_one_per_model
+        FAIL [   0.060s] (11/14) axcenity-assets hidden::tests::a_mask_leaves_out_the_triangles_over_its_red_texels
+        FAIL [   0.104s] (12/14) axcenity-player::bin/axcenity-player fit_gate_tests::hidden_skin_isnt_counted_through_the_cloth_and_shows_only_through_a_hole
+        FAIL [   1.067s] (13/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_hides_the_skin_and_underwear_it_encloses
+        FAIL [   1.302s] (14/14) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_hides_the_skin_and_underwear_it_encloses
+     Summary [   1.304s] 14 tests run: 3 passed, 11 failed, 720 skipped
+
+    thread 'fit::enclosure::tests::skin_seen_up_an_opening_stays_drawn' (34776) panicked at crates\avatar\src\fit\enclosure_tests.rs:154:5:
+    thread 'fit::enclosure::tests::cloth_flipped_towards_the_skin_hides_nothing' (45604) panicked at crates\avatar\src\fit\enclosure_tests.rs:236:5:
+    thread 'fit::enclosure::tests::a_tube_over_a_cylinder_hides_the_skin_it_encloses_away_from_its_openings' (44944) panicked at crates\avatar\src\fit\enclosure_tests.rs:118:13:
+    z -0.096666664 is drawn: HideReport { cases: 0, enclosed: 0, far: 0, opening: 0, seen: 0, hidden: [] }
+    thread 'fit::enclosure::tests::a_gap_that_opens_in_a_pose_keeps_the_skin_round_it_drawn' (45912) panicked at crates\avatar\src\fit\enclosure_tests.rs:204:17:
+    z 0.103333354 under the upper half is drawn: HideReport { cases: 0, enclosed: 0, far: 0, opening: 0, seen: 0, hidden: [] }
+    thread 'fit::enclosure::tests::skin_out_through_the_cloth_is_hidden_and_the_cloth_behind_it_is_seen' (13484) panicked at crates\avatar\src\fit\enclosure_tests.rs:273:13:
+    thread 'tests::hiding_under_clothing::a_worn_items_masks_resolve_for_the_body_and_the_layers_worn_under_it' (24748) panicked at crates\avatar\src\tests\hiding_under_clothing.rs:72:5:
+      left: []
+     right: [(None, "test/items/tee.hide.png", "test/tee"), (Some("test/watch"), "test/items/tee.hide.watch.png", "test/tee")]
+    thread 'tests::hiding_under_clothing::a_hide_map_must_be_a_path_name_another_item_and_be_one_per_model' (37820) panicked at crates\avatar\src\tests\hiding_under_clothing.rs:54:5:
+    thread 'hidden::tests::a_mask_leaves_out_the_triangles_over_its_red_texels' (39464) panicked at crates\assets\src\hidden.rs:311:9:
+      left: 2
+     right: 1
+    thread 'fit_gate_tests::hidden_skin_isnt_counted_through_the_cloth_and_shows_only_through_a_hole' (8772) panicked at crates\player\src\fit_gate_tests.rs:1543:5:
+      left: 0
+     right: 1
+    thread 'tee_crew_tests::the_licensed_tee_hides_the_skin_and_underwear_it_encloses' (20936) panicked at crates\player\src\tee_crew_tests.rs:185:9:
+    realistic-masculine-cast-average: 0 hidden, at least 1
+    thread 'wardrobe_tests::the_wardrobe_hides_the_skin_and_underwear_it_encloses' (6004) panicked at crates\player\src\wardrobe_tests.rs:73:9:
+    realistic-masculine-cast-average: 0 hidden, at least 1

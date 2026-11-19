@@ -21,8 +21,8 @@ use axcenity_core::{ClassName, Value};
 
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
 use super::fit_gate_tests::{
-    Failure, Known, Posed, WALK, WALK_FRAMES, bodies, check, cover_at_rest, measure, measure_walk,
-    poke_through, pose_name, posed_at, undressed, worn,
+    Failure, Known, Posed, WALK, WALK_FRAMES, bodies, check, cover_at_rest, hidden_at_rest,
+    measure, measure_walk, poke_through, pose_name, posed_at, undressed, worn,
 };
 use super::garment_checks::{Record, check_motion};
 
@@ -167,6 +167,50 @@ fn the_licensed_tee_covers_the_cast_with_the_elbows_bent() {
 fn the_licensed_tee_covers_the_cast_with_the_knees_bent() {
     tee_gate(Stance::Held(HeldPose::KneesBent), &KNEES_BENT);
 }
+
+/// Wave 5, hiding under clothing: wearing the tee leaves out the skin it
+/// encloses (`Shirt_TeeCrew.hide.png`) and the underwear's (the sports bra
+/// on the feminine frame), and taking it off puts them back. The gate's
+/// hole check holds them in every pose (the gate tests above).
+#[test]
+fn the_licensed_tee_hides_the_skin_and_underwear_it_encloses() {
+    let stage = Stage::new("tee-crew-hiding", &repository_library()).expect("the stage");
+    for (name, skin_least, bra_least) in [
+        ("realistic-masculine-cast-average", HIDES_SKIN.0, 0),
+        ("realistic-feminine-cast-average", HIDES_SKIN.1, HIDES_BRA),
+    ] {
+        let description = bodies().into_iter().find(|d| d.name == name).unwrap();
+        let (skin, parts) = hidden_at_rest(&stage.assets, &description, &dressed(&description));
+        println!("{name}: {skin} body triangles hidden; parts {parts:?}");
+        assert!(
+            skin >= skin_least,
+            "{name}: {skin} hidden, at least {skin_least}"
+        );
+        let bra = parts
+            .iter()
+            .find(|(part, _)| part == "Underwear_Bra")
+            .map_or(0, |(_, n)| *n);
+        assert!(
+            bra >= bra_least,
+            "{name}: the bra {bra} hidden, at least {bra_least}"
+        );
+        // The tee's own triangles are all drawn.
+        assert!(
+            parts.iter().any(|(part, n)| part == PART && *n == 0),
+            "{parts:?}"
+        );
+        let (again, parts) = hidden_at_rest(&stage.assets, &description, &description);
+        assert_eq!(again, 0);
+        assert!(parts.iter().all(|(_, n)| *n == 0), "{parts:?}");
+    }
+}
+
+/// How many body triangles the tee hides at least (masculine, feminine
+/// average) and of the sports bra's: what the masks hid when made (wave
+/// 5, `refinement/wave5/body-hiding.md`), less nothing. They change only
+/// when the masks are made again.
+const HIDES_SKIN: (usize, usize) = (25, 25);
+const HIDES_BRA: usize = 74;
 
 /// The body and the tee's part at rest, the tee at its level of detail
 /// `level`.

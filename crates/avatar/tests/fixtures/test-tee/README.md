@@ -18,3 +18,7 @@ Remake it (Blender's Python, bpy 5.x):
 ```bash
 python -I crates/avatar/tests/fixtures/test-tee/make_test_tee.py --body assets/characters/realistic/RealisticParts.glb --out crates/avatar/tests/fixtures/test-tee
 ```
+
+## Masks (wave 5, hiding under clothing)
+
+`TestTee.hide.png` (the body) and `TestTee.hide.realistic-sports-bra.png` (the sports bra, by triangle number) are the masks of what the test tee hides under it, made by its import and trimmed to the runtime (`player` `hide_trim_tests`, `AXCENITY_TRIM=test-tee`). The fit gate puts them in place of its import's own and skips making them. If the tee or its fit changes, delete them, let the gate import the tee again (it then makes its own) and trim them again.

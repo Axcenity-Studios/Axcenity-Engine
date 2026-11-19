@@ -51,7 +51,8 @@
 //!   [`VIEWS`] and [`MORE_VIEWS`]: the six above and `face-three-quarter`,
 //!   `face-side`, `skin-close`; from [`HAIR_VIEWS`], R6: `hair-back`,
 //!   `hair-top`, `hair-hairline`, `hair-temple`, `hair-crown`,
-//!   `hair-nape`). The sheet has a row per light and a column per view,
+//!   `hair-nape`; from [`OPENING_VIEWS`], wave 5: `hem-up-front`,
+//!   `hem-up-back`, `neck-down`, `sleeve-up`). The sheet has a row per light and a column per view,
 //!   as before.
 //! - `AXCENITY_CAPTURE_POSE` also takes the held poses of the brief's body
 //!   tests ([`HeldPose`]): `t-pose`, `arms-raised`, `elbows-bent`,
@@ -215,6 +216,38 @@ pub(crate) const HAIR_VIEWS: [View; 6] = [
     },
 ];
 
+/// Cameras looking into a garment's openings (wave 5, hiding under
+/// clothing: the hole check's views up and down the openings), drawn only
+/// when named, like [`MORE_VIEWS`]: up under the hem from the front and
+/// the back, down the neck from above, and up a sleeve from below at the
+/// character's right side.
+pub(crate) const OPENING_VIEWS: [View; 4] = [
+    View {
+        name: "hem-up-front",
+        eye: [0.0, 0.9, -2.6],
+        target: [0.0, 3.2, 0.0],
+        fov: 40.0,
+    },
+    View {
+        name: "hem-up-back",
+        eye: [0.0, 0.9, 2.6],
+        target: [0.0, 3.2, 0.0],
+        fov: 40.0,
+    },
+    View {
+        name: "neck-down",
+        eye: [0.0, 6.6, -1.2],
+        target: [0.0, 3.6, 0.0],
+        fov: 35.0,
+    },
+    View {
+        name: "sleeve-up",
+        eye: [-2.4, 2.2, -0.6],
+        target: [-0.5, 3.8, 0.0],
+        fov: 40.0,
+    },
+];
+
 /// A lighting preset: the time of day (which places the sun), the ambient
 /// light, and the backdrop's and floor's colours.
 pub(crate) struct Light {
@@ -370,12 +403,14 @@ pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
                 .iter()
                 .chain(&MORE_VIEWS)
                 .chain(&HAIR_VIEWS)
+                .chain(&OPENING_VIEWS)
                 .find(|view| view.name == name)
                 .ok_or_else(|| {
                     let known: Vec<&str> = VIEWS
                         .iter()
                         .chain(&MORE_VIEWS)
                         .chain(&HAIR_VIEWS)
+                        .chain(&OPENING_VIEWS)
                         .map(|v| v.name)
                         .collect();
                     format!("no view `{name}` (there are {})", known.join(", "))
@@ -770,6 +805,10 @@ fn copy_library(from: &Path, to: &Path) -> Result<(), String> {
         files.extend(library.manifest_path(id).map(str::to_owned));
         for model in item.models() {
             files.extend(library.path_of(id, &model.file));
+        }
+        // What it hides under it (wave 5, hiding under clothing).
+        for hide in &item.hide_maps {
+            files.extend(library.path_of(id, &hide.map));
         }
         if let Some(strands) = item.groom.as_ref().and_then(|g| g.strands.as_deref()) {
             files.extend(library.path_of(id, strands));

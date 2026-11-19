@@ -40,7 +40,7 @@ use std::time::SystemTime;
 use axcenity_assets::Assets;
 use axcenity_avatar::{
     Description, LIBRARY_FOLDER, Library, MaterialValue, MaterialValues, PartFit, Problem,
-    ResolvedPart,
+    Resolved, ResolvedPart,
 };
 use axcenity_core::{
     ClassName, Color3, InstanceId, MATERIAL_VALUE_PREFIX, Value, World, material_value_attribute,
@@ -282,6 +282,7 @@ pub fn apply_description(
         base,
         mesh_id(&resolved.body.model),
         &resolved.hidden_regions,
+        &masks_for(&resolved, None),
     );
     let current = text_property(world, body, "MeshId");
     if current != wanted {
@@ -391,7 +392,16 @@ pub fn apply_description(
                 None => continue,
             },
         };
-        let wanted = mesh_id(&part.model);
+        // A lower layer keeps out the triangles the items over it hide
+        // (wave 5, hiding under clothing).
+        let wanted = match &part.item {
+            Some(item) => hidden_part(
+                assets,
+                mesh_id(&part.model),
+                masks_for(&resolved, Some(item)),
+            ),
+            None => mesh_id(&part.model),
+        };
         if text_property(world, instance, "MeshId") != wanted {
             let _ = world.set_property(instance, "MeshId", Value::String(wanted));
         }
@@ -502,15 +512,27 @@ pub fn is_baked(world: &World, character: InstanceId) -> bool {
     })
 }
 
-/// The body's `MeshId` with the map regions in `hidden` left out (CO9,
-/// `axcenity_assets::RegionHiding`): its base's own when nothing worn
-/// hides a region of the base's region map.
+/// The masks the worn items hide `under`'s triangles by (`None`: the
+/// body's), as project paths.
+fn masks_for(resolved: &Resolved, under: Option<&String>) -> Vec<String> {
+    resolved
+        .hide_maps
+        .iter()
+        .filter(|hide| hide.under.as_ref() == under)
+        .map(|hide| format!("{LIBRARY_FOLDER}/{}", hide.map))
+        .collect()
+}
+
+/// The body's `MeshId` with the map regions in `hidden` and the triangles
+/// `masks` mark left out (CO9, wave 5; `axcenity_assets::RegionHiding`):
+/// its base's own when nothing worn hides any of it.
 fn hidden_body(
     assets: &Assets,
     library: &Library,
     base: &axcenity_avatar::BaseManifest,
     body: String,
     hidden: &[String],
+    masks: &[String],
 ) -> String {
     let indices: Vec<u8> = hidden
         .iter()
@@ -521,16 +543,37 @@ fn hidden_body(
         .regions_map
         .as_deref()
         .and_then(|map| library.path_of(&base.id, map));
-    match map {
-        Some(map) if !indices.is_empty() => assets.hide_regions(
-            &body,
-            &Arc::new(axcenity_assets::RegionHiding {
-                map: format!("{LIBRARY_FOLDER}/{map}"),
-                hidden: indices,
-            }),
-        ),
-        _ => body,
+    let (map, indices) = match map {
+        Some(map) => (format!("{LIBRARY_FOLDER}/{map}"), indices),
+        None => (String::new(), Vec::new()),
+    };
+    if indices.is_empty() && masks.is_empty() {
+        return body;
     }
+    assets.hide_regions(
+        &body,
+        &Arc::new(axcenity_assets::RegionHiding {
+            map,
+            hidden: indices,
+            masks: masks.to_vec(),
+        }),
+    )
+}
+
+/// A worn part's `MeshId` with the triangles `masks` mark left out (a
+/// lower layer under a garment that hides it): its own when none does.
+fn hidden_part(assets: &Assets, part: String, masks: Vec<String>) -> String {
+    if masks.is_empty() {
+        return part;
+    }
+    assets.hide_regions(
+        &part,
+        &Arc::new(axcenity_assets::RegionHiding {
+            map: String::new(),
+            hidden: Vec::new(),
+            masks,
+        }),
+    )
 }
 
 /// How a worn part is told apart from the others: its item, or its model

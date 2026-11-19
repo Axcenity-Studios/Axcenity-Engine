@@ -55,7 +55,7 @@ pub use content_state::{check_declared_state, production_slots};
 pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{
-    Adjust, ContentTier, Fit, Groom, ITEM_VERSION, ItemKind, ItemManifest, ItemParameter,
+    Adjust, ContentTier, Fit, Groom, HideMap, ITEM_VERSION, ItemKind, ItemManifest, ItemParameter,
     Limitation, Origin, Quality, Source, Variant,
 };
 pub use library::{LIBRARY_FOLDER, Library};
@@ -81,7 +81,8 @@ pub use provenance::{
 };
 pub use randomize::{Scope, random_span, randomize};
 pub use resolve::{
-    PartFit, Resolved, ResolvedPart, body_shape_weights, parameter_values, resolve, span,
+    PartFit, Resolved, ResolvedHideMap, ResolvedPart, body_shape_weights, parameter_values,
+    resolve, span,
 };
 pub use skin::{Skin, SkinLayer, SkinLayerKind, SkinLayerSpec, skin_layer_value};
 

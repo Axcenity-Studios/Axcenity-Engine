@@ -13,9 +13,12 @@ use axcenity_assets::Assets;
 use glam::Vec3;
 
 use super::coverage::{RegionMap, classify, coverage, hidden_regions, triangle_regions};
+use super::enclosure::{
+    HIDE_RULE, HideInput, HideReport, hide_under, layer_masks, write_hide_maps,
+};
 use super::glb::{FittedModel, write_fitted_glb};
 use super::hiding::pose_safe_hides;
-use super::pose::{FinishPose, fit_poses};
+use super::pose::{FinishPose, fit_poses, hide_poses};
 use super::surface::Surface;
 use super::thumbnail::{thumbnail, write_png};
 use super::transfer::{FitOptions, FitReport, Layer, carried_shapes, extremes_near, fit_garment};
@@ -83,11 +86,16 @@ pub struct Imported {
     pub report: FitReport,
     /// The share of each region it covers, by region ID.
     pub coverage: Vec<(String, f32)>,
-    /// Regions it covers whole at rest but doesn't hide, because their
-    /// skin comes out from under it in a fit pose
-    /// ([`pose_safe_hides`](super::pose_safe_hides)), with the farthest
-    /// it came out (metres).
+    /// Regions it covers whole at rest, which it doesn't hide whole (since
+    /// wave 5 nothing is hidden by region: `hide_maps` hides triangle by
+    /// triangle), with the farthest their skin came out from under it in
+    /// a fit pose ([`pose_safe_hides`](super::pose_safe_hides); 0 for a
+    /// region whose skin stayed under it), metres.
     pub unhidden: Vec<(String, f32)>,
+    /// What the enclosure rule hid under it (wave 5,
+    /// [`hide_under`](super::hide_under)), written as the manifest's
+    /// `hide_maps`.
+    pub hiding: HideReport,
 }
 
 fn library_error(message: impl Into<String>) -> FitError {
@@ -433,6 +441,10 @@ pub struct ImportOptions {
     /// ([`align`] looks for an even ease, which lifts a brimmed hat off
     /// the head). The alignment says scale 1 and no offset.
     pub keep_placement: bool,
+    /// Its masks of what it hides under it aren't made (no `hide_maps`):
+    /// for a caller that has them already (the fit gate keeps the test
+    /// tee's, trimmed to the runtime), since making them takes minutes.
+    pub skip_hiding: bool,
 }
 
 /// [`import_garment`] with `options`.
@@ -461,6 +473,7 @@ pub fn import_garment_with(
     if garment.is_empty() {
         return Err(FitError::Empty);
     }
+    let skip_hiding = options.skip_hiding;
     let alignment = if options.keep_placement {
         Alignment {
             scale: 1.0,
@@ -475,6 +488,7 @@ pub fn import_garment_with(
 
     // The layers it is worn over.
     let mut under = Vec::new();
+    let mut under_meshes: Vec<(String, BodyMesh)> = Vec::new();
     for id in &request.under {
         let item = library
             .item(id)
@@ -493,7 +507,9 @@ pub fn import_garment_with(
         let loaded = assets
             .model_blocking(&mesh_id)
             .ok_or_else(|| FitError::Model(format!("`{mesh_id}` doesn't load")))?;
-        under.push(Layer::of_body_mesh(id, &BodyMesh::from_model(&loaded)?));
+        let mesh = BodyMesh::from_model(&loaded)?;
+        under.push(Layer::of_body_mesh(id, &mesh));
+        under_meshes.push((id.clone(), mesh));
     }
 
     let options = FitOptions {
@@ -517,9 +533,14 @@ pub fn import_garment_with(
         .ok_or_else(|| library_error(format!("`{}` has no region map", base.id)))?;
     let regions = triangle_regions(&body, &map);
     let covered = coverage(&body, &regions, &surface);
-    // Hidden only where the cloth keeps the skin covered in every pose:
-    // hidden skin out from under the cloth is a hole.
-    let (hides, unhidden) = pose_safe_hides(
+    // Whole regions are no longer hidden (wave 5): the regions the
+    // pose-safe rule would hide (the test tee's waist) are seen from below
+    // up the hem by the hole check, which looks from the viewer's side.
+    // What can't be seen is hidden triangle by triangle instead
+    // (`hide_maps`, below); a region covered whole is reported, with how
+    // far its skin came out in the fit's poses (0 for one the old rule
+    // would have hidden).
+    let (pose_safe, mut unhidden) = pose_safe_hides(
         base,
         &body,
         &fitted,
@@ -528,6 +549,8 @@ pub fn import_garment_with(
         &options.poses,
         &options.pose_states,
     );
+    unhidden.extend(pose_safe.into_iter().map(|id| (id, 0.0)));
+    let hides: Vec<String> = Vec::new();
     let guess = classify(base, &covered);
     let slot = match (&request.slot, &guess) {
         (Some(slot), _) => slot.clone(),
@@ -570,6 +593,25 @@ pub fn import_garment_with(
         shading: "cloth",
     });
     write(&format!("{object}.glb"), &glb)?;
+    // What it hides under it, triangle by triangle (wave 5): the model as
+    // written, over the body and the layers it is worn over.
+    let (hide_maps, hide_report) = if skip_hiding {
+        (Vec::new(), HideReport::default())
+    } else {
+        hide_maps_of(
+            &assets,
+            request,
+            base,
+            &library,
+            &body,
+            &under_meshes,
+            &folder,
+            &object,
+            armature,
+            &options.pose_states,
+        )?
+    };
+
     let mut binding = fitted.binding.clone();
     binding.body = body_id.clone();
     write(
@@ -610,6 +652,7 @@ pub fn import_garment_with(
             object: Some(format!("{armature}/{object}")),
         }),
         hides,
+        hide_maps,
         materials,
         variants: Vec::new(),
         fit: Fit::Binding {
@@ -669,7 +712,54 @@ pub fn import_garment_with(
         report: fitted.report,
         coverage,
         unhidden,
+        hiding: hide_report,
     })
+}
+
+/// The import's masks ([`hide_under`]): of the model written as `object`
+/// in `folder`, over `body` and the layers `under_meshes`, on `states`.
+#[allow(clippy::too_many_arguments)]
+fn hide_maps_of(
+    assets: &Assets,
+    request: &ImportRequest,
+    base: &BaseManifest,
+    library: &Library,
+    body: &BodyMesh,
+    under_meshes: &[(String, BodyMesh)],
+    folder: &Path,
+    object: &str,
+    armature: &str,
+    states: &[Vec<(String, f32)>],
+) -> Result<(Vec<crate::HideMap>, HideReport), FitError> {
+    let written = assets
+        .model_blocking(&format!(
+            "{}/{object}.glb#{armature}/{object}",
+            request.folder.trim_end_matches('/')
+        ))
+        .ok_or_else(|| FitError::Model(format!("the written `{object}.glb` doesn't load")))?;
+    let garment_mesh = BodyMesh::from_model(&written)?;
+    let layers: Vec<&BodyMesh> = under_meshes.iter().map(|(_, mesh)| mesh).collect();
+    let poses = hide_poses(&body.rig, request.finish_pose);
+    let (hidden, hide_report) = hide_under(&HideInput {
+        body,
+        garment: &garment_mesh,
+        layers: &layers,
+        poses: &poses,
+        states,
+        layer_shapes: &request
+            .under
+            .iter()
+            .map(|id| layer_masks(base, library, std::slice::from_ref(id)))
+            .collect::<Vec<_>>(),
+        outfits: &[],
+        rule: HIDE_RULE,
+    });
+    let named: Vec<(&str, &BodyMesh)> = under_meshes
+        .iter()
+        .map(|(id, mesh)| (id.as_str(), mesh))
+        .collect();
+    let hide_maps = write_hide_maps(folder, object, body, &named, &hidden)?;
+    Ok((hide_maps, hide_report))
 }
 
 /// An object name from a label: its words run together, each capitalised
