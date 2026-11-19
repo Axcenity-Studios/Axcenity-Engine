@@ -716,7 +716,17 @@ const MOTION_RUN: [Record; 1] = [Record {
 /// flat on the floor: the fit carries the body's shapes onto the sole, so
 /// it tilts with the foot (masculine 3.9 mm under the floor to 5.7 mm over
 /// it; feminine 4 to 5 mm under it).
-const FOOTWEAR: [Record; 2] = [
+///
+/// Wave 5 (`sneakers-scratch.md`): the footwear check's new `exposed`
+/// measure (a foot corner outside the shoe with the shoe's outside right
+/// under it, which the cover rule can't follow) finds one corner out of
+/// these sneakers on three feminine bodies (athletic, heavyset, muscular),
+/// up to 4.35 mm, in every pose checked: recorded as found, a defect the
+/// draft already had, not a limit raised. (The toes the captures show
+/// between the toe box and the crumpled sole on every body are not found
+/// by it: their way out meets the crumpled sole in front, so the cover
+/// rule counts them covered.)
+const FOOTWEAR: [Record; 5] = [
     Record {
         what: "Shoes_CourtSneakers through",
         case: "Walk@18",
@@ -726,6 +736,21 @@ const FOOTWEAR: [Record; 2] = [
         what: "Shoes_CourtSneakers tread",
         case: "rest",
         most: 0.0099,
+    },
+    Record {
+        what: "Shoes_CourtSneakers exposed",
+        case: "rest",
+        most: 0.0044,
+    },
+    Record {
+        what: "Shoes_CourtSneakers exposed",
+        case: "KneesBent",
+        most: 0.0044,
+    },
+    Record {
+        what: "Shoes_CourtSneakers exposed",
+        case: "Walk@18",
+        most: 0.0044,
     },
 ];
 

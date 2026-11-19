@@ -275,6 +275,75 @@ pub(crate) const OPENING_VIEWS: [View; 7] = [
         eye: [0.33, 0.2, 0.35],
         target: [-0.1, 3.4, -0.6],
         fov: 60.0,
+/// Cameras for shoes (wave 5, the first sneakers: asset-quality.md §3
+/// "Footwear"), drawn only when named, like [`MORE_VIEWS`]: both feet
+/// from the front, the side, three-quarter, the back and above, low at
+/// the floor, and close crops of one shoe's toe, collar, laces and heel.
+/// The feet stand about 0.34 studs either side of the middle; the sole is
+/// on the floor (y 0).
+pub(crate) const FOOT_VIEWS: [View; 10] = [
+    View {
+        name: "feet-front",
+        eye: [0.0, 0.75, -2.6],
+        target: [0.0, 0.25, 0.0],
+        fov: 28.0,
+    },
+    View {
+        name: "feet-side",
+        eye: [-2.8, 0.5, 0.05],
+        target: [0.0, 0.25, 0.05],
+        fov: 28.0,
+    },
+    View {
+        name: "feet-three-quarter",
+        eye: [-1.9, 0.8, -1.9],
+        target: [0.0, 0.25, 0.0],
+        fov: 28.0,
+    },
+    View {
+        name: "feet-back",
+        eye: [0.0, 0.7, 2.6],
+        target: [0.0, 0.25, 0.0],
+        fov: 28.0,
+    },
+    // From above and in front (a camera straight down has no "up").
+    View {
+        name: "feet-top",
+        eye: [0.0, 2.9, -1.05],
+        target: [0.0, 0.1, 0.0],
+        fov: 28.0,
+    },
+    // At the floor, beside the right shoe's outer side: the sole's wall,
+    // the toe spring and the foxing line.
+    View {
+        name: "feet-low",
+        eye: [-2.2, 0.12, -0.9],
+        target: [0.0, 0.14, -0.05],
+        fov: 26.0,
+    },
+    View {
+        name: "shoe-toe",
+        eye: [-0.55, 0.55, -1.05],
+        target: [-0.34, 0.15, -0.3],
+        fov: 26.0,
+    },
+    View {
+        name: "shoe-collar",
+        eye: [-1.05, 0.85, 0.6],
+        target: [-0.36, 0.3, 0.2],
+        fov: 26.0,
+    },
+    View {
+        name: "shoe-laces",
+        eye: [-0.62, 1.15, -0.85],
+        target: [-0.34, 0.3, -0.1],
+        fov: 26.0,
+    },
+    View {
+        name: "shoe-heel",
+        eye: [-0.55, 0.45, 1.25],
+        target: [-0.34, 0.2, 0.25],
+        fov: 26.0,
     },
 ];
 
@@ -424,8 +493,8 @@ pub(crate) fn lights_named(names: &str) -> Result<Vec<Lit>, String> {
         .collect()
 }
 
-/// The cameras `names` lists (separated by `,`), from [`VIEWS`] and
-/// [`MORE_VIEWS`], in its order.
+/// The cameras `names` lists (separated by `,`), from [`VIEWS`],
+/// [`MORE_VIEWS`], [`HAIR_VIEWS`], [`OPENING_VIEWS`] and [`FOOT_VIEWS`], in its order.
 pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
     names_in(names)
         .map(|name| {
@@ -434,6 +503,7 @@ pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
                 .chain(&MORE_VIEWS)
                 .chain(&HAIR_VIEWS)
                 .chain(&OPENING_VIEWS)
+                .chain(&FOOT_VIEWS)
                 .find(|view| view.name == name)
                 .ok_or_else(|| {
                     let known: Vec<&str> = VIEWS
@@ -441,6 +511,7 @@ pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
                         .chain(&MORE_VIEWS)
                         .chain(&HAIR_VIEWS)
                         .chain(&OPENING_VIEWS)
+                        .chain(&FOOT_VIEWS)
                         .map(|v| v.name)
                         .collect();
                     format!("no view `{name}` (there are {})", known.join(", "))

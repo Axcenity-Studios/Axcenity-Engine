@@ -269,6 +269,26 @@
       "thumbnail": "realistic/clothing/sneakers/Shoes_CourtSneakers.png"
     },
     {
+      "id": "axcenity/realistic-sneakers-low",
+      "manifest": "realistic/clothing/sneakers-low/Shoes_LowSneakers.item.json",
+      "label": "Low-top sneakers",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/realistic"
+      ],
+      "tags": [
+        "sneakers",
+        "trainers",
+        "low-top",
+        "court",
+        "leather",
+        "casual"
+      ],
+      "thumbnail": "realistic/clothing/sneakers-low/Shoes_LowSneakers.png"
+    },
+    {
       "id": "axcenity/realistic-sports-bra",
       "manifest": "realistic/items/realistic-sports-bra.item.json",
       "label": "Sports bra",

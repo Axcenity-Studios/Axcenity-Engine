@@ -7,6 +7,7 @@ The garment pipeline of the realistic family (Character Studio R7, milestone CO1
 | Crew-neck T-shirt | `crew-tee/` | `axcenity/realistic-crew-tee` | Pattern (FreeSewing `teagan`), sewn and draped | draft |
 | Joggers | `joggers/` | `axcenity/realistic-joggers` | Pattern (FreeSewing `paco` on `titan`), sewn and draped, gathered on elastic | draft |
 | Court sneakers | `sneakers/` | `axcenity/realistic-sneakers` | Shell over the foot, a cemented sole | draft |
+| Low-top sneakers (from scratch) | `sneakers-low/` | `axcenity/realistic-sneakers-low` | Modelled from scratch (Paul's decision 14) over a last made from the realistic foot, against Openverse reference photographs (links in `docs/development/character-studio/references/clothing/README.md` §10, where the seven branded ones, used for proportions and construction only, are named): a stitched cupsole, a leather upper with toe cap, eyestay and heel counter overlays, a padded collar and tongue, eyelets and laces; skinned to the foot's bones, its shapes smooth maps of the foot's (`build_sneakers_low.py`, `fit_sneakers_low.py`) | draft (wave 5) |
 | Crew-neck T-shirt (licensed) | `tee-crew/` | `axcenity/realistic-tee-crew` | Licensed base (BlenderKit's Plain T-shirt, CC0) through the intake (`../import/`, `items/tee-crew.intake.json`): turned hems, a rib band, maps from Poly Haven's Cotton Jersey | draft (wave 5) |
 
 All of them are **drafts**. The licensed tee (wave 5, Paul's decision 11) is made by the licensed-asset intake, not by the pipeline below: rebuild it with `python -I assets/characters/realistic/import/intake.py --spec assets/characters/realistic/import/items/tee-crew.intake.json --downloads <its download folder> --work <scratch> --out assets/characters` and `AXCENITY_FABRIC_TILES=<tiles>`; its provenance record is `tee-crew/Shirt_TeeCrew.provenance.json`, and what it fails is in `docs/development/character-studio/refinement/wave5/tee-licensed.md` and `crates/player/src/tee_crew_tests.rs`. The first three: what each still fails, with numbers, is in `docs/development/character-studio/refinement/wave4/r7-wardrobe-first.md` and in the tests' records (`crates/avatar/tests/realistic_wardrobe.rs`, `crates/player/src/wardrobe_tests.rs`). Drafts are never in a preset or drawn by Randomize (`avatar::randomize` skips an item that says `quality: "draft"`).
@@ -39,6 +40,18 @@ python -I assets/characters/catalogue.py
 ```
 
 Each build takes one to three minutes (the tee's drape about 45 s on 16 cores); the imports about a minute in all. The cloth simulation is deterministic for one Blender version and machine; another may drape a few millimetres differently. A body change (`RealisticParts.glb`) means a rebuild: the items carry the body's shapes.
+
+## The low-top sneakers (wave 5)
+
+Built by their own scripts, not the pipeline above (a shoe is a firm shell over a last, not a draped garment):
+
+```bash
+python -I assets/characters/realistic/clothing/build_sneakers_low.py --body assets/characters/realistic/RealisticParts.glb --tiles <tiles> --out <built>/sneakers-low
+python -I assets/characters/realistic/clothing/fit_sneakers_low.py --built <built>/sneakers-low
+python -I assets/characters/catalogue.py
+```
+
+`build_sneakers_low.py` (Blender's Python): the last (`sneakers_last.py`: the foot's signed distance on a 2 mm grid, the toe box run 11 mm on past the toes, a 4 mm blur, never nearer the foot than the foot itself), the shoe at three levels (`sneakers_low.py`), texture coordinates (Blender's minimum-stretch unwrap of the full level along its seams, packed at one density; each simpler level unwrapped the same way and laid onto the full level's islands), the maps (`sneakers_maps.py`: overlays, stitching, the tread, from the geometry and the CC0 tiles), each corner's weights and its offsets for the body's shapes; about 45 s. `fit_sneakers_low.py` (Python with NumPy, the Blender environment's): each level through the engine's import (`--placed`) for the skeleton, binding and thumbnail, then the build's places, weights and shapes put back, and the model written afresh; about 15 s. What it still fails is in `docs/development/character-studio/refinement/wave5/sneakers-scratch.md` and the tests' records (`crates/avatar/tests/realistic_sneakers_low.rs`, `crates/player/src/sneakers_low_tests.rs`).
 
 ## Sources and licence
 
