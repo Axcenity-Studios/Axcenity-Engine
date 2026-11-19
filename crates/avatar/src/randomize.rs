@@ -2,15 +2,17 @@
 //! old one, deterministic from a seed. Parameters are drawn inside their
 //! `random` share (the middle half of the range when they have none), the
 //! base model's constraints are kept, and items come only from what fits
-//! the base and isn't excluded by what is worn, never an item marked
-//! `draft` (asset-quality.md §5). It lives here, not in the
-//! editor, because games randomize NPCs too (plan section 0, decision 6).
+//! the base and isn't excluded by what is worn, and only Production items
+//! (Paul's decision 12, ADR-0043, asset-quality.md §5): a slot with no
+//! Production item for the base keeps what the character wore, and the
+//! modesty layer is never taken off. It lives here, not in the editor,
+//! because games randomize NPCs too (plan section 0, decision 6).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    BaseManifest, Category, Constraint, Description, ItemManifest, Library, Quality, WornItem,
-    chosen_slots, wear_choices,
+    BaseManifest, Category, Constraint, Description, ItemManifest, Library, WornItem, chosen_slots,
+    production_slots, wear_choices,
 };
 
 /// What Randomize may change.
@@ -207,10 +209,13 @@ fn keep_constraints(
     }
 }
 
-/// Wears new items in the `redrawn` slots: each slot gets one of the
-/// items that fit the base there (or nothing), drawn evenly, skipping
-/// items that conflict with what is worn, need what isn't, or also fill a
-/// slot already taken. Items in other slots stay.
+/// Wears new items in the `redrawn` slots that have a Production item
+/// for the base: each gets one of the Production items that fit the base
+/// there (or nothing), drawn evenly, skipping items that conflict with
+/// what is worn, need what isn't, or also fill a slot already taken. A
+/// slot with no Production item, and every other slot, keeps what it
+/// wore. A slot that wore underwear (layer 0, the modesty layer) never
+/// draws nothing, and gets its old underwear back if nothing fits.
 fn draw_items(
     rng: &mut Rng,
     base: &BaseManifest,
@@ -218,9 +223,28 @@ fn draw_items(
     out: &mut Description,
     redrawn: &[&str],
 ) {
+    let production = production_slots(library, &base.id);
+    let redrawn: Vec<&str> = redrawn
+        .iter()
+        .copied()
+        .filter(|slot| production.contains(*slot))
+        .collect();
+    if redrawn.is_empty() {
+        return;
+    }
     let slot_of = |id: &str| library.item(id).map(|item| item.slot.clone());
-    out.items
-        .retain(|worn| slot_of(&worn.id).is_none_or(|slot| !redrawn.contains(&slot.as_str())));
+    // The slots where underwear is worn now: never left bare.
+    let modest: BTreeSet<String> = out
+        .items
+        .iter()
+        .filter_map(|worn| library.item(&worn.id))
+        .filter(|item| item.layer == Some(0) && redrawn.contains(&item.slot.as_str()))
+        .map(|item| item.slot.clone())
+        .collect();
+    let (taken_off, kept): (Vec<WornItem>, Vec<WornItem>) = std::mem::take(&mut out.items)
+        .into_iter()
+        .partition(|worn| slot_of(&worn.id).is_some_and(|slot| redrawn.contains(&slot.as_str())));
+    out.items = kept;
     let mut filled: BTreeSet<String> = out
         .items
         .iter()
@@ -228,7 +252,7 @@ fn draw_items(
         .flat_map(|item| item.slots().cloned())
         .filter(|slot| base.slot(slot).is_some_and(|s| !s.multiple))
         .collect();
-    for slot in redrawn {
+    for slot in &redrawn {
         // A slot that holds several gets up to two, so an item that needs
         // another there (a charm on a watch) can follow it.
         let picks = if base.slot(slot).is_some_and(|s| s.multiple) {
@@ -236,7 +260,7 @@ fn draw_items(
         } else {
             1
         };
-        for _ in 0..picks {
+        for pick_number in 0..picks {
             if filled.contains(*slot) {
                 break;
             }
@@ -248,11 +272,9 @@ fn draw_items(
             let options: Vec<&ItemManifest> = library
                 .items
                 .values()
-                .filter(|item| item.slot == *slot && item.bases.contains(&base.id))
-                // Drafts never appear in randomization (asset-quality.md
-                // §5). Only items marked `draft` are left out: an item with
-                // no quality yet (from before the standard) still is drawn.
-                .filter(|item| item.quality != Some(Quality::Draft))
+                .filter(|item| item.slot == **slot && item.bases.contains(&base.id))
+                // Production only (ADR-0043): never a Legacy or Draft item.
+                .filter(|item| item.is_production())
                 .filter(|item| !worn.iter().any(|other| other.id == item.id))
                 .filter(|item| !worn.iter().any(|other| item.conflicts_with(other)))
                 .filter(|item| {
@@ -266,8 +288,11 @@ fn draw_items(
                         .all(|other| !filled.contains(other) && base.slot(other).is_some())
                 })
                 .collect();
-            // One more choice than there are items: wearing nothing there.
-            let pick = rng.below(options.len() + 1);
+            // One more choice than there are items: wearing nothing there
+            // (but never in place of the underwear worn).
+            let bare_allowed = !(pick_number == 0 && modest.contains(*slot));
+            let choices = options.len() + usize::from(bare_allowed || options.is_empty());
+            let pick = rng.below(choices);
             let Some(item) = options.get(pick) else {
                 break;
             };
@@ -275,6 +300,22 @@ fn draw_items(
             filled.extend(
                 item.slots()
                     .filter(|slot| base.slot(slot).is_some_and(|s| !s.multiple))
+                    .cloned(),
+            );
+        }
+    }
+    // Underwear that nothing could replace goes back on.
+    for slot in &modest {
+        let bare = !out
+            .items
+            .iter()
+            .filter_map(|worn| library.item(&worn.id))
+            .any(|item| item.slots().any(|s| s == slot));
+        if bare {
+            out.items.extend(
+                taken_off
+                    .iter()
+                    .filter(|worn| slot_of(&worn.id).as_deref() == Some(slot.as_str()))
                     .cloned(),
             );
         }

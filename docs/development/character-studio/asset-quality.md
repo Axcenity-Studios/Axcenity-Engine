@@ -69,12 +69,14 @@ An item passes only when **every** check of its kind passes **and** the review f
 |---|---|---|---|
 | Listed in Character Studio | Not in normal character creation; only for content review, marked "Draft" | Only with the Legacy content filter on, marked "Legacy" | Yes |
 | In randomization | No (a test holds this) | No | Yes |
-| In default outfits and presets | No | Only presets kept for compatibility | Yes |
+| In default outfits and presets | No | Only kept for compatibility (the stylized family's defaults and presets; the realistic body type's underwear) | Yes |
 | Loads and draws when a saved character wears it | Yes | Yes | Yes |
 | Shipped in the library | Yes, so it can be reviewed and improved | Yes | Yes |
 | Counted toward a milestone's "Done when" | No | No | Yes |
 
 An item moves to Production only by passing every check of its kind and the review (section 1); the first of each kind also needs Paul's sign-off.
+
+How it is built ([ADR-0043](../../../wiki/Architecture/Architecture-Decisions/ADR-0043-Three-Content-States-Production-Legacy-Draft-In-The-Item-Manifest.md)): the item manifest's `quality` says `production`, `legacy` or `draft`, and every shipped item says it (a check holds this); a manifest with none (an older project's copy) reads as Legacy. Character Studio's "Legacy items" filter and its View menu's "Show drafts for content review" are off by default. Randomize leaves a slot with no Production item as it was, so it never strips a character. A default outfit or preset made of Legacy items is a compatibility case, not Production content. Today: the stylized family's items and the realistic underwear are Legacy, the four wave-4 items Draft (decision 13), nothing Production.
 
 ## 6. How production items are made (decision 11)
 

@@ -304,6 +304,12 @@ def ref(part):
     return {"file": "../" + PARTS_FILE, "object": part["path"]}
 
 
+# The stylized family's items are Legacy (Paul's decision 12 of
+# 2026-11-18, ADR-0043): older content kept for compatibility and optional
+# use, hidden by default in Character Studio and never drawn by Randomize.
+QUALITY = "legacy"
+
+
 def item_manifests(custom, parts):
     items = {}
     for name, (iid, label, slot, layer, tags) in GARMENTS.items():
@@ -315,7 +321,7 @@ def item_manifests(custom, parts):
             "hides": [region_id(m) for m in custom["parts"][name]["masks"]],
             "materials": [{"name": m, "shading": SHADING[m]} for m in part["materials"]],
             "fit": {"method": "shapes", "follows": part["shapes"]},
-            "tags": tags, "source": SOURCE,
+            "tags": tags, "source": SOURCE, "quality": QUALITY,
         }
     for name, (iid, label, tags) in HAIR.items():
         part = parts[name]
@@ -325,7 +331,7 @@ def item_manifests(custom, parts):
             "materials": [{"name": m, "shading": SHADING[m]} for m in part["materials"]],
             "fit": {"method": "shapes", "follows": part["shapes"]},
             "groom": {"mesh": ref(part)},
-            "tags": tags, "source": SOURCE,
+            "tags": tags, "source": SOURCE, "quality": QUALITY,
         }
     return items
 

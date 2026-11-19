@@ -84,20 +84,35 @@ pub struct ItemManifest {
     /// None means it stays as made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adjust: Option<Adjust>,
-    /// Whether it meets the asset quality standard (plan 11.3,
-    /// `asset-quality.md`): `draft` or `production`. Unset is a draft.
+    /// Its content state (Paul's decision 12, ADR-0043,
+    /// `asset-quality.md` §5): `production`, `legacy` or `draft`. Unset is
+    /// legacy: a manifest from before the three states (an older
+    /// project's copy of the stylized items). Every shipped item says it
+    /// ([`crate::check_declared_state`]). Read it through
+    /// [`ItemManifest::state`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality: Option<Quality>,
 }
 
-/// An item's quality (`docs/development/character-studio/asset-quality.md`):
-/// a draft until it passes every check of its kind and the review.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// An item's content state (Paul's decision 12 of 2026-11-18, ADR-0043;
+/// `docs/development/character-studio/asset-quality.md` §5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Quality {
-    #[default]
+    /// Incomplete: never in normal character creation, presets or
+    /// Randomize; listed only for content review.
     Draft,
+    /// Older content kept for compatibility and optional use: hidden by
+    /// default behind Character Studio's "Legacy items" filter, never
+    /// drawn by Randomize; a character that wears it loads and draws it.
+    Legacy,
+    /// Approved: passed every check of its kind and the review.
     Production,
+    /// A state this engine doesn't know (a newer engine's): read as a
+    /// draft, so the manifest still loads (`#[serde(other)]` takes any
+    /// unknown string here instead of failing the whole file).
+    #[serde(other)]
+    Other,
 }
 
 /// An item's own slider: shaped like a base model's parameter, without a
@@ -258,12 +273,31 @@ impl ItemManifest {
         self.materials.iter().find(|m| m.name == name)
     }
 
-    /// Whether it says it is a draft. An item with no `quality` (made
-    /// before the asset-quality standard: the stylized family's) is listed
-    /// and drawn as before until it is reviewed; the lead's call at the
-    /// wave-4 merge, so the browsers and Randomize follow one rule.
+    /// Its content state, one of the three: `quality` unset is
+    /// [`Quality::Legacy`] (made before the states), a state this engine
+    /// doesn't know is [`Quality::Draft`].
+    pub fn state(&self) -> Quality {
+        match self.quality {
+            None => Quality::Legacy,
+            Some(Quality::Other) => Quality::Draft,
+            Some(state) => state,
+        }
+    }
+
+    /// Whether it is a draft ([`ItemManifest::state`]).
     pub fn is_draft(&self) -> bool {
-        self.quality == Some(Quality::Draft)
+        self.state() == Quality::Draft
+    }
+
+    /// Whether it is legacy content ([`ItemManifest::state`]).
+    pub fn is_legacy(&self) -> bool {
+        self.state() == Quality::Legacy
+    }
+
+    /// Whether it is production content: the only state Randomize draws
+    /// and Character Studio lists by default.
+    pub fn is_production(&self) -> bool {
+        self.state() == Quality::Production
     }
 
     pub fn variant(&self, id: &str) -> Option<&Variant> {

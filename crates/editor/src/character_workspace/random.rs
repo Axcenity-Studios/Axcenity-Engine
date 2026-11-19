@@ -12,7 +12,7 @@
 
 use std::collections::BTreeSet;
 
-use axcenity_avatar::{BaseManifest, Scope};
+use axcenity_avatar::{BaseManifest, Library, Scope, chosen_slots, production_slots};
 
 use super::CharacterWorkspace;
 use super::selection::parameter_feature;
@@ -26,6 +26,30 @@ pub enum RandomScope {
     Category,
     /// The feature picked in it (the nose…).
     Feature,
+}
+
+/// What the menu and the notice add when [`no_items_to_draw`]: Randomize
+/// draws Production items only (ADR-0043).
+pub const NO_ITEMS: &str = " Worn items stay as they are: there are no production items to draw \
+                            yet.";
+
+/// Whether `scope` reaches item slots on `base` (ones a person picks in,
+/// not a body type's) and none of them has a Production item: Randomize
+/// then leaves every item as it is.
+pub fn no_items_to_draw(library: &Library, base: &BaseManifest, scope: &Scope) -> bool {
+    let chosen = chosen_slots(library, &base.id);
+    let production = production_slots(library, &base.id);
+    let mut reached = base
+        .slots
+        .iter()
+        .filter(|slot| !chosen.contains(&slot.id))
+        .filter(|slot| match scope {
+            Scope::All => true,
+            Scope::Category(category) => slot.category == *category,
+            Scope::Feature(_) | Scope::Parameters(_) => false,
+        })
+        .peekable();
+    reached.peek().is_some() && reached.all(|slot| !production.contains(&slot.id))
 }
 
 /// The locks a new workspace starts with: the body type.
@@ -87,6 +111,16 @@ impl CharacterWorkspace {
             ^ self.rolls.wrapping_mul(0x9e37_79b9_7f4a_7c15);
         let drawn =
             axcenity_avatar::randomize(&self.description, &scope, &self.locks, seed, &library);
+        if drawn == self.description {
+            // Nothing to draw (no production items, everything locked): no
+            // empty undo step, and say why.
+            self.notice = Some(if no_items_to_draw(&library, base, &scope) {
+                format!("Nothing changed.{NO_ITEMS}")
+            } else {
+                "Nothing changed.".to_owned()
+            });
+            return;
+        }
         self.edit(|description| *description = drawn);
     }
 

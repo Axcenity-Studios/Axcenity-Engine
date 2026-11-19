@@ -2,6 +2,7 @@
 //! find what is wrong, parameters resolve. The repository's own library is
 //! checked against its models in `tests/shipped_library.rs`.
 
+mod content_states;
 mod contracts;
 mod formats;
 mod migration;

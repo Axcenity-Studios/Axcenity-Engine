@@ -8,8 +8,14 @@
 //!   (the slots a body type's choice fills, the underwear, are listed as
 //!   what the body type wears, not offered), and whose `also_fills` slots
 //!   are all such slots too. An item a slot can't take is not offered.
-//! - **Drafts** (`asset-quality.md` §5) are hidden unless "Show drafts" is
-//!   on, and marked "Draft" when shown. One that is worn is always listed.
+//! - **Content states** (Paul's decision 12, ADR-0043, `asset-quality.md`
+//!   §5): a page lists Production items. Legacy items show only with the
+//!   page's "Legacy items" filter on, marked "Legacy"; drafts only for
+//!   content review (the View menu's "Show drafts for content review"),
+//!   marked "Draft". Both are editor state, off by default, never in a
+//!   character. An item that is worn is always listed, whatever its state,
+//!   and its controls stay. An empty page says what is hidden
+//!   ([`empty_message`]).
 //! - **Search** matches every word typed against the label, ID, tags and
 //!   `about`. **Filters**: a slot (the page's categories), a kind (one of
 //!   the listed items' tags), "Recolourable" (a colour role or variants),
@@ -31,7 +37,7 @@ use std::collections::BTreeSet;
 
 use axcenity_avatar::{
     BaseManifest, Category as Data, Description, ItemManifest, Library, MaterialRole,
-    MaterialValue, Slot, WornItem, chosen_slots,
+    MaterialValue, Quality, Slot, WornItem, chosen_slots,
 };
 
 use super::intent::Gesture;
@@ -112,6 +118,27 @@ impl Filters {
     }
 }
 
+/// Which content states a page lists besides Production (ADR-0043):
+/// Legacy through the page's "Legacy items" filter, drafts only for
+/// content review (the View menu). Editor state, never in a character;
+/// the default is normal character creation, Production only.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Shown {
+    pub legacy: bool,
+    pub drafts: bool,
+}
+
+impl Shown {
+    /// Whether an item in `state` is listed.
+    pub fn shows(self, state: Quality) -> bool {
+        match state {
+            Quality::Production => true,
+            Quality::Legacy => self.legacy,
+            Quality::Draft | Quality::Other => self.drafts,
+        }
+    }
+}
+
 /// A tile: wearing `item` in `slot`, or nothing there (`None`: "Bald").
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pick {
@@ -124,8 +151,11 @@ pub struct Pick {
 pub enum Browse {
     /// A page's search and filters, whole.
     Filters(Shelf, Filters),
-    /// Lists drafts (both pages), marked "Draft".
+    /// Content review: lists drafts (both pages), marked "Draft".
     ShowDrafts(bool),
+    /// The "Legacy items" filter: lists legacy items (both pages), marked
+    /// "Legacy".
+    ShowLegacy(bool),
     /// The tile under the pointer (`None`: none): previewed while it is.
     Hover(Option<Pick>),
     /// The tile picked to try on, waiting for "Wear" (`None`: none).
@@ -138,6 +168,7 @@ pub struct Browser {
     pub hair: Filters,
     pub clothing: Filters,
     pub show_drafts: bool,
+    pub show_legacy: bool,
     pub hovered: Option<Pick>,
     pub selected: Option<Pick>,
     /// What the preview shows in the character's place while a tile is
@@ -151,6 +182,14 @@ pub struct Browser {
 }
 
 impl Browser {
+    /// What the pages list besides Production.
+    pub fn shown(&self) -> Shown {
+        Shown {
+            legacy: self.show_legacy,
+            drafts: self.show_drafts,
+        }
+    }
+
     pub fn filters(&self, shelf: Shelf) -> &Filters {
         match shelf {
             Shelf::Hair => &self.hair,
@@ -275,7 +314,8 @@ pub struct Entry<'a> {
     pub item: &'a ItemManifest,
     /// The slot's label ("Top").
     pub slot: &'a str,
-    pub draft: bool,
+    /// Its content state ([`ItemManifest::state`]).
+    pub state: Quality,
     pub worn: bool,
     pub favourite: bool,
     /// A limitation the character is outside of (its note).
@@ -297,8 +337,10 @@ pub struct Listing<'a> {
     pub recent: Vec<Entry<'a>>,
     /// The tags of the items offered, for the kind filter.
     pub kinds: Vec<String>,
-    /// Offered drafts left out because "Show drafts" is off.
+    /// Offered drafts left out (content review is off).
     pub hidden_drafts: usize,
+    /// Offered legacy items left out ("Legacy items" is off).
+    pub hidden_legacy: usize,
     /// Items offered at all before the search and filters.
     pub offered: usize,
 }
@@ -367,7 +409,7 @@ pub fn list<'a>(
     description: &Description,
     shelf: Shelf,
     filters: &Filters,
-    show_drafts: bool,
+    content: Shown,
     favourites: &BTreeSet<String>,
     recent: &[String],
 ) -> Listing<'a> {
@@ -406,21 +448,28 @@ pub fn list<'a>(
         Entry {
             item,
             slot,
-            draft: item.is_draft(),
+            state: item.state(),
             worn: worn_ids.contains(item.id.as_str()),
             favourite: favourites.contains(&item.id),
             misfit: misfit(item, description, base),
             takes_off,
         }
     };
-    let mut hidden_drafts = 0;
+    let (mut hidden_drafts, mut hidden_legacy) = (0, 0);
     let shown: Vec<&ItemManifest> = library
         .items
         .values()
         .filter(|item| offered(item, &base.id, &slots))
         .filter(|item| {
-            let keep = show_drafts || !item.is_draft() || worn_ids.contains(item.id.as_str());
-            hidden_drafts += usize::from(!keep);
+            let state = item.state();
+            // What is worn is always listed, so it can be seen and edited.
+            let keep = content.shows(state) || worn_ids.contains(item.id.as_str());
+            if !keep {
+                match state {
+                    Quality::Legacy => hidden_legacy += 1,
+                    _ => hidden_drafts += 1,
+                }
+            }
             keep
         })
         .collect();
@@ -464,14 +513,106 @@ pub fn list<'a>(
             .collect()
     };
     Listing {
-        offered: shown.len() + hidden_drafts,
+        offered: shown.len() + hidden_drafts + hidden_legacy,
         slots,
         body_type_wears,
         entries,
         recent,
         kinds,
         hidden_drafts,
+        hidden_legacy,
     }
+}
+
+/// What a page with no tiles says (a title and a sentence), or `None`
+/// when it has tiles: that the search or a filter hides what is listed,
+/// or that there are no Production items yet and how many legacy items
+/// and drafts are hidden. `filters` is the page's.
+pub fn empty_message(
+    listing: &Listing,
+    shelf: Shelf,
+    filters: &Filters,
+) -> Option<(String, String)> {
+    if !listing.entries.is_empty() {
+        return None;
+    }
+    let listed = listing.offered - listing.hidden_drafts - listing.hidden_legacy;
+    if listed > 0 || filters.narrowed() {
+        return Some((
+            "Nothing to show".to_owned(),
+            "Nothing matches. Clear the search or a filter.".to_owned(),
+        ));
+    }
+    let what = match shelf {
+        Shelf::Hair => "hairstyles",
+        Shelf::Clothing => "clothes",
+    };
+    let sentence = hidden_sentence(listing.hidden_legacy, listing.hidden_drafts)
+        .unwrap_or_else(|| "Nothing in the library fits this body here yet.".to_owned());
+    Some((format!("No production {what} yet"), sentence))
+}
+
+/// What a page with nothing listed says it hides: how many legacy items
+/// and drafts, or `None` when it hides none (the Accessories page says it
+/// too).
+pub fn hidden_sentence(legacy: usize, drafts: usize) -> Option<String> {
+    let mut sentence = Vec::new();
+    if legacy > 0 {
+        sentence.push(format!(
+            "Legacy items: {legacy} (turn on Legacy items to show them)."
+        ));
+    }
+    if drafts > 0 {
+        sentence.push(format!("Drafts: {drafts} (content review only)."));
+    }
+    (!sentence.is_empty()).then(|| sentence.join(" "))
+}
+
+/// `item`'s label as a chip or a worn item's title says it: marked
+/// "(Legacy)" or "(Draft)" unless it is Production (ADR-0043).
+pub fn marked_label(item: &ItemManifest) -> String {
+    match item.state() {
+        Quality::Production => item.label.clone(),
+        Quality::Legacy => format!("{} (Legacy)", item.label),
+        Quality::Draft | Quality::Other => format!("{} (Draft)", item.label),
+    }
+}
+
+/// What a slot page (Accessories) offers in one slot: the items for the
+/// character's base that `shown` lists, and any worn there whatever its
+/// state, as (ID, marked label); and how many it hides by state.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SlotChoices {
+    pub items: Vec<(String, String)>,
+    pub hidden_legacy: usize,
+    pub hidden_drafts: usize,
+}
+
+/// [`SlotChoices`] for `slot` on `description`'s base: the same content
+/// rule as the browsers' [`list`].
+pub fn slot_choices(
+    library: &Library,
+    description: &Description,
+    slot: &str,
+    shown: Shown,
+) -> SlotChoices {
+    let mut choices = SlotChoices::default();
+    let worn = |id: &str| description.items.iter().any(|w| w.id == id);
+    for item in library
+        .items
+        .values()
+        .filter(|item| item.slot == slot && item.bases.contains(&description.base))
+    {
+        let state = item.state();
+        if shown.shows(state) || worn(&item.id) {
+            choices.items.push((item.id.clone(), marked_label(item)));
+        } else if state == Quality::Legacy {
+            choices.hidden_legacy += 1;
+        } else {
+            choices.hidden_drafts += 1;
+        }
+    }
+    choices
 }
 
 /// `recent` with `id` at the front, once, at most [`MAX_RECENT_ITEMS`].
@@ -586,27 +727,13 @@ impl CharacterWorkspace {
     pub fn browse(&mut self, change: Browse) {
         match change {
             Browse::Filters(shelf, filters) => *self.browser.filters_mut(shelf) = filters,
+            Browse::ShowLegacy(on) => {
+                self.browser.show_legacy = on;
+                self.drop_hidden_picks();
+            }
             Browse::ShowDrafts(on) => {
                 self.browser.show_drafts = on;
-                // A draft tile tried on goes when drafts are hidden.
-                if !on {
-                    let library = self.library();
-                    let draft = |pick: &Option<Pick>| {
-                        pick.as_ref()
-                            .and_then(|pick| pick.item.as_deref())
-                            .and_then(|id| library.item(id))
-                            .is_some_and(|item| {
-                                item.is_draft()
-                                    && !self.description.items.iter().any(|w| w.id == item.id)
-                            })
-                    };
-                    if draft(&self.browser.selected) {
-                        self.browser.selected = None;
-                    }
-                    if draft(&self.browser.hovered) {
-                        self.browser.hovered = None;
-                    }
-                }
+                self.drop_hidden_picks();
             }
             Browse::Hover(pick) => {
                 if !self.browser.hover(pick) {
@@ -618,6 +745,28 @@ impl CharacterWorkspace {
         let library = self.library();
         self.browser.update_preview(&self.description, &library);
         self.refresh();
+    }
+
+    /// Forgets a tile hovered or picked that the pages no longer list (a
+    /// legacy item or a draft just hidden, not worn).
+    fn drop_hidden_picks(&mut self) {
+        let library = self.library();
+        let shown = self.browser.shown();
+        let hidden = |pick: &Option<Pick>| {
+            pick.as_ref()
+                .and_then(|pick| pick.item.as_deref())
+                .and_then(|id| library.item(id))
+                .is_some_and(|item| {
+                    !shown.shows(item.state())
+                        && !self.description.items.iter().any(|w| w.id == item.id)
+                })
+        };
+        if hidden(&self.browser.selected) {
+            self.browser.selected = None;
+        }
+        if hidden(&self.browser.hovered) {
+            self.browser.hovered = None;
+        }
     }
 
     /// Takes a tile's preview off the character.
@@ -769,7 +918,7 @@ impl CharacterWorkspace {
             description,
             shelf,
             self.browser.filters(shelf),
-            self.browser.show_drafts,
+            self.browser.shown(),
             &self.item_favourites,
             &self.recent_items,
         );

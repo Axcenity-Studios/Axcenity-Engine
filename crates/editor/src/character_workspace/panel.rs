@@ -20,11 +20,12 @@ pub(super) use parameters::{Shown, hidden_changes, rows, side_choices};
 use axcenity_avatar::{BaseManifest, Library, PresetKind, matches_preset};
 use eframe::egui::{self, Sense, vec2};
 
+use super::browser::{Browse, hidden_sentence, slot_choices};
 use super::intent::Intent;
 use super::motion::Motion;
 use super::presets::{self, Listed};
 use super::selection::Level;
-use super::{Category, CharacterWorkspace, chosen_slots, items_for, worn_in};
+use super::{Category, CharacterWorkspace, chosen_slots, worn_in};
 use crate::theme::{self, icons};
 use crate::widgets;
 
@@ -321,7 +322,9 @@ fn base_picker(
 }
 
 /// The manifest's slots of `category`: a chip per item that fits this
-/// body, and one for wearing nothing.
+/// body, and one for wearing nothing. The content states rule as on the
+/// browsers (ADR-0043): Production listed, Legacy with the "Legacy items"
+/// filter, drafts for content review, each marked; a worn item always.
 fn slots_page(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
@@ -334,6 +337,7 @@ fn slots_page(
     let description = workspace.description();
     let chosen = chosen_slots(library, &description.base);
     let palette = theme::palette(ui.ctx());
+    let shown = workspace.browser.shown();
     if base
         .slots
         .iter()
@@ -345,15 +349,45 @@ fn slots_page(
         );
         ui.add_space(8.0);
     }
-    let mut any = false;
-    for slot in base
+    let slots: Vec<_> = base
         .slots
         .iter()
         .filter(|slot| Some(slot.category) == data && !chosen.contains(&slot.id))
-    {
-        let items = items_for(library, &description.base, &slot.id);
+        .map(|slot| (slot, slot_choices(library, description, &slot.id, shown)))
+        .collect();
+    let hidden_legacy: usize = slots.iter().map(|(_, c)| c.hidden_legacy).sum();
+    let hidden_drafts: usize = slots.iter().map(|(_, c)| c.hidden_drafts).sum();
+    // The optional content filter, as on the browsers: only where there
+    // is legacy content to show.
+    if hidden_legacy > 0 || shown.legacy {
+        let tip = if shown.legacy {
+            "Hide the older items kept for compatibility".to_owned()
+        } else {
+            format!(
+                "Show {hidden_legacy} older items kept for compatibility, marked \"Legacy\". \
+                 Randomize never uses them"
+            )
+        };
+        if widgets::chip(ui, "Legacy items", shown.legacy)
+            .on_hover_text(tip)
+            .clicked()
+        {
+            intents.push(Intent::Browse(Browse::ShowLegacy(!shown.legacy)));
+        }
+        ui.add_space(4.0);
+    }
+    if shown.drafts {
+        ui.label(
+            egui::RichText::new("Content review: drafts are shown, marked \"Draft\" (View menu).")
+                .small()
+                .color(palette.warning),
+        );
+        ui.add_space(4.0);
+    }
+    let mut any = false;
+    for (slot, choices) in &slots {
         let worn = worn_in(library, description, &slot.id);
-        if items.is_empty() && worn.is_none() {
+        if choices.items.is_empty() && worn.is_none() {
             continue;
         }
         any = true;
@@ -366,7 +400,7 @@ fn slots_page(
                     item: None,
                 });
             }
-            for (id, label) in &items {
+            for (id, label) in &choices.items {
                 if widgets::chip(ui, label, worn.as_deref() == Some(id.as_str())).clicked() {
                     intents.push(Intent::Wear {
                         slot: slot.id.clone(),
@@ -378,22 +412,27 @@ fn slots_page(
         ui.add_space(10.0);
     }
     if !any {
-        let (title, sentence) = match category {
-            Category::Hair => (
-                "No hairstyles yet",
-                "Nothing in the library fits this body yet. Hairstyles for it are being made.",
-            ),
-            Category::Accessories => (
-                "No accessories yet",
-                "Nothing in the library fits this body yet. Glasses, jewellery, hats and bags \
-                 are being made.",
-            ),
-            _ => (
-                "No clothes yet",
-                "Nothing in the library fits this body yet beyond what the body type wears.",
-            ),
+        let what = match category {
+            Category::Hair => "hairstyles",
+            Category::Accessories => "accessories",
+            _ => "clothes",
         };
-        widgets::empty_state(ui, super::nav::icon(category), title, sentence, None);
+        // Say what is hidden, if anything is; else that nothing fits yet.
+        let nothing = match category {
+            Category::Hair => {
+                "Nothing in the library fits this body yet. Hairstyles for it are being made."
+            }
+            Category::Accessories => {
+                "Nothing in the library fits this body yet. Glasses, jewellery, hats and bags \
+                 are being made."
+            }
+            _ => "Nothing in the library fits this body yet beyond what the body type wears.",
+        };
+        let (title, sentence) = match hidden_sentence(hidden_legacy, hidden_drafts) {
+            Some(sentence) => (format!("No production {what} yet"), sentence),
+            None => (format!("No {what} yet"), nothing.to_owned()),
+        };
+        widgets::empty_state(ui, super::nav::icon(category), &title, &sentence, None);
     }
     intents
 }
