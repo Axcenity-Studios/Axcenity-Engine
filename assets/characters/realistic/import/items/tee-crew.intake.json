@@ -71,6 +71,10 @@
     "drape": {
       "pin_top": 0.04,
       "pin_band": 0.025,
+      "over_layers": [
+        "axcenity/realistic-boxer-briefs",
+        "axcenity/realistic-briefs"
+      ],
       "smooth_push": 30,
       "relax_edges": 6,
       "start_clearance": 0.004,

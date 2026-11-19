@@ -40,7 +40,11 @@
    they are (a tee's neck band and shoulders; a pant's waistband), and
    gravity does the rest. It keeps its ease and hangs (a tee's hem falls
    from the chest and the shoulder blades, free below the seat) instead of
-   being pushed onto the skin; with `drape.relax_edges`, its open edges
+   being pushed onto the skin. With `drape.over_layers` (`true`, or a
+   list of `fit.under` IDs), the underwear it is worn over collides too
+   and is pushed out of first (`under_layers`): a top's hem then hangs over
+   the briefs, not into the cleft they bridge (review fixes 2). With
+   `drape.relax_edges`, its open edges
    are then relaxed along themselves (`relax_edges`). `drape.settings` are the cloth settings
    (`drape.Settings`). The export then fits it with `--drape`
    (`FitOptions::drape`), which keeps that ease as the body changes.
@@ -535,9 +539,55 @@ def relax_edges(mesh, rounds):
             "most_before_mm": round(before, 1), "most_after_mm": round(worst(P), 1)}
 
 
-def drape(mesh, body, spec):
+class _Surface:
+    """Corners and triangles (a collider: the body and the layers under)."""
+
+    def __init__(self, P, tris):
+        self.P, self.tris = P, tris
+
+
+def _with_layers(body, under):
+    """The body and the layers the item is worn over as one surface."""
+    Ps, tris, offset = [], [], 0
+    for part in [body, *under]:
+        Ps.append(np.asarray(part.P, float))
+        tris.append(_triangles(part) + offset)
+        offset += len(part.P)
+    return _Surface(np.vstack(Ps), np.vstack(tris))
+
+
+def under_layers(spec, only=None):
+    """The layers an item is worn over (`fit.under`, item ids, or those of
+    them in `only`) as they sit on the default body at rest: each item's
+    model object read from its GLB (`../items/<name>.item.json`), so the
+    drape hangs the cloth over them, not into the hollows they bridge
+    (review fixes 2)."""
+    import bodyglb
+    items = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "items")
+    layers = []
+    for item_id in spec.get("fit", {}).get("under", []):
+        if only is not None and item_id not in only:
+            continue
+        with open(os.path.join(items, item_id.split("/")[-1] + ".item.json"), encoding="utf-8") as f:
+            model = json.load(f)["model"]
+        doc, binary = bodyglb.read_glb(os.path.normpath(os.path.join(items, model["file"])))
+        name = model["object"].split("/")[-1]
+        node = next(n for n in doc["nodes"] if n.get("name") == name and "mesh" in n)
+        Ps, tris, offset = [], [], 0
+        for prim in doc["meshes"][node["mesh"]]["primitives"]:
+            P = bodyglb.accessor(doc, binary, prim["attributes"]["POSITION"])
+            Ps.append(P)
+            tris.append(bodyglb.accessor(doc, binary, prim["indices"]).reshape(-1, 3) + offset)
+            offset += len(P)
+        layers.append(_Surface(np.vstack(Ps), np.vstack(tris).astype(np.int64)))
+    return layers
+
+
+def drape(mesh, body, spec, under=()):
     """Hangs the item on the body by Blender's cloth simulation (see the
-    module's note); returns what it did."""
+    module's note); returns what it did. `under`: the layers it is worn
+    over (surfaces with `P` and `tris`, at rest on the same body), which
+    collide with it and which it is first pushed out of, like the body."""
     import bpy
     sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "clothing"))
     import drape as cloth  # the realistic wardrobe's cloth simulation
@@ -548,9 +598,12 @@ def drape(mesh, body, spec):
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
-    me = bpy.data.meshes.new("Body")
+    skin = body
     tris = _triangles(body)
-    me.from_pydata(to_blender(body.P).tolist(), [], tris.tolist())
+    if under:
+        body = _with_layers(body, under)
+    me = bpy.data.meshes.new("Body")
+    me.from_pydata(to_blender(body.P).tolist(), [], _triangles(body).tolist())
     me.update()
     collider = bpy.data.objects.new("Body", me)
     scene.collection.objects.link(collider)
@@ -580,7 +633,9 @@ def drape(mesh, body, spec):
     mesh.P = np.stack([out[:, 0], out[:, 2], -out[:, 1]], axis=1)
     relaxed = relax_edges(mesh, int(spec["relax_edges"])) if spec.get("relax_edges") else None
     moved = np.linalg.norm(mesh.P - before, axis=1)
-    d = checks.distances(mesh.P, body.P, tris, signed=True)
+    d = checks.distances(mesh.P, skin.P, tris, signed=True)
+    # Over the layers too: corners left between a layer and the skin.
+    inside_layers = int((checks.distances(mesh.P, body.P, _triangles(body), signed=True) < 0).sum())         if under else 0
     # The rest lengths kept: each edge now against before.
     edges = set()
     for f in mesh.faces():
@@ -597,7 +652,9 @@ def drape(mesh, body, spec):
         "frames": settings.frames,
         "moved_m": {"most": round(float(moved.max()), 4), "median": round(float(np.median(moved)), 4)},
         "clearance_m": {"least": round(float(d.min()), 4), "median": round(float(np.median(d)), 4),
-                        "inside_body": int((d < 0).sum())},
+                        "inside_body": int((d < 0).sum()),
+                        **({"inside_layers": inside_layers} if under else {})},
+        **({"over_layers": len(under)} if under else {}),
         "edges_stretched": {"p95": round(float(np.percentile(ratio, 95)), 4),
                             "most": round(float(ratio.max()), 4)},
     }
@@ -635,7 +692,12 @@ def step(spec, work, source="topology.npz", target="conformed.npz"):
     if options.get("grade"):
         report["grade"] = grade(mesh, body, options["grade"])
     if options.get("drape"):
-        report["drape"] = drape(mesh, body, options["drape"])
+        # `drape.over_layers`: hang it over the items it is worn over
+        # (`fit.under`: all of them with `true`, or those listed) as well
+        # as the body.
+        over = options["drape"].get("over_layers")
+        under = under_layers(spec, over if isinstance(over, list) else None) if over else ()
+        report["drape"] = drape(mesh, body, options["drape"], under=under)
     mesh.save(os.path.join(work, target), report)
     return report
 

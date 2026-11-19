@@ -106,3 +106,57 @@ ERROR: test_a_jagged_free_edge_is_relaxed_along_itself (__main__.GradeReviewTest
 AttributeError: module 'conform' has no attribute 'relax_edges'
 Ran 1 test in 0.001s
 FAILED (errors=1)
+
+==============
+Review fixes 2
+==============
+
+8. The drape over the layers the item is worn over (conform.py drape(.., under=)),
+   test written first:
+   python -I assets/characters/realistic/import/test_intake.py DrapeTest
+   (a) against conform.py without the change: drape() has no `under`:
+
+======================================================================
+ERROR: test_the_cloth_hangs_over_the_layers_it_is_worn_over (__main__.DrapeTest.test_the_cloth_hangs_over_the_layers_it_is_worn_over)
+Review fixes 2: draped against the body alone, the tee's hem fell
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\Paul Janota\Desktop\axcenity-w5-fit-drape\assets\characters\realistic\import\test_intake.py", line 404, in test_the_cloth_hangs_over_the_layers_it_is_worn_over
+    report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}},
+                           under=[under])
+TypeError: drape() got an unexpected keyword argument 'under'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.689s
+
+FAILED (errors=1)
+
+   (b) with `under` accepted but ignored (the collider and the push the body only;
+   restored after):
+
+Review fixes 2: draped against the body alone, the tee's hem fell
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\Paul Janota\Desktop\axcenity-w5-fit-drape\assets\characters\realistic\import\test_intake.py", line 410, in test_the_cloth_hangs_over_the_layers_it_is_worn_over
+    self.assertGreater(np.hypot(low[:, 0], low[:, 2]).min(), 0.17 - 0.001)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: np.float64(0.1649923318695568) not greater than 0.169
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.752s
+
+FAILED (failures=1)
+
+   With the change: Ran 4 tests, OK; the whole file: Ran 40 tests, OK.
+
+9. The hem-point path of hanging() isolated (cloth_checks.rs, a_hem_pulled_into_a_point_hangs:
+   a body reaching 12 cm below the hem, so the tab is inside its hull). Red with the
+   hem points taken out of hanging() (`most.max(0.0 * points[..])`), restored after:
+   cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+           FAIL [   0.105s] (5/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs
+        Summary [   0.137s] 6 tests run: 5 passed, 1 failed, 321 skipped
+       the tab inside the hull isn't found
+       thread 'cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs' (2732) panicked at crates\player\src\cloth_checks.rs:1398:9:
+
+   Restored: 6 run, 6 passed.

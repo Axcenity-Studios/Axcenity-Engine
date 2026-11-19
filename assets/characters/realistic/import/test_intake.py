@@ -390,6 +390,27 @@ class DrapeTest(unittest.TestCase):
         self.assertEqual(report["pinned"], 64)
         self.assertIn("moved_m", report)
 
+    def test_the_cloth_hangs_over_the_layers_it_is_worn_over(self):
+        """Review fixes 2: draped against the body alone, the tee's hem fell
+        into the hollow the underwear bridges (the cleft), and the engine's
+        fit then pushed it out over the underwear, pulling the centre back
+        down into a point. Draped over the layers it is worn over too, it
+        hangs outside them."""
+        body = round_tube(0.15, 0.0, 1.2, sides=32, rings=13, closed=True)
+        # Underwear: a band from 0.4 to 0.7 m standing 2 cm off the skin.
+        under = round_tube(0.17, 0.4, 0.7, sides=32, rings=7)
+        # A tube 1.5 cm off the skin, its lower part inside the band.
+        shirt = round_tube(0.165, 0.5, 1.0, sides=32, rings=11)
+        report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}},
+                               under=[under])
+        low = shirt.P[shirt.P[:, 1] < 0.68]
+        self.assertGreater(len(low), 32)
+        # Every corner over the band is outside it (its collision margin
+        # less a little), none left between it and the skin.
+        self.assertGreater(np.hypot(low[:, 0], low[:, 2]).min(), 0.17 - 0.001)
+        self.assertEqual(report["clearance_m"]["inside_layers"], 0)
+        self.assertGreater(report["pushed_out_first"]["pushed"], 0)
+
 
 def axis_tube(radius, origin, axis, t0, t1, sides=24, rings=8, closed=False):
     """A tube of quads round `axis` (a unit vector through `origin`), from
