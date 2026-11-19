@@ -47,3 +47,28 @@ PASS [   7.890s] (16/16) axcenity-player::bin/axcenity-player fit_gate_tests::st
 Summary [  28.730s] 16 tests run: 10 passed, 6 failed, 253 skipped
 
 The held-pose test's first failure (ArmsForward 1.17 degrees from straight ahead) was the new pose's own error: the arm was let down about the forward axis only, and the rest arm leans a little forward. Fixed in the pose (the shortest turn to hanging), not in the test; it passes since.
+
+Review fixes 2 (the face-normal condition in `enclosed`), before the fix:
+cargo nextest run -p axcenity-player -E 'test(/skin_a_loose_garment/)' --no-fail-fast
+
+    FAIL fit_gate_tests::skin_a_loose_garment_encloses_is_inside_and_skin_through_it_is_out
+    panicked at crates\player\src\fit_gate_tests.rs:1324:5:
+    assertion `left == right` failed: skin under a flipped fold counted inside by -0.020000001
+      left: 0
+     right: 1
+    Summary [0.076s] 1 test run: 0 passed, 1 failed, 271 skipped
+
+Skin 5 mm through the panel, under a fold whose corner normals face out
+but whose triangles face the skin: the smooth normal alone called the
+fold's hit "from inside" and the skin 20 mm inside.
+
+Review fixes 2 (a record's body count must still be earned), before the fix:
+cargo nextest run -p axcenity-player -E 'test(/the_gate_holds_garments/)' --no-fail-fast
+
+    FAIL fit_gate_tests::the_gate_holds_garments_to_their_records
+    panicked at crates\player\src\fit_gate_tests.rs:1237:9:
+    fewer bodies
+    Summary [0.081s] 1 test run: 0 passed, 1 failed, 271 skipped
+
+A record of 2 bodies held with 1 body failing: `check` never caught a
+count left above the measure.

@@ -401,6 +401,11 @@ fn the_sneakers_hold_the_feet() {
 // garment encloses is inside it), not a refit: the bra through the tee in
 // Idle 15.8 -> 5.3 mm, the boxer briefs through the joggers in the walk
 // frame 8.9 -> 5.2 mm, the joggers with the knees bent 39.3 -> 31.1 mm.
+// That last is the value from before the wave-4 merge by coincidence: the
+// knees-bent case is the ankle's, 31.0 mm in every pose, and the 39.3 mm
+// one was enclosed skin; nothing was refitted. Tee-walk review fixes 2
+// (the hit triangle's posed face must agree, `from_inside`) measured
+// every record here again: no count or worst moved, so none changed.
 
 const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
     Known {
