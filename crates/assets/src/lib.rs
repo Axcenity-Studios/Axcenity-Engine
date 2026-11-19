@@ -131,9 +131,8 @@ pub use model::{
     ModelError, ModelFormat, ModelMaterial, ModelObject, ModelShading, MorphTarget, Pick, Pose,
     PoseDriver, Posed, PosedBone, PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig,
     Sheen, Take, TextureRole, Track, TriangleAt, apply_morphs, cached_meshes, cooked_models,
-    derived_mesh_id,
-    embedded_files, is_collision_piece, list_objects, load_model, load_models, load_takes,
-    lod_level, split_derived, strip_tags, tangents, texture_pack_name, texture_roles,
+    derived_mesh_id, embedded_files, is_collision_piece, list_objects, load_model, load_models,
+    load_takes, lod_level, split_derived, strip_tags, tangents, texture_pack_name, texture_roles,
 };
 pub use model_presets::{
     BringIn, DEFAULT_MODEL_PRESET, ImportCollision, LAST_MODEL_PRESET_FILE, ModelSettings, UpAxis,

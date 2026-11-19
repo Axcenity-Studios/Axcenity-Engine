@@ -1391,6 +1391,7 @@ fn the_footwear_check_finds_a_toe_out_of_the_toe_box_at_rest() {
             normals: vec![Vec3::Z; positions.len()],
             positions,
             triangles,
+            hidden: Vec::new(),
         }
     };
     let out = toe(0.125);
@@ -1426,6 +1427,7 @@ fn box_pair(gap: f32) -> Posed {
             .copied()
             .chain(right.triangles.iter().map(|t| t.map(|v| v + first)))
             .collect(),
+        hidden: Vec::new(),
     }
 }
 
@@ -1464,6 +1466,7 @@ fn the_footwear_check_finds_an_inner_side_out_beside_the_other_shoe() {
             normals: vec![-Vec3::X; positions.len()],
             positions,
             triangles,
+            hidden: Vec::new(),
         }
     };
     let out = side(gap / 2.0 - 0.005);

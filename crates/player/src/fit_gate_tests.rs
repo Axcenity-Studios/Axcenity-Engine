@@ -150,8 +150,7 @@ fn make_gate_library(correctives: Option<String>) -> PathBuf {
                 .zip([None, Some("axcenity/realistic-sports-bra")])
             {
                 if tee_fixtures().join(mask).is_file() {
-                    std::fs::copy(tee_fixtures().join(mask), made.join(TEE).join(mask))
-                        .unwrap();
+                    std::fs::copy(tee_fixtures().join(mask), made.join(TEE).join(mask)).unwrap();
                     manifest.hide_maps.push(axcenity_avatar::HideMap {
                         under: under.map(str::to_owned),
                         map: (*mask).to_owned(),

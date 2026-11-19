@@ -275,6 +275,9 @@ pub(crate) const OPENING_VIEWS: [View; 7] = [
         eye: [0.33, 0.2, 0.35],
         target: [-0.1, 3.4, -0.6],
         fov: 60.0,
+    },
+];
+
 /// Cameras for shoes (wave 5, the first sneakers: asset-quality.md §3
 /// "Footwear"), drawn only when named, like [`MORE_VIEWS`]: both feet
 /// from the front, the side, three-quarter, the back and above, low at
