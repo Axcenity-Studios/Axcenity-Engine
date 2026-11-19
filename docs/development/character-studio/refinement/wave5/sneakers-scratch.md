@@ -27,7 +27,7 @@ I also added two measures to the footwear check, `exposed` and `toe box`, each w
 
 ## 1. References (Openverse, looked at, never shipped)
 
-I searched Openverse's API without an account (`api.openverse.org/v1/images/?q=<words>&license=cc0,by,pdm`) for 27 queries and looked at about 300 results as thumbnails. I took 15 at full size and used 12. Review fixes 1 added about 60 more queries (rawpixel, StockSnap, Wikimedia and museum collections; the anonymous API throttled most of the way) and three more photographs, so 15 are recorded. They are saved outside the repository in `axcenity-w5-sources/references/sneakers-scratch/used/` (the search results and metadata are beside them, review fixes 1's under `review1/`). The table below is also in `references/clothing/README.md` §10, as links only.
+I searched Openverse's API without an account (`api.openverse.org/v1/images/?q=<words>&license=cc0,by,pdm`) for 27 queries and looked at about 300 results as thumbnails. I took 15 at full size and used 12. Review fixes 1 added about 60 more queries (rawpixel, StockSnap, Wikimedia and museum collections; the anonymous API throttled most of the way) and three more photographs, so 15 are recorded. They are saved outside the repository in `axcenity-w5-sources/references/sneakers-scratch/used/` (the search results and metadata are beside them, review fixes 1's under `review1/`). The table below is also in `references/clothing/README.md` §11, as links only.
 
 **Not an unbranded set.** The brief asked for photographs of plain, unbranded low-tops. Six of the 12 photographs used to model the shoe are branded products, by their Openverse title or tags or by a mark in the picture: Coach, Dunlop Volley, adidas, Nike (twice) and Marina Militare. A seventh shows a Mossimo insole print. The first hand-back described them only as plain shoes, which was wrong. The brand column below now says so. From each branded one only proportions or construction were taken (where its sole, toe box, collar or lacing sits, how a cupsole is built), never a design element: no logo, panel layout, tab, stripe, perforation or tread pattern. That was true when modelling, too, and the model shows no brand design (the review found none either). Review fixes 1 added an unbranded true-profile side view (1cafb6c7) and two unbranded front views (98a63874, 06135a5f). I found no unbranded rear view of a low-top within the API's anonymous limits. The only back reference is still a Nike heel-collar close-up (66838b71). So the set does not yet cover side, top, front, back and sole with unbranded photographs, and acceptance point 1 is **not met**: for the lead's ruling, keep the branded references as disclosed proportion-only sources, or have the unbranded rear view found (an Openverse API key or a photograph Paul supplies).
 
@@ -323,7 +323,7 @@ Changed:
 - `assets/characters/realistic/clothing/README.md`.
 - `docs/development/character-studio/asset-quality.md`: the Footwear row's "measured by" column; no limit changed.
 - `docs/development/character-studio/testing.md` and `visual-qa.md`.
-- `docs/development/character-studio/references/clothing/README.md` §10.
+- `docs/development/character-studio/references/clothing/README.md` §11.
 - `wiki/Roadmap/Known-Limitations.md` and `wiki/Engine-Systems/Characters.md`.
 
 **Interfaces** (all `pub(crate)` in `player`, test-only):
@@ -382,7 +382,7 @@ So seven of the 12 used are branded.
 
 **What I changed:**
 
-- Section 1's table and `references/clothing/README.md` §10 now have a brand column, giving the title, tags or the mark seen, and say what was taken from each (proportions or construction only) and what was not.
+- Section 1's table and `references/clothing/README.md` §11 now have a brand column, giving the title, tags or the mark seen, and say what was taken from each (proportions or construction only) and what was not.
 - The wrong sentence ("results that showed a brand clearly ... were not used") is corrected in both.
 - Three unbranded photographs are added:
   - **1cafb6c7:** a plain grey canvas low-top in true profile (rawpixel, CC0). It is the side reference for the silhouette measurement.
@@ -434,7 +434,7 @@ Against the references, the lacing ends at 54% where they end at 71% to 80%, and
 - `crates/player/src/garment_checks.rs`: the same-shoe rule in `exposed`, `box_pair` and the negative-control test.
 - `crates/player/src/sneakers_low_tests.rs`: `extremes()`, `wearing()`, `hold_the_feet_of`, the body-extremes test, `EXTREME_RECORDS`.
 - `docs/development/character-studio/refinement/wave5/sneakers-scratch.md` (sections 1, 6, 6a and 8, this section) and `sneakers-scratch-red-run.txt` (appended).
-- `docs/development/character-studio/references/clothing/README.md` §10, `visual-qa.md`, `testing.md`, `assets/characters/realistic/clothing/README.md`, `wiki/Roadmap/Known-Limitations.md`.
+- `docs/development/character-studio/references/clothing/README.md` §11, `visual-qa.md`, `testing.md`, `assets/characters/realistic/clothing/README.md`, `wiki/Roadmap/Known-Limitations.md`.
 
 ### Tests run in review fixes 1
 
@@ -503,7 +503,7 @@ Looking at the same crops found two defects the reviews didn't name, now items 1
 - `docs/development/character-studio/refinement/wave5/sneakers-scratch.md`: sections 2, 4, 5, 6, 6a and 8, and this section.
 - `docs/development/character-studio/refinement/wave5/sneakers-scratch/walk-stance-wedge.jpg` and `eyelets-close.jpg` (new sheets; the folder is now 2.0 MB).
 - `crates/player/src/sneakers_low_tests.rs`: the stride records' comment only.
-- `docs/development/character-studio/testing.md`, `docs/development/character-studio/references/clothing/README.md` §10 (one link), `wiki/Roadmap/Known-Limitations.md`.
+- `docs/development/character-studio/testing.md`, `docs/development/character-studio/references/clothing/README.md` §11 (one link), `wiki/Roadmap/Known-Limitations.md`.
 
 ### Tests run in review fixes 2
 
