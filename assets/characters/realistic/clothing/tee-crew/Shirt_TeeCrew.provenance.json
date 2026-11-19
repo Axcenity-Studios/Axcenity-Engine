@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "asset": "Plain T-shirt",
+  "source_page": "https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/",
+  "author": "Introspective Mnisi",
+  "licence": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "retrieved": "2026-11-18",
+  "files": [
+    {
+      "name": "bk-plain-t-shirt.glb",
+      "sha256": "a0bde896788e40219791bc79b16f67a3619d487c7d2ae8ba3fd20df48eaecc5f",
+      "bytes": 1172888
+    }
+  ],
+  "changes": [
+    "topology repaired: 112 welded",
+    "placed on the Axcenity realistic body",
+    "a rib band made from the faces along its edge",
+    "turned hems added at every open edge (highest: 3 mm thick, 20 mm turned up, lowest: 3 mm thick, 18 mm turned up, left: 3 mm thick, 18 mm turned up, right: 3 mm thick, 18 mm turned up)",
+    "maps baked again from Poly Haven's cotton jersey (CC0) with seams and stitching; the source's own maps dropped",
+    "simpler copies made by decimation (levels of detail)",
+    "fitted, rigged and given the body's shapes by the Axcenity engine's fit",
+    "materials rebuilt for the Axcenity engine"
+  ],
+  "attribution": "\"Plain T-shirt\" by Introspective Mnisi (https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/), licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/); changed: topology repaired: 112 welded; placed on the Axcenity realistic body; a rib band made from the faces along its edge; turned hems added at every open edge (highest: 3 mm thick, 20 mm turned up, lowest: 3 mm thick, 18 mm turned up, left: 3 mm thick, 18 mm turned up, right: 3 mm thick, 18 mm turned up); maps baked again from Poly Haven's cotton jersey (CC0) with seams and stitching; the source's own maps dropped; simpler copies made by decimation (levels of detail); fitted, rigged and given the body's shapes by the Axcenity engine's fit; materials rebuilt for the Axcenity engine, by Axcenity Engine contributors",
+  "items": [
+    "axcenity/realistic-tee-crew"
+  ],
+  "evidence": "The asset's page, https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/ (it redirects to .../126dea9d-bcb8-4edb-a688-b996b4779f84/, the asset's base ID), retrieved 2026-11-18, gives 'Plain T-Shirt', 'license: Creative commons zero', the author 'Introspective Mnisi', 'published 17 Sep 2026' and 'Plain, game ready, T-shirt with unwrapped UV texture and normal map'. Saved as retrieved: docs/development/character-studio/refinement/wave5/tee-licensed/evidence/asset-page-2026-11-18.html (SHA-256 4fd43b0c4ea80d6d00cf895ec2af3dd7a6b15dc49fbf1feb7083950fb438bef2). BlenderKit's API record of the asset (search asset_base_id:126dea9d-bcb8-4edb-a688-b996b4779f84) gives license cc_zero, author Introspective Mnisi, asset id cd6d0347-484a-426c-9c72-9b8c117ef500, verificationStatus validated, created 2026-09-14: saved as evidence/api-record-2026-11-18.json (SHA-256 a2df1cf19da8414f3413f4072522feee66a12c5b22785d4e54861143ca240520). BlenderKit's licensing FAQ: 'the CC0 license technically allows you to do anything with the assets' (evidence/licensing-faq-2026-11-18.html, SHA-256 c7db5b389d7e46709d6af79d8be9588a543a268099c0af56dd73c21ba4c231ff). AUTHORSHIP NOT CONFIRMED: the licence check verified CC0 on the asset's own page but could not confirm that the uploader made the mesh. The uploader is a new author on BlenderKit (the asset is from September 2026) and the mesh inside the downloaded file is named 'base.001'. BlenderKit's position on CC0 models (evidence/position-on-cc0-models-2026-11-18.html, SHA-256 a5c45685ab5a7b9dfade8a730b7ab20d0ab753d2f50fbb13050653bbb3ad4c48) asks people not to upload others' CC0 models and says it has no option yet to exclude an asset from redistribution, and an author may later change an asset's terms; the pages as retrieved are the evidence of the grant on 2026-11-18. No other source of this mesh was looked for."
+}

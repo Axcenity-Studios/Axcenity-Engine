@@ -335,6 +335,17 @@ def changes_of(spec, work):
         out.append(f"placed on the Axcenity realistic body{on}" + (f" ({', '.join(how)})" if how else ""))
     if "pose" in conformed:
         out.append("posed to the realistic body's rest pose")
+    refined = report("refined.json") if os.path.exists(os.path.join(work, "refined.npz")) else {}
+    for name in refined.get("materials", {}):
+        out.append(f"a {name.lower()} band made from the faces along its edge")
+    hems = refined.get("hems", [])
+    if hems:
+        out.append("turned hems added at every open edge (" + ", ".join(
+            f"{h['loop']}: {h['thickness_m'] * 1000:g} mm thick, {h['turn_up_m'] * 1000:g} mm turned up"
+            for h in hems) + ")")
+    if "maps" in refined:
+        out.append(f"maps baked again from Poly Haven's {refined['maps']['fabric'].replace('_', ' ')} (CC0) "
+                   "with seams and stitching; the source's own maps dropped")
     if os.path.exists(os.path.join(work, "lod1.npz")):
         out.append("simpler copies made by decimation (levels of detail)")
     if spec.get("fit", {}).get("rigid_bone"):

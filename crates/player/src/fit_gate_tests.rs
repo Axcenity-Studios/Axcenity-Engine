@@ -636,7 +636,7 @@ pub(super) const HOLES: &str = "hidden skin showing";
 /// Layered pairs the gate checks: (the lower layer, the upper one). A
 /// lower layer never comes through the upper one where the upper one
 /// covers it at rest.
-const LAYERS: [(&str, &str); 7] = [
+const LAYERS: [(&str, &str); 10] = [
     // The realistic sports bra under the test tee.
     ("Underwear_Bra", "TestTee"),
     // The stylized cargo pants' waistband under the tee's hem, and the
@@ -649,6 +649,11 @@ const LAYERS: [(&str, &str); 7] = [
     ("Underwear_Bra", "Shirt_CrewTee"),
     ("Underwear_BoxerBriefs", "Pants_Joggers"),
     ("Underwear_Briefs", "Pants_Joggers"),
+    // The first licensed tee (wave 5, `tee_crew_tests`): every piece of
+    // the realistic underwear it is worn over.
+    ("Underwear_Bra", "Shirt_TeeCrew"),
+    ("Underwear_BoxerBriefs", "Shirt_TeeCrew"),
+    ("Underwear_Briefs", "Shirt_TeeCrew"),
 ];
 
 /// The cover each garment of `garments` gives at rest: (garment name,

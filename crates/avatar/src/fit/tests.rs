@@ -681,3 +681,87 @@ fn corners_moved_by_the_push_out_take_the_normals_of_where_they_are() {
     }
     assert!(kept > 100, "{kept}");
 }
+
+/// A sleeve of `sides` flat panels round the tube, from 0.3 m to 0.7 m,
+/// its corners `radius` from the middle.
+fn coarse_sleeve(sides: usize, radius: f32) -> GarmentMesh {
+    let rings = 5usize;
+    let mut positions = Vec::new();
+    let mut uvs = Vec::new();
+    for ring in 0..rings {
+        let y = 0.3 + 0.4 * ring as f32 / (rings - 1) as f32;
+        for side in 0..sides {
+            let angle = side as f32 / sides as f32 * TAU;
+            positions.push(Vec3::new(angle.cos(), 0.0, angle.sin()) * radius + Vec3::Y * y);
+            uvs.push([side as f32 / sides as f32, y]);
+        }
+    }
+    let mut indices = Vec::new();
+    for ring in 0..rings - 1 {
+        for side in 0..sides {
+            let a = (ring * sides + side) as u32;
+            let b = (ring * sides + (side + 1) % sides) as u32;
+            let c = a + sides as u32;
+            let d = b + sides as u32;
+            indices.extend([a, c, b, b, c, d]);
+        }
+    }
+    let triangles: Vec<[u32; 3]> = indices
+        .chunks_exact(3)
+        .map(|t| [t[0], t[1], t[2]])
+        .collect();
+    let normals = vertex_normals(&positions, &triangles);
+    GarmentMesh {
+        pieces: vec![GarmentPiece {
+            material: "Cotton".to_owned(),
+            colour: [0.2, 0.3, 0.6, 1.0],
+            roughness: 0.8,
+            positions,
+            normals,
+            uvs,
+            indices,
+        }],
+    }
+}
+
+/// Wave 5 (the licensed tee): a garment far coarser than the body under it
+/// (a licensed base at 2,800 triangles over the realistic body) can have
+/// every corner clear of the skin while its flat triangles cut through the
+/// skin between them. The push-out also keeps the body's corners under the
+/// cloth's triangles, by the margin, at rest and at every shape and
+/// extreme.
+#[test]
+fn skin_between_a_coarse_garments_corners_stays_under_its_triangles() {
+    let body = tube_body();
+    // Eight flat panels with their corners 3 mm off the 0.15 m tube: the
+    // middle of each panel is 141 mm from the middle, 9 mm inside it.
+    let garment = coarse_sleeve(8, 0.153);
+    let options = options();
+    let fitted = fit_garment(&body, &garment, &options).unwrap();
+    let cloth = |weights: &[(String, f32)]| {
+        let positions = transfer::garment_at(&fitted.garment.positions(), &fitted.shapes, weights);
+        let triangles = fitted.garment.triangles();
+        let normals = vertex_normals(&positions, &triangles);
+        Surface::new(positions, normals, triangles)
+    };
+    let mut states: Vec<Vec<(String, f32)>> = vec![Vec::new(), vec![("Fat".to_owned(), 1.0)]];
+    states.extend(options.extremes.iter().cloned());
+    for weights in &states {
+        let surface = cloth(weights);
+        let (skin, normals) = body.shaped(weights);
+        let mut worst = f32::NEG_INFINITY;
+        for (p, n) in skin.iter().zip(&normals) {
+            // The skin the sleeve covers, away from its hems.
+            if p.y < 0.4 || p.y > 0.6 || n.y.abs() > 0.5 {
+                continue;
+            }
+            let hit = surface.closest(*p, 0.1).expect("under the sleeve");
+            worst = worst.max(hit.signed(*p));
+        }
+        assert!(
+            worst <= -0.002 + 2e-4,
+            "at {weights:?} the skin comes {:.1} mm from the cloth (the margin is 2 mm)",
+            -worst * 1000.0
+        );
+    }
+}

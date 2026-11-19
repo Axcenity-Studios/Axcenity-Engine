@@ -340,6 +340,81 @@ class SettleTest(unittest.TestCase):
         self.assertAlmostEqual(2.0 - drop, 1.704, places=3)
 
 
+def tube(radius=0.1, height=0.3, around=24, rings=6):
+    """An open tube round Y (a sleeve): quads, outward, mapped onto the
+    lower half of the UV square (the upper half left free)."""
+    P, faces, uv = [], [], []
+    for j in range(rings + 1):
+        for i in range(around):
+            a = 2 * math.pi * i / around
+            P.append([radius * math.cos(a), height * j / rings, radius * math.sin(a)])
+    for j in range(rings):
+        for i in range(around):
+            a, b = j * around + i, j * around + (i + 1) % around
+            faces.append((a, a + around, b + around, b))
+            u0, u1 = i / around * 0.9, (i + 1) / around * 0.9
+            v0, v1 = j / rings * 0.4, (j + 1) / rings * 0.4
+            uv += [(u0, v0), (u0, v1), (u1, v1), (u1, v0)]
+    return WorkMesh.from_faces(np.array(P), faces, uv=np.array(uv))
+
+
+class RefineTest(unittest.TestCase):
+    def test_a_turned_hem_has_its_thickness_and_its_own_texture_space(self):
+        """Wave 5: an open edge turned under is a fold `thickness` thick
+        that lies back up inside for `turn_up`; its strip takes free texture
+        space (no overlap) and the edge is no longer a single layer."""
+        import refine
+        mesh = tube()
+        before = checks.geometry(mesh)["boundary_edges"]
+        report, edges = refine.hems(mesh, [{"loop": "lowest", "thickness": 0.003, "turn_up": 0.018,
+                                            "rows": 3}])
+        self.assertEqual(report[0]["corners"], 24)
+        self.assertEqual(len(edges), 1)
+        # The inner layer: 3 mm inside the cloth all round, up to 18 mm.
+        r = np.linalg.norm(mesh.P[:, [0, 2]], axis=1)
+        inner = mesh.P[r < 0.0995]
+        self.assertAlmostEqual(float(r[r < 0.0995].mean()), 0.097, places=3)
+        self.assertAlmostEqual(float(inner[:, 1].max()), 0.018, places=3)
+        # The fold reaches 1.5 mm below the old edge.
+        self.assertAlmostEqual(float(mesh.P[:, 1].min()), -0.0015, places=4)
+        # Still one open loop at the top and one (the turn-up's end) inside.
+        self.assertEqual(checks.geometry(mesh)["boundary_edges"], before)
+        self.assertEqual(checks.uvs(mesh)["overlap_share"], 0.0)
+
+    def test_an_unwrap_takes_the_stretch_out_of_the_texture(self):
+        """A tube mapped with its texture squashed to a third along it is
+        stretched everywhere; laid out again along its own seams, not."""
+        import refine
+        mesh = tube()
+        mesh.uv[:, 1] *= 0.33
+        self.assertGreater(checks.uvs(mesh)["stretched_share"], 0.9)
+        out, _ = refine.unwrap(mesh, {"method": "CONFORMAL", "margin": 0.01})
+        self.assertLess(checks.uvs(out)["stretched_share"], 0.05)
+
+
+class LoadTest(unittest.TestCase):
+    def test_a_packed_webp_map_is_saved_as_a_png(self):
+        """A glTF may pack its maps as WebP (BlenderKit's do); the engine
+        reads PNG and JPEG, so the copy must be a PNG, not WebP bytes
+        under a `.png` name (wave 5, the licensed tee)."""
+        import bpy
+
+        import load
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        with tempfile.TemporaryDirectory() as folder:
+            image = bpy.data.images.new("Map", 8, 8)
+            image.pixels.foreach_set(np.tile([0.2, 0.4, 0.6, 1.0], 64).astype(np.float32))
+            image.file_format = "WEBP"
+            image.filepath_raw = os.path.join(folder, "map.webp")
+            image.save()
+            image.pack()
+            saved = load._save_image(image, os.path.join(folder, "out"), "Map_base_color")
+            self.assertEqual(saved, "Map_base_color.png")
+            with open(os.path.join(folder, "out", saved), "rb") as f:
+                self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
+            bpy.data.images.remove(image)
+
+
 class DistanceTest(unittest.TestCase):
     def test_a_copy_lies_on_itself(self):
         mesh = cube()

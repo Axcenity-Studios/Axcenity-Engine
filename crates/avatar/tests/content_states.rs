@@ -24,6 +24,11 @@ const WAVE_4_DRAFTS: [&str; 4] = [
     "axcenity/realistic-sneakers",
 ];
 
+/// Wave 5's licensed items, drafts until the lead's review and Paul's
+/// sign-off of the first of each kind: the first licensed tee
+/// (`refinement/wave5/tee-licensed.md`).
+const WAVE_5_DRAFTS: [&str; 1] = ["axcenity/realistic-tee-crew"];
+
 /// The realistic underwear, made before the standard (Legacy).
 const REALISTIC_UNDERWEAR: [&str; 3] = [
     "axcenity/realistic-boxer-briefs",
@@ -83,23 +88,29 @@ fn every_shipped_item_declares_its_state() {
 
 /// The classification (ADR-0043): the stylized family's items are Legacy;
 /// the realistic underwear is Legacy (made before the standard, never
-/// passed it); the four wave-4 items stay Draft; nothing is Production.
+/// passed it); the four wave-4 items and wave 5's licensed tee are Draft;
+/// nothing is Production.
 #[test]
 fn the_shipped_items_are_classified() {
     let library = read();
     for (id, item) in &library.items {
-        let expected = if WAVE_4_DRAFTS.contains(&id.as_str()) {
-            Quality::Draft
-        } else if REALISTIC_UNDERWEAR.contains(&id.as_str())
-            || item.bases.iter().any(|b| b == V1_BASE)
-        {
-            Quality::Legacy
-        } else {
-            panic!("`{id}` isn't classified here: add it");
-        };
+        let expected =
+            if WAVE_4_DRAFTS.contains(&id.as_str()) || WAVE_5_DRAFTS.contains(&id.as_str()) {
+                Quality::Draft
+            } else if REALISTIC_UNDERWEAR.contains(&id.as_str())
+                || item.bases.iter().any(|b| b == V1_BASE)
+            {
+                Quality::Legacy
+            } else {
+                panic!("`{id}` isn't classified here: add it");
+            };
         assert_eq!(item.state(), expected, "{id}");
     }
-    for id in WAVE_4_DRAFTS.iter().chain(&REALISTIC_UNDERWEAR) {
+    for id in WAVE_4_DRAFTS
+        .iter()
+        .chain(&WAVE_5_DRAFTS)
+        .chain(&REALISTIC_UNDERWEAR)
+    {
         assert!(library.item(id).is_some(), "{id} ships");
     }
     let production = library.items.values().filter(|i| i.is_production()).count();
