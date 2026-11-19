@@ -1378,25 +1378,34 @@ fn the_realistic_clothing_page_is_drawn_with_the_test_tee() {
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let tee =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee/TestTee.obj");
-    let imported = axcenity_avatar::fit::import_garment(&axcenity_avatar::fit::ImportRequest {
-        source: tee,
-        library: folder.join(LIBRARY_FOLDER),
-        base: DEFAULT_BASE.to_owned(),
-        id: "imported/test-tee".to_owned(),
-        label: "Test tee".to_owned(),
-        folder: "imported/test-tee".to_owned(),
-        source_info: axcenity_avatar::Source {
-            author: "Axcenity Engine contributors".to_owned(),
-            licence: "CC0-1.0".to_owned(),
-            ..axcenity_avatar::Source::default()
+    // Its masks of what it hides aren't wanted here (wave 5: they take a
+    // minute).
+    let skip = axcenity_avatar::fit::ImportOptions {
+        skip_hiding: true,
+        ..Default::default()
+    };
+    let imported = axcenity_avatar::fit::import_garment_with(
+        &axcenity_avatar::fit::ImportRequest {
+            source: tee,
+            library: folder.join(LIBRARY_FOLDER),
+            base: DEFAULT_BASE.to_owned(),
+            id: "imported/test-tee".to_owned(),
+            label: "Test tee".to_owned(),
+            folder: "imported/test-tee".to_owned(),
+            source_info: axcenity_avatar::Source {
+                author: "Axcenity Engine contributors".to_owned(),
+                licence: "CC0-1.0".to_owned(),
+                ..axcenity_avatar::Source::default()
+            },
+            slot: None,
+            layer: None,
+            margin: 0.002,
+            under: vec!["axcenity/realistic-sports-bra".to_owned()],
+            about: Some("The fitting test garment (CO9): a draft.".to_owned()),
+            finish_pose: None,
         },
-        slot: None,
-        layer: None,
-        margin: 0.002,
-        under: vec!["axcenity/realistic-sports-bra".to_owned()],
-        about: Some("The fitting test garment (CO9): a draft.".to_owned()),
-        finish_pose: None,
-    });
+        skip,
+    );
     assert!(imported.is_ok(), "{:?}", imported.err());
     workspace.apply(Intent::PickCategory(Category::Clothing));
     snapshot(

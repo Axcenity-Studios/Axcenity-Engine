@@ -142,14 +142,72 @@ impl Surface {
     /// grid's cells along the ray in half-cell steps, with each step's
     /// neighbours, so no cell the ray crosses is missed.
     pub fn cast(&self, origin: Vec3, direction: Vec3, reach: f32) -> Option<Hit> {
+        self.cast_with(origin, direction, reach, |_| true, 0.0)
+    }
+
+    /// As [`cast`](Self::cast), meeting only the triangles `keep` takes
+    /// (by index): those facing a viewer, say, when back faces aren't
+    /// drawn. A ray along an edge between two triangles meets one of
+    /// them (an edge is widened by a millionth of the triangle, so a ray
+    /// can't slip between two triangles by rounding). The walk stops
+    /// where the ray leaves the grid.
+    pub fn cast_where(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        reach: f32,
+        keep: impl Fn(u32) -> bool,
+    ) -> Option<Hit> {
+        self.cast_with(origin, direction, reach, keep, 1e-6)
+    }
+
+    fn cast_with(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        reach: f32,
+        keep: impl Fn(u32) -> bool,
+        widen: f32,
+    ) -> Option<Hit> {
         let grid = &self.grid;
         if grid.starts.is_empty() {
             return None;
         }
-        let mut seen = std::collections::HashSet::new();
+        let (enter, exit) = grid.span(origin, direction)?;
+        if enter > reach {
+            return None;
+        }
+        let reach = reach.min(exit);
+        // The triangles already tried, in a set kept per thread (casting is
+        // done millions of times when hiding under clothing is worked out:
+        // `enclosure`), hashed cheaply. The set is borrowed for the whole
+        // walk, so `keep` must not cast on this thread itself (a nested
+        // cast would panic on the second borrow); no caller does.
+        thread_local! {
+            static SEEN: std::cell::RefCell<std::collections::HashSet<u32, Cheap>> =
+                std::cell::RefCell::new(std::collections::HashSet::default());
+        }
+        SEEN.with(|seen| {
+            let mut seen = seen.borrow_mut();
+            seen.clear();
+            self.cast_walk(origin, direction, (enter, reach), &keep, widen, &mut seen)
+        })
+    }
+
+    fn cast_walk(
+        &self,
+        origin: Vec3,
+        direction: Vec3,
+        (enter, reach): (f32, f32),
+        keep: &impl Fn(u32) -> bool,
+        widen: f32,
+        seen: &mut std::collections::HashSet<u32, Cheap>,
+    ) -> Option<Hit> {
+        let grid = &self.grid;
         let mut best: Option<(f32, u32, Vec3)> = None;
         let step = grid.cell * 0.5;
-        let mut t = 0.0;
+        // From where the ray enters the grid's box (nothing is nearer).
+        let mut t = (enter - step).max(0.0);
         while t <= reach + step {
             let [cx, cy, cz] = grid.cell_of(origin + direction * t);
             for z in (cz - 1).max(0)..=(cz + 1).min(grid.counts[2] - 1) {
@@ -159,11 +217,12 @@ impl Surface {
                         let (start, end) =
                             (grid.starts[cell] as usize, grid.starts[cell + 1] as usize);
                         for &triangle in &grid.items[start..end] {
-                            if !seen.insert(triangle) {
+                            if !seen.insert(triangle) || !keep(triangle) {
                                 continue;
                             }
                             let [a, b, c] = self.corners(triangle);
-                            if let Some((along, bary)) = ray_triangle(origin, direction, a, b, c)
+                            if let Some((along, bary)) =
+                                ray_triangle(origin, direction, a, b, c, widen)
                                 && along <= reach
                                 && best.is_none_or(|(best, _, _)| along < best)
                             {
@@ -207,6 +266,35 @@ impl Surface {
     }
 }
 
+/// A hasher for triangle numbers: a multiply, which spreads them well
+/// enough for a set and is much cheaper than the standard one.
+#[derive(Clone, Copy, Default)]
+struct Cheap(u64);
+
+impl std::hash::Hasher for Cheap {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 = (self.0 ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    fn write_u32(&mut self, n: u32) {
+        self.0 = u64::from(n).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    }
+}
+
+impl std::hash::BuildHasher for Cheap {
+    type Hasher = Cheap;
+
+    fn build_hasher(&self) -> Cheap {
+        Cheap(0)
+    }
+}
+
 /// Area-weighted smooth normals of `positions` over `triangles`.
 pub fn vertex_normals(positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<Vec3> {
     let mut normals = vec![Vec3::ZERO; positions.len()];
@@ -227,6 +315,32 @@ pub fn vertex_normals(positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<Vec3> {
 }
 
 impl Grid {
+    /// Where along the ray from `origin` along `direction` it is inside
+    /// the grid's box (a cell wider each way): from and to, or `None` when
+    /// it never is. Nothing of the surface is outside that stretch.
+    fn span(&self, origin: Vec3, direction: Vec3) -> Option<(f32, f32)> {
+        let size = Vec3::new(
+            self.counts[0] as f32,
+            self.counts[1] as f32,
+            self.counts[2] as f32,
+        ) * self.cell;
+        let (lo, hi) = (self.min - self.cell, self.min + size + self.cell);
+        let (mut near, mut far) = (0.0f32, f32::INFINITY);
+        for axis in 0..3 {
+            let d = direction[axis];
+            if d.abs() < 1e-12 {
+                if origin[axis] < lo[axis] || origin[axis] > hi[axis] {
+                    return None;
+                }
+                continue;
+            }
+            let (a, b) = ((lo[axis] - origin[axis]) / d, (hi[axis] - origin[axis]) / d);
+            near = near.max(a.min(b));
+            far = far.min(a.max(b));
+        }
+        (near <= far).then_some((near, far))
+    }
+
     fn new(positions: &[Vec3], triangles: &[[u32; 3]]) -> Self {
         if triangles.is_empty() {
             return Grid::default();
@@ -383,7 +497,14 @@ pub fn closest_on_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> (Vec3, Vec3) {
 /// Where the ray from `origin` along `direction` meets triangle `a b c`
 /// (either side): how far along, and the point's weights of the corners
 /// (Möller and Trumbore).
-fn ray_triangle(origin: Vec3, direction: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<(f32, Vec3)> {
+fn ray_triangle(
+    origin: Vec3,
+    direction: Vec3,
+    a: Vec3,
+    b: Vec3,
+    c: Vec3,
+    widen: f32,
+) -> Option<(f32, Vec3)> {
     let ab = b - a;
     let ac = c - a;
     let p = direction.cross(ac);
@@ -394,14 +515,21 @@ fn ray_triangle(origin: Vec3, direction: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Opt
     let inv = 1.0 / det;
     let s = origin - a;
     let u = s.dot(p) * inv;
-    if !(0.0..=1.0).contains(&u) {
+    if !(-widen..=1.0 + widen).contains(&u) {
         return None;
     }
     let q = s.cross(ab);
     let v = direction.dot(q) * inv;
-    if v < 0.0 || u + v > 1.0 {
+    if v < -widen || u + v > 1.0 + widen {
         return None;
     }
     let t = ac.dot(q) * inv;
+    // Barycentric weights clamped back onto the triangle.
+    let (u, v) = (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0));
+    let (u, v) = if u + v > 1.0 {
+        (u / (u + v), v / (u + v))
+    } else {
+        (u, v)
+    };
     (t >= 0.0).then_some((t, Vec3::new(1.0 - u - v, u, v)))
 }

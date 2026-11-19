@@ -100,6 +100,7 @@ fn main() -> ExitCode {
     let options = ImportOptions {
         keep_placement: placed,
         drape,
+        ..ImportOptions::default()
     };
     match import_garment_with(&request, options) {
         Ok(imported) => {
@@ -112,6 +113,10 @@ fn main() -> ExitCode {
             println!(
                 "slot {}, layer {:?}, hides {:?}",
                 imported.manifest.slot, imported.manifest.layer, imported.manifest.hides
+            );
+            println!(
+                "hide_maps {:?}; hiding {:?}",
+                imported.manifest.hide_maps, imported.hiding
             );
             println!("alignment {:?}", imported.alignment);
             println!("coverage {:?}", imported.coverage);

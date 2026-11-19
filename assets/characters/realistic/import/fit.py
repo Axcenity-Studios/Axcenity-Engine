@@ -419,6 +419,7 @@ def step(spec, work, out_root):
         "bases": [BASE],
         "model": {"file": f"{obj}.glb", "object": f"AxcenityRealistic/{obj}"},
         "hides": item["hides"] if isinstance(item.get("hides"), list) else imported.get("hides", []),
+        "hide_maps": wardrobe.hide_maps(imported, lod0, src, folder, obj) or None,
         "materials": [dict({"name": m["name"],
                             "shading": item.get("materials", {}).get(m["name"], {}).get("shading", "standard"),
                             "label": item.get("materials", {}).get(m["name"], {}).get("label", m["name"])},

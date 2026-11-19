@@ -51,7 +51,9 @@
 //!   [`VIEWS`] and [`MORE_VIEWS`]: the six above and `face-three-quarter`,
 //!   `face-side`, `skin-close`; from [`HAIR_VIEWS`], R6: `hair-back`,
 //!   `hair-top`, `hair-hairline`, `hair-temple`, `hair-crown`,
-//!   `hair-nape`). The sheet has a row per light and a column per view,
+//!   `hair-nape`; from [`OPENING_VIEWS`], wave 5: `hem-up-front`,
+//!   `hem-up-back`, `neck-down`, `sleeve-up`, `cuff-up`, `cuff-close`,
+//!   `hem-up-under`). The sheet has a row per light and a column per view,
 //!   as before.
 //! - `AXCENITY_CAPTURE_POSE` also takes the held poses of the brief's body
 //!   tests ([`HeldPose`]): `t-pose`, `arms-raised`, `elbows-bent`,
@@ -75,6 +77,10 @@
 //!   reach), or with `all` ray traced ambient occlusion and reflections
 //!   too, on a GPU with ray queries (CO8: they trace the posed characters).
 //!   Every preset has them off, so unset nothing is ray traced.
+//! - `AXCENITY_CAPTURE_UNDRAWN=<item ID>,...` (wave 5, hiding under
+//!   clothing) draws those worn items see-through ([`undraw`]): what they
+//!   hide stays hidden, so the picture shows the holes where hidden skin
+//!   and underwear would be. Unset, every item is drawn.
 
 use std::path::{Path, PathBuf};
 
@@ -212,6 +218,63 @@ pub(crate) const HAIR_VIEWS: [View; 6] = [
         eye: [0.0, 4.42, 1.05],
         target: [0.0, 4.45, 0.1],
         fov: 30.0,
+    },
+];
+
+/// Cameras looking into a garment's openings (wave 5, hiding under
+/// clothing: the hole check's views up and down the openings), drawn only
+/// when named, like [`MORE_VIEWS`]: up under the hem from the front and
+/// the back, down the neck from above, up a sleeve from below at the
+/// character's right side, and up the left trouser leg's cuff from in
+/// front just above the floor, from a metre and from under it.
+pub(crate) const OPENING_VIEWS: [View; 7] = [
+    View {
+        name: "hem-up-front",
+        eye: [0.0, 0.9, -2.6],
+        target: [0.0, 3.2, 0.0],
+        fov: 40.0,
+    },
+    View {
+        name: "hem-up-back",
+        eye: [0.0, 0.9, 2.6],
+        target: [0.0, 3.2, 0.0],
+        fov: 40.0,
+    },
+    View {
+        name: "neck-down",
+        eye: [0.0, 6.6, -1.2],
+        target: [0.0, 3.6, 0.0],
+        fov: 35.0,
+    },
+    View {
+        name: "sleeve-up",
+        eye: [-2.4, 2.2, -0.6],
+        target: [-0.5, 3.8, 0.0],
+        fov: 40.0,
+    },
+    View {
+        name: "cuff-up",
+        eye: [0.3, 0.06, -1.1],
+        target: [0.3, 0.42, 0.0],
+        fov: 35.0,
+    },
+    // Close under the same cuff, looking up steeply into the gap between
+    // the rib and the ankle.
+    View {
+        name: "cuff-close",
+        eye: [0.3, 0.08, -0.34],
+        target: [0.3, 0.5, 0.0],
+        fov: 50.0,
+    },
+    // From the floor between the feet, steeply up under the front hem at
+    // the chest's underside: the direction the gate saw the crew tee's
+    // hidden bra from, worn without the joggers, in the walk (review
+    // fixes 2).
+    View {
+        name: "hem-up-under",
+        eye: [0.33, 0.2, 0.35],
+        target: [-0.1, 3.4, -0.6],
+        fov: 60.0,
     },
 ];
 
@@ -370,12 +433,14 @@ pub(crate) fn views_named(names: &str) -> Result<Vec<&'static View>, String> {
                 .iter()
                 .chain(&MORE_VIEWS)
                 .chain(&HAIR_VIEWS)
+                .chain(&OPENING_VIEWS)
                 .find(|view| view.name == name)
                 .ok_or_else(|| {
                     let known: Vec<&str> = VIEWS
                         .iter()
                         .chain(&MORE_VIEWS)
                         .chain(&HAIR_VIEWS)
+                        .chain(&OPENING_VIEWS)
                         .map(|v| v.name)
                         .collect();
                     format!("no view `{name}` (there are {})", known.join(", "))
@@ -771,6 +836,10 @@ fn copy_library(from: &Path, to: &Path) -> Result<(), String> {
         for model in item.models() {
             files.extend(library.path_of(id, &model.file));
         }
+        // What it hides under it (wave 5, hiding under clothing).
+        for hide in &item.hide_maps {
+            files.extend(library.path_of(id, &hide.map));
+        }
         if let Some(strands) = item.groom.as_ref().and_then(|g| g.strands.as_deref()) {
             files.extend(library.path_of(id, strands));
         }
@@ -1043,9 +1112,35 @@ pub(crate) fn capture_in(
     views: &[&View],
 ) -> Result<Vec<Shot>, String> {
     let (mut world, animators) = stage_world(assets, description, settings.stance, settings.face)?;
+    if let Ok(ids) = std::env::var("AXCENITY_CAPTURE_UNDRAWN") {
+        let ids: Vec<&str> = ids.split(',').map(str::trim).collect();
+        undraw(&mut world, &ids);
+    }
     draw_staged(
         device, queue, assets, &mut world, &animators, settings, lights, views,
     )
+}
+
+/// Makes the worn items `ids` see-through in a staged `world` (their parts'
+/// `Transparency` 1), leaving what they hide hidden: the reveal of what
+/// hiding under clothing leaves out. Returns how many parts it changed.
+pub(crate) fn undraw(world: &mut World, ids: &[&str]) -> usize {
+    let parts: Vec<_> = world
+        .descendants(world.workspace())
+        .into_iter()
+        .filter(|id| {
+            world.get(*id).is_some_and(|instance| {
+                matches!(
+                    instance.attribute(axcenity_gameplay::description::DESCRIPTION_PART),
+                    Some(Value::String(item)) if ids.contains(&item.as_str())
+                )
+            })
+        })
+        .collect();
+    for part in &parts {
+        let _ = world.set_property(*part, "Transparency", Value::Number(1.0));
+    }
+    parts.len()
 }
 
 /// Draws a staged `world` ([`stage_world`]) as [`capture_in`] does: each of
@@ -1604,6 +1699,63 @@ fn the_default_run_is_every_fixed_view_under_every_fixed_light() {
     }
     for added in MORE_LIGHTS.iter().map(|more| more.light.name) {
         assert!(LIGHTS.iter().all(|light| light.name != added), "{added}");
+    }
+}
+
+/// `AXCENITY_CAPTURE_UNDRAWN`: the named items' parts are see-through and
+/// the hidden skin under them stays hidden; the body and the other items
+/// are drawn as before.
+#[test]
+fn undrawn_items_are_see_through_and_keep_hiding() {
+    let stage = Stage::new("undraw", &repository_library()).expect("the stage");
+    let library = axcenity_gameplay::description::library(&stage.assets);
+    let mut description =
+        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    description.items.clear();
+    for id in [
+        "axcenity/realistic-boxer-briefs",
+        "axcenity/realistic-crew-tee",
+        "axcenity/realistic-joggers",
+    ] {
+        description.items.push(axcenity_avatar::WornItem::new(id));
+    }
+    let (mut world, _) = stage_world(&stage.assets, &description, Stance::Rest, &[]).unwrap();
+    let parts = |world: &World| -> Vec<(String, String, f64)> {
+        world
+            .descendants(world.workspace())
+            .into_iter()
+            .filter_map(|id| {
+                let instance = world.get(id)?;
+                let Some(Value::String(item)) =
+                    instance.attribute(axcenity_gameplay::description::DESCRIPTION_PART)
+                else {
+                    return None;
+                };
+                let mesh = match instance.property("MeshId") {
+                    Some(Value::String(mesh)) => mesh.clone(),
+                    _ => String::new(),
+                };
+                let transparency = instance
+                    .property("Transparency")
+                    .and_then(Value::as_number)
+                    .unwrap_or(0.0);
+                Some((item.clone(), mesh, transparency))
+            })
+            .collect()
+    };
+    let before = parts(&world);
+    let changed = undraw(
+        &mut world,
+        &["axcenity/realistic-crew-tee", "axcenity/realistic-joggers"],
+    );
+    let after = parts(&world);
+    assert_eq!(changed, 2, "{after:?}");
+    for ((item, mesh, was), (_, mesh_after, now)) in before.iter().zip(&after) {
+        let undrawn = item == "axcenity/realistic-crew-tee" || item == "axcenity/realistic-joggers";
+        assert_eq!(*now, if undrawn { 1.0 } else { *was }, "{item}");
+        // Nothing is drawn again: the body's and the boxers' masked
+        // models are the same.
+        assert_eq!(mesh, mesh_after, "{item}");
     }
 }
 

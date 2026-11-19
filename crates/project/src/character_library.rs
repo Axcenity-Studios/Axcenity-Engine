@@ -162,6 +162,8 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .chain(groom.and_then(|groom| groom.strands.as_deref()))
             .chain(item.thumbnail.as_deref())
             .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()))
+            // The masks of what it hides under it (wave 5).
+            .chain(item.hide_maps.iter().map(|hide| hide.map.as_str()))
             // An imported item's provenance record travels with it, so a
             // game made from the project credits it (decision 11).
             .chain(item.source.as_ref().and_then(|s| s.provenance.as_deref()));
@@ -333,6 +335,20 @@ mod tests {
             );
         }
         assert!(library.validate().is_empty(), "{:?}", library.validate());
+        // An item's masks of what it hides under it come with it (wave 5).
+        let mut masks = 0;
+        for (id, item) in &repository.items {
+            for hide in &item.hide_maps {
+                let file = repository.path_of(id, &hide.map).unwrap();
+                assert_eq!(
+                    fs::read(root.join(&file)).unwrap(),
+                    fs::read(shipped.join(&file)).unwrap(),
+                    "{file}"
+                );
+                masks += 1;
+            }
+        }
+        assert!(masks > 0);
 
         // Again: nothing new to copy, and the catalogue is left alone.
         fs::write(

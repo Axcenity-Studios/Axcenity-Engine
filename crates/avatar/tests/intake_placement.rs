@@ -103,9 +103,13 @@ fn a_placed_item_keeps_its_place_and_an_unplaced_one_is_aligned() {
     let library = scratch_library("placement");
     let tee = lifted_tee(&library.0, 0.04);
 
-    // As the import has always done: put back on the body.
-    let aligned =
-        import_garment_with(&request(&library.0, tee.clone()), ImportOptions::default()).unwrap();
+    // As the import has always done: put back on the body. (Its masks of
+    // what it hides aren't wanted here: they take a minute, wave 5.)
+    let skip = ImportOptions {
+        skip_hiding: true,
+        ..ImportOptions::default()
+    };
+    let aligned = import_garment_with(&request(&library.0, tee.clone()), skip).unwrap();
     assert!(
         aligned.alignment.offset.y < -0.02,
         "a tee made 4 cm too high comes down: {:?}",
@@ -117,7 +121,7 @@ fn a_placed_item_keeps_its_place_and_an_unplaced_one_is_aligned() {
         &request(&library.0, tee),
         ImportOptions {
             keep_placement: true,
-            ..ImportOptions::default()
+            ..skip
         },
     )
     .unwrap();

@@ -142,6 +142,24 @@ pub struct Resolved {
     /// (CO9): a region with a `map_index` is left out of the body drawn
     /// (`axcenity_assets::RegionHiding`), one with a mask shape sinks.
     pub hidden_regions: Vec<String>,
+    /// What the worn items hide triangle by triangle (wave 5, hiding the
+    /// body under clothing; an item manifest's `hide_maps`): for the body
+    /// and for each worn lower layer, the masks over its texture
+    /// coordinates, in the order the items are worn. A mask for a layer
+    /// that isn't worn is left out.
+    pub hide_maps: Vec<ResolvedHideMap>,
+}
+
+/// A mask a worn item hides some of the body's or a worn lower layer's
+/// triangles by ([`crate::HideMap`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResolvedHideMap {
+    /// The worn item whose part it hides; `None` the body.
+    pub under: Option<String>,
+    /// The mask, relative to the library's folder.
+    pub map: String,
+    /// The item that hides it.
+    pub by: String,
 }
 
 /// One mesh of a resolved character.
@@ -386,6 +404,23 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         hidden.extend(manifest.hides.iter().map(String::as_str));
     }
     problems.sort_by_key(|(index, _)| *index);
+    // Masks for the body and for lower layers worn here.
+    let mut hide_maps = Vec::new();
+    for (_, _, manifest) in &worn {
+        for hide in &manifest.hide_maps {
+            let under_worn = hide
+                .under
+                .as_ref()
+                .is_none_or(|under| worn.iter().any(|(_, _, other)| other.id == *under));
+            if under_worn && let Some(map) = library.path_of(&manifest.id, &hide.map) {
+                hide_maps.push(ResolvedHideMap {
+                    under: hide.under.clone(),
+                    map,
+                    by: manifest.id.clone(),
+                });
+            }
+        }
+    }
 
     let values = parameter_values(base, description);
     let value = |id: &str| values.get(id).copied().unwrap_or(0.0);
@@ -497,6 +532,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .filter(|region| hidden.contains(&region.id.as_str()))
             .map(|region| region.id.clone())
             .collect(),
+        hide_maps,
     })
 }
 

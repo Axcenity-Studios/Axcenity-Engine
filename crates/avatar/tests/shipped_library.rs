@@ -619,3 +619,54 @@ fn every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks
         }
     }
 }
+
+/// Wave 5, hiding under clothing: every mask an item names is there,
+/// beside it, an image of the size its model is masked at: the body's
+/// texture square (`fit::BODY_MASK`), or a mesh without texture
+/// coordinates by number (`fit::NUMBERED_WIDTH` a row, a texel per
+/// triangle), and it hides something.
+#[test]
+fn every_hide_map_is_there_and_fits_its_model() {
+    use axcenity_avatar::fit::{BODY_MASK, BodyMesh, LAYER_MASK, NUMBERED_WIDTH};
+    let library = read();
+    let assets = axcenity_assets::Assets::new(root());
+    let mut checked = 0;
+    for (id, item) in &library.items {
+        for hide in &item.hide_maps {
+            let path = library.path_of(id, &hide.map).unwrap();
+            let image = axcenity_assets::read_texture(&root(), &path)
+                .unwrap_or_else(|err| panic!("{id}: {path}: {err}"));
+            let mesh_id = match &hide.under {
+                None => {
+                    let base = library.base(&item.bases[0]).unwrap();
+                    let file = library.path_of(&base.id, &base.model.file).unwrap();
+                    format!("{file}#{}", base.model.body)
+                }
+                Some(under) => {
+                    let lower = library
+                        .item(under)
+                        .unwrap_or_else(|| panic!("{id}: {under}"));
+                    let model = lower.model.as_ref().unwrap();
+                    let file = library.path_of(under, &model.file).unwrap();
+                    format!("{file}#{}", model.object.clone().unwrap_or_default())
+                }
+            };
+            let mesh = BodyMesh::from_model(&assets.model_blocking(&mesh_id).unwrap()).unwrap();
+            let (width, height) = if mesh.uvs.is_empty() {
+                let rows = (mesh.triangles.len() as u32).div_ceil(NUMBERED_WIDTH);
+                (NUMBERED_WIDTH, rows)
+            } else if hide.under.is_none() {
+                (BODY_MASK, BODY_MASK)
+            } else {
+                (LAYER_MASK, LAYER_MASK)
+            };
+            assert_eq!((image.width, image.height), (width, height), "{id}: {path}");
+            assert!(
+                image.rgba().chunks_exact(4).any(|px| px[0] >= 128),
+                "{id}: {path} hides nothing"
+            );
+            checked += 1;
+        }
+    }
+    println!("{checked} masks");
+}

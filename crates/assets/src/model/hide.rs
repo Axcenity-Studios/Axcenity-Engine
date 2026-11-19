@@ -10,6 +10,14 @@ impl Model {
     /// corners, shapes and skeleton are this model's; its key and its
     /// primitives' keys are new.
     pub fn without_triangles(&self, hide: &dyn Fn([f32; 2]) -> bool) -> Model {
+        self.without_triangles_where(&|at: TriangleAt| at.uv.is_some_and(hide))
+    }
+
+    /// A copy without the triangles `hide` says to leave out, told each
+    /// triangle's [`TriangleAt`] (wave 5: a lower layer without texture
+    /// coordinates is masked by its triangles' numbers).
+    pub fn without_triangles_where(&self, hide: &dyn Fn(TriangleAt) -> bool) -> Model {
+        let mut start = 0u32;
         Model {
             key: new_key(),
             size: self.size,
@@ -17,7 +25,11 @@ impl Model {
             primitives: self
                 .primitives
                 .iter()
-                .map(|primitive| kept(primitive, hide))
+                .map(|primitive| {
+                    let first = start;
+                    start += (primitive.indices.len() / 3) as u32;
+                    kept(primitive, Some(first), hide)
+                })
                 .collect(),
             hull_points: self.hull_points.clone(),
             collision: self.collision.clone(),
@@ -29,26 +41,39 @@ impl Model {
     }
 }
 
+/// Where a triangle is, for [`Model::without_triangles_where`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TriangleAt {
+    /// The middle of its texture coordinates (`None` when its primitive
+    /// has none).
+    pub uv: Option<[f32; 2]>,
+    /// Its number over the full-detail model's primitives in order
+    /// (`None` in a simpler copy, a level of detail).
+    pub index: Option<u32>,
+}
+
 /// `primitive` (and its simpler copies) without the triangles `hide`
-/// names.
-fn kept(primitive: &Primitive, hide: &dyn Fn([f32; 2]) -> bool) -> Primitive {
-    let indices = if primitive.uvs.len() == primitive.positions.len() {
-        primitive
-            .indices
-            .chunks_exact(3)
-            .filter(|t| {
-                let uv = t.iter().fold([0.0f32; 2], |sum, &v| {
+/// names. `first` is the number of its first triangle over the model (a
+/// full-detail primitive's).
+fn kept(primitive: &Primitive, first: Option<u32>, hide: &dyn Fn(TriangleAt) -> bool) -> Primitive {
+    let with_uvs = primitive.uvs.len() == primitive.positions.len();
+    let indices = primitive
+        .indices
+        .chunks_exact(3)
+        .enumerate()
+        .filter(|(k, t)| {
+            let uv = with_uvs.then(|| {
+                t.iter().fold([0.0f32; 2], |sum, &v| {
                     let uv = primitive.uvs[v as usize];
                     [sum[0] + uv[0] / 3.0, sum[1] + uv[1] / 3.0]
-                });
-                !hide(uv)
-            })
-            .flatten()
-            .copied()
-            .collect()
-    } else {
-        primitive.indices.clone()
-    };
+                })
+            });
+            let index = first.map(|first| first + *k as u32);
+            !hide(TriangleAt { uv, index })
+        })
+        .flat_map(|(_, t)| t)
+        .copied()
+        .collect();
     Primitive {
         key: new_key(),
         positions: primitive.positions.clone(),
@@ -61,7 +86,11 @@ fn kept(primitive: &Primitive, hide: &dyn Fn([f32; 2]) -> bool) -> Primitive {
         joints: primitive.joints.clone(),
         weights: primitive.weights.clone(),
         morphs: primitive.morphs.clone(),
-        lods: primitive.lods.iter().map(|lod| kept(lod, hide)).collect(),
+        lods: primitive
+            .lods
+            .iter()
+            .map(|lod| kept(lod, None, hide))
+            .collect(),
         level: primitive.level,
     }
 }

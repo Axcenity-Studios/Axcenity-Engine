@@ -13,6 +13,23 @@
     "object": "AxcenityRealistic/Shirt_TeeCrew"
   },
   "hides": [],
+  "hide_maps": [
+    {
+      "map": "Shirt_TeeCrew.hide.png"
+    },
+    {
+      "under": "axcenity/realistic-sports-bra",
+      "map": "Shirt_TeeCrew.hide.realistic-sports-bra.png"
+    },
+    {
+      "under": "axcenity/realistic-briefs",
+      "map": "Shirt_TeeCrew.hide.realistic-briefs.png"
+    },
+    {
+      "under": "axcenity/realistic-boxer-briefs",
+      "map": "Shirt_TeeCrew.hide.realistic-boxer-briefs.png"
+    }
+  ],
   "materials": [
     {
       "name": "Jersey",

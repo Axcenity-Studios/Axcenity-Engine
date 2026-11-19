@@ -329,6 +329,38 @@ pub fn fit_poses(rig: &Rig, finish: Option<FinishPose>) -> Vec<FitPose> {
     poses
 }
 
+/// The poses hiding under clothing is checked in
+/// ([`hide_under`](super::hide_under)): the fit's ([`fit_poses`]), both
+/// arms raised forward to level (the gate's `ArmsForward`), and a long
+/// stride either way round.
+pub fn hide_poses(rig: &Rig, finish: Option<FinishPose>) -> Vec<FitPose> {
+    let mut poses = fit_poses(rig, finish);
+    let mut posing = Posing::new(rig, finish);
+    for side in ["Left", "Right"] {
+        posing.arm_out(side, 5.0);
+        posing.arm_swing(side, 85.0);
+    }
+    poses.push(posing.done("arms-forward"));
+    // A long stride either way round (the thigh further forward and back
+    // than the fit's walk, the knee bent more): the runtime's walk lifts
+    // the hem off the belly and the seat further than the fit's walk does.
+    for (name, ahead) in [("stride-left", "Left"), ("stride-right", "Right")] {
+        let behind = if ahead == "Left" { "Right" } else { "Left" };
+        let mut posing = Posing::new(rig, finish);
+        for side in ["Left", "Right"] {
+            posing.arm_out(side, 14.0);
+            posing.bend_limb(side, true, 30.0);
+        }
+        posing.arm_swing(ahead, 31.0);
+        posing.arm_swing(behind, -49.0);
+        posing.leg_swing(behind, 45.0);
+        posing.leg_swing(ahead, -30.0);
+        posing.bend_limb(behind, false, 60.0);
+        poses.push(posing.done(name));
+    }
+    poses
+}
+
 /// Each joint's matrix in `bones`: from a vertex as bound (the file's
 /// space) to where the pose puts it (the file's space).
 pub fn skin_matrices(rig: &Rig, bones: &[BoneTransform]) -> Vec<Mat4> {

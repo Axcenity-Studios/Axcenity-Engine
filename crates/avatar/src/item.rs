@@ -43,6 +43,13 @@ pub struct ItemManifest {
     /// The body regions it hides, by ID.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hides: Vec<String>,
+    /// What it hides triangle by triangle (wave 5, hiding the body under
+    /// clothing): masks over the body's (or a lower layer's) texture
+    /// coordinates, made by the fit's enclosure rule
+    /// (`fit::hide_under`). Optional: an engine without them draws the
+    /// skin as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hide_maps: Vec<HideMap>,
     /// Every material of its model, with its shading model.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub materials: Vec<MaterialSlot>,
@@ -92,6 +99,20 @@ pub struct ItemManifest {
     /// [`ItemManifest::state`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality: Option<Quality>,
+}
+
+/// A mask of what an item hides under it, triangle by triangle: an image
+/// over the first texture coordinates of the base body (or of a lower
+/// layer's model, `under`). A triangle whose middle falls on a texel with
+/// red at least 128 isn't drawn while the item is worn (and, for a lower
+/// layer, while that layer is worn under it).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HideMap {
+    /// The lower layer it hides, by item ID; unset is the base body.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub under: Option<String>,
+    /// The image, relative to the manifest.
+    pub map: String,
 }
 
 /// An item's content state (Paul's decision 12 of 2026-11-18, ADR-0043;
@@ -576,6 +597,23 @@ impl ItemManifest {
             }
         }
         unique(p, "hides", self.hides.iter());
+        let mut hidden_under = std::collections::BTreeSet::new();
+        for (index, hide) in self.hide_maps.iter().enumerate() {
+            let at = format!("hide_maps[{index}]");
+            check_path(p, &format!("{at}.map"), &hide.map);
+            if let Some(under) = &hide.under {
+                check_id(p, &format!("{at}.under"), under);
+                if *under == self.id {
+                    p.push(Problem::new(&at, "names the item itself"));
+                }
+            }
+            if !hidden_under.insert(hide.under.as_deref()) {
+                p.push(Problem::new(
+                    &at,
+                    "a second mask for the same model (one for the body, one per lower layer)",
+                ));
+            }
+        }
         unique(p, "materials", self.materials.iter().map(|m| &m.name));
         unique(p, "variants", self.variants.iter().map(|v| &v.id));
         for (index, variant) in self.variants.iter().enumerate() {

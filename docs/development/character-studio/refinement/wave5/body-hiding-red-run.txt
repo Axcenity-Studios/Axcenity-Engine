@@ -1,0 +1,78 @@
+Red run, wave 5 body-hiding (2026-11-19): the new tests against the implementation stubbed out
+(hidden_under hides nothing, holes_seen finds nothing, masks aren't read, resolve lists no masks,
+hide_maps aren't checked, the gate counts no hole and never counts hidden skin).
+cargo nextest run -p axcenity-avatar -p axcenity-assets -p axcenity-player --no-fail-fast -E 'test(enclosure::) | test(hiding_under_clothing) | test(a_mask_leaves) | test(hidden_skin_isnt) | test(the_licensed_tee_hides) | test(the_wardrobe_hides)'
+The three that pass test format and geometry helpers the stubs leave alone (the round trip, the mask's texels, the openings).
+
+        FAIL [   0.008s] ( 1/14) axcenity-avatar fit::enclosure::tests::skin_seen_up_an_opening_stays_drawn
+        FAIL [   0.011s] ( 2/14) axcenity-avatar fit::enclosure::tests::cloth_flipped_towards_the_skin_hides_nothing
+        FAIL [   0.013s] ( 3/14) axcenity-avatar fit::enclosure::tests::a_tube_over_a_cylinder_hides_the_skin_it_encloses_away_from_its_openings
+        PASS [   0.016s] ( 4/14) axcenity-avatar tests::hiding_under_clothing::hide_maps_round_trip_and_an_item_without_them_reads_as_before
+        PASS [   0.021s] ( 5/14) axcenity-avatar fit::enclosure::tests::a_masks_middles_read_each_triangles_own_value
+        FAIL [   0.024s] ( 6/14) axcenity-avatar fit::enclosure::tests::a_gap_that_opens_in_a_pose_keeps_the_skin_round_it_drawn
+        FAIL [   0.027s] ( 7/14) axcenity-avatar fit::enclosure::tests::skin_out_through_the_cloth_is_hidden_and_the_cloth_behind_it_is_seen
+        FAIL [   0.031s] ( 8/14) axcenity-avatar tests::hiding_under_clothing::a_worn_items_masks_resolve_for_the_body_and_the_layers_worn_under_it
+        PASS [   0.037s] ( 9/14) axcenity-avatar fit::enclosure::tests::a_tubes_openings_are_its_ends
+        FAIL [   0.039s] (10/14) axcenity-avatar tests::hiding_under_clothing::a_hide_map_must_be_a_path_name_another_item_and_be_one_per_model
+        FAIL [   0.060s] (11/14) axcenity-assets hidden::tests::a_mask_leaves_out_the_triangles_over_its_red_texels
+        FAIL [   0.104s] (12/14) axcenity-player::bin/axcenity-player fit_gate_tests::hidden_skin_isnt_counted_through_the_cloth_and_shows_only_through_a_hole
+        FAIL [   1.067s] (13/14) axcenity-player::bin/axcenity-player tee_crew_tests::the_licensed_tee_hides_the_skin_and_underwear_it_encloses
+        FAIL [   1.302s] (14/14) axcenity-player::bin/axcenity-player wardrobe_tests::the_wardrobe_hides_the_skin_and_underwear_it_encloses
+     Summary [   1.304s] 14 tests run: 3 passed, 11 failed, 720 skipped
+
+    thread 'fit::enclosure::tests::skin_seen_up_an_opening_stays_drawn' (34776) panicked at crates\avatar\src\fit\enclosure_tests.rs:154:5:
+    thread 'fit::enclosure::tests::cloth_flipped_towards_the_skin_hides_nothing' (45604) panicked at crates\avatar\src\fit\enclosure_tests.rs:236:5:
+    thread 'fit::enclosure::tests::a_tube_over_a_cylinder_hides_the_skin_it_encloses_away_from_its_openings' (44944) panicked at crates\avatar\src\fit\enclosure_tests.rs:118:13:
+    z -0.096666664 is drawn: HideReport { cases: 0, enclosed: 0, far: 0, opening: 0, seen: 0, hidden: [] }
+    thread 'fit::enclosure::tests::a_gap_that_opens_in_a_pose_keeps_the_skin_round_it_drawn' (45912) panicked at crates\avatar\src\fit\enclosure_tests.rs:204:17:
+    z 0.103333354 under the upper half is drawn: HideReport { cases: 0, enclosed: 0, far: 0, opening: 0, seen: 0, hidden: [] }
+    thread 'fit::enclosure::tests::skin_out_through_the_cloth_is_hidden_and_the_cloth_behind_it_is_seen' (13484) panicked at crates\avatar\src\fit\enclosure_tests.rs:273:13:
+    thread 'tests::hiding_under_clothing::a_worn_items_masks_resolve_for_the_body_and_the_layers_worn_under_it' (24748) panicked at crates\avatar\src\tests\hiding_under_clothing.rs:72:5:
+      left: []
+     right: [(None, "test/items/tee.hide.png", "test/tee"), (Some("test/watch"), "test/items/tee.hide.watch.png", "test/tee")]
+    thread 'tests::hiding_under_clothing::a_hide_map_must_be_a_path_name_another_item_and_be_one_per_model' (37820) panicked at crates\avatar\src\tests\hiding_under_clothing.rs:54:5:
+    thread 'hidden::tests::a_mask_leaves_out_the_triangles_over_its_red_texels' (39464) panicked at crates\assets\src\hidden.rs:311:9:
+      left: 2
+     right: 1
+    thread 'fit_gate_tests::hidden_skin_isnt_counted_through_the_cloth_and_shows_only_through_a_hole' (8772) panicked at crates\player\src\fit_gate_tests.rs:1543:5:
+      left: 0
+     right: 1
+    thread 'tee_crew_tests::the_licensed_tee_hides_the_skin_and_underwear_it_encloses' (20936) panicked at crates\player\src\tee_crew_tests.rs:185:9:
+    realistic-masculine-cast-average: 0 hidden, at least 1
+    thread 'wardrobe_tests::the_wardrobe_hides_the_skin_and_underwear_it_encloses' (6004) panicked at crates\player\src\wardrobe_tests.rs:73:9:
+    realistic-masculine-cast-average: 0 hidden, at least 1
+
+Review fixes 1 (2026-11-19): the capture's see-through items (AXCENITY_CAPTURE_UNDRAWN), with `undraw` stubbed to change nothing:
+
+cargo nextest run -p axcenity-player -E 'test(undrawn_items)' --no-fail-fast
+        FAIL [   1.104s] (1/1) axcenity-player::bin/axcenity-player character_capture::undrawn_items_are_see_through_and_keep_hiding
+    thread 'character_capture::undrawn_items_are_see_through_and_keep_hiding' panicked at crates\player\src\character_capture.rs:1719:5:
+    assertion `left == right` failed: (changed 0, expected 2; every part's Transparency still 0)
+     Summary [   1.105s] 1 test run: 0 passed, 1 failed, 322 skipped
+
+The new synthetic test `fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views` pins the gate's existing limit (no behaviour change), so it passes as written; it was seen failing against a mutation instead: with GRAZE set to FINE_GRAZE (0.05),
+        FAIL [   0.036s] (1/1) axcenity-avatar fit::enclosure::tests::a_hidden_rim_seen_at_a_graze_is_left_to_the_fine_views
+     Summary [   0.037s] 1 test run: 0 passed, 1 failed, 218 skipped
+(the gate's views then find the ring; the constant was restored with git checkout).
+
+Review fixes 2 (2026-11-19): each wardrobe item worn alone (the crew tee without the joggers; the joggers barefoot without a top), the gate's hole check on every gate body, before trimming the masks for these outfits:
+
+cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/alone_show/)'
+        FAIL [  21.761s] ( 7/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_crew_tee_alone_shows_no_hidden_place_through_the_walk_1
+        FAIL [  30.301s] (11/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_crew_tee_alone_shows_no_hidden_place_through_the_walk_2
+        FAIL [  30.433s] (14/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_joggers_alone_show_no_hidden_place_through_the_walk_2
+        FAIL [  32.485s] (15/21) axcenity-player::bin/axcenity-player wardrobe_tests::the_joggers_alone_show_no_hidden_place_through_the_walk_3
+     Summary [  68.457s] 21 tests run: 17 passed (5 slow), 4 failed, 323 skipped
+
+The bodies that fail (the walk tests, rerun alone):
+      realistic-blend-body-lean-muscular Walk@32 Walk hidden skin showing: 2 vertices out, worst 24.17 mm
+      realistic-blend-body-shortest Walk@2 Walk hidden skin showing: 1 vertices out, worst 10.10 mm
+      realistic-blend-body-slight Walk@29 Walk hidden skin showing: 1 vertices out, worst 19.37 mm
+      realistic-feminine-body-heavy-soft Walk@23 Walk hidden skin showing: 1 vertices out, worst 18.77 mm
+      realistic-feminine-body-lean-muscular Walk@32 Walk hidden skin showing: 3 vertices out, worst 6.96 mm
+      realistic-feminine-body-narrowest-hips Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-body-tallest Walk@32 Walk hidden skin showing: 1 vertices out, worst 16.78 mm
+      realistic-feminine-cast-asymmetry Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-cast-broad-face Walk@32 Walk hidden skin showing: 1 vertices out, worst 4.77 mm
+      realistic-feminine-cast-muscular Walk@32 Walk hidden skin showing: 1 vertices out, worst 1.07 mm
+      realistic-feminine-cast-slim Walk@35 Walk hidden skin showing: 1 vertices out, worst 4.90 mm
