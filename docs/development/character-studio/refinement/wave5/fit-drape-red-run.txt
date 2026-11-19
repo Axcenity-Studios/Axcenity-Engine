@@ -1,0 +1,162 @@
+Wave 5 stage 3, fit-drape: the RED run (2026-11-18).
+
+1. The cloth-defect check (crates/player/src/cloth_checks.rs), its measures stubbed
+   (stretched, folded, hanging and the hulls returning nothing), the synthetic tests
+   written first:
+
+cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+        PASS [   0.068s] (1/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_bones_name_the_parts
+        PASS [   0.084s] (2/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_cloth_check_holds_garments_to_their_records
+        FAIL [   0.084s] (3/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_tab_hanging_off_the_body_is_found
+        FAIL [   0.084s] (4/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_fold_turned_over_is_found
+        FAIL [   0.084s] (5/5) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_sheet_stretched_past_the_fabric_is_found
+     Summary [   0.092s] 5 tests run: 2 passed, 3 failed, 288 skipped
+
+(The two that pass are the bone-to-part names and the records' ratchet, written with
+their code; the three measures fail until they are written.)
+
+2. The hem pulled into a point (the licensed tee's centre-back tab, which the hull
+   measure alone doesn't reach: it hangs within the tee's ease of the buttocks), its
+   measure `hem_points` stubbed, its synthetic test written first:
+
+cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+        PASS [   0.076s] (1/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_fold_turned_over_is_found
+        PASS [   0.076s] (2/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_bones_name_the_parts
+        PASS [   0.076s] (3/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::the_cloth_check_holds_garments_to_their_records
+        FAIL [   0.075s] (4/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs
+        PASS [   0.090s] (5/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_sheet_stretched_past_the_fabric_is_found
+        PASS [   0.216s] (6/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_tab_hanging_off_the_body_is_found
+     Summary [   0.217s] 6 tests run: 5 passed, 1 failed, 321 skipped
+
+3. The drape-preserving engine fit (crates/avatar/src/fit/transfer.rs): a loose sleeve
+   (4 cm of ease) over a 3 cm bulge of the skin, written first against wave 4's fit:
+
+cargo nextest run -p axcenity-avatar -E 'test(/fit::tests::(a_loose|carried_shapes)/)' --no-fail-fast
+
+        PASS [   0.037s] (1/2) axcenity-avatar fit::tests::carried_shapes_follow_the_body_and_clear_it_at_full_weight
+        FAIL [   0.039s] (2/2) axcenity-avatar fit::tests::a_loose_garment_keeps_its_ease_when_the_body_changes
+    thread 'fit::tests::a_loose_garment_keeps_its_ease_when_the_body_changes' panicked at crates\avatar\src\fit\tests.rs:792:5:
+    the loose sleeve followed the bump 0.030000001
+     Summary [   0.040s] 2 tests run: 1 passed, 1 failed, 206 skipped
+
+(Every corner follows its own bound point's frame, so the sleeve, 4 cm off the skin,
+is drawn out over the whole 3 cm bump: the shrink-wrap.)
+
+4. The intake's grade and drape (assets/characters/realistic/import/conform.py), tests
+   written first (Blender's Python):
+
+python -I assets/characters/realistic/import/test_intake.py DrapeTest
+
+AttributeError: module 'conform' has no attribute 'girth'
+AttributeError: module 'conform' has no attribute 'drape'
+AttributeError: module 'conform' has no attribute 'grade'
+Ran 3 tests in 0.002s
+FAILED (errors=3)
+
+Review fixes 1
+==============
+
+5. The intake's sleeve grade, the neck held at the highest height's grade, a height's own
+   ease, the smoothed push-out and the pinned neck band (conform.py), the tests written
+   first and run against the committed conform.py (a4d9f29c) (Blender's Python):
+
+python -I assets/characters/realistic/import/test_intake.py GradeReviewTest
+
+ERROR: test_a_height_can_ask_its_own_ease (__main__.GradeReviewTest.test_a_height_can_ask_its_own_ease)
+ValueError: operands could not be broadcast together with shapes (528,) (2,) 
+ERROR: test_what_is_left_to_push_out_moves_as_one_smooth_patch (__main__.GradeReviewTest.test_what_is_left_to_push_out_moves_as_one_smooth_patch)
+TypeError: push_out() got an unexpected keyword argument 'rounds'
+FAIL: test_a_small_sleeve_is_graded_round_its_arm (__main__.GradeReviewTest.test_a_small_sleeve_is_graded_round_its_arm)
+AssertionError: np.float64(0.03210050506338831) not greater than 0.055729577951308236
+FAIL: test_the_neck_keeps_the_grade_of_the_highest_height (__main__.GradeReviewTest.test_the_neck_keeps_the_grade_of_the_highest_height)
+AssertionError: 0.8790185940913677 != 1.002477796076938 within 0.006 delta (0.12345920198557025 difference)
+FAIL: test_the_whole_neck_band_is_pinned_where_it_was_graded (__main__.GradeReviewTest.test_the_whole_neck_band_is_pinned_where_it_was_graded)
+AssertionError: 
+Ran 5 tests in 0.630s
+FAILED (failures=3, errors=2)
+
+(The first red run used a body tube without rings at the graded heights; the fixtures
+were corrected to rings=11 and the sleeve test to 'at least its ease' before the green,
+and the run above is the corrected tests against the old conform.py.)
+
+6. The engine fit's drape mechanisms the review found untested (crates/avatar/src/fit/
+   transfer.rs), each new test run with its mechanism removed, then restored:
+
+LOOSE_WEIGHT_ROUNDS set to 0; cargo nextest run -p axcenity-avatar --no-fail-fast
+
+        FAIL [   0.414s] ( 66/209) axcenity-avatar fit::tests::a_loose_garments_weights_mix_across_a_bone_split_and_cloth_on_the_skin_keeps_its_own
+    loose cloth's weights mixed 0.001193583 with drape against 0.001193583 without
+     Summary [  26.961s] 209 tests run: 208 passed, 1 failed, 1 skipped
+        FAIL [   0.414s] ( 66/209) axcenity-avatar fit::tests::a_loose_garments_weights_mix_across_a_bone_split_and_cloth_on_the_skin_keeps_its_own
+
+The bulge clamp disabled ('if short > 0.0 && false'); cargo nextest run -p axcenity-avatar --no-fail-fast
+
+        FAIL [   0.119s] (  8/209) axcenity-avatar fit::tests::a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it
+    loose cloth over a bulge bigger than its ease is 0.002000004 m off it
+     Summary [  30.686s] 209 tests run: 208 passed (1 slow), 1 failed, 1 skipped
+        FAIL [   0.119s] (  8/209) axcenity-avatar fit::tests::a_bulge_bigger_than_the_ease_carries_loose_cloth_out_with_it
+
+7. The free hems relaxed along themselves (conform.py relax_edges), written first:
+
+python -I assets/characters/realistic/import/test_intake.py GradeReviewTest.test_a_jagged_free_edge_is_relaxed_along_itself
+
+ERROR: test_a_jagged_free_edge_is_relaxed_along_itself (__main__.GradeReviewTest.test_a_jagged_free_edge_is_relaxed_along_itself)
+AttributeError: module 'conform' has no attribute 'relax_edges'
+Ran 1 test in 0.001s
+FAILED (errors=1)
+
+==============
+Review fixes 2
+==============
+
+8. The drape over the layers the item is worn over (conform.py drape(.., under=)),
+   test written first:
+   python -I assets/characters/realistic/import/test_intake.py DrapeTest
+   (a) against conform.py without the change: drape() has no `under`:
+
+======================================================================
+ERROR: test_the_cloth_hangs_over_the_layers_it_is_worn_over (__main__.DrapeTest.test_the_cloth_hangs_over_the_layers_it_is_worn_over)
+Review fixes 2: draped against the body alone, the tee's hem fell
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\Paul Janota\Desktop\axcenity-w5-fit-drape\assets\characters\realistic\import\test_intake.py", line 404, in test_the_cloth_hangs_over_the_layers_it_is_worn_over
+    report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}},
+                           under=[under])
+TypeError: drape() got an unexpected keyword argument 'under'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.689s
+
+FAILED (errors=1)
+
+   (b) with `under` accepted but ignored (the collider and the push the body only;
+   restored after):
+
+Review fixes 2: draped against the body alone, the tee's hem fell
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\Paul Janota\Desktop\axcenity-w5-fit-drape\assets\characters\realistic\import\test_intake.py", line 410, in test_the_cloth_hangs_over_the_layers_it_is_worn_over
+    self.assertGreater(np.hypot(low[:, 0], low[:, 2]).min(), 0.17 - 0.001)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: np.float64(0.1649923318695568) not greater than 0.169
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.752s
+
+FAILED (failures=1)
+
+   With the change: Ran 4 tests, OK; the whole file: Ran 40 tests, OK.
+
+9. The hem-point path of hanging() isolated (cloth_checks.rs, a_hem_pulled_into_a_point_hangs:
+   a body reaching 12 cm below the hem, so the tab is inside its hull). Red with the
+   hem points taken out of hanging() (`most.max(0.0 * points[..])`), restored after:
+   cargo nextest run -p axcenity-player -E 'test(/cloth_checks::synthetic/)' --no-fail-fast
+
+           FAIL [   0.105s] (5/6) axcenity-player::bin/axcenity-player cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs
+        Summary [   0.137s] 6 tests run: 5 passed, 1 failed, 321 skipped
+       the tab inside the hull isn't found
+       thread 'cloth_checks::synthetic::a_hem_pulled_into_a_point_hangs' (2732) panicked at crates\player\src\cloth_checks.rs:1398:9:
+
+   Restored: 6 run, 6 passed.

@@ -237,7 +237,7 @@ Every item made from a third-party asset names a **provenance record**, a sideca
 | Method | How the item follows the body | Who uses it |
 |---|---|---|
 | `shapes` | The item carries its own copies of the named body shapes; the runtime gives each the body's weight by name (section 14) | The stylized humanoid's garments and hair (today's build) |
-| `binding` | Each item vertex is bound to the body's surface (a triangle, the point's weights of its corners, and the vertex's offset in the frame of the triangle's smoothed normal and first edge), **made at build or import** (CO9, `avatar::fit`, ADR-0041 decision 4): through the binding the item takes the body's skin weights and **every identity and corrective shape of the body, as morph targets of the same names**, pushed clear of the body and of every lower layer by `margin` metres (default 0.002) at rest, at each shape's full weight and at the parameter extremes. At run time it is a skinned part like a `shapes` item: it takes the body's weight of every shape it has (section 14), so nothing is fitted or rebuilt when the description changes. `data` is the binding file (format 1: `{format_version, body, vertices: [{triangle, bary, local}]}`), kept for refitting | Every new garment (CO10) and every import (the test tee) |
+| `binding` | Each item vertex is bound to the body's surface (a triangle, the point's weights of its corners, and the vertex's offset in the frame of the triangle's smoothed normal and first edge), **made at build or import** (CO9, `avatar::fit`, ADR-0041 decision 4): through the binding the item takes the body's skin weights and **every identity and corrective shape of the body, as morph targets of the same names**, pushed clear of the body and of every lower layer by `margin` metres (default 0.002) at rest, at each shape's full weight and at the parameter extremes. A garment with ease of its own (draped onto the body by cloth simulation in the licensed-asset intake, wave 5 stage 3) is fitted with `drape`: its loose cloth takes each shape's displacement smoothed over it, so it keeps its ease and hang instead of following every bulge of the skin. At run time it is a skinned part like a `shapes` item: it takes the body's weight of every shape it has (section 14), so nothing is fitted or rebuilt when the description changes. `data` is the binding file (format 1: `{format_version, body, vertices: [{triangle, bary, local}]}`), kept for refitting | Every new garment (CO10) and every import (the test tee) |
 | `socket` | Rigid on a socket; scaled by the socket bone's scale | Caps, glasses, watches |
 
 **The realistic body's underwear** (`assets/characters/realistic/underwear.py`, 2026-11-16) is cut from the body's own surface, so it is fitted by `shapes`: its vertices are fixed mixes of body vertices and carry every body shape exactly. CO9 measured it against the transfer (`avatar`'s `tests/fitting.rs`): where its cloth lies on the skin the transferred shapes agree (90 to 96% of offsets within 1 mm), and where it bridges a hollow (the gusset, the bra between the breasts on the feminine frame) its own per-frame shapes are right and a transfer by binding would not be (up to 64 mm off), so it keeps `shapes`. Its regions keep their mask shapes, which sink the skin under it 5 mm (easing out 15 mm past the hems): it covers no map region whole, so map hiding can't stand in for them.
@@ -479,7 +479,11 @@ GarmentMesh::from_model(&Model);  Surface::new(positions, normals, triangles).cl
 bind(&Surface, &[Vec3], &[Vec3]) -> Binding                         // garment points and their normals (empty: closest points)
 place(&Binding, positions, normals, triangles) -> Vec<Vec3>
 carried_shapes(&BaseManifest, &BodyMesh) -> Vec<String>          // identity (parameters, corners) + Corrective_*, no Mask_*
-fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds, poses, pose_states }) -> Result<Fitted, FitError>
+fit_garment(&BodyMesh, &GarmentMesh, &FitOptions { margin, shapes, under: Vec<Layer>, extremes, rounds, poses, pose_states, drape }) -> Result<Fitted, FitError>
+    // drape (wave 5 stage 3, a garment draped onto the body by the intake's cloth simulation): a body shape moves
+    // its loose cloth (more than 1 cm off the body or the layer under it, fully past 3 cm) by the shape's displacement
+    // smoothed over the garment (48 rounds), taking in a bulge of the skin only up to that ease; loose cloth's
+    // weights smoothed 6 rounds more. Off (the default): every corner follows its own bound point's frame
     // weights from the skin under each corner (both sides of a crease), the bound point's where none; normals turned with the push-out
     // push-out both ways (wave 5): each garment corner `margin` out of the body and lower layers, and each body or
     // lower-layer corner its triangles cover (facing the same way, within 12 mm past them, not enclosed) `margin`
@@ -502,7 +506,7 @@ RegionHiding { map, hidden };  Assets::hide_regions(mesh_id, &Arc<RegionHiding>)
 hidden_mesh_id(base, key);  split_hidden(mesh_id);  strip_tags(mesh_id);  Model::without_triangles(&dyn Fn(uv) -> bool)
 ```
 
-The command line: `cargo run -p axcenity-avatar --release --example import_garment -- <garment> <library> <base> <id> <label> <folder> [--under <id>]...`.
+The command line: `cargo run -p axcenity-avatar --release --example import_garment -- <garment> <library> <base> <id> <label> <folder> [--under <id>]... [--placed] [--drape]` (`ImportOptions { keep_placement, drape }`).
 
 ## 17. Lua API (built in CO3, Roblox-familiar names)
 

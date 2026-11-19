@@ -18,6 +18,10 @@
   "changes": [
     "topology repaired: 112 welded",
     "placed on the Axcenity realistic body",
+    "graded to the realistic body by its girths (up to x1.2049 across)",
+    "its left sleeve graded round the arm (up to x1.0345)",
+    "its right sleeve graded round the arm (up to x1.061)",
+    "draped onto the realistic body by cloth simulation, hanging from its neck and shoulders",
     "texture coordinates laid out again (Blender's conformal unwrap along the source's own seams)",
     "a rib band made from the faces along its edge",
     "turned hems added at every open edge (highest: 3 mm thick, 20 mm turned up, lowest: 3 mm thick, 18 mm turned up, left: 3 mm thick, 18 mm turned up, right: 3 mm thick, 18 mm turned up)",
@@ -26,7 +30,7 @@
     "fitted, rigged and given the body's shapes by the Axcenity engine's fit",
     "materials rebuilt for the Axcenity engine"
   ],
-  "attribution": "\"Plain T-shirt\" by Introspective Mnisi (https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/), licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/); changed: topology repaired: 112 welded; placed on the Axcenity realistic body; texture coordinates laid out again (Blender's conformal unwrap along the source's own seams); a rib band made from the faces along its edge; turned hems added at every open edge (highest: 3 mm thick, 20 mm turned up, lowest: 3 mm thick, 18 mm turned up, left: 3 mm thick, 18 mm turned up, right: 3 mm thick, 18 mm turned up); maps baked again from Poly Haven's cotton jersey (CC0) with seams and stitching; the source's own maps dropped; simpler copies made by decimation (levels of detail); fitted, rigged and given the body's shapes by the Axcenity engine's fit; materials rebuilt for the Axcenity engine, by Axcenity Engine contributors",
+  "attribution": "\"Plain T-shirt\" by Introspective Mnisi (https://www.blendkit.com/asset-gallery-detail/cd6d0347-484a-426c-9c72-9b8c117ef500/), licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/); changed: topology repaired: 112 welded; placed on the Axcenity realistic body; graded to the realistic body by its girths (up to x1.2049 across); its left sleeve graded round the arm (up to x1.0345); its right sleeve graded round the arm (up to x1.061); draped onto the realistic body by cloth simulation, hanging from its neck and shoulders; texture coordinates laid out again (Blender's conformal unwrap along the source's own seams); a rib band made from the faces along its edge; turned hems added at every open edge (highest: 3 mm thick, 20 mm turned up, lowest: 3 mm thick, 18 mm turned up, left: 3 mm thick, 18 mm turned up, right: 3 mm thick, 18 mm turned up); maps baked again from Poly Haven's cotton jersey (CC0) with seams and stitching; the source's own maps dropped; simpler copies made by decimation (levels of detail); fitted, rigged and given the body's shapes by the Axcenity engine's fit; materials rebuilt for the Axcenity engine, by Axcenity Engine contributors",
   "items": [
     "axcenity/realistic-tee-crew"
   ],

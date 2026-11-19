@@ -1559,6 +1559,8 @@ mod bench_tests;
 #[cfg(test)]
 mod character_capture;
 #[cfg(test)]
+mod cloth_checks;
+#[cfg(test)]
 mod content_state_tests;
 #[cfg(test)]
 mod face_preset_tests;

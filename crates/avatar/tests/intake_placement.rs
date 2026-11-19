@@ -117,6 +117,7 @@ fn a_placed_item_keeps_its_place_and_an_unplaced_one_is_aligned() {
         &request(&library.0, tee),
         ImportOptions {
             keep_placement: true,
+            ..ImportOptions::default()
         },
     )
     .unwrap();

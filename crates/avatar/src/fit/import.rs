@@ -433,6 +433,9 @@ pub struct ImportOptions {
     /// ([`align`] looks for an even ease, which lifts a brimmed hat off
     /// the head). The alignment says scale 1 and no offset.
     pub keep_placement: bool,
+    /// The garment hangs with ease of its own (draped onto the body by the
+    /// intake's cloth simulation): [`FitOptions::drape`].
+    pub drape: bool,
 }
 
 /// [`import_garment`] with `options`.
@@ -503,6 +506,7 @@ pub fn import_garment_with(
         extremes: extremes_near(&body, &garment, &extremes_of(base, &library)),
         poses: fit_poses(&body.rig, request.finish_pose),
         pose_states: pose_states_of(base, &library),
+        drape: options.drape,
         ..FitOptions::default()
     };
     let fitted = fit_garment(&body, &garment, &options)?;

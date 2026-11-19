@@ -33,6 +33,23 @@ const OVER_FACING: f32 = 0.7;
 /// How many rounds the transferred weights are smoothed over the
 /// garment.
 const WEIGHT_ROUNDS: usize = 2;
+/// A corner bound this near the skin (or nearer) follows its own bound
+/// point, and the frame there, exactly: cloth on the skin moves with it.
+const ON_SKIN: f32 = 0.01;
+/// A corner bound this far off the skin (or farther) has ease: a body
+/// shape moves it by the body's displacement smoothed over the garment
+/// ([`DRAPE_ROUNDS`]), so the cloth keeps its ease and hang where the skin
+/// under it bulges or hollows, and only the push-out moves it out where
+/// the skin would come through. Between the two, a mix.
+const LOOSE: f32 = 0.03;
+/// How many rounds a shape's displacement is smoothed over the garment for
+/// loose cloth (each mixes a corner half and half with its neighbours':
+/// about five corners of reach, 10 to 15 cm on a tee).
+const DRAPE_ROUNDS: usize = 48;
+/// How many more rounds loose cloth's weights are smoothed: cloth across
+/// the armpit or between the legs moves with both sides, not with
+/// whichever skin is nearest.
+const LOOSE_WEIGHT_ROUNDS: usize = 6;
 /// A shape that moves no bound point farther than this moves the garment
 /// by nothing worth checking.
 const LEAST: f32 = 1e-5;
@@ -60,6 +77,14 @@ pub struct FitOptions {
     /// (`posed`). Empty: not posed.
     pub poses: Vec<FitPose>,
     pub pose_states: Vec<Vec<(String, f32)>>,
+    /// The garment hangs with ease of its own (wave 5 stage 3: a licensed
+    /// garment draped onto the body by cloth simulation, the intake's
+    /// `conform.drape`): body shapes move its loose cloth by the body's
+    /// displacement smoothed over it, taking in a bulge of the skin up to
+    /// its ease ([`LOOSE`]), and its loose cloth's weights are smoothed
+    /// more ([`LOOSE_WEIGHT_ROUNDS`]). Off: every corner follows its own
+    /// bound point (cloth made on the skin).
+    pub drape: bool,
 }
 
 impl Default for FitOptions {
@@ -72,6 +97,7 @@ impl Default for FitOptions {
             rounds: 4,
             poses: Vec::new(),
             pose_states: Vec::new(),
+            drape: false,
         }
     }
 }
@@ -410,7 +436,36 @@ pub fn fit_garment(
     // Smoothed over the garment, so where neighbouring corners were bound
     // to different limbs (a sleeve meeting the torso) the cloth stretches
     // over a few corners instead of tearing at one edge.
-    let (joints, weights) = welds.smooth_weights(&joints, &weights, WEIGHT_ROUNDS);
+    let (joints, weights) = welds.smooth_weights(&joints, &weights, WEIGHT_ROUNDS, None);
+    // How much ease each corner has at rest: how far it is from the body
+    // or the nearest layer under it (as far as `LOOSE`); and so how loose
+    // it is (0 on the skin, 1 with ease: [`ON_SKIN`], [`LOOSE`]).
+    let ease: Vec<f32> = rest
+        .iter()
+        .map(|p| {
+            at_rest
+                .surfaces
+                .iter()
+                .filter_map(|(_, surface, _)| surface.closest(*p, LOOSE))
+                .map(|hit| hit.distance)
+                .fold(LOOSE, f32::min)
+        })
+        .collect();
+    let loose: Vec<f32> = ease
+        .iter()
+        .map(|off| {
+            if options.drape {
+                ((off - ON_SKIN) / (LOOSE - ON_SKIN)).clamp(0.0, 1.0)
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let (joints, weights) = if options.drape {
+        welds.smooth_weights(&joints, &weights, LOOSE_WEIGHT_ROUNDS, Some(&loose))
+    } else {
+        (joints, weights)
+    };
 
     // 4. Every carried shape, pushed out at its full weight (each on its
     // own, so they are worked out side by side).
@@ -435,6 +490,22 @@ pub fn fit_garment(
         let moves =
             body.shapes[index].reach() > LEAST && offsets.iter().any(|o| o.length() > LEAST);
         let mut pushes = Vec::new();
+        if moves && options.drape {
+            // Loose cloth takes the displacement smoothed over the garment,
+            // but takes in a bulge of the skin under it only as far as its
+            // ease there (how far it is off the skin, less `ON_SKIN`): past
+            // that the cloth moves out with the skin.
+            let smooth = welds.smooth_field(&offsets, DRAPE_ROUNDS);
+            for (k, o) in offsets.iter_mut().enumerate() {
+                let normal = rest_frames[k].1 * Vec3::Z;
+                let mut moved = o.lerp(smooth[k], loose[k]);
+                let short = o.dot(normal) - (ease[k] - ON_SKIN).max(0.0) - moved.dot(normal);
+                if short > 0.0 {
+                    moved += normal * short;
+                }
+                *o = moved;
+            }
+        }
         if moves {
             let state = obstacles(body, &near, &options.under, &weights);
             for _ in 0..options.rounds.max(1) {
@@ -982,13 +1053,28 @@ impl Welds {
 
     /// Skin weights (per corner) made the same for welded corners and
     /// each round mixed half and half with the mean of the neighbours',
-    /// the four largest kept, adding up to 1.
+    /// the four largest kept, adding up to 1. With `only`, each corner
+    /// mixes in that share of half (0: not at all), and only those over 0
+    /// change.
     fn smooth_weights(
         &self,
         joints: &[[u16; 4]],
         weights: &[[f32; 4]],
         rounds: usize,
+        only: Option<&[f32]>,
     ) -> (Vec<[u16; 4]>, Vec<[f32; 4]>) {
+        // Each group's share (the largest of its corners').
+        let mut share = vec![1.0f32; self.neighbours.len()];
+        if let Some(only) = only {
+            share.fill(0.0);
+            for (corner, t) in only.iter().enumerate() {
+                let g = self.group[corner];
+                share[g] = share[g].max(*t);
+            }
+            if share.iter().all(|t| *t <= 0.0) {
+                return (joints.to_vec(), weights.to_vec());
+            }
+        }
         let mut groups: Vec<BTreeMap<u16, f32>> = vec![BTreeMap::new(); self.neighbours.len()];
         let mut counts = vec![0usize; self.neighbours.len()];
         for (corner, (j, w)) in joints.iter().zip(weights).enumerate() {
@@ -1008,17 +1094,18 @@ impl Welds {
         for _ in 0..rounds {
             let before = groups.clone();
             for (g, list) in self.neighbours.iter().enumerate() {
-                if list.is_empty() {
+                if list.is_empty() || share[g] <= 0.0 {
                     continue;
                 }
+                let mix = 0.5 * share[g];
                 let mut mixed: BTreeMap<u16, f32> = BTreeMap::new();
                 for (joint, weight) in &before[g] {
-                    *mixed.entry(*joint).or_default() += 0.5 * weight;
+                    *mixed.entry(*joint).or_default() += (1.0 - mix) * weight;
                 }
-                let share = 0.5 / list.len() as f32;
+                let each = mix / list.len() as f32;
                 for other in list {
                     for (joint, weight) in &before[*other] {
-                        *mixed.entry(*joint).or_default() += share * weight;
+                        *mixed.entry(*joint).or_default() += each * weight;
                     }
                 }
                 groups[g] = mixed;
@@ -1043,6 +1130,34 @@ impl Welds {
             })
             .collect();
         self.group.iter().map(|g| limited[*g]).unzip()
+    }
+
+    /// `field` (a move per corner) smoothed over the garment: made the
+    /// same for welded corners (their mean), then each round every corner
+    /// mixed half and half with the mean of its neighbours'.
+    fn smooth_field(&self, field: &[Vec3], rounds: usize) -> Vec<Vec3> {
+        let mut sums = vec![Vec3::ZERO; self.neighbours.len()];
+        let mut counts = vec![0u32; self.neighbours.len()];
+        for (corner, v) in field.iter().enumerate() {
+            sums[self.group[corner]] += *v;
+            counts[self.group[corner]] += 1;
+        }
+        let mut amount: Vec<Vec3> = sums
+            .iter()
+            .zip(&counts)
+            .map(|(s, c)| *s / (*c).max(1) as f32)
+            .collect();
+        for _ in 0..rounds {
+            let before = amount.clone();
+            for (g, list) in self.neighbours.iter().enumerate() {
+                if list.is_empty() {
+                    continue;
+                }
+                let mean = list.iter().map(|o| before[*o]).sum::<Vec3>() / list.len() as f32;
+                amount[g] = (before[g] + mean) * 0.5;
+            }
+        }
+        self.group.iter().map(|g| amount[*g]).collect()
     }
 
     /// The moves `need` (per corner) made the same for welded corners

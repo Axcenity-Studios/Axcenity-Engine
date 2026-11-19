@@ -328,6 +328,255 @@ class ConformTest(unittest.TestCase):
         np.testing.assert_allclose(still[0], [0.0, 1.2, 0.1], atol=1e-12)
 
 
+def round_tube(radius, y0, y1, sides=24, rings=9, closed=False):
+    """A tube of quads round Y (outward), from y0 to y1; with `closed`, a
+    fan at each end."""
+    P = []
+    for j in range(rings):
+        y = y0 + (y1 - y0) * j / (rings - 1)
+        for i in range(sides):
+            a = 2 * math.pi * i / sides
+            P.append([radius * math.cos(a), y, radius * math.sin(a)])
+    faces = []
+    for j in range(rings - 1):
+        for i in range(sides):
+            a, b = j * sides + i, j * sides + (i + 1) % sides
+            faces.append((a, a + sides, b + sides, b))
+    if closed:
+        for y, ring, flip in ((y0, 0, True), (y1, rings - 1, False)):
+            P.append([0.0, y, 0.0])
+            c = len(P) - 1
+            for i in range(sides):
+                a, b = ring * sides + i, ring * sides + (i + 1) % sides
+                faces.append((c, b, a) if flip else (c, a, b))
+    return WorkMesh.from_faces(np.array(P, float), faces)
+
+
+class DrapeTest(unittest.TestCase):
+    """Wave 5 stage 3 (`refinement/wave5/fit-drape.md`): a garment is graded
+    to the body by measured girths, then draped onto it by Blender's cloth
+    simulation, hanging from its pins, keeping its ease."""
+
+    def test_a_girth_is_the_slice_round_the_outside(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48)
+        self.assertAlmostEqual(conform.girth(body.P, 0.5, 0.02), 2 * math.pi * 0.15, delta=0.005)
+
+    def test_a_small_garment_is_graded_to_its_least_ease(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48, closed=True)
+        shirt = round_tube(0.14, 0.4, 0.9, sides=48, rings=11)
+        report = conform.grade(shirt, body, {"at": [0.5, 0.8], "least_ease": 0.06})
+        want = 2 * math.pi * 0.15 + 0.06
+        self.assertAlmostEqual(conform.girth(shirt.P, 0.5, 0.02), want, delta=0.006)
+        self.assertGreater(report["scale"], 1.1)
+        # A garment with enough ease isn't touched.
+        roomy = round_tube(0.2, 0.4, 0.9, sides=48, rings=11)
+        before = roomy.P.copy()
+        report = conform.grade(roomy, body, {"at": [0.5], "least_ease": 0.06})
+        self.assertEqual(report["scale"], 1.0)
+        np.testing.assert_allclose(roomy.P, before)
+
+    def test_a_loose_tube_hangs_from_its_pins_and_keeps_its_ease(self):
+        body = round_tube(0.15, 0.0, 1.2, sides=32, rings=13, closed=True)
+        # A loose tube round it, its top pinned: it hangs, it doesn't
+        # stretch down, it isn't drawn onto the body, and nothing of it is
+        # inside the body.
+        shirt = round_tube(0.2, 0.5, 1.0, sides=32, rings=11)
+        report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}})
+        bottom = shirt.P[:32]
+        self.assertGreater(bottom[:, 1].min(), 0.47)
+        radius = np.hypot(shirt.P[:, 0], shirt.P[:, 2])
+        self.assertGreater(np.median(radius), 0.18)
+        self.assertGreater(radius.min(), 0.15)
+        self.assertEqual(report["pinned"], 64)
+        self.assertIn("moved_m", report)
+
+    def test_the_cloth_hangs_over_the_layers_it_is_worn_over(self):
+        """Review fixes 2: draped against the body alone, the tee's hem fell
+        into the hollow the underwear bridges (the cleft), and the engine's
+        fit then pushed it out over the underwear, pulling the centre back
+        down into a point. Draped over the layers it is worn over too, it
+        hangs outside them."""
+        body = round_tube(0.15, 0.0, 1.2, sides=32, rings=13, closed=True)
+        # Underwear: a band from 0.4 to 0.7 m standing 2 cm off the skin.
+        under = round_tube(0.17, 0.4, 0.7, sides=32, rings=7)
+        # A tube 1.5 cm off the skin, its lower part inside the band.
+        shirt = round_tube(0.165, 0.5, 1.0, sides=32, rings=11)
+        report = conform.drape(shirt, body, {"pin_top": 0.06, "settings": {"frames": 30, "quality": 5}},
+                               under=[under])
+        low = shirt.P[shirt.P[:, 1] < 0.68]
+        self.assertGreater(len(low), 32)
+        # Every corner over the band is outside it (its collision margin
+        # less a little), none left between it and the skin.
+        self.assertGreater(np.hypot(low[:, 0], low[:, 2]).min(), 0.17 - 0.001)
+        self.assertEqual(report["clearance_m"]["inside_layers"], 0)
+        self.assertGreater(report["pushed_out_first"]["pushed"], 0)
+
+
+def axis_tube(radius, origin, axis, t0, t1, sides=24, rings=8, closed=False):
+    """A tube of quads round `axis` (a unit vector through `origin`), from
+    t0 to t1 along it (an arm, or a sleeve round it)."""
+    axis = np.asarray(axis, float) / np.linalg.norm(axis)
+    u = np.cross(axis, [0.0, 0.0, 1.0])
+    u = u / np.linalg.norm(u)
+    v = np.cross(axis, u)
+    tube = round_tube(radius, t0, t1, sides=sides, rings=rings, closed=closed)
+    # round_tube runs along Y with X and Z round it: map Y to the axis.
+    local = tube.P
+    tube.P = (np.asarray(origin, float) + np.outer(local[:, 1], axis)
+              + np.outer(local[:, 0], u) + np.outer(local[:, 2], v))
+    return tube
+
+
+def ring_girth(points, origin, axis, t, band=0.006):
+    """The girth round `points` across `axis` at `t` along it."""
+    axis = np.asarray(axis, float) / np.linalg.norm(axis)
+    r = np.asarray(points, float) - origin
+    along = r @ axis
+    sel = np.abs(along - t) <= band
+    u = np.cross(axis, [0.0, 0.0, 1.0])
+    u = u / np.linalg.norm(u)
+    v = np.cross(axis, u)
+    return conform._hull_perimeter(np.stack([r[sel] @ u, r[sel] @ v], axis=1))
+
+
+def joined(*meshes):
+    """Meshes as one (the body's trunk and arm)."""
+    P, faces = [], []
+    for m in meshes:
+        faces += [[int(k) + len(P) for k in f] for f in m.faces()]
+        P += m.P.tolist()
+    return WorkMesh.from_faces(np.array(P), faces)
+
+
+class GradeReviewTest(unittest.TestCase):
+    """Wave 5 stage 3, review fixes 1: the grade replaces the push-out
+    where the garment is too small (sleeves and shoulders too, not only the
+    torso), and the drape keeps the neck band where the grade put it."""
+
+    SHOULDER = np.array([0.16, 1.38, 0.0])
+    ARM = np.array([math.cos(math.radians(45)), -math.sin(math.radians(45)), 0.0])
+
+    def body(self):
+        trunk = round_tube(0.12, 0.9, 1.42, sides=32, rings=14, closed=True)
+        arm = axis_tube(0.05, self.SHOULDER, self.ARM, -0.02, 0.3, sides=24, rings=12, closed=True)
+        body = joined(trunk, arm)
+        body.heads = {"LeftUpperArm": self.SHOULDER, "LeftLowerArm": self.SHOULDER + 0.3 * self.ARM}
+        # The arm's skin is the arm's (its weights), the trunk's isn't.
+        body.armness = {"Left": np.r_[np.zeros(len(trunk.P)), np.ones(len(arm.P))]}
+        return body
+
+    def test_a_small_sleeve_is_graded_round_its_arm(self):
+        body = self.body()
+        # A sleeve too small for the arm and 1 cm off its axis (towards the
+        # armpit), and a patch of the side below the armpit.
+        off = np.array([-0.007, -0.007, 0.0])
+        sleeve = axis_tube(0.042, self.SHOULDER + off, self.ARM, 0.06, 0.2, sides=24, rings=8)
+        side = round_tube(0.135, 1.05, 1.15, sides=32, rings=3)
+        item = joined(sleeve, side)
+        n_sleeve = len(sleeve.P)
+        before = item.P.copy()
+        report = conform.grade(item, body, {"at": [], "sleeves": {"least_ease": 0.04}})
+        P = item.P[:n_sleeve]
+        # Round the arm, not through it: every corner the ease's share of
+        # radius (4 cm / 2 pi, 6.4 mm) off the arm's skin, or nearly (the
+        # arm is a 24-sided tube), and the girth its ease over the arm's,
+        # not much more (the side that was off the arm moves least).
+        r = P - self.SHOULDER
+        radial = np.linalg.norm(r - np.outer(r @ self.ARM, self.ARM), axis=1)
+        self.assertGreater(radial.min(), 0.05 + 0.9 * 0.04 / (2 * math.pi))
+        want = 2 * math.pi * 0.05 + 0.04
+        for t in (0.1, 0.14, 0.18):
+            g = ring_girth(P, self.SHOULDER, self.ARM, t)
+            self.assertGreater(g, want - 0.008)
+            self.assertLess(g, want + 0.03)
+        self.assertGreater(report["sleeves"]["Left"]["scale"], 1.1)
+        # The side below the armpit isn't moved by the sleeve's grade.
+        np.testing.assert_allclose(item.P[n_sleeve:], before[n_sleeve:], atol=1e-9)
+
+    def test_the_neck_keeps_the_grade_of_the_highest_height(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48, rings=11, closed=True)
+        shirt = round_tube(0.14, 0.4, 0.9, sides=48, rings=11)
+        conform.grade(shirt, body, {"at": [0.5, 0.8], "least_ease": 0.06})
+        # The top (the neck) isn't let back to its source's size, inside
+        # the body: it keeps the scale of the highest height graded.
+        want = 2 * math.pi * 0.15 + 0.06
+        self.assertAlmostEqual(conform.girth(shirt.P, 0.9, 0.02), want, delta=0.006)
+
+    def test_a_height_can_ask_its_own_ease(self):
+        body = round_tube(0.15, 0.0, 1.0, sides=48, rings=11, closed=True)
+        shirt = round_tube(0.14, 0.4, 0.9, sides=48, rings=11)
+        report = conform.grade(shirt, body, {"at": [[0.5, 0.1], [0.8, 0.02]], "least_ease": 0.06})
+        self.assertAlmostEqual(conform.girth(shirt.P, 0.5, 0.02), 2 * math.pi * 0.15 + 0.1, delta=0.006)
+        self.assertAlmostEqual(conform.girth(shirt.P, 0.8, 0.02), 2 * math.pi * 0.15 + 0.02, delta=0.006)
+        self.assertEqual([row["least_ease_m"] for row in report["girths"]], [0.1, 0.02])
+
+    def test_what_is_left_to_push_out_moves_as_one_smooth_patch(self):
+        """The corners still inside after the grade move out as a smooth
+        field over the cloth (their neighbours carried along), not each on
+        its own along the body's normal: one row pushed out and the next
+        not is the step that notched the stage-3 neckline."""
+        body = round_tube(0.15, 0.0, 1.2, sides=48, rings=13, closed=True)
+        # A tube set 3 cm to one side: up to 2 cm inside the body there.
+        shirt = round_tube(0.16, 0.5, 1.0, sides=48, rings=21)
+        shirt.P[:, 0] += 0.03
+        edges = np.array(sorted({(min(a, b), max(a, b)) for f in shirt.faces()
+                                 for a, b in zip(f, np.roll(f, -1))}))
+
+        def lengths(P):
+            return np.linalg.norm(P[edges[:, 0]] - P[edges[:, 1]], axis=1)
+
+        before = lengths(shirt.P)
+        plain = WorkMesh.from_faces(shirt.P.copy(), shirt.faces())
+        hard = conform.push_out(plain, body, 0.004)
+        report = conform.push_out(shirt, body, 0.004, rounds=30)
+        self.assertEqual(report["pushed"], hard["pushed"])
+        self.assertGreater(report["carried"], 0)
+        # Clear of the body everywhere,
+        self.assertGreater(np.hypot(shirt.P[:, 0], shirt.P[:, 2]).min(), 0.15 + 0.0035)
+        # and the cloth keeps its lengths (the drape's springs' rest
+        # lengths) far better: the hard push stretches an edge by 30%
+        # where a pushed corner meets a free one.
+        self.assertGreater(np.abs(lengths(plain.P) / before - 1).max(), 0.25)
+        self.assertLess(np.abs(lengths(shirt.P) / before - 1).max(), 0.2)
+
+    def test_a_jagged_free_edge_is_relaxed_along_itself(self):
+        """A free hem the simulation left in a zig-zag (the review fixes 1
+        sleeve hems: corners 10 to 15 mm off their neighbours' line) is
+        relaxed along its own loop; the cloth away from the edge is left
+        where the drape put it."""
+        shirt = round_tube(0.2, 0.5, 1.0, sides=32, rings=11)
+        bottom = np.arange(32)
+        # Every other corner of the lowest ring 1.5 cm lower: a zig-zag.
+        shirt.P[bottom[::2], 1] -= 0.015
+        inner = shirt.P[32:320].copy()
+        report = conform.relax_edges(shirt, rounds=6)
+        y = shirt.P[bottom, 1]
+        self.assertLess(y.max() - y.min(), 0.003)
+        np.testing.assert_allclose(shirt.P[32:320], inner)
+        # A smooth edge (the top ring) isn't drawn in: within 1 mm of its
+        # radius (plain averaging would draw it 11 mm in).
+        r = np.hypot(shirt.P[320:, 0], shirt.P[320:, 2])
+        self.assertLess(np.abs(r - 0.2).max(), 0.001)
+        self.assertEqual(report["corners"], 64)
+        self.assertGreater(report["most_before_mm"], 7.0)
+        # What is left is the round loops' own sag between corners (3.9 mm).
+        self.assertLess(report["most_after_mm"], 4.5)
+
+    def test_the_whole_neck_band_is_pinned_where_it_was_graded(self):
+        body = round_tube(0.15, 0.0, 1.2, sides=32, rings=13, closed=True)
+        shirt = round_tube(0.2, 0.5, 1.0, sides=32, rings=11)
+        # A scooped neck: the front of the top ring 6 cm lower than the back.
+        top = np.arange(10 * 32, 11 * 32)
+        shirt.P[top, 1] -= 0.03 * (1 + shirt.P[top, 2] / 0.2)
+        before = shirt.P.copy()
+        report = conform.drape(shirt, body, {"pin_top": 0.01, "pin_band": 0.03,
+                                             "settings": {"frames": 20, "quality": 5}})
+        # Every corner of the neck's open edge is held, the front too.
+        np.testing.assert_allclose(shirt.P[top], before[top], atol=1e-4)
+        self.assertGreaterEqual(report["pinned"], 32)
+        self.assertEqual(report["pushed_out_first"]["pushed"], 0)
+
+
 class SettleTest(unittest.TestCase):
     def test_a_hat_comes_down_until_it_sits_its_clearance_off_the_head(self):
         head = cube(0.2)

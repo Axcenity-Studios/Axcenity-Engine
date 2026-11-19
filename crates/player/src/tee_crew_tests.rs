@@ -262,8 +262,8 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // The records: what the licensed tee, a draft, still fails (open
 // defects, not accepted behaviour; `refinement/wave5/tee-licensed.md`
 // says where each is and why). Lower them as the item improves; never
-// raise one; a production item has none. From the first run of the item
-// as committed (wave 5):
+// raise one; a production item has none. What the stage-2 item (wave 5)
+// failed, for the history; its successor's records are below:
 //
 // - The walk, Idle and the arms forward (every body): the armpit, as
 //   every tee before it. The cloth bridging the arm and the side, made
@@ -288,7 +288,8 @@ fn the_licensed_tee_stays_steady_in_the_run() {
 // - The run: the cloth at the front of the armpit jolts 6 mm in one frame
 //   as the arm swings through hanging (feminine slim, frame 10).
 //
-// Seen in the captures and **not counted by any record** (cloth-only
+// Seen in the stage-2 item's captures and then **not counted by any
+// record** (since stage 3 `cloth_checks` counts these kinds; cloth-only
 // defects, or skin the gate's records already hold elsewhere on the same
 // body; review fixes 1, `tee-licensed.md` section 5):
 //
@@ -338,61 +339,80 @@ const BOXERS: &str = "Underwear_BoxerBriefs through Shirt_TeeCrew";
 const BRA: &str = "Underwear_Bra through Shirt_TeeCrew";
 const BRIEFS: &str = "Underwear_Briefs through Shirt_TeeCrew";
 
-/// The hems' edges, in the poses that leave them where they are at rest.
-const fn at_the_hems(pose: &'static str, tee: usize) -> [Known; 3] {
-    [
-        known(PART, pose, tee, 0.0282),
-        known(BOXERS, pose, 1, 0.0151),
-        known(BRIEFS, pose, 11, 0.0179),
-    ]
-}
-
-const REST: [Known; 3] = at_the_hems("rest", 7);
-const T_POSE: [Known; 3] = at_the_hems("TPose", 7);
-const ELBOWS_BENT: [Known; 3] = at_the_hems("ElbowsBent", 8);
-const KNEES_BENT: [Known; 3] = at_the_hems("KneesBent", 7);
-const ARMS_RAISED: [Known; 4] = [
-    known(PART, "ArmsRaised", 14, 0.0282),
-    known(BOXERS, "ArmsRaised", 1, 0.0151),
-    known(BRA, "ArmsRaised", 1, 0.0031),
-    known(BRIEFS, "ArmsRaised", 11, 0.0179),
+// The re-intaken tee (wave 5 stage 3, graded and draped,
+// `refinement/wave5/fit-drape.md`), measured as committed after review
+// fixes 2. Review fixes 1 graded the sleeves round the arms, held the neck
+// at the chest's grade, smoothed the push-out over the cloth, pinned the
+// neck band whole and relaxed the free hems along themselves (the front
+// neckline is a smooth crew again). Review fixes 2 drapes it over the
+// underwear it is worn over as well as the body: draped on the skin alone,
+// its back hem fell into the hollow the boxer briefs and briefs bridge at
+// the cleft, and the engine's fit pushed it out over them by up to 21 mm,
+// pulling the centre back down into a point 16.4 mm below the hem's line
+// (masculine average; 20.8 mm feminine). Now the back hem is level (1.9
+// and 6.1 mm) and the fit pushes nothing out over the underwear. Against
+// review fixes 1, fewer bodies fail in Idle (41 to 32) and the boxers no
+// longer come through in the walk's first and last thirds; but these rose,
+// all at a turned hem's edge (the turned-hem rule, open issue 3 of
+// `tee-licensed.md`): the tee at rest and knees bent 5 to 8 bodies (same
+// worst), the T-pose 4 to 7, the elbows bent 3 to 5 bodies and 23.1 to
+// 28.6 mm, the arms raised 4 to 7; skin past the sleeves' undersides, and
+// on the shortest bodies the front of the crotch just past the front hem
+// (25.7 to 28.6 mm). The briefs at the back hem's edge on the widest hips
+// (15.1 mm, rest and four held poses, none before), the briefs in the
+// walk (14.9 to 17.6 mm, last third 7.8 to 16.9 mm), the bra in the walk
+// (1 to 3 bodies in its first third, 15 to 17 in its second), the tee in
+// the walk (49, 46 and 42 bodies to 54, 50 and 53), the walk's
+// worst in its last third (39.5 to 39.7 mm) and the simpler copies (LOD1
+// 3 bodies at 18.5 mm to 4 at 30.1 mm; LOD2 23 bodies at 30.2 mm to 11 at
+// 31.8 mm). These were set from the re-intaken item, not to pass an old
+// one: the lead rules on them (the hand-back's review fixes 2 lists each).
+const REST: [Known; 2] = [
+    known(PART, "rest", 8, 0.0323),
+    known(BRIEFS, "rest", 1, 0.0151),
 ];
-const IDLE: [Known; 4] = [
-    known(PART, "idle", 53, 0.0380),
-    known(BOXERS, "idle", 1, 0.0145),
-    known(BRA, "idle", 17, 0.0041),
-    known(BRIEFS, "idle", 11, 0.0180),
+const T_POSE: [Known; 2] = [
+    known(PART, "TPose", 7, 0.0327),
+    known(BRIEFS, "TPose", 1, 0.0151),
 ];
-const WALK_FIRST: [Known; 4] = [
-    known(PART, WALK, 54, 0.0325),
-    known(BOXERS, WALK, 2, 0.0141),
-    known(BRA, WALK, 17, 0.0057),
-    known(BRIEFS, WALK, 12, 0.0185),
+const ELBOWS_BENT: [Known; 2] = [
+    known(PART, "ElbowsBent", 5, 0.0286),
+    known(BRIEFS, "ElbowsBent", 1, 0.0151),
 ];
-const WALK_SECOND: [Known; 4] = [
-    known(PART, WALK, 54, 0.0313),
-    known(BOXERS, WALK, 26, 0.0024),
-    known(BRA, WALK, 20, 0.0092),
-    known(BRIEFS, WALK, 13, 0.0227),
+const KNEES_BENT: [Known; 2] = [
+    known(PART, "KneesBent", 8, 0.0323),
+    known(BRIEFS, "KneesBent", 1, 0.0151),
 ];
-const WALK_LAST: [Known; 4] = [
-    known(PART, WALK, 54, 0.0320),
-    known(BOXERS, WALK, 2, 0.0142),
-    known(BRA, WALK, 10, 0.0074),
-    known(BRIEFS, WALK, 12, 0.0183),
+const ARMS_RAISED: [Known; 3] = [
+    known(PART, "ArmsRaised", 7, 0.0395),
+    known(BRA, "ArmsRaised", 2, 0.0057),
+    known(BRIEFS, "ArmsRaised", 1, 0.0151),
 ];
-const ARMS_FORWARD: [Known; 4] = [
-    known(PART, "ArmsForward", 54, 0.0302),
-    known(BOXERS, "ArmsForward", 1, 0.0140),
-    known(BRA, "ArmsForward", 19, 0.0032),
-    known(BRIEFS, "ArmsForward", 3, 0.0173),
+const IDLE: [Known; 2] = [
+    known(PART, "idle", 32, 0.0285),
+    known(BRA, "idle", 3, 0.0074),
+];
+const WALK_FIRST: [Known; 3] = [
+    known(PART, WALK, 54, 0.0368),
+    known(BRA, WALK, 3, 0.0077),
+    known(BRIEFS, WALK, 3, 0.0176),
+];
+const WALK_SECOND: [Known; 3] = [
+    known(PART, WALK, 50, 0.0369),
+    known(BOXERS, WALK, 9, 0.0017),
+    known(BRA, WALK, 17, 0.0076),
+];
+const WALK_LAST: [Known; 3] = [
+    known(PART, WALK, 53, 0.0397),
+    known(BRA, WALK, 3, 0.0077),
+    known(BRIEFS, WALK, 2, 0.0170),
+];
+const ARMS_FORWARD: [Known; 2] = [
+    known(PART, "ArmsForward", 54, 0.0396),
+    known(BRA, "ArmsForward", 21, 0.0067),
 ];
 const LODS: [Known; 2] = [
-    known("Shirt_TeeCrew LOD1", "rest", 10, 0.0120),
-    known("Shirt_TeeCrew LOD2", "rest", 54, 0.0307),
+    known("Shirt_TeeCrew LOD1", "rest", 4, 0.0302),
+    known("Shirt_TeeCrew LOD2", "rest", 11, 0.0319),
 ];
-const MOTION_RUN: [Record; 1] = [Record {
-    what: "Shirt_TeeCrew pop",
-    case: "Run",
-    most: 0.0061,
-}];
+const MOTION_RUN: [Record; 0] = [];
