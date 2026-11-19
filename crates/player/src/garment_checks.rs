@@ -738,14 +738,20 @@ pub(crate) fn foot_report(
             continue;
         }
         // ... and that face is the shoe's nearest to the corner, which is
-        // outside it there, with no shoe at all over the corner (a corner
-        // inside a shoe's cavity, its way out meeting the upper past the
-        // cover rule's reach or at a hem, can have the inner floor of the
-        // sole nearest under it).
+        // outside it there, with nothing of that shoe over the corner (a
+        // corner inside a shoe's cavity, its way out meeting the upper past
+        // the cover rule's reach or at a hem, can have the inner floor of
+        // the sole nearest under it). Only the same shoe counts as over it:
+        // the pair's other shoe, across the gap between the feet, is not
+        // one the corner is inside (the shoes are told apart by side, the
+        // left foot at +X, as for the toe box).
         let Some(near) = surface.closest(*p, EXPOSED_REACH) else {
             continue;
         };
-        if surface.cast(*p, *n, EXPOSED_CLEAR).is_some() {
+        if surface
+            .cast(*p, *n, EXPOSED_CLEAR)
+            .is_some_and(|over| over.point.x * hit.point.x > 0.0)
+        {
             continue;
         }
         if hit.normal.dot(*n) > 0.3
@@ -1378,6 +1384,74 @@ fn the_footwear_check_finds_a_toe_out_of_the_toe_box_at_rest() {
     let report = foot_report("c", "rest", &foot, &shoe, &foot, &shoe);
     assert_eq!(report.exposed, 0, "{report:?}");
     assert!(report.problems().is_empty(), "{:?}", report.problems());
+}
+
+/// The pair as one mesh, as an item ships it: a box shoe on each foot's
+/// side (the left at +X), `gap` apart between their inner sides.
+fn box_pair(gap: f32) -> Posed {
+    let half = 0.05 + gap / 2.0;
+    let left = moved(&box_shoe(0.0), Vec3::X * half);
+    let right = moved(&box_shoe(0.0), -Vec3::X * half);
+    let first = left.positions.len() as u32;
+    Posed {
+        name: "Shoes_Box".to_owned(),
+        positions: [left.positions, right.positions].concat(),
+        normals: [left.normals, right.normals].concat(),
+        triangles: left
+            .triangles
+            .iter()
+            .copied()
+            .chain(right.triangles.iter().map(|t| t.map(|v| v + first)))
+            .collect(),
+    }
+}
+
+/// A negative control for `exposed`'s "nothing of the shoe over the
+/// corner" filter (`EXPOSED_CLEAR`): a patch 5 mm out of the left shoe's
+/// inner side, facing the right shoe 6 cm away, is still exposed. The
+/// right shoe lies along its way out, but it is the other shoe, not one
+/// the corner is inside; only a face of the shoe the corner came out of
+/// counts as over it.
+#[test]
+fn the_footwear_check_finds_an_inner_side_out_beside_the_other_shoe() {
+    let gap = 0.06;
+    let pair = box_pair(gap);
+    // The left shoe's inner side is at x = gap / 2, facing -X.
+    let side = |x: f32| {
+        let mut positions = Vec::new();
+        let mut triangles = Vec::new();
+        for i in 0..4 {
+            for j in 0..5 {
+                positions.push(Vec3::new(
+                    x,
+                    0.015 + 0.013 * i as f32,
+                    -0.06 + 0.03 * j as f32,
+                ));
+            }
+        }
+        for i in 0..3u32 {
+            for j in 0..4u32 {
+                let a = i * 5 + j;
+                triangles.push([a, a + 1, a + 5]);
+                triangles.push([a + 1, a + 6, a + 5]);
+            }
+        }
+        Posed {
+            name: "Body".to_owned(),
+            normals: vec![-Vec3::X; positions.len()],
+            positions,
+            triangles,
+        }
+    };
+    let out = side(gap / 2.0 - 0.005);
+    let report = foot_report("c", "Walk@18", &out, &pair, &out, &pair);
+    assert_eq!(report.through, 0, "{report:?}");
+    assert_eq!(report.exposed, out.positions.len(), "{report:?}");
+    assert!((report.exposed_most - 0.005).abs() < 1e-4, "{report:?}");
+    // The same patch inside the left shoe is not exposed.
+    let inside = side(gap / 2.0 + 0.005);
+    let report = foot_report("c", "Walk@18", &inside, &pair, &inside, &pair);
+    assert_eq!(report.exposed, 0, "{report:?}");
 }
 
 /// A shoe that turns as one piece keeps its toe box; one whose toe box's

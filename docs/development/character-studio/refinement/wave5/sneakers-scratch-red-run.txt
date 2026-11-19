@@ -78,3 +78,23 @@ thread 'sneakers_low_tests::the_sneakers_stay_steady_in_the_run' (45996) panicke
 FAIL [   1.040s] (13/13) axcenity-player::bin/axcenity-player sneakers_low_tests::the_sneakers_stay_steady_in_the_walk
 thread 'sneakers_low_tests::the_sneakers_stay_steady_in_the_walk' (45692) panicked at crates\player\src\sneakers_low_tests.rs:211:9:
 Summary [   2.575s] 13 tests run: 1 passed, 12 failed, 287 skipped
+
+== Review fixes 1: the exposed measure's negative control (garment_checks), before the side rule ==
+cargo nextest run -p axcenity-player --no-fail-fast -E 'test(/garment_checks::the_footwear_check/)'
+FAIL [   0.076s] (2/4) axcenity-player::bin/axcenity-player garment_checks::the_footwear_check_finds_an_inner_side_out_beside_the_other_shoe
+thread 'garment_checks::the_footwear_check_finds_an_inner_side_out_beside_the_other_shoe' (39080) panicked at crates\player\src\garment_checks.rs:1439:5:
+assertion `left == right` failed: FootReport { character: "c", pose: "Walk@18", shoe: "Shoes_Box", covered: 0, through: 0, through_most: 0.0, exposed: 0, exposed_most: 0.0, toe_box_bend: 0.0, tread_low: 0.0, tread_high: 0.0 }
+left: 0
+right: 20
+Summary [   0.077s] 4 tests run: 3 passed, 1 failed, 297 skipped
+
+== Review fixes 1: the body extremes, first measured (a one-off run of the rest and held-pose tests over the 36 -body- descriptions, before EXTREME_RECORDS) ==
+"realistic-blend-body-shortest rest Shoes_LowSneakers the tread from -5.88 to 2.57 mm above the floor",
+"realistic-blend-body-tallest rest Shoes_LowSneakers the tread from -4.83 to 2.77 mm above the floor",
+"realistic-feminine-body-shortest rest Shoes_LowSneakers the tread from -9.10 to -0.38 mm above the floor",
+"realistic-feminine-body-slim idle Shoes_LowSneakers 1 foot corners out of the shoe, the farthest 5.69 mm",
+"realistic-feminine-body-tallest rest Shoes_LowSneakers the tread from -2.26 to 5.63 mm above the floor",
+"realistic-masculine-body-shortest rest Shoes_LowSneakers the tread from -2.65 to 5.51 mm above the floor",
+"realistic-masculine-body-tallest rest Shoes_LowSneakers the tread from -7.40 to -0.09 mm above the floor",
+"realistic-feminine-body-slim KneesBent Shoes_LowSneakers 1 foot corners out of the shoe, the farthest 5.69 mm",
+Summary [ 312.283s] 6 tests run: 4 passed (4 slow), 2 failed, 294 skipped

@@ -5,9 +5,10 @@
 //! worn by every realistic cast body of both frames, as a game poses it.
 //! It is held to `docs/development/character-studio/asset-quality.md` §3
 //! "Footwear" and "Stability in motion". It is a draft: what it still
-//! fails is recorded below ([`WALK_RECORDS`], [`RUN_RECORDS`]) as open
-//! defects with their numbers, which can only go down; everything else
-//! (rest, Idle, the held poses, the simpler copies, motion) has none.
+//! fails is recorded below ([`WALK_RECORDS`], [`RUN_RECORDS`], and
+//! [`EXTREME_RECORDS`] for the body extremes) as open defects with their
+//! numbers, which can only go down; everything else (the cast at rest, in
+//! Idle and the held poses, the simpler copies, motion) has none.
 //!
 //! - **Footwear** (`garment_checks::foot_report`): no foot corner through
 //!   the sole or the upper (the cover rule, and the shoe's outside under
@@ -30,22 +31,35 @@ pub(super) const SNEAKERS: &str = "axcenity/realistic-sneakers-low";
 /// The part the pair draws as.
 pub(super) const PART: &str = "Shoes_LowSneakers";
 
-/// The realistic cast of both frames (the body extremes are the fit
-/// gate's; a shoe follows only the foot, which the cast's builds barely
-/// change: `sneakers-scratch.md`), each wearing the sneakers over its
+/// The realistic cast of both frames, each wearing the sneakers over its
 /// underwear.
 fn cast() -> Vec<Description> {
-    let cast: Vec<Description> = bodies()
+    let cast = wearing(|name| name.contains("-cast-"));
+    assert_eq!(cast.len(), 18, "nine cast bodies a frame");
+    cast
+}
+
+/// The body extremes of the three frames (masculine, feminine and the
+/// blend: tallest, shortest, heaviest and the rest, each body parameter at
+/// its ends), each wearing the sneakers. The tallest and shortest change
+/// the foot's size, so the shoe's shapes are tested at their ends here.
+fn extremes() -> Vec<Description> {
+    let extremes = wearing(|name| name.contains("-body-"));
+    assert_eq!(extremes.len(), 36, "twelve body extremes a frame");
+    extremes
+}
+
+/// The realistic bodies whose name `pick` accepts, wearing the sneakers.
+fn wearing(pick: impl Fn(&str) -> bool) -> Vec<Description> {
+    bodies()
         .into_iter()
-        .filter(|d| d.name.contains("-cast-"))
+        .filter(|d| pick(&d.name))
         .map(|d| {
             let mut out = d.clone();
             out.items.push(WornItem::new(SNEAKERS));
             out
         })
-        .collect();
-    assert_eq!(cast.len(), 18, "nine cast bodies a frame");
-    cast
+        .collect()
 }
 
 /// Prints a report and adds its problems (each under its clip's name, a
@@ -78,10 +92,15 @@ fn take(reports: &[FootReport], who: &str, problems: &mut Vec<Problem>) {
 /// The footwear check in held stances (`Rest`, `Idle`, held poses) on the
 /// cast: no problem at all.
 fn hold_the_feet(label: &str, stances: &[Stance]) {
+    hold_the_feet_of(label, cast(), stances, &[]);
+}
+
+/// The footwear check in held stances on `bodies`, against `records`.
+fn hold_the_feet_of(label: &str, bodies: Vec<Description>, stances: &[Stance], records: &[Record]) {
     let stage =
         Stage::new(&format!("sneakers-low-{label}"), &repository_library()).expect("the stage");
     let mut problems = Vec::new();
-    for description in cast() {
+    for description in bodies {
         let (body_rest, garments_rest) = worn(&stage.assets, &description, Stance::Rest);
         for stance in stances {
             let (body, garments) = if *stance == Stance::Rest {
@@ -109,8 +128,10 @@ fn hold_the_feet(label: &str, stances: &[Stance]) {
             take(&reports, &description.name, &mut problems);
         }
     }
-    let lines: Vec<&String> = problems.iter().map(|p| &p.line).collect();
-    assert!(problems.is_empty(), "{lines:#?}");
+    let left = unrecorded(&problems, records);
+    assert!(left.is_empty(), "{left:#?}");
+    let old = stale(&problems, records);
+    assert!(old.is_empty(), "{old:#?}");
 }
 
 /// The footwear check through `frames` of `clip` on the cast, against the
@@ -148,6 +169,26 @@ fn the_sneakers_hold_the_feet_in_the_held_poses() {
             Stance::Held(HeldPose::ElbowsBent),
             Stance::Held(HeldPose::KneesBent),
         ],
+    );
+}
+
+/// The body extremes at rest, in Idle and in the held poses, against
+/// [`EXTREME_RECORDS`] (review fixes 1: the cast alone left them unmeasured).
+#[test]
+fn the_sneakers_hold_the_feet_of_the_body_extremes() {
+    hold_the_feet_of(
+        "extremes",
+        extremes(),
+        &[
+            Stance::Rest,
+            Stance::Idle,
+            Stance::Held(HeldPose::TPose),
+            Stance::Held(HeldPose::ArmsRaised),
+            Stance::Held(HeldPose::ArmsForward),
+            Stance::Held(HeldPose::ElbowsBent),
+            Stance::Held(HeldPose::KneesBent),
+        ],
+        &EXTREME_RECORDS,
     );
 }
 
@@ -293,3 +334,27 @@ const RUN_RECORDS: [Record; 1] = [Record {
     case: "Run",
     most: 0.0091,
 }];
+/// On the body extremes (measured first in review fixes 1): the shoe
+/// follows the foot's size by one smooth map per body shape, which on the
+/// shortest and tallest bodies of each frame tilts and sinks the tread
+/// (from 9.10 mm under the floor to 5.63 mm over it, the worst on the
+/// shortest feminine body; on every other extreme it is flat); and on the
+/// slim feminine body one foot corner leaves the shoe in Idle and with
+/// the knees bent, 5.69 mm.
+const EXTREME_RECORDS: [Record; 3] = [
+    Record {
+        what: "Shoes_LowSneakers tread",
+        case: "rest",
+        most: 0.0092,
+    },
+    Record {
+        what: "Shoes_LowSneakers through",
+        case: "idle",
+        most: 0.0058,
+    },
+    Record {
+        what: "Shoes_LowSneakers through",
+        case: "KneesBent",
+        most: 0.0058,
+    },
+];
