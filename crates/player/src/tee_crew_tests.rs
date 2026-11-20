@@ -208,9 +208,12 @@ fn the_licensed_tee_hides_the_skin_and_underwear_it_encloses() {
 /// How many body triangles the tee hides at least (masculine, feminine
 /// average) and of the sports bra's: what the masks hid when made (wave
 /// 5, `refinement/wave5/body-hiding.md`), less nothing. They change only
-/// when the masks are made again.
-const HIDES_SKIN: (usize, usize) = (25, 25);
-const HIDES_BRA: usize = 72;
+/// when the masks are made again: at the wave-5 stage-3 merge they were,
+/// for the tee as fit-drape refitted it (made, then trimmed with the fine
+/// views): it hangs looser, so it encloses less at rest (25 and 25 body
+/// triangles and 72 of the bra's before; 19, 19 and 88 now).
+const HIDES_SKIN: (usize, usize) = (19, 19);
+const HIDES_BRA: usize = 88;
 
 /// The body and the tee's part at rest, the tee at its level of detail
 /// `level`.

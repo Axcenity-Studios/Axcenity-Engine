@@ -1664,6 +1664,11 @@ fn cloth_holds_walking_stylized() {
 /// behaviour; `refinement/wave5/fit-drape.md` says where each is). Exact:
 /// lower them as items improve; never raise one; a production item has
 /// none.
+///
+/// Lowered at the wave-5 stage-3 merge: with body-hiding's trimmed masks
+/// beside the test tee, the bra triangles it hides are no longer drawn, so
+/// the bra's hanging counts fell (rest 1,826 to 1,442 triangles, the same
+/// bodies and worst) in every pose; nothing else moved.
 #[rustfmt::skip]
 mod records {
     #[allow(unused_imports)]
@@ -1672,7 +1677,7 @@ mod records {
     pub const GATE_REST: [ClothRecord; 4] = [
         rec("TestTee", "rest", Kind::Hanging, 10, 557, 0.0385),
         rec("Underwear_BoxerBriefs", "rest", Kind::Hanging, 31, 1619, 0.0155),
-        rec("Underwear_Bra", "rest", Kind::Hanging, 21, 1826, 0.0086),
+        rec("Underwear_Bra", "rest", Kind::Hanging, 21, 1442, 0.0086),
         rec("Underwear_Briefs", "rest", Kind::Hanging, 21, 3462, 0.0694),
     ];
     pub const GATE_IDLE: [ClothRecord; 7] = [
@@ -1681,7 +1686,7 @@ mod records {
         rec("TestTee", "idle", Kind::Stretched, 54, 5718, 47.7391),
         rec("Underwear_BoxerBriefs", "idle", Kind::Hanging, 33, 2126, 0.0171),
         rec("Underwear_Bra", "idle", Kind::Folded, 13, 14, 123.7613),
-        rec("Underwear_Bra", "idle", Kind::Hanging, 21, 2858, 0.01),
+        rec("Underwear_Bra", "idle", Kind::Hanging, 21, 2355, 0.01),
         rec("Underwear_Briefs", "idle", Kind::Hanging, 21, 3518, 0.0685),
     ];
     pub const GATE_T_POSE: [ClothRecord; 8] = [
@@ -1690,7 +1695,7 @@ mod records {
         rec("TestTee", "TPose", Kind::Stretched, 54, 16859, 43.8648),
         rec("Underwear_BoxerBriefs", "TPose", Kind::Hanging, 31, 1557, 0.0155),
         rec("Underwear_Bra", "TPose", Kind::Folded, 21, 21, 176.8709),
-        rec("Underwear_Bra", "TPose", Kind::Hanging, 21, 1757, 0.0086),
+        rec("Underwear_Bra", "TPose", Kind::Hanging, 21, 1345, 0.0086),
         rec("Underwear_Bra", "TPose", Kind::Stretched, 6, 61, 1.7989),
         rec("Underwear_Briefs", "TPose", Kind::Hanging, 21, 3469, 0.0694),
     ];
@@ -1700,8 +1705,8 @@ mod records {
         rec("TestTee", "ArmsRaised", Kind::Stretched, 54, 36992, 86.742),
         rec("Underwear_BoxerBriefs", "ArmsRaised", Kind::Hanging, 32, 1639, 0.0155),
         rec("Underwear_Bra", "ArmsRaised", Kind::Folded, 21, 85, 176.9729),
-        rec("Underwear_Bra", "ArmsRaised", Kind::Hanging, 21, 1581, 0.0095),
-        rec("Underwear_Bra", "ArmsRaised", Kind::Stretched, 21, 2751, 2.7257),
+        rec("Underwear_Bra", "ArmsRaised", Kind::Hanging, 21, 1202, 0.0095),
+        rec("Underwear_Bra", "ArmsRaised", Kind::Stretched, 21, 2750, 2.7257),
         rec("Underwear_Briefs", "ArmsRaised", Kind::Hanging, 21, 3543, 0.0694),
     ];
     pub const GATE_ARMS_FORWARD: [ClothRecord; 8] = [
@@ -1719,13 +1724,13 @@ mod records {
         rec("TestTee", "ElbowsBent", Kind::Hanging, 11, 572, 0.0385),
         rec("TestTee", "ElbowsBent", Kind::Stretched, 54, 583, 14.6994),
         rec("Underwear_BoxerBriefs", "ElbowsBent", Kind::Hanging, 31, 1560, 0.0155),
-        rec("Underwear_Bra", "ElbowsBent", Kind::Hanging, 21, 1820, 0.0086),
+        rec("Underwear_Bra", "ElbowsBent", Kind::Hanging, 21, 1436, 0.0086),
         rec("Underwear_Briefs", "ElbowsBent", Kind::Hanging, 21, 3510, 0.0694),
     ];
     pub const GATE_KNEES_BENT: [ClothRecord; 4] = [
         rec("TestTee", "KneesBent", Kind::Hanging, 9, 518, 0.0385),
         rec("Underwear_BoxerBriefs", "KneesBent", Kind::Hanging, 30, 569, 0.0144),
-        rec("Underwear_Bra", "KneesBent", Kind::Hanging, 21, 1841, 0.0086),
+        rec("Underwear_Bra", "KneesBent", Kind::Hanging, 21, 1470, 0.0086),
         rec("Underwear_Briefs", "KneesBent", Kind::Hanging, 19, 2601, 0.0694),
     ];
     pub const GATE_WALK: [&[ClothRecord]; 3] = [
@@ -1737,7 +1742,7 @@ mod records {
             rec("Underwear_BoxerBriefs", "Walk", Kind::Hanging, 9, 561, 0.0115),
             rec("Underwear_BoxerBriefs", "Walk", Kind::Stretched, 9, 1148, 10.5517),
             rec("Underwear_Bra", "Walk", Kind::Folded, 9, 37, 155.2484),
-            rec("Underwear_Bra", "Walk", Kind::Hanging, 9, 717, 0.0079),
+            rec("Underwear_Bra", "Walk", Kind::Hanging, 9, 660, 0.0079),
             rec("Underwear_Bra", "Walk", Kind::Stretched, 9, 20, 1.5656),
             rec("Underwear_Briefs", "Walk", Kind::Folded, 9, 32, 132.1338),
             rec("Underwear_Briefs", "Walk", Kind::Hanging, 9, 694, 0.0697),
@@ -1764,7 +1769,7 @@ mod records {
             rec("Underwear_BoxerBriefs", "Walk", Kind::Hanging, 9, 519, 0.0111),
             rec("Underwear_BoxerBriefs", "Walk", Kind::Stretched, 9, 1100, 10.5105),
             rec("Underwear_Bra", "Walk", Kind::Folded, 9, 35, 155.0492),
-            rec("Underwear_Bra", "Walk", Kind::Hanging, 9, 799, 0.0079),
+            rec("Underwear_Bra", "Walk", Kind::Hanging, 9, 718, 0.0079),
             rec("Underwear_Bra", "Walk", Kind::Stretched, 9, 26, 1.5838),
             rec("Underwear_Briefs", "Walk", Kind::Folded, 9, 32, 138.2174),
             rec("Underwear_Briefs", "Walk", Kind::Hanging, 9, 740, 0.0688),
