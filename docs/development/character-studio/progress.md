@@ -13,7 +13,41 @@ Where the overhaul stands, newest first. The plan and its stage IDs are in [plan
 | 6. QA, optimization, second wave (CO14–CO18) | Not started | |
 | 7. Final integration | Not started | |
 | Refinement R0 (Paul's brief of 2026-11-16) | **Done** (2026-11-16) | Audits, reference index, baseline of `main`, plan section 11 (stages R1 to R11); see the log |
-| Refinement R1 to R11 | **Started** (2026-11-17) | Waves 1 to 4 merged (PR #428 open); wave 5 stages 1 and 2 on `refinement-wave5`: Paul's decisions 11 to 13 (licensed-asset-first content, Production / Legacy / Draft, the stricter acceptance), the content states (ADR-0043), the licensed-asset intake with provenance and game credits, the walking fit test, tests that clean up their temporary folders, and the first licensed T-shirt, a **draft**. No item is Production; no tee passes the walk; the fit shrink-wraps loose garments. Next: the fit and deformation work for loose clothing, then the first items again; hair and sneakers wait for Paul (a Sketchfab account), then R8 and R11 |
+| Refinement R1 to R11 | **Started** (2026-11-17) | Waves 1 to 4 merged (PR #428 open); wave 5 stages 1 to 3 on `refinement-wave5`: Paul's decisions 11 to 14, the content states (ADR-0043), the licensed-asset intake, the walking fit test, test temp cleanup, the cloth-defect check, the drape-preserving fit, hiding the body under clothing, pose correctives from cloth simulation (ADR-0044), and three first items, all **drafts**: the licensed tee (refitted, now hangs at the back), a crop made from scratch, sneakers made from scratch. No item is Production; no tee passes the walk. Next: the items again on the new tools, then R8 and R11 |
+
+## 2026-11-19: the refinement, wave 5 stage 3 (branch `refinement-wave5`)
+
+Paul approved fixing the fit and deformation for loose clothing before more items, and added decision 14 (2026-11-18): where no licensed base is usable, model from scratch in Blender against reference photographs from Openverse; references are recorded by link, author and licence and never shipped, and no brand design is modelled. Five tracks, 22 agents, each reviewed adversarially up to twice. Hand-backs in [refinement/wave5/](refinement/wave5/).
+
+- `fit-drape` (CO9 part 4):
+  - **A cloth-defect check** (`player` `cloth_checks.rs`): each garment triangle in a pose is compared with rest. It flags an edge stretched past 1.5 times its rest length (from knit fabric data; a new asset-quality.md section 3 row), a face folded over, and cloth hanging past the item's ease or pulled into a hem point. It has 6 synthetic tests and 172 exact records. It finds every stage-2 tee defect except a 2 to 3 mm neck lip.
+  - **A drape-preserving fit:** the intake grades a garment by measured girths and drapes it with Blender cloth simulation over the body and the layers it is worn over. The engine's `FitOptions::drape` (opt-in) moves loose cloth by the body's smoothed displacement and keeps its ease.
+  - **The licensed tee refitted:** the back hem hangs level (the centre-back point is 1.9 mm below the hem line on the masculine average and 6.1 mm on the feminine, against 36 and 44 mm before). The bodysuit look, the underarm strips and the run's pop are gone.
+  - **Not met:** the gate at rest and in the held poses (arm skin past the turned sleeve hems), and the walk (54 bodies, up to 37 mm). The reviews sent back a jagged neckline, untested drape mechanisms and the hem point coming back.
+- `body-hiding`:
+  - **A hiding rule** (`avatar::fit::enclosure`, `hide_under`, an item's `hide_maps`): body and lower-layer triangles are hidden where a garment encloses them at rest, they stay near it in every gate pose, and they sit a measured margin from its openings.
+  - **The proof:** a view-based hole check from many directions and up the openings (`holes_seen`, `OPENING_VIEWS`). The gate counts poke-through on drawn skin only; the old count is kept behind `AXCENITY_FIT_GATE_COUNT_HIDDEN`.
+  - **Coverage:** the crew tee and the joggers are trimmed and checked worn together and each alone, on all 54 bodies.
+  - **What it doesn't do:** it lowers no poke-through record. 59% of the licensed tee's failing corners are within the opening margin, 15% aren't enclosed at rest, and 20% would show if hidden.
+  - **What the reviews sent back:** a reveal sheet that wasn't committed, no view up the joggers' cuffs, a graze limit that hid a real hole, and items never checked worn alone.
+- `pose-correctives` ([ADR-0044](../../../wiki/Architecture/Architecture-Decisions/ADR-0044-A-Garment-Carries-Its-Own-Pose-Correctives-Baked-From-Cloth-Simulation.md)):
+  - **What it adds:** an item may carry pose-driven shapes, baked by an intake step that poses the body and simulates the cloth, and driven per frame from the joints like the body's swing correctives (`assets` `PoseDriver`, `anim` `correctives`).
+  - **What it achieved on the test tee:** flipped armpit folds in the stride went from 507 to 397 corners.
+  - **What's still missing:** blending between key poses alone leaves the stride's armpit 9 to 16 mm off half way through the swings, so it needs more key poses or another kind of blend. The licensed tee carries no correctives yet.
+  - **What the reviews sent back:** a half-way check that ran before its shape existed, unreported defects, and a stated cause that rested on the buggy check.
+- `hair-scratch`: `axcenity/realistic-hair-crop-taper`, a short textured crop with a tapered nape, groomed from scratch against 12 CC BY 2.0 Openverse photographs, with new guide and clump-card tools.
+  - **Fixed against wave 4:** the hairline ramp (9 and 10 mm), 0 hair inside the head in Idle, Walk and Run, 0.30% geometric show-through, TAA steady, and within budget.
+  - **Draft:** a bowl at the back and sides instead of a taper, painted-stroke clumps close up, a jagged hairline with flecks of skin, 6.3% scalp show-through from the front (masculine), and a slab shadow under hard light. The review accepted it as an honest draft.
+- `sneakers-scratch`: `axcenity/realistic-sneakers-low`, modelled from scratch over a last from the realistic foot: a stitched cupsole, a leather upper with overlays, a padded collar and tongue, eyelets and laces.
+  - **Draft:** a long, low vamp with the throat set back (it reads toward a slipper), a flat toe box, a faceted sole outline, pentagonal eyelets, and the foot through in the stride (9 mm). Seven of its 15 references are branded products, used for proportions and construction only, as the hand-back states; no brand design is modelled.
+  - **A finding for every character:** the Walk and Run clips plant the bare foot 14 to 34 mm under the floor.
+- **The lead at merge:** the branches overlapped in the fit gate's library setup (pose-correctives moved it into a function, which body-hiding had edited in place; the edits were carried over), the item lists, two capture view sets (both kept), and two section 10s in the clothing references (the sneakers' became section 11). Synthetic posed meshes gained body-hiding's `hidden` field.
+- **Tests:** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --check` clean; `cargo nextest run --workspace` on the merge: 5,695 run, 5,676 passed; five Collaborate tests failed or timed out under load (all pass alone) and 14 player tests failed because fit-drape refitted the licensed tee after body-hiding made its masks (hidden skin showed in Idle, the walk and the run) and the test tee's bra records fell with its trimmed masks. The lead made the tee's masks again and trimmed them (body 19, bra 88, briefs 3 triangles; the boxer-briefs mask hid nothing after the trim and was dropped) and lowered the bra records; then `-p axcenity-player -p axcenity-avatar`: 640 run, all pass.
+- **Seen by the lead:**
+  - **Tee:** at the back in the walk it now reads as a shirt hanging from the shoulders; the front still clings and runs long, and the neckline is uneven.
+  - **Crop:** reads as a short haircut from a distance and from above, but as paint strokes close up, with a hard dark edge at the nape.
+  - **Sneakers:** read as a shoe with a clean upper, but low and flat at the toe.
+  - **Verdict:** none is near Paul's bar yet.
 
 ## 2026-11-18: the refinement, wave 5 stages 1 and 2 (branch `refinement-wave5`)
 
