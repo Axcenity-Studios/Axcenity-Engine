@@ -16,7 +16,7 @@ SemVer 2.0, with one of three pre-release tags. The channel follows from the ver
 
 While the engine is 0.x, a breaking change (an old engine can't open new projects, a script API removed) bumps the minor number, new features bump the minor number, and fixes alone bump the patch. Bump the last number of a pre-release (`-alpha.2`, …) for each new build of the same version, including a retried tag.
 
-History so far: `v0.1.0-alpha.1` and `v0.1.0-alpha.2` are tags that never became releases, and `v0.1.0-alpha.3` (2026-10-21) is the one published release. Its editor reported itself as `0.1.0` (known issue AX-0002). The next release is `0.2.0-alpha.1`.
+History so far: `v0.1.0-alpha.1` and `v0.1.0-alpha.2` are tags that never became releases, and `v0.1.0-alpha.3` (2026-10-21) is the one published release. Its editor reported itself as `0.1.0` (known issue AX-0002). `v0.2.0-alpha.1` (2026-11-11) was the first with the signed manifest and the self-updating editor, so installs from it onward update from Settings > Updates; `v0.1.0-alpha.3` installs must be replaced by hand. `v0.3.0-alpha.1` followed (2026-11-21).
 
 ## Release notes and history
 

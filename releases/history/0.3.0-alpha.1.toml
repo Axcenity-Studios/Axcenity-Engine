@@ -1,0 +1,813 @@
+version = "0.3.0-alpha.1"
+date = "2026-11-21"
+title = "Character Studio, ray tracing, living terrain and secure multiplayer"
+summary = """
+A Development build following 0.2.0-alpha.1: a stylized default humanoid
+with faces, expressions and lip sync, and Character Studio to edit it;
+optional ray traced shadows, reflections, GI and a Path Traced view; biomes,
+scatter rules, paths, water and caves for terrain; richer particles and
+fog volumes; servers that validate movement, lag compensation, replays and
+join codes; USD and OBJ import, Edit in Blender, AutoRecover and build
+profiles. Projects opened in it are upgraded to project format 6 after
+asking, older engines can't open them again, and it can't play online with
+older versions (network protocol 16).
+"""
+evidence = "verified"
+published = true
+
+[verification]
+linux = "scripts/check-platform.sh and check-packages.py --profile release on 6bb0ae49 plus the release prep (Fedora 45 desktop): build, player without editor code, clippy, every test, doc tests, game test, headless server, tar.gz/deb/rpm/pkg.tar.zst/AppImage, Build Game for Linux and the built game drawing frames all pass. axcenity-updater end-to-end update and roll back pass. Fixed before the tag: two release tests shared a scratch folder under cargo test."
+windows = "Not run for this release: Windows is checked by the release workflow's build and package jobs only."
+
+[formats]
+axgame = 2
+network_protocol = 16
+project = 6
+save = 2
+world = 2
+
+[[changes]]
+category = "fix"
+subsystem = "editor"
+title = "Some tooltips and messages no longer show a long gap in the middle of a sentence"
+details = "The Developer Console tooltip, the sky picker's hover, the volumetric fog notice, an FBX import note and several Team Create messages had a run of spaces where a line break in the source was lost."
+prs = [195]
+
+[[changes]]
+category = "feature"
+subsystem = "scripting"
+title = "Script tabs type-check out of the box: the editor ships the Luau language server"
+details = "Every package now includes luau-lsp 1.70.1 in a tools folder beside the editor, so type errors and lints are underlined in script tabs as you type without installing anything. An editor built from source offers to download the same version (checked against its pinned SHA-256) from a bar above a script tab or Settings > External tools. AXCENITY_LUAU_LSP still names another one."
+features = ["scripting.scripts"]
+prs = [348]
+
+[[changes]]
+category = "improvement"
+subsystem = "scripting"
+title = "Type checking follows require into your ModuleScripts"
+details = "Script tabs are now checked against the whole project: require(game.ReplicatedStorage.Utils) (or through GetService) brings in the module's functions and types, so calling one that doesn't exist or passing the wrong type is underlined in the script that requires it. Editing a module, even before saving it, checks the scripts open beside it again."
+features = ["scripting.scripts"]
+prs = [352]
+
+[[changes]]
+category = "improvement"
+subsystem = "scripting"
+title = "Breakpoints and stepping work inside your own coroutines"
+details = "A breakpoint inside coroutine.wrap or coroutine.resume now pauses there instead of being skipped. The call stack shows the coroutine's functions and then the ones that resumed it, Step Into goes into a coroutine you resume and stepping past its yield comes back out, and a new Waiting coroutines list shows your other suspended coroutines with where each waits and its locals."
+features = ["editor.script-editor"]
+prs = [356]
+
+[[changes]]
+category = "feature"
+subsystem = "assets"
+title = "Import USD files (.usd, .usda, .usdc, .usdz)"
+details = "USD scenes, including Apple's .usdz, can be imported with Import… or by dropping them on the editor. They're converted to a .glb first, with their units, up axis, object tree and UsdPreviewSurface materials and textures, so the project and games only ever hold glTF. Anything the conversion leaves out is listed in Output. Skeletons and animation aren't brought in yet."
+features = ["assets.model-import"]
+prs = [362]
+
+[[changes]]
+category = "feature"
+subsystem = "scripting"
+title = "The Profiler shows which script handlers and functions are slow"
+details = "The Profiler has a new Scripts tab. Press Record and play: every event handler (Door.Touched, RunService.Heartbeat), script and task.spawn is listed by the time it took, with its share of all script time and its time per call, and every script function by the time spent in it and the functions it calls, with its busiest line. The costliest come first, and clicking one opens the script there."
+features = ["editor.script-editor"]
+prs = [363]
+
+[[changes]]
+category = "feature"
+subsystem = "assets"
+title = "Animations in glTF and GLB files play as takes, like FBX animation stacks"
+details = "Each animation in a .gltf or .glb file (Blender's export, for one) is a take: a clip can link it, state machines play it, and it retargets onto other skeletons by its own skeleton."
+features = ["assets.model-import", "animation.clips"]
+prs = [368]
+
+[[changes]]
+category = "feature"
+subsystem = "scripting"
+title = "API docs and examples where you write code"
+details = "Rest the pointer on an engine name in a script (part.Touched, task.wait, workspace:Raycast) to see how it's written, what it does and an example. F1 opens its full API Reference page, and the reference can insert an example straight into the script you're editing. There are now 115 checked examples, up from 45, covering vectors, CFrames, colours, tweens, players and characters, remote events and functions, UI, input, attributes and tags."
+features = ["editor.script-editor"]
+prs = [370]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "A stylized default humanoid character with 41 face shapes and 32 starter animations"
+details = "assets/characters/humanoid has an original, faceted low-poly person (1.75 m, CC0) on a standard humanoid skeleton that retargets with no rig definition, four hair styles and swappable outfit parts, built by a Blender script, and 32 animations (idle, walk, run, jump, crouch, swim, climb, wave, dance and more). examples/hello-humanoid plays them."
+features = ["animation.clips"]
+prs = [373]
+
+[[changes]]
+category = "feature"
+subsystem = "assets"
+title = "Import presets for models: pick or save how a model comes in"
+details = "The Import dialog has a Preset row (Default, Static prop, Building kit, Character, and your own) and a Settings tab with Scale, Up axis, Anchored and Collision. Save as preset… keeps the current choices in the project's import-presets.json, and the next import starts with the preset you used last."
+features = ["assets.model-import"]
+prs = [374]
+
+[[changes]]
+category = "feature"
+subsystem = "gameplay"
+title = "New projects and Insert ▸ Character use the stylized default humanoid"
+details = "Empty, Baseplate, Third Person, Vehicle and Arena projects start with the default humanoid as the player's character, animated walking, running, jumping, falling and crouching, and Insert ▸ Character makes it in a saved project. A character with a HumanoidRootPart (or a PrimaryPart) is now measured by that part alone, so its mesh doesn't widen it."
+features = ["gameplay.humanoid"]
+prs = [380]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Plugin API 3: commands, shortcuts, Explorer items and import hooks"
+details = "Plugins can add commands to Ctrl+K with their own keyboard shortcuts (plugin:CreateAction), items to the Explorer's right-click menu (plugin:AddExplorerAction), change each imported model inside the import's own undo step (plugin.ModelImported), save settings before they stop (plugin.Unloading), open a script at a line (plugin:OpenScript) and show a notice (plugin:Notify). plugin.ApiVersion is 3."
+features = ["editor.plugins"]
+prs = [383]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Characters can wear parts: hair and clothes inside a skinned MeshPart move with it"
+details = "A skinned MeshPart put inside a character's animated MeshPart follows its pose bone by bone and places itself, so the default humanoid's hair styles and clothes (HumanoidParts.glb) swap by changing a MeshId."
+features = ["animation.clips"]
+prs = [386]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Characters have body sliders and sockets for accessories"
+details = "Attributes on a skinned MeshPart (BodyHeight, LegLength, ArmLength, ShoulderWidth, WaistWidth, HipWidth, HeadSize, HandSize, FootSize) reshape a humanoid character, with its feet kept on the ground and its parts shaped the same. Attachments with a Bone attribute follow that bone, and a Part with an Attachment of the same name hangs from it, so hats, backpacks and held props move with the body. The default character has sockets on its head, back, hips, hands and feet."
+features = ["animation.clips"]
+prs = [400]
+
+[[changes]]
+category = "feature"
+subsystem = "project"
+title = "Unsaved work comes back after a crash or power cut (AutoRecover)"
+details = "Every few minutes (Settings > Saving: off, 1, 2, 5 or 10 minutes; 2 by default) the editor keeps a copy of unsaved work in the project's .axcenity/autorecover folder: the world, script and stylesheet tabs and block scripts. If the editor crashes or the computer loses power, opening the project asks Recover unsaved work?; Recover opens it as unsaved changes and Discard deletes the copy. Saving removes it. UI graphs, behavior trees, dialogues, data tables, materials and terrain sculpting aren't kept yet."
+features = ["project.autorecover"]
+prs = [255]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Biomes split a terrain into forest, meadow, alpine and beach areas, each with its own ground and scatter rules"
+details = "Terrain Studio > Biomes adds Biome objects from presets (Lowland Forest, Meadow, Alpine, Beach or an empty one). Each brings its ground layer and its scatter rules, and covers ground by itself between its heights, below its steepest slope and between its driest and wettest ground, with soft, ragged edges; later biomes win where they overlap. Paint this biome spreads it by hand with the Paint tool on its ground layer, and changing a biome's settings never loses that paint. Scatter rules inside a biome place only there, thinning out at its edges; with a biome selected, Add rule adds into it."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Models keep their blend shapes (shape keys, morph targets) and draw them"
+details = "glTF morph targets and FBX blend shapes are imported instead of dropped, with their names and default values, and drawn on the GPU before skinning, in shadows and motion blur too. Nothing animates them yet except code; facial controls come next. Hardware ray tracing still sees the shape without them."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [360, 367]
+
+[[changes]]
+category = "feature"
+subsystem = "build"
+title = "Build Game uses build profiles and writes a build report"
+details = "File > Build Game > Build profile picks Release (the build it always made), Development (texture sources kept, fast compression, Developer Console on) or a profile from the project's build-profiles.json; --build-game takes --profile. Every build first runs Asset Check's missing files, bad references, broken dependencies and failed imports, and writes build-report.json and build-report.txt beside the game with the engine version, Git commit, settings, files by kind, largest files, left-out sources, problems and notes. Release packs exactly as before."
+features = ["project.build-game"]
+prs = [268]
+
+[[changes]]
+category = "fix"
+subsystem = "gameplay"
+title = "Characters no longer fall through the floor after brushing a ledge or another player"
+details = "A falling character steered into the side of a ledge lower than a step, or pushed into another player's character, could find no ground under its feet and fall through the floor. It now lands on the ledge (as on a step), or on whatever is below the other character."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Character Studio: edit a character's face"
+details = "A Character Studio tab shows the selected character's face in a preview of its own. Rig: pick the face profile, see what doesn't fit, move the 48 face controls with sliders, and map the model's own blend shapes, eye and jaw bones and their limits to a new profile. Expressions: preview the built-in and project expressions at any intensity, blend two, change one and save it. Lip sync: open a lip sync or make one from a sound or phoneme timings, see it over the sound's waveform, pick, retime, change, add and delete visemes, play them on the face and save. Key in Animation opens the face's controls in the Animation tab to key them over time."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [392]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Character Studio opens from the start screen"
+details = "Character Studio is now a workspace of its own: pick Character Studio on the start screen (or run axcenity-editor --character-studio) to make a character with no project open. Start from a preset (Everyday, Casual, Athlete, Long hair, Base body), shape the build and muscle, pick one of six hairstyles or none, and dress the character piece by piece (top, outerwear, bottoms, shoes), all on a live, idling character. Turn, pan and zoom round it, jump to the full body, face, front, side or back, and change the lighting and backdrop. Every change can be undone, and Save keeps the character as a .character.json file listed on the start page. The Game Editor's menus aren't shown while it's open."
+stability = "experimental"
+features = ["animation.facial"]
+
+[[changes]]
+category = "feature"
+subsystem = "physics"
+title = "Models can carry their own collision shapes, and MeshParts can choose what they collide as"
+details = "An object in a model named like another with _COL on the end (Rock_COL, Rock_COL2 and so on) is now one convex piece of that object's collision: it isn't drawn and doesn't change the model's size, the same idea as Unreal's UCX_ and Godot's -colonly objects, so they can be made in Blender. MeshParts gain CollisionFidelity: Default (the model's pieces when it has any, otherwise its hull, which is what every MeshPart did before), Box, Hull or PreciseConvexDecomposition, so a doorway or an arch can be walked through. The Collisions overlay draws the pieces."
+features = ["physics.rigid-bodies", "assets.model-import"]
+prs = [319]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Data layers: hide or lock a tagged set of objects while you build"
+details = "A new Layers panel (View > Panels > Layers) gathers everything tagged with a layer's name into a data layer, wherever it is in the Explorer. Hide a layer to keep it out of the viewport, or lock it so clicks go through it, without changing the world: which layers you hide is kept on your computer and Play still shows them all. Layers are DataLayer objects in the new DataLayerService, saved with the world; making, renaming and deleting one are undo steps."
+prs = [328]
+
+[[changes]]
+category = "feature"
+subsystem = "scripting"
+title = "Switch data layers on and off while a game runs"
+details = "DataLayerService:SetLayerActive(name, active) sets a layer's objects aside and puts them back where they were, in the same order. A layer whose Active On Start is off starts set aside. IsLayerActive reads a layer, and LayerChanged fires on the server and on every player's device, where the parts leave and come back. Levels set aside their own members of a switched-off layer, and save slots and checkpoints keep each layer's state. Blocks: set layer active, layer is active and when layer changes."
+prs = [336]
+
+[[changes]]
+category = "feature"
+subsystem = "gameplay"
+title = "A new default character: smooth and stylized"
+details = "The default humanoid is redesigned. The faceted low-poly person is now a smooth stylized one built on Blender Studio's CC0 base meshes: sculpted anatomy, hands and feet, a face with big expressive eyes, brows, lashes and teeth, a baked skin texture, and a modern outfit (a cropped jacket over a T-shirt, cargo joggers, sneakers) with hems, cuffs, folds and pockets. HumanoidParts.glb has six hair styles, underwear, a feminine frame and build shapes for the body, face shapes for Character Studio's coming sliders, and clothing masks that keep skin from poking through clothes; the clothes stay clear of the body and of each other on both frames and every build. The skeleton, the 32 starter animations and the 41 facial shapes keep their names, so existing clips, state machines and face profiles still work. Projects that already have the old model keep it; new projects and Insert > Character get the new one."
+stability = "experimental"
+features = ["gameplay.humanoid"]
+
+[[changes]]
+category = "feature"
+subsystem = "project"
+title = "New blank projects start under a default HDR sky"
+details = "New Project's Baseplate and Empty templates now start with a built-in sky image (Kloofendal 48d Partly Cloudy, a CC0 HDRI from Poly Haven) in assets/sky/partly-cloudy-sky.hdr, with Lighting's ClockTime and GeographicLatitude set so the sun and shadows match it. Lighting's SkyImage row has a sun button that puts the default sky into any project. Genre templates and existing projects are unchanged."
+features = ["project.templates"]
+prs = [247]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Edit in Blender: open a model in Blender and save it straight back into the project"
+details = "Edit in Blender, on a .glb model in the Assets panel, a MeshPart's Properties and the Model Studio toolbar, opens the model in Blender with a small script. Saving in Blender (Ctrl+S) writes the .glb back: MeshParts using it reload, and an open Model Studio document of it offers to load it again or keep your edits. Settings > External tools sets which Blender to use; left empty, the editor finds it on PATH or in the usual install folder. Nothing is installed into Blender."
+features = ["editor.model-studio"]
+prs = [321]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Unload a region of a big world while you edit another"
+details = "The Layers panel lists the Workspace's top-level Folders and Models under Regions, with their part counts. Unload in Editor sets one aside: it isn't drawn and a click goes through it, but it stays in the world, saves unchanged and plays as usual. Which regions you unloaded is kept for you in .axcenity/layers.json, like hidden layers. A click now also goes through what Stream While Editing leaves out."
+prs = [333]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Effect tab: presets that suit the place, an Environment module and the place's backdrop"
+details = "The Effect tab's Add menu adds a Fire, Smoke, Sparks, Magic, Explosion or Dripping effect to the selected part as one undo step. Each suits the place when added: glowing effects are brighter by day than at night, smoke takes on the sky's haze, and in a windy place drifting particles follow the wind. A new Environment module holds the emitter's wind setting and the place's wind, and the backdrop menu can show the place's own lighting and weather behind the effect."
+features = ["renderer.particles"]
+prs = [313]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Effect tab: preview and edit particle effects, and save them as effect assets"
+details = "The new Effect tab (Window menu or Ctrl+K) plays the selected particle effect alone, with play, pause, restart, loop, slow motion, a floor and a sky or dark backdrop. Below the preview, each emitter's properties are grouped as a module stack (Spawn, Birth, Over life, Render), and every edit there is an undo step. It shows how many particles run on the CPU and GPU and what they cost. Save as Effect saves the effect as a prefab in assets/effects, so it places, overrides, applies and reverts like any prefab, and the Assets panel lists effects under Particles."
+features = ["renderer.particles"]
+prs = [310]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Move a character's face with FaceControls: blinks, brows, smiles, eyes and jaw"
+details = "Insert > Face Controls in a MeshPart gives it 48 standard facial controls (Blink_Left, Brow_Raise_Left, Mouth_Smile_Left, Eye_Look_Up, Jaw_Open …), 0 to 1, which scripts and tweens can set. A face profile maps them to the model's blend shapes: built-in ones for Axcenity's own naming, ARKit's 52 shapes and VRoid characters, or a *.face.json file of the project's own. Eye and jaw bones are found by name and turned within limits. The Import dialog says how many controls a model's face gets."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [377]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Faces blink, look at things and show expressions"
+details = "FaceControls:SetExpression blends in one of 15 built-in expressions (Happy, Sad, Angry, Surprised, Sleepy …) or a *.expression.json of the project's own, with an intensity, transition time, weight, priority and one-sided asymmetry; ClearExpression blends it out. Faces blink by themselves (random intervals, double blinks, per eye, or off), follow the camera, a part, a character or a point with their eyes within limits, and make small idle movements. Layers (Base, Expression, Dialogue, Procedural, Override) can be reordered, weighted, made additive and masked to parts of the face, and SetOverride holds a control over everything."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [384]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Key a face's controls in animation clips and sequences"
+details = "Select a FaceControls in the Animation tab or the Sequencer to key its controls (Jaw_Open, Blink_Left, Mouth_Smile_Left …) like any other property. Clip files name them as the track's property."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [385]
+
+[[changes]]
+category = "performance"
+subsystem = "animation"
+title = "Faces cost less far away and out of view"
+details = "A FaceControls' LodDistance (30 studs) sets where its face starts costing less: beyond it the face updates 15 times a second without idle motion, beyond twice it only its expressions 4 times a second, and beyond four times it, or out of the camera's view, it rests while its expressions and lip sync keep time. ProceduralEnabled turns blinking, gaze and idle motion off for a character, and the Profiler's Faces section shows how many faces are at each level, how many were worked out and what they cost. The network protocol is now 15."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [393]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Faces play the same on every player's screen"
+details = "In multiplayer, the expressions, overrides, layer settings and lip sync a server script sets on a FaceControls now reach players' devices, which blend towards them themselves and keep a lip sync within a tenth of a second of the server's. ReplicateExpressions, ReplicateOverrides and ReplicateLipSync choose which parts go (a part that doesn't is left to each device's LocalScripts), and ReplicationRate (10 a second) how often at most. The network protocol is now 16."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [394]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Fill with Probes, and real-time GI tiers by preset"
+details = "Fill with Probes (Light menu, under Bake Probes) puts a light probe volume around the selected parts or model, spaced to fit 512 probes, as one undo step, and says in Output how many probes stand inside solid parts (the bake leaves those out). Real-time GI, while on, now traces as much as the graphics preset allows: Low one probe a frame at 8² faces, Medium two at 8², High two at 16² (as before) and Ultra four at 16²."
+features = ["renderer.global-illumination"]
+prs = [309]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Fog Volumes and Interiors: big local haze, and rooms with their own air"
+details = "Lighting ribbon > Volumes > Fog Volume inserts a 200 x 60 x 200 stud box of haze that sunlight shines through in shafts (with Volumetric fog) and lamps light; its Fog sets Density, Color, Glare and the new HeightFalloff for haze lying low. Interior inserts a room-sized box whose FogEffect has the new Interior switch: inside it the outdoor fog and haze is cleared and only its own dust fills it, so light through windows shows as shafts. Up to 8 fog volumes now draw at once (only the nearest one did before)."
+stability = "experimental"
+
+[[changes]]
+category = "fix"
+subsystem = "assets"
+title = "Blender glTF files whose shape keys move only some meshes load again"
+details = "Blender's glTF exporter (with its default Try sparse shape keys) writes a shape key that doesn't move a mesh as an empty accessor, which glTF reads as zeros. Such files were refused as invalid; they now load, and that mesh simply doesn't move for that shape."
+features = ["assets.model-import"]
+prs = [369]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Big particle emitters can collide on the GPU, landing on what the camera sees"
+details = "A ParticleEmitter with Collides on that gives off thousands of particles now moves them on the GPU instead of staying on the CPU, landing them on the surfaces the camera sees (the depth prepass) with the same Bounce and LifetimeLoss. Surfaces off screen or hidden don't stop them there; smaller colliding emitters still land on physics surfaces on the CPU, and emitters with sub-emitters stay on the CPU."
+features = ["renderer.particles"]
+prs = [312]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Light probes baked inside walls or the ground no longer leak light into rooms"
+details = "Bake Probes now marks each light probe that stands inside a colliding part or under the terrain's ground as invalid. Surfaces leave those probes out and blend the ones around them instead, so a bright probe stuck in a wall no longer lights the next room. The Light Probes overlay shows them as magenta crosses and counts them. Bake again to get this; older bakes light as before."
+features = ["renderer.global-illumination"]
+prs = [301]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "A Light Probes overlay shows every probe, its baked light and which bakes need redoing"
+details = "Test > Overlays > Light Probes (also in Settings and the command palette) draws each LightProbeVolume's probes as discs filled with the light their bake gives a surface facing you, so dark or leaking probes stand out. Volumes are outlined green when baked, orange when the world has changed since the bake, grey before their first bake and red when the bake file is missing; a legend counts them and the probes the renderer keeps (roadmap R18.1)."
+features = ["renderer.global-illumination"]
+prs = [289]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Baked light probes follow a sky that dims or changes color"
+details = "Bake Probes now keeps the sky's share of each light probe's light apart from the sun's, lamps' and ambient light's. While the sky is drawn darker or a different color than when baked (time of day, weather, a new sky), surfaces in the volume take that much more or less of the sky's share, without baking again or turning on real-time GI. A sky as baked draws exactly as before. Bakes from before keep their light as baked until probes are baked again; the Light Probes overlay counts them."
+features = ["renderer.global-illumination"]
+prs = [305]
+
+[[changes]]
+category = "feature"
+subsystem = "animation"
+title = "Characters say their lines with lip sync"
+details = "FaceControls:PlayLipSync plays a *.lipsync.json of timed visemes (12 mouth shapes) on a face in time with its Sound, blending neighbours smoothly and a little early, with the jaw carrying part of the opening. A viseme map (built in, or the project's own *.visemes.json) says what each viseme does to the face. The Console's lipsync command makes a lip sync from a recording or from phoneme timings, and voiced dialogue lines play the lip sync beside their sound on the speaker's face."
+stability = "experimental"
+features = ["animation.facial"]
+prs = [389]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Make a model's collision in the Model Studio"
+details = "The Model Studio's new Collision fold gives the active object a box, a hull or up to 64 convex pieces that follow its hollows, so a doorway or the space under a table stays open. They're saved in the .glb as _COL objects, and a MeshPart with CollisionFidelity Default collides as them. Remove takes them out. Show Collision outlines them in green, and Edit mode edits them like any object."
+features = ["editor.model-studio"]
+prs = [334]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Model Studio: a Levels of detail fold to see, tune, preview and remove LODs"
+details = "Under Modifiers, the new Levels of detail fold lists the active object and its LOD copies with each one's triangle count and share. You can set how much LOD 1 and LOD 2 keep before Generate LODs (or Regenerate, which replaces the copies), take the copies out with Remove LODs, and preview the whole model as LOD 0, 1 or 2 in the view, as the game draws it far away. Each change is one undo step."
+features = ["editor.model-studio"]
+prs = [320]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Model Studio's sculpting and baking are back"
+details = "Sculpt mode returns with its brushes (Draw, Clay Strips, Smooth, Grab, Inflate, Crease, Flatten, Pinch, Snake Hook, Mask), symmetry, masks, Voxel Remesh and Subdivide. The Bake fold returns too: pick a reference object, Make Low Poly (decimate, relax, Smart UV Project) and Bake normal, occlusion, curvature and base color maps as one undo step. Retopology by hand stays out."
+features = ["editor.model-studio"]
+prs = [271]
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Load-test a game server with headless bots"
+details = "axcenity-bots <game> --join <address> --count <n> joins that many headless players over real UDP, walking and jumping about, and reports their join times, round trips, bandwidth and how often the server moved them back. axcenity-server --stats prints the server's frame times and players' connections while it serves, and --max-players takes more players than the game's MaxPlayers. scripts/net-scale.py runs both on one or two machines and writes a report (multiplayer readiness MP1)."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Servers stop players' characters going through walls or flying"
+details = "A dedicated server or host now refuses a joined player's character move that passes through (or ends inside) an anchored solid part or Terrain, or keeps it off the ground longer and higher than a jump allows, and an owned part moved faster than 400 studs a second; the device is moved back. A device that keeps making such moves is flagged and kicked like one over its budgets. axcenity-bots --cheat speed|noclip|fly runs modified clients to check it (multiplayer readiness MP3b)."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Players rejoin by themselves after losing the connection"
+details = "A player who joined a game over the network and loses the connection (the server crashed or restarted, or the network dropped) keeps playing what they see and tries to rejoin for a minute before ConnectionFailed fires. A server that hasn't noticed the old connection is gone lets them back in place of it, even when the game is full, with the same name. axcenity-bots gains --churn and --flood for operational tests, the server's --stats lines show its Instance count and Lua memory, and renetcode's error for every unreadable packet no longer floods the log (multiplayer readiness MP2)."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Servers hold each player to what a game client sends, and kick cheaters"
+details = "Each player's device has a budget for bytes, remote calls, chat, console commands, streaming requests and motion packets; what goes over it, can't be read or only the server sends is dropped, and the player is flagged. Scripts hear Players.PlayerFlagged(player, reason), and a player flagged 5 times in a minute is kicked with the reason (axcenity-server --kick-flags changes it, 0 never). A device spamming junk as fast as it can is kicked in about 3 seconds (multiplayer readiness MP3)."
+stability = "experimental"
+
+[[changes]]
+category = "breaking"
+subsystem = "networking"
+title = "Network protocol 13: games and Collaborate sessions on this version can't join older ones"
+details = "The new DataLayerService (roadmap R16.2) is made with every world, after the other services, so the Instances after it are numbered differently than on older versions. DataLayer also has a new Active property (R16.4), so class defaults differ too. A player or Collaborate member on an older version is told to update when they join."
+prs = [328]
+
+[[changes]]
+category = "breaking"
+subsystem = "networking"
+title = "Network protocol 14: players on this version can't join games on older ones"
+details = "The join request and the server's welcome carry a rejoin key (multiplayer readiness MP2), so a player on an older version is told to update when they join."
+
+[[changes]]
+category = "breaking"
+subsystem = "networking"
+title = "Network protocol 16: players on this version can't join games on older ones"
+details = "Players gains CharacterAuthority, and devices and servers exchange moves and their answers for server-moved characters (multiplayer readiness MP6a), so a player on an older version is told to update when they join."
+
+[[changes]]
+category = "feature"
+subsystem = "assets"
+title = "Import OBJ models with their materials"
+details = "Wavefront .obj files can be imported like glTF and FBX ones, by Import… or by dropping them on the editor. The .mtl library next to the file gives them their colors and textures; each o object can be picked in the Import dialog. OBJ is taken as Y up, 1 unit = 1 stud."
+features = ["assets.model-import"]
+prs = [351]
+
+[[changes]]
+category = "fix"
+subsystem = "gameplay"
+title = "Characters spawned with no SpawnLocation no longer stand inside each other"
+details = "In a game with no SpawnLocation, every character stood at the origin, so two players' characters pushed each other apart and one could fall through the floor. Characters now spread out around the origin as they do on a SpawnLocation."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Particles can come out in timed bursts, keep their part's speed and head out from (or into) round shapes"
+details = "A ParticleEmitter's new Bursts (a NumberSequence of times and counts) gives off bursts over a loop of Duration seconds, VelocityInheritance adds a share of the moving part's velocity to new particles, and ShapeInOut (Outward, Inward, InAndOut) picks which way they head. Sphere, Cylinder and Disc shapes now send particles away from their middle instead of along Direction; a Box still heads along Direction. CPU and GPU particles behave the same."
+features = ["renderer.particles"]
+prs = [302]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Particles can land on floors and bounce, and emitters can burst where other particles die or land"
+details = "A ParticleEmitter's new Collides makes its particles land on parts with CanCollide on and the ground, keeping Bounce of their speed into the surface and losing LifetimeLoss of their life each landing. A ParticleEmitter inside another with EmitOn set to Birth, Death or Collision becomes a sub-emitter, giving off EmitCount particles where each of its parent's particles is born, dies or lands: sparks that splash on the ground, fireworks that burst at the end of their trail. Such emitters move their particles on the CPU, up to 4,000 each; existing emitters are unchanged."
+features = ["renderer.particles"]
+prs = [311]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Particles can change size, color and transparency along curves over their lives"
+details = "A ParticleEmitter's new SizeOverLife, TransparencyOverLife and ColorOverLife take a NumberSequence or ColorSequence (keypoints from birth to death, with an envelope for a per-particle spread), edited in Properties as a curve or gradient and from scripts with NumberSequence.new and ColorSequence.new. Unset, Size/SizeEnd and the other pairs work as before."
+features = ["renderer.particles"]
+prs = [284]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Particles can play a flipbook: a texture cut into frames, shown one at a time"
+details = "A ParticleEmitter's new FlipbookLayout (Grid2x2, Grid4x4, Grid8x8) cuts its Texture into frames, FlipbookMode picks each particle's frame as it ages (Loop, OneShot over its life, PingPong or Random), FlipbookFramerate sets the frames a second and FlipbookStartRandom starts each particle on a frame of its own. Smoke, fire and explosion sheets animate on CPU and GPU particles alike. FlipbookLayout None (the default) shows the whole texture as before."
+features = ["renderer.particles"]
+prs = [306]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Particles can be born in a sphere, cylinder or disc, or only on its surface, and change speed over their lives"
+details = "A ParticleEmitter's new Shape (Box, Sphere, Cylinder, Disc) and ShapeStyle (Volume, Surface) pick where in its part particles start, stretched to the part's size, and SpeedOverLife (a NumberSequence) scales their speed as they age. The defaults give off from anywhere in the part at a steady speed, as before. CPU and GPU particles follow the same shapes and curve."
+features = ["renderer.particles"]
+prs = [292]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Path Traced view mode"
+details = "Viewport > View Mode > Path Traced shows a reference picture of the scene made by path tracing: rays bounce through the hardware ray traced scene, one more path a pixel each frame, picking up the sun, every lamp (each with its own shadow ray), glowing surfaces and the sky. The picture clears up while the camera and scene stay still and starts again when anything changes; its legend counts the paths so far. Surfaces are treated as matte, and glass, water and fog are left out. Needs a GPU that can ray trace."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Shots at moving targets count where the shooter saw them"
+details = "A server's workspace:Raycast with RaycastParams.CompensateFor = player, or in a RemoteEvent handler inside a Tool with LagCompensated on, tests moving parts where that player saw them: their round trip plus the 0.1 s smoothing delay, at most 1 second back."
+features = ["networking.lag-compensation"]
+commits = ["db1ffa77"]
+
+[[changes]]
+category = "breaking"
+subsystem = "networking"
+title = "Network protocol 12: games on this version can't play with older ones"
+details = "Tools have a LagCompensated property (unified plan Phase 81), so a server sends it to players' devices. A player on an older version is told to update when they join."
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Record games as replays, watch them back and show kill cams"
+details = "ReplayService:StartRecording() and StopRecording(name) save a .replay in the player's data folder; axcenity-player --replay <file> <game> plays it with pause, speed, jumps, a timeline and a camera that follows any player. BufferSeconds and PlayBuffer(player) show the last seconds through a player's eyes."
+features = ["networking.replays"]
+commits = ["0d61d0b7"]
+
+[[changes]]
+category = "breaking"
+subsystem = "scripting"
+title = "animation:Play(), Stop(), Pause() and Resume() are now errors that name the fix"
+details = """These Animation methods were kept from before AnimationTracks. Each now raises an error such as "animation:Play() was removed: use local track = animator:LoadAnimation(animation), then track:Play()". Play the Animation through its Animator instead (pause with track:AdjustSpeed(0)). AutoPlay still works, and the UI Designer's Play on click writes the LoadAnimation form."""
+prs = [223]
+
+[[changes]]
+category = "breaking"
+subsystem = "project"
+title = "Projects move to format 6, and the oldest clip and block-script shapes are upgraded once on open"
+details = "Opening a project upgrades it to format 6 and keeps a copy of the previous files in .axcenity/previous/5, as earlier upgrades did. Clips and state machines still in animation format 1, and block-script conditions saved in the first block format, are rewritten in the current shape; the engine no longer reads the old shapes anywhere else. An older Axcenity can't open a format 6 project. The Starter scene template is gone from New Project (the genre templates replace it); projects made from it open as before."
+prs = [223]
+
+[[changes]]
+category = "fix"
+subsystem = "editor"
+title = "Bake Probes no longer freezes the editor: it bakes in the background with progress and Cancel"
+details = "Baking light probe volumes and reflection probes used to run all at once, so a project with many probes locked the editor until it finished, with no sign of what was happening. The bake now runs a little each frame: a Baking Probes window shows what's being baked, how many probes are done and about how long is left, and Cancel keeps the volumes already finished. Bakes of 1,000 or more light probes say in Output that they can take minutes, and the scene is uploaded once for all volumes instead of once per volume."
+features = ["renderer.global-illumination"]
+prs = [297]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Procedural buildings: a street of houses from a few settings"
+details = "Insert > Building makes a building from a footprint: its own box, which the Move, Rotate and Scale handles change, or the corners of a Spline. It stacks Floors of walls with windows and a front door under a flat or gable roof, varied by Seed, from built-in parts or your own wall, window, door and corner models. Change a setting and it's built again; Bake keeps it as ordinary parts. The Hello Buildings example is a street of them."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "fix"
+subsystem = "renderer"
+title = "No more black blotches under leaves with ray traced shadows"
+details = "Ray traced shadows and ambient occlusion traced cut-out leaves and grass as solid cards, so leaves lying on the ground shaded it in black, card-shaped patches that flickered. A cut-out right on a surface is no longer counted; farther ones still cast shadows."
+
+[[changes]]
+category = "fix"
+subsystem = "renderer"
+title = "Soft ray traced shadows on slopes no longer look dithered"
+details = "The smoothing of soft ray traced shadows left out pixels of a surface seen side-on, so a shadow's soft edge on a slope showed the rays' per-pixel pattern as a dither. It now compares neighbours by the surface's plane."
+
+[[changes]]
+category = "fix"
+subsystem = "renderer"
+title = "Ray traced ambient occlusion and GI see through cut-outs' holes"
+details = "Ray traced ambient occlusion and ray traced global illumination now let rays through the cut-out parts of leaves, grilles and fences, as ray traced shadows already did, instead of treating every cut-out as a solid card. Foliage no longer darkens the ground around it in card-shaped patches, and light bounces through gaps between leaves."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced light shafts in volumetric fog"
+details = "With volumetric fog and ray traced shadows both on, the sunlight in the fog near the camera is traced by rays instead of read from the shadow maps, so shafts through windows, between leaves and through gaps are sharp, have no shadow-map leaks and show even with shadow quality Off. Glass lets the light through. Past the ray tracing distance the shadow maps take over smoothly."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced shadows for point, spot and rect lights"
+details = "With Settings > Graphics > Ray traced shadows on, every PointLight, SpotLight and RectLight with Shadows on near the camera casts ray traced shadows, not only the few the shadow maps allowed. Soft shadows follow Lighting's ShadowSoftness: a lamp's shadow softens with its bulb size, and a RectLight's is traced over its whole rectangle. A lamp's own fixture doesn't shade it. Lights inserted in the editor now have Shadows on; turn it on for existing lamps."
+stability = "experimental"
+
+[[changes]]
+category = "improvement"
+subsystem = "editor"
+title = "One click for the ray traced look, and a Learn guide to ray tracing"
+details = "Settings > Graphics > Ray tracing has Use the ray traced look, which turns on Hardware ray tracing, ray traced shadows and ambient occlusion and the settings they look best with, keeping the rest, and Ray traced effects off. When a restart is still needed it says so, and to check a Desktop shortcut opens this version. A new Learn page, Ray tracing: the best look, simply, explains turning it on, reading the viewport badge, and getting good shadows and sky."
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced water reflections"
+details = "With hardware ray tracing on, water at High and Ultra reflection quality traces a ray where its screen-space reflection finds nothing, so parts above or behind the view, or hidden on screen, show in the water. What a ray finds is lit by the sun (with its shadow), nearby lamps, the ambient light and the light probes."
+stability = "experimental"
+
+[[changes]]
+category = "improvement"
+subsystem = "editor"
+title = "Compare: see the view with and without ray tracing"
+details = "The Scene view's ray tracing badge has a Compare toggle that draws the view without its ray traced effects, and back, without a restart or a settings change. The Learn guide says what to look for."
+
+[[changes]]
+category = "fix"
+subsystem = "editor"
+title = "Ray tracing says when AXCENITY_RAY_TRACING=0 keeps it off"
+details = "When the editor was started with AXCENITY_RAY_TRACING=0 (for example left set in a PowerShell window after a test), ray tracing stayed off however often it restarted, and the badge only said to restart. The badge and Settings > Graphics now name the variable, and Restart now starts the editor without it."
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Players can join a game hosted behind a home router with a join code"
+details = "Run axcenity-relay on a computer with a public address (TCP and UDP port 47810) and host with --relay address:port: the host gets a six-letter join code and a link. Players join with --join CODE --relay address:port, or the link; they connect directly when a hole can be punched through both routers, and through the relay otherwise. The relay can't read the game or the password. Axcenity runs no public relay (multiplayer readiness MP5a)."
+stability = "experimental"
+
+[[changes]]
+category = "fix"
+subsystem = "networking"
+title = "A remote message of deeply nested tables no longer crashes a server"
+details = "A modified client could send a RemoteEvent message whose argument was tables nested 200,000 deep (600 KB), and the server, or any device that read it, overflowed its stack and stopped. Reading now stops at 32 tables deep and drops the message, and a script that sends tables nested deeper than that gets an error (multiplayer readiness MP3)."
+
+[[changes]]
+category = "improvement"
+subsystem = "editor"
+title = "Restart now, for Hardware ray tracing"
+details = "When Hardware ray tracing needs a restart, Settings > Graphics > Ray tracing and the Scene view's ray tracing badge have a Restart now button. It starts the editor again with the same project, keeping unsaved world and script edits, so ray tracing turns on without closing and reopening anything by hand."
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Hosts ask the home router to forward the game's port"
+details = "A secured host (axcenity-server, or axcenity-player --host without --lan) asks its router to forward the game's port from the internet over UPnP, PCP or NAT-PMP, and logs the router's outside address with a join link players on other networks can use. The mapping is renewed while the game is hosted and removed when hosting stops. Routers with these turned off, and internet providers that put their own router in front (carrier-grade NAT, which the log warns about), still need a forwarded port or a relay. --no-port-map turns it off (multiplayer readiness MP5b)."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced sun shadows (optional)"
+details = "With Hardware ray tracing on, Settings > Graphics > Ray tracing > Ray traced shadows (Off, Low, Medium, High) traces the sun's shadows as rays from each pixel within the ray tracing distance: exact up close, soft by how far the caster is (from Lighting's ShadowSoftness), with the shadow maps past the reach and for see-through surfaces. Low, Medium and High trace 1, 2 or 4 rays a pixel for soft shadows. Off at every preset. LocalScripts can set UserGameSettings.RayTracedShadows, and blocks have it under set graphics option. A badge at the bottom right of the editor viewport says whether ray tracing is on, which effects are drawing and how many items rays see."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced global illumination (optional)"
+details = "On a GPU that can ray trace, Settings > Graphics > Ray traced GI lights light probes with rays each frame, so bounced light follows a moving sun, lamps and moved walls, and rooms get the light their windows let in. The camera brings its own probes, 3 studs apart, so it needs no light probe volume; probes stuck inside walls are left out. Low, Medium and High trace 128, 256 or 512 probes a frame. It's off by default, takes Real-time GI's place while on, and scripts set it through UserGameSettings.RayTracedGlobalIllumination."
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Ray traced ambient occlusion (optional)"
+details = "With Hardware ray tracing on, Settings > Graphics > Ray tracing > Ray traced ambient occlusion (Off, Low, Medium, High) darkens corners and creases with short rays (2, 4 or 8 a pixel) instead of guessing from the screen, so things off screen or behind others count too. It draws ambient occlusion even with the screen-space setting off, and fades into it past the ray tracing distance. Off at every preset. LocalScripts can set UserGameSettings.RayTracedAmbientOcclusion, and blocks have it under set graphics option."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Scatter rules place plants, props and models over a whole terrain by height, slope and material"
+details = "Terrain Studio > Scatter Rules adds ScatterRule objects inside a Terrain (the Forest set of three, Forest Trees, Undergrowth, Meadow Flowers, Grass Tufts, or an empty Scatter Rule). Each places what its Models list names, picked from the Assets panel, wherever its spacing, density, height and slope windows, material layer, clumping and distance from earlier rules allow, with random turn and size. The layout follows sculpting and painting as you work, is the same for the same seed on every device, and isn't saved: it's made again when the world loads. Bake turns it into painted foliage you can brush and erase. A 2,048-stud forest of 348,000 plants is placed in about a tenth of a second."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Model Studio: seven new sculpt brushes and a Mesh Filter"
+details = "Sculpt mode adds Layer, Blob, Scrape, Fill, Draw Sharp, Nudge and Elastic Grab brushes, each explained on hover. The new Mesh Filter smooths, sharpens, inflates, scales or roughens the whole object at once, held back by the mask, as one undo step."
+prs = [317]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Model Studio saves sculpt masks with the model"
+details = "A mask painted in Sculpt mode is kept on its object and saved in the model's sidecar, so it's there again after closing and reopening the model. Painting or clearing a mask leaves the model unsaved, undoing a stroke keeps the mask, and undoing Voxel Remesh or Subdivide brings it back."
+features = ["editor.model-studio"]
+prs = [322]
+
+[[changes]]
+category = "security"
+subsystem = "networking"
+title = "Games hosted on the network are encrypted, and only players who pass the password get in"
+details = "A dedicated server and a player's --host now hand out connect tokens over TLS from TCP on the game's port (47800), checking the game, version and password first, and every packet after is encrypted. Players check the server's certificate against the fingerprint in a join link (axcenity://join/address:port#fingerprint, printed by the host) or the one remembered for that address, and are told if it changed. The certificate is kept in the engine's data folder, never in a project. LAN games stay unsecured: player --host --lan, axcenity-server --insecure (multiplayer readiness MP4)."
+stability = "experimental"
+
+[[changes]]
+category = "breaking"
+subsystem = "networking"
+title = "Older Axcenity versions can't join a secured game"
+details = "Players on a version from before secure connections can't join a server hosted with this one (their connection requests carry no token and are dropped). Update every player, or host a LAN game with player --host --lan or axcenity-server --insecure. A secured server needs TCP as well as UDP open on its port."
+
+[[changes]]
+category = "feature"
+subsystem = "networking"
+title = "Servers can move players' characters, with prediction on their devices"
+details = """Players.CharacterAuthority = "Server" (or axcenity-server --character-authority server) has the server move each player's character from the keys their device sends, so a modified client can't move it anywhere the game wouldn't. The player's own device still moves its character at once and checks it against the server's answers; when they differ it puts the character where the server has it, takes the steps since again and slides the difference away. "Client", the default, keeps today's behavior. Other players' characters, seats and moving platforms can still cost small corrections (multiplayer readiness MP6a)."""
+stability = "experimental"
+
+[[changes]]
+category = "improvement"
+subsystem = "renderer"
+title = "A sky picture darkens toward night, and one click makes the sky follow the time of day"
+details = "A sky image (Lighting.SkyImage, such as the default sky) now dims with ClockTime as the drawn sky does, so night falls with a picture too; its own colors stay the picture's. Under Lighting's SkyImage row a note says so, with a Follow time of day button that clears the picture and adds an Atmosphere, for a sky that turns orange at sunrise and sunset."
+
+[[changes]]
+category = "fix"
+subsystem = "networking"
+title = "Players who spawn on the same SpawnLocation no longer stand inside each other"
+details = "Each character now takes a free spot on the SpawnLocation's top. Before, characters made in the same place pushed each other apart on their devices, and the server moved them back every frame, or they fell through the floor. A character standing still is also never moved back for the network's rounding of its position."
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Big worlds can stream while you edit them"
+details = "Viewport menu > Overlays > Stream While Editing (also Settings > Viewport): with the Workspace's StreamingEnabled on, the viewport leaves out what's beyond StreamingTargetRadius of the camera while editing, as Play does, so a big world edits as light as it plays. Whatever is selected always shows. Off by default and kept between runs."
+prs = [331]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "The Streaming overlay shows what streams in around the camera while editing"
+details = "With Workspace.StreamingEnabled on, Overlays > Streaming outlines each streaming unit within the unload radius by where it stands from the camera (there at once, loads, or kept if loaded), the parts that are always there and both radii. Its legend counts what a player standing there would have and names any unit too big to stream well."
+prs = [280]
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Sun Rays effect: beams of sunlight through leaves and windows (optional)"
+details = "Insert > Lighting > Lens > Sun Rays puts a SunRaysEffect in Lighting. While the sun is in or near the view, bright sky showing through gaps in leaves, a window frame or anything else in front of the sun streams into beams. Intensity (0.25) sets how bright they are and Spread (0.5) how far they reach. They're worked out on screen, so they fade as the sun leaves the view, and they need no ray tracing. Settings > Graphics > Sun rays turns them off (off at Low). LocalScripts can set UserGameSettings.SunRays, and blocks have it under set graphics option."
+stability = "experimental"
+
+[[changes]]
+category = "improvement"
+subsystem = "renderer"
+title = "With TAA on, a render scale below 100% upscales inside TAA for a sharper picture"
+details = "Below 100% render scale with TAA on, TAA gathers the jittered scene samples into an output-sized history and result, so the picture is rebuilt over several frames instead of stretched; only the sharpening pass runs after it. Motion blur and depth of field run before TAA while it upscales. Without TAA, the render scale upscales as before."
+features = ["renderer.temporal"]
+prs = [277]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Terrain holes, cliff rocks and walk-in caves"
+details = "The Terrain Studio's Holes tool cuts holes in the ground (Shift fills them): you see, walk and fall through them, they save with the terrain, and one stroke is one undo step. Build a cave from parts under a hole in a hillside for a cave mouth you can walk into. New Cliff Rocks and Boulders scatter rules stand rock faces on steep slopes and rocks on gentler ones, and the Alpine world preset adds cliff rocks. The Hello Caves example is a hill with a cave in it."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Scatter rules keep off buildings, lean with slopes, and models can be set into the terrain"
+details = "Scatter rules no longer place plants inside anchored parts standing on the ground (Avoid Parts, with a Part Margin), and moving a house remakes only the ground near it. Align To Slope leans what a rule places with the hillside and Sink Depth sinks it into the ground, for rocks, grass and tree trunks on slopes. Solid Modeling has Conform to Terrain, which sets the selected parts or models on the ground, and Blend into Terrain, which levels and paints the ground under them, fading into the slope around."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Terrain paths: roads that keep plants off, flatten and paint the ground, and route over hills"
+details = "Insert > Terrain Path puts a TerrainPath in a Spline. Scatter rules keep off its strip as soon as it's there and wherever its points move. Apply to Terrain flattens the ground under it to the curve and paints a layer, blending in over Falloff, as one undo step. Route lays the Spline's points over the terrain from its first point to its last, never climbing more than Max Grade, so a road winds round or up a hill; also one undo step."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "Terrain water: seas, lakes and rivers that fill the terrain's hollows"
+details = "A Terrain has a Water switch and a WaterLevel: every part of the ground below the level is under water with waves, foam where it meets the ground, what's under seen through it and reflections, the same water as water materials. WaterColor, WaterClarity, WaveHeight, WaveLength, WaveSpeed and WaveDirection set its look. The Terrain Studio has a Water section with a level slider. Water is only drawn for now: nothing swims or floats in it."
+features = ["terrain.studio"]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Drag a Toolbox card onto the Assets panel to get it into the project"
+details = "A Toolbox result can now be dragged onto the Assets panel as well as the scene. It downloads into the project without being placed, and the Assets panel then shows the new texture set or sound, picked. The panel is outlined while a card is held over it. A sky still asks to be used and a model still opens the Import dialog."
+prs = [314]
+
+[[changes]]
+category = "feature"
+subsystem = "editor"
+title = "Listen to Toolbox sounds before getting them"
+details = "Each sound in the Toolbox, and its details, has a listen button that plays the source's preview in the editor without downloading the sound into the project. Press it again, listen to another sound or leave the Sounds tab to stop it."
+prs = [315]
+
+[[changes]]
+category = "feature"
+subsystem = "project"
+title = "Save a project as a template and start new projects from it"
+details = "File > Save as Template… turns the open project into an .axtemplate file (its world, scripts, assets and settings, with a name, description and picture) in the editor's templates folder. New Project lists them under Your templates, and Import… adds a template file someone else made. Projects made from one get their own name and history; a Collaborate project's repository and project ID aren't copied."
+features = ["project.user-templates"]
+prs = [258]
+
+[[changes]]
+category = "fix"
+subsystem = "renderer"
+title = "A white square no longer flashes in the viewport"
+details = "Since hardware ray tracing came in, the GPU was opened with ray tracing whenever it could, and on an RX 9070 XT under DirectX 12 a white square flashed in the editor's viewport now and then. The GPU is now opened with ray tracing only when Settings > Graphics > Ray tracing > Hardware ray tracing is on (off by default; it takes effect at the next start). Bloom also ignores pixels that aren't numbers and caps how much one pixel adds, so one broken pixel can't grow into a square."
+
+[[changes]]
+category = "feature"
+subsystem = "renderer"
+title = "Sun shafts indoors: dusty air in a box, volumetric fog that stays dark in closed rooms, leaf-shaped ray traced shadows"
+details = "A FogEffect inside a GraphicsVolume takes Density and Glare: above 0 it fills the volume's box with dust or mist, seen from anywhere, that the sun's shadows carve into shafts through windows and gaps (volumetric fog, Ultra), without thickening the sky or reddening the sun as an Atmosphere does. Volumetric fog now lights the air by the light around it (light probe volumes or ray traced GI), so a closed room's air no longer glows like the open air outside and hides its shafts, and it looks up the sun's shadow at 8 points a cell, so shafts no longer step and crawl. Ray traced shadows pass through cut-outs' holes (leaves cast leaf-shaped shadows instead of solid cards). TAA takes swaying plants' motion into account, so leaves in the wind no longer smear, and Sun Rays' noise averages away under TAA."
+stability = "experimental"
+
+[[changes]]
+category = "feature"
+subsystem = "terrain"
+title = "World presets set up a whole landscape at once, and your own can be saved"
+details = "The Terrain Studio's Generate tool has World Presets: Temperate Forest, Alpine, Desert, Tropical Island, Tundra and Meadow. Generate with it previews the landscape, and Apply puts in its shape, material layers, biomes, scatter rules and water as one undo step; Only its materials and rules keeps the terrain's shape. Save as preset writes the terrain's setup to the project's presets folder as an .axworld file, listed with the built-in ones; heights scale to the terrain it's used on."
+features = ["terrain.studio"]

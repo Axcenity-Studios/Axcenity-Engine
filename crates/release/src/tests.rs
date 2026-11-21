@@ -853,7 +853,7 @@ fn prepare_refuses_an_invalid_history() {
 
 #[test]
 fn a_format_change_needs_a_breaking_entry_and_prepare_records_the_formats() {
-    let root = sample("formats");
+    let root = sample("format-change");
     let history = History::load(&root).unwrap();
     let then = history.latest().unwrap().formats["project"];
     assert!(
@@ -918,7 +918,7 @@ fn the_repositorys_own_release_files_are_consistent() {
     // The latest release: update this with each `prepare`.
     assert_eq!(
         history.latest_published().map(|r| r.version.to_string()),
-        Some("0.2.0-alpha.1".into())
+        Some("0.3.0-alpha.1".into())
     );
     // Nothing internal survives into what would be published.
     for (_, change) in history.public().changes() {
