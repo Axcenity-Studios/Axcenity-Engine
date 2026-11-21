@@ -605,7 +605,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "axcenity-anim"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-assets"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "glam 0.34.3",
@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-audio"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-avatar"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-blocks"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-blocks-runtime",
@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-blocks-runtime"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "serde",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-character"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-collab"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-core",
  "axcenity-net",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-collab-server"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-collab",
@@ -731,7 +731,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-convert"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-workspace-hack",
@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-cook"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-workspace-hack",
@@ -757,7 +757,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-core"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "rustc-hash 2.1.3",
@@ -766,7 +766,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-anim",
@@ -835,7 +835,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-benchmark"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-assets",
@@ -852,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-kit"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -872,7 +872,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-model-studio"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -889,7 +889,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-node-graph"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-blocks",
  "axcenity-editor-kit",
@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-toolbox"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-tools"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -935,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-editor-ui-designer"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-blocks",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-gameplay"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-mcp"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "rmcp",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-mesh-edit"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-nav"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-character",
@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-net"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-character",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-physics"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -1052,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-player"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-anim",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-plugins"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-core",
  "axcenity-script",
@@ -1100,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-procedural"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-project"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -1131,7 +1131,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-relay"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-workspace-hack",
@@ -1142,7 +1142,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-release"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "minisign-verify",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-render"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-render-types",
@@ -1173,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-render-types"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "glam 0.34.3",
@@ -1183,7 +1183,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-repo"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "log",
@@ -1195,7 +1195,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-save"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-core",
  "axcenity-workspace-hack",
@@ -1206,7 +1206,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-scene"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-core",
@@ -1221,7 +1221,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-script"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-server"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "anyhow",
  "axcenity-assets",
@@ -1265,7 +1265,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-sim"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-assets",
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-teamwork"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "log",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-terrain"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-core",
  "axcenity-workspace-hack",
@@ -1304,7 +1304,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-testing"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-assets",
  "axcenity-character",
@@ -1319,7 +1319,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-toolbox"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-workspace-hack",
  "log",
@@ -1334,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-ui"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-anim",
  "axcenity-core",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-updater"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "axcenity-release",
  "axcenity-workspace-hack",
@@ -1365,7 +1365,7 @@ dependencies = [
 
 [[package]]
 name = "axcenity-workspace-hack"
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 dependencies = [
  "ahash",
  "arrayvec",
