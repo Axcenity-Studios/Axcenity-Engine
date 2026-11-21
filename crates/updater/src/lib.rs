@@ -8,13 +8,17 @@
 //!   it, and handing over to the new release's `axcenity-updater`.
 //! - [`apply`]: what `axcenity-updater` does after the editor exits: swap
 //!   the install folder, check the new editor, roll back on failure.
+//! - [`package`]: the Linux system packages and the AppImage, which update
+//!   in place instead: the package manager through `pkexec`, or a rename.
 //!
-//! Only Windows setup installs and the Linux `.tar.gz` update themselves;
-//! the others point to their new package.
+//! The Windows setup and the Linux `.tar.gz` go through `axcenity-updater`;
+//! `.deb`, `.rpm`, Arch packages and the AppImage through [`package`]. Only
+//! the macOS disk image and source builds point to the release page.
 
 pub mod apply;
 pub mod download;
 pub mod extract;
+pub mod package;
 pub mod stage;
 
 #[cfg(test)]

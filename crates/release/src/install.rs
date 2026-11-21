@@ -1,8 +1,10 @@
 //! How this copy of Axcenity was installed: `install.json`, which the
 //! packaging writes into the install folder (`packaging/stage.py` and
-//! `packaging/linux/build-packages.sh`). It decides whether the editor can
-//! update itself (Windows setup, Linux tar.gz and AppImage) or should point
-//! to a new package instead. No file means a build from source.
+//! `packaging/linux/build-packages.sh`). It decides how the editor updates:
+//! by swapping its folder with `axcenity-updater` (Windows setup, Linux
+//! tar.gz), in place (`.deb`, `.rpm`, Arch package through the package
+//! manager; the AppImage by replacing its file), or not at all (the macOS
+//! disk image, source builds). No file means a build from source.
 
 use std::path::Path;
 
@@ -30,11 +32,18 @@ pub enum InstallKind {
 }
 
 impl InstallKind {
-    /// Whether the editor may download and install updates itself.
+    /// Whether `axcenity-updater` swaps this install's folder (and keeps
+    /// the previous one for Roll back).
     pub fn updates_itself(self) -> bool {
+        matches!(self, InstallKind::WindowsSetup | InstallKind::LinuxTarball)
+    }
+
+    /// Whether the editor updates this install in place: a Linux system
+    /// package through its package manager, or the AppImage's file.
+    pub fn updates_in_place(self) -> bool {
         matches!(
             self,
-            InstallKind::WindowsSetup | InstallKind::LinuxTarball | InstallKind::AppImage
+            InstallKind::AppImage | InstallKind::Deb | InstallKind::Rpm | InstallKind::Pacman
         )
     }
 
@@ -105,6 +114,8 @@ mod tests {
         .unwrap();
         assert_eq!(InstallKind::of_folder(&dir), InstallKind::Deb);
         assert!(!InstallKind::Deb.updates_itself());
+        assert!(InstallKind::Deb.updates_in_place());
+        assert!(!InstallKind::MacosDmg.updates_in_place());
 
         std::fs::write(dir.join(INSTALL_FILE), "not json").unwrap();
         assert_eq!(InstallKind::of_folder(&dir), InstallKind::Source);

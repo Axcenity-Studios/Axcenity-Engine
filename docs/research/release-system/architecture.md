@@ -233,8 +233,8 @@ The editor-facing topic is `docs/editor/shell.md` ("Versions and updates"). Diff
 |---|---|---|
 | Windows setup (per user) | **Yes** | |
 | Linux `.tar.gz` | **Yes** | |
-| Linux AppImage | **Yes** (replace the one file); not yet, see Phase 6 | |
-| Linux `.deb` / `.rpm` / pacman | No | Notification links the new package and shows the `apt`/`dnf`/`pacman` command |
+| Linux AppImage | **Yes** (replace the one file; releases after 0.3.0-alpha.1) | |
+| Linux `.deb` / `.rpm` / pacman | **Yes**, through the package manager with `pkexec` (releases after 0.3.0-alpha.1; ADR-0043) | Without `pkexec`: the release page and the `apt`/`dnf`/`pacman` command |
 | macOS `.dmg` | No, for now | Notification links the new `.dmg` (in-app later, once builds are signed) |
 | Built from source | No | "Built from source at `<commit>`" |
 
@@ -270,7 +270,7 @@ Only the install folder and `<app data>/Updates/`. Projects, settings, plugins, 
 `crates/updater` (`docs/editor/shell.md`, "Versions and updates", for what people see; `docs/project/releases.md`, "Checking the updater"). Differences from the plan above:
 
 - The download, safe extraction and staging live in `crates/updater` (`download.rs`, `extract.rs`, `stage.rs`) rather than `crates/release`, so the release crate stays light for the player and server; the editor uses them from a thread. The download is `Updates/<version>/<file>.part` beside the archive.
-- The AppImage doesn't update itself yet: Settings > Updates tells it to download the new one. Only the Windows setup and the Linux tar.gz do.
+- The Windows setup and the Linux tar.gz go through `axcenity-updater`. In releases after 0.3.0-alpha.1 the AppImage and the `.deb`, `.rpm` and Arch packages update in place instead (`crates/updater/src/package.rs`, ADR-0043): the AppImage by renaming the checked new file over `$APPIMAGE`, the system packages through their package manager as root with `pkexec`, after a root-side copy and SHA-256 check. Neither keeps a previous version for Roll back.
 - The updater copies the staged folder to `<install>.new` before the editor has to close, then swaps by renames (`.previous`, `.failed`, `.rollback` beside the install). It refuses a relative path, a filesystem root, the home folder, a link, a folder without `install.json` and an install kind that doesn't update itself, and it deletes a sibling only when it is an Axcenity install.
 - The Windows setup's `Uninstall.exe` isn't in the update zip, so the updater carries it to the new folder; the uninstaller removes `<install>.previous` as well. The uninstall entry's `DisplayVersion` is updated only when the entry's `InstallLocation` is this folder; `EstimatedSize` isn't.
 - Roll back swaps `.previous` and the install, keeping the newer one as `.previous`, and checks only that the version put back runs.
@@ -314,7 +314,7 @@ User-facing and format details: `docs/project/layout.md` (the upgrade bullet). D
 | Incomplete download | `.part` file, size and hash checked before use; a failed check deletes it |
 | Malicious archive (path traversal, zip bombs) | Extractor rejects absolute paths, `..`, drive prefixes, symlinks and device files; caps entry count, per-file and total size (the `.axgame` unpacker's limits are the model); extracts only into the staging folder |
 | Downloaded code run unchecked | Nothing downloaded runs except the new updater and editor, and only after the signature and hashes pass. No scripts, no installers |
-| Privilege escalation | No admin rights asked or needed: Windows installs are per user; system-wide Linux packages are left to the package manager |
+| Privilege escalation | No admin rights for Windows, the tar.gz or the AppImage. A system-wide Linux package is updated only by its package manager, as root through `pkexec` (the system's own password prompt, after the user pressed Download and install). The root side copies the package into a fresh root-only folder and checks its SHA-256 from the signed manifest before the package manager sees it, so a file changed after the editor's check is refused (ADR-0043) |
 | Leaked private information | Only `public = true` entries reach published files; a test checks the history file has no internal entries. Issue and PR numbers link to a private repository only if D1 keeps it private, in which case links are omitted from published data |
 | Key compromise | Key rotation by shipping a new public key in a release signed by the old one; documented in the runbook |
 

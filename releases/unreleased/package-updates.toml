@@ -1,0 +1,4 @@
+category = "feature"
+subsystem = "release"
+title = "RPM, Debian and Arch packages and the AppImage update from the editor"
+details = "Settings > Updates > Download and install now works on every Linux install: a .deb, .rpm or Arch package downloads the new release's package, checks it against the signed manifest and installs it with the system's package manager (your system asks for your password), and an AppImage replaces its own file. Restart now opens the new version. Copies of 0.3.0-alpha.1 and older still need this one update installed by hand."

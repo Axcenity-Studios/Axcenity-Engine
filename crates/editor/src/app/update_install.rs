@@ -5,8 +5,13 @@
 //! new release's `axcenity-updater` and close. The updater swaps the install
 //! folder, checks the new editor, rolls back if it fails, and opens the
 //! editor again; the next start says how it went. Roll back works the same
-//! way with the install's own updater. Only Windows setup installs and the
-//! Linux `.tar.gz` update themselves (`InstallKind::updates_itself`).
+//! way with the install's own updater. That's the Windows setup and the
+//! Linux `.tar.gz` (`InstallKind::updates_itself`). The Linux system
+//! packages and the AppImage update in place instead
+//! (`InstallKind::updates_in_place`, `axcenity_updater::package`): right
+//! after the download, the package manager installs the release's own
+//! package (asking for the password), or the AppImage file is replaced;
+//! then Restart now opens the new version.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,6 +23,7 @@ use axcenity_release::updates::{self, Update};
 use axcenity_release::{InstallKind, Version};
 use axcenity_updater::apply::{self as updater, Action, Expected, Instruction};
 use axcenity_updater::download::{self, Fetch};
+use axcenity_updater::package;
 use axcenity_updater::stage;
 
 use super::*;
@@ -44,10 +50,25 @@ pub(super) enum Install {
         done: Arc<AtomicU64>,
         total: u64,
         cancel: Arc<AtomicBool>,
-        result: mpsc::Receiver<Result<Staged, String>>,
+        /// Downloaded; the package manager or the AppImage swap is
+        /// running (no Cancel then).
+        installing: Arc<AtomicBool>,
+        result: mpsc::Receiver<Result<Done, String>>,
     },
     Ready(Staged),
+    /// Installed in place (a system package or the AppImage) while this
+    /// editor runs on; restarting opens `relaunch`, the new version.
+    Installed {
+        version: Version,
+        relaunch: PathBuf,
+    },
     Failed(String),
+}
+
+/// What the download thread ends with.
+pub(super) enum Done {
+    Staged(Staged),
+    Installed { version: Version, relaunch: PathBuf },
 }
 
 impl Install {
@@ -61,7 +82,10 @@ impl Install {
             Err(mpsc::TryRecvError::Disconnected) => {
                 Install::Failed("the download stopped unexpectedly".to_owned())
             }
-            Ok(Ok(staged)) => Install::Ready(staged),
+            Ok(Ok(Done::Staged(staged))) => Install::Ready(staged),
+            Ok(Ok(Done::Installed { version, relaunch })) => {
+                Install::Installed { version, relaunch }
+            }
             Ok(Err(error)) if error == download::DownloadError::Cancelled.to_string() => {
                 Install::Idle
             }
@@ -71,13 +95,17 @@ impl Install {
     }
 
     /// Downloads and stages `update` for an install of `kind`, keeping its
-    /// files in `updates_dir/<version>/`, on a thread.
+    /// files in `updates_dir/<version>/`, on a thread. An install that
+    /// updates in place is installed right after, and `relaunch` is the
+    /// program to restart into: the AppImage file (which is replaced) or
+    /// the packaged editor.
     pub fn start(
         &mut self,
         update: &Update,
         kind: InstallKind,
         updates_dir: &Path,
         fetch: Box<dyn Fetch + Send>,
+        relaunch: Option<PathBuf>,
     ) {
         if matches!(self, Install::Working { .. }) {
             return;
@@ -85,6 +113,18 @@ impl Install {
         let Some(artifact) = stage::payload(&update.manifest, kind).cloned() else {
             *self = Install::Failed("this release has no update for this install".to_owned());
             return;
+        };
+        let in_place = match (kind.updates_in_place(), relaunch) {
+            (false, _) => None,
+            (true, Some(relaunch)) => Some(relaunch),
+            (true, None) => {
+                *self = Install::Failed(if kind == InstallKind::AppImage {
+                    "couldn't find the AppImage file this editor runs from".to_owned()
+                } else {
+                    "couldn't find the editor's folder".to_owned()
+                });
+                return;
+            }
         };
         let version = update.candidate.version.clone();
         let version_dir = updates_dir.join(version.to_string());
@@ -96,9 +136,14 @@ impl Install {
         let total = artifact.size;
         let done = Arc::new(AtomicU64::new(0));
         let cancel = Arc::new(AtomicBool::new(false));
+        let installing = Arc::new(AtomicBool::new(false));
         let (send, result) = mpsc::channel();
-        let (thread_done, thread_cancel, thread_version) =
-            (done.clone(), cancel.clone(), version.clone());
+        let (thread_done, thread_cancel, thread_installing, thread_version) = (
+            done.clone(),
+            cancel.clone(),
+            installing.clone(),
+            version.clone(),
+        );
         std::thread::Builder::new()
             .name("update download".to_owned())
             .spawn(move || {
@@ -113,14 +158,26 @@ impl Install {
                     &thread_cancel,
                 )
                 .map_err(|e| e.to_string())
-                .and_then(|archive| {
-                    stage::stage(&archive, &artifact.file, kind, &staged).map_err(|e| e.to_string())
-                })
-                .map(|()| Staged {
-                    version: thread_version,
-                    version_dir,
-                    staged,
-                    expect,
+                .and_then(|archive| match in_place {
+                    Some(relaunch) => {
+                        thread_installing.store(true, Ordering::Relaxed);
+                        install_in_place(kind, &archive, &artifact.sha256, &relaunch).map(|()| {
+                            Done::Installed {
+                                version: thread_version,
+                                relaunch,
+                            }
+                        })
+                    }
+                    None => stage::stage(&archive, &artifact.file, kind, &staged)
+                        .map_err(|e| e.to_string())
+                        .map(|()| {
+                            Done::Staged(Staged {
+                                version: thread_version,
+                                version_dir,
+                                staged,
+                                expect,
+                            })
+                        }),
                 });
                 let _ = send.send(outcome);
             })
@@ -130,8 +187,40 @@ impl Install {
             done,
             total,
             cancel,
+            installing,
             result,
         };
+    }
+}
+
+/// Installs the checked download in place: the AppImage replaces the file
+/// it runs from (`target`); a system package goes to the package manager.
+fn install_in_place(
+    kind: InstallKind,
+    download: &Path,
+    sha256: &str,
+    target: &Path,
+) -> Result<(), String> {
+    if kind == InstallKind::AppImage {
+        package::replace_appimage(download, target).map_err(|error| {
+            format!(
+                "couldn't replace {}: {error}. Download the new AppImage from the release page \
+                 instead",
+                target.display()
+            )
+        })
+    } else {
+        package::install_system_package(kind, download, sha256)
+    }
+}
+
+/// What to restart into after an in-place update: the AppImage file, or the
+/// packaged editor (found now, before the package manager replaces it).
+fn relaunch_target(kind: InstallKind) -> Option<PathBuf> {
+    match kind {
+        InstallKind::AppImage => package::running_appimage(),
+        _ if kind.updates_in_place() => install_dir().map(|dir| dir.join(updater::EDITOR_EXE)),
+        _ => None,
     }
 }
 
@@ -169,17 +258,26 @@ impl EditorApp {
             self.updates.install = Install::Failed("there's no folder for app data".to_owned());
             return;
         };
+        let kind = InstallKind::current();
         self.updates.install.start(
             &update,
-            InstallKind::current(),
+            kind,
             &dir,
             Box::new(download::HttpFetch::new(USER_AGENT)),
+            relaunch_target(kind),
         );
     }
 
     /// Hands over to the updater and closes, once unsaved work was saved
     /// or discarded (`Discard::Update`).
     pub(super) fn hand_over_update(&mut self, ctx: &egui::Context, action: Action) {
+        if let (Action::Install, Install::Installed { version, relaunch }) =
+            (action, &self.updates.install)
+        {
+            let (version, relaunch) = (version.clone(), relaunch.clone());
+            self.restart_into(ctx, &version, &relaunch);
+            return;
+        }
         match self.write_hand_over(action) {
             Ok((updater, instruction)) => {
                 match std::process::Command::new(&updater)
@@ -197,6 +295,39 @@ impl EditorApp {
                 }
             }
             Err(error) => self.toasts.error(error),
+        }
+    }
+
+    /// After an in-place update: notes the result for the next start, as the
+    /// updater does, opens the new version with the open project, and closes.
+    fn restart_into(&mut self, ctx: &egui::Context, version: &Version, relaunch: &Path) {
+        if let Some(dir) = updates_dir() {
+            let outcome = updater::Outcome {
+                action: Action::Install,
+                ok: true,
+                version: version.to_string(),
+                message: String::new(),
+                at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_secs()),
+            };
+            let text =
+                serde_json::to_string_pretty(&outcome).expect("an outcome always serializes");
+            let _ = std::fs::write(dir.join("result.json"), text);
+        }
+        let mut command = std::process::Command::new(relaunch);
+        if let Some(project) = &self.project {
+            command.arg(&project.folder);
+        }
+        match command.spawn() {
+            Ok(_) => {
+                self.closing = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            Err(error) => self.toasts.error(format!(
+                "Axcenity {version} is installed, but it couldn't be started ({error}). Close \
+                 this editor and open it again."
+            )),
         }
     }
 
@@ -289,6 +420,15 @@ impl EditorApp {
                     );
                 }
                 let label = format!("Download and install ({})", megabytes(artifact.size));
+                let hover = if package::kind_arg(kind).is_some() {
+                    "Downloads in the background, then installs with the system's package \
+                     manager: your system asks for your password. Restart when it's done."
+                } else if kind == InstallKind::AppImage {
+                    "Downloads in the background and replaces this AppImage file. Restart when \
+                     it's done."
+                } else {
+                    "Downloads in the background; you choose when to restart and install."
+                };
                 if ui
                     .add(widgets::button(
                         widgets::Role::Primary,
@@ -296,13 +436,30 @@ impl EditorApp {
                         &label,
                         &palette,
                     ))
-                    .on_hover_text(
-                        "Downloads in the background; you choose when to restart and install.",
-                    )
+                    .on_hover_text(hover)
                     .clicked()
                 {
                     self.download_update();
                 }
+            }
+            Install::Working {
+                installing,
+                version,
+                ..
+            } if installing.load(Ordering::Relaxed) => {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(format!("Installing {version}…"));
+                });
+                if package::kind_arg(kind).is_some() {
+                    note(
+                        ui,
+                        "Your system asks for your password to let the package manager \
+                         install it.",
+                    );
+                }
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(200));
             }
             Install::Working {
                 done,
@@ -331,6 +488,31 @@ impl EditorApp {
                 }
                 ui.ctx()
                     .request_repaint_after(std::time::Duration::from_millis(200));
+            }
+            Install::Installed { version, .. } => {
+                let version = version.clone();
+                ui.label(theme::with_icon(
+                    icons::CHECK_CIRCLE,
+                    &format!("Axcenity {version} is installed."),
+                ));
+                let restart = widgets::button(
+                    widgets::Role::Primary,
+                    Some(icons::ARROWS_CLOCKWISE),
+                    "Restart now",
+                    &palette,
+                );
+                if ui
+                    .add_enabled(!self.playing(), restart)
+                    .on_disabled_hover_text("Stop Play first.")
+                    .clicked()
+                {
+                    self.request_and_go_ahead(ui.ctx(), Discard::Update(Action::Install));
+                }
+                note(
+                    ui,
+                    "This editor keeps running the old version until it restarts (asking to \
+                     save first).",
+                );
             }
             Install::Ready(staged) => {
                 let version = staged.version.clone();
@@ -534,6 +716,7 @@ mod tests {
             InstallKind::LinuxTarball,
             &updates,
             Box::new(Memory(bytes)),
+            None,
         );
         wait(&mut install);
         let Install::Ready(staged) = &install else {
@@ -559,6 +742,7 @@ mod tests {
             InstallKind::LinuxTarball,
             &dir.join("Updates"),
             Box::new(Memory(bytes)),
+            None,
         );
         wait(&mut install);
         let Install::Failed(error) = &install else {
@@ -577,10 +761,59 @@ mod tests {
             InstallKind::Deb,
             &dir.join("Updates"),
             Box::new(Memory(bytes)),
+            None,
         );
         assert!(matches!(install, Install::Failed(_)));
         assert!(package_hint(InstallKind::Deb).contains("apt install"));
         assert!(package_hint(InstallKind::Source).contains("from source"));
+    }
+
+    #[test]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    fn an_appimage_downloads_and_replaces_its_file_then_is_ready_to_restart() {
+        let dir = scratch("appimage");
+        let (_, mut update) = release(&dir, &[]);
+        let bytes = b"the new AppImage".to_vec();
+        let new = dir.join("new.AppImage");
+        std::fs::write(&new, &bytes).unwrap();
+        let platform = update.manifest.artifacts.get_mut("linux-x86_64").unwrap();
+        platform.insert(
+            "appimage".to_owned(),
+            axcenity_release::publish::Artifact {
+                file: "AxcenityEditor-0.2.0-alpha.2-linux-x86_64.AppImage".to_owned(),
+                sha256: download::hash_of(&new).unwrap(),
+                size: bytes.len() as u64,
+            },
+        );
+        let running = dir.join("AxcenityEditor-0.2.0-alpha.1-linux-x86_64.AppImage");
+        std::fs::write(&running, b"the old one").unwrap();
+
+        // Without the file it runs from, nothing is downloaded.
+        let mut install = Install::default();
+        install.start(
+            &update,
+            InstallKind::AppImage,
+            &dir.join("Updates"),
+            Box::new(Memory(bytes.clone())),
+            None,
+        );
+        assert!(matches!(install, Install::Failed(_)));
+
+        let mut install = Install::default();
+        install.start(
+            &update,
+            InstallKind::AppImage,
+            &dir.join("Updates"),
+            Box::new(Memory(bytes.clone())),
+            Some(running.clone()),
+        );
+        wait(&mut install);
+        let Install::Installed { version, relaunch } = &install else {
+            panic!("not installed")
+        };
+        assert_eq!(version.to_string(), "0.2.0-alpha.2");
+        assert_eq!(relaunch, &running);
+        assert_eq!(std::fs::read(&running).unwrap(), bytes);
     }
 
     #[test]

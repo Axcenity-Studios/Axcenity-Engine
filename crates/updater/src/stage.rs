@@ -31,16 +31,23 @@ pub fn updates_dir(app_data: &Path) -> PathBuf {
 }
 
 /// The update payload in `manifest` for an install of `kind` on this
-/// machine, if this kind updates itself and the release has one.
+/// machine, if this kind updates from the editor and the release has one:
+/// the update archive for the Windows setup and the tar.gz, and the
+/// release's own package for `.deb`, `.rpm`, Arch and the AppImage.
 pub fn payload(manifest: &Manifest, kind: InstallKind) -> Option<&Artifact> {
-    let platform = match kind {
-        InstallKind::WindowsSetup if cfg!(all(windows, target_arch = "x86_64")) => "windows-x86_64",
-        InstallKind::LinuxTarball if cfg!(all(target_os = "linux", target_arch = "x86_64")) => {
-            "linux-x86_64"
+    let linux = cfg!(all(target_os = "linux", target_arch = "x86_64"));
+    let (platform, role) = match kind {
+        InstallKind::WindowsSetup if cfg!(all(windows, target_arch = "x86_64")) => {
+            ("windows-x86_64", "update")
         }
+        InstallKind::LinuxTarball if linux => ("linux-x86_64", "update"),
+        InstallKind::AppImage if linux => ("linux-x86_64", "appimage"),
+        InstallKind::Deb if linux => ("linux-x86_64", "deb"),
+        InstallKind::Rpm if linux => ("linux-x86_64", "rpm"),
+        InstallKind::Pacman if linux => ("linux-x86_64", "pacman"),
         _ => return None,
     };
-    manifest.artifacts.get(platform)?.get("update")
+    manifest.artifacts.get(platform)?.get(role)
 }
 
 /// Unpacks the downloaded `archive` (named `file`, as in the manifest) into
