@@ -18,7 +18,7 @@ The sources are black ink on white. `build.py` keys the white out by brightness,
 | `icon.ico` | 16 to 256 | The Windows installer icon. |
 | `favicon-32.png` | 32×32 | A PNG favicon for a website. |
 
-To change the logo, replace `mark-source.png` and/or `wordmark-source.png` (black on white) and run `python assets/branding/build.py` (needs Pillow and NumPy). If faint background texture survives, lower `PAPER` in `build.py`; if edges look chewed, raise it. Then run `python packaging/generate-assets.py` so the Windows installer bitmaps and the macOS disk-image background match.
+To change the logo, replace `mark-source.png` and/or `wordmark-source.png` (black on white) and run `python assets/branding/build.py` (needs Pillow and NumPy). If faint background texture survives, lower `PAPER` in `build.py`; if edges look chewed, raise it. Then run `python packaging/generate-assets.py` so the Windows installer bitmaps and the macOS disk-image background (1x and @2x) match. Those pictures use the editor's dark theme and default blue accent (`crates/editor-kit/src/theme.rs`) with its fonts; if the theme's colours change, change them at the top of that script too.
 
 Windows and Linux (X11) show the window icon in the title bar and taskbar. macOS and Wayland ignore window icons: there, the app bundle or desktop file sets the icon, which comes with exporting.
 

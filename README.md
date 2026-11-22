@@ -10,9 +10,39 @@ A free, open-source 3D game engine and editor inspired by Roblox Studio. Build w
 
 Alpha installers are on [GitHub Releases](https://github.com/MrBearson321/Axcenity-Engine/releases): a Windows `.exe` setup wizard, a macOS `.dmg`, and Linux `.deb`, `.rpm`, `.pkg.tar.zst`, `.tar.gz` and AppImage. How to install each one: [docs/project/install.md](docs/project/install.md). Tags look like `v0.1.0-alpha.1` ([versioning](docs/project/releases.md)).
 
-To run from source instead:
+### Build requirements
 
-1. Install Rust with [rustup](https://rustup.rs). On Windows, rustup also asks you to install the Microsoft C++ Build Tools; accept that.
+To build from source, you need [Rust](https://rustup.rs) (`rust-toolchain.toml` pins the version, and rustup installs it on the first build), a C and C++ compiler (Luau and some dependencies are compiled from C/C++ source), and a few system libraries. Without the compiler, every crate fails with `linker 'cc' not found`.
+
+**Windows 10 or 11**
+
+- [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) 17.11 or later, or its Build Tools, with:
+  - the **Desktop development with C++** workload
+  - the individual component **C++ ATL for latest v143 build tools (x86 & x64)** (without it the link fails with `LNK1104: cannot open file 'atls.lib'`)
+- rustup offers to install the C++ Build Tools for you, but that doesn't include ATL, so add it in the Visual Studio Installer.
+- `curl` and `tar` (Windows 10 and 11 include both) are used to download the DXC shader compiler during the build.
+
+**macOS**
+
+- The Xcode Command Line Tools: `xcode-select --install`. Nothing else is needed; graphics use Metal and audio uses Core Audio.
+
+**Linux**
+
+A C/C++ compiler, `pkg-config`, and development packages for ALSA (audio), libudev (gamepads) and D-Bus, plus a Vulkan driver to run the engine:
+
+| Distribution | Command |
+|---|---|
+| Fedora | `sudo dnf install gcc gcc-c++ pkgconf-pkg-config alsa-lib-devel systemd-devel dbus-devel libxkbcommon-devel wayland-devel mesa-vulkan-drivers vulkan-loader` |
+| Ubuntu, Debian | `sudo apt install build-essential pkg-config libasound2-dev libudev-dev libdbus-1-dev libxkbcommon-dev libwayland-dev mesa-vulkan-drivers` |
+| Arch | `sudo pacman -S --needed base-devel alsa-lib systemd-libs dbus libxkbcommon wayland vulkan-icd-loader` plus your GPU's Vulkan driver (`vulkan-radeon`, `vulkan-intel` or `nvidia-utils`) |
+
+On NVIDIA with the proprietary driver, the Vulkan driver comes with the NVIDIA driver package instead of Mesa.
+
+### Running from source
+
+Once the [build requirements](#build-requirements) are installed:
+
+1. Install Rust with [rustup](https://rustup.rs) if you haven't yet.
 2. From this folder, run the player with the example project:
 
    ```bash
@@ -109,7 +139,7 @@ Useful commands:
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format | `cargo fmt --all` |
 
-On Linux you may need your distribution's Vulkan driver package (for example `mesa-vulkan-drivers`). Install the test runner and the workspace-hack tool with `cargo install cargo-nextest cargo-hakari --locked`; [docs/development.md](docs/development.md) explains both and how to keep builds fast on a laptop.
+System packages for each OS are listed under [Build requirements](#build-requirements). Install the test runner and the workspace-hack tool with `cargo install cargo-nextest cargo-hakari --locked`; [docs/development.md](docs/development.md) explains both and how to keep builds fast on a laptop.
 
 ### Changing the engine while it runs
 

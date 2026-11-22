@@ -2,12 +2,18 @@
 //! rolls back, after the editor that wrote the instruction has exited. The
 //! editor starts it; people don't need to. See `apply.rs`.
 
+// Release builds on Windows are GUI programs, so no terminal window opens
+// beside them; `attach_parent_console` still prints to a terminal that
+// started one (`axcenity_release::console`).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 use std::path::Path;
 use std::process::ExitCode;
 
 use axcenity_updater::apply::{self, Instruction};
 
 fn main() -> ExitCode {
+    axcenity_release::console::attach_parent_console();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(text) = axcenity_release::version_flag("axcenity-updater", &args) {
         println!("{text}");

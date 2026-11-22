@@ -6,14 +6,17 @@ const SCENE_HIDDEN: &str = "These act on the Scene View: show it (Show Scene, be
                             tools) to use them.";
 
 impl EditorApp {
-    /// The ribbon under the menu bar: Play and Stop, the tools, the snapping
-    /// settings, then buttons that insert each primitive and each kind of script.
-    /// The ribbon's tabs, on the app background like the header, over the
+    /// The ribbon under the menu bar: the tools, the snapping settings, then
+    /// buttons that insert each primitive and each kind of script. The
+    /// ribbon's tabs, on the app background like the header, over the
     /// ribbon itself, a shade lighter with a hairline above and below, so
-    /// the tabs don't run into its buttons.
+    /// the tabs don't run into its buttons. Play, Run and Stop are pinned at
+    /// the right of the tabs' row, so they're there whichever tab shows.
     pub(in crate::app) fn toolbar(&mut self, ui: &mut egui::Ui) {
         let palette = theme::palette(ui.ctx());
         ui.spacing_mut().item_spacing.y = 0.0;
+        let centered = self.appearance.ribbon == theme::RibbonAlign::Centered;
+        let mut clicks = RibbonClicks::default();
         let active_tab = egui::Frame::new()
             .inner_margin(egui::Margin {
                 left: 8,
@@ -21,9 +24,17 @@ impl EditorApp {
                 top: 2,
                 bottom: 0,
             })
-            .show(ui, |ui| self.ribbon_tabs.tab_bar(ui))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let tab = self.ribbon_tabs.tab_bar(ui, centered);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        self.pinned_play(ui, &mut clicks);
+                    });
+                    tab
+                })
+                .inner
+            })
             .inner;
-        let mut clicks = RibbonClicks::default();
         let groups = self.ribbon_tabs.groups();
         let ribbon = egui::Frame::new()
             .fill(palette.panel)
@@ -105,6 +116,117 @@ impl EditorApp {
         if clicks.stop {
             self.stop();
         }
+    }
+
+    /// Play (or Pause, Continue), Run and Stop at the right of the ribbon's
+    /// tab row, in a small container, on every tab.
+    fn pinned_play(&mut self, ui: &mut egui::Ui, clicks: &mut RibbonClicks) {
+        let palette = theme::palette(ui.ctx());
+        let buttons = self.play_buttons(ui.ctx());
+        egui::Frame::new()
+            .fill(palette.panel)
+            .stroke(egui::Stroke::new(1.0_f32, palette.border))
+            .corner_radius(theme::radius::CONTROL)
+            .inner_margin(egui::Margin::same(2))
+            .show(ui, |ui| {
+                // Drawn right to left, so Stop first.
+                ui.spacing_mut().item_spacing.x = 2.0;
+                for (index, button) in buttons.iter().enumerate().rev() {
+                    let clicked = ui
+                        .add_enabled(
+                            button.enabled,
+                            ribbon::PinnedButton::new(button.icon, button.label, button.color),
+                        )
+                        .on_hover_text(&button.hover)
+                        .on_disabled_hover_text(button.disabled_hover)
+                        .clicked();
+                    match index {
+                        0 => clicks.play |= clicked,
+                        1 => clicks.run |= clicked,
+                        _ => clicks.stop |= clicked,
+                    }
+                }
+            });
+    }
+
+    /// Play (Pause or Continue while the game runs), Run and Stop, as the
+    /// pinned buttons and the Game group show them.
+    fn play_buttons(&self, ctx: &egui::Context) -> [PlayButton; 3] {
+        let palette = theme::palette(ctx);
+        let playing = self.playing();
+        let paused = self.paused();
+        let can_play = self.project.is_some();
+        // Paused at a breakpoint, Play is Continue, as in Studio; while the
+        // game runs, it's Pause (roadmap G6).
+        let pausing = self.pausing();
+        let (icon, label, hover) = if paused {
+            (
+                filled_icons::PLAY,
+                "Continue",
+                "Continue the game from the breakpoint",
+            )
+        } else if pausing {
+            (
+                filled_icons::PAUSE,
+                "Pausing…",
+                "Play pauses at the next line a script runs",
+            )
+        } else if playing {
+            (
+                filled_icons::PAUSE,
+                "Pause",
+                "Pause at the next line a script runs, to see its variables and step",
+            )
+        } else {
+            (filled_icons::PLAY, "Play", "Save, then run the game here")
+        };
+        let shortcut = |action: crate::shortcuts::Action| action.menu_text(ctx);
+        let open_first = "Open a project first.";
+        [
+            PlayButton {
+                icon,
+                label,
+                hover: format!("{hover} ({})", shortcut(crate::shortcuts::Action::Play)),
+                color: if playing && !paused {
+                    palette.warning
+                } else {
+                    palette.success
+                },
+                enabled: (playing && !pausing || paused || !playing) && can_play,
+                disabled_hover: if pausing {
+                    "Waiting for a script to run a line."
+                } else {
+                    open_first
+                },
+            },
+            PlayButton {
+                icon: filled_icons::PERSON_SIMPLE_RUN,
+                label: "Run",
+                hover: format!(
+                    "Save, then run the game with no player: Scripts and physics run, no \
+                     character spawns, and the fly camera stays ({})",
+                    shortcut(crate::shortcuts::Action::Run)
+                ),
+                color: palette.success,
+                enabled: !playing && can_play,
+                disabled_hover: if playing {
+                    "The game is playing."
+                } else {
+                    open_first
+                },
+            },
+            PlayButton {
+                icon: filled_icons::STOP,
+                label: "Stop",
+                hover: format!(
+                    "Stop the game and go back to editing ({})",
+                    shortcut(crate::shortcuts::Action::Stop)
+                ),
+                color: palette.error,
+                enabled: playing,
+                disabled_hover: "The game isn't playing.",
+            },
+        ]
     }
 
     /// The ribbon's groups in a row: centred unless Settings > Appearance >
@@ -243,84 +365,22 @@ impl EditorApp {
         clicks: &mut RibbonClicks,
     ) {
         let playing = self.playing();
-        let paused = self.paused();
         let can_play = self.project.is_some();
         match group {
             RibbonGroup::Game => ribbon::group_tinted(ui, "Game", Some(group.hue()), |ui| {
-                let palette = theme::palette(ui.ctx());
-                // Paused at a breakpoint, Play is Continue, as in Studio;
-                // while the game runs, it's Pause (roadmap G6).
-                let pausing = self.pausing();
-                let (icon, label, hover) = if paused {
-                    (
-                        filled_icons::PLAY,
-                        "Continue",
-                        "Continue the game from the breakpoint",
-                    )
-                } else if pausing {
-                    (
-                        filled_icons::PAUSE,
-                        "Pausing…",
-                        "Play pauses at the next line a script runs",
-                    )
-                } else if playing {
-                    (
-                        filled_icons::PAUSE,
-                        "Pause",
-                        "Pause at the next line a script runs, to see its variables and step",
-                    )
-                } else {
-                    (filled_icons::PLAY, "Play", "Save, then run the game here")
+                let [play, run, stop] = self.play_buttons(ui.ctx());
+                let mut add = |button: &PlayButton| {
+                    let ribbon_button = RibbonButton::new(button.icon, button.label)
+                        .family(theme::filled())
+                        .color(button.color);
+                    ui.add_enabled(button.enabled, ribbon_button)
+                        .on_hover_text(&button.hover)
+                        .on_disabled_hover_text(button.disabled_hover)
+                        .clicked()
                 };
-                let color = if playing && !paused {
-                    palette.warning
-                } else {
-                    palette.success
-                };
-                let play_button = RibbonButton::new(icon, label)
-                    .family(theme::filled())
-                    .color(color);
-                clicks.play = ui
-                    .add_enabled(
-                        (playing && !pausing || paused || !playing) && can_play,
-                        play_button,
-                    )
-                    .on_hover_text(format!(
-                        "{hover} ({})",
-                        crate::shortcuts::Action::Play.menu_text(ui.ctx())
-                    ))
-                    .on_disabled_hover_text(if pausing {
-                        "Waiting for a script to run a line."
-                    } else {
-                        "Open a project first."
-                    })
-                    .clicked();
-                let run_button = RibbonButton::new(filled_icons::PERSON_SIMPLE_RUN, "Run")
-                    .family(theme::filled())
-                    .color(palette.success);
-                clicks.run = ui
-                    .add_enabled(!playing && can_play, run_button)
-                    .on_hover_text(format!(
-                        "Save, then run the game with no player: Scripts and physics run, no \
-                         character spawns, and the fly camera stays ({})",
-                        crate::shortcuts::Action::Run.menu_text(ui.ctx())
-                    ))
-                    .on_disabled_hover_text(if playing {
-                        "The game is playing."
-                    } else {
-                        "Open a project first."
-                    })
-                    .clicked();
-                let stop_button = RibbonButton::new(filled_icons::STOP, "Stop")
-                    .family(theme::filled())
-                    .color(palette.error);
-                clicks.stop = ui
-                    .add_enabled(playing, stop_button)
-                    .on_hover_text(format!(
-                        "Stop the game and go back to editing ({})",
-                        crate::shortcuts::Action::Stop.menu_text(ui.ctx())
-                    ))
-                    .clicked();
+                clicks.play = add(&play);
+                clicks.run = add(&run);
+                clicks.stop = add(&stop);
             }),
             RibbonGroup::Clients => ribbon::group_tinted(ui, "Clients", Some(group.hue()), |ui| {
                 self.play_settings_controls(ui, playing);
@@ -1123,4 +1183,14 @@ impl EditorApp {
             }
         });
     }
+}
+
+/// One of Play, Run and Stop: how it looks, and whether it can be pressed.
+struct PlayButton {
+    icon: &'static str,
+    label: &'static str,
+    hover: String,
+    color: egui::Color32,
+    enabled: bool,
+    disabled_hover: &'static str,
 }

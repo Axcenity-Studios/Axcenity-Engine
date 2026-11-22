@@ -240,7 +240,9 @@ impl BuiltInTab {
     pub fn groups(self) -> &'static [RibbonGroup] {
         use RibbonGroup::*;
         match self {
-            BuiltInTab::Home => &[Game, Tools, Snapping, Parts, Panels],
+            // Play, Run and Stop are pinned beside the tabs, on every tab
+            // (the Game group is still there for custom tabs).
+            BuiltInTab::Home => &[Tools, Snapping, Parts, Panels],
             // Building and joining parts; what lights and fills the world,
             // and what plays in it, are on World.
             BuiltInTab::Model => &[Build, Solid, Constraints, Import],
@@ -248,8 +250,8 @@ impl BuiltInTab {
             // Explorer's Insert menu has every class too.
             BuiltInTab::World => &[Lights, Effects, Gameplay, Terrain],
             BuiltInTab::Ui => &[Ui],
-            BuiltInTab::Script => &[Game, Scripts],
-            BuiltInTab::Test => &[Game, Clients, Check, Overlays],
+            BuiltInTab::Script => &[Scripts],
+            BuiltInTab::Test => &[Clients, Check, Overlays],
             BuiltInTab::Plugins => &[Plugins],
         }
     }
@@ -356,12 +358,12 @@ impl RibbonTabs {
         };
     }
 
-    /// Draws the row of tabs, centred: the built-in ones, the custom ones
-    /// (right-click to change or delete), and + to make a new one. The
-    /// active tab is filled like the ribbon under it and underlined in the
-    /// accent colour, and the line slides to a newly picked tab. Returns
-    /// where the active tab is, so the ribbon can join it.
-    pub fn tab_bar(&mut self, ui: &mut egui::Ui) -> Option<egui::Rect> {
+    /// Draws the row of tabs, from the left or `centered`: the built-in
+    /// ones, the custom ones (right-click to change or delete), and + to
+    /// make a new one. The active tab is filled like the ribbon under it
+    /// and underlined in the accent colour, and the line slides to a newly
+    /// picked tab. Returns where the active tab is, so the ribbon can join it.
+    pub fn tab_bar(&mut self, ui: &mut egui::Ui, centered: bool) -> Option<egui::Rect> {
         let mut active_rect = None;
         // A place in the paint order behind the tabs, filled in once the
         // active tab's place is known.
@@ -372,7 +374,9 @@ impl RibbonTabs {
         let last_width: f32 = ui.ctx().data(|data| data.get_temp(width_id)).unwrap_or(0.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
-            ui.add_space(((ui.available_width() - last_width) / 2.0).max(0.0));
+            if centered {
+                ui.add_space(((ui.available_width() - last_width) / 2.0).max(0.0));
+            }
             let start = ui.cursor().left();
             for tab in BuiltInTab::ALL {
                 let active = ActiveTab::BuiltIn(tab);
@@ -577,7 +581,6 @@ mod tests {
         assert_eq!(
             BuiltInTab::Home.groups(),
             &[
-                RibbonGroup::Game,
                 RibbonGroup::Tools,
                 RibbonGroup::Snapping,
                 RibbonGroup::Parts,
@@ -635,13 +638,22 @@ mod tests {
                 "{tab:?}"
             );
         }
-        // Play and Stop are still beside them.
-        assert!(BuiltInTab::Test.groups().contains(&RibbonGroup::Game));
+    }
+
+    #[test]
+    fn play_and_stop_are_pinned_beside_the_tabs_not_on_one() {
+        for tab in BuiltInTab::ALL {
+            assert!(!tab.groups().contains(&RibbonGroup::Game), "{tab:?}");
+        }
     }
 
     #[test]
     fn every_group_is_on_some_built_in_tab() {
-        for group in RibbonGroup::ALL {
+        // Game is pinned beside the tabs instead.
+        for group in RibbonGroup::ALL
+            .into_iter()
+            .filter(|g| *g != RibbonGroup::Game)
+        {
             assert!(
                 BuiltInTab::ALL
                     .iter()

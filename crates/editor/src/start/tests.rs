@@ -547,8 +547,14 @@ fn recent_project_cards_stay_inside_the_page_at_every_window_width() {
                 .unwrap_or_else(|| panic!("`{label}` is drawn at {width}"))
                 .clone()
         };
-        // The header's New Project button ends where the page does.
-        let (_, _, page_right, _) = edge("New Project");
+        // The two blank templates share a row that fills the page, so the
+        // second ends where the page does (to the point, as its width is
+        // rounded down). The header's buttons stay inside it too, at its
+        // right or, in a narrow window, under the title.
+        let (_, _, page_right, _) = edge(Template::Empty.name());
+        let page_right = page_right + 1.0;
+        let (_, _, new_right, _) = edge("New Project");
+        assert!(new_right <= page_right + 0.5, "at {width}");
         let cards: Vec<_> = buttons
             .iter()
             .filter(|(label, ..)| label.starts_with("Project "))
@@ -789,7 +795,7 @@ fn a_folded_sidebar_keeps_every_page_as_an_icon_and_gives_the_page_its_room() {
     }
     // The version shows in the logo's tooltip, not as text that won't fit.
     assert!(drawn.iter().all(|(text, ..)| !text.contains("Apache")));
-    find(&drawn, "Open the sidebar");
+    find(&drawn, "Expand the sidebar");
     // The page moves left to fill the room: wider than beside an open sidebar.
     let (_, folded_left, ..) = find(&drawn, "Space Race");
     let open = draw_with_nav(StartNav::default(), 1280.0);
@@ -821,11 +827,64 @@ fn the_top_bar_lists_the_same_pages_across_the_top() {
             lefts.push(*left);
         }
         assert!(lefts.is_sorted(), "left to right, then Settings: {lefts:?}");
-        find(&drawn, "Show the pages in a sidebar");
+        find(&drawn, "Move the pages to a sidebar");
         // The page uses the whole width, below the bar.
         let (_, card_left, _, card_top, _) = find(&drawn, "Space Race");
         assert!(*card_left < nav::SIDEBAR_WIDTH && *card_top > nav::TOP_BAR_HEIGHT);
     }
+}
+
+#[test]
+fn the_empty_project_list_offers_open_and_new() {
+    let mut projects = Vec::new();
+    let mut start = StartScreen::default();
+    let ctx = theme::test_context();
+    ctx.enable_accesskit();
+    let mut clock = 0.0;
+    // Tall enough that the note under All projects is on screen.
+    let mut frame = |start: &mut StartScreen, events: Vec<egui::Event>| {
+        clock += 10.0;
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1280.0, 1400.0))),
+            time: Some(clock),
+            events,
+            ..Default::default()
+        };
+        let mut action = None;
+        let output = crate::theme::run(&ctx, input, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
+                let brand = Brand::load(ui.ctx());
+                action = start.show(ui, &mut projects, &brand);
+            });
+        });
+        (output, action)
+    };
+    let click = |at: egui::Pos2| {
+        let button = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        vec![egui::Event::PointerMoved(at), button(true), button(false)]
+    };
+    frame(&mut start, Vec::new());
+    let (output, _) = frame(&mut start, Vec::new());
+    let drawn = drawn_text(&output);
+    find(&drawn, "No projects yet");
+    let (_, left, right, top, bottom) = find(&drawn, "Open Project Folder…");
+    let open = pos2((left + right) / 2.0, (top + bottom) / 2.0);
+    // A New Project beside it, as well as the header's.
+    let new_buttons = drawn
+        .iter()
+        .filter(|(text, ..)| text.contains("New Project"))
+        .count();
+    assert!(new_buttons >= 2, "{new_buttons}");
+    let (_, action) = frame(&mut start, click(open));
+    assert!(
+        matches!(action, Some(StartAction::OpenDialog)),
+        "{action:?}"
+    );
 }
 
 #[test]
@@ -866,22 +925,22 @@ fn the_layout_buttons_switch_between_sidebar_and_top_bar() {
     };
     frame(&mut start, Vec::new());
     let drawn = drawn_text(&frame(&mut start, Vec::new()));
-    let fold = center(&drawn, "Fold the sidebar to its icons");
+    let fold = center(&drawn, "Collapse the sidebar to icons");
     frame(&mut start, click(fold));
     assert!(start.nav().folded);
     frame(&mut start, Vec::new());
     let drawn = drawn_text(&frame(&mut start, Vec::new()));
-    let unfold = center(&drawn, "Open the sidebar");
+    let unfold = center(&drawn, "Expand the sidebar");
     frame(&mut start, click(unfold));
     assert!(!start.nav().folded);
     frame(&mut start, Vec::new());
     let drawn = drawn_text(&frame(&mut start, Vec::new()));
-    let top_bar = center(&drawn, "Show the pages in a top bar");
+    let top_bar = center(&drawn, "Move the pages to a top bar");
     frame(&mut start, click(top_bar));
     assert_eq!(start.nav().layout, NavLayout::TopBar);
     frame(&mut start, Vec::new());
     let drawn = drawn_text(&frame(&mut start, Vec::new()));
-    let sidebar = center(&drawn, "Show the pages in a sidebar");
+    let sidebar = center(&drawn, "Move the pages to a sidebar");
     frame(&mut start, click(sidebar));
     assert_eq!(start.nav().layout, NavLayout::Sidebar);
 }
@@ -1221,7 +1280,7 @@ fn the_join_dialog_asks_for_a_link_then_says_how_joining_goes() {
     };
     // The header offers Join beside New and Open.
     let drawn = draw(&mut start);
-    find(&drawn, "Join…");
+    find(&drawn, "Join Session…");
 
     start.join_session();
     let drawn = draw(&mut start);

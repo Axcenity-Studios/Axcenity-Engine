@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, icons};
 
+pub mod dock_chrome;
 pub mod floating;
 use floating::{FloatingWindow, Home, SavedWindow};
 pub mod presets;
@@ -341,11 +342,20 @@ impl Layout {
         if let Some(found) = self.dock.find_tab(&pane) {
             // Fails only for a tab that isn't there, and this one was just found.
             let _ = self.dock.set_active_tab(found);
+            // A collapsed panel opens to show it.
+            dock_chrome::expand(
+                &mut self.dock,
+                egui_dock::NodePath::new(found.surface, found.node),
+            );
             return;
         }
         if let Some(window) = self.windows.iter_mut().find(|w| w.holds(pane)) {
             if let Some(found) = window.dock.find_tab(&pane) {
                 let _ = window.dock.set_active_tab(found);
+                dock_chrome::expand(
+                    &mut window.dock,
+                    egui_dock::NodePath::new(found.surface, found.node),
+                );
             }
             window.focus = true;
             return;
@@ -685,7 +695,9 @@ fn zero_nulls(json: &mut serde_json::Value) {
 /// Like Roblox Studio: the Scene in the middle (with the Animation tab and
 /// the UI Designer beside it, like Unity's), the Explorer with
 /// Properties (and the Terrain Studio as a tab beside it) under it down the
-/// right, and the Console, Assets and Profiler as tabs under the Scene.
+/// right, and the Console, Assets and Profiler as tabs under the Scene,
+/// short enough to leave the Scene most of the height (its tab bar's
+/// chevron collapses it to its tabs).
 fn default_dock() -> DockState<Pane> {
     let mut dock = DockState::new(vec![Pane::Scene, Pane::Animation, Pane::UiDesigner]);
     let _ = dock.set_active_tab(egui_dock::TabPath::new(
@@ -698,7 +710,7 @@ fn default_dock() -> DockState<Pane> {
     tree.split_below(explorer, 0.45, vec![Pane::Properties, Pane::Terrain]);
     tree.split_below(
         scene,
-        0.78,
+        0.85,
         vec![Pane::Console, Pane::Assets, Pane::Profiler],
     );
     dock

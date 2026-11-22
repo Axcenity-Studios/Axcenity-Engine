@@ -2,9 +2,11 @@ use super::*;
 
 impl EditorApp {
     /// The header, which is also the window's title bar, like VS Code's (see
-    /// `window_frame.rs`): the logo and menus, the search box (like Visual
-    /// Studio's), the window title in the middle, then Play's badge,
-    /// Settings and the window buttons. Its empty space drags the window.
+    /// `window_frame.rs`): the logo and menus, the search box in the middle
+    /// reading the window title until it's clicked (like VS Code's command
+    /// centre), then Play's badge, Settings and the window buttons. With no
+    /// search box (no project) the title is in the middle on its own. Its
+    /// empty space drags the window.
     pub(in crate::app) fn title_bar(&mut self, ui: &mut egui::Ui) {
         let bar = ui.max_rect();
         // First, so the menus and buttons added after it sit on top.
@@ -33,9 +35,11 @@ impl EditorApp {
             )
             .inner;
 
-        let free = self.header_search(ui, free);
-        // Centred on the window, but kept clear of the menus, the search
-        // box and the buttons.
+        if self.header_search(ui, free, bar.center().x) {
+            return;
+        }
+        // Centred on the window, but kept clear of the menus and the
+        // buttons.
         let span = free.shrink2(egui::vec2(16.0, 0.0));
         if span.width() > 48.0 {
             let palette = theme::palette(ui.ctx());
@@ -57,40 +61,44 @@ impl EditorApp {
         }
     }
 
-    /// Universal search's box, at the left of `free` (the room between the
-    /// menus and the chips at the right), with a project open: as wide as
-    /// leaves the title room, or, in a narrow window, a magnifying glass
-    /// that opens search in the middle. Returns the room left for the title.
-    fn header_search(&mut self, ui: &mut egui::Ui, free: egui::Rect) -> egui::Rect {
+    /// Universal search's box, with a project open: centred on the window
+    /// (at `center_x`) as far as `free` (the room between the menus and the
+    /// chips at the right) allows, reading the window title until it's
+    /// clicked; or, in a narrow window, a magnifying glass that opens search
+    /// in the middle. Returns whether it drew anything, so the title isn't
+    /// drawn again beside it.
+    fn header_search(&mut self, ui: &mut egui::Ui, free: egui::Rect, center_x: f32) -> bool {
         // The start screen and Character Studio have searches of their own;
         // with no project, Ctrl+K still opens search in the middle.
         if self.project.is_none() || self.character_workspace.is_some() {
-            return free;
+            return false;
         }
         const GAP: f32 = 8.0;
-        const MIN_BOX: f32 = 170.0;
-        const MAX_BOX: f32 = 320.0;
-        // Room kept for the title before the box shrinks.
-        const TITLE_ROOM: f32 = 180.0;
-        let room = free.width() - GAP;
+        const MIN_BOX: f32 = 200.0;
+        const MAX_BOX: f32 = 460.0;
+        let room = free.width() - 2.0 * GAP;
         let shortcut = crate::shortcuts::Action::Search.menu_text(ui.ctx());
         let middle = free.center().y;
         let (width, icon_only) = if room >= MIN_BOX {
-            ((room - TITLE_ROOM).clamp(MIN_BOX, MAX_BOX), false)
+            (room.min(MAX_BOX), false)
         } else if room >= 28.0 {
             (26.0, true)
         } else {
-            return free;
+            return false;
         };
         let height = if icon_only {
             26.0
         } else {
             crate::command_palette::HEADER_BOX_HEIGHT
         };
+        // In the window's middle, slid aside when the menus or the chips
+        // reach into it.
+        let left = (center_x - width / 2.0).clamp(free.left() + GAP, free.right() - GAP - width);
         let rect = egui::Rect::from_min_size(
-            egui::pos2(free.left() + GAP, middle - height / 2.0),
+            egui::pos2(left, middle - height / 2.0),
             egui::vec2(width, height),
         );
+        let title = self.title();
         ui.scope_builder(
             egui::UiBuilder::new()
                 .max_rect(rect)
@@ -100,18 +108,18 @@ impl EditorApp {
                     ui.disable();
                 }
                 if icon_only {
-                    let tip = format!("Search ({shortcut})");
+                    let tip = format!("{title}\nSearch ({shortcut})");
                     if widgets::icon_button(ui, icons::MAGNIFYING_GLASS, &tip, self.palette.open)
                         .clicked()
                     {
                         self.palette.toggle();
                     }
                 } else {
-                    self.palette.header_box(ui, width, &shortcut);
+                    self.palette.header_box(ui, width, &shortcut, &title);
                 }
             },
         );
-        egui::Rect::from_min_max(egui::pos2(rect.right(), free.top()), free.max)
+        true
     }
 
     /// The logo and the menus, then Play's badge and Settings at the right.
@@ -493,8 +501,15 @@ impl EditorApp {
                 self.ribbon_tabs.edit(None);
             }
         });
-        // Viewport: what the Scene view draws over the world while editing.
-        ui.menu_button("Viewport", |ui| self.viewport_menu(ui));
+        // Viewport: what the Scene view draws over the world while editing,
+        // so there's nothing in it until a project is open (the same
+        // switches stay in Settings > Viewport).
+        let project = self.project.is_some();
+        ui.add_enabled_ui(project, |ui| {
+            ui.menu_button("Viewport", |ui| self.viewport_menu(ui))
+                .response
+                .on_disabled_hover_text("Open a project to change what the viewport shows.");
+        });
         ui.menu_button("Debug", |ui| {
             if ui
                 .button(item(ui, icons::GAUGE, "Graphics Benchmark…"))
@@ -507,11 +522,15 @@ impl EditorApp {
                 self.open_graphics_benchmark();
             }
             if ui
-                .button(item(ui, icons::BONE, "Animator Inspector…"))
+                .add_enabled(
+                    project,
+                    egui::Button::new(item(ui, icons::BONE, "Animator Inspector…")),
+                )
                 .on_hover_text(
                     "During Play, watch the selected Animator live: its state, blends, \
                          layers, tracks, parameters and the events it fires.",
                 )
+                .on_disabled_hover_text("Open a project first.")
                 .clicked()
             {
                 self.open_animator_inspector();
@@ -587,6 +606,13 @@ impl EditorApp {
             icons::CUBE_FOCUS,
             "View Cube",
             "The cube in the viewport's corner: click a face, edge or corner to look from there.",
+        );
+        overlay_menu_item(
+            ui,
+            &mut self.viewport_bar,
+            icons::SLIDERS_HORIZONTAL,
+            "Viewport Bar",
+            VIEWPORT_BAR_HINT,
         );
         overlay_menu_item(
             ui,

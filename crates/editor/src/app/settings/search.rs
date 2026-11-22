@@ -187,6 +187,18 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         ),
         setting(
             Viewport,
+            "Show the viewport bar",
+            &[
+                "Viewport bar",
+                "Camera speed",
+                "FPS",
+                "Draw calls",
+                "Wireframe toggle",
+            ],
+            "The bar at the viewport's top left: camera speed, grid snap, Shaded or Wireframe, FPS.",
+        ),
+        setting(
+            Viewport,
             "Show the ray tracing badge",
             &["Ray tracing badge", "RTX", "Hide ray tracing"],
             "The badge that says which ray traced effects are drawing.",

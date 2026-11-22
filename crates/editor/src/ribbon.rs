@@ -131,10 +131,10 @@ impl egui::Widget for RibbonButton<'_> {
             } else if hovered {
                 palette.text_strong
             } else {
-                palette.text_secondary
+                ink(&palette, palette.text_secondary)
             };
             let icon_color = match self.color {
-                Some(color) if enabled => color,
+                Some(color) if enabled => ink(&palette, color),
                 Some(color) => color.gamma_multiply(0.4),
                 None if self.selected => palette.accent,
                 None => text_color,
@@ -170,6 +170,104 @@ impl egui::Widget for RibbonButton<'_> {
         }
         if compact {
             // The name is only in the tooltip, so say it there first.
+            response.on_hover_text(self.label)
+        } else {
+            response
+        }
+    }
+}
+
+/// A small button with a coloured icon and its name beside it, for the
+/// Play, Run and Stop pinned at the right of the ribbon's tab row. Greyed
+/// out by `ui.add_enabled` like [`RibbonButton`].
+pub struct PinnedButton<'a> {
+    icon: &'a str,
+    label: &'a str,
+    color: Color32,
+}
+
+impl<'a> PinnedButton<'a> {
+    pub fn new(icon: &'a str, label: &'a str, color: Color32) -> Self {
+        Self { icon, label, color }
+    }
+}
+
+impl egui::Widget for PinnedButton<'_> {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let palette = theme::palette(ui.ctx());
+        let compact = theme::density(ui.ctx()) == Density::Compact;
+        let icon = ui.painter().layout_no_wrap(
+            self.icon.to_owned(),
+            FontId::new(14.0, theme::filled()),
+            Color32::PLACEHOLDER,
+        );
+        let label = ui.painter().layout_no_wrap(
+            self.label.to_owned(),
+            FontId::new(type_scale::SMALL + 0.5, theme::medium_family()),
+            Color32::PLACEHOLDER,
+        );
+        // Compact, the name is only in the tooltip.
+        let width = if compact {
+            26.0
+        } else {
+            icon.size().x + 5.0 + label.size().x + 18.0
+        };
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(width, 22.0), egui::Sense::click());
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), self.label)
+        });
+        if ui.is_rect_visible(rect) {
+            let enabled = ui.is_enabled();
+            let hover = theme::ease(
+                ui.ctx(),
+                response.id.with("hover"),
+                response.hovered() && enabled,
+            );
+            let fill = if response.is_pointer_button_down_on() && enabled {
+                palette.control_active
+            } else {
+                palette.control_hover.gamma_multiply(hover)
+            };
+            let painter = ui.painter();
+            painter.rect_filled(rect, theme::radius::CONTROL, fill);
+            if response.has_focus() {
+                painter.rect_stroke(
+                    rect,
+                    theme::radius::CONTROL,
+                    egui::Stroke::new(1.0_f32, palette.accent),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            let (icon_color, text_color) = if enabled {
+                let text = theme::mix(
+                    ink(&palette, palette.text_secondary),
+                    palette.text_strong,
+                    hover,
+                );
+                (ink(&palette, self.color), text)
+            } else {
+                (self.color.gamma_multiply(0.35), palette.text_muted)
+            };
+            if compact {
+                painter.galley(rect.center() - icon.size() / 2.0, icon, icon_color);
+            } else {
+                let left = rect.left() + 9.0;
+                let middle = rect.center().y;
+                let icon_width = icon.size().x;
+                painter.galley(
+                    egui::pos2(left, middle - icon.size().y / 2.0),
+                    icon,
+                    icon_color,
+                );
+                painter.galley(
+                    egui::pos2(left + icon_width + 5.0, middle - label.size().y / 2.0),
+                    label,
+                    text_color,
+                );
+            }
+        }
+        if compact {
             response.on_hover_text(self.label)
         } else {
             response
@@ -226,7 +324,8 @@ pub fn group(ui: &mut egui::Ui, caption: &str, add_contents: impl FnOnce(&mut eg
     group_tinted(ui, caption, None, add_contents);
 }
 
-/// [`group`], with the caption in a category colour (cohesion pass CW2.2).
+/// [`group`], with a short bar of a category colour under the caption
+/// (cohesion pass CW2.2).
 pub fn group_tinted(
     ui: &mut egui::Ui,
     caption: &str,
@@ -270,15 +369,15 @@ pub fn group_tinted(
             egui::vec2(row.rect.width(), CAPTION_HEIGHT),
             egui::Sense::hover(),
         );
-        let color = hue.map_or(palette.text_weak, |hue| {
-            theme::mix(hue.ink(&palette), palette.text_weak, 0.35)
-        });
+        // A neutral grey a step brighter than weak text, so the captions
+        // read at a glance without competing with the coloured icons; the
+        // group's colour is only the short bar under it.
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
             caption,
-            FontId::proportional(type_scale::CAPTION - 0.5),
-            color,
+            FontId::proportional(type_scale::CAPTION),
+            ink(&palette, palette.text_secondary),
         );
         if let Some(hue) = hue {
             // A short bar of the group's colour under its caption.
@@ -293,4 +392,15 @@ pub fn group_tinted(
             );
         }
     });
+}
+
+/// A ribbon icon's or caption's colour, darkened by a fifth in the light
+/// theme: the thin-stroke icons and small captions are delicate on a light
+/// background and read as clearly as in the dark theme this way.
+fn ink(palette: &theme::Palette, color: egui::Color32) -> egui::Color32 {
+    if palette.dark {
+        color
+    } else {
+        theme::mix(color, egui::Color32::BLACK, 0.2)
+    }
 }

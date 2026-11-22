@@ -45,6 +45,14 @@ const MEMORY_ROWS: usize = 7;
 const MEMORY_CLASSES: usize = 12;
 /// The width the four tabs need side by side.
 const TABS_WIDTH: f32 = 290.0;
+/// The narrowest a column of sections is: wider panels lay their sections
+/// side by side, up to [`MAX_COLUMNS`] of them.
+const COLUMN_MIN: f32 = 280.0;
+const MAX_COLUMNS: usize = 3;
+/// The frame-time graph's height.
+const GRAPH_HEIGHT: f32 = 72.0;
+/// A frame at 60 fps, in milliseconds: the graph's reference line.
+const FRAME_BUDGET_MS: f32 = 1000.0 / 60.0;
 /// How many shader messages the Graphics tab keeps, newest last.
 const SHADER_MESSAGES: usize = 20;
 
@@ -470,11 +478,7 @@ impl Profiler {
             lights: newest.render.lights,
             audio: average(|s| s.game.audio),
             sounds_playing: newest.load.sounds_playing,
-            history: self
-                .samples
-                .iter()
-                .map(|s| (s.game.total + s.render.cpu).as_secs_f32() * 1000.0)
-                .collect(),
+            history: self.samples.iter().map(FrameTimes::of).collect(),
         })
     }
 
@@ -536,7 +540,7 @@ impl Profiler {
                     return;
                 };
                 ui.add_space(4.0);
-                history(ui, &summary.history);
+                frame_graph(ui, &summary.history);
                 match self.tab {
                     Tab::Game | Tab::Scripts => self.game(ui, summary),
                     Tab::Graphics => self.graphics(ui, summary),
@@ -547,7 +551,8 @@ impl Profiler {
 
     /// The Game tab.
     fn game(&self, ui: &mut egui::Ui, summary: &Summary) {
-        section(ui, "Frame", |ui| {
+        let mut grid = Grid::default();
+        grid.section("Frame", |ui| {
             row(
                 ui,
                 "Frame rate",
@@ -573,7 +578,7 @@ impl Profiler {
             );
             row(ui, "GPU time", gpu_text(summary.gpu, summary.gpu_timing));
         });
-        section(ui, "Memory", |ui| {
+        grid.section("Memory", |ui| {
             row(
                 ui,
                 "Editor process",
@@ -581,7 +586,7 @@ impl Profiler {
             );
             row(ui, "Lua", bytes(summary.lua_bytes));
         });
-        section(ui, "Physics", |ui| {
+        grid.section("Physics", |ui| {
             row(ui, "CPU", millis(summary.physics));
             row(
                 ui,
@@ -590,11 +595,11 @@ impl Profiler {
             );
             row(ui, "Bodies", summary.bodies.to_string());
         });
-        section(ui, "Audio", |ui| {
+        grid.section("Audio", |ui| {
             row(ui, "CPU", millis(summary.audio));
             row(ui, "Sounds playing", summary.sounds_playing.to_string());
         });
-        section(ui, "Scripts and animation", |ui| {
+        grid.section("Scripts and animation", |ui| {
             row(ui, "Scripts", millis(summary.scripts));
             row(ui, "Animation", millis(summary.animation));
         });
@@ -609,7 +614,7 @@ impl Profiler {
             .filter(|(_, time)| !time.is_zero())
             .collect();
         if !posing.is_empty() {
-            section(ui, "Posing by thread", |ui| {
+            grid.section("Posing by thread", move |ui| {
                 for (slot, time) in posing {
                     row(ui, &PosingThreads::name(slot), millis(time));
                 }
@@ -619,7 +624,7 @@ impl Profiler {
         // worked out this frame, and the controls moving.
         let faces = summary.faces;
         if faces.faces.iter().sum::<usize>() > 0 {
-            section(ui, "Faces", |ui| {
+            grid.section("Faces", move |ui| {
                 for (lod, count) in axcenity_anim::FaceLod::ALL.iter().zip(faces.faces) {
                     if count > 0 {
                         row(ui, lod.label(), count.to_string());
@@ -630,7 +635,7 @@ impl Profiler {
                 row(ui, "Time", millis(summary.face_time));
             });
         }
-        section(ui, "Network", |ui| {
+        grid.section("Network", |ui| {
             if self.network.is_empty() {
                 row(ui, "Clients", "1 (no connections)".into());
             }
@@ -650,13 +655,15 @@ impl Profiler {
                 row(ui, "  Instances", client.instances.to_string());
             }
         });
+        grid.show(ui);
     }
 
     /// The Graphics tab: the viewport's newest [`RenderStats`], with times
     /// averaged like the Game tab's.
     fn graphics(&self, ui: &mut egui::Ui, summary: &Summary) {
         let stats = &summary.stats;
-        section(ui, "Frame", |ui| {
+        let mut grid = Grid::default();
+        grid.section("Frame", |ui| {
             row(
                 ui,
                 "CPU frame",
@@ -670,7 +677,7 @@ impl Profiler {
             row(ui, "GPU frame", gpu_text(summary.gpu, summary.gpu_timing));
             row(ui, "Limited by", summary.bound.label().to_owned());
         });
-        section(ui, "GPU passes", |ui| {
+        grid.section("GPU passes", |ui| {
             if summary.gpu_timing {
                 for (pass, time) in FramePass::ALL.iter().zip(summary.passes) {
                     row(ui, pass.label(), time.map_or("off".into(), millis));
@@ -687,13 +694,13 @@ impl Profiler {
                 row(ui, "Per pass", "not available on this GPU".into());
             }
         });
-        section(ui, "Draws", |ui| {
+        grid.section("Draws", |ui| {
             row(ui, "Draw calls", stats.draw_calls.to_string());
             row(ui, "Batches", stats.batches.to_string());
             row(ui, "Triangles", thousands(stats.triangles));
             row(ui, "Vertices", thousands(stats.vertices));
         });
-        section(ui, "Culling", |ui| {
+        grid.section("Culling", |ui| {
             row(
                 ui,
                 "Items drawn",
@@ -712,12 +719,12 @@ impl Profiler {
             row(ui, "GPU particles", thousands(stats.gpu_particles.into()));
             row(ui, "Lights", summary.lights.to_string());
         });
-        section(ui, "Levels of detail", |ui| {
+        grid.section("Levels of detail", |ui| {
             for (name, count) in LOD_NAMES.iter().zip(stats.lod_items) {
                 row(ui, name, count.to_string());
             }
         });
-        section(ui, "GPU memory", |ui| {
+        grid.section("GPU memory", |ui| {
             let kinds = [
                 ("Textures", stats.texture_bytes),
                 ("Meshes", stats.mesh_bytes),
@@ -730,6 +737,7 @@ impl Profiler {
             let total = kinds.iter().map(|(_, count)| count).sum::<u64>();
             row(ui, "Total", bytes(total as usize));
         });
+        grid.show(ui);
         self.shaders(ui, Some(stats));
     }
 
@@ -762,8 +770,9 @@ impl Profiler {
             .collect();
         let game_limit = self.budget.game_mb.map(|mb| megabytes(mb) as f32);
         bars(ui, &totals, MEMORY_HISTORY, game_limit);
+        let mut grid = Grid::default();
         if !self.budget.is_empty() {
-            section(ui, "Budget", |ui| {
+            grid.section("Budget", |ui| {
                 for (name, used, limit) in budget_rows(breakdown, &self.budget) {
                     let Some(limit) = limit else { continue };
                     let over = used > megabytes(limit);
@@ -773,7 +782,7 @@ impl Profiler {
                 }
             });
         }
-        section(ui, "Game, by kind", |ui| {
+        grid.section("Game, by kind", |ui| {
             for (name, count, size) in breakdown.rows() {
                 let value = match count {
                     Some(count) => format!("{} ({})", bytes(size), thousands(count as u64)),
@@ -783,7 +792,7 @@ impl Profiler {
             }
         });
         if let Some(first) = &self.first_breakdown {
-            section(ui, "Since Play started", |ui| {
+            grid.section("Since Play started", |ui| {
                 for (((name, _, now), (_, _, then)), peak) in breakdown
                     .rows()
                     .into_iter()
@@ -798,7 +807,7 @@ impl Profiler {
                 }
             });
         }
-        section(ui, "Instances by class", |ui| {
+        grid.section("Instances by class", |ui| {
             for (class, used) in breakdown.instances.classes.iter().take(MEMORY_CLASSES) {
                 row(
                     ui,
@@ -815,6 +824,7 @@ impl Profiler {
                 row(ui, "Other classes", more.to_string());
             }
         });
+        grid.show(ui);
         ui.add_space(6.0);
         let budget_note = if self.budget.is_empty() {
             " Set a budget in Settings > This project."
@@ -889,8 +899,107 @@ struct Summary {
     lights: usize,
     audio: Duration,
     sounds_playing: usize,
-    /// Each frame's CPU time in milliseconds, oldest first.
-    history: Vec<f32>,
+    /// Each frame's CPU times, oldest first, for the graph.
+    history: Vec<FrameTimes>,
+}
+
+/// One frame's times in milliseconds, for the frame-time graph: the CPU's
+/// steps, stacked, and the GPU's, drawn as a line over them.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct FrameTimes {
+    scripts: f32,
+    physics: f32,
+    animation: f32,
+    /// The rest of the game's step: audio, faces and the engine's own.
+    other: f32,
+    /// Building and recording the frame's drawing.
+    rendering: f32,
+    gpu: Option<f32>,
+}
+
+impl FrameTimes {
+    fn of(sample: &Sample) -> Self {
+        let ms = |time: Duration| time.as_secs_f32() * 1000.0;
+        let game = &sample.game;
+        let parts = game.scripts + game.physics + game.animation;
+        Self {
+            scripts: ms(game.scripts),
+            physics: ms(game.physics),
+            animation: ms(game.animation),
+            other: ms(game.total.saturating_sub(parts)),
+            rendering: ms(sample.render.cpu),
+            gpu: sample.render.stats.gpu_time.map(ms),
+        }
+    }
+
+    /// The CPU's whole frame.
+    fn cpu(&self) -> f32 {
+        self.scripts + self.physics + self.animation + self.other + self.rendering
+    }
+
+    /// The stacked parts, bottom first, with their names and colours
+    /// (from [`series_colors`]).
+    fn parts(&self, colors: [egui::Color32; 5]) -> [(&'static str, f32, egui::Color32); 5] {
+        let [scripts, physics, animation, other, rendering] = colors;
+        [
+            ("Scripts", self.scripts, scripts),
+            ("Physics", self.physics, physics),
+            ("Animation", self.animation, animation),
+            ("Other game", self.other, other),
+            ("Rendering (CPU)", self.rendering, rendering),
+        ]
+    }
+}
+
+/// The graph's colours: Scripts, Physics, Animation, Other game and
+/// Rendering, then the GPU line's ([`gpu_color`]). The kinds' own colours
+/// from the Explorer, so Scripts reads as scripts everywhere.
+fn series_colors(ui: &egui::Ui) -> [egui::Color32; 5] {
+    use axcenity_core::ClassName;
+    let visuals = ui.visuals();
+    let palette = theme::palette(ui.ctx());
+    [
+        theme::class_color(ClassName::Script, visuals),
+        theme::class_color(ClassName::Part, visuals),
+        theme::AnimKind::Clip.color(visuals),
+        palette.text_muted,
+        palette.accent,
+    ]
+}
+
+fn gpu_color(ui: &egui::Ui) -> egui::Color32 {
+    theme::class_color(axcenity_core::ClassName::PointLight, ui.visuals())
+}
+
+/// Sections side by side in as many columns as fit ([`COLUMN_MIN`]),
+/// filled across then down so the first ones are read together; one under
+/// another in a narrow column.
+#[derive(Default)]
+struct Grid<'a> {
+    sections: Vec<(&'static str, Box<dyn FnOnce(&mut egui::Ui) + 'a>)>,
+}
+
+impl<'a> Grid<'a> {
+    fn section(&mut self, title: &'static str, rows: impl FnOnce(&mut egui::Ui) + 'a) {
+        self.sections.push((title, Box::new(rows)));
+    }
+
+    fn show(self, ui: &mut egui::Ui) {
+        let gap = ui.spacing().item_spacing.x;
+        let fit = ((ui.available_width() + gap) / (COLUMN_MIN + gap)).floor() as usize;
+        let columns = fit.clamp(1, MAX_COLUMNS).min(self.sections.len().max(1));
+        if columns == 1 {
+            for (title, rows) in self.sections {
+                section(ui, title, rows);
+            }
+            return;
+        }
+        ui.columns(columns, |uis| {
+            for (index, (title, rows)) in self.sections.into_iter().enumerate() {
+                section(&mut uis[index % columns], title, rows);
+            }
+        });
+    }
 }
 
 fn section(ui: &mut egui::Ui, title: &str, rows: impl FnOnce(&mut egui::Ui)) {
@@ -917,10 +1026,129 @@ fn row_colored(ui: &mut egui::Ui, name: &str, value: String, color: egui::Color3
     ui.end_row();
 }
 
-/// Each recent frame's CPU time as a bar, scaled to the slowest, with a
-/// line at 16.7 ms (60 fps) when it's in range.
-fn history(ui: &mut egui::Ui, frames: &[f32]) {
-    bars(ui, frames, WINDOW, Some(1000.0 / 60.0));
+/// The rolling frame-time graph: each recent frame's CPU time as a bar
+/// stacked by step (Scripts, Physics, Animation, the rest of the game, and
+/// Rendering), the GPU's time as a line over them, and a line at 16.7 ms
+/// (60 fps). A frame over it is a spike: its column is tinted and marked
+/// at the top. Hovering a frame lists its times; a legend follows.
+fn frame_graph(ui: &mut egui::Ui, frames: &[FrameTimes]) {
+    let palette = theme::palette(ui.ctx());
+    let width = ui.available_width();
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, GRAPH_HEIGHT), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 3.0, palette.inset);
+    // Room over the 60 fps line, so it's never the top edge.
+    let top = frames
+        .iter()
+        .map(|frame| frame.cpu().max(frame.gpu.unwrap_or(0.0)))
+        .fold(FRAME_BUDGET_MS * 1.25, f32::max);
+    let y_of = |ms: f32| rect.bottom() - rect.height() * (ms / top).clamp(0.0, 1.0);
+    let bar = rect.width() / WINDOW as f32;
+    let start = rect.right() - bar * frames.len() as f32;
+    let hovered = response
+        .hover_pos()
+        .map(|pointer| ((pointer.x - start) / bar).floor())
+        .filter(|&index| index >= 0.0 && (index as usize) < frames.len())
+        .map(|index| index as usize);
+    let colors = series_colors(ui);
+    let mut gpu_line = Vec::with_capacity(frames.len());
+    for (index, frame) in frames.iter().enumerate() {
+        let left = start + bar * index as f32;
+        let right = left + (bar - 1.0).max(1.0);
+        let spike = frame.cpu().max(frame.gpu.unwrap_or(0.0)) > FRAME_BUDGET_MS;
+        if spike || hovered == Some(index) {
+            let tint = if spike {
+                palette.warning.gamma_multiply(0.16)
+            } else {
+                palette.control_hover
+            };
+            painter.rect_filled(
+                egui::Rect::from_x_y_ranges(left..=right, rect.y_range()),
+                0.0,
+                tint,
+            );
+        }
+        let mut base = 0.0;
+        for (_, ms, color) in frame.parts(colors) {
+            if ms <= 0.0 {
+                continue;
+            }
+            painter.rect_filled(
+                egui::Rect::from_x_y_ranges(left..=right, y_of(base + ms)..=y_of(base)),
+                0.0,
+                color,
+            );
+            base += ms;
+        }
+        if spike {
+            painter.rect_filled(
+                egui::Rect::from_x_y_ranges(left..=right, rect.top()..=rect.top() + 3.0),
+                0.0,
+                palette.warning,
+            );
+        }
+        if let Some(gpu) = frame.gpu {
+            gpu_line.push(egui::pos2((left + right) / 2.0, y_of(gpu)));
+        }
+    }
+    if gpu_line.len() > 1 {
+        painter.add(egui::Shape::line(
+            gpu_line,
+            egui::Stroke::new(1.5_f32, gpu_color(ui)),
+        ));
+    }
+    // The 60 fps line, dashed, with its label at the left.
+    let y = y_of(FRAME_BUDGET_MS);
+    painter.extend(egui::Shape::dashed_line(
+        &[egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+        egui::Stroke::new(1.0_f32, palette.border_strong),
+        4.0,
+        3.0,
+    ));
+    painter.text(
+        egui::pos2(rect.left() + 4.0, y - 2.0),
+        egui::Align2::LEFT_BOTTOM,
+        "16.7 ms · 60 fps",
+        egui::FontId::proportional(type_scale::CAPTION),
+        palette.text_weak,
+    );
+    if let Some(frame) = hovered.map(|index| frames[index]) {
+        response.on_hover_ui_at_pointer(|ui| {
+            let total = frame.cpu();
+            ui.label(RichText::new(format!("CPU {total:.2} ms")).strong());
+            for (name, ms, color) in frame.parts(colors).into_iter().rev() {
+                ui.label(RichText::new(format!("{name}: {ms:.2} ms")).color(color));
+            }
+            let gpu = frame.gpu.map_or("not measured".to_owned(), |ms| format!("{ms:.2} ms"));
+            ui.label(RichText::new(format!("GPU: {gpu}")).color(gpu_color(ui)));
+        });
+    }
+    // The legend.
+    ui.add_space(2.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 10.0;
+        let names = ["Scripts", "Physics", "Animation", "Other game", "Rendering"];
+        let gpu = gpu_color(ui);
+        for (name, color) in names.into_iter().zip(colors).chain([("GPU", gpu)]) {
+            legend_key(ui, name, color);
+        }
+    });
+}
+
+/// A dot of `color` and its name, in the frame-time graph's legend.
+fn legend_key(ui: &mut egui::Ui, name: &str, color: egui::Color32) {
+    let palette = theme::palette(ui.ctx());
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let (dot, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
+        ui.painter().rect_filled(dot, 2.0, color);
+        ui.label(
+            RichText::new(name)
+                .size(type_scale::CAPTION)
+                .color(palette.text_secondary),
+        );
+    });
 }
 
 /// `values` as bars, the newest at the right, room for `slots` of them,

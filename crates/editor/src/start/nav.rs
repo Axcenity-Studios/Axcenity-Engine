@@ -139,6 +139,45 @@ const PAGES: [(Page, &str, &str, &str); 7] = [
     ),
 ];
 
+/// The first of the pages for learning and looking things up; the sidebar
+/// sets them apart from the workspace pages above with a divider.
+const FIRST_RESOURCE: Page = Page::Learn;
+
+/// What the navigation's own buttons do, as their tooltips (and names for
+/// screen readers).
+const COLLAPSE: &str = "Collapse the sidebar to icons";
+const EXPAND: &str = "Expand the sidebar";
+const TO_TOP_BAR: &str = "Move the pages to a top bar";
+const TO_SIDEBAR: &str = "Move the pages to a sidebar";
+
+/// A gap with a hairline between groups of the sidebar's pages, and the
+/// next group's micro-label under it while the labels show (`labels`).
+fn group_break(ui: &mut egui::Ui, name: &str, labels: f32, palette: &theme::Palette) {
+    ui.add_space(8.0);
+    let width = ui.available_width();
+    let (line, _) = ui.allocate_exact_size(vec2(width, 1.0), egui::Sense::hover());
+    let inset = 10.0 * labels + 8.0 * (1.0 - labels);
+    ui.painter().hline(
+        (line.left() + inset)..=(line.right() - inset),
+        line.center().y,
+        Stroke::new(1.0_f32, palette.border),
+    );
+    if labels > 0.01 {
+        ui.add_space(10.0 * labels);
+        let (rect, _) = ui.allocate_exact_size(vec2(width, 14.0 * labels), egui::Sense::hover());
+        ui.painter().text(
+            pos2(rect.left() + 10.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            name.to_uppercase(),
+            egui::FontId::monospace(type_scale::CAPTION),
+            palette.text_weak.gamma_multiply(labels),
+        );
+        ui.add_space(4.0 * labels);
+    } else {
+        ui.add_space(8.0);
+    }
+}
+
 /// "Settings (Ctrl+,)": the tooltip of the Settings button in either layout.
 fn settings_tooltip(ctx: &egui::Context) -> String {
     format!(
@@ -367,6 +406,9 @@ impl StartScreen {
         bar.add_space(12.0 + 6.0 * open);
         bar.spacing_mut().item_spacing.y = 2.0;
         for (page, icon, title, about) in PAGES {
+            if page == FIRST_RESOURCE {
+                group_break(&mut bar, "Resources", labels, &palette);
+            }
             let count = (page == Page::Projects).then_some(tracked);
             let selected = self.page == page;
             let tip = match count {
@@ -398,9 +440,10 @@ impl StartScreen {
             let line = |text: String, color| {
                 egui::Label::new(RichText::new(text).size(type_scale::CAPTION).color(color)).wrap()
             };
-            version.add(line("Apache-2.0".to_owned(), palette.text_weak));
-            version.add(line(version_label(), palette.text_weak));
-            version.add(line("Axcenity Engine".to_owned(), palette.text_secondary));
+            // Secondary, not weak: small type on glass needs the contrast.
+            version.add(line("Apache-2.0".to_owned(), palette.text_secondary));
+            version.add(line(version_label(), palette.text_secondary));
+            version.add(line("Axcenity Engine".to_owned(), palette.text));
             top_of_version = version.min_rect().top() - 8.0;
         }
         let mut foot = ui.new_child(
@@ -444,20 +487,13 @@ impl StartScreen {
                 .on_hover_text(about_line());
             open_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
-                if widgets::icon_button(ui, icons::BROWSER, "Show the pages in a top bar", false)
-                    .clicked()
-                {
-                    self.nav.layout = NavLayout::TopBar;
-                }
-                if widgets::icon_button(
-                    ui,
-                    icons::SIDEBAR_SIMPLE,
-                    "Fold the sidebar to its icons",
-                    false,
-                )
-                .clicked()
-                {
+                // Collapse at the edge it collapses toward; the layout
+                // switch beside it. Each says what it does in its tooltip.
+                if widgets::icon_button(ui, icons::CARET_DOUBLE_LEFT, COLLAPSE, false).clicked() {
                     self.nav.folded = true;
+                }
+                if widgets::icon_button(ui, icons::BROWSER, TO_TOP_BAR, false).clicked() {
+                    self.nav.layout = NavLayout::TopBar;
                 }
             });
             return;
@@ -488,13 +524,7 @@ impl StartScreen {
         ));
         folded_ui.set_clip_rect(header);
         folded_ui.multiply_opacity(fade);
-        if widgets::icon_button(
-            &mut folded_ui,
-            icons::SIDEBAR_SIMPLE,
-            "Open the sidebar",
-            false,
-        )
-        .clicked()
+        if widgets::icon_button(&mut folded_ui, icons::CARET_DOUBLE_RIGHT, EXPAND, false).clicked()
         {
             self.nav.folded = false;
         }
@@ -543,14 +573,7 @@ impl StartScreen {
             settings = widgets::icon_button(ui, icons::GEAR_SIX, "Settings", false)
                 .on_hover_text(settings_tooltip(&ctx))
                 .clicked();
-            if widgets::icon_button(
-                ui,
-                icons::SIDEBAR_SIMPLE,
-                "Show the pages in a sidebar",
-                false,
-            )
-            .clicked()
-            {
+            if widgets::icon_button(ui, icons::SIDEBAR_SIMPLE, TO_SIDEBAR, false).clicked() {
                 self.nav.layout = NavLayout::Sidebar;
             }
             if names {

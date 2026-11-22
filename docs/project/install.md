@@ -11,17 +11,19 @@ What a computer needs (supported systems, processor, memory, graphics, network a
 ## Windows (`.exe`)
 
 1. Download `AxcenityEditor-*-windows-x86_64.exe`.
-2. Open it. The setup wizard shows the license, then the install folder (default: `%LOCALAPPDATA%\Programs\Axcenity Engine`), Start menu name, and an optional desktop shortcut.
-3. If **Windows protected your PC** (SmartScreen) appears, choose **More info**, then **Run anyway**, after you have checked you trust the file.
-4. Finish, and optionally launch the editor.
+2. If **Windows protected your PC** (SmartScreen) appears, choose **More info**, then **Run anyway**, after you have checked you trust the file.
+3. The setup wizard shows the license, then the install folder (default: `%LOCALAPPDATA%\Programs\Axcenity Engine`; no administrator rights needed). If the editor is open, setup asks you to close it first.
+4. On the last page, choose whether to open the editor now and whether to add a desktop shortcut. **Axcenity Editor** is in the Start menu.
 
-Uninstall from **Settings > Apps > Axcenity Editor**, or the Uninstall shortcut in the Start menu folder. Project folders are left as they are.
+The editor and the player open without a terminal window. Run from a terminal (`axcenity-editor --version`), they still print there.
+
+Uninstall from **Settings > Apps > Axcenity Editor**. Project folders are never removed. The uninstaller offers to remove your editor settings and global assets (`%APPDATA%\Axcenity Editor`) too; that's off unless you tick it.
 
 ## macOS (`.dmg`)
 
 1. Download `AxcenityEditor-*-macos-universal.dmg` (Apple Silicon and Intel).
 2. Open it. Agree to the Apache License 2.0.
-3. Drag **Axcenity Editor** onto **Applications**.
+3. In the window that opens, drag **Axcenity Editor** onto **Applications**, then eject the disk image.
 4. The first open is blocked because the build is not notarized: **Control-click** the app, choose **Open**, then confirm. If it is still blocked, **System Settings > Privacy & Security > Open Anyway**.
 
 ## Debian, Ubuntu and similar (`.deb`)

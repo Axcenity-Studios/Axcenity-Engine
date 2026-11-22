@@ -173,7 +173,7 @@ impl Build {
         wake: Box<dyn Fn() + Send>,
     ) -> std::io::Result<Build> {
         let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-        let mut child = Command::new(cargo)
+        let mut child = axcenity_release::console::hide_window(&mut Command::new(cargo))
             .current_dir(workspace)
             .args(["build", "-p", package, "--message-format=json"])
             .arg("--target-dir")

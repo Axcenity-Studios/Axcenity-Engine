@@ -50,6 +50,7 @@ axcenity-toolbox.workspace = true
 axcenity-updater = { workspace = true, features = ["http"] }
 axcenity-ui.workspace = true
 anyhow.workspace = true
+chrono.workspace = true
 eframe.workspace = true
 egui_dock.workspace = true
 env_logger.workspace = true

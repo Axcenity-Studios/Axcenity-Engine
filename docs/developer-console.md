@@ -39,6 +39,6 @@ Tests: `script` `console_service_tests`, `net` `a_joined_players_console_command
 Everything the player prints goes through `player::logs::line`: to the terminal, to the log file, and to the console. `log` records go there too (`logs::Logger` wraps `env_logger`).
 
 - The file is `logs/latest.log` in the player's data folder for the game (beside its saves: `axcenity_save::game_folder`). Each start moves it to `previous-1.log`, and those along to `previous-4.log`, so five runs are kept.
-- A panic (`logs::install_panic_hook`) writes `panic: message (at file:line)` to the log, then prints "The game crashed: … The log is at …" on stderr before the player exits. There is no dialog box; on Windows the player keeps its console window, which shows it.
+- A panic (`logs::install_panic_hook`) writes `panic: message (at file:line)` to the log, then prints "The game crashed: … The log is at …" on stderr before the player exits. On Windows a release player has no console window (`windows_subsystem = "windows"`), so when nothing shows its standard error it also shows the message in an error dialog box (`axcenity_release::console::tell_error`); run from a terminal, it prints there instead.
 
 Test: `logs::tests::a_forced_panic_leaves_a_log_with_the_panic_and_says_where_the_log_is`.

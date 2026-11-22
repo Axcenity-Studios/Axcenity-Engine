@@ -481,6 +481,16 @@ pub fn nav_rail(
         ui.painter()
             .rect_filled(highlight, theme::radius::CONTROL, fill.gamma_multiply(t));
     }
+    if selected {
+        // An accent bar on the selected item's left edge, so where you are
+        // reads at a glance, folded or open.
+        let bar = Rect::from_min_size(
+            egui::pos2(highlight.left(), highlight.top() + 7.0),
+            vec2(3.0, (highlight.height() - 14.0).max(8.0)),
+        );
+        ui.painter()
+            .rect_filled(bar, theme::radius::NONE, palette.accent);
+    }
     if response.has_focus() {
         ui.painter().rect_stroke(
             highlight,
@@ -682,11 +692,25 @@ pub fn search_field(
     hint: &str,
     width: f32,
 ) -> egui::Response {
+    search_field_sized(ui, text, hint, width, 0.0)
+}
+
+/// [`search_field`] at least `height` tall, to line up with the buttons,
+/// menus and switches beside it in a toolbar.
+pub fn search_field_sized(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    hint: &str,
+    width: f32,
+    height: f32,
+) -> egui::Response {
     let palette = theme::palette(ui.ctx());
     let response = ui.add(
         egui::TextEdit::singleline(text)
             .hint_text(RichText::new(hint).color(palette.text_muted))
             .desired_width(width)
+            .min_size(vec2(0.0, height))
+            .vertical_align(egui::Align::Center)
             .margin(egui::Margin {
                 left: 26,
                 right: 22,
@@ -746,6 +770,88 @@ pub fn elided(
         overflow_character: Some('…'),
     };
     ui.painter().layout_job(job)
+}
+
+/// A name laid out like [`elided`] on at most `rows` centred lines, but
+/// broken between its words, counting the humps of `CamelCase`, `_`, `-`,
+/// `.` and digits as word ends: `HumanoidParts` is `Humanoid` over `Parts`,
+/// never `HumanoidPar` over `ts`. Only the last line ends in "…", and only
+/// a word too long for a line of its own is cut. Draw it with its origin
+/// at the middle of where it goes (`halign` is centre).
+pub fn elided_name(
+    ui: &egui::Ui,
+    text: &str,
+    font: FontId,
+    color: Color32,
+    max_width: f32,
+    rows: usize,
+) -> std::sync::Arc<egui::Galley> {
+    let width =
+        |s: &str| ui.painter().layout_no_wrap(s.to_owned(), font.clone(), color).size().x;
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    let mut words = name_words(text).into_iter().peekable();
+    while let Some(word) = words.next() {
+        if lines.len() + 1 >= rows.max(1) {
+            // The last line takes the rest, cut with "…" below.
+            line.push_str(word);
+            continue;
+        }
+        let joined = format!("{line}{word}");
+        if line.is_empty() && width(word) > max_width {
+            // Too long for a line of its own: it and the rest go last.
+            line = joined;
+            line.extend(words.by_ref());
+            break;
+        }
+        if line.is_empty() || width(joined.trim_end()) <= max_width {
+            line = joined;
+        } else {
+            lines.push(std::mem::take(&mut line).trim_end().to_owned());
+            line.push_str(word);
+        }
+    }
+    lines.push(line);
+    let mut job = egui::text::LayoutJob::simple(lines.join("\n"), font, color, max_width);
+    job.halign = egui::Align::Center;
+    job.wrap = egui::text::TextWrapping {
+        max_width,
+        max_rows: rows,
+        break_anywhere: true,
+        overflow_character: Some('…'),
+    };
+    ui.painter().layout_job(job)
+}
+
+/// `text` cut into the pieces [`elided_name`] may break between, each
+/// keeping what follows it (a space, `_`, `-` or `.`), so they join back
+/// into `text`.
+fn name_words(text: &str) -> Vec<&str> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let mut words = Vec::new();
+    let mut start = 0;
+    for k in 1..chars.len() {
+        let (at, here) = chars[k];
+        let before = chars[k - 1].1;
+        let after = chars.get(k + 1).map(|&(_, c)| c);
+        let breaks = matches!(before, ' ' | '_' | '-' | '.')
+            // lowerUpper, letter→digit and digit→letter.
+            || (before.is_lowercase() && here.is_uppercase())
+            || (before.is_alphabetic() && here.is_ascii_digit())
+            || (before.is_ascii_digit() && here.is_alphabetic())
+            // The end of a run of capitals: "HTTPServer" is "HTTP", "Server".
+            || (before.is_uppercase()
+                && here.is_uppercase()
+                && after.is_some_and(char::is_lowercase));
+        if breaks && !matches!(here, ' ' | '_' | '-' | '.') {
+            words.push(&text[start..at]);
+            start = at;
+        }
+    }
+    if start < text.len() {
+        words.push(&text[start..]);
+    }
+    words
 }
 
 /// The open/close arrow of a collapsible section: a chevron that turns
@@ -1150,6 +1256,32 @@ pub fn transparency_slider(ui: &mut egui::Ui, value: f64) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_break_between_words_and_camel_case_humps() {
+        assert_eq!(name_words("HumanoidParts"), ["Humanoid", "Parts"]);
+        assert_eq!(name_words("Shirt_CrewTee"), ["Shirt_", "Crew", "Tee"]);
+        assert_eq!(name_words("HTTPServer2 rock-a"), ["HTTP", "Server", "2 ", "rock-", "a"]);
+        assert_eq!(name_words("plain"), ["plain"]);
+        assert!(name_words("").is_empty());
+    }
+
+    #[test]
+    fn a_long_name_wraps_at_a_hump_not_mid_word() {
+        let ctx = crate::theme::test_context();
+        frame(&ctx, Vec::new(), |ui| {
+            let font = FontId::proportional(11.0);
+            let width = ui
+                .painter()
+                .layout_no_wrap("Humanoid".into(), font.clone(), Color32::WHITE)
+                .size()
+                .x
+                + 4.0;
+            let galley = elided_name(ui, "HumanoidParts", font, Color32::WHITE, width, 2);
+            assert_eq!(galley.text(), "Humanoid\nParts");
+            assert!(!galley.elided);
+        });
+    }
 
     /// Runs one frame of `draw` in a 400×600 window, with `events`.
     fn frame(ctx: &egui::Context, events: Vec<egui::Event>, draw: impl FnMut(&mut egui::Ui)) {

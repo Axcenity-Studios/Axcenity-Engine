@@ -100,51 +100,29 @@ impl GlobalPage {
         cards
     }
 
-    pub(super) fn show(&mut self, ui: &mut egui::Ui) {
+    /// Draws the page. Returns what it asked for: opening a project, from
+    /// the empty page.
+    pub(super) fn show(&mut self, ui: &mut egui::Ui) -> Option<StartAction> {
         let palette = theme::palette(ui.ctx());
+        let mut action = None;
         self.thumbnails.poll(ui.ctx());
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.label(
-                    RichText::new("Global Assets")
-                        .family(theme::display_family())
-                        .size(type_scale::DISPLAY)
-                        .extra_letter_spacing(theme::DISPLAY_TRACKING)
-                        .color(palette.text_strong),
-                );
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(
-                            "Shared by every project on this computer. To add one, right-click \
-                             it in a project's Assets panel and tick Global asset.",
-                        )
-                        .color(palette.text_secondary),
-                    )
-                    .wrap(),
-                );
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let show = widgets::button(
-                    Role::Secondary,
-                    Some(icons::FOLDER_OPEN),
-                    "Show Folder",
-                    &palette,
-                )
-                .min_size(vec2(0.0, 32.0));
-                if let Some(library) = self.library.clone()
-                    && ui
-                        .add(show)
-                        .on_hover_text(library.display().to_string())
-                        .clicked()
-                {
-                    let shown = std::fs::create_dir_all(library.join("assets"))
-                        .and_then(|()| reveal(&library));
-                    if let Err(err) = shown {
-                        self.notice = Some((true, format!("Could not show the folder: {err}")));
-                    }
-                }
-            });
-        });
+        let library = self.library.clone();
+        let show_folder = HeaderButton {
+            role: Role::Secondary,
+            icon: icons::FOLDER_OPEN,
+            label: "Show Folder",
+            tip: "Open the global assets folder in the file manager",
+        };
+        let buttons: &[HeaderButton] = if library.is_some() {
+            std::slice::from_ref(&show_folder)
+        } else {
+            &[]
+        };
+        let subtitle = "Shared by every project on this computer. To add one, right-click it in \
+                        a project's Assets panel and tick Global asset.";
+        if page_title(ui, "Global Assets", subtitle, buttons, |_| {}).is_some() {
+            self.show_folder();
+        }
         if let Some((error, text)) = &self.notice {
             ui.add_space(10.0);
             let (icon, color) = if *error {
@@ -166,24 +144,27 @@ impl GlobalPage {
         self.search = search;
         ui.add_space(8.0);
         let cards = self.cards(&self.search.trim().to_lowercase());
-        if cards.is_empty() {
-            ui.add_space(theme::space::XL);
-            ui.vertical_centered(|ui| {
-                ui.label(
-                    RichText::new(icons::GLOBE)
-                        .size(32.0)
-                        .color(palette.text_muted),
-                );
-                ui.label(
-                    RichText::new(if self.search.trim().is_empty() {
-                        "No global assets yet. Mark one global in a project's Assets panel \
-                         and it shows here, and in every project."
-                    } else {
-                        "No global asset's path has that in it."
-                    })
-                    .color(palette.text_weak),
-                );
-            });
+        if cards.is_empty() && self.search.trim().is_empty() {
+            // The same note as the other pages' empty lists, with the way
+            // to fill it right there: global assets are marked in a project.
+            let picked = empty_state_with(
+                ui,
+                icons::GLOBE,
+                "No global assets yet",
+                "Open a project and mark an asset global in its Assets panel. It shows here, \
+                 and in every project.",
+                &[(Role::Primary, icons::FOLDER_OPEN, "Open Project…")],
+            );
+            if picked.is_some() {
+                action = Some(StartAction::OpenDialog);
+            }
+        } else if cards.is_empty() {
+            empty_state(
+                ui,
+                icons::MAGNIFYING_GLASS,
+                "Nothing matches",
+                "No global asset's path has that in it.",
+            );
         } else {
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = vec2(12.0, 12.0);
@@ -195,6 +176,18 @@ impl GlobalPage {
             });
         }
         self.remove_dialog(ui.ctx());
+        action
+    }
+
+    /// Opens the global assets folder in the file manager.
+    fn show_folder(&mut self) {
+        let Some(library) = self.library.clone() else {
+            return;
+        };
+        let shown = std::fs::create_dir_all(library.join("assets")).and_then(|()| reveal(&library));
+        if let Err(err) = shown {
+            self.notice = Some((true, format!("Could not show the folder: {err}")));
+        }
     }
 
     /// Draws one card. True when Remove is clicked.

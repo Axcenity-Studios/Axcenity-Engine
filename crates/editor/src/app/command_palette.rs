@@ -194,6 +194,8 @@ pub(super) enum Command {
     /// Stream While Editing (roadmap R16.3).
     StreamEditing,
     ViewCube,
+    /// Viewport > Viewport Bar.
+    ViewportBar,
     /// Viewport > Ray Tracing Badge.
     RayBadge,
     Grid,
@@ -802,13 +804,14 @@ impl EditorApp {
             None,
             Ok(()),
         );
+        // The Viewport menu is about the open scene: off with no project.
         add(
             Command::LightCones,
             "Light Cones",
             "Viewport",
             &[],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
         add(
             Command::StreamEditing,
@@ -816,7 +819,7 @@ impl EditorApp {
             "Viewport",
             &["Streaming", "Large worlds", "Editor performance"],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
         add(
             Command::ViewCube,
@@ -824,7 +827,15 @@ impl EditorApp {
             "Viewport",
             &[],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
+        );
+        add(
+            Command::ViewportBar,
+            "Viewport Bar",
+            "Viewport",
+            &["Camera speed", "FPS", "Draw calls", "Wireframe", "Shaded"],
+            None,
+            when(project, "Open a project first."),
         );
         add(
             Command::RayBadge,
@@ -832,16 +843,23 @@ impl EditorApp {
             "Viewport",
             &["RTX", "Hide ray tracing badge"],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
-        add(Command::Grid, "Grid", "Viewport", &[], None, Ok(()));
+        add(
+            Command::Grid,
+            "Grid",
+            "Viewport",
+            &[],
+            None,
+            when(project, "Open a project first."),
+        );
         add(
             Command::MovementGuide,
             "Movement Guide",
             "Viewport",
             &["Move overlay", "Distance", "Snap guide"],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
         add(
             Command::ViewportSettings,
@@ -849,7 +867,7 @@ impl EditorApp {
             "Viewport",
             &[],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
         for mode in ViewMode::all() {
             add(
@@ -858,7 +876,7 @@ impl EditorApp {
                 "Viewport › View Mode",
                 &[mode.label()],
                 None,
-                Ok(()),
+                when(project, "Open a project first."),
             );
         }
         for overlay in Overlay::ALL {
@@ -868,7 +886,7 @@ impl EditorApp {
                 "Viewport › Overlays",
                 &[overlay.label()],
                 None,
-                Ok(()),
+                when(project, "Open a project first."),
             );
         }
         // The + after the ribbon's tabs is named by its tooltip.
@@ -926,7 +944,7 @@ impl EditorApp {
             "Debug",
             &["Animation", "State machine", "Debug animation", "Bones"],
             None,
-            Ok(()),
+            when(project, "Open a project first."),
         );
         if cfg!(debug_assertions) {
             add(
@@ -1326,6 +1344,7 @@ impl EditorApp {
                 self.overlays.stream_editing = !self.overlays.stream_editing;
             }
             Command::ViewCube => self.view_cube = !self.view_cube,
+            Command::ViewportBar => self.viewport_bar = !self.viewport_bar,
             Command::RayBadge => self.ray_badge = !self.ray_badge,
             Command::Grid => self.grid = !self.grid,
             Command::MovementGuide => self.move_guide = !self.move_guide,

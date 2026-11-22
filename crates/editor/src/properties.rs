@@ -42,12 +42,124 @@ pub fn can_rename_here(instance: &Instance) -> bool {
     can_rename(instance) && !crate::tree::is_file_script(instance)
 }
 
+/// An Instance the empty Properties panel offers to select: its id, name
+/// and class.
+pub type Shortcut = (InstanceId, String, ClassName);
+
+/// What was picked under the empty Properties panel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NothingSelectedPick {
+    Select(InstanceId),
+    ProjectSettings,
+}
+
+/// What the Properties panel offers when nothing is selected, so its room
+/// isn't dead space: the place's settings (Workspace, Lighting and the
+/// other services, a click away), what was selected recently, and the
+/// project's settings.
+pub fn nothing_selected(
+    ui: &mut egui::Ui,
+    place: &[Shortcut],
+    recent: &[Shortcut],
+) -> Option<NothingSelectedPick> {
+    let mut pick = None;
+    let mut list = |ui: &mut egui::Ui, title: &str, items: &[Shortcut]| {
+        if items.is_empty() {
+            return;
+        }
+        ui.add_space(theme::space::M);
+        crate::widgets::section_label(ui, title);
+        ui.add_space(theme::space::XXS);
+        for (id, name, class) in items {
+            if shortcut_row(ui, name, *class).clicked() {
+                pick = Some(NothingSelectedPick::Select(*id));
+            }
+        }
+    };
+    list(ui, "Place settings", place);
+    list(ui, "Recently selected", recent);
+    ui.add_space(theme::space::M);
+    let palette = theme::palette(ui.ctx());
+    if ui
+        .add(crate::widgets::button(
+            crate::widgets::Role::Secondary,
+            Some(icons::FOLDER_SIMPLE),
+            "Project Settings…",
+            &palette,
+        ))
+        .on_hover_text("The project's name, branding and the rest, in Settings")
+        .clicked()
+    {
+        pick = Some(NothingSelectedPick::ProjectSettings);
+    }
+    pick
+}
+
+/// One row under the empty Properties panel: the class's icon, the name and
+/// the class, the whole row clickable.
+fn shortcut_row(ui: &mut egui::Ui, name: &str, class: ClassName) -> egui::Response {
+    let palette = theme::palette(ui.ctx());
+    let height = ui.spacing().interact_size.y + 2.0;
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), height),
+        egui::Sense::click(),
+    );
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name));
+    crate::widgets::paint_hover(ui, rect, &response, false, theme::radius::CONTROL);
+    let painter = ui.painter();
+    let middle = rect.center().y;
+    painter.text(
+        egui::pos2(rect.left() + 14.0, middle),
+        egui::Align2::CENTER_CENTER,
+        theme::class_icon(class),
+        egui::FontId::proportional(14.0),
+        theme::class_color(class, ui.visuals()),
+    );
+    let class_text = painter.layout_no_wrap(
+        class.as_str().to_owned(),
+        egui::FontId::proportional(theme::type_scale::SMALL),
+        palette.text_weak,
+    );
+    let name_left = rect.left() + 28.0;
+    let class_room = if name == class.as_str() {
+        0.0
+    } else {
+        class_text.size().x + 8.0
+    };
+    let name_text = crate::widgets::elided(
+        ui,
+        name,
+        egui::FontId::proportional(theme::type_scale::BODY),
+        palette.text,
+        (rect.right() - 8.0 - class_room - name_left).max(24.0),
+        1,
+    );
+    let name_width = name_text.size().x;
+    painter.galley(
+        egui::pos2(name_left, middle - name_text.size().y / 2.0),
+        name_text,
+        palette.text,
+    );
+    if class_room > 0.0 {
+        painter.galley(
+            egui::pos2(
+                name_left + name_width + 8.0,
+                middle - class_text.size().y / 2.0,
+            ),
+            class_text,
+            palette.text_weak,
+        );
+    }
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
 /// Draws the panel for `selected` and returns the edit made this frame, if any.
 /// While `playing`, `world` is the game's, and the panel says that changes
 /// last only until Stop unless kept: `kept` lists the fields edited during
 /// Play and whether each is kept, and each gets a Keep pin by its name.
 /// `more` draws further sections (the Style section) at the end, in the
-/// same scrolling area.
+/// same scrolling area; with nothing selected it's drawn under the empty
+/// state (where the app puts [`nothing_selected`]).
 pub fn show(
     ui: &mut egui::Ui,
     world: &World,
@@ -86,6 +198,7 @@ pub fn show(
                     "Select something in the Explorer or the viewport to see its properties.",
                     None,
                 );
+                more(ui);
                 return;
             };
             // What's selected, so it's clear what the fields below change.

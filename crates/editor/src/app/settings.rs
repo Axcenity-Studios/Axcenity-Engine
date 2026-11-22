@@ -506,6 +506,13 @@ impl EditorApp {
         found(ui, &row, "Show the view cube");
         let row = ui
             .checkbox(
+                &mut self.viewport_bar,
+                theme::with_icon(icons::SLIDERS_HORIZONTAL, "Show the viewport bar"),
+            )
+            .on_hover_text(VIEWPORT_BAR_HINT);
+        found(ui, &row, "Show the viewport bar");
+        let row = ui
+            .checkbox(
                 &mut self.ray_badge,
                 theme::with_icon(icons::SUN, "Show the ray tracing badge"),
             )

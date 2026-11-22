@@ -28,8 +28,6 @@ use dialogs::ShelfDialog;
 pub(super) const RECENT_SHOWN: usize = 4;
 /// Character cards are at least this wide; a row fills the page.
 const MIN_CHARACTER_CARD_WIDTH: f32 = 150.0;
-/// Below this width the header's button goes under its title.
-const NARROW_HEADER: f32 = 620.0;
 /// Pack cards are at least this wide.
 const MIN_PACK_CARD_WIDTH: f32 = 340.0;
 /// The files are listed again this often while the page shows, so a
@@ -241,51 +239,20 @@ impl StartScreen {
         }
         let mut action = None;
         let mut pick = None;
-        let title = |ui: &mut egui::Ui| {
-            ui.label(
-                RichText::new("Character Studio")
-                    .family(theme::display_family())
-                    .size(type_scale::DISPLAY)
-                    .extra_letter_spacing(theme::DISPLAY_TRACKING)
-                    .color(palette.text_strong),
-            );
-            ui.add(
-                egui::Label::new(
-                    RichText::new(
-                        "Create a character, dress it and save it, then use it in any game.",
-                    )
-                    .color(palette.text_secondary),
-                )
-                .wrap(),
-            );
+        let new_character = HeaderButton {
+            role: Role::Primary,
+            icon: icons::PLUS,
+            label: "New Character",
+            tip: "Open Character Studio on the default character",
         };
-        let new_character = |ui: &mut egui::Ui| {
-            let new = widgets::button(Role::Primary, Some(icons::PLUS), "New Character", &palette)
-                .min_size(vec2(0.0, 32.0));
-            ui.add(new)
-                .on_hover_text("Open Character Studio on the default character")
-                .clicked()
-        };
-        // In a narrow window the button goes under the title.
-        let clicked = if ui.available_width() < NARROW_HEADER {
-            ui.vertical(|ui| {
-                title(ui);
-                ui.add_space(10.0);
-                new_character(ui)
-            })
-            .inner
-        } else {
-            ui.horizontal(|ui| {
-                ui.vertical(title);
-                ui.with_layout(
-                    egui::Layout::right_to_left(egui::Align::Center),
-                    new_character,
-                )
-                .inner
-            })
-            .inner
-        };
-        if clicked {
+        let clicked = page_title(
+            ui,
+            "Character Studio",
+            "Create a character, dress it and save it, then use it in any game.",
+            &[new_character],
+            |_| {},
+        );
+        if clicked.is_some() {
             action = Some(StartAction::NewCharacter(Start::default()));
         }
         if let Some((notice, failed)) = &self.shelf.notice {
@@ -433,10 +400,16 @@ impl StartScreen {
         pick
     }
 
-    /// The presets' cards: picking one starts a new character from it.
+    /// The presets' cards: picking one starts a new character from it, in
+    /// rows as even as they can be (nine are five and four, not seven and
+    /// two).
     fn preset_grid(&mut self, ui: &mut egui::Ui) -> Option<Pick> {
         let ctx = ui.ctx().clone();
-        let (columns, width) = columns(ui.available_width(), MIN_CHARACTER_CARD_WIDTH);
+        let (columns, width) = balanced_columns(
+            ui.available_width(),
+            MIN_CHARACTER_CARD_WIDTH,
+            self.shelf.presets.len(),
+        );
         let mut pick = None;
         ui.spacing_mut().item_spacing.y = CARD_SPACING;
         let presets: Vec<(Start, String, String, Overview, Option<PathBuf>)> = self
@@ -648,8 +621,25 @@ fn columns(width: f32, min: f32) -> (usize, f32) {
     let columns = ((width + CARD_SPACING) / (min + CARD_SPACING))
         .floor()
         .max(1.0);
-    let card = ((width - CARD_SPACING * (columns - 1.0)) / columns)
+    (columns as usize, card_width(width, columns))
+}
+
+/// [`columns`] for `count` cards that take more than one row: as few
+/// columns as keep the same number of rows, so the last row is as full as
+/// it can be and the rows' right edges line up as nearly as they can.
+pub(super) fn balanced_columns(width: f32, min: f32, count: usize) -> (usize, f32) {
+    let (most, card) = columns(width, min);
+    if count <= most {
+        return (most, card);
+    }
+    let rows = count.div_ceil(most);
+    let columns = count.div_ceil(rows);
+    (columns, card_width(width, columns as f32))
+}
+
+/// Each card's width when `columns` of them fill `width`.
+fn card_width(width: f32, columns: f32) -> f32 {
+    ((width - CARD_SPACING * (columns - 1.0)) / columns)
         .floor()
-        .max(1.0);
-    (columns as usize, card)
+        .max(1.0)
 }

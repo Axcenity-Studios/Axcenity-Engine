@@ -44,6 +44,9 @@ pub(super) struct Reference {
     pub(super) insert_into: Option<String>,
     /// An example whose Insert button was pressed, for the editor.
     pub(super) inserted: Option<String>,
+    /// The kind picked in the filter chips under the search box: only
+    /// entries of that kind, and their members, are listed. `None` is All.
+    pub(super) kind: Option<ApiKind>,
 }
 
 /// Where a click on the page goes.
@@ -61,6 +64,7 @@ impl Reference {
     /// search box, as if it had been searched for.
     pub(super) fn look_up(&mut self, name: &str) {
         self.load();
+        self.kind = None;
         self.query = name.to_owned();
         self.open = search_entries(&self.entries, name).first().copied();
     }
@@ -98,7 +102,15 @@ impl Reference {
             "Search classes, properties, events and functions",
             width,
         );
-        let results = search_entries(&self.entries, &self.query);
+        ui.add_space(10.0);
+        if let Some(kind) = kind_chips(ui, &self.entries, self.kind) {
+            self.kind = kind;
+            self.open = None;
+        }
+        let mut results = search_entries(&self.entries, &self.query);
+        if let Some(kind) = self.kind {
+            results.retain(|&index| of_kind(&self.entries, index, kind));
+        }
         if search.changed() {
             self.open = None;
         }
@@ -116,7 +128,7 @@ impl Reference {
                 self.insert_into.as_deref(),
                 &palette,
             ),
-            None if self.query.trim().is_empty() => browse(ui, &self.entries),
+            None if self.query.trim().is_empty() => browse(ui, &self.entries, self.kind),
             None => result_list(ui, &self.entries, &results, &palette),
         };
         match nav {
@@ -190,10 +202,63 @@ fn top_level(entries: &[ApiEntry], name: &str) -> Option<usize> {
         .position(|entry| entry.owner.is_empty() && entry.name == name)
 }
 
-/// Before anything is searched for: every top-level entry, by kind.
-fn browse(ui: &mut egui::Ui, entries: &[ApiEntry]) -> Option<Nav> {
+/// The filter chips: All, then each top-level kind with how many there
+/// are. Returns the kind clicked (`Some(None)` for All).
+fn kind_chips(
+    ui: &mut egui::Ui,
+    entries: &[ApiEntry],
+    picked: Option<ApiKind>,
+) -> Option<Option<ApiKind>> {
+    let mut clicked = None;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
+        if widgets::chip(ui, "All", picked.is_none())
+            .on_hover_text("Every class, type, enum, library and global")
+            .clicked()
+        {
+            clicked = Some(None);
+        }
+        for kind in TOP_LEVEL {
+            let count = entries
+                .iter()
+                .filter(|entry| entry.owner.is_empty() && entry.kind == kind)
+                .count();
+            if count == 0 {
+                continue;
+            }
+            let label = format!("{} {count}", plural(kind));
+            if widgets::chip(ui, &label, picked == Some(kind))
+                .on_hover_text(format!(
+                    "Only {}, and their members",
+                    plural(kind).to_lowercase()
+                ))
+                .clicked()
+            {
+                clicked = Some(Some(kind));
+            }
+        }
+    });
+    clicked
+}
+
+/// Whether the entry at `index` is of `kind`, or a member of one that is.
+fn of_kind(entries: &[ApiEntry], index: usize, kind: ApiKind) -> bool {
+    let entry = &entries[index];
+    if entry.owner.is_empty() {
+        entry.kind == kind
+    } else {
+        top_level(entries, &entry.owner).is_some_and(|owner| entries[owner].kind == kind)
+    }
+}
+
+/// Before anything is searched for: every top-level entry, by kind (only
+/// `only`'s, when a chip is picked).
+fn browse(ui: &mut egui::Ui, entries: &[ApiEntry], only: Option<ApiKind>) -> Option<Nav> {
     let mut nav = None;
     for kind in TOP_LEVEL {
+        if only.is_some_and(|only| only != kind) {
+            continue;
+        }
         let group: Vec<usize> = (0..entries.len())
             .filter(|&index| entries[index].owner.is_empty() && entries[index].kind == kind)
             .collect();
@@ -245,15 +310,25 @@ fn result_list(
     rows(ui, entries, shown).map(Nav::Open)
 }
 
-/// A row for each of `indices`. Returns the one clicked.
+/// A row for each of `indices`, on a panel of their own so a long list
+/// reads easily off the page. Returns the one clicked.
 fn rows(ui: &mut egui::Ui, entries: &[ApiEntry], indices: &[usize]) -> Option<usize> {
+    let palette = theme::palette(ui.ctx());
     let mut clicked = None;
-    ui.spacing_mut().item_spacing.y = 2.0;
-    for &index in indices {
-        if entry_row(ui, &entries[index]).clicked() {
-            clicked = Some(index);
-        }
-    }
+    egui::Frame::new()
+        .fill(super::backdrop::soft_fill(&palette))
+        .stroke(Stroke::new(1.0_f32, palette.border))
+        .corner_radius(CARD_RADIUS)
+        .inner_margin(egui::Margin::same(4))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.spacing_mut().item_spacing.y = 2.0;
+            for &index in indices {
+                if entry_row(ui, &entries[index]).clicked() {
+                    clicked = Some(index);
+                }
+            }
+        });
     clicked
 }
 

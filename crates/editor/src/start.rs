@@ -25,6 +25,7 @@ mod global;
 mod learn;
 mod nav;
 mod pages;
+mod previews;
 mod reference;
 mod team;
 mod tilt;
@@ -613,7 +614,11 @@ impl StartScreen {
                                     action = Some(picked);
                                 }
                             }
-                            Page::Global => self.global.show(ui),
+                            Page::Global => {
+                                if let Some(picked) = self.global.show(ui) {
+                                    action = Some(picked);
+                                }
+                            }
                             Page::Learn => {
                                 let picked = self.learn.show(ui, |_| SampleState::Ready);
                                 if let Some(sample) = self.follow_learn(picked) {
@@ -660,7 +665,7 @@ impl StartScreen {
     ) -> Option<StartAction> {
         let palette = theme::palette(ctx);
         let mut action = None;
-        match page_header(ui, &palette, projects.is_empty()) {
+        match page_header(ui, projects.is_empty()) {
             Some(HeaderAction::New) => self.new_project(Template::Baseplate),
             Some(HeaderAction::Open) => action = Some(StartAction::OpenDialog),
             Some(HeaderAction::Join) => self.join_session(),
@@ -690,9 +695,24 @@ impl StartScreen {
             }
         }
 
-        ui.add_space(28.0);
-        widgets::section_label(ui, "Start from a template");
-        ui.add_space(6.0);
+        ui.add_space(22.0);
+        let now = SystemTime::now();
+        let mut chosen = None;
+        // Recent first: going back to a project is what the start screen is
+        // opened for most. The last few opened, newest first, whatever the sort.
+        let recent = projects.len().min(RECENT_PROJECTS);
+        if recent > 0 {
+            section_heading(ui, "Recent");
+            ui.add_space(10.0);
+            let links = projects[..recent].to_vec();
+            if let Some(picked) = self.project_grid(ui, ctx, &links, "recent", 0, now) {
+                chosen = Some(picked);
+            }
+            ui.add_space(22.0);
+        }
+
+        section_heading(ui, "Start from a template");
+        ui.add_space(8.0);
         let width = ui.available_width();
         let columns = Template::BLANK.len() as f32;
         // Rounded down, so rounding never pushes the last card onto a new row.
@@ -709,9 +729,9 @@ impl StartScreen {
         });
 
         // The genre templates, as pictures: whole small games to change.
-        ui.add_space(20.0);
-        widgets::section_label(ui, "Or from a game");
-        ui.add_space(6.0);
+        ui.add_space(18.0);
+        section_heading(ui, "Or from a game");
+        ui.add_space(8.0);
         let columns = ((width + CARD_SPACING) / (MIN_GAME_CARD_WIDTH + CARD_SPACING))
             .floor()
             .clamp(1.0, Template::GAMES.len() as f32);
@@ -726,26 +746,13 @@ impl StartScreen {
             }
         });
 
-        ui.add_space(32.0);
-        let now = SystemTime::now();
-        let mut chosen = None;
-        // Recent: the last few opened, newest first, whatever the sort.
-        let recent = projects.len().min(RECENT_PROJECTS);
-        if recent > 0 {
-            widgets::section_label(ui, "Recent");
-            ui.add_space(12.0);
-            let links = projects[..recent].to_vec();
-            if let Some(picked) = self.project_grid(ui, ctx, &links, "recent", 0, now) {
-                chosen = Some(picked);
-            }
-            ui.add_space(36.0);
-        }
+        ui.add_space(24.0);
 
         // All projects: searchable, sorted, a page at a time.
         let mut filter = std::mem::take(&mut self.filter);
         let (mut view, mut sort) = (self.view, self.sort);
         ui.horizontal(|ui| {
-            widgets::section_label(ui, "All projects");
+            section_label(ui, "All projects");
             if !projects.is_empty() {
                 ui.label(
                     RichText::new(projects.len().to_string())
@@ -753,16 +760,25 @@ impl StartScreen {
                         .color(theme::palette(ui.ctx()).text_weak),
                 );
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let lead = ui.min_rect();
+            let controls = ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                widgets::segmented(
-                    ui,
-                    &mut view,
-                    &[
-                        (View::Grid, Some(icons::SQUARES_FOUR), ""),
-                        (View::List, Some(icons::LIST), ""),
-                    ],
-                );
+                let switch = ui
+                    .scope(|ui| {
+                        widgets::segmented(
+                            ui,
+                            &mut view,
+                            &[
+                                (View::Grid, Some(icons::SQUARES_FOUR), ""),
+                                (View::List, Some(icons::LIST), ""),
+                            ],
+                        );
+                    })
+                    .response;
+                // The sort menu and the search box take the switch's height,
+                // so the three sit on one line.
+                let height = switch.rect.height();
+                ui.spacing_mut().interact_size.y = height;
                 egui::ComboBox::from_id_salt("project sort")
                     .selected_text(match sort {
                         Sort::Recent => "Last opened",
@@ -775,8 +791,12 @@ impl StartScreen {
                     })
                     .response
                     .on_hover_text("Sort");
-                widgets::search_field(ui, &mut filter, "Search projects", 220.0);
+                // The leftmost control: the rule ends before it.
+                widgets::search_field_sized(ui, &mut filter, "Search projects", 220.0, height).rect
             });
+            // The heading's rule, between its count and the controls.
+            let y = lead.center().y;
+            paint_rule(ui, lead.right() + 12.0, controls.inner.left() - 12.0, y);
         });
         if filter != self.filter {
             // A new search starts from its first page.
@@ -784,7 +804,7 @@ impl StartScreen {
         }
         self.filter = filter;
         (self.view, self.sort) = (view, sort);
-        ui.add_space(12.0);
+        ui.add_space(10.0);
 
         let filter = self.filter.trim().to_lowercase();
         let mut shown: Vec<ProjectLink> = projects
@@ -800,12 +820,23 @@ impl StartScreen {
             shown.sort_by_key(|link| link.name.to_lowercase());
         }
         if projects.is_empty() {
-            empty_state(
+            // The way out is right in the note: a folder already on disk,
+            // or a new project.
+            let picked = empty_state_with(
                 ui,
                 icons::CUBE,
                 "No projects yet",
-                "Create one from a template above, or open a project folder.",
+                "Create one from a template above, or open a project folder you already have.",
+                &[
+                    (Role::Secondary, icons::FOLDER_OPEN, "Open Project Folder…"),
+                    (Role::Primary, icons::PLUS, "New Project"),
+                ],
             );
+            match picked {
+                Some(0) => action = Some(StartAction::OpenDialog),
+                Some(_) => self.new_project(Template::Baseplate),
+                None => {}
+            }
         } else if shown.is_empty() {
             empty_state(
                 ui,
@@ -926,6 +957,9 @@ impl StartScreen {
         let mut chosen = None;
         let (columns, card_width) = grid_columns(ui.available_width());
         let arrived_at = self.arrived.map_or(0.0, |(_, at)| at);
+        // The rows' gap, put back afterwards so what follows the grid on the
+        // page keeps its own spacing.
+        let page_gap = ui.spacing().item_spacing.y;
         ui.spacing_mut().item_spacing.y = CARD_SPACING + 4.0;
         // Rows of `columns` cards each, laid out here rather than by
         // `horizontal_wrapped`: each card fades in inside its own scope, and
@@ -950,6 +984,7 @@ impl StartScreen {
                 }
             });
         }
+        ui.spacing_mut().item_spacing.y = page_gap;
         chosen
     }
 
@@ -1106,7 +1141,35 @@ impl StartScreen {
     }
 }
 
-/// True when `a` and `b` are the same folder, however they're written.
+/// A section's micro-label with a hairline running on to the page's right
+/// edge, so each heading clearly leads the cards under it.
+fn section_heading(ui: &mut egui::Ui, text: &str) {
+    let label = section_label(ui, text).rect;
+    let right = ui.max_rect().right();
+    paint_rule(ui, label.right() + 12.0, right, label.center().y);
+}
+
+/// A section's micro-label alone, a step brighter than the editor's quiet
+/// group labels: on the start screen it leads a whole section of cards.
+fn section_label(ui: &mut egui::Ui, text: &str) -> egui::Response {
+    let palette = theme::palette(ui.ctx());
+    ui.label(widgets::micro(text, palette.text_secondary))
+}
+
+/// A 1-point line in the border colour from `left` to `right` at `y`, drawn
+/// only (it takes no room), and left out when there's barely any room.
+fn paint_rule(ui: &egui::Ui, left: f32, right: f32, y: f32) {
+    if right - left < 24.0 {
+        return;
+    }
+    let palette = theme::palette(ui.ctx());
+    ui.painter().hline(
+        left..=right,
+        y.round() + 0.5,
+        Stroke::new(1.0_f32, palette.border),
+    );
+}
+
 /// How many project cards fit in a row `width` wide, and how wide each is
 /// so the row fills it (rounded down, so the row never overflows).
 fn grid_columns(width: f32) -> (usize, f32) {
@@ -1119,6 +1182,7 @@ fn grid_columns(width: f32) -> (usize, f32) {
     (columns as usize, card_width)
 }
 
+/// True when `a` and `b` are the same folder, however they're written.
 fn same_folder(a: &Path, b: &Path) -> bool {
     match (a.canonicalize(), b.canonicalize()) {
         (Ok(a), Ok(b)) => a == b,

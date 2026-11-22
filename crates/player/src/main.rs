@@ -8,6 +8,11 @@
 //! camera follows it; otherwise a fly camera looks around. The keyboard and
 //! game controllers can move focus through menus (`axcenity_ui::NavKey`).
 
+// Release builds on Windows are GUI programs, so no terminal window opens
+// beside them; `attach_parent_console` still prints to a terminal that
+// started one (`axcenity_release::console`).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod dev_console;
 mod graphics;
 mod host_io;
@@ -112,6 +117,7 @@ const USAGE: &str = "usage: axcenity-player [--watch] [--dev] [--host [port] [--
                      Up/Down speed, Tab follows a player)";
 
 fn main() -> Result<()> {
+    axcenity_release::console::attach_parent_console();
     // `--version` (and `--version --json`): this build's version, channel,
     // commit and toolchain, then exit.
     let all: Vec<String> = std::env::args_os()

@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axcenity_release::InstallKind;
+use axcenity_release::console::hide_window;
 use axcenity_release::install::{INSTALL_FILE, InstallMarker};
 use axcenity_release::publish::UPDATE_PROTOCOL;
 use serde::{Deserialize, Serialize};
@@ -446,7 +447,7 @@ impl Host for System {
     }
 
     fn version_of(&mut self, editor: &Path) -> Result<(String, String), String> {
-        let mut child = std::process::Command::new(editor)
+        let mut child = hide_window(&mut std::process::Command::new(editor))
             .args(["--version", "--json"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -494,7 +495,7 @@ impl Host for System {
         const KEY: &str =
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AxcenityEditor";
         // Only the entry for this folder: another copy (or none) is left alone.
-        let query = std::process::Command::new("reg")
+        let query = hide_window(&mut std::process::Command::new("reg"))
             .args(["query", KEY, "/v", "InstallLocation"])
             .output()
             .map_err(|e| e.to_string())?;
@@ -508,7 +509,7 @@ impl Host for System {
         if !ours {
             return Ok(());
         }
-        let status = std::process::Command::new("reg")
+        let status = hide_window(&mut std::process::Command::new("reg"))
             .args([
                 "add",
                 KEY,
@@ -549,7 +550,7 @@ fn running(pid: u32) -> bool {
     if cfg!(target_os = "linux") {
         Path::new(&format!("/proc/{pid}")).exists()
     } else if cfg!(windows) {
-        std::process::Command::new("tasklist")
+        hide_window(&mut std::process::Command::new("tasklist"))
             .args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"])
             .output()
             .is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains(&format!("\"{pid}\"")))

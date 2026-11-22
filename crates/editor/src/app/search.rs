@@ -498,6 +498,9 @@ fn command_description(command: &Command) -> String {
             "With Workspace streaming on, leave out what's far from the camera while editing, as in Play."
         }
         Command::ViewCube => "The cube in the viewport's corner that turns the camera to a face.",
+        Command::ViewportBar => {
+            "The bar at the viewport's top left: camera speed, grid snap, Shaded or Wireframe, FPS."
+        }
         Command::RayBadge => "Show or hide the badge saying which ray traced effects are drawing.",
         Command::Grid => "Lines and distances in studs on the baseplate, while editing.",
         Command::MovementGuide => {

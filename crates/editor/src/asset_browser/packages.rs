@@ -13,8 +13,8 @@ use eframe::egui;
 
 use super::origin::{Origin, Origins};
 use super::{
-    AssetBrowser, AssetEntry, AssetKind, AssetPayload, ItemMenu, LIST_PICTURE, LIST_ROW, PICTURE,
-    TILE, global_badge,
+    AssetBrowser, AssetEntry, AssetKind, AssetPayload, ItemMenu, LIST_PICTURE, LIST_ROW,
+    global_badge,
 };
 use crate::theme::{self, icons};
 use crate::widgets;
@@ -371,10 +371,11 @@ impl AssetBrowser {
         can_edit: bool,
         list: bool,
     ) -> (bool, Option<ItemMenu>) {
+        let (tile, picture_side) = (self.tile_size.tile(), self.tile_size.picture());
         let size = if list {
             egui::vec2(ui.available_width(), LIST_ROW)
         } else {
-            TILE
+            tile
         };
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
         let id = response.id;
@@ -440,10 +441,10 @@ impl AssetBrowser {
             (picture, LIST_PICTURE)
         } else {
             let picture = egui::Rect::from_center_size(
-                egui::pos2(rect.center().x, rect.min.y + 6.0 + PICTURE / 2.0),
-                egui::vec2(PICTURE, PICTURE),
+                egui::pos2(rect.center().x, rect.min.y + 6.0 + picture_side / 2.0),
+                egui::vec2(picture_side, picture_side),
             );
-            (picture, PICTURE)
+            (picture, picture_side)
         };
         let color = AssetKind::Model.color(ui.visuals());
         painter.rect(
@@ -522,16 +523,16 @@ impl AssetBrowser {
                 text_color,
             );
         } else {
-            let galley = widgets::elided(
+            let galley = widgets::elided_name(
                 ui,
-                package.name.clone(),
+                &package.name,
                 egui::FontId::proportional(theme::type_scale::SMALL),
                 text_color,
-                TILE.x - 8.0,
+                tile.x - 8.0,
                 2,
             );
             ui.painter().galley(
-                egui::pos2(rect.center().x - galley.size().x / 2.0, picture.max.y + 5.0),
+                egui::pos2(rect.center().x, picture.max.y + 5.0),
                 galley,
                 text_color,
             );

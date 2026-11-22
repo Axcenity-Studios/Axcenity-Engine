@@ -13,9 +13,11 @@ format = "UDZO"
 files = [application]
 symlinks = {"Applications": "/Applications"}
 window_rect = ((200, 120), (720, 438))
+# Icon centres; the background's slots and arrow are drawn around these
+# (`dmg_background` in packaging/generate-assets.py).
 icon_locations = {
-    "Axcenity Editor.app": (180, 220),
-    "Applications": (540, 220),
+    "Axcenity Editor.app": (200, 270),
+    "Applications": (520, 270),
 }
 show_status_bar = False
 show_tab_view = False
@@ -28,7 +30,7 @@ grid_offset = (0, 0)
 grid_spacing = 100
 scroll_position = (0, 0)
 label_pos = "bottom"
-text_size = 12
+text_size = 13
 icon_size = 128
 
 license = {

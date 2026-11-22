@@ -76,6 +76,29 @@ impl AssetKind {
         }
     }
 
+    /// What it is in a few capitals, for the corner of its tile, so a model
+    /// and the picture of the same name beside it are told apart at a
+    /// glance.
+    pub fn badge(self) -> &'static str {
+        match self {
+            AssetKind::Prop => "PART",
+            AssetKind::Model => "MESH",
+            AssetKind::Prefab => "PREFAB",
+            AssetKind::Image => "IMG",
+            AssetKind::Texture => "TEX",
+            AssetKind::TextureSet => "TEXSET",
+            AssetKind::Material => "MAT",
+            AssetKind::Audio => "AUDIO",
+            AssetKind::Particle => "FX",
+            AssetKind::Animation => "ANIM",
+            AssetKind::Controller => "STATES",
+            AssetKind::BehaviorTree => "TREE",
+            AssetKind::DataTable => "DATA",
+            AssetKind::Sequence => "SEQ",
+            AssetKind::Sky => "SKY",
+        }
+    }
+
     /// What it is, in a list row.
     pub fn label(self) -> &'static str {
         match self {

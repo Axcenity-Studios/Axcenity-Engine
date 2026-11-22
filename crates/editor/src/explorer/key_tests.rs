@@ -210,6 +210,11 @@ fn tab_reaches_the_explorer_after_its_filter() {
     panel.press(egui::Key::Tab, false);
     assert!(panel.ctx.egui_wants_keyboard_input(), "Filter first");
     assert!(!panel.explorer.has_focus(&panel.ctx));
+    // Then the quick filters beside it.
+    for _ in crate::explorer::KindFilter::ALL {
+        panel.press(egui::Key::Tab, false);
+        assert!(!panel.explorer.has_focus(&panel.ctx));
+    }
     panel.press(egui::Key::Tab, false);
     assert!(panel.explorer.has_focus(&panel.ctx), "then the rows");
     assert!(panel.explorer.ring, "shown with the focus ring");

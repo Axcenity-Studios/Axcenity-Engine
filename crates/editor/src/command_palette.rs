@@ -244,12 +244,19 @@ impl Palette {
         self.open && self.docked
     }
 
-    /// The search box in the header, `width` wide: a field reading
-    /// "Search (Ctrl+K)" until it's clicked or Ctrl+K is pressed, then the
-    /// field the query is typed in, with the results dropping down under it
-    /// ([`ui`](Self::ui) draws them). `shortcut` is how the menus write
-    /// Ctrl+K on this computer.
-    pub fn header_box(&mut self, ui: &mut egui::Ui, width: f32, shortcut: &str) -> egui::Response {
+    /// The search box in the header, `width` wide: a field reading `title`
+    /// (the window's: the project and "Axcenity Editor") in its middle, with
+    /// the shortcut at its right, until it's clicked or Ctrl+K is pressed;
+    /// then the field the query is typed in, with the results dropping down
+    /// under it ([`ui`](Self::ui) draws them). `shortcut` is how the menus
+    /// write Ctrl+K on this computer.
+    pub fn header_box(
+        &mut self,
+        ui: &mut egui::Ui,
+        width: f32,
+        shortcut: &str,
+        title: &str,
+    ) -> egui::Response {
         let ctx = ui.ctx().clone();
         let palette = theme::palette(&ctx);
         let (rect, response) =
@@ -312,18 +319,36 @@ impl Palette {
         } else {
             // Closed by Ctrl+K or a menu while it was typed in.
             ctx.memory_mut(|memory| memory.surrender_focus(header_field_id()));
+            // The shortcut at the right, when there's room for it and the
+            // title, which is centred in the room between the glass and it.
+            let keys = one_line(
+                ui,
+                shortcut,
+                egui::FontId::proportional(type_scale::SMALL),
+                palette.text_muted,
+                f32::INFINITY,
+            );
+            let mut title_room = text_rect;
+            if text_rect.width() >= keys.size().x + 120.0 {
+                let keys_pos = egui::pos2(
+                    text_rect.right() - keys.size().x,
+                    rect.center().y - keys.size().y / 2.0,
+                );
+                title_room.max.x = keys_pos.x - 8.0;
+                ui.painter().galley(keys_pos, keys, palette.text_muted);
+            }
+            let color = theme::mix(palette.text_secondary, palette.text, hover);
             let text = one_line(
                 ui,
-                &hint,
-                egui::FontId::proportional(type_scale::BODY),
-                palette.text_muted,
-                text_rect.width(),
+                title,
+                egui::FontId::new(type_scale::BODY, theme::medium_family()),
+                color,
+                title_room.width(),
             );
-            ui.painter().galley(
-                egui::pos2(text_rect.left(), rect.center().y - text.size().y / 2.0),
-                text,
-                palette.text_muted,
-            );
+            let x = (rect.center().x - text.size().x / 2.0)
+                .clamp(title_room.left(), title_room.right() - text.size().x);
+            ui.painter()
+                .galley(egui::pos2(x, rect.center().y - text.size().y / 2.0), text, color);
             if response.hovered() {
                 ctx.set_cursor_icon(egui::CursorIcon::Text);
             }
@@ -332,8 +357,9 @@ impl Palette {
                 ctx.request_repaint();
             }
         }
-        response
-            .on_hover_text("Search commands, tools, objects, scripts, assets, levels and settings")
+        response.on_hover_text(format!(
+            "{title}\n{hint}: commands, tools, objects, scripts, assets, levels and settings"
+        ))
     }
 
     /// Focuses `field` if it was asked for, with the caret at the end

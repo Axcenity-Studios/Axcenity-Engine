@@ -8,13 +8,21 @@
 //! (`crates/…/x.rs:line:column:`) link the same way, to the Rust file. Under a script error is
 //! its stack trace: the calls that led to it, innermost first, each a link
 //! to its own script and line.
+//!
+//! Each line has the time it came at its left (the local clock), and a
+//! Copy button while hovered (the line and its stack trace). Above the
+//! lines: the kinds' filter buttons, Filter logs (only lines with that
+//! text), Collapse (each message once, at its newest, with how many times
+//! it came) and Clear.
+
+use std::collections::HashMap;
 
 use eframe::egui;
 
 use crate::theme::{self, icons};
 use crate::widgets;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OutputKind {
     Info,
     Warning,
@@ -48,6 +56,60 @@ pub struct OutputLine {
     pub location: Option<Location>,
     /// For a script error, the calls that led to it, innermost first.
     pub trace: Vec<TraceLine>,
+    /// When it came, in seconds since local midnight.
+    pub time: u32,
+}
+
+impl OutputLine {
+    /// The line and its stack trace, as copied.
+    pub fn copy_text(&self) -> String {
+        let mut text = format!("[{}] {}", clock(self.time), self.text);
+        for frame in &self.trace {
+            text.push_str("\n    ");
+            text.push_str(&frame.text);
+        }
+        text
+    }
+
+    fn matches(&self, filter: &str) -> bool {
+        contains_ignoring_case(&self.text, filter)
+            || self
+                .trace
+                .iter()
+                .any(|frame| contains_ignoring_case(&frame.text, filter))
+    }
+}
+
+/// Whether `text` has `lower` (already lower case) in it, whatever its case.
+fn contains_ignoring_case(text: &str, lower: &str) -> bool {
+    text.to_lowercase().contains(lower)
+}
+
+/// The local time now, in seconds since midnight.
+fn now_of_day() -> u32 {
+    use chrono::Timelike;
+    chrono::Local::now().num_seconds_from_midnight()
+}
+
+/// `seconds` since midnight as `21:12:04`.
+fn clock(seconds: u32) -> String {
+    format!(
+        "{:02}:{:02}:{:02}",
+        seconds / 3600 % 24,
+        seconds / 60 % 60,
+        seconds % 60
+    )
+}
+
+/// What the rows shown were worked out for: the lines kept (the first
+/// one's number and how many), the kinds hidden, the filter and Collapse.
+#[derive(Clone, PartialEq, Eq)]
+struct RowsKey {
+    gone: usize,
+    len: usize,
+    hidden: Vec<OutputKind>,
+    filter: String,
+    collapse: bool,
 }
 
 /// One call in a script error's stack trace, such as
@@ -100,6 +162,14 @@ pub struct Output {
     reveal: Option<usize>,
     /// The line (by number) last scrolled to, outlined so the eye finds it.
     marked: Option<usize>,
+    /// Filter logs: only lines with this in them (or their trace), in any
+    /// case.
+    pub filter: String,
+    /// Each message once, at its newest, with how many times it came.
+    pub collapse: bool,
+    /// The rows shown (an index into `lines` and how many lines it stands
+    /// for), worked out again only when their key changes.
+    rows: Option<(RowsKey, Vec<(usize, usize)>)>,
 }
 
 impl Output {
@@ -134,6 +204,7 @@ impl Output {
         self.seen = self.gone;
         self.reveal = None;
         self.marked = None;
+        self.rows = None;
     }
 
     /// Where the kept lines start in `lines`.
@@ -178,7 +249,50 @@ impl Output {
             .map(|index| self.gone + start + index);
         if self.reveal.is_some() {
             self.hidden.retain(|kind| *kind != OutputKind::Error);
+            self.filter.clear();
         }
+    }
+
+    /// Works out the rows to show, if what they depend on changed: each an
+    /// index into `lines` and how many lines it stands for (more than 1
+    /// only with Collapse, where a message shows once, at its newest).
+    fn update_rows(&mut self) {
+        let key = RowsKey {
+            gone: self.gone,
+            len: self.lines.len(),
+            hidden: self.hidden.clone(),
+            filter: self.filter.trim().to_lowercase(),
+            collapse: self.collapse,
+        };
+        if self.rows.as_ref().is_some_and(|(old, _)| *old == key) {
+            return;
+        }
+        let start = self.start();
+        let lines = &self.lines;
+        let shown = (start..lines.len()).filter(|&index| {
+            let line = &lines[index];
+            !key.hidden.contains(&line.kind)
+                && (key.filter.is_empty() || line.matches(&key.filter))
+        });
+        let rows = if key.collapse {
+            // How many of each message, and where its newest is.
+            let mut newest: HashMap<(OutputKind, &str), (usize, usize)> = HashMap::new();
+            for index in shown.clone() {
+                let line = &lines[index];
+                let entry = newest.entry((line.kind, &line.text)).or_insert((index, 0));
+                *entry = (index, entry.1 + 1);
+            }
+            shown
+                .filter_map(|index| {
+                    let line = &lines[index];
+                    let (last, count) = newest[&(line.kind, line.text.as_str())];
+                    (last == index).then_some((index, count))
+                })
+                .collect()
+        } else {
+            shown.map(|index| (index, 1)).collect()
+        };
+        self.rows = Some((key, rows));
     }
 
     fn push(&mut self, kind: OutputKind, text: String) {
@@ -217,6 +331,7 @@ impl Output {
             text,
             location,
             trace,
+            time: now_of_day(),
         });
         self.heights.push(None);
         if self.lines.len() > MAX_LINES {
@@ -283,6 +398,7 @@ impl Output {
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
                 if ui
                     .add_enabled(
                         !self.lines().is_empty(),
@@ -299,6 +415,20 @@ impl Output {
                 {
                     self.clear();
                 }
+                if widgets::icon_button(
+                    ui,
+                    icons::STACK,
+                    "Collapse: show each message once, at its newest, with how many times \
+                     it came",
+                    self.collapse,
+                )
+                .clicked()
+                {
+                    self.collapse = !self.collapse;
+                }
+                let width = (ui.available_width() - widgets::SEARCH_FIELD_MARGINS - 4.0)
+                    .clamp(40.0, 220.0);
+                widgets::search_field(ui, &mut self.filter, "Filter logs…", width);
             });
         });
         ui.add_space(2.0);
@@ -308,7 +438,9 @@ impl Output {
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let start = self.start();
         let (gone, dropped) = (self.gone, self.dropped);
-        let hidden = &self.hidden;
+        let filtering = !self.filter.trim().is_empty();
+        self.update_rows();
+        let rows = self.rows.as_ref().map_or(&[][..], |(_, rows)| rows.as_slice());
         let lines = &self.lines;
         let heights = &mut self.heights;
         let heights_for = &mut self.heights_for;
@@ -338,6 +470,10 @@ impl Output {
                         )
                         .color(palette.text_weak),
                     );
+                } else if rows.is_empty() && filtering {
+                    ui.label(
+                        egui::RichText::new("No line has that in it.").color(palette.text_weak),
+                    );
                 }
                 // Lines wrap, so each has its own height: as last drawn, or
                 // worked out from its length until it has been.
@@ -352,11 +488,8 @@ impl Output {
                 let (mut above, mut below, mut y) = (0.0, 0.0, top);
                 let mut visible = Vec::new();
                 let mut reveal_at = None;
-                for index in start..lines.len() {
+                for &(index, count) in rows {
                     let line = &lines[index];
-                    if hidden.contains(&line.kind) {
-                        continue;
-                    }
                     // Worked out once; drawing replaces it with the real one.
                     let height = *heights[index].get_or_insert_with(|| measure.height(line));
                     if reveal.is_some_and(|number| number == gone + index) {
@@ -367,14 +500,14 @@ impl Output {
                     } else if y > viewport.max.y {
                         below += height + LINE_GAP;
                     } else {
-                        visible.push(index);
+                        visible.push((index, count));
                     }
                     y += height + LINE_GAP;
                 }
                 ui.add_space(above);
-                for index in visible {
+                for (index, count) in visible {
                     let line = &lines[index];
-                    let (row, link) = draw_line(ui, line, &font, &palette);
+                    let (row, link) = draw_line(ui, line, count, &font, &palette);
                     if link.is_some() {
                         clicked = link;
                     }
@@ -406,12 +539,14 @@ impl Output {
     }
 }
 
-/// One line: its icon, then its text (wrapping beside the icon) with the
-/// stack trace under it. Returns where it was drawn, and its script
-/// location if it was clicked.
+/// One line: the time it came, its icon, how many times it came when that's
+/// more than once (Collapse), then its text (wrapping beside the icon) with
+/// the stack trace under it, and while hovered a Copy button at its right.
+/// Returns where it was drawn, and its script location if it was clicked.
 fn draw_line(
     ui: &mut egui::Ui,
     line: &OutputLine,
+    count: usize,
     font: &egui::FontId,
     palette: &theme::Palette,
 ) -> (egui::Rect, Option<Location>) {
@@ -419,10 +554,18 @@ fn draw_line(
     let mut clicked = None;
     let row = ui.horizontal_top(|ui| {
         ui.label(
+            egui::RichText::new(clock(line.time))
+                .font(stamp_font(font))
+                .color(palette.text_muted),
+        );
+        ui.label(
             egui::RichText::new(icon)
                 .font(egui::FontId::proportional(font.size))
                 .color(icon_color),
         );
+        if count > 1 {
+            count_badge(ui, count, icon_color, palette);
+        }
         ui.vertical(|ui| {
             if let Some(location) =
                 text_or_link(ui, &line.text, &line.location, font.clone(), color)
@@ -445,7 +588,54 @@ fn draw_line(
             }
         });
     });
-    (row.response.rect, clicked)
+    let rect = row.response.rect;
+    if ui.rect_contains_pointer(rect) {
+        let button = egui::Rect::from_min_size(
+            egui::pos2(rect.right() - 22.0, rect.top() - 1.0),
+            egui::vec2(22.0, 20.0),
+        );
+        ui.painter()
+            .rect_filled(button, theme::radius::CONTROL, palette.panel);
+        let mut child = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(button)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        let tip = if line.trace.is_empty() {
+            "Copy this line"
+        } else {
+            "Copy this line and its stack trace"
+        };
+        if widgets::icon_button(&mut child, icons::COPY, tip, false).clicked() {
+            ui.ctx().copy_text(line.copy_text());
+        }
+    }
+    (rect, clicked)
+}
+
+/// The font of the time at each line's left: the code font, a size smaller.
+fn stamp_font(font: &egui::FontId) -> egui::FontId {
+    egui::FontId::monospace((font.size - 1.5).max(8.0))
+}
+
+/// How many times a collapsed message came, in a small pill.
+fn count_badge(ui: &mut egui::Ui, count: usize, color: egui::Color32, palette: &theme::Palette) {
+    let galley = ui.painter().layout_no_wrap(
+        count.to_string(),
+        egui::FontId::new(theme::type_scale::SMALL, theme::medium_family()),
+        palette.text_strong,
+    );
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(galley.size().x + 10.0, galley.size().y + 2.0),
+        egui::Sense::hover(),
+    );
+    ui.painter()
+        .rect_filled(rect, rect.height() / 2.0, color.gamma_multiply(0.22));
+    ui.painter().galley(
+        rect.center() - galley.size() / 2.0,
+        galley,
+        palette.text_strong,
+    );
 }
 
 /// How far a stack trace is indented under its error.
@@ -477,15 +667,18 @@ struct Measure {
 
 impl Measure {
     fn new(ui: &egui::Ui, font: &egui::FontId, width: f32) -> Self {
-        let (row, char_width, icon) = ui.fonts_mut(|fonts| {
+        let (row, char_width, icon, digit) = ui.fonts_mut(|fonts| {
             (
                 fonts.row_height(font),
                 fonts.glyph_width(font, 'M'),
                 fonts.glyph_width(&egui::FontId::proportional(font.size), '\u{e000}'),
+                fonts.glyph_width(&stamp_font(font), '0'),
             )
         });
         let spacing = ui.spacing().item_spacing.x;
-        let text_width = (width - icon.max(font.size) - spacing).max(char_width);
+        // The time ("00:00:00") and the icon, each with a gap after it.
+        let stamp = digit * 8.0 + spacing;
+        let text_width = (width - stamp - icon.max(font.size) - spacing).max(char_width);
         Self {
             row,
             char_width: char_width.max(1.0),

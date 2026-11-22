@@ -7,6 +7,11 @@
 //! Built on eframe (egui's app framework), which owns the window and the GPU
 //! device; the viewport draws with the same renderer as the player.
 
+// Release builds on Windows are GUI programs, so no terminal window opens
+// beside them; `attach_parent_console` still prints to a terminal that
+// started one (`axcenity_release::console`).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 // The shared UI base lives in the editor kit crate; these keep its modules
 // at `crate::theme`, `crate::widgets` and so on (roadmap G11).
 #[cfg(test)]
@@ -110,6 +115,10 @@ use crate::app::EditorApp;
 /// this name (`eframe::storage_dir`); the global assets are there too.
 pub const APP_ID: &str = "Axcenity Editor";
 
+/// The window's app ID on Linux: the name of `packaging/linux/axcenity-editor.desktop`
+/// without `.desktop`.
+const DESKTOP_ID: &str = "axcenity-editor";
+
 /// The logo at 256×256, from `assets/branding` (see its README), built into
 /// the program. Windows and X11 show it; macOS and Wayland ignore window icons.
 const ICON_PNG: &[u8] = include_bytes!("../../../assets/branding/icon-256.png");
@@ -156,6 +165,7 @@ fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
 }
 
 fn main() -> eframe::Result {
+    axcenity_release::console::attach_parent_console();
     // `--version` (and `--version --json`): this build's version, channel,
     // commit and toolchain, then exit.
     let all: Vec<String> = std::env::args_os()
@@ -261,6 +271,13 @@ fn main() -> eframe::Result {
         viewport: window_frame::viewport(
             egui::ViewportBuilder::default()
                 .with_title("Axcenity Editor")
+                // On Linux this is the Wayland app ID and the X11 WM_CLASS. It
+                // must match `axcenity-editor.desktop` (and its StartupWMClass)
+                // so the desktop pairs the window with its launcher: the dock
+                // shows the right icon and the "loading" cursor it shows after
+                // a launch ends as soon as the window appears, instead of
+                // spinning until the desktop gives up.
+                .with_app_id(DESKTOP_ID)
                 .with_inner_size([1280.0, 800.0])
                 .with_min_inner_size([800.0, 500.0])
                 .with_icon(window_icon()),
@@ -268,6 +285,9 @@ fn main() -> eframe::Result {
         // Always open at the size above, in the middle of the screen. A
         // remembered size can outgrow a monitor (or span two) and stick.
         persist_window: false,
+        // eframe names its settings folder after the app ID when there is
+        // one; keep the settings where they have always been, under APP_ID.
+        persistence_path: eframe::storage_dir(APP_ID).map(|folder| folder.join("app.ron")),
         centered: true,
         wgpu_options: wgpu_options(),
         ..Default::default()

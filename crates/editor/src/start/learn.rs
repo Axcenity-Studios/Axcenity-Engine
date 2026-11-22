@@ -17,9 +17,10 @@ use super::reference::doc_text;
 use super::*;
 
 /// How tall a tutorial's card is, in points.
-const TUTORIAL_CARD_HEIGHT: f32 = 148.0;
-/// How tall a chapter's card is, in points.
-const CHAPTER_CARD_HEIGHT: f32 = 120.0;
+const TUTORIAL_CARD_HEIGHT: f32 = 136.0;
+/// How tall a chapter's card is, in points: its description is cut to two
+/// lines, so every row of cards lines up.
+const CHAPTER_CARD_HEIGHT: f32 = 108.0;
 /// Cards are at least this wide; a row fits as many as it can.
 const LEARN_CARD_WIDTH: f32 = 260.0;
 /// How far a step's words and picture are indented past its number.
@@ -267,10 +268,7 @@ fn chapter_sample(
     palette: &Palette,
 ) -> Option<SampleClick> {
     let mut clicked = None;
-    egui::Frame::new()
-        .fill(palette.surface)
-        .stroke(Stroke::new(1.0_f32, palette.border))
-        .corner_radius(CARD_RADIUS)
+    super::cards::soft_panel(palette)
         .inner_margin(egui::Margin::symmetric(14, 10))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -470,7 +468,7 @@ fn chapter_card(
         FontId::proportional(type_scale::SMALL + 0.5),
         palette.text_secondary,
         rect.width() - 32.0,
-        3,
+        2,
     );
     painter.galley(rect.min + vec2(16.0, 42.0), summary, palette.text_secondary);
     let status = page.status;
@@ -725,10 +723,7 @@ fn sample_box(
 ) -> bool {
     let mut clicked = false;
     let relative = format!("examples/{}", tutorial.sample);
-    egui::Frame::new()
-        .fill(palette.surface)
-        .stroke(Stroke::new(1.0_f32, palette.border))
-        .corner_radius(CARD_RADIUS)
+    super::cards::soft_panel(palette)
         .inner_margin(egui::Margin::symmetric(14, 12))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());

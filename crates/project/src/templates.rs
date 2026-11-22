@@ -62,10 +62,30 @@ impl Template {
         }
     }
 
+    /// A short line about the template, short enough for two lines of a
+    /// template card. [`Self::details`] has the whole thought.
     pub fn description(self) -> &'static str {
         match self {
             Template::Baseplate => "A grey baseplate to build on.",
             Template::Empty => "An empty world, for starting from nothing.",
+            Template::FirstPerson => "Shoot targets with a blaster and an ammo HUD.",
+            Template::ThirdPerson => "Explore, open doors and collect coins.",
+            Template::Vehicle => "Race a car round a track against the clock.",
+            Template::TopDown => "Click to move, past enemies that hunt you.",
+            Template::Arena => "Red against blue, for up to 8 players.",
+        }
+    }
+
+    /// Everything the template starts with, for its tooltip and the New
+    /// Project dialog.
+    pub fn details(self) -> &'static str {
+        match self {
+            Template::Baseplate => {
+                "A grey 40 × 40 baseplate to build on, under a sky, with a character to play as."
+            }
+            Template::Empty => {
+                "An empty world under a sky, with a character to play as, for starting from nothing."
+            }
             Template::FirstPerson => {
                 "Shoot targets in first person with a blaster, with ammo on the HUD."
             }

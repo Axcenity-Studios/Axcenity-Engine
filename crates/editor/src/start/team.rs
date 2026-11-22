@@ -57,77 +57,76 @@ impl StartScreen {
     ) -> Option<StartAction> {
         let palette = theme::palette(ui.ctx());
         let mut action = None;
-        ui.label(
-            RichText::new("Team Projects")
-                .family(theme::display_family())
-                .size(type_scale::DISPLAY)
-                .extra_letter_spacing(theme::DISPLAY_TRACKING)
-                .color(palette.text_strong),
-        );
-        ui.add(
-            egui::Label::new(
-                RichText::new(
-                    "Make a game together. One computer hosts the project's session and the \
-                     others join it with an invite link; everyone edits the same world live.",
-                )
-                .color(palette.text_secondary),
-            )
-            .wrap(),
-        );
-        ui.add_space(14.0);
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-            let buttons = [
-                (
-                    Role::Primary,
-                    icons::SIGN_IN,
-                    "Join Session…",
-                    "Paste an invite link someone sent you",
-                ),
-                (
-                    Role::Secondary,
-                    icons::PLUS,
-                    "New Team Project…",
-                    "Make a new project, then host a session for it",
-                ),
-                (
-                    Role::Secondary,
-                    icons::WRENCH,
-                    "Set Up Collaborate…",
-                    "The setup wizard: your name, Tailscale for working over the internet, \
-                     and a check that others can reach this computer",
-                ),
-                (
-                    Role::Secondary,
-                    icons::GEAR_SIX,
-                    "Collaborate Settings",
-                    "Who gets in, where this computer listens, and the other settings",
-                ),
-                (
-                    Role::Secondary,
-                    icons::INFO,
-                    "How Collaborate works",
-                    "What's shared, where files live, who can get in and what goes over the \
-                     internet",
-                ),
-            ];
-            for (index, (role, icon, label, tip)) in buttons.into_iter().enumerate() {
-                let button =
-                    widgets::button(role, Some(icon), label, &palette).min_size(vec2(0.0, 32.0));
-                if ui.add(button).on_hover_text(tip).clicked() {
-                    match index {
-                        0 => self.join_session(),
-                        1 => {
-                            self.new_project(Template::Baseplate);
-                            self.team.host_new = true;
+        // Join and New Team Project lead, at the title row's right like
+        // every page's main buttons; setting up and reading about
+        // Collaborate are quiet links under the line about it.
+        let buttons = [
+            HeaderButton {
+                role: Role::Secondary,
+                icon: icons::PLUS,
+                label: "New Team Project…",
+                tip: "Make a new project, then host a session for it",
+            },
+            HeaderButton {
+                role: Role::Primary,
+                icon: icons::SIGN_IN,
+                label: "Join Session…",
+                tip: "Paste an invite link someone sent you",
+            },
+        ];
+        let mut link = None;
+        let clicked = page_title(
+            ui,
+            "Team Projects",
+            "Make a game together. One computer hosts the project's session and the others \
+             join it with an invite link; everyone edits the same world live.",
+            &buttons,
+            |ui| {
+                ui.add_space(6.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
+                    let links = [
+                        (
+                            icons::WRENCH,
+                            "Set Up Collaborate…",
+                            "The setup wizard: your name, Tailscale for working over the \
+                             internet, and a check that others can reach this computer",
+                        ),
+                        (
+                            icons::GEAR_SIX,
+                            "Collaborate Settings",
+                            "Who gets in, where this computer listens, and the other settings",
+                        ),
+                        (
+                            icons::INFO,
+                            "How Collaborate works",
+                            "What's shared, where files live, who can get in and what goes \
+                             over the internet",
+                        ),
+                    ];
+                    for (index, (icon, label, tip)) in links.into_iter().enumerate() {
+                        let button = widgets::button(Role::Ghost, Some(icon), label, &palette);
+                        if ui.add(button).on_hover_text(tip).clicked() {
+                            link = Some(index);
                         }
-                        2 => action = Some(StartAction::SetUpCollaborate),
-                        3 => action = Some(StartAction::CollaborateSettings),
-                        _ => self.how_collaborate_works(),
                     }
-                }
+                });
+            },
+        );
+        match clicked {
+            Some(0) => {
+                self.new_project(Template::Baseplate);
+                self.team.host_new = true;
             }
-        });
+            Some(_) => self.join_session(),
+            None => {}
+        }
+        match link {
+            Some(0) => action = Some(StartAction::SetUpCollaborate),
+            Some(1) => action = Some(StartAction::CollaborateSettings),
+            Some(_) => self.how_collaborate_works(),
+            None => {}
+        }
 
         ui.add_space(28.0);
         widgets::section_label(ui, "On this computer");
@@ -317,9 +316,5 @@ fn share_row(ui: &mut egui::Ui, palette: &Palette, link: &ProjectLink) -> bool {
 }
 
 fn row_frame(palette: &Palette) -> egui::Frame {
-    egui::Frame::new()
-        .fill(palette.surface)
-        .stroke(Stroke::new(1.0_f32, palette.border))
-        .corner_radius(CARD_RADIUS)
-        .inner_margin(egui::Margin::symmetric(14, 10))
+    super::cards::soft_panel(palette).inner_margin(egui::Margin::symmetric(14, 10))
 }

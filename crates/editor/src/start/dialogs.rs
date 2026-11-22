@@ -225,10 +225,14 @@ pub(super) fn template_icon(template: Template) -> &'static str {
     }
 }
 
-/// A card to start a new project from `template`: an icon tile, the name
-/// and what it starts with.
+/// How tall a blank template's card is.
+pub(super) const BLANK_CARD_HEIGHT: f32 = 92.0;
+
+/// A card to start a new project from a blank template (Baseplate or
+/// Empty): a small drawn scene of what the world starts with, the name and
+/// a line about it.
 pub(super) fn template_card(ui: &mut egui::Ui, template: Template, width: f32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(vec2(width, 68.0), Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(width, BLANK_CARD_HEIGHT), Sense::click());
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, template.name()));
     let palette = theme::palette(ui.ctx());
@@ -236,52 +240,47 @@ pub(super) fn template_card(ui: &mut egui::Ui, template: Template, width: f32) -
     let hover = lean.hover;
     tilt::leaning(ui, rect, CARD_RADIUS, lean, |ui| {
         card_surface(ui, rect, &response, hover, &palette);
-        // The icon floats above the card: it drifts further than the card
-        // leans, and glows in the accent while hovered.
-        let tile = Rect::from_min_size(rect.min + vec2(14.0, 14.0), vec2(40.0, 40.0));
-        let float = lean.drift(3.0);
-        icon_glow(ui, tile.center() + float * 1.5, 30.0, hover, &palette);
-        ui.painter().rect(
-            tile.translate(float),
-            8,
-            theme::mix(palette.surface, palette.control_hover, hover),
-            Stroke::new(
-                1.0_f32,
-                theme::mix(palette.border, palette.accent.gamma_multiply(0.6), hover),
-            ),
-            egui::StrokeKind::Inside,
+        // The scene, 16:9, inset like a genre card's picture; narrower on a
+        // narrow card so the words keep room.
+        let height = BLANK_CARD_HEIGHT - 16.0;
+        let picture = Rect::from_min_size(
+            rect.min + vec2(8.0, 8.0),
+            vec2((height * 16.0 / 9.0).min(width * 0.42).round(), height),
         );
-        ui.painter().text(
-            tile.center() + float * 1.6,
-            egui::Align2::CENTER_CENTER,
-            template_icon(template),
-            FontId::proportional(theme::size::ICON_LARGE + 2.0 * hover),
-            theme::mix(palette.text_secondary, palette.accent, hover),
+        previews::blank_preview(
+            ui,
+            template,
+            picture,
+            CornerRadius::same(6),
+            hover,
+            lean.drift(3.0),
+            &palette,
         );
-        let left = tile.right() + 12.0;
+        let left = picture.right() + 16.0;
+        let middle = rect.center().y;
         ui.painter().text(
-            pos2(left, rect.top() + 23.0),
+            pos2(left, middle - 12.0),
             egui::Align2::LEFT_CENTER,
             template.name(),
-            FontId::new(type_scale::BODY, theme::medium_family()),
+            FontId::new(type_scale::BODY + 0.5, theme::medium_family()),
             palette.text_strong,
         );
         let description = widgets::elided(
             ui,
             template.description(),
             FontId::proportional(type_scale::SMALL),
-            palette.text_weak,
-            rect.right() - left - 12.0,
+            palette.text_secondary,
+            rect.right() - left - 14.0,
             2,
         );
         ui.painter().galley(
-            pos2(left, rect.top() + 33.0),
+            pos2(left, middle - 1.0),
             description,
-            palette.text_weak,
+            palette.text_secondary,
         );
     });
     response
-        .on_hover_text(format!("New project: {}", template.description()))
+        .on_hover_text(format!("New project: {}", template.details()))
         .on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -326,18 +325,18 @@ pub(super) fn game_template_card(
             ui,
             template.description(),
             FontId::proportional(type_scale::SMALL),
-            palette.text_weak,
+            palette.text_secondary,
             rect.right() - left - 12.0,
             2,
         );
         ui.painter().galley(
             pos2(left, image.bottom() + 30.0),
             description,
-            palette.text_weak,
+            palette.text_secondary,
         );
     });
     response
-        .on_hover_text(format!("New project: {}", template.description()))
+        .on_hover_text(format!("New project: {}", template.details()))
         .on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -479,7 +478,7 @@ impl StartScreen {
                             format!("Your template \"{}\".", chosen.info.name)
                         }
                         Some(chosen) => chosen.info.description.clone(),
-                        None => template.description().to_owned(),
+                        None => template.details().to_owned(),
                     };
                     ui.add_space(4.0);
                     ui.label(

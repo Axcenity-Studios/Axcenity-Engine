@@ -1,7 +1,7 @@
 //! The start screen's background, a landscape waiting to be built: a dark
 //! wash warming toward the accent, aurora light and twinkling stars, a
-//! glow with ripples on the horizon, mountain ridges sliding past at three
-//! depths, wireframe solids turning as they drift across the sky, and a
+//! glow with ripples on the horizon, mountain ridges at three depths
+//! fading into a mist along the horizon, wireframe solids turning as they drift across the sky, and a
 //! grid floor running toward the viewer. It doesn't react to the pointer
 //! (hover light belongs to the cards and icons).
 //!
@@ -77,8 +77,10 @@ pub(super) fn paint(ui: &egui::Ui, rect: Rect) {
 
     horizon_glow(&painter, rect, horizon, &palette, time);
     solids(&painter, rect, horizon, &palette, time);
-    ridges(&painter, rect, horizon, &palette, time);
+    // The floor first, so the mist at the ridges' feet lies over its far
+    // end.
     floor(&painter, rect, horizon, &palette, time);
+    ridges(&painter, rect, horizon, &palette, time);
 
     // A soft dark edge, so the page's middle reads first.
     let edge = Color32::BLACK.gamma_multiply(if dark { 0.22 } else { 0.05 });
@@ -189,7 +191,7 @@ fn horizon_glow(
 /// from one side to the other.
 fn solids(painter: &egui::Painter, rect: Rect, horizon: f32, palette: &theme::Palette, time: f32) {
     let line = theme::mix(palette.text_strong, palette.accent, 0.6);
-    let strongest = if palette.dark { 0.42 } else { 0.30 };
+    let strongest = if palette.dark { 0.36 } else { 0.24 };
     // (shape, where across, how high above the horizon (0 on it, 1 the
     // top), size, depth from 0 near to 1 far, drift in points a second)
     let placed = [
@@ -211,7 +213,11 @@ fn solids(painter: &egui::Painter, rect: Rect, horizon: f32, palette: &theme::Pa
             time * (0.35 + 0.1 * index as f32) + phase,
             time * 0.23 + phase * 2.0,
         );
-        let alpha = strongest * (1.0 - depth * 0.65);
+        // Fainter the higher they float: the page's header and buttons sit
+        // up there, and a crisp line behind a button reads as part of it.
+        // Low over the hills they keep their strength.
+        let calm = 1.0 - 0.7 * up * up;
+        let alpha = strongest * (1.0 - depth * 0.65) * calm;
         let stroke = Stroke::new(1.2 - depth * 0.5, line.gamma_multiply(alpha));
         let (points, edges) = solid.shape();
         let shown: Vec<Pos2> = points
@@ -226,7 +232,7 @@ fn solids(painter: &egui::Painter, rect: Rect, horizon: f32, palette: &theme::Pa
             painter,
             center,
             size * 1.6,
-            palette.accent.gamma_multiply(0.06 * (1.0 - depth)),
+            palette.accent.gamma_multiply(0.06 * (1.0 - depth) * calm),
         );
     }
 }
@@ -367,49 +373,126 @@ impl Solid {
     }
 }
 
-/// Mountain ridges on the horizon at three depths, sliding sideways at
-/// different speeds (the far ones slowest, for parallax), each a soft
-/// silhouette with a lit edge.
+/// Mountain ridges on the horizon at three depths, drifting very slowly
+/// (the far ones slowest, for parallax). They are painted with air between
+/// them, not as cut-out silhouettes: the farther a ridge, the more it
+/// fades into the sky's haze, each one's foot dissolves into a mist that
+/// lies along the horizon, and only the edges facing the horizon's glow
+/// catch its light.
 fn ridges(painter: &egui::Painter, rect: Rect, horizon: f32, palette: &theme::Palette, time: f32) {
-    const STEP: f32 = 6.0;
+    const STEP: f32 = 4.0;
     let dark = palette.dark;
+    let haze = sky_haze(palette);
+    // The nearest ridge's colour: a little deeper than the page.
+    let shade = if dark {
+        theme::mix(palette.app_bg, Color32::BLACK, 0.3)
+    } else {
+        theme::mix(palette.app_bg, palette.text_strong, 0.12)
+    };
+    let glow_x = rect.center().x;
+    let reach = rect.width() * 0.5;
     // (height as a share of the page, wavelength in points, speed in points
-    // a second, how much of the accent, edge strength)
+    // a second, depth from 0 near to 1 far)
     let layers = [
-        (0.15, 260.0, 4.0, 0.22, 0.20),
-        (0.11, 190.0, 9.0, 0.14, 0.30),
-        (0.07, 130.0, 16.0, 0.06, 0.42),
+        (0.16, 320.0, 0.8, 1.0),
+        (0.115, 220.0, 1.8, 0.6),
+        (0.075, 150.0, 3.0, 0.2),
     ];
-    for (layer, (height, wavelength, speed, tint, edge)) in layers.into_iter().enumerate() {
+    for (layer, (height, wavelength, speed, depth)) in layers.into_iter().enumerate() {
         let peak = rect.height() * height;
         let seed = layer as f32 * 2.9;
-        let fill_top = theme::mix(palette.app_bg, palette.accent, tint).gamma_multiply(if dark {
-            0.95
-        } else {
-            0.55
-        });
-        let fill_bottom = palette.app_bg.gamma_multiply(if dark { 0.95 } else { 0.4 });
-        let line = palette
-            .accent
-            .gamma_multiply(edge * if dark { 1.0 } else { 0.7 });
-        let mut mesh = egui::Mesh::default();
-        let mut outline = Vec::new();
+        // Aerial perspective: farther ridges are paler and thinner, so the
+        // glow behind shows through them.
+        let body = theme::mix(shade, haze, 0.25 + 0.6 * depth);
+        let opacity = if dark { 0.9 } else { 0.6 } * (1.0 - 0.35 * depth);
+        let crest = body.gamma_multiply(opacity);
+        // Their feet are lost in the mist.
+        let foot = theme::mix(body, haze, 0.7).gamma_multiply(opacity * 0.35);
+        let rim_strength = if dark { 0.5 } else { 0.3 } * (1.0 - 0.5 * depth);
+        let mut fill = egui::Mesh::default();
+        let mut rim = egui::Mesh::default();
         let mut x = rect.left();
         while x <= rect.right() + STEP {
             let u = (x - rect.left() + time * speed) / wavelength;
             let top = horizon - peak * ridge(u, seed);
-            let first = mesh.vertices.len() as u32;
-            mesh.colored_vertex(pos2(x, top), fill_top);
-            mesh.colored_vertex(pos2(x, horizon + 1.0), fill_bottom);
+            // Lit most where it faces the glow, and not at all far off.
+            let facing = (1.0 - ((x - glow_x) / reach).powi(2)).max(0.0);
+            let lit = palette
+                .accent
+                .gamma_multiply(rim_strength * (0.15 + 0.85 * facing));
+            let first = fill.vertices.len() as u32;
+            fill.colored_vertex(pos2(x, top), crest);
+            fill.colored_vertex(pos2(x, horizon + 1.0), foot);
+            rim.colored_vertex(pos2(x, top - 0.5), lit);
+            rim.colored_vertex(pos2(x, top + 3.0), Color32::TRANSPARENT);
             if first >= 2 {
-                mesh.add_triangle(first - 2, first, first - 1);
-                mesh.add_triangle(first, first + 1, first - 1);
+                for mesh in [&mut fill, &mut rim] {
+                    mesh.add_triangle(first - 2, first, first - 1);
+                    mesh.add_triangle(first, first + 1, first - 1);
+                }
             }
-            outline.push(pos2(x, top));
             x += STEP;
         }
-        painter.add(mesh);
-        painter.add(egui::Shape::line(outline, Stroke::new(1.0_f32, line)));
+        painter.add(fill);
+        painter.add(rim);
+        // A thin veil of mist in front of each ridge but the nearest, so
+        // the one behind sits back in the air.
+        if layer + 1 < layers.len() {
+            let veil = Rect::from_min_max(
+                pos2(rect.left(), horizon - peak * 0.7),
+                pos2(rect.right(), horizon + 1.0),
+            );
+            vertical_gradient(
+                painter,
+                veil,
+                Color32::TRANSPARENT,
+                haze.gamma_multiply(if dark { 0.35 } else { 0.3 }),
+            );
+        }
+    }
+    // The mist the ridges stand in, spilling a little onto the floor so
+    // the ground and the hills meet without a hard line.
+    let mist = haze.gamma_multiply(if dark { 0.55 } else { 0.45 });
+    let rise = rect.height() * 0.05;
+    let spill = rect.height() * 0.06;
+    vertical_gradient(
+        painter,
+        Rect::from_min_max(
+            pos2(rect.left(), horizon - rise),
+            pos2(rect.right(), horizon),
+        ),
+        Color32::TRANSPARENT,
+        mist,
+    );
+    vertical_gradient(
+        painter,
+        Rect::from_min_max(
+            pos2(rect.left(), horizon),
+            pos2(rect.right(), horizon + spill),
+        ),
+        mist,
+        Color32::TRANSPARENT,
+    );
+    // The glow comes back over the mist, so the hills look lit from behind
+    // rather than pasted over the light.
+    soft_pool(
+        painter,
+        pos2(glow_x, horizon),
+        rect.width().min(rect.height() * 1.6) * 0.3,
+        palette
+            .accent
+            .gamma_multiply(if dark { 0.10 } else { 0.05 }),
+    );
+}
+
+/// The sky's colour low down, where the air is thickest: the page's
+/// background warmed by the accent. The ridges fade into it and the mist
+/// is made of it.
+fn sky_haze(palette: &theme::Palette) -> Color32 {
+    if palette.dark {
+        theme::mix(palette.app_bg, palette.accent, 0.2)
+    } else {
+        theme::mix(palette.app_bg, palette.accent, 0.12)
     }
 }
 
@@ -536,19 +619,46 @@ pub(super) fn reading_glass(painter: &egui::Painter, rect: Rect, palette: &theme
     );
 }
 
+/// A soft panel's fill: a quiet, slightly lifted tint of the surface that
+/// lets the scene glow through a little, in place of a bare outline. Opaque
+/// enough that text on it keeps WCAG AA contrast
+/// (`text_on_soft_panels_meets_wcag_aa`).
+pub(super) fn soft_fill(palette: &theme::Palette) -> Color32 {
+    if palette.dark {
+        theme::mix(palette.surface, palette.app_bg, 0.35).gamma_multiply(0.9)
+    } else {
+        theme::mix(palette.surface, Color32::WHITE, 0.5).gamma_multiply(0.86)
+    }
+}
+
+/// The shadow under a soft panel: wide and faint, so it lifts the panel
+/// off the scene without drawing an edge.
+pub(super) fn soft_shadow(palette: &theme::Palette) -> egui::Shadow {
+    egui::Shadow {
+        offset: [0, 6],
+        blur: 22,
+        spread: 0,
+        color: Color32::BLACK.gamma_multiply(if palette.dark { 0.28 } else { 0.07 }),
+    }
+}
+
+/// `top` laid over the opaque `under`, as egui blends it (for the
+/// contrast tests).
+#[cfg(test)]
+fn over(top: Color32, under: Color32) -> Color32 {
+    let rest = 1.0 - f32::from(top.a()) / 255.0;
+    let channel = |a: u8, b: u8| (f32::from(a) + f32::from(b) * rest).round() as u8;
+    Color32::from_rgb(
+        channel(top.r(), under.r()),
+        channel(top.g(), under.g()),
+        channel(top.b(), under.b()),
+    )
+}
+
 /// The glass over `behind`, at its haziest, as egui blends it (for the
 /// contrast test).
 #[cfg(test)]
 fn glass_over(palette: &theme::Palette, behind: Color32) -> Color32 {
-    let over = |top: Color32, under: Color32| {
-        let rest = 1.0 - f32::from(top.a()) / 255.0;
-        let channel = |a: u8, b: u8| (f32::from(a) + f32::from(b) * rest).round() as u8;
-        Color32::from_rgb(
-            channel(top.r(), under.r()),
-            channel(top.g(), under.g()),
-            channel(top.b(), under.b()),
-        )
-    };
     let glassed = over(glass_tint(palette).gamma_multiply(GLASS), behind);
     over(glass_haze(palette), glassed)
 }
@@ -666,6 +776,33 @@ mod tests {
                                  ({accent:?}, dark {dark}, increased contrast {high})"
                             );
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn text_on_soft_panels_meets_wcag_aa() {
+        for (dark, high) in [(true, false), (false, false), (true, true), (false, true)] {
+            for accent in theme::Accent::ALL {
+                let p = theme::Palette::new(dark, accent).with_contrast(high);
+                // Behind the page's glass, the scene at its brightest.
+                let behind = glass_over(&p, theme::mix(p.app_bg, p.accent, 0.8));
+                for under in [behind, p.app_bg] {
+                    let surface = over(soft_fill(&p), under);
+                    for (name, text) in [
+                        ("text", p.text),
+                        ("strong", p.text_strong),
+                        ("secondary", p.text_secondary),
+                        ("weak", p.text_weak),
+                    ] {
+                        let ratio = theme::contrast(text, surface);
+                        assert!(
+                            ratio >= 4.5,
+                            "{name} on a soft panel over {under:?}: {ratio:.2} \
+                             ({accent:?}, dark {dark}, increased contrast {high})"
+                        );
                     }
                 }
             }

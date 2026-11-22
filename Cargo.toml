@@ -66,6 +66,9 @@ axcenity-workspace-hack = { path = "crates/workspace-hack" }
 # Third-party crates.
 anyhow = "1"
 bytemuck = { version = "1", features = ["derive"] }
+# The local wall clock, for the Console's timestamps. Already built into the
+# editor through rmcp; MIT OR Apache-2.0.
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 # The editor's app shell: egui plus its window and wgpu backend. `persistence`
 # remembers the theme, recent projects and window layout between runs. 0.36 is the
 # release built on wgpu 30 and winit 0.30, the versions `render` and `player`

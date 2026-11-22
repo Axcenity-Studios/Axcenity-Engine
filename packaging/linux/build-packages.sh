@@ -118,6 +118,7 @@ Icon=axcenity-editor
 Terminal=false
 Categories=Development;IDE;Graphics;
 StartupNotify=true
+StartupWMClass=axcenity-editor
 MimeType=x-scheme-handler/axcenity;
 EOF
 cp "$APPDIR/axcenity-editor.desktop" "$APPDIR/usr/share/applications/axcenity-editor.desktop"

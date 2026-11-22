@@ -17,6 +17,10 @@ impl AssetBrowser {
         picking: Option<&Picking>,
     ) -> Option<BrowserAction> {
         let mut action = None;
+        let size_memory = egui::Id::new(TILE_SIZE_MEMORY);
+        if let Some(index) = ui.data_mut(|data| data.get_persisted::<usize>(size_memory)) {
+            self.tile_size = TileSize::ALL.get(index).copied().unwrap_or_default();
+        }
         self.thumbnails.poll(ui.ctx());
         self.global_thumbnails.poll(ui.ctx());
         let width = ui.available_width();
@@ -31,6 +35,7 @@ impl AssetBrowser {
                         action = Some(done);
                     }
                     self.refresh_button(ui);
+                    self.tile_size_control(ui);
                     widgets::search_field(ui, &mut self.search, "Search assets", 170.0);
                 });
             });
@@ -49,8 +54,10 @@ impl AssetBrowser {
                         - ui.spacing().interact_size.y
                         - 6.0
                         - widgets::SEARCH_FIELD_MARGINS
+                        - TILE_SIZE_CONTROL
                 };
                 widgets::search_field(ui, &mut self.search, "Search assets", search_width);
+                self.tile_size_control(ui);
                 self.refresh_button(ui);
                 if buttons_beside {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -183,8 +190,10 @@ impl AssetBrowser {
                     widgets::empty_state(ui, icon, title, sentence, None);
                     return;
                 }
-                // A readable list in a narrow column, tiles where there's room.
-                let list = ui.available_width() < LIST_BELOW;
+                // A readable list in a narrow column, tiles where there's
+                // room or when they're Large.
+                let list =
+                    ui.available_width() < LIST_BELOW && self.tile_size != TileSize::Large;
                 for block in shown {
                     if let Some(origin) = &block.origin {
                         let open = !self.folded.contains(origin);
@@ -247,7 +256,27 @@ impl AssetBrowser {
         if let Some(done) = self.asset_dialog(ui.ctx()) {
             action = Some(done);
         }
+        let index = self.tile_size.index();
+        ui.data_mut(|data| data.insert_persisted(size_memory, index));
         action
+    }
+
+    /// S, M and L: how big the tiles are, beside the search.
+    fn tile_size_control(&mut self, ui: &mut egui::Ui) {
+        widgets::segmented_tips(
+            ui,
+            &mut self.tile_size,
+            &[
+                (TileSize::Small, None, "S"),
+                (TileSize::Medium, None, "M"),
+                (TileSize::Large, None, "L"),
+            ],
+            &[
+                "Small tiles: more at once",
+                "Medium tiles",
+                "Large tiles: see models' detail, as tiles even in a narrow column",
+            ],
+        );
     }
 
     /// Opens Rename or Move… for the project file at `path`, such as the
@@ -797,10 +826,11 @@ impl AssetBrowser {
         list: bool,
         picking: Option<&Picking>,
     ) -> (bool, bool, Option<ItemMenu>) {
+        let (tile, picture_side) = (self.tile_size.tile(), self.tile_size.picture());
         let size = if list {
             egui::vec2(ui.available_width(), LIST_ROW)
         } else {
-            TILE
+            tile
         };
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
         let id = response.id;
@@ -810,9 +840,16 @@ impl AssetBrowser {
         let mut hover = if let Some(picking) = takes {
             format!("{}\n{}", entry.path, picking.hover())
         } else {
+            // The whole name first, for a tile whose name ends in "…".
             match entry.prop() {
-                Some(prop) => format!("{}\n{}", prop.hover, entry.kind.hover()),
-                None => format!("{}\n{}", entry.path, entry.kind.hover()),
+                Some(prop) => format!("{}\n{}\n{}", entry.name, prop.hover, entry.kind.hover()),
+                None => format!(
+                    "{} ({})\n{}\n{}",
+                    entry.name,
+                    entry.kind.label(),
+                    entry.path,
+                    entry.kind.hover()
+                ),
             }
         };
         if let Some(line) = self.source_line(&entry.path) {
@@ -881,13 +918,16 @@ impl AssetBrowser {
             )
         } else {
             egui::Rect::from_center_size(
-                egui::pos2(rect.center().x, rect.min.y + 6.0 + PICTURE / 2.0),
-                egui::vec2(PICTURE, PICTURE),
+                egui::pos2(rect.center().x, rect.min.y + 6.0 + picture_side / 2.0),
+                egui::vec2(picture_side, picture_side),
             )
         };
         self.paint_picture(ui, picture, entry, thumbnail.as_ref());
         if global {
             global_badge(ui, picture);
+        }
+        if !list {
+            kind_badge(ui, picture, entry.kind);
         }
         let text_color = if response.hovered() {
             palette.text_strong
@@ -923,17 +963,18 @@ impl AssetBrowser {
                 text_color,
             );
         } else {
-            // Long names show two lines, then "…".
-            let galley = widgets::elided(
+            // Long names show two lines, broken between words (and
+            // CamelCase humps), then "…"; the tooltip has the whole name.
+            let galley = widgets::elided_name(
                 ui,
-                entry.name.clone(),
+                &entry.name,
                 egui::FontId::proportional(theme::type_scale::SMALL),
                 text_color,
-                TILE.x - 8.0,
+                tile.x - 8.0,
                 2,
             );
             ui.painter().galley(
-                egui::pos2(rect.center().x - galley.size().x / 2.0, picture.max.y + 5.0),
+                egui::pos2(rect.center().x, picture.max.y + 5.0),
                 galley,
                 text_color,
             );

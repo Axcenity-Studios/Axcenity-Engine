@@ -191,6 +191,7 @@ impl EditorApp {
                 visuals,
                 ctx: ctx.clone(),
                 floating: Some(id),
+                tab_rects: Vec::new(),
             };
             let dock_area = egui_dock::DockArea::new(&mut dock)
                 .id(area)
@@ -198,6 +199,11 @@ impl EditorApp {
                 .show_leaf_collapse_buttons(false)
                 .show_leaf_close_all_buttons(false);
             dock_area.show_inside(ui, &mut viewer);
+            let tab_rects = std::mem::take(&mut viewer.tab_rects);
+            drop(viewer);
+            if layout::dock_chrome::decorate(ui, &mut dock, &tab_rects) {
+                ctx.request_repaint();
+            }
             // Keyboard shortcuts go to the window with focus.
             if ctx.input(|input| input.viewport().focused == Some(true)) {
                 self.shortcuts(ctx);

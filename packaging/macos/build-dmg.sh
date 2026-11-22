@@ -52,7 +52,10 @@ rm -f "$OUTFILE"
 
 export AXCENITY_APP="$APP"
 export AXCENITY_ICNS="$RES/AppIcon.icns"
-export AXCENITY_DMG_BG="$ROOT/packaging/assets/dmg-background.png"
+# One HiDPI TIFF from the 1x and @2x pictures, so Retina screens get the sharp one.
+tiffutil -cathidpicheck "$ROOT/packaging/assets/dmg-background.png" \
+  "$ROOT/packaging/assets/dmg-background@2x.png" -out "$WORK/background.tiff"
+export AXCENITY_DMG_BG="$WORK/background.tiff"
 export AXCENITY_LICENSE="$ROOT/LICENSE"
 
 python3 -m venv "$WORK/venv"

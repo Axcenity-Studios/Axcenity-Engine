@@ -127,11 +127,11 @@ fn ribbon_captions_share_one_baseline() {
             .map(|(_, at)| at.y)
             .fold(f32::MIN, f32::max)
     };
-    let game = caption("Game");
-    for name in ["Tools", "Snapping", "Parts"] {
+    let tools = caption("Tools");
+    for name in ["Snapping", "Parts", "Panels"] {
         assert!(
-            (caption(name) - game).abs() < 0.5,
-            "{name} at {} but Game at {game}",
+            (caption(name) - tools).abs() < 0.5,
+            "{name} at {} but Tools at {tools}",
             caption(name)
         );
     }
@@ -214,8 +214,9 @@ fn the_ribbon_centres_its_groups_when_asked() {
         )),
         ..Default::default()
     };
-    // The left and right ends of the Home tab's groups, from the Play
-    // button's label down to the group captions.
+    // The left and right ends of the Home tab's groups, from the Select
+    // button's label down to the group captions (Play, Run and Stop are
+    // pinned in the tab row above).
     let mut ends = |place: theme::RibbonAlign| {
         app.appearance.ribbon = place;
         let mut output = None;
@@ -241,8 +242,8 @@ fn the_ribbon_centres_its_groups_when_asked() {
                 .next()
                 .unwrap_or_else(|| panic!("{place:?}: no {name} in the ribbon"))
         };
-        let (play, caption) = (at("Play"), at("Game"));
-        let band = play.top() - 1.0..=caption.bottom() + 1.0;
+        let (select, caption) = (at("Select"), at("Tools"));
+        let band = select.top() - 1.0..=caption.bottom() + 1.0;
         texts
             .iter()
             .filter(|(_, rect)| band.contains(&rect.top()) && band.contains(&rect.bottom()))

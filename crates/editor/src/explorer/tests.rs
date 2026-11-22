@@ -682,3 +682,43 @@ fn double_clicking_a_row_asks_to_open_what_has_somewhere_to_open() {
         "the Workspace closed"
     );
 }
+
+#[test]
+fn a_quick_filter_shows_only_its_kind_and_narrows_the_text_filter() {
+    let mut world = World::new();
+    let make = |world: &mut World, class, name: &str, parent| {
+        let id = world.create(class).unwrap();
+        world.set_name(id, name).unwrap();
+        world.set_parent(id, Some(parent)).unwrap();
+        id
+    };
+    let workspace = world.workspace();
+    let car = make(&mut world, ClassName::Model, "Car", workspace);
+    make(&mut world, ClassName::Part, "Door", car);
+    make(&mut world, ClassName::Script, "Drive", car);
+    let gui = make(&mut world, ClassName::ScreenGui, "Hud", workspace);
+    make(&mut world, ClassName::TextLabel, "Speed", gui);
+    let mut explorer = Explorer::new(&world);
+
+    explorer.kind = Some(KindFilter::Scripts);
+    assert!(explorer.filtering());
+    assert_eq!(
+        outline(&explorer, &world),
+        ["Game", "  Workspace", "    Car", "      Drive"].map(str::to_owned)
+    );
+    explorer.kind = Some(KindFilter::Ui);
+    assert_eq!(
+        outline(&explorer, &world),
+        ["Game", "  Workspace", "    Hud", "      Speed"].map(str::to_owned)
+    );
+    // With text too, only what matches both.
+    explorer.kind = Some(KindFilter::Parts);
+    explorer.filter = "door".to_owned();
+    assert_eq!(
+        outline(&explorer, &world),
+        ["Game", "  Workspace", "    Car", "      Door"].map(str::to_owned)
+    );
+    explorer.filter.clear();
+    explorer.kind = None;
+    assert!(!explorer.filtering());
+}

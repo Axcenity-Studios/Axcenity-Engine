@@ -357,15 +357,16 @@ impl MenuIcons {
     }
 }
 
-/// Where the ribbon's buttons sit across the window (Settings > Appearance >
-/// Ribbon): from the left edge, or in the middle under the centred tabs.
-/// When they don't fit, they start at the left and scroll either way.
+/// Where the ribbon's tabs and buttons sit across the window (Settings >
+/// Appearance > Ribbon): from the left edge, in line with the menus and the
+/// panels, or in the middle. When they don't fit, they start at the left
+/// and scroll either way.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RibbonAlign {
     /// From the left edge, as in Visual Studio.
-    Left,
-    /// In the middle of the window, under the tabs.
     #[default]
+    Left,
+    /// In the middle of the window.
     Centered,
 }
 
@@ -407,7 +408,10 @@ pub struct Appearance {
     pub steady_hz: u32,
     /// Where icons sit in menus.
     pub menu_icons: MenuIcons,
-    /// Where the ribbon's buttons sit across the window.
+    /// Where the ribbon's tabs and buttons sit across the window. Saved
+    /// under a new name when Left became the default, so a Centered saved
+    /// back when it was the default doesn't keep the old look.
+    #[serde(rename = "ribbon_align")]
     pub ribbon: RibbonAlign,
 }
 
@@ -424,7 +428,7 @@ impl Default for Appearance {
             hold_refresh: false,
             steady_hz: 60,
             menu_icons: MenuIcons::Left,
-            ribbon: RibbonAlign::Centered,
+            ribbon: RibbonAlign::Left,
         }
     }
 }
@@ -543,20 +547,24 @@ impl Palette {
                 error: hex(0xF07178),
             }
         } else {
-            let panel = Color32::WHITE;
+            // Off-white, cool-grey tiers rather than pure white, so panels
+            // part from the bars around them and sit easier beside the
+            // viewport: bars and headers #F1F3F5, panels #F8F9FA, and
+            // white kept for fields, cards and menus.
+            let panel = hex(0xF8F9FA);
             Self {
                 dark,
                 high_contrast: false,
-                app_bg: hex(0xF4F4F5),
+                app_bg: hex(0xF1F3F5),
                 panel,
-                surface: hex(0xF7F7F8),
+                surface: Color32::WHITE,
                 elevated: Color32::WHITE,
                 inset: Color32::WHITE,
-                control: hex(0xF1F1F3),
-                control_hover: hex(0xE9E9EC),
-                control_active: hex(0xE0E0E4),
-                border: hex(0xE4E4E7),
-                border_strong: hex(0xD1D1D6),
+                control: hex(0xECEEF1),
+                control_hover: hex(0xE3E6EA),
+                control_active: hex(0xD9DDE2),
+                border: hex(0xDFE2E6),
+                border_strong: hex(0xCACED4),
                 text: hex(0x27272A),
                 text_strong: hex(0x18181B),
                 text_secondary: hex(0x52525B),
@@ -1876,7 +1884,7 @@ mod tests {
             hold_refresh: true,
             steady_hz: 30,
             menu_icons: MenuIcons::Centered,
-            ribbon: RibbonAlign::Left,
+            ribbon: RibbonAlign::Centered,
         };
         assert_eq!(Appearance::from_text(&appearance.to_text()), appearance);
         assert_eq!(Appearance::from_text("not json"), Appearance::default());
@@ -1886,6 +1894,9 @@ mod tests {
         assert_eq!(odd.accent, Accent::Blue);
         let odd = Appearance::from_text(r#"{"steady_hz": 7}"#);
         assert_eq!(odd.steady_hz, 60);
+        // Centered was the default once: saved then, it's Left now.
+        let old = Appearance::from_text(r#"{"ribbon": "Centered"}"#);
+        assert_eq!(old.ribbon, RibbonAlign::Left);
     }
 
     #[test]

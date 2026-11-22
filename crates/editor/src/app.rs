@@ -116,6 +116,7 @@ mod ui_selection;
 mod update_install;
 mod updates;
 mod version_history;
+mod viewport_bar;
 mod welcome;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -220,6 +221,10 @@ pub struct EditorApp {
     /// Every selected Instance, in the order they were added. The viewport and
     /// Explorer highlight all of them. Ctrl toggles; Shift extends.
     selection: Vec<InstanceId>,
+    /// What was selected lately, newest first, for the empty Properties
+    /// panel, and the world it was selected in (another world's ids mean
+    /// nothing here).
+    recent_selections: (u64, Vec<InstanceId>),
     /// The LOD Inspector's preview: this MeshPart drawn at this level.
     lod_preview: Option<(InstanceId, usize)>,
     /// File > Version History (its timeline, checkpoints, restores and
@@ -536,6 +541,12 @@ pub struct EditorApp {
     /// Whether the viewport shows the view cube (Test > View, View > View
     /// Cube). On unless turned off; saved between runs.
     view_cube: bool,
+    /// Whether the viewport bar shows over the Scene View's top left
+    /// (`viewport_bar.rs`, Viewport > Viewport Bar). On unless turned off;
+    /// saved between runs.
+    viewport_bar: bool,
+    /// What the viewport bar measures between frames.
+    viewport_bar_state: viewport_bar::ViewportBar,
     /// Whether the viewport shows the ray tracing badge (Viewport > Ray
     /// Tracing Badge). On unless turned off; saved between runs.
     ray_badge: bool,
@@ -620,6 +631,9 @@ struct DockViewer<'a> {
     ctx: egui::Context,
     /// The window these panels are in, unless it's the main one.
     floating: Option<u64>,
+    /// Where each tab was drawn, for the accent line over the active ones
+    /// (`layout/dock_chrome.rs`).
+    tab_rects: layout::dock_chrome::TabRects,
 }
 
 impl DockViewer<'_> {
@@ -797,6 +811,7 @@ impl egui_dock::TabViewer for DockViewer<'_> {
 
     /// Clicking a tab makes it the one used last: the Scene, or a script.
     fn on_tab_button(&mut self, pane: &mut Pane, response: &egui::Response) {
+        self.tab_rects.push((*pane, response.rect));
         if !response.clicked() {
             return;
         }
@@ -854,6 +869,7 @@ const VIEW_CUBE_KEY: &str = "view cube";
 const RAY_BADGE_KEY: &str = "ray tracing badge";
 const AI_CONNECTIONS_KEY: &str = "ai connections";
 const GRID_KEY: &str = "grid";
+const VIEWPORT_BAR_KEY: &str = "viewport bar";
 const MOVE_GUIDE_KEY: &str = "movement guide";
 /// What the Movement Guide toggle does, for its menu item and Settings row.
 /// What Viewport > Ray Tracing Badge and its setting say on hover.
@@ -862,6 +878,9 @@ const RAY_BADGE_HINT: &str = "The badge in the viewport's corner that says which
 const MOVE_GUIDE_HINT: &str = "While a part is moved, resized or turned: the line along the \
     change, the snap points near it and how far it has gone. Off, moving, snapping and the \
     handles work the same; only the guide isn't drawn.";
+/// What Viewport > Viewport Bar and its setting say on hover.
+const VIEWPORT_BAR_HINT: &str = "The bar at the viewport's top left: the camera's speed, grid \
+    snap, Shaded or Wireframe, and frames a second with draw calls.";
 const GRID_STRENGTH_KEY: &str = "grid strength";
 const COLOR_PALETTES_KEY: &str = "color palettes";
 const DEFAULT_GRID_STRENGTH: f32 = 1.0;
@@ -1012,6 +1031,7 @@ impl EditorApp {
             generators: Default::default(),
             selected: None,
             selection: Vec::new(),
+            recent_selections: (0, Vec::new()),
             lod_preview: None,
             version_history: Default::default(),
             input_settings: Default::default(),
@@ -1152,6 +1172,8 @@ impl EditorApp {
             world_presets: Default::default(),
             light_cones: false,
             view_cube: true,
+            viewport_bar: true,
+            viewport_bar_state: Default::default(),
             ray_badge: true,
             ai: Default::default(),
             move_guide: true,
@@ -1227,6 +1249,7 @@ impl EditorApp {
                 self.blender_path = text;
             }
             self.view_cube = storage.get_string(VIEW_CUBE_KEY).as_deref() != Some("off");
+            self.viewport_bar = storage.get_string(VIEWPORT_BAR_KEY).as_deref() != Some("off");
             self.ray_badge = storage.get_string(RAY_BADGE_KEY).as_deref() != Some("off");
             self.ai.allowed = storage.get_string(AI_CONNECTIONS_KEY).as_deref() == Some("on");
             if let Some(text) = storage.get_string(team_panel::TEAM_CREATE_KEY) {
@@ -1374,6 +1397,8 @@ impl eframe::App for EditorApp {
         storage.set_string(BLENDER_KEY, self.blender_path.clone());
         let cube = if self.view_cube { "on" } else { "off" };
         storage.set_string(VIEW_CUBE_KEY, cube.to_owned());
+        let bar = if self.viewport_bar { "on" } else { "off" };
+        storage.set_string(VIEWPORT_BAR_KEY, bar.to_owned());
         let badge = if self.ray_badge { "on" } else { "off" };
         storage.set_string(RAY_BADGE_KEY, badge.to_owned());
         let ai = if self.ai.allowed { "on" } else { "off" };
@@ -1802,6 +1827,7 @@ impl EditorApp {
         // spans the whole top, then the Explorer (with Properties under it)
         // runs down the whole right side, then the Output fits under the viewport.
         self.update_warnings();
+        self.note_recent_selection();
         let now = ctx.input(|input| input.time);
         if self.check_scripts(now) {
             ctx.request_repaint_after(std::time::Duration::from_millis(150));
@@ -1836,8 +1862,18 @@ impl EditorApp {
             // Taken out while it's drawn, so the panels can borrow the app.
             let mut dock = std::mem::replace(&mut self.layout.dock, DockState::new(Vec::new()));
             dock.translations.tab_context_menu.eject_button = "Float in New Window".to_owned();
+            let dock_id = floating::main_area(self.layout.dock_generation);
+            let mut viewer = DockViewer {
+                app: self,
+                render_state,
+                viewport: &mut output,
+                visuals: ctx.global_style().visuals.clone(),
+                ctx: ctx.clone(),
+                floating: None,
+                tab_rects: Vec::new(),
+            };
             egui_dock::DockArea::new(&mut dock)
-                .id(floating::main_area(self.layout.dock_generation))
+                .id(dock_id)
                 .style(layout::style(
                     &ctx.global_style(),
                     &palette,
@@ -1845,17 +1881,12 @@ impl EditorApp {
                 ))
                 .show_leaf_collapse_buttons(false)
                 .show_leaf_close_all_buttons(false)
-                .show_inside(
-                    ui,
-                    &mut DockViewer {
-                        app: self,
-                        render_state,
-                        viewport: &mut output,
-                        visuals: ctx.global_style().visuals.clone(),
-                        ctx: ctx.clone(),
-                        floating: None,
-                    },
-                );
+                .show_inside(ui, &mut viewer);
+            let tab_rects = std::mem::take(&mut viewer.tab_rects);
+            drop(viewer);
+            if layout::dock_chrome::decorate(ui, &mut dock, &tab_rects) {
+                ctx.request_repaint();
+            }
             self.layout.dock = dock;
             if std::mem::take(&mut self.pending_close_scene) {
                 self.layout.close_scene();

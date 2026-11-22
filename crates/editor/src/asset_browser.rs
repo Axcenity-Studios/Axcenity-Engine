@@ -66,16 +66,52 @@ pub fn is_effect(path: &str) -> bool {
 }
 /// How often the folder is walked again while the panel is shown.
 const RESCAN: Duration = Duration::from_secs(2);
-const TILE: egui::Vec2 = egui::vec2(84.0, 96.0);
-const PICTURE: f32 = 60.0;
+/// How big the tiles are (the S, M and L beside Search assets), kept
+/// across runs in egui's memory under [`TILE_SIZE_MEMORY`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TileSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl TileSize {
+    const ALL: [TileSize; 3] = [TileSize::Small, TileSize::Medium, TileSize::Large];
+
+    /// The side of a tile's picture.
+    fn picture(self) -> f32 {
+        match self {
+            TileSize::Small => 44.0,
+            TileSize::Medium => 60.0,
+            TileSize::Large => 96.0,
+        }
+    }
+
+    /// A whole tile: the picture with a margin, and two lines of name.
+    fn tile(self) -> egui::Vec2 {
+        let picture = self.picture();
+        egui::vec2(picture + 24.0, picture + 36.0)
+    }
+
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+
+/// Where egui's memory keeps [`TileSize`] (its index) between runs.
+const TILE_SIZE_MEMORY: &str = "asset tile size";
 /// The largest a picture is shown when its tile is hovered.
 const HOVER_PICTURE: f32 = 192.0;
-/// Narrower than this, the panel lists its assets instead of tiling them.
+/// Narrower than this, the panel lists its assets instead of tiling them,
+/// unless the tiles are Large (to look at models in a side column).
 const LIST_BELOW: f32 = 360.0;
 const LIST_ROW: f32 = 30.0;
 const LIST_PICTURE: f32 = 24.0;
 /// From this width the chips, Source menu, search and buttons share one row.
 const ONE_ROW_FROM: f32 = 1300.0;
+/// The S, M and L tile sizes' width, kept from the search in a narrow column.
+const TILE_SIZE_CONTROL: f32 = 92.0;
 /// From this width the buttons sit beside the search.
 const BUTTONS_BESIDE_FROM: f32 = 520.0;
 
@@ -354,6 +390,8 @@ pub struct AssetBrowser {
     /// (`plugin:AddAssetAction`), each with its plugin's place in the
     /// editor's list; the app sets them each frame.
     pub plugin_actions: Vec<(usize, axcenity_plugins::AssetAction)>,
+    /// How big the tiles are.
+    tile_size: TileSize,
 }
 
 impl AssetBrowser {
@@ -787,6 +825,31 @@ pub(super) fn delete_button(ui: &mut egui::Ui, name: &str, paths: &[String]) -> 
             paths: paths.to_vec(),
         }
     })
+}
+
+/// What a tile is (MESH, TEX, PREFAB…, [`AssetKind::badge`]) in a small
+/// pill at the bottom left of its picture, in the kind's colour.
+pub(super) fn kind_badge(ui: &egui::Ui, picture: egui::Rect, kind: AssetKind) {
+    let palette = theme::palette(ui.ctx());
+    let color = kind.color(ui.visuals());
+    let galley = ui.painter().layout_no_wrap(
+        kind.badge().to_owned(),
+        egui::FontId::new(8.0, theme::medium_family()),
+        color,
+    );
+    let pill = egui::Rect::from_min_size(
+        picture.left_bottom() + egui::vec2(3.0, -galley.size().y - 5.0),
+        galley.size() + egui::vec2(6.0, 2.0),
+    );
+    let painter = ui.painter();
+    painter.rect(
+        pill,
+        3.0,
+        palette.elevated.gamma_multiply(0.92),
+        egui::Stroke::new(1.0_f32, color.gamma_multiply(0.6)),
+        egui::StrokeKind::Inside,
+    );
+    painter.galley(pill.min + egui::vec2(3.0, 1.0), galley, color);
 }
 
 /// A globe at the top right of a global asset's picture.

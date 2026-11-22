@@ -363,6 +363,9 @@ pub struct ViewportScene<'a> {
     pub light_cones: bool,
     /// Whether the view cube is drawn in the corner while editing.
     pub view_cube: bool,
+    /// How far down from the top what's drawn at the top left (the view
+    /// mode legend) starts, below the app's viewport bar.
+    pub top_inset: f32,
     /// Whether the ray tracing badge is drawn (Viewport > Ray Tracing Badge).
     pub ray_badge: bool,
     /// Whether the measuring grid is drawn while editing.
@@ -987,6 +990,16 @@ impl Viewport {
         self.ui = axcenity_ui::UiInteraction::default();
     }
 
+    /// The flying speed, in studs a second.
+    pub fn camera_speed(&self) -> f32 {
+        self.camera.speed()
+    }
+
+    /// Sets the flying speed (kept between the camera's limits).
+    pub fn set_camera_speed(&mut self, speed: f32) {
+        self.camera.set_speed(speed);
+    }
+
     /// Puts the camera back where it starts, for a newly opened project.
     /// The flying speed is a preference, not part of the project, so it stays.
     pub fn reset_camera(&mut self) {
@@ -1114,6 +1127,7 @@ impl Viewport {
         scene: ViewportScene<'_>,
     ) -> ViewportOutput {
         let ViewportScene {
+            top_inset,
             world,
             assets,
             selected,
@@ -1708,7 +1722,14 @@ impl Viewport {
         if overlays.light_probes {
             probe_overlay::paint(ui, rect, &screen, world, assets, stale_light_probes, eye);
         }
-        if legend::paint(ui, rect, view_mode, &render.stats, self.overdraw.as_ref()) {
+        let below_bar = egui::Rect::from_min_max(rect.min + egui::vec2(0.0, top_inset), rect.max);
+        if legend::paint(
+            ui,
+            below_bar,
+            view_mode,
+            &render.stats,
+            self.overdraw.as_ref(),
+        ) {
             self.measure_overdraw = true;
         }
         // Hiding the badge also ends its Compare, so nothing stays hidden

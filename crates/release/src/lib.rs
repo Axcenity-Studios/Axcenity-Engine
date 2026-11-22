@@ -12,12 +12,15 @@
 //! - [`publish`]: what a release attaches: release notes, the public history
 //!   file and the manifest the updater trusts.
 //! - [`install`]: `install.json`, how this copy was installed.
+//! - [`console`]: the terminal window on Windows (GUI programs that still
+//!   print to the terminal that started them).
 //! - [`updates`]: finding an update and checking its signed manifest.
 //!
 //! Design: `docs/research/release-system/`. Writing release files:
 //! `releases/README.md`.
 
 pub mod build_info;
+pub mod console;
 pub mod history;
 pub mod install;
 pub mod prepare;

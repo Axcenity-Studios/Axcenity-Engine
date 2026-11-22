@@ -7,71 +7,161 @@ pub(super) enum HeaderAction {
     Join,
 }
 
-/// The page's title and a line about the engine, with New Project, Open
-/// Project and Join Session at the right.
-pub(super) fn page_header(
+/// The Projects page's title and a line about the engine, with Join
+/// Session, Open Project and New Project at the right.
+pub(super) fn page_header(ui: &mut egui::Ui, first_time: bool) -> Option<HeaderAction> {
+    let title = if first_time {
+        "Welcome to Axcenity"
+    } else {
+        "Projects"
+    };
+    // Joining is about people, not files: the quieter button, furthest
+    // from New, named for what it joins.
+    let buttons = [
+        HeaderButton {
+            role: Role::Ghost,
+            icon: icons::SIGN_IN,
+            label: "Join Session…",
+            tip: "Join a teammate's live Collaborate session with the invite link \
+                  they sent you, and build the same project together",
+        },
+        HeaderButton {
+            role: Role::Secondary,
+            icon: icons::FOLDER_OPEN,
+            label: "Open Project…",
+            tip: "Open a project folder",
+        },
+        HeaderButton {
+            role: Role::Primary,
+            icon: icons::PLUS,
+            label: "New Project",
+            tip: "Start a project from a template",
+        },
+    ];
+    let subtitle = "Build worlds from parts, script them in Lua or blocks, and press Play.";
+    match page_title(ui, title, subtitle, &buttons, |_| {}) {
+        Some(0) => Some(HeaderAction::Join),
+        Some(1) => Some(HeaderAction::Open),
+        Some(_) => Some(HeaderAction::New),
+        None => None,
+    }
+}
+
+/// One of a page title's buttons.
+pub(super) struct HeaderButton<'a> {
+    pub role: Role,
+    pub icon: &'a str,
+    pub label: &'a str,
+    pub tip: &'a str,
+}
+
+/// Below this many points for the title beside its buttons, the buttons go
+/// under it.
+const TITLE_ROOM: f32 = 300.0;
+/// A page title's button height.
+const HEADER_BUTTON_HEIGHT: f32 = 32.0;
+
+/// Every start page's header, laid out the same way: the title, a line
+/// under it and anything `below` adds (quiet links), with the page's main
+/// `buttons` (left to right, the primary last) at the right of the title row.
+/// In a narrow window the buttons go under the title. Returns the index of
+/// the button clicked.
+pub(super) fn page_title(
     ui: &mut egui::Ui,
-    palette: &Palette,
-    first_time: bool,
-) -> Option<HeaderAction> {
-    let mut action = None;
-    ui.horizontal(|ui| {
-        ui.vertical(|ui| {
-            ui.label(
-                RichText::new(if first_time {
-                    "Welcome to Axcenity"
-                } else {
-                    "Projects"
-                })
+    title: &str,
+    subtitle: &str,
+    buttons: &[HeaderButton],
+    below: impl FnOnce(&mut egui::Ui),
+) -> Option<usize> {
+    let palette = theme::palette(ui.ctx());
+    let gap = 8.0;
+    let buttons_width = buttons
+        .iter()
+        .map(|button| button_width(ui, button.icon, button.label))
+        .sum::<f32>()
+        + gap * buttons.len().saturating_sub(1) as f32;
+    let room = ui.available_width() - buttons_width - 24.0;
+    // Returns the title's height, to centre the buttons on.
+    let heading = |ui: &mut egui::Ui| {
+        let title = ui.label(
+            RichText::new(title)
                 .family(theme::display_family())
                 .size(type_scale::DISPLAY)
                 .extra_letter_spacing(theme::DISPLAY_TRACKING)
                 .color(palette.text_strong),
+        );
+        ui.add(egui::Label::new(RichText::new(subtitle).color(palette.text_secondary)).wrap());
+        below(ui);
+        title.rect.height()
+    };
+    let mut clicked = None;
+    // Drawn in either direction: right to left from the page's edge, so the
+    // row ends exactly there whatever the estimate above, or left to right
+    // under the title.
+    let mut row = |ui: &mut egui::Ui, from_right: bool| {
+        ui.spacing_mut().item_spacing.x = gap;
+        let order: Vec<usize> = if from_right {
+            (0..buttons.len()).rev().collect()
+        } else {
+            (0..buttons.len()).collect()
+        };
+        for index in order {
+            let button = &buttons[index];
+            let widget = widgets::button(button.role, Some(button.icon), button.label, &palette)
+                .min_size(vec2(0.0, HEADER_BUTTON_HEIGHT));
+            if ui.add(widget).on_hover_text(button.tip).clicked() {
+                clicked = Some(index);
+            }
+        }
+    };
+    if buttons.is_empty() {
+        ui.vertical(heading);
+    } else if room < TITLE_ROOM {
+        ui.vertical(|ui| {
+            heading(ui);
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.y = gap;
+                row(ui, false);
+            });
+        });
+    } else {
+        ui.horizontal(|ui| {
+            let title_height = ui
+                .vertical(|ui| {
+                    ui.set_max_width(room);
+                    heading(ui)
+                })
+                .inner;
+            // Centred on the title's own line, so a long subtitle or links
+            // under it don't pull the buttons down.
+            let right = ui.max_rect().right();
+            let top = ui.min_rect().top() + (title_height - HEADER_BUTTON_HEIGHT).max(0.0) / 2.0;
+            let rect = Rect::from_min_max(
+                pos2(right - buttons_width - 24.0, top),
+                pos2(right, top + HEADER_BUTTON_HEIGHT),
             );
-            ui.label(
-                RichText::new(
-                    "Build worlds from parts, script them in Lua or blocks, and press Play.",
-                )
-                .color(palette.text_secondary),
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(rect)
+                    .layout(egui::Layout::right_to_left(egui::Align::Center)),
+                |ui| row(ui, true),
             );
         });
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            let new = widgets::button(Role::Primary, Some(icons::PLUS), "New Project", palette)
-                .min_size(vec2(0.0, 32.0));
-            if ui
-                .add(new)
-                .on_hover_text("Start a project from a template")
-                .clicked()
-            {
-                action = Some(HeaderAction::New);
-            }
-            let open = widgets::button(
-                Role::Secondary,
-                Some(icons::FOLDER_OPEN),
-                "Open Project…",
-                palette,
-            )
-            .min_size(vec2(0.0, 32.0));
-            if ui
-                .add(open)
-                .on_hover_text("Open a project folder")
-                .clicked()
-            {
-                action = Some(HeaderAction::Open);
-            }
-            let join = widgets::button(Role::Secondary, Some(icons::SIGN_IN), "Join…", palette)
-                .min_size(vec2(0.0, 32.0));
-            if ui
-                .add(join)
-                .on_hover_text("Join someone's Collaborate session with their invite link")
-                .clicked()
-            {
-                action = Some(HeaderAction::Join);
-            }
-        });
-    });
-    action
+    }
+    clicked
+}
+
+/// How wide `widgets::button` makes a button with `icon` and `label`.
+pub(super) fn button_width(ui: &egui::Ui, icon: &str, label: &str) -> f32 {
+    let text = RichText::new(theme::with_icon(icon, label)).family(theme::medium_family());
+    let galley = egui::WidgetText::from(text).into_galley(
+        ui,
+        Some(egui::TextWrapMode::Extend),
+        f32::INFINITY,
+        egui::TextStyle::Button,
+    );
+    galley.size().x + 2.0 * ui.spacing().button_padding.x
 }
 
 /// A card's surface with a spotlight under the pointer, for cards that
@@ -467,13 +557,34 @@ pub(super) fn project_row(
     action
 }
 
+/// A soft panel: a gentle fill and a faint shadow, no outline, for notes
+/// and rows that sit on the start screen's scene.
+pub(super) fn soft_panel(palette: &Palette) -> egui::Frame {
+    egui::Frame::new()
+        .fill(super::backdrop::soft_fill(palette))
+        .shadow(super::backdrop::soft_shadow(palette))
+        .corner_radius(CARD_RADIUS)
+}
+
 /// A quiet note in place of the project cards.
 pub(super) fn empty_state(ui: &mut egui::Ui, icon: &str, title: &str, text: &str) {
+    empty_state_with(ui, icon, title, text, &[]);
+}
+
+/// [`empty_state`] with buttons under the note, so the way out is right
+/// there: `actions` are (role, icon, label). Returns the index of the one
+/// clicked.
+pub(super) fn empty_state_with(
+    ui: &mut egui::Ui,
+    icon: &str,
+    title: &str,
+    text: &str,
+    actions: &[(Role, &str, &str)],
+) -> Option<usize> {
     let palette = theme::palette(ui.ctx());
+    let mut clicked = None;
     ui.add_space(8.0);
-    egui::Frame::new()
-        .stroke(Stroke::new(1.0_f32, palette.border))
-        .corner_radius(CARD_RADIUS)
+    soft_panel(&palette)
         .inner_margin(egui::Margin::symmetric(16, 32))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -485,8 +596,37 @@ pub(super) fn empty_state(ui: &mut egui::Ui, icon: &str, title: &str, text: &str
                         .family(theme::medium_family())
                         .color(palette.text_strong),
                 );
-                ui.label(RichText::new(text).color(palette.text_weak));
+                ui.label(RichText::new(text).color(palette.text_secondary));
+                if actions.is_empty() {
+                    return;
+                }
+                ui.add_space(14.0);
+                // Centred as a group: measure the buttons, then lay them out
+                // from where the row starts.
+                let buttons: Vec<_> = actions
+                    .iter()
+                    .map(|(role, icon, label)| {
+                        widgets::button(*role, Some(icon), label, &palette)
+                            .min_size(vec2(0.0, 30.0))
+                    })
+                    .collect();
+                let gap = 8.0;
+                let widths: f32 = actions
+                    .iter()
+                    .map(|(_, icon, label)| button_width(ui, icon, label))
+                    .sum::<f32>()
+                    + gap * (actions.len() - 1) as f32;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = gap;
+                    ui.add_space(((ui.available_width() - widths) / 2.0).max(0.0));
+                    for (index, button) in buttons.into_iter().enumerate() {
+                        if ui.add(button).clicked() {
+                            clicked = Some(index);
+                        }
+                    }
+                });
             });
         });
     ui.add_space(8.0);
+    clicked
 }

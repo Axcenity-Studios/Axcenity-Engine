@@ -324,11 +324,14 @@ impl EditorApp {
             .separator()
             .system(SystemItem::FullScreen);
 
+        // Nothing to draw over until a project is open, as in the header.
+        let scene = when(project);
         let mut viewport = Items::default();
         viewport.heading("Guides");
         for (label, command, on) in [
             ("Grid", Command::Grid, self.grid),
             ("View Cube", Command::ViewCube, self.view_cube),
+            ("Viewport Bar", Command::ViewportBar, self.viewport_bar),
             ("Ray Tracing Badge", Command::RayBadge, self.ray_badge),
             ("Light Cones", Command::LightCones, self.light_cones),
             ("Movement Guide", Command::MovementGuide, self.move_guide),
@@ -338,7 +341,7 @@ impl EditorApp {
                 self.overlays.stream_editing,
             ),
         ] {
-            viewport.check(label, MenuAction::Command(command), ready, on);
+            viewport.check(label, MenuAction::Command(command), scene, on);
         }
         viewport.separator();
         let mut modes = Items::default();
@@ -346,7 +349,7 @@ impl EditorApp {
             modes.check(
                 mode.label(),
                 MenuAction::Command(Command::ViewMode(mode)),
-                ready,
+                scene,
                 self.view_mode == mode,
             );
         }
@@ -356,17 +359,17 @@ impl EditorApp {
             viewport.check(
                 overlay.label(),
                 MenuAction::Command(Command::Overlay(overlay)),
-                ready,
+                scene,
                 on,
             );
         }
         viewport
             .separator()
-            .command("Viewport Settings…", Command::ViewportSettings, ready);
+            .command("Viewport Settings…", Command::ViewportSettings, scene);
 
         let mut debug = Items::default();
         debug.command("Graphics Benchmark…", Command::GraphicsBenchmark, ready);
-        debug.command("Animator Inspector…", Command::AnimatorInspector, ready);
+        debug.command("Animator Inspector…", Command::AnimatorInspector, scene);
         // Only in debug builds (`cargo run`), never in a release.
         if cfg!(debug_assertions) {
             debug

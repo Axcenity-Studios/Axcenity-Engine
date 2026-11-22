@@ -188,9 +188,10 @@ pub fn install_panic_hook(tell: fn(&str)) {
     }));
 }
 
-/// How a crash is told: on the terminal's standard error.
+/// How a crash is told: on the terminal's standard error, and on Windows,
+/// when the game was opened without a terminal, in an error dialog box.
 pub fn tell_on_stderr(message: &str) {
-    eprintln!("{message}");
+    axcenity_release::console::tell_error("The game crashed", message);
 }
 
 #[cfg(test)]

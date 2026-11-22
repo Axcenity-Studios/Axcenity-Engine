@@ -124,6 +124,10 @@ pub struct Explorer {
     /// The text in Filter: while it isn't blank, only the Instances whose
     /// name or class has it in them show, with the branches above them.
     pub filter: String,
+    /// The quick filter beside Filter (scripts, parts and models, or UI):
+    /// while one is on, only Instances of that kind show, with the branches
+    /// above them. It narrows the text filter's matches when both are on.
+    pub kind: Option<KindFilter>,
     /// Arrow, Home and End presses taken for the Explorer this frame, with
     /// whether Shift was held; done when it's drawn.
     keys: Vec<(egui::Key, bool)>,
@@ -143,6 +147,59 @@ pub struct Explorer {
     /// Where each row's name was drawn last frame, so tests can point at rows.
     #[cfg(test)]
     drawn: Vec<(InstanceId, egui::Rect)>,
+}
+
+/// A quick filter beside the Explorer's Filter box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KindFilter {
+    /// Scripts, LocalScripts and ModuleScripts.
+    Scripts,
+    /// Parts of every kind, and Models.
+    Parts,
+    /// ScreenGuis, BillboardGuis and the elements in them.
+    Ui,
+}
+
+impl KindFilter {
+    pub const ALL: [KindFilter; 3] = [KindFilter::Scripts, KindFilter::Parts, KindFilter::Ui];
+
+    /// Whether an Instance of `class` is of this kind.
+    pub fn matches(self, class: ClassName) -> bool {
+        match self {
+            KindFilter::Scripts => class.is_script(),
+            KindFilter::Parts => class.is_base_part() || class == ClassName::Model,
+            KindFilter::Ui => class.is_gui(),
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            KindFilter::Scripts => icons::CODE,
+            KindFilter::Parts => icons::CUBE,
+            KindFilter::Ui => icons::LAYOUT,
+        }
+    }
+
+    fn hint(self) -> &'static str {
+        match self {
+            KindFilter::Scripts => {
+                "Show only scripts (and what they're in). Click again to show everything."
+            }
+            KindFilter::Parts => {
+                "Show only parts and models (and what they're in). Click again to show everything."
+            }
+            KindFilter::Ui => "Show only UI (and what it's in). Click again to show everything.",
+        }
+    }
+}
+
+/// How much taller than a control an Explorer row is, so a deep tree is
+/// easier to read down.
+fn row_padding(ctx: &egui::Context) -> f32 {
+    match theme::density(ctx) {
+        theme::Density::Comfortable => 4.0,
+        theme::Density::Compact => 1.0,
+    }
 }
 
 /// The keys the Explorer takes while it has them.
@@ -299,6 +356,7 @@ impl Explorer {
             plugin_items: Vec::new(),
             hidden: Default::default(),
             filter: String::new(),
+            kind: None,
             keys: Vec::new(),
             anchor: None,
             keys_active: false,
@@ -398,7 +456,7 @@ impl Explorer {
     /// frame, since names decide which rows there are. Give them back with
     /// [`keep_rows`](Self::keep_rows).
     fn take_rows(&mut self, world: &World) -> Vec<Row> {
-        if !self.filter.trim().is_empty() {
+        if self.filtering() {
             return self.rows(world);
         }
         let key = self.row_key(world);
@@ -410,7 +468,7 @@ impl Explorer {
 
     /// Keeps the rows `take_rows` gave, unless they were filtered.
     fn keep_rows(&mut self, world: &World, rows: Vec<Row>) {
-        if self.filter.trim().is_empty() {
+        if !self.filtering() {
             self.cache = Some(RowCache {
                 key: self.row_key(world),
                 rows,
@@ -427,19 +485,28 @@ impl Explorer {
         }
     }
 
+    /// Whether the text filter or a quick filter is narrowing the rows.
+    pub fn filtering(&self) -> bool {
+        !self.filter.trim().is_empty() || self.kind.is_some()
+    }
+
     /// The visible rows, top to bottom: every Instance whose ancestors are
     /// all open, with children in their stored order. While [`filter`]
-    /// isn't blank, every Instance that matches it instead, with all the
-    /// branches above it open whether or not they were.
+    /// isn't blank or a [`kind`] is picked, every Instance that matches
+    /// instead, with all the branches above it open whether or not they were.
     ///
     /// [`filter`]: Self::filter
+    /// [`kind`]: Self::kind
     pub fn rows(&self, world: &World) -> Vec<Row> {
         let mut rows = Vec::new();
-        let filter = self.filter.trim();
-        if filter.is_empty() {
-            self.add_rows(world, world.root(), 0, &mut rows);
+        if self.filtering() {
+            let filter = Filter {
+                text: self.filter.trim(),
+                kind: self.kind,
+            };
+            add_matching_rows(world, world.root(), 0, &filter, &mut rows);
         } else {
-            add_matching_rows(world, world.root(), 0, filter, &mut rows);
+            self.add_rows(world, world.root(), 0, &mut rows);
         }
         rows
     }
@@ -529,10 +596,23 @@ impl Explorer {
         #[cfg(test)]
         self.drawn.clear();
         let palette = theme::palette(ui.ctx());
-        let width = (ui.available_width() - crate::widgets::SEARCH_FIELD_MARGINS).max(60.0);
-        crate::widgets::search_field(ui, &mut self.filter, "Filter", width)
-            .on_hover_text("Show only what has this in its name or class, and what it's in");
-        let filtering = !self.filter.trim().is_empty();
+        // Filter, then a toggle for each quick filter at its right.
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            let chips = KindFilter::ALL.len() as f32 * (ui.spacing().interact_size.y + 2.0) + 4.0;
+            let width =
+                (ui.available_width() - crate::widgets::SEARCH_FIELD_MARGINS - chips).max(60.0);
+            crate::widgets::search_field(ui, &mut self.filter, "Filter", width)
+                .on_hover_text("Show only what has this in its name or class, and what it's in");
+            ui.add_space(4.0);
+            for kind in KindFilter::ALL {
+                let on = self.kind == Some(kind);
+                if crate::widgets::icon_button(ui, kind.icon(), kind.hint(), on).clicked() {
+                    self.kind = if on { None } else { Some(kind) };
+                }
+            }
+        });
+        let filtering = self.filtering();
         let rows = self.take_rows(world);
         let panel = ui.max_rect();
         self.drawn_frame = Some(theme::frame_number(ui.ctx()));
@@ -591,12 +671,17 @@ impl Explorer {
             .then(|| selected.last().copied())
             .flatten();
         if filtering && rows.is_empty() {
-            ui.weak(format!("Nothing matches \"{}\".", self.filter.trim()));
+            let text = self.filter.trim();
+            ui.weak(if text.is_empty() {
+                "Nothing of that kind here.".to_owned()
+            } else {
+                format!("Nothing matches \"{text}\".")
+            });
         }
         // Rows touch, so their highlights join into one column; `show_rows`
         // reads the spacing from here.
         ui.spacing_mut().item_spacing.y = 0.0;
-        let row_height = ui.spacing().interact_size.y;
+        let row_height = ui.spacing().interact_size.y + row_padding(ui.ctx());
         // Only scrolls up and down: long names end in "…" instead of
         // running past the panel. Only the rows on screen are laid out, so
         // a row to reveal is scrolled to by its place in the list.
@@ -619,7 +704,11 @@ impl Explorer {
             }
         }
         let scrolled = area.show_rows(ui, row_height, rows.len(), |ui, range| {
-            for row in &rows[range] {
+            let first = range.start;
+            for (offset, row) in rows[range].iter().enumerate() {
+                // Every other row is shaded faintly, so a long row is easy
+                // to follow across.
+                let striped = (first + offset) % 2 == 1;
                 // Read now, so a rename shows without remaking the rows.
                 let name = world
                     .get(row.id)
@@ -677,10 +766,14 @@ impl Explorer {
                     let layer_hidden = self.hidden.contains(&row.id);
                     let kept = row.class == ClassName::GroupedParts
                         || axcenity_core::csg::in_group(world, row.id);
-                    let label_text = if row.matches && !layer_hidden && !kept {
-                        egui::RichText::new(name)
-                    } else {
+                    // In the body text colour (a frameless button's own is
+                    // the dimmer secondary one), brightest when selected.
+                    let label_text = if !row.matches || layer_hidden || kept {
                         egui::RichText::new(name).color(palette.text_weak)
+                    } else if is_selected {
+                        egui::RichText::new(name).color(palette.text_strong)
+                    } else {
+                        egui::RichText::new(name).color(palette.text)
                     };
                     // The class (when the name doesn't already say it) and
                     // any warning keep their room after the name, unless the
@@ -805,8 +898,15 @@ impl Explorer {
                     palette.control.gamma_multiply(hover)
                 };
                 let row_shape = row_rect.shrink2(egui::vec2(2.0, 0.0));
-                ui.painter()
-                    .set(background, egui::Shape::rect_filled(row_shape, 4, fill));
+                let stripe = if striped {
+                    egui::Shape::rect_filled(row_rect, 0, palette.text.gamma_multiply(0.025))
+                } else {
+                    egui::Shape::Noop
+                };
+                ui.painter().set(
+                    background,
+                    egui::Shape::Vec(vec![stripe, egui::Shape::rect_filled(row_shape, 4, fill)]),
+                );
                 // A bar in each colour of the others who have it selected.
                 if let Some(colors) = self.others.get(&row.id) {
                     for (i, color) in colors.iter().take(3).enumerate() {
@@ -934,21 +1034,36 @@ fn hides_children(class: ClassName) -> bool {
     class == ClassName::UnionOperation || axcenity_core::spline::is_generator(class)
 }
 
+/// What the rows are narrowed to: text in the name or class (none when
+/// blank), and a kind.
+struct Filter<'a> {
+    text: &'a str,
+    kind: Option<KindFilter>,
+}
+
+impl Filter<'_> {
+    fn matches(&self, instance: &axcenity_core::Instance) -> bool {
+        let text = self.text.is_empty()
+            || properties::matches_filter(instance.name(), self.text)
+            || properties::matches_filter(instance.class().as_str(), self.text);
+        text && self.kind.is_none_or(|kind| kind.matches(instance.class()))
+    }
+}
+
 /// Adds `id`'s row and its children's if it or anything below it matches
-/// `filter`, by name or class (case and spaces ignored). Returns whether it
-/// added any.
+/// `filter`: by name or class (case and spaces ignored), and by kind.
+/// Returns whether it added any.
 fn add_matching_rows(
     world: &World,
     id: InstanceId,
     depth: usize,
-    filter: &str,
+    filter: &Filter,
     rows: &mut Vec<Row>,
 ) -> bool {
     let Some(instance) = world.get(id) else {
         return false;
     };
-    let matches = properties::matches_filter(instance.name(), filter)
-        || properties::matches_filter(instance.class().as_str(), filter);
+    let matches = filter.matches(instance);
     let at = rows.len();
     rows.push(Row {
         id,

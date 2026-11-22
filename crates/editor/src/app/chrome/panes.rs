@@ -132,7 +132,20 @@ impl EditorApp {
         if !ui.input(|input| input.pointer.any_down()) {
             self.team_panel.editing_field = None;
         }
+        // With nothing selected, the place's settings and what was
+        // selected lately are a click away.
+        let nothing = selected.and_then(|id| world.get(id)).is_none();
+        let (place, recent) = if nothing {
+            self.nothing_selected_shortcuts(world)
+        } else {
+            Default::default()
+        };
+        let mut picked = None;
         let edit = properties::show(ui, world, &self.assets, selected, !editing, &kept, |ui| {
+            if nothing {
+                picked = properties::nothing_selected(ui, &place, &recent);
+                return;
+            }
             // Stylesheets are edited, not the game, so not during Play.
             if editing {
                 style_edit = style_panel::show(ui, world, selected, stylesheets);
@@ -142,6 +155,17 @@ impl EditorApp {
             }
         });
         drop(plugin_rows);
+        match picked {
+            Some(properties::NothingSelectedPick::Select(id)) => {
+                self.select_from_viewport(Some(id));
+                ui.ctx().request_repaint();
+            }
+            Some(properties::NothingSelectedPick::ProjectSettings) => {
+                self.settings.open = true;
+                self.settings.page = settings::SettingsPage::Project;
+            }
+            None => {}
+        }
         // Other panels may already be drawn this frame, so draw again to
         // show the change everywhere.
         if let (Some(id), Some(edit)) = (selected, edit) {
@@ -161,6 +185,63 @@ impl EditorApp {
             self.plugin_row_action(id, action);
             ui.ctx().request_repaint();
         }
+    }
+
+    /// What the empty Properties panel offers in `world`: its services
+    /// that have settings worth a look, then what was selected lately and is
+    /// still there.
+    fn nothing_selected_shortcuts(
+        &self,
+        world: &World,
+    ) -> (Vec<properties::Shortcut>, Vec<properties::Shortcut>) {
+        let shortcut = |id: InstanceId| {
+            world
+                .get(id)
+                .map(|instance| (id, instance.name().to_owned(), instance.class()))
+        };
+        let place = [
+            ClassName::Workspace,
+            ClassName::Lighting,
+            ClassName::Players,
+            ClassName::StarterPlayer,
+            ClassName::SoundService,
+        ]
+        .into_iter()
+        .filter_map(|class| world.service(class))
+        .filter_map(shortcut)
+        .collect();
+        let recent = if self.recent_selections.0 == world.identity() {
+            self.recent_selections
+                .1
+                .iter()
+                .copied()
+                .filter_map(shortcut)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        (place, recent)
+    }
+
+    /// Keeps [`recent_selections`](Self::recent_selections) up to date with
+    /// what's selected now: once a frame, newest first, five at most.
+    pub(in crate::app) fn note_recent_selection(&mut self) {
+        const KEPT: usize = 5;
+        let world = shown(&self.world, &self.play);
+        let identity = world.identity();
+        if self.recent_selections.0 != identity {
+            self.recent_selections = (identity, Vec::new());
+        }
+        let Some(id) = self.selected.filter(|id| world.get(*id).is_some()) else {
+            return;
+        };
+        let recent = &mut self.recent_selections.1;
+        if recent.first() == Some(&id) {
+            return;
+        }
+        recent.retain(|kept| *kept != id);
+        recent.insert(0, id);
+        recent.truncate(KEPT);
     }
 
     /// The Assets panel, then what was asked for in it.
@@ -1114,6 +1195,8 @@ impl EditorApp {
             .show(ui, |ui| match render_state {
                 Some(render_state) => {
                     self.viewport_rect = Some(ui.available_rect_before_wrap());
+                    let top_inset =
+                        super::viewport_bar::top_inset(self.viewport_bar, ui.available_width());
                     self.viewport.show(
                         ui,
                         render_state,
@@ -1159,6 +1242,7 @@ impl EditorApp {
                             console: std::mem::take(&mut console),
                             light_cones: self.light_cones,
                             view_cube: self.view_cube,
+                            top_inset,
                             ray_badge: self.ray_badge,
                             grid: self.grid,
                             move_guide: self.move_guide,
@@ -1234,6 +1318,10 @@ impl EditorApp {
             })
             .inner;
         self.swap_play_effects();
+        if let Some(rect) = self.viewport_rect {
+            let draw_calls = output.render.map(|render| render.stats.draw_calls);
+            self.viewport_bar(&ctx, rect, draw_calls);
+        }
         if let Some(render) = output.render {
             self.profiler.record_render(render);
             self.last_drawn = Some(super::mcp::LastDrawn {

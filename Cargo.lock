@@ -809,6 +809,7 @@ dependencies = [
  "axcenity-ui",
  "axcenity-updater",
  "axcenity-workspace-hack",
+ "chrono",
  "eframe",
  "egui_dock",
  "env_logger",

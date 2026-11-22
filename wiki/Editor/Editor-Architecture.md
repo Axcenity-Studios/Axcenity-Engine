@@ -61,6 +61,7 @@ Lua plugins (`plugins` crate, Phase 54): `plugin.json` manifests found in plugin
 - **UI prefabs** (G5): Save prefab and Export Package take ScreenGuis and UI elements with their `SourceFile` LocalScripts.
 - **Version Explorer** and the updater ([Release process](../Development/Release-Process.md)); **Profiler › Memory** (G7).
 - **egui 0.36** since M12: wheel deltas summed per frame (`wheel.rs`); tests run frames through `theme::run`.
+- **UI polish pass** (2026-11-21; `docs/editor/shell.md`): Play, Run and Stop pinned at the right of the ribbon's tab row on every tab (the built-in tabs drop the Game group); the ribbon left-aligned by default; group captions neutral grey with the category hue only in the bar under them (the ADR-0024 palette still marks each group); Explorer rows brighter, roomier and striped, with Scripts / Parts / UI quick filters (`explorer::KindFilter`); Properties' empty state offers place settings, recent selections and Project Settings; a viewport bar (`app/viewport_bar.rs`: camera speed, grid snap, Shaded/Wireframe, FPS and draw calls); a shorter default bottom dock with a collapse chevron on stacked panels and an accent line on active dock tabs (`layout/dock_chrome.rs`).
 
 ## Integration and tooling
 
