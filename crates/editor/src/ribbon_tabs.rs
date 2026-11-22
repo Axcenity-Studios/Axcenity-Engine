@@ -177,7 +177,9 @@ impl RibbonGroup {
             RibbonGroup::Ui => "Insert screens, frames, text, buttons and other UI",
             RibbonGroup::Scripts => "Insert scripts",
             RibbonGroup::Terrain => "Sculpt, paint and generate terrain",
-            RibbonGroup::Panels => "Show or hide the Explorer, Properties and the other panels",
+            RibbonGroup::Panels => {
+                "Show or hide the Explorer, Properties, Console and Assets panels"
+            }
             RibbonGroup::Check => "Scan the project for missing and broken assets",
             RibbonGroup::Overlays => "Overlays, the view cube, light cones and view modes",
             RibbonGroup::Plugins => "Buttons the project's and your plugins add",

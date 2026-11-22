@@ -469,19 +469,24 @@ impl EditorApp {
         // Settings, one click away on the gear at the right.
         ui.menu_button("View", |ui| {
             widgets::section_label(ui, "Panels");
-            for pane in Pane::CLOSABLE {
-                let item = egui::Button::selectable(
-                    self.layout.is_open(pane),
-                    item(ui, pane.icon(), pane.label()),
-                );
-                if ui
-                    .add(item)
-                    .on_hover_text("Show or hide it. Drag a panel by its tab to move it.")
-                    .clicked()
-                {
-                    self.layout.toggle(pane);
-                }
+            for group in Pane::GROUPS {
+                crate::widgets::menu_button(ui, Some(group.icon), group.label, |ui| {
+                    for &pane in group.panes {
+                        let entry = egui::Button::selectable(
+                            self.layout.is_open(pane),
+                            item(ui, pane.icon(), pane.label()),
+                        );
+                        if ui
+                            .add(entry)
+                            .on_hover_text("Show or hide it. Drag a panel by its tab to move it.")
+                            .clicked()
+                        {
+                            self.layout.toggle(pane);
+                        }
+                    }
+                });
             }
+            ui.separator();
             if ui
                 .button(item(ui, icons::ARROW_COUNTER_CLOCKWISE, "Reset Layout"))
                 .on_hover_text("Put every panel back where it starts.")

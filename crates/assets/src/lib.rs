@@ -121,7 +121,7 @@ pub use material::{
     MaterialFileError, MaterialMaps, MaterialShader, OutlineFile, ParamValue, Shading,
     StandardMaps, StandardMaterial, StandardOutline, StandardToon, StandardWater, ToonFile,
     WaterFile, is_material_file, material_json, parse_material, read_material_file,
-    write_material_file,
+    read_resolved_material, write_material_file,
 };
 pub use memory::{AssetMemory, CacheUse, model_bytes};
 pub use model::{

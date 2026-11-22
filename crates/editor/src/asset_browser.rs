@@ -48,7 +48,7 @@ pub mod thumbnails;
 use origin::{Origin, Origins};
 use packages::{Shown, grouped, shown};
 pub use scan::{display_name, kind_of, loose_images, scan};
-use thumbnails::Thumbnails;
+use thumbnails::{ThumbnailKind, Thumbnails};
 
 /// Where prefabs are saved, in the project folder.
 pub const PREFABS_FOLDER: &str = "assets/prefabs";
@@ -101,6 +101,27 @@ impl TileSize {
 
 /// Where egui's memory keeps [`TileSize`] (its index) between runs.
 const TILE_SIZE_MEMORY: &str = "asset tile size";
+/// Where egui's memory keeps [`SourceLayout`] (its index) between runs.
+const SOURCE_LAYOUT_MEMORY: &str = "asset source layout";
+
+/// How the Assets panel organizes asset sources (`Built-in`, `Made in Axcenity`,
+/// `Imported`, Toolbox sources, `Global assets`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SourceLayout {
+    /// Quick filter tabs across the top for one-click source switching.
+    #[default]
+    Tabbed,
+    /// Stacked linear list of collapsible sections, one per source.
+    List,
+}
+
+impl SourceLayout {
+    const ALL: [SourceLayout; 2] = [SourceLayout::Tabbed, SourceLayout::List];
+
+    fn index(self) -> usize {
+        self as usize
+    }
+}
 /// The largest a picture is shown when its tile is hovered.
 const HOVER_PICTURE: f32 = 192.0;
 /// Narrower than this, the panel lists its assets instead of tiling them,
@@ -380,6 +401,8 @@ pub struct AssetBrowser {
     origins_stale: bool,
     /// The Source menu's "Group by source" is off: one grid, as before.
     flat: bool,
+    /// Quick source filter tabs vs stacked linear sections per source.
+    source_layout: SourceLayout,
     /// The sections folded shut.
     folded: HashSet<Origin>,
     /// How many materials' maps lie loose in the project (a download's
@@ -583,11 +606,15 @@ impl AssetBrowser {
         ctx: &egui::Context,
         entry: &AssetEntry,
     ) -> Option<egui::TextureHandle> {
-        let set = entry.kind == AssetKind::TextureSet;
+        let kind = match entry.kind {
+            AssetKind::TextureSet => ThumbnailKind::TextureSet,
+            AssetKind::Material => ThumbnailKind::Material,
+            _ => ThumbnailKind::Image,
+        };
         if self.is_local(&entry.path) {
-            self.thumbnails.get(ctx, &entry.path, set)
+            self.thumbnails.get(ctx, &entry.path, kind)
         } else {
-            self.global_thumbnails.get(ctx, &entry.path, set)
+            self.global_thumbnails.get(ctx, &entry.path, kind)
         }
     }
 
@@ -628,7 +655,7 @@ impl AssetBrowser {
         let mut picks: Vec<TexturePick> = entries
             .into_iter()
             .map(|entry| TexturePick {
-                thumbnail: self.thumbnails.get(ctx, &entry.path, false),
+                thumbnail: self.thumbnails.get(ctx, &entry.path, ThumbnailKind::Image),
                 entry,
             })
             .collect();
@@ -640,7 +667,7 @@ impl AssetBrowser {
     /// the first time; `None` until it has been read.
     pub fn thumbnail(&mut self, ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
         self.thumbnails.poll(ctx);
-        self.thumbnails.get(ctx, path, false)
+        self.thumbnails.get(ctx, path, ThumbnailKind::Image)
     }
 
     fn rescan_if_due(&mut self) {

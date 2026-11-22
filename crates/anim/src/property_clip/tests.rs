@@ -456,3 +456,95 @@ fn a_face_control_track_reads_by_name_and_sets_the_face_controls() {
     let jaw = world.get(face).unwrap().property("Jaw_Open").cloned();
     assert_eq!(jaw, Some(axcenity_core::Value::Number(0.4000000059604645)));
 }
+
+#[test]
+fn a_part_with_a_custom_pivot_swings_in_an_arc_around_its_pivot() {
+    let mut world = World::new();
+    let workspace = world.workspace();
+    // A 4-stud wide door centered at (2, 0, 0), with its pivot at its left hinge (-2, 0, 0)
+    // in local space -> world pivot at (0, 0, 0).
+    let door = part_in(&mut world, workspace, "Door", Vec3::new(2.0, 0.0, 0.0));
+    world
+        .set_property(
+            door,
+            "PivotOffset",
+            Value::CFrame(axcenity_core::CFrame {
+                position: Vector3::new(-2.0, 0.0, 0.0),
+                rotation: [0.0, 0.0, 0.0, 1.0],
+            }),
+        )
+        .unwrap();
+
+    let mut applied = Applied::default();
+    // Swing the door 90° around Y: only Orientation is keyed!
+    apply_evaluated(
+        &mut world,
+        door,
+        &[one(".", PropertyName::Orientation, &[0.0, 90.0, 0.0])],
+        &mut applied,
+    );
+    let pos = Placement::of_part(&world, door).unwrap();
+    // Rotating (+2, 0, 0) by +90° around Y puts the center at (0, 0, -2),
+    // keeping the hinge edge pinned at world (0, 0, 0)!
+    assert!(
+        (pos.position - Vec3::new(0.0, 0.0, -2.0)).length() < 1e-4,
+        "door center should swing on arc to (0, 0, -2), got {:?}",
+        pos.position
+    );
+    let pivot_now = part_pivot(&world, door).unwrap();
+    assert!(
+        pivot_now.position.length() < 1e-4,
+        "hinge stays pinned at origin, got {:?}",
+        pivot_now.position
+    );
+
+    // At 45° (midpoint of an animation), the door is still exactly 2 studs from the hinge!
+    apply_evaluated(
+        &mut world,
+        door,
+        &[one(".", PropertyName::Orientation, &[0.0, 45.0, 0.0])],
+        &mut applied,
+    );
+    let mid = Placement::of_part(&world, door).unwrap();
+    assert!(
+        (mid.position.length() - 2.0).abs() < 1e-4,
+        "midpoint stays on true circular arc of radius 2, got radius {}",
+        mid.position.length()
+    );
+}
+
+#[test]
+fn a_model_with_a_custom_pivot_rotates_around_its_pivot_offset() {
+    let mut world = World::new();
+    let workspace = world.workspace();
+    let model = world.create(ClassName::Model).unwrap();
+    world.set_parent(model, Some(workspace)).unwrap();
+    let panel = part_in(&mut world, model, "Panel", Vec3::new(2.0, 0.0, 0.0));
+    // Model bbox center is (2, 0, 0); shift PivotOffset by (-2, 0, 0) -> world pivot (0, 0, 0).
+    world
+        .set_property(
+            model,
+            "PivotOffset",
+            Value::CFrame(axcenity_core::CFrame {
+                position: Vector3::new(-2.0, 0.0, 0.0),
+                rotation: [0.0, 0.0, 0.0, 1.0],
+            }),
+        )
+        .unwrap();
+    let start = model_pivot(&world, model).unwrap();
+    assert!(start.position.length() < 1e-5);
+
+    let mut applied = Applied::default();
+    apply_evaluated(
+        &mut world,
+        model,
+        &[one(".", PropertyName::Orientation, &[0.0, 90.0, 0.0])],
+        &mut applied,
+    );
+    let p = Placement::of_part(&world, panel).unwrap();
+    assert!(
+        (p.position - Vec3::new(0.0, 0.0, -2.0)).length() < 1e-4,
+        "panel should swing around model's custom pivot, got {:?}",
+        p.position
+    );
+}

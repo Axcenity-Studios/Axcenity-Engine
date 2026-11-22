@@ -37,6 +37,81 @@ pub struct GlbMaterial {
     pub base_color_texture: Option<String>,
 }
 
+/// An image encoded as PNG bytes, embedded directly inside a `.glb`'s binary
+/// chunk (for procedural built-in materials, embedded source `.glb` textures,
+/// or packed metallic-roughness maps).
+#[derive(Clone, Debug)]
+pub struct EmbeddedImage {
+    pub hash: u64,
+    pub png: Arc<Vec<u8>>,
+}
+
+impl PartialEq for EmbeddedImage {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash && self.png.len() == other.png.len()
+    }
+}
+
+impl Eq for EmbeddedImage {}
+
+impl std::hash::Hash for EmbeddedImage {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+    }
+}
+
+impl EmbeddedImage {
+    /// Encodes `rgba` (`width × height × 4` bytes) as PNG and hashes the
+    /// result deterministically so identical textures share one buffer view.
+    pub fn from_rgba(width: u32, height: u32, rgba: &[u8]) -> Option<Self> {
+        use image::ImageEncoder;
+        if width == 0 || height == 0 || rgba.len() < (width as usize) * (height as usize) * 4 {
+            return None;
+        }
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        encoder
+            .write_image(rgba, width, height, image::ExtendedColorType::Rgba8)
+            .ok()?;
+        let hash = fnv1a(&png);
+        Some(Self {
+            hash,
+            png: Arc::new(png),
+        })
+    }
+}
+
+/// Deterministic 64-bit FNV-1a hash for deduplicating embedded images.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for &byte in bytes {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+/// Embedded PNG textures for a material (used when a texture has no external
+/// project file, such as a built-in material or an embedded `.glb` image).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct EmbeddedMaps {
+    pub base_color: Option<EmbeddedImage>,
+    pub metal_rough: Option<EmbeddedImage>,
+    pub normal: Option<EmbeddedImage>,
+    pub occlusion: Option<EmbeddedImage>,
+    pub emissive: Option<EmbeddedImage>,
+}
+
+impl EmbeddedMaps {
+    pub fn is_empty(&self) -> bool {
+        self.base_color.is_none()
+            && self.metal_rough.is_none()
+            && self.normal.is_none()
+            && self.occlusion.is_none()
+            && self.emissive.is_none()
+    }
+}
+
 /// The texture files a material links, by role: paths with `/` between
 /// folders, relative to the `.glb` when written (Group as Mesh keeps them
 /// relative to the project until then).
@@ -255,6 +330,8 @@ pub(crate) struct File {
     textures: Vec<Value>,
     /// The texture already made for each image URI.
     texture_of: HashMap<String, usize>,
+    /// The texture already made for each embedded PNG (by hash).
+    embedded_of: HashMap<u64, usize>,
     /// Some texture is placed with `KHR_texture_transform`.
     transforms: bool,
 }
@@ -270,6 +347,38 @@ impl File {
             .push(json!({ "source": self.images.len() - 1 }));
         let texture = self.textures.len() - 1;
         self.texture_of.insert(uri.to_owned(), texture);
+        texture
+    }
+
+    /// The texture showing an embedded PNG image, stored in the `.glb`'s
+    /// binary chunk and deduplicated by its content hash.
+    fn texture_embedded(&mut self, image: &EmbeddedImage) -> usize {
+        if let Some(&texture) = self.embedded_of.get(&image.hash) {
+            return texture;
+        }
+        while !self.bin.len().is_multiple_of(4) {
+            self.bin.push(0);
+        }
+        let start = self.bin.len();
+        self.bin.extend_from_slice(&image.png);
+        let len = image.png.len();
+        while !self.bin.len().is_multiple_of(4) {
+            self.bin.push(0);
+        }
+        self.buffer_views.push(json!({
+            "buffer": 0,
+            "byteOffset": start,
+            "byteLength": len,
+        }));
+        let view = self.buffer_views.len() - 1;
+        self.images.push(json!({
+            "bufferView": view,
+            "mimeType": "image/png",
+        }));
+        self.textures
+            .push(json!({ "source": self.images.len() - 1 }));
+        let texture = self.textures.len() - 1;
+        self.embedded_of.insert(image.hash, texture);
         texture
     }
 
@@ -308,6 +417,18 @@ impl File {
         material: &ModelMaterial,
         maps: &MaterialMaps,
     ) -> usize {
+        self.add_material_with_embedded(material, maps, &EmbeddedMaps::default())
+    }
+
+    /// [`add_material_with`](Self::add_material_with), also accepting embedded
+    /// PNG textures when a slot has no external URI.
+    pub(crate) fn add_material_with_embedded(
+        &mut self,
+        material: &ModelMaterial,
+        maps: &MaterialMaps,
+        embedded: &EmbeddedMaps,
+    ) -> usize {
+        let has_any_map = !maps.is_empty() || !embedded.is_empty();
         let transform = (material.uv_scale != [1.0, 1.0]
             || material.uv_offset != [0.0, 0.0]
             || material.uv_rotation != 0.0)
@@ -318,10 +439,15 @@ impl File {
                     "scale": material.uv_scale.map(finite),
                 })
             });
-        self.transforms |= transform.is_some() && !maps.is_empty();
-        let info = |file: &mut Self, uri: &Option<String>| {
-            let uri = uri.as_deref()?;
-            let mut info = json!({ "index": file.texture(uri) });
+        self.transforms |= transform.is_some() && has_any_map;
+        let info = |file: &mut Self, uri: &Option<String>, embed: &Option<EmbeddedImage>| {
+            let index = if let Some(uri) = uri.as_deref() {
+                file.texture(uri)
+            } else {
+                let img = embed.as_ref()?;
+                file.texture_embedded(img)
+            };
+            let mut info = json!({ "index": index });
             if let Some(transform) = &transform {
                 info["extensions"] = json!({ "KHR_texture_transform": transform });
             }
@@ -332,10 +458,10 @@ impl File {
             "metallicFactor": finite(material.metalness).clamp(0.0, 1.0),
             "roughnessFactor": finite(material.roughness).clamp(0.0, 1.0),
         });
-        if let Some(texture) = info(self, &maps.base_color) {
+        if let Some(texture) = info(self, &maps.base_color, &embedded.base_color) {
             pbr["baseColorTexture"] = texture;
         }
-        if let Some(texture) = info(self, &maps.metal_rough) {
+        if let Some(texture) = info(self, &maps.metal_rough, &embedded.metal_rough) {
             pbr["metallicRoughnessTexture"] = texture;
         }
         let mut json = json!({
@@ -352,15 +478,15 @@ impl File {
             }
             AlphaMode::Blend => json["alphaMode"] = json!("BLEND"),
         }
-        if let Some(mut texture) = info(self, &maps.normal) {
+        if let Some(mut texture) = info(self, &maps.normal, &embedded.normal) {
             texture["scale"] = json!(finite(material.normal_scale));
             json["normalTexture"] = texture;
         }
-        if let Some(mut texture) = info(self, &maps.occlusion) {
+        if let Some(mut texture) = info(self, &maps.occlusion, &embedded.occlusion) {
             texture["strength"] = json!(finite(material.occlusion_strength));
             json["occlusionTexture"] = texture;
         }
-        if let Some(texture) = info(self, &maps.emissive) {
+        if let Some(texture) = info(self, &maps.emissive, &embedded.emissive) {
             json["emissiveTexture"] = texture;
         }
         // A leaf (one that flutters) is see-through to light unless told

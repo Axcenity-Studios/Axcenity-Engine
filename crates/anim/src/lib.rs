@@ -96,8 +96,8 @@ pub use lip_sync::{
 pub use live_identity::{IDENTITY, identity_key, set_identity_key};
 pub use property_clip::{
     Applied, EvaluatedProperty, Placement, PropertyClip, apply_evaluated, blend_evaluated,
-    current_numbers, model_pivot, numbers_of, resolve_target, sample_time, sample_track,
-    target_path, value_from_numbers,
+    current_numbers, model_pivot, numbers_of, part_pivot, pivot_offset_of, resolve_target,
+    sample_time, sample_track, target_path, value_from_numbers,
 };
 pub use retarget::{
     Digit, HipsTravel, HumanBone, HumanoidMap, RETARGET_EXTENSION, ROLE_COUNT, RetargetProfile,

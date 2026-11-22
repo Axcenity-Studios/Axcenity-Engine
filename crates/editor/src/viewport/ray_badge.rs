@@ -12,7 +12,7 @@ use eframe::egui;
 
 /// What the badge says.
 #[derive(Debug, PartialEq)]
-pub(super) struct Badge {
+pub(crate) struct Badge {
     /// The short line on the badge.
     pub text: String,
     /// More, on hover.
@@ -30,7 +30,7 @@ pub(super) struct Badge {
 
 /// What was clicked on the badge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Click {
+pub(crate) enum Click {
     Restart,
     /// Compare: show the view with the ray traced effects hidden, or back.
     Compare,
@@ -205,11 +205,11 @@ pub(super) fn badge(
 
 /// Draws `badge` at the bottom right of `rect`, and says what on it was
 /// clicked.
-pub(super) fn paint(ui: &egui::Ui, rect: egui::Rect, badge: &Badge) -> Option<Click> {
+pub(crate) fn paint(ui: &egui::Ui, rect: egui::Rect, badge: &Badge) -> Option<Click> {
     let palette = crate::theme::palette(ui.ctx());
     let mut click = None;
     egui::Area::new(egui::Id::new("ray tracing badge"))
-        .order(egui::Order::Foreground)
+        .order(ui.layer_id().order)
         .pivot(egui::Align2::RIGHT_BOTTOM)
         .fixed_pos(rect.right_bottom() + egui::vec2(-10.0, -10.0))
         .constrain_to(rect)

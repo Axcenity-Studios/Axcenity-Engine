@@ -248,6 +248,9 @@ pub struct EditorApp {
     window_icon: Option<std::sync::Arc<egui::IconData>>,
     /// The New Custom Material window's form, while it's open.
     custom_material: Option<custom_materials::CustomMaterialForm>,
+    /// Modal dialog for choosing multi-material vs single-material overwrite
+    /// when grouping textured or multi-material parts as a mesh.
+    group_mesh_dialog: Option<group_mesh::GroupMeshDialog>,
     /// Universal search's window (Ctrl+K, and the command palette and
     /// Quick Open, Phase 70), its index of providers and rows
     /// (`app/search.rs`), whether it was open last frame, Find in Scripts,
@@ -282,6 +285,9 @@ pub struct EditorApp {
     /// The Move, Resize and Rotate tools' axes, directions and pivot, and
     /// the other building tools' settings. Preferences, like `snap`.
     modes: Modes,
+    /// When true, the viewport handles edit the selected part's or Model's
+    /// pivot (`PivotOffset`) without moving the geometry.
+    edit_pivot: bool,
     build: BuildSettings,
     /// Something waiting for an answer to "Save changes?".
     asking: Option<Discard>,
@@ -1042,6 +1048,7 @@ impl EditorApp {
             pending_close_scene: false,
             window_icon: None,
             custom_material: None,
+            group_mesh_dialog: None,
             palette: Default::default(),
             search: search::SearchIndex::new(),
             palette_was_open: false,
@@ -1056,6 +1063,7 @@ impl EditorApp {
             tool: Tool::default(),
             snap: Snap::default(),
             modes: Modes::default(),
+            edit_pivot: false,
             build: BuildSettings::default(),
             pending_emits: Vec::new(),
             asking: None,
@@ -1220,6 +1228,9 @@ impl EditorApp {
                     ..Appearance::default()
                 },
             };
+            if let Some(text) = storage.get_string("shortcuts") {
+                crate::shortcuts::load_overrides(&text);
+            }
             // One folder per line. The project opened at startup stays first.
             let opened = std::mem::take(&mut self.recent);
             for line in storage.get_string(RECENT_KEY).unwrap_or_default().lines() {
@@ -1381,6 +1392,7 @@ impl eframe::App for EditorApp {
         // History lines still folding go to the project's files.
         self.flush_history();
         storage.set_string(APPEARANCE_KEY, self.appearance.to_text());
+        storage.set_string("shortcuts", crate::shortcuts::save_overrides());
         storage.set_string(updates::UPDATES_KEY, self.updates.to_text());
         let recent: Vec<String> = self
             .recent
@@ -2048,6 +2060,7 @@ impl EditorApp {
         self.animator_inspector_window(ctx);
         self.probe_bake_window(ctx);
         self.custom_material_window(ctx);
+        self.group_mesh_window(ctx);
         self.save_layout_dialog(ctx);
         self.references_window(ctx);
         self.unsaved_changes_prompt(ctx);

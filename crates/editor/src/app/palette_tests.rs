@@ -165,7 +165,18 @@ fn every_ribbon_and_menu_command_can_be_run_from_the_palette() {
     let menus: &[(&str, &[&str])] = &[
         ("File", &["Build Game"]),
         ("Edit", &["Undo History"]),
-        ("View", &["Layout"]),
+        (
+            "View",
+            &[
+                "Core",
+                "World & Scene",
+                "Modeling & Assets",
+                "Animation & UI",
+                "Logic & Data",
+                "Diagnostics & Team",
+                "Layout",
+            ],
+        ),
         ("Viewport", &["View Mode"]),
         ("Debug", &[]),
         ("Help", &[]),
@@ -188,11 +199,12 @@ fn every_ribbon_and_menu_command_can_be_run_from_the_palette() {
         "Interact",
         "Spawn",
         "Vehicle",
+        "Studios",
+        "Scene",
         "Layout",
         "Elements",
         "Constraint",
         "Brush",
-        "Panels",
         "Overlays",
         "View Mode",
     ];
@@ -253,6 +265,32 @@ fn every_ribbon_and_menu_command_can_be_run_from_the_palette() {
         assert!(drawn.contains(label), "`{label}` was drawn: {drawn:?}");
     }
     assert!(drawn.len() > 150, "{} drawn", drawn.len());
+}
+
+#[test]
+fn test_ribbon_clients_group_renders_cleanly() {
+    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    app.ribbon_tabs
+        .set_active(ActiveTab::BuiltIn(BuiltInTab::Test));
+    let size = egui::vec2(960.0, 140.0);
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS") {
+        crate::snapshot::snapshot(
+            &std::path::PathBuf::from(snapshots).join("ribbon-test-tab.png"),
+            size,
+            vec![Vec::new(); 3],
+            |ui| {
+                egui::Panel::top("menu bar").show(ui, |ui| app.menu_bar(ui));
+                egui::Panel::top("ribbon").show(ui, |ui| app.toolbar(ui));
+                egui::CentralPanel::default().show(ui, |_| {});
+            },
+        );
+    }
+    let ctx = warm(theme::test_context());
+    let mut clock = 0.0;
+    let output = chrome_frame(&mut app, &ctx, &mut clock, Vec::new());
+    let labels: Vec<String> = clickables(&output).into_iter().map(|(l, _)| l).collect();
+    assert!(labels.iter().any(|l| l == "Network"), "{labels:?}");
+    assert!(labels.iter().any(|l| l == "Pause on errors"), "{labels:?}");
 }
 
 /// Runs one frame of the palette with `events`.

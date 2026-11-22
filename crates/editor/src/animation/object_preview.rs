@@ -16,10 +16,10 @@ use std::sync::Arc;
 
 use axcenity_anim::{
     Applied, EvaluatedProperty, PropertyName, apply_evaluated, bone_numbers, bone_paths,
-    numbers_of, resolve_target, target_path,
+    numbers_of, pivot_offset_of, resolve_target, target_path,
 };
 use axcenity_assets::{Assets, BoneTransform, Model};
-use axcenity_core::{ClassName, InstanceId, Value, World};
+use axcenity_core::{CFrame, ClassName, InstanceId, Value, World};
 use axcenity_render::Camera;
 use axcenity_render::glam::Vec3;
 use axcenity_ui::{Stylesheet, UiLayout, UiRect};
@@ -28,7 +28,9 @@ use eframe::egui_wgpu::RenderState;
 
 use super::posing::{BoneEvent, PoseSettings, Poser, Skeleton};
 use super::preview::{Canvas, add_floor};
-use crate::gizmo::{self, Drag, Handle, Modes, Pointer, Pose, Snap, Tool};
+use crate::gizmo::{
+    self, Drag, Handle, Modes, MoveAxes, PivotDrag, Pointer, Pose, RotatePivot, Snap, Tool,
+};
 use crate::screen::Screen;
 use crate::theme::{self, icons};
 use crate::ui_handles::{Grip, Handles, UiDrag};
@@ -40,6 +42,9 @@ pub enum PreviewEvent {
     Select(Option<InstanceId>),
     /// A handle was dragged: the new values, by target path from the root.
     Edit(Vec<EvaluatedProperty>),
+    /// The selected Part's or Model's `PivotOffset` was moved, turned or reset
+    /// in Edit Pivot mode (applied to the edit world, not keyed as a track).
+    SetPivot { id: InstanceId, offset: CFrame },
     /// Something to say in Output: pinned joints a drag couldn't hold.
     Warn(String),
 }
@@ -58,6 +63,7 @@ pub struct Focus {
 
 enum Dragging {
     Handle(Drag),
+    Pivot(PivotDrag),
     Ui(Box<UiDrag>),
 }
 
@@ -76,6 +82,14 @@ pub struct ObjectPreview {
     flat: bool,
     pub selected: Option<InstanceId>,
     pub tool: Tool,
+    /// Whether Move and Rotate handles follow world axes or the object's /
+    /// pivot's own axes.
+    pub axes: MoveAxes,
+    /// When true, the 3D handles edit the selected object's `PivotOffset`
+    /// without moving its geometry or creating keyframes.
+    pub edit_pivot: bool,
+    /// A pivot reset triggered from the toolbar, emitted on the next `show_ui`.
+    pending_pivot: Option<(InstanceId, CFrame)>,
     drag: Option<Dragging>,
     yaw: f32,
     pitch: f32,
@@ -102,6 +116,9 @@ impl Default for ObjectPreview {
             flat: false,
             selected: None,
             tool: Tool::Move,
+            axes: MoveAxes::Global,
+            edit_pivot: false,
+            pending_pivot: None,
             drag: None,
             yaw: 35.0,
             pitch: 20.0,
@@ -355,11 +372,14 @@ impl ObjectPreview {
         self.applied.missing.iter().cloned().collect()
     }
 
-    /// The value of `property` on `id` as posed: a Model's pivot for its
-    /// Position and Orientation.
+    /// The value of `property` on `id` as posed: a Model's pivot (or a
+    /// Part's custom pivot) for its Position and Orientation.
     fn value(&self, id: InstanceId, property: PropertyName) -> Option<Vec<f32>> {
         let instance = self.posed.get(id)?;
-        if instance.class() == ClassName::Model {
+        if instance.class() == ClassName::Model
+            || (pivot_offset_of(&self.posed, id).is_some()
+                && matches!(property, PropertyName::Position | PropertyName::Orientation))
+        {
             let pivot = self.applied.pivot(&self.posed, id)?;
             let (position, orientation) = pivot.numbers();
             return match property {
@@ -453,8 +473,50 @@ impl ObjectPreview {
         Some((id, Pose::of(instance)?))
     }
 
-    /// The Move / Rotate / Resize buttons, shown above a 3D preview, or
-    /// with a bone selected its tools and `settings`.
+    /// Where the selected object's pivot is in the posed preview:
+    /// `(id, base_pose, world_pivot, is_model)`.
+    fn selected_pivot(&self) -> Option<(InstanceId, Pose, Pose, bool)> {
+        let id = self.selected?;
+        let instance = self.posed.get(id)?;
+        if instance.class() == ClassName::Model {
+            let center = gizmo::model_bbox_center(&self.posed, id)?;
+            let pivot = self.applied.pivot(&self.posed, id)?;
+            let base = Pose {
+                position: center,
+                rotation: axcenity_render::glam::Quat::IDENTITY,
+                size: Vec3::ONE,
+            };
+            let world_pivot = Pose {
+                position: pivot.position,
+                rotation: pivot.rotation,
+                size: Vec3::ONE,
+            };
+            return Some((id, base, world_pivot, true));
+        }
+        let base = Pose::of(instance)?;
+        let pivot = self.applied.pivot(&self.posed, id)?;
+        let world_pivot = Pose {
+            position: pivot.position,
+            rotation: pivot.rotation,
+            size: base.size,
+        };
+        Some((id, base, world_pivot, false))
+    }
+
+    /// Updates `PivotOffset` on `id` inside both the pristine copy and posed
+    /// world so the preview immediately reflects the new pivot.
+    pub fn apply_pivot_offset(&mut self, id: InstanceId, offset: CFrame) {
+        let _ = self
+            .pristine
+            .set_property(id, "PivotOffset", Value::CFrame(offset));
+        let _ = self
+            .posed
+            .set_property(id, "PivotOffset", Value::CFrame(offset));
+        self.applied = Applied::default();
+    }
+
+    /// The Move / Rotate / Resize and Pivot buttons, shown above a 3D preview,
+    /// or with a bone selected its tools and `settings`.
     pub fn tools(&mut self, ui: &mut egui::Ui, settings: &mut PoseSettings) {
         if self.flat || self.root.is_none() {
             return;
@@ -471,9 +533,63 @@ impl ObjectPreview {
             (Tool::Rotate, icons::ARROW_CLOCKWISE),
             (Tool::Scale, icons::ARROWS_OUT),
         ] {
-            if crate::widgets::icon_button(ui, icon, tool.label(), self.tool == tool).clicked() {
+            if crate::widgets::icon_button(
+                ui,
+                icon,
+                tool.label(),
+                !self.edit_pivot && self.tool == tool,
+            )
+            .clicked()
+            {
                 self.tool = tool;
+                self.edit_pivot = false;
             }
+        }
+        ui.separator();
+        let local = self.axes == MoveAxes::Local;
+        if ui
+            .selectable_label(local, if local { "Local" } else { "World" })
+            .on_hover_text("Switch between world axes and the object's / pivot's own axes.")
+            .clicked()
+        {
+            self.axes = if local {
+                MoveAxes::Global
+            } else {
+                MoveAxes::Local
+            };
+        }
+        let target = self.selected_pivot();
+        let has_custom = target.is_some_and(|(id, _, _, _)| {
+            self.posed
+                .get(id)
+                .and_then(gizmo::pivot_offset_of)
+                .is_some()
+        });
+        if ui
+            .add_enabled(
+                target.is_some(),
+                egui::Button::new(theme::with_icon(icons::CROSSHAIR_SIMPLE, "Pivot"))
+                    .selected(self.edit_pivot),
+            )
+            .on_hover_text(
+                "Edit Pivot: move or rotate the selected object's pivot point and angle without \
+                 moving the object or adding keyframes.",
+            )
+            .clicked()
+        {
+            self.edit_pivot = !self.edit_pivot;
+        }
+        if let Some((id, _, _, _)) = target
+            && ui
+                .add_enabled(
+                    has_custom,
+                    egui::Button::new(theme::with_icon(icons::ARROW_COUNTER_CLOCKWISE, "Reset")),
+                )
+                .on_hover_text("Reset the selected object's pivot back to its center.")
+                .clicked()
+        {
+            self.apply_pivot_offset(id, CFrame::IDENTITY);
+            self.pending_pivot = Some((id, CFrame::IDENTITY));
         }
     }
 
@@ -527,19 +643,55 @@ impl ObjectPreview {
     ) -> Option<PreviewEvent> {
         let screen = Screen::new(self.camera(), rect);
         let tool = self.tool;
+        let mut event = self
+            .pending_pivot
+            .take()
+            .map(|(id, offset)| PreviewEvent::SetPivot { id, offset });
         // With a bone selected, its gizmo shows instead of the part's.
-        let pose = self
-            .selected_pose()
-            .filter(|_| self.bones.selected.is_none() || self.skeleton.is_none());
+        let bone_active = self.bones.selected.is_some() && self.skeleton.is_some();
+        let pose = self.selected_pose().filter(|_| !bone_active);
+        let target_pivot = self.selected_pivot().filter(|_| !bone_active);
         let model = self
             .selected
             .and_then(|id| self.posed.get(id))
             .is_some_and(|i| i.class() == ClassName::Model);
-        let modes = Modes::default();
-        let frame = pose
-            .filter(|_| !(model && tool == Tool::Scale))
-            .and_then(|(_, pose)| gizmo::handle_frame(tool, modes, &[pose]));
-        let shapes = frame.map_or_else(Vec::new, |frame| gizmo::shapes(tool, frame, &screen));
+        let has_custom_pivot = target_pivot.is_some_and(|(id, _, _, _)| {
+            self.posed
+                .get(id)
+                .and_then(gizmo::pivot_offset_of)
+                .is_some()
+        });
+        let custom_pivot = target_pivot
+            .filter(|_| has_custom_pivot || model)
+            .map(|(_, _, world_pivot, _)| world_pivot);
+        let modes = Modes {
+            axes: self.axes,
+            pivot: if self.axes == MoveAxes::Local || has_custom_pivot || model {
+                RotatePivot::Local
+            } else {
+                RotatePivot::Center
+            },
+            ..Modes::default()
+        };
+        let (shapes, pivot_indicator) = if self.edit_pivot {
+            match target_pivot {
+                Some((_, _, world_pivot, _)) => (
+                    gizmo::pivot_shapes(world_pivot, &screen),
+                    Some((world_pivot, true)),
+                ),
+                None => (Vec::new(), None),
+            }
+        } else {
+            let shapes = pose
+                .filter(|_| !(model && tool == Tool::Scale))
+                .map_or_else(Vec::new, |(_, p)| {
+                    gizmo::shapes_for_pivot(tool, modes, &[p], custom_pivot, &screen)
+                });
+            let indicator = target_pivot
+                .filter(|_| has_custom_pivot)
+                .map(|(_, _, world_pivot, _)| (world_pivot, false));
+            (shapes, indicator)
+        };
         let (pressed, down, pointer, fine) = ui.input(|input| {
             (
                 input.pointer.primary_pressed(),
@@ -560,19 +712,47 @@ impl ObjectPreview {
             _ => None,
         };
         if pressed
-            && let (Some(handle), Some(pointer), Some(frame), Some(part)) =
-                (hovered, pointer, frame, pose)
+            && self.edit_pivot
+            && let (Some(handle), Some(pointer), Some((id, base, world_pivot, is_model))) =
+                (hovered, pointer, target_pivot)
         {
-            self.drag = Drag::start_many(handle, frame, vec![part], modes, &screen, pointer)
+            self.drag = PivotDrag::start(id, handle, world_pivot, base, is_model, &screen, pointer)
+                .map(Dragging::Pivot);
+        } else if pressed
+            && let (Some(handle), Some(pointer), Some(part)) = (hovered, pointer, pose)
+            && let Some(frame) = gizmo::frame_of(&shapes, handle)
+        {
+            // For a Part with a custom PivotOffset (or a Model), Move and Rotate
+            // key its world pivot directly so playback sweeps cleanly around it.
+            let drag_part = match (tool, target_pivot) {
+                (Tool::Move | Tool::Rotate, Some((id, _, world_pivot, _)))
+                    if has_custom_pivot || model =>
+                {
+                    (id, world_pivot)
+                }
+                _ => part,
+            };
+            self.drag = Drag::start_many(handle, frame, vec![drag_part], modes, &screen, pointer)
                 .map(Dragging::Handle);
         }
 
-        let mut event = None;
         let highlighted: Option<Handle> = match &self.drag {
             Some(Dragging::Handle(drag)) => Some(drag.handle),
+            Some(Dragging::Pivot(drag)) => Some(drag.handle),
             _ => hovered,
         };
-        if let Some(Dragging::Handle(drag)) = &mut self.drag {
+        if let Some(Dragging::Pivot(drag)) = &mut self.drag {
+            if !down {
+                self.drag = None;
+            } else if let Some(pointer) = pointer
+                && let Some((_, offset)) =
+                    drag.update(Pointer::on(&screen, pointer, fine), &Snap::default())
+            {
+                let id = drag.target;
+                self.apply_pivot_offset(id, offset);
+                event = Some(PreviewEvent::SetPivot { id, offset });
+            }
+        } else if let Some(Dragging::Handle(drag)) = &mut self.drag {
             if !down {
                 self.drag = None;
             } else if let Some(pointer) = pointer
@@ -649,6 +829,9 @@ impl ObjectPreview {
             );
         }
         gizmo::paint(&painter, &shapes, highlighted);
+        if let Some((pivot, editing_pivot)) = pivot_indicator {
+            gizmo::paint_pivot_indicator(&painter, &screen, pivot, editing_pivot);
+        }
         if response.hovered() && self.drag.is_none() {
             hint(
                 &painter,

@@ -1388,6 +1388,43 @@ mod global_illumination {
     }
 
     #[test]
+    fn software_ray_traced_gi_stays_steady_on_a_still_scene() {
+        let Some((device, queue)) = test_device() else {
+            return skipped();
+        };
+        let world = yard_with_block(Vec3::new(-8.0, 5.0, 8.0));
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        renderer.set_graphics(&traced(RayTracedGlobalIllumination::Low));
+        assert!(renderer.graphics().ray_traced_gi_in_software);
+        // Warm up until every near probe has been traced multiple times.
+        for _ in 0..96 {
+            renderer.render(&world).unwrap();
+        }
+        let mut prev = renderer.read_pixels();
+        let mut worst_mean_diff = 0.0f32;
+        for _ in 0..40 {
+            renderer.render(&world).unwrap();
+            let curr = renderer.read_pixels();
+            let sum: u64 = prev
+                .chunks_exact(4)
+                .zip(curr.chunks_exact(4))
+                .map(|(a, b)| {
+                    u64::from(a[0].abs_diff(b[0]))
+                        + u64::from(a[1].abs_diff(b[1]))
+                        + u64::from(a[2].abs_diff(b[2]))
+                })
+                .sum();
+            let mean = sum as f32 / (3 * (prev.len() / 4)) as f32;
+            worst_mean_diff = worst_mean_diff.max(mean);
+            prev = curr;
+        }
+        assert!(
+            worst_mean_diff < 1.0,
+            "software ray traced GI flickered on a still scene: worst mean channel delta {worst_mean_diff}"
+        );
+    }
+
+    #[test]
     fn without_ray_queries_or_compute_shaders_nothing_is_traced() {
         let Some((device, queue)) = test_device() else {
             return skipped();

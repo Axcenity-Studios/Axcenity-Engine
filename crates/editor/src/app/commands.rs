@@ -15,11 +15,16 @@ const LABEL_LENGTH: usize = 40;
 impl EditorApp {
     /// The Console: the command line at the bottom, the log above it.
     pub(super) fn console_pane(&mut self, ui: &mut egui::Ui) {
+        let palette = theme::palette(ui.ctx());
         // The command line takes at most a third of the panel, so the log
         // above it always has room (cohesion pass CW2.5).
-        self.console.room = ui.available_height() / 3.0;
+        self.console.room = (ui.available_height() / 3.0).max(24.0);
         egui::Panel::bottom("console command line")
-            .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(0, 4)))
+            .frame(
+                egui::Frame::new()
+                    .fill(palette.panel)
+                    .inner_margin(egui::Margin::symmetric(0, 4)),
+            )
             .show_separator_line(false)
             .resizable(false)
             .show(ui, |ui| {
@@ -30,7 +35,11 @@ impl EditorApp {
                     self.pending_command = Some(command);
                 }
             });
-        if let Some(location) = self.output.show(ui) {
+        let clicked = egui::CentralPanel::default()
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| self.output.show(ui))
+            .inner;
+        if let Some(location) = clicked {
             if location.path.ends_with(".rs") {
                 self.open_engine_source(&location.path, location.line);
             } else {

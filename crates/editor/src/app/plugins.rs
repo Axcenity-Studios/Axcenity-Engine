@@ -940,8 +940,18 @@ impl EditorApp {
     /// The ribbon's Plugins group: each running plugin's toolbars.
     pub(in crate::app) fn plugin_ribbon_groups(&mut self, ui: &mut egui::Ui) {
         let playing = self.playing();
+        ribbon::group(ui, "Plugins", |ui| {
+            let button = RibbonButton::new(icons::PUZZLE_PIECE, "Plugins")
+                .selected(self.layout.is_open(Pane::Plugins));
+            if ui
+                .add(button)
+                .on_hover_text("Show or hide the Plugins manager panel.")
+                .clicked()
+            {
+                self.layout.toggle(Pane::Plugins);
+            }
+        });
         let mut clicked = None;
-        let mut any = false;
         for (index, entry) in self.plugins.entries.iter().enumerate() {
             let Some(plugin) = &entry.running else {
                 continue;
@@ -950,10 +960,7 @@ impl EditorApp {
                 if toolbar.buttons.is_empty() {
                     continue;
                 }
-                if any {
-                    ui.add(egui::Separator::default().vertical().spacing(10.0));
-                }
-                any = true;
+                ui.add(egui::Separator::default().vertical().spacing(10.0));
                 ribbon::group(ui, &toolbar.name, |ui| {
                     for button in &toolbar.buttons {
                         let ribbon_button =
@@ -975,17 +982,6 @@ impl EditorApp {
                     }
                 });
             }
-        }
-        if !any {
-            ribbon::group(ui, "Plugins", |ui| {
-                if ui
-                    .add(RibbonButton::new(icons::PUZZLE_PIECE, "Plugins"))
-                    .on_hover_text("No plugin has made a toolbar. Open the Plugins panel.")
-                    .clicked()
-                {
-                    self.layout.open(Pane::Plugins);
-                }
-            });
         }
         if let Some((index, button)) = clicked {
             self.click_plugin_button(index, button);

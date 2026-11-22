@@ -12,7 +12,7 @@ pub struct Section {
 
 /// The groups, in panel order, and which properties go in each. Name and
 /// ClassName come first, under "Data", and aren't in the property map.
-pub(super) const GROUPS: [(&str, &[&str]); 35] = [
+pub(super) const GROUPS: [(&str, &[&str]); 36] = [
     (
         "Appearance",
         &[
@@ -85,6 +85,7 @@ pub(super) const GROUPS: [(&str, &[&str]); 35] = [
         "Part",
         &["Shape", "MeshId", "Position", "Orientation", "Size"],
     ),
+    ("Pivot", &["PivotOffset"]),
     ("Terrain", &["Position", "Size", "DataFolder"]),
     (
         "Surface",

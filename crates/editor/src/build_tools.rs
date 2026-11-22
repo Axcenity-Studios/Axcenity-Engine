@@ -26,7 +26,11 @@
 //! The panel only reads the world and returns [`ToolAction`]s; the app
 //! applies each as one undo step. Values shown are the last selected part's.
 
-use axcenity_core::{ClassName, Color3, InstanceId, Material, ParticleType, Value, Vector3, World};
+use axcenity_core::{
+    CFrame, ClassName, Color3, InstanceId, Material, ParticleType, Value, Vector3, World,
+};
+use axcenity_render::glam::Quat;
+use axcenity_scene::{orientation_from_rotation, rotation_from_orientation};
 use eframe::egui;
 
 use crate::angular::AngularSettings;
@@ -101,6 +105,12 @@ pub enum ToolAction {
     NewCustomMaterial,
     /// Bring in a material file from anywhere on the computer.
     LoadMaterial,
+    /// Toggle Edit Pivot mode on or off.
+    ToggleEditPivot,
+    /// Put the selected object's pivot back at its center.
+    ResetPivot,
+    /// Set `PivotOffset` directly on `target`.
+    SetPivot { target: InstanceId, offset: CFrame },
 }
 
 /// What the panel shows: the world and the parts the tools act on.
@@ -110,6 +120,10 @@ pub struct PanelScene<'a> {
     pub parts: &'a [InstanceId],
     /// The project's material files' paths.
     pub materials: &'a [String],
+    /// The single selected BasePart or Model whose pivot can be edited.
+    pub pivot_target: Option<InstanceId>,
+    /// True while Edit Pivot mode is active.
+    pub edit_pivot: bool,
 }
 
 impl PanelScene<'_> {
@@ -161,6 +175,10 @@ pub fn panel(
     snap: &mut Snap,
 ) -> Vec<ToolAction> {
     let mut actions = Vec::new();
+    if scene.edit_pivot {
+        edit_pivot_panel(ui, scene, snap, &mut actions);
+        return actions;
+    }
     ui.horizontal(|ui| {
         ui.label(
             egui::RichText::new(theme::with_icon(theme::tool_icon(tool), tool.label()))
@@ -179,6 +197,7 @@ pub fn panel(
         Tool::Move => {
             axes_choice(ui, modes);
             studs_step(ui, snap);
+            pivot_controls(ui, scene, &mut actions);
         }
         Tool::Scale => {
             choice(
@@ -203,6 +222,7 @@ pub fn panel(
         Tool::Rotate => {
             pivot_choice(ui, modes);
             turn_step(ui, snap);
+            pivot_controls(ui, scene, &mut actions);
         }
         Tool::Transform => {
             transform(ui, scene, &mut actions);
@@ -211,6 +231,7 @@ pub fn panel(
             pivot_choice(ui, modes);
             studs_step(ui, snap);
             turn_step(ui, snap);
+            pivot_controls(ui, scene, &mut actions);
         }
         Tool::Paint => paint(ui, scene, settings, &mut actions),
         Tool::Material => material(ui, scene, settings, &mut actions),
@@ -331,6 +352,210 @@ fn angular(
     {
         actions.push(ToolAction::Extend);
     }
+}
+
+/// Compact Edit Pivot / Reset Pivot buttons inside the Move, Rotate and
+/// Transform tool panels.
+fn pivot_controls(ui: &mut egui::Ui, scene: &PanelScene, actions: &mut Vec<ToolAction>) {
+    ui.separator();
+    let has_target = scene.pivot_target.is_some();
+    let has_custom = scene
+        .pivot_target
+        .and_then(|id| scene.world.get(id))
+        .and_then(crate::gizmo::pivot_offset_of)
+        .is_some();
+    ui.horizontal(|ui| {
+        if ui
+            .add_enabled(
+                has_target,
+                egui::Button::new(theme::with_icon(icons::CROSSHAIR_SIMPLE, "Edit Pivot")),
+            )
+            .on_hover_text("Move or angle the object's pivot without moving the object.")
+            .clicked()
+        {
+            actions.push(ToolAction::ToggleEditPivot);
+        }
+        if ui
+            .add_enabled(
+                has_custom,
+                egui::Button::new(theme::with_icon(icons::ARROW_COUNTER_CLOCKWISE, "Reset")),
+            )
+            .on_hover_text("Put the pivot back at the center.")
+            .clicked()
+        {
+            actions.push(ToolAction::ResetPivot);
+        }
+    });
+}
+
+/// The Edit Pivot options panel: drag or type the local offset and angle of
+/// the selected object's pivot, snap it to common points, or reset it.
+fn edit_pivot_panel(
+    ui: &mut egui::Ui,
+    scene: &PanelScene,
+    snap: &mut Snap,
+    actions: &mut Vec<ToolAction>,
+) {
+    ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new(theme::with_icon(icons::CROSSHAIR_SIMPLE, "Edit Pivot"))
+                .family(theme::heading_family())
+                .color(theme::palette(ui.ctx()).text_strong),
+        );
+        let subtitle = scene
+            .pivot_target
+            .and_then(|id| scene.world.get(id))
+            .map_or("select a Part or Model", |i| i.name());
+        ui.weak(subtitle);
+    });
+    ui.separator();
+    let Some(target) = scene.pivot_target else {
+        ui.weak("Select one Part or Model to move or rotate its pivot point.");
+        if ui.button("Done").clicked() {
+            actions.push(ToolAction::ToggleEditPivot);
+        }
+        return;
+    };
+    let Some(instance) = scene.world.get(target) else {
+        return;
+    };
+    let cf = match instance.property("PivotOffset") {
+        Some(Value::CFrame(cf)) => *cf,
+        _ => CFrame::IDENTITY,
+    };
+    let mut offset = cf.position;
+    let start_rot = Quat::from_array(cf.rotation);
+    let start_rot = if start_rot.length_squared() > 1e-8 {
+        start_rot.normalize()
+    } else {
+        Quat::IDENTITY
+    };
+    let mut angle = orientation_from_rotation(start_rot);
+    let orig_offset = offset;
+    let orig_angle = angle;
+    egui::Grid::new("edit pivot numbers")
+        .num_columns(4)
+        .spacing([4.0, 4.0])
+        .show(ui, |ui| {
+            ui.label("Offset");
+            for (axis, value) in [
+                ("X", &mut offset.x),
+                ("Y", &mut offset.y),
+                ("Z", &mut offset.z),
+            ] {
+                ui.add_sized(
+                    [62.0, 20.0],
+                    egui::DragValue::new(value)
+                        .speed(0.05)
+                        .max_decimals(3)
+                        .prefix(format!("{axis} ")),
+                );
+            }
+            ui.end_row();
+            ui.label("Angle");
+            for (axis, value) in [
+                ("X", &mut angle.x),
+                ("Y", &mut angle.y),
+                ("Z", &mut angle.z),
+            ] {
+                ui.add_sized(
+                    [62.0, 20.0],
+                    egui::DragValue::new(value)
+                        .speed(0.5)
+                        .max_decimals(2)
+                        .prefix(format!("{axis} "))
+                        .suffix("°"),
+                );
+            }
+            ui.end_row();
+        });
+    if offset != orig_offset || angle != orig_angle {
+        let rot = if angle != orig_angle {
+            rotation_from_orientation(angle)
+        } else {
+            start_rot
+        };
+        let next = CFrame {
+            position: offset,
+            rotation: rot.normalize().to_array(),
+        };
+        actions.push(ToolAction::SetPivot {
+            target,
+            offset: if next.is_identity() {
+                CFrame::IDENTITY
+            } else {
+                next
+            },
+        });
+    }
+    if let Some(size) = instance.property("Size").and_then(Value::as_vector3) {
+        ui.horizontal(|ui| {
+            ui.label("Place");
+            if ui
+                .small_button("Center")
+                .on_hover_text("Center the pivot offset (keeps angle).")
+                .clicked()
+            {
+                actions.push(ToolAction::SetPivot {
+                    target,
+                    offset: CFrame {
+                        position: Vector3::new(0.0, 0.0, 0.0),
+                        rotation: start_rot.to_array(),
+                    },
+                });
+            }
+            if ui
+                .small_button("Bottom")
+                .on_hover_text("Place pivot on the bottom face.")
+                .clicked()
+            {
+                actions.push(ToolAction::SetPivot {
+                    target,
+                    offset: CFrame {
+                        position: Vector3::new(0.0, -size.y * 0.5, 0.0),
+                        rotation: start_rot.to_array(),
+                    },
+                });
+            }
+            if ui
+                .small_button("Top")
+                .on_hover_text("Place pivot on the top face.")
+                .clicked()
+            {
+                actions.push(ToolAction::SetPivot {
+                    target,
+                    offset: CFrame {
+                        position: Vector3::new(0.0, size.y * 0.5, 0.0),
+                        rotation: start_rot.to_array(),
+                    },
+                });
+            }
+        });
+    }
+    studs_step(ui, snap);
+    turn_step(ui, snap);
+    ui.separator();
+    ui.horizontal(|ui| {
+        if ui
+            .button(theme::with_icon(icons::ARROW_COUNTER_CLOCKWISE, "Reset"))
+            .on_hover_text("Reset both pivot position and angle to the center.")
+            .clicked()
+        {
+            actions.push(ToolAction::ResetPivot);
+        }
+        let palette = theme::palette(ui.ctx());
+        if ui
+            .add(crate::widgets::button(
+                crate::widgets::Role::Primary,
+                None,
+                "Done",
+                &palette,
+            ))
+            .clicked()
+        {
+            actions.push(ToolAction::ToggleEditPivot);
+        }
+    });
 }
 
 /// The Transform panel's numbers: the last selected part's Position,
@@ -1131,6 +1356,8 @@ mod tests {
                         world: &world,
                         parts: &[part],
                         materials: &materials,
+                        pivot_target: Some(part),
+                        edit_pivot: false,
                     };
                     panel(
                         ui,
@@ -1197,6 +1424,8 @@ mod tests {
                         world: &world,
                         parts: &[part],
                         materials: &[],
+                        pivot_target: Some(part),
+                        edit_pivot: false,
                     };
                     let actions = panel(ui, tool, &scene, &mut settings, &mut modes, &mut snap);
                     assert!(actions.is_empty());

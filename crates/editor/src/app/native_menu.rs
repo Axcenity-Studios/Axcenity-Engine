@@ -309,15 +309,20 @@ impl EditorApp {
 
         let mut view = Items::default();
         view.heading("Panels");
-        for pane in Pane::CLOSABLE {
-            view.check(
-                pane.label(),
-                MenuAction::Command(Command::TogglePane(pane)),
-                ready,
-                self.layout.is_open(pane),
-            );
+        for group in Pane::GROUPS {
+            let mut sub = Items::default();
+            for &pane in group.panes {
+                sub.check(
+                    pane.label(),
+                    MenuAction::Command(Command::TogglePane(pane)),
+                    ready,
+                    self.layout.is_open(pane),
+                );
+            }
+            view.submenu(group.label, sub);
         }
-        view.command("Reset Layout", Command::ResetLayout, ready)
+        view.separator()
+            .command("Reset Layout", Command::ResetLayout, ready)
             .submenu("Layout", self.layout_items(ready))
             .separator()
             .command("New Ribbon Tab…", Command::NewRibbonTab, ready)

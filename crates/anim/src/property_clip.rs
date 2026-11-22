@@ -417,8 +417,39 @@ impl Placement {
     }
 }
 
+/// A Model or BasePart's custom `PivotOffset` as a [`Placement`], or `None`
+/// when it is at the default identity pivot.
+pub fn pivot_offset_of(world: &World, id: InstanceId) -> Option<Placement> {
+    let instance = world.get(id)?;
+    let Some(axcenity_core::Value::CFrame(cf)) = instance.property("PivotOffset") else {
+        return None;
+    };
+    if cf.is_identity() {
+        return None;
+    }
+    let rotation = Quat::from_array(cf.rotation);
+    Some(Placement {
+        position: Vec3::new(cf.position.x, cf.position.y, cf.position.z),
+        rotation: if rotation.length_squared() > 1e-8 {
+            rotation.normalize()
+        } else {
+            Quat::IDENTITY
+        },
+    })
+}
+
+/// A Part's pivot in world space: its own placement followed by its
+/// `PivotOffset` (if customized).
+pub fn part_pivot(world: &World, id: InstanceId) -> Option<Placement> {
+    let part = Placement::of_part(world, id)?;
+    Some(match pivot_offset_of(world, id) {
+        Some(offset) => part.then(offset),
+        None => part,
+    })
+}
+
 /// A Model's pivot when nothing has moved it: the middle of the box around
-/// its parts, turned the way it was built.
+/// its parts, shifted and turned by its `PivotOffset`.
 pub fn model_pivot(world: &World, model: InstanceId) -> Option<Placement> {
     let mut min = Vec3::splat(f32::INFINITY);
     let mut max = Vec3::splat(f32::NEG_INFINITY);
@@ -440,9 +471,15 @@ pub fn model_pivot(world: &World, model: InstanceId) -> Option<Placement> {
         min = min.min(placement.position - reach);
         max = max.max(placement.position + reach);
     }
-    min.x.is_finite().then(|| Placement {
-        position: (min + max) / 2.0,
-        rotation: Quat::IDENTITY,
+    min.x.is_finite().then(|| {
+        let base = Placement {
+            position: (min + max) / 2.0,
+            rotation: Quat::IDENTITY,
+        };
+        match pivot_offset_of(world, model) {
+            Some(offset) => base.then(offset),
+            None => base,
+        }
     })
 }
 
@@ -466,13 +503,16 @@ struct Rest {
 }
 
 impl Applied {
-    /// Where `model`'s pivot is now: where its tracks last put it, or where
-    /// it is unmoved.
-    pub fn pivot(&self, world: &World, model: InstanceId) -> Option<Placement> {
-        self.pivots
-            .get(&model)
-            .copied()
-            .or_else(|| model_pivot(world, model))
+    /// Where `id`'s pivot is now (a Model, or a Part with a custom
+    /// `PivotOffset`): where its tracks last put it, or where it is unmoved.
+    pub fn pivot(&self, world: &World, id: InstanceId) -> Option<Placement> {
+        self.pivots.get(&id).copied().or_else(|| {
+            if world.get(id).is_some_and(|i| i.class() == ClassName::Model) {
+                model_pivot(world, id)
+            } else {
+                part_pivot(world, id)
+            }
+        })
     }
 
     /// Remembers where `id` (at `at`) and the parts inside it are, the first
@@ -548,6 +588,46 @@ pub fn apply_evaluated(
             applied.pivots.insert(id, pivot);
             continue;
         }
+        // A Part with a custom PivotOffset animates its world pivot, just
+        // like a Model, so turning around an off-center hinge sweeps a clean
+        // arc instead of drifting along a chord.
+        if let Some(offset) = pivot_offset_of(world, id)
+            && items.iter().any(moves)
+            && let Some(start) = part_pivot(world, id)
+        {
+            let rest = applied.rest(world, id, start).at;
+            let mut pivot = rest;
+            for item in &items {
+                match (item.property, item.value.as_slice()) {
+                    (PropertyName::Position, [x, y, z]) => pivot.position = Vec3::new(*x, *y, *z),
+                    (PropertyName::Orientation, [x, y, z]) => {
+                        pivot.rotation = quat_from_orientation(Vector3::new(*x, *y, *z));
+                    }
+                    _ => {
+                        let name = item.property.as_str();
+                        let value = world
+                            .get(id)
+                            .and_then(|i| i.property(name))
+                            .and_then(|like| value_from_numbers(like, &item.value));
+                        let set =
+                            value.is_some_and(|value| world.set_property(id, name, value).is_ok());
+                        if !set {
+                            applied.missing.insert(format!("{target}:{name}"));
+                        }
+                    }
+                }
+            }
+            let part_rotation = pivot.rotation * offset.rotation.inverse();
+            let part_position = pivot.position - part_rotation * offset.position;
+            Placement {
+                position: part_position,
+                rotation: part_rotation,
+            }
+            .put(world, id);
+            carry(world, applied, id, pivot);
+            applied.pivots.insert(id, pivot);
+            continue;
+        }
         // A part that moves carries the parts inside it from where they
         // were the first time it did.
         let carries = items.iter().any(moves)
@@ -586,7 +666,10 @@ pub fn current_numbers(
 ) -> Option<Vec<f32>> {
     let id = resolve_target(world, root, target)?;
     let instance = world.get(id)?;
-    if instance.class() == ClassName::Model {
+    if instance.class() == ClassName::Model
+        || (pivot_offset_of(world, id).is_some()
+            && matches!(property, PropertyName::Position | PropertyName::Orientation))
+    {
         let (position, orientation) = applied.pivot(world, id)?.numbers();
         return match property {
             PropertyName::Position => Some(position.to_vec()),

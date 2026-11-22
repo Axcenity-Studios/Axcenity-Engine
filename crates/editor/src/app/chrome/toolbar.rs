@@ -354,6 +354,12 @@ impl EditorApp {
         } else {
             tool
         };
+        if !matches!(
+            self.tool,
+            Tool::Select | Tool::Move | Tool::Rotate | Tool::Transform
+        ) {
+            self.edit_pivot = false;
+        }
     }
 
     /// Draws one of the ribbon's groups. Buttons that act on the whole app
@@ -395,10 +401,63 @@ impl EditorApp {
                     )
                     .on_disabled_hover_text("Open a project first.")
                     .clicked();
+                for (pane, hint) in [
+                    (
+                        Pane::Profiler,
+                        "Show or hide the Profiler panel: frame time, GPU cost and memory during Play.",
+                    ),
+                    (
+                        Pane::Mixer,
+                        "Show or hide the Mixer panel: SoundGroups with live levels, mute and solo.",
+                    ),
+                    (
+                        Pane::Tests,
+                        "Show or hide the Tests panel: run the project's Luau game tests.",
+                    ),
+                    (
+                        Pane::LodInspector,
+                        "Show or hide the LOD Inspector for the selected MeshPart.",
+                    ),
+                ] {
+                    let btn = RibbonButton::new(pane.icon(), pane.label())
+                        .selected(self.layout.is_open(pane));
+                    if ui.add(btn).on_hover_text(hint).clicked() {
+                        self.layout.toggle(pane);
+                    }
+                }
             }),
             RibbonGroup::Plugins => self.plugin_ribbon_groups(ui),
             RibbonGroup::Tools => ribbon::group_tinted(ui, "Tools", Some(group.hue()), |ui| {
                 self.tool_buttons(ui, &Tool::TRANSFORM);
+                let has_target =
+                    crate::viewport::pivot_target(&self.world, &self.selection, self.selected)
+                        .is_some();
+                let edit = RibbonButton::new(icons::CROSSHAIR_SIMPLE, "Edit Pivot")
+                    .selected(self.edit_pivot);
+                if ui
+                    .add_enabled(!playing, edit)
+                    .on_hover_text(
+                        "Move or turn the selected Part's or Model's pivot point without moving \
+                         the object, so Move and Rotate act around that point and angle.",
+                    )
+                    .on_disabled_hover_text("Press Stop to edit.")
+                    .clicked()
+                {
+                    self.edit_pivot = !self.edit_pivot;
+                }
+                let reset = RibbonButton::new(icons::ARROW_COUNTER_CLOCKWISE, "Reset Pivot");
+                if ui
+                    .add_enabled(!playing && has_target, reset)
+                    .on_hover_text("Put the selected object's pivot back at its center.")
+                    .on_disabled_hover_text(if playing {
+                        "Press Stop to edit."
+                    } else {
+                        "Select a Part or Model first."
+                    })
+                    .clicked()
+                {
+                    self.reset_pivot();
+                }
             }),
             RibbonGroup::Build => ribbon::group_tinted(ui, "Build", Some(group.hue()), |ui| {
                 self.tool_buttons(ui, &Tool::BUILD);
@@ -529,6 +588,17 @@ impl EditorApp {
                     playing,
                     &mut clicks.insert,
                 );
+                let effect = RibbonButton::new(Pane::Effect.icon(), Pane::Effect.label())
+                    .selected(self.layout.is_open(Pane::Effect));
+                if ui
+                    .add(effect)
+                    .on_hover_text(
+                        "Show or hide the Effect editor for the selected particle effect.",
+                    )
+                    .clicked()
+                {
+                    self.layout.toggle(Pane::Effect);
+                }
             }),
             RibbonGroup::Lights => {
                 ribbon::group_tinted(ui, "Lights & Sky", Some(group.hue()), |ui| {
@@ -633,6 +703,52 @@ impl EditorApp {
                         playing,
                         &mut clicks.insert,
                     );
+                    let studios_open = [Pane::Animation, Pane::Sequencer, Pane::CharacterStudio]
+                        .into_iter()
+                        .any(|pane| self.layout.is_open(pane));
+                    let studios = ui
+                        .add(
+                            RibbonButton::new(icons::FILM_SLATE, "Studios")
+                                .selected(studios_open)
+                                .dropdown(),
+                        )
+                        .on_hover_text("Open Animation, Sequencer or Character Studio panels.");
+                    egui::Popup::menu(&studios)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .show(|ui| {
+                            for pane in [Pane::Animation, Pane::Sequencer, Pane::CharacterStudio] {
+                                let item = egui::Button::selectable(
+                                    self.layout.is_open(pane),
+                                    theme::menu_item(ui.ctx(), pane.icon(), pane.label()),
+                                );
+                                if ui.add(item).clicked() {
+                                    self.layout.toggle(pane);
+                                }
+                            }
+                        });
+                    let scene_open = [Pane::Levels, Pane::Layers, Pane::Tags]
+                        .into_iter()
+                        .any(|pane| self.layout.is_open(pane));
+                    let scene = ui
+                        .add(
+                            RibbonButton::new(icons::STACK, "Scene")
+                                .selected(scene_open)
+                                .dropdown(),
+                        )
+                        .on_hover_text("Open Levels, Layers or Tags panels.");
+                    egui::Popup::menu(&scene)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .show(|ui| {
+                            for pane in [Pane::Levels, Pane::Layers, Pane::Tags] {
+                                let item = egui::Button::selectable(
+                                    self.layout.is_open(pane),
+                                    theme::menu_item(ui.ctx(), pane.icon(), pane.label()),
+                                );
+                                if ui.add(item).clicked() {
+                                    self.layout.toggle(pane);
+                                }
+                            }
+                        });
                 })
             }
             RibbonGroup::Solid => {
@@ -741,17 +857,21 @@ impl EditorApp {
                 {
                     self.layout.open(Pane::ModelStudio);
                 }
-                let scatter = RibbonButton::new(Pane::Scatter.icon(), "Scatter")
-                    .selected(self.layout.is_open(Pane::Scatter));
-                if ui
-                    .add_enabled(can_play, scatter)
-                    .on_hover_text(
-                        "Open the Scatter pane: choose props and models, how big each is, its share of the mix and whether it collides, then paint them onto terrain.",
-                    )
-                    .on_disabled_hover_text("Open a project first.")
-                    .clicked()
-                {
-                    self.open_scatter();
+                for (pane, hint) in [
+                    (
+                        Pane::Material,
+                        "Show or hide the Material editor panel for .material.json files.",
+                    ),
+                    (
+                        Pane::Toolbox,
+                        "Show or hide the Toolbox panel: browse online assets and the asset library.",
+                    ),
+                ] {
+                    let btn = RibbonButton::new(pane.icon(), pane.label())
+                        .selected(self.layout.is_open(pane));
+                    if ui.add(btn).on_hover_text(hint).clicked() {
+                        self.layout.toggle(pane);
+                    }
                 }
             }),
             RibbonGroup::Ui => ribbon::group_tinted(ui, "UI", Some(group.hue()), |ui| {
@@ -813,6 +933,15 @@ impl EditorApp {
                     )
                     .on_disabled_hover_text("Open a project, and press Stop to edit.")
                     .clicked();
+                let designer = RibbonButton::new(Pane::UiDesigner.icon(), Pane::UiDesigner.label())
+                    .selected(self.layout.is_open(Pane::UiDesigner));
+                if ui
+                    .add(designer)
+                    .on_hover_text("Show or hide the UI Designer artboard and inspector.")
+                    .clicked()
+                {
+                    self.layout.toggle(Pane::UiDesigner);
+                }
             }),
             RibbonGroup::Scripts => ribbon::group_tinted(ui, "Scripts", Some(group.hue()), |ui| {
                 for class in explorer::SCRIPT_CLASSES {
@@ -828,6 +957,23 @@ impl EditorApp {
                         .clicked()
                     {
                         clicks.insert_script = Some(class);
+                    }
+                }
+                for (pane, hint) in [
+                    (
+                        Pane::BehaviorTree,
+                        "Show or hide the Behavior Tree graph editor.",
+                    ),
+                    (Pane::Dialogue, "Show or hide the Dialogue graph editor."),
+                    (
+                        Pane::DataTable,
+                        "Show or hide the Data Table spreadsheet editor.",
+                    ),
+                ] {
+                    let btn = RibbonButton::new(pane.icon(), pane.label())
+                        .selected(self.layout.is_open(pane));
+                    if ui.add(btn).on_hover_text(hint).clicked() {
+                        self.layout.toggle(pane);
                     }
                 }
             }),
@@ -874,15 +1020,28 @@ impl EditorApp {
                         }
                     }
                 });
+                let scatter = RibbonButton::new(Pane::Scatter.icon(), "Scatter")
+                    .selected(self.layout.is_open(Pane::Scatter));
+                if ui
+                    .add_enabled(can_play, scatter)
+                    .on_hover_text(
+                        "Open the Scatter pane: choose props and models, how big each is, its share of the mix and whether it collides, then paint them onto terrain.",
+                    )
+                    .on_disabled_hover_text("Open a project first.")
+                    .clicked()
+                {
+                    self.open_scatter();
+                }
             }),
             RibbonGroup::Panels => ribbon::group_tinted(ui, "Panels", Some(group.hue()), |ui| {
-                for pane in [Pane::Explorer, Pane::Properties] {
+                for pane in Pane::CORE {
                     let button = RibbonButton::new(pane.icon(), pane.label())
                         .selected(self.layout.is_open(pane));
                     if ui
                         .add(button)
                         .on_hover_text(format!(
-                            "Show or hide the {} panel. Drag a panel by its tab to move it.",
+                            "Show or hide the {} panel. Drag a panel by its tab to move it. \
+                             More panels are on their matching ribbon tabs and under View ▸ Panels.",
                             pane.label()
                         ))
                         .clicked()
@@ -890,36 +1049,6 @@ impl EditorApp {
                         self.layout.toggle(pane);
                     }
                 }
-                let more = RibbonButton::new(icons::SIDEBAR, "Panels").dropdown();
-                let more = ui.add(more).on_hover_text(
-                    "Show or hide any panel, or put them all back where they start.",
-                );
-                egui::Popup::menu(&more)
-                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-                    .show(|ui| {
-                        for pane in Pane::CLOSABLE {
-                            let item = egui::Button::selectable(
-                                self.layout.is_open(pane),
-                                theme::menu_item(ui.ctx(), pane.icon(), pane.label()),
-                            );
-                            if ui.add(item).clicked() {
-                                self.layout.toggle(pane);
-                            }
-                        }
-                        ui.separator();
-                        if ui
-                            .button(theme::menu_item(
-                                ui.ctx(),
-                                icons::ARROW_COUNTER_CLOCKWISE,
-                                "Reset Layout",
-                            ))
-                            .on_hover_text("Put every panel back where it starts.")
-                            .clicked()
-                        {
-                            self.layout.reset();
-                            ui.close();
-                        }
-                    });
             }),
             RibbonGroup::Overlays => ribbon::group_tinted(ui, "View", Some(group.hue()), |ui| {
                 let cube =
@@ -1086,102 +1215,238 @@ impl EditorApp {
     /// runs, the network emulated between them, and, while several play,
     /// which one the viewport shows.
     fn play_settings_controls(&mut self, ui: &mut egui::Ui, playing: bool) {
-        ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label("Clients");
-                let mut clients = self.play_settings.clients;
-                ui.add_enabled(
-                    !playing,
-                    egui::DragValue::new(&mut clients).range(1..=crate::play::multi::MAX_CLIENTS),
-                )
-                .on_hover_text(
-                    "How many players Play runs, each a client with its own world. The first \
-                     plays on the server; the others join it, as players on other computers do.",
-                )
-                .on_disabled_hover_text("Stop the game to change how many clients play.");
-                self.play_settings.clients = clients;
-            });
-            ui.horizontal(|ui| {
-                crate::widgets::menu_button(ui, Some(icons::WIFI_HIGH), "Network", |ui| {
-                    let mut conditions = self.play_settings.conditions;
-                    let mut latency = conditions.latency.as_secs_f64() * 1000.0;
-                    let mut jitter = conditions.jitter.as_secs_f64() * 1000.0;
-                    let mut loss = conditions.loss * 100.0;
-                    crate::responsive::form(ui, "play network", |ui| {
-                        ui.label("Latency");
-                        ui.add(
-                            egui::DragValue::new(&mut latency)
-                                .range(0.0..=1000.0)
-                                .suffix(" ms"),
+        let palette = theme::palette(ui.ctx());
+        let density = theme::density(ui.ctx());
+        let compact = density == theme::Density::Compact;
+        let height = ribbon::button_height(density);
+
+        // Players count card: matches the ribbon's button height and icon-over-caption rhythm.
+        let mut clients = self.play_settings.clients;
+        egui::Frame::new()
+            .fill(palette.surface)
+            .stroke(egui::Stroke::new(1.0_f32, palette.border))
+            .corner_radius(theme::radius::CONTROL)
+            .inner_margin(egui::Margin::symmetric(8, if compact { 2 } else { 4 }))
+            .show(ui, |ui| {
+                let inner_h = (height - if compact { 4.0 } else { 8.0 }).max(18.0);
+                if compact {
+                    ui.horizontal_centered(|ui| {
+                        ui.set_height(inner_h);
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.label(
+                            egui::RichText::new(icons::USERS)
+                                .size(14.0)
+                                .color(if playing {
+                                    palette.text_muted
+                                } else {
+                                    palette.text_secondary
+                                }),
+                        );
+                        ui.add_enabled(
+                            !playing,
+                            egui::DragValue::new(&mut clients)
+                                .range(1..=crate::play::multi::MAX_CLIENTS),
                         )
-                        .on_hover_text("Added to every packet each way between the clients.");
-                        ui.end_row();
-                        ui.label("Jitter");
-                        ui.add(
-                            egui::DragValue::new(&mut jitter)
-                                .range(0.0..=500.0)
-                                .suffix(" ms"),
+                        .on_hover_text(
+                            "How many players Play runs, each a client with its own world. The \
+                             first plays on the server; the others join it, as players on other \
+                             computers do.",
                         )
-                        .on_hover_text("Each packet is up to this much earlier or later.");
-                        ui.end_row();
-                        ui.label("Packet loss");
-                        ui.add(
-                            egui::DragValue::new(&mut loss)
-                                .range(0.0..=50.0)
-                                .suffix(" %"),
-                        )
-                        .on_hover_text("This share of packets never arrives.");
-                        ui.end_row();
+                        .on_disabled_hover_text("Stop the game to change how many clients play.");
                     });
-                    ui.weak("Between Play's clients, with 2 or more.");
-                    conditions.latency = std::time::Duration::from_secs_f64(latency / 1000.0);
-                    conditions.jitter = std::time::Duration::from_secs_f64(jitter / 1000.0);
-                    conditions.loss = loss / 100.0;
-                    if conditions != self.play_settings.conditions {
-                        self.play_settings.conditions = conditions;
-                        if let Some(play) = &mut self.play {
-                            play.emulate(conditions);
+                } else {
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(62.0, inner_h),
+                        egui::Layout::top_down(egui::Align::Center),
+                        |ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 4.0;
+                                ui.label(egui::RichText::new(icons::USERS).size(15.0).color(
+                                    if playing {
+                                        palette.text_muted
+                                    } else {
+                                        palette.text_secondary
+                                    },
+                                ));
+                                ui.add_enabled(
+                                    !playing,
+                                    egui::DragValue::new(&mut clients)
+                                        .range(1..=crate::play::multi::MAX_CLIENTS),
+                                )
+                                .on_hover_text(
+                                    "How many players Play runs, each a client with its own \
+                                     world. The first plays on the server; the others join it, as \
+                                     players on other computers do.",
+                                )
+                                .on_disabled_hover_text(
+                                    "Stop the game to change how many clients play.",
+                                );
+                            });
+                            ui.label(
+                                egui::RichText::new("Players")
+                                    .size(theme::type_scale::CAPTION)
+                                    .color(palette.text_secondary),
+                            );
+                        },
+                    );
+                }
+            });
+        self.play_settings.clients = clients;
+
+        // While multiple clients play, show a matching Viewing selector card beside Players.
+        if let Some(play) = &mut self.play
+            && play.clients() > 1
+        {
+            let views = play.views();
+            let shown = play.view();
+            let name = views
+                .iter()
+                .find(|(view, _)| *view == shown)
+                .map(|(_, name)| name.clone())
+                .unwrap_or_default();
+            egui::Frame::new()
+                .fill(palette.surface)
+                .stroke(egui::Stroke::new(1.0_f32, palette.border))
+                .corner_radius(theme::radius::CONTROL)
+                .inner_margin(egui::Margin::symmetric(8, if compact { 2 } else { 4 }))
+                .show(ui, |ui| {
+                    let inner_h = (height - if compact { 4.0 } else { 8.0 }).max(18.0);
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(92.0, inner_h),
+                        egui::Layout::top_down(egui::Align::Center),
+                        |ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            egui::ComboBox::from_id_salt("play view")
+                                .width(86.0)
+                                .selected_text(name)
+                                .show_ui(ui, |ui| {
+                                    for (view, name) in views {
+                                        if ui.selectable_label(view == shown, name).clicked() {
+                                            play.set_view(view);
+                                        }
+                                    }
+                                })
+                                .response
+                                .on_hover_text(
+                                    "Which device the viewport, Explorer and Properties show: the \
+                                     server, from the fly camera, or a client's game, which gets \
+                                     the keys and mouse.",
+                                );
+                            if !compact {
+                                ui.label(
+                                    egui::RichText::new("Viewing")
+                                        .size(theme::type_scale::CAPTION)
+                                        .color(palette.text_secondary),
+                                );
+                            }
+                        },
+                    );
+                });
+        }
+
+        // Network emulation dropdown matching the ribbon's dropdown buttons (Overlays, View Mode).
+        let conditions = self.play_settings.conditions;
+        let emulating =
+            !conditions.latency.is_zero() || !conditions.jitter.is_zero() || conditions.loss > 0.0;
+        let network_tip = if emulating {
+            format!(
+                "Network emulation active: {:.0} ms latency, {:.0} ms jitter, {:.0}% packet loss.",
+                conditions.latency.as_secs_f64() * 1000.0,
+                conditions.jitter.as_secs_f64() * 1000.0,
+                conditions.loss * 100.0,
+            )
+        } else {
+            "Emulate latency, jitter, and packet loss between Play's clients (2 or more)."
+                .to_owned()
+        };
+        let network_btn = ui
+            .add(
+                RibbonButton::new(icons::WIFI_HIGH, "Network")
+                    .selected(emulating)
+                    .dropdown(),
+            )
+            .on_hover_text(network_tip);
+        egui::Popup::menu(&network_btn)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                ui.set_min_width(230.0);
+                let mut conditions = self.play_settings.conditions;
+                ui.label(widgets::micro("Presets", palette.text_weak));
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+                    for (label, lat_ms, jit_ms, loss_pct) in [
+                        ("Ideal", 0.0, 0.0, 0.0),
+                        ("Wi-Fi", 40.0, 8.0, 0.5),
+                        ("4G", 120.0, 25.0, 2.0),
+                        ("Lossy", 250.0, 60.0, 8.0),
+                    ] {
+                        let active = (conditions.latency.as_secs_f64() * 1000.0 - lat_ms).abs()
+                            < 0.5
+                            && (conditions.jitter.as_secs_f64() * 1000.0 - jit_ms).abs() < 0.5
+                            && (conditions.loss * 100.0 - loss_pct).abs() < 0.1;
+                        if widgets::chip(ui, label, active).clicked() {
+                            conditions.latency =
+                                std::time::Duration::from_secs_f64(lat_ms / 1000.0);
+                            conditions.jitter = std::time::Duration::from_secs_f64(jit_ms / 1000.0);
+                            conditions.loss = loss_pct / 100.0;
                         }
                     }
                 });
-                let mut pause_on_error = self.play_settings.pause_on_error;
-                if ui
-                    .checkbox(&mut pause_on_error, "Pause on errors")
-                    .on_hover_text(
-                        "A script error pauses Play where it happened, with that script's \
-                         variables, instead of only being shown in Output.",
+                ui.separator();
+                let mut latency = conditions.latency.as_secs_f64() * 1000.0;
+                let mut jitter = conditions.jitter.as_secs_f64() * 1000.0;
+                let mut loss = conditions.loss * 100.0;
+                crate::responsive::form(ui, "play network", |ui| {
+                    ui.label("Latency");
+                    ui.add(
+                        egui::DragValue::new(&mut latency)
+                            .range(0.0..=1000.0)
+                            .suffix(" ms"),
                     )
-                    .changed()
-                {
-                    self.set_pause_on_error(pause_on_error);
+                    .on_hover_text("Added to every packet each way between the clients.");
+                    ui.end_row();
+                    ui.label("Jitter");
+                    ui.add(
+                        egui::DragValue::new(&mut jitter)
+                            .range(0.0..=500.0)
+                            .suffix(" ms"),
+                    )
+                    .on_hover_text("Each packet is up to this much earlier or later.");
+                    ui.end_row();
+                    ui.label("Packet loss");
+                    ui.add(
+                        egui::DragValue::new(&mut loss)
+                            .range(0.0..=50.0)
+                            .suffix(" %"),
+                    )
+                    .on_hover_text("This share of packets never arrives.");
+                    ui.end_row();
+                });
+                ui.weak("Applies between Play's clients when 2 or more run.");
+                conditions.latency = std::time::Duration::from_secs_f64(latency / 1000.0);
+                conditions.jitter = std::time::Duration::from_secs_f64(jitter / 1000.0);
+                conditions.loss = loss / 100.0;
+                if conditions != self.play_settings.conditions {
+                    self.play_settings.conditions = conditions;
+                    if let Some(play) = &mut self.play {
+                        play.emulate(conditions);
+                    }
                 }
             });
-            if let Some(play) = &mut self.play
-                && play.clients() > 1
-            {
-                let views = play.views();
-                let shown = play.view();
-                let name = views
-                    .iter()
-                    .find(|(view, _)| *view == shown)
-                    .map(|(_, name)| name.clone())
-                    .unwrap_or_default();
-                egui::ComboBox::from_id_salt("play view")
-                    .selected_text(name)
-                    .show_ui(ui, |ui| {
-                        for (view, name) in views {
-                            if ui.selectable_label(view == shown, name).clicked() {
-                                play.set_view(view);
-                            }
-                        }
-                    })
-                    .response
-                    .on_hover_text(
-                        "Which device the viewport, Explorer and Properties show: the server, \
-                         from the fly camera, or a client's game, which gets the keys and mouse.",
-                    );
-            }
-        });
+
+        // Pause on errors toggle matching View Cube / Grid / Profiler ribbon toggles.
+        let pause_on_error = self.play_settings.pause_on_error;
+        if ui
+            .add(RibbonButton::new(icons::BUG, "Pause on errors").selected(pause_on_error))
+            .on_hover_text(
+                "A script error pauses Play where it happened, with that script's variables, \
+                 instead of only being shown in Output.",
+            )
+            .clicked()
+        {
+            self.set_pause_on_error(!pause_on_error);
+        }
     }
 }
 

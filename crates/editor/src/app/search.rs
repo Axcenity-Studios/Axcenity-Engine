@@ -307,6 +307,8 @@ impl SearchProvider for Commands {
 fn command_icon(command: &Command, category: Category) -> &'static str {
     match command {
         Command::Tool(tool) => theme::tool_icon(*tool),
+        Command::EditPivot => icons::CROSSHAIR_SIMPLE,
+        Command::ResetPivot => icons::ARROW_COUNTER_CLOCKWISE,
         Command::TogglePane(pane) => pane.icon(),
         _ if category == Category::Tool => icons::WRENCH,
         _ => icons::COMMAND,
@@ -317,6 +319,7 @@ fn command_icon(command: &Command, category: Category) -> &'static str {
 pub(super) fn command_category(command: &Command) -> Category {
     match command {
         Command::Tool(_)
+        | Command::EditPivot
         | Command::TerrainTool(_)
         | Command::TerrainStudio
         | Command::ModelStudio
@@ -430,6 +433,10 @@ fn command_description(command: &Command) -> String {
         Command::TerrainTool(tool) => tool.hint(),
         Command::ViewMode(mode) => mode.hint(),
         Command::Tool(tool) => return tool_description(*tool),
+        Command::EditPivot => {
+            "Move or rotate the selected Part's or Model's pivot point without moving the object."
+        }
+        Command::ResetPivot => "Put the selected object's pivot back at its center.",
         Command::NewProject => "Start a project from a template.",
         Command::OpenProject => "Open a project folder.",
         Command::Save => "Save the world, scripts and project files.",

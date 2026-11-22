@@ -729,6 +729,15 @@ pub fn write_material_file(path: &Path, material: &MaterialFile) -> Result<(), M
     fs::write(path, material_json(material)).map_err(MaterialFileError::Write)
 }
 
+/// Reads and resolves the material file at `path` inside `folder`, together
+/// with its `base` chain, without needing an [`Assets`](crate::Assets) cache.
+/// Returns `None` if the file can't be read.
+pub fn read_resolved_material(folder: &Path, path: &str) -> Option<StandardMaterial> {
+    let mut errors = Vec::new();
+    let resolved = resolve(folder, path, &HashMap::new(), &mut errors)?;
+    Some((*resolved.material).clone())
+}
+
 /// A material file and its bases put together, as [`Assets`](crate::Assets)
 /// keeps it.
 #[derive(Clone)]

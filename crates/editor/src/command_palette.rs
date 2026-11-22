@@ -347,8 +347,11 @@ impl Palette {
             );
             let x = (rect.center().x - text.size().x / 2.0)
                 .clamp(title_room.left(), title_room.right() - text.size().x);
-            ui.painter()
-                .galley(egui::pos2(x, rect.center().y - text.size().y / 2.0), text, color);
+            ui.painter().galley(
+                egui::pos2(x, rect.center().y - text.size().y / 2.0),
+                text,
+                color,
+            );
             if response.hovered() {
                 ctx.set_cursor_icon(egui::CursorIcon::Text);
             }

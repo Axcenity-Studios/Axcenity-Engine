@@ -969,12 +969,31 @@ mod tests {
             &mut world,
             vec![
                 blueprint_on(),
+                ("Material", Value::Material(PartMaterial::SmoothPlastic)),
+            ],
+        );
+        part(
+            &mut world,
+            vec![
+                blueprint_on(),
                 ("Material", Value::Material(PartMaterial::Metal)),
             ],
         );
-        for item in items(&world, &blueprint_assets()) {
-            assert!(item.material.base_color_texture.is_none());
-        }
+        let assets = blueprint_assets();
+        let blueprint_key = assets.blueprint().expect("blueprint set").key();
+        let drawn = items(&world, &assets);
+        // Plain Plastic with blueprint off and SmoothPlastic with blueprint on stay flat.
+        assert!(drawn[0].material.base_color_texture.is_none());
+        assert!(drawn[1].material.base_color_texture.is_none());
+        // Metal keeps its own brushed surface texture rather than the blueprint grid.
+        assert_ne!(
+            drawn[2]
+                .material
+                .base_color_texture
+                .as_ref()
+                .map(|tex| tex.key()),
+            Some(blueprint_key)
+        );
     }
 
     #[test]

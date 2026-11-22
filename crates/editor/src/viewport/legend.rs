@@ -210,7 +210,7 @@ pub fn paint(
     };
     let mut measure = false;
     egui::Area::new(egui::Id::new("view mode legend"))
-        .order(egui::Order::Foreground)
+        .order(ui.layer_id().order)
         .fixed_pos(rect.left_top() + egui::vec2(10.0, 10.0))
         .constrain_to(rect)
         .show(ui.ctx(), |ui| {

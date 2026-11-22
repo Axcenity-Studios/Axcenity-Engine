@@ -786,8 +786,12 @@ pub fn elided_name(
     max_width: f32,
     rows: usize,
 ) -> std::sync::Arc<egui::Galley> {
-    let width =
-        |s: &str| ui.painter().layout_no_wrap(s.to_owned(), font.clone(), color).size().x;
+    let width = |s: &str| {
+        ui.painter()
+            .layout_no_wrap(s.to_owned(), font.clone(), color)
+            .size()
+            .x
+    };
     let mut lines: Vec<String> = Vec::new();
     let mut line = String::new();
     let mut words = name_words(text).into_iter().peekable();
@@ -1261,7 +1265,10 @@ mod tests {
     fn names_break_between_words_and_camel_case_humps() {
         assert_eq!(name_words("HumanoidParts"), ["Humanoid", "Parts"]);
         assert_eq!(name_words("Shirt_CrewTee"), ["Shirt_", "Crew", "Tee"]);
-        assert_eq!(name_words("HTTPServer2 rock-a"), ["HTTP", "Server", "2 ", "rock-", "a"]);
+        assert_eq!(
+            name_words("HTTPServer2 rock-a"),
+            ["HTTP", "Server", "2 ", "rock-", "a"]
+        );
         assert_eq!(name_words("plain"), ["plain"]);
         assert!(name_words("").is_empty());
     }

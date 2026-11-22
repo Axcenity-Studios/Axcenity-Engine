@@ -88,7 +88,11 @@ pub fn call(host: &mut Host, args: &Args) -> Outcome {
     let app = &mut host.app;
     let revision = app.history.revision();
     let from = app.output.total();
-    app.solid_action(action);
+    if action == SolidAction::GroupAsMesh {
+        app.group_as_mesh_with_mode(axcenity_mesh_edit::GroupMode::MultiMaterial);
+    } else {
+        app.solid_action(action);
+    }
     let made = std::mem::replace(&mut app.selection, selection);
     if app.history.revision() == revision {
         let reason = app

@@ -48,6 +48,7 @@ mod skin_tone;
 mod streaming;
 mod surface_pick;
 mod surfaces;
+pub use surfaces::{BuiltInMaps, built_in_maps};
 mod terrain;
 mod terrain_water;
 mod time_of_day;

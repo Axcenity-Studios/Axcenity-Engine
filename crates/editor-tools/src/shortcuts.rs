@@ -9,6 +9,10 @@
 //! Escape cancels or closes, Tab moves on), which work the same everywhere,
 //! and the keys a game gets during Play.
 
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::{OnceLock, RwLock};
+
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers};
 
 use crate::gizmo::Tool;
@@ -145,7 +149,6 @@ impl Context {
 
     /// Whether shortcuts of both can be live at once, so they mustn't share
     /// keys unless one [wins](Self::wins_over). Everywhere is live with all.
-    #[cfg(test)] // Checked by the clash test; rebinding (V23) will use it too.
     pub fn overlaps(self, other: Context) -> bool {
         use Context::*;
         let pair = |a, b| (self == a && other == b) || (self == b && other == a);
@@ -169,7 +172,6 @@ impl Context {
     /// Angular tools before the Explorer's rename; the Explorer's arrows
     /// before the UI Designer's; a clip's and a block graph's keys instead
     /// of the scene's.
-    #[cfg(test)] // Checked by the clash test; rebinding (V23) will use it too.
     pub fn wins_over(self, other: Context) -> bool {
         use Context::*;
         matches!(
@@ -183,7 +185,7 @@ impl Context {
 }
 
 /// Something a shortcut does.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Action {
     // Everywhere.
     Save,
@@ -378,7 +380,7 @@ impl Action {
         all.extend(
             crate::gizmo::Tool::ALL
                 .into_iter()
-                .filter(|tool| !Action::Tool(*tool).keys().is_empty())
+                .filter(|tool| !Action::Tool(*tool).default_keys().is_empty())
                 .map(Tool),
         );
         all.extend([
@@ -399,7 +401,7 @@ impl Action {
         ]);
         all.extend(
             crate::terrain_tool::TerrainTool::all()
-                .filter(|tool| !Action::TerrainTool(*tool).keys().is_empty())
+                .filter(|tool| !Action::TerrainTool(*tool).default_keys().is_empty())
                 .map(TerrainTool),
         );
         all.extend([
@@ -500,9 +502,66 @@ impl Action {
         all
     }
 
-    /// Its keys: any one of them does it. Empty for what the mouse does
-    /// (see [`gesture`](Self::gesture)).
-    pub fn keys(self) -> &'static [KeyboardShortcut] {
+    /// Stable string identifier for saving/loading custom bindings.
+    pub fn id(self) -> String {
+        format!("{self:?}")
+    }
+
+    /// Looks up an action by its [`id`](Self::id).
+    pub fn from_id(id: &str) -> Option<Action> {
+        static BY_ID: OnceLock<HashMap<String, Action>> = OnceLock::new();
+        BY_ID
+            .get_or_init(|| {
+                Action::all()
+                    .into_iter()
+                    .map(|action| (action.id(), action))
+                    .collect()
+            })
+            .get(id)
+            .copied()
+    }
+
+    /// Whether the user can rebind this action in Settings ▸ Shortcuts.
+    /// Mouse-only gestures and positional multi-key sets (e.g. WASD fly,
+    /// arrow navigation, X/Y/Z axis lock) stay fixed.
+    pub fn is_rebindable(self) -> bool {
+        use Action::*;
+        if self.default_keys().is_empty() {
+            return false;
+        }
+        !matches!(
+            self,
+            Fly | ExplorerMove
+                | ExplorerExtend
+                | ExplorerEnds
+                | ConsoleHistory
+                | Nudge
+                | NudgeTen
+                | SelectMode
+                | LockAxis
+                | LockUvAxis
+                | ProportionalRadius
+        )
+    }
+
+    /// Its active keys (custom override if set, otherwise [`default_keys`](Self::default_keys)).
+    pub fn keys(self) -> Cow<'static, [KeyboardShortcut]> {
+        if let Ok(map) = overrides().read()
+            && let Some(custom) = map.get(&self)
+        {
+            return Cow::Owned(custom.clone());
+        }
+        Cow::Borrowed(self.default_keys())
+    }
+
+    /// Whether this action currently has a custom override differing from its default.
+    pub fn is_customized(self) -> bool {
+        overrides().read().is_ok_and(|map| map.contains_key(&self))
+    }
+
+    /// Its built-in default keys: any one of them does it. Empty for what the
+    /// mouse does (see [`gesture`](Self::gesture)).
+    pub fn default_keys(self) -> &'static [KeyboardShortcut] {
         use Action::*;
         match self {
             Save => keys![CMD S],
@@ -870,9 +929,10 @@ impl Action {
     /// All its keys, as Settings ▸ Shortcuts shows them: chords with the
     /// same modifiers share them ("Shift+Up, Down"), and a gesture follows.
     pub fn text(self, ctx: &egui::Context) -> String {
+        let keys = self.keys();
         let mut parts: Vec<String> = Vec::new();
         let mut last: Option<Modifiers> = None;
-        for chord in self.keys() {
+        for chord in keys.iter() {
             if last == Some(chord.modifiers) && chord.modifiers != NONE {
                 parts.push(key_name(ctx, chord.logical_key));
             } else {
@@ -888,6 +948,208 @@ impl Action {
             text.push_str(gesture);
         }
         text
+    }
+}
+
+/// Active custom keybinding overrides, shared across every panel and tool.
+fn overrides() -> &'static RwLock<HashMap<Action, Vec<KeyboardShortcut>>> {
+    static OVERRIDES: OnceLock<RwLock<HashMap<Action, Vec<KeyboardShortcut>>>> = OnceLock::new();
+    OVERRIDES.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+/// Replaces `action`'s active binding with `keys` (empty unbinds it). If
+/// `keys` matches `action.default_keys()`, removes the override.
+pub fn set_override(action: Action, keys: Vec<KeyboardShortcut>) {
+    if !action.is_rebindable() {
+        return;
+    }
+    if let Ok(mut map) = overrides().write() {
+        if keys.as_slice() == action.default_keys() {
+            map.remove(&action);
+        } else {
+            map.insert(action, keys);
+        }
+    }
+}
+
+/// Restores `action` to its default binding.
+pub fn reset(action: Action) {
+    if let Ok(mut map) = overrides().write() {
+        map.remove(&action);
+    }
+}
+
+/// Restores every shortcut to its default binding.
+pub fn reset_all() {
+    if let Ok(mut map) = overrides().write() {
+        map.clear();
+    }
+}
+
+/// How many actions currently have custom bindings.
+pub fn customized_count() -> usize {
+    overrides().read().map_or(0, |map| map.len())
+}
+
+/// Other actions whose context can be live with `action` (without one winning
+/// over the other) and that currently use `chord`.
+pub fn conflicts(action: Action, chord: &KeyboardShortcut) -> Vec<Action> {
+    let ctx = action.context();
+    Action::all()
+        .into_iter()
+        .filter(|&other| {
+            if other == action {
+                return false;
+            }
+            let other_ctx = other.context();
+            if !ctx.overlaps(other_ctx) || ctx.wins_over(other_ctx) || other_ctx.wins_over(ctx) {
+                return false;
+            }
+            other.keys().contains(chord)
+        })
+        .collect()
+}
+
+/// What happened while Settings ▸ Shortcuts is recording a new keybind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CaptureEvent {
+    Cancel,
+    Captured(KeyboardShortcut),
+}
+
+/// Reads a single key press from `input` while recording a new binding.
+/// Plain Escape cancels; any other key press (with optional Command/Ctrl,
+/// Shift, Alt) is captured and consumed.
+pub fn capture_shortcut(input: &mut egui::InputState) -> Option<CaptureEvent> {
+    let mut result = None;
+    let mut consumed = None;
+    for (idx, event) in input.events.iter().enumerate() {
+        if let egui::Event::Key {
+            key,
+            pressed: true,
+            repeat: false,
+            modifiers,
+            ..
+        } = event
+        {
+            let mut clean = Modifiers::NONE;
+            if modifiers.command || modifiers.ctrl || modifiers.mac_cmd {
+                clean = clean.plus(Modifiers::COMMAND);
+            }
+            if modifiers.shift {
+                clean = clean.plus(Modifiers::SHIFT);
+            }
+            if modifiers.alt {
+                clean = clean.plus(Modifiers::ALT);
+            }
+            if *key == Key::Escape && clean == Modifiers::NONE {
+                result = Some(CaptureEvent::Cancel);
+            } else {
+                result = Some(CaptureEvent::Captured(KeyboardShortcut::new(clean, *key)));
+            }
+            consumed = Some(idx);
+            break;
+        }
+    }
+    if let Some(idx) = consumed {
+        input.events.remove(idx);
+    }
+    result
+}
+
+/// Formats a single chord for display in Settings.
+pub fn format_chord(ctx: &egui::Context, chord: &KeyboardShortcut) -> String {
+    chord_text(ctx, chord)
+}
+
+fn serialize_chord(chord: &KeyboardShortcut) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    if chord.modifiers.command || chord.modifiers.ctrl || chord.modifiers.mac_cmd {
+        parts.push("Cmd");
+    }
+    if chord.modifiers.shift {
+        parts.push("Shift");
+    }
+    if chord.modifiers.alt {
+        parts.push("Alt");
+    }
+    parts.push(chord.logical_key.name());
+    parts.join("+")
+}
+
+fn deserialize_chord(text: &str) -> Option<KeyboardShortcut> {
+    let mut modifiers = Modifiers::NONE;
+    let mut key = None;
+    for part in text.split('+') {
+        let part = part.trim();
+        match part {
+            "Cmd" | "Ctrl" | "Command" => modifiers = modifiers.plus(Modifiers::COMMAND),
+            "Shift" => modifiers = modifiers.plus(Modifiers::SHIFT),
+            "Alt" => modifiers = modifiers.plus(Modifiers::ALT),
+            other => {
+                key = Key::from_name(other);
+            }
+        }
+    }
+    Some(KeyboardShortcut::new(modifiers, key?))
+}
+
+/// Saves custom shortcut overrides as deterministic `ActionId=Chord1,Chord2` lines.
+pub fn save_overrides() -> String {
+    let Ok(map) = overrides().read() else {
+        return String::new();
+    };
+    let mut entries: Vec<(String, String)> = map
+        .iter()
+        .map(|(&action, chords)| {
+            let value = chords
+                .iter()
+                .map(serialize_chord)
+                .collect::<Vec<_>>()
+                .join(",");
+            (action.id(), value)
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    entries
+        .into_iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Loads custom shortcut overrides written by [`save_overrides`].
+pub fn load_overrides(text: &str) {
+    let mut parsed = HashMap::new();
+    for line in text.lines() {
+        let Some((id, rhs)) = line.split_once('=') else {
+            continue;
+        };
+        let Some(action) = Action::from_id(id.trim()) else {
+            continue;
+        };
+        if !action.is_rebindable() {
+            continue;
+        }
+        let rhs = rhs.trim();
+        let chords: Vec<KeyboardShortcut> = if rhs.is_empty() {
+            Vec::new()
+        } else {
+            let list: Vec<KeyboardShortcut> = rhs
+                .split(',')
+                .filter_map(|piece| deserialize_chord(piece.trim()))
+                .collect();
+            if list.is_empty() {
+                continue;
+            }
+            list
+        };
+        if chords.as_slice() != action.default_keys() {
+            parsed.insert(action, chords);
+        }
+    }
+    if let Ok(mut map) = overrides().write() {
+        *map = parsed;
     }
 }
 
@@ -966,9 +1228,16 @@ pub fn consume(input: &mut egui::InputState, action: Action) -> bool {
 /// more modifiers first, across all of them (Shift+F5 before F5), then in
 /// the order given.
 pub fn consume_first(input: &mut egui::InputState, actions: &[Action]) -> Option<Action> {
-    let mut chords: Vec<(Action, &KeyboardShortcut)> = actions
+    let mut chords: Vec<(Action, KeyboardShortcut)> = actions
         .iter()
-        .flat_map(|&action| action.keys().iter().map(move |chord| (action, chord)))
+        .flat_map(|&action| {
+            action
+                .keys()
+                .iter()
+                .copied()
+                .map(move |chord| (action, chord))
+                .collect::<Vec<_>>()
+        })
         .collect();
     // A stable sort, so equal ones keep the order given.
     chords.sort_by_key(|(_, chord)| std::cmp::Reverse(modifier_count(chord.modifiers)));
@@ -1082,8 +1351,8 @@ mod tests {
                 if !here.overlaps(there) || here.wins_over(there) || there.wins_over(here) {
                     continue;
                 }
-                for chord in a.keys() {
-                    if b.keys().contains(chord) {
+                for chord in a.default_keys() {
+                    if b.default_keys().contains(chord) {
                         clashes.push(format!("{a:?} and {b:?}: {chord:?}"));
                     }
                 }
@@ -1096,10 +1365,11 @@ mod tests {
     fn every_action_has_keys_or_a_gesture_and_a_label() {
         for action in Action::all() {
             assert!(
-                !action.keys().is_empty() || action.gesture().is_some(),
+                !action.default_keys().is_empty() || action.gesture().is_some(),
                 "{action:?}"
             );
             assert!(!action.label().is_empty());
+            assert_eq!(Action::from_id(&action.id()), Some(action));
         }
         let all = Action::all();
         for (i, action) in all.iter().enumerate() {
@@ -1111,6 +1381,33 @@ mod tests {
                 "{context:?} has shortcuts"
             );
         }
+    }
+
+    #[test]
+    fn rebinding_overrides_conflicts_and_persistence_work() {
+        reset_all();
+        let custom = KeyboardShortcut::new(CMD_SHIFT, Key::S);
+        assert!(Action::Save.is_rebindable());
+        assert!(!Action::LookAround.is_rebindable());
+        assert!(!Action::Fly.is_rebindable());
+        // Conflict detection: binding Save to Ctrl+P clashes with QuickOpen.
+        let quick_open_key = KeyboardShortcut::new(CMD, Key::P);
+        assert!(conflicts(Action::Save, &quick_open_key).contains(&Action::QuickOpen));
+        assert!(conflicts(Action::Save, &custom).is_empty());
+
+        set_override(Action::Save, vec![custom]);
+        assert!(Action::Save.is_customized());
+        assert_eq!(Action::Save.keys().as_ref(), &[custom]);
+        let saved = save_overrides();
+        assert!(saved.contains("Save=Cmd+Shift+S"), "{saved}");
+
+        reset_all();
+        assert!(!Action::Save.is_customized());
+        load_overrides(&saved);
+        assert_eq!(Action::Save.keys().as_ref(), &[custom]);
+        reset(Action::Save);
+        assert!(!Action::Save.is_customized());
+        assert_eq!(customized_count(), 0);
     }
 
     #[test]

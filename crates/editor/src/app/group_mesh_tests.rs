@@ -81,6 +81,7 @@ fn group_as_mesh_makes_one_meshpart_keeping_the_parts_as_one_undo_step() {
     app.select_many(parts.to_vec());
     assert!(SolidAction::GroupAsMesh.usable(&app.world, &app.solid_parts()));
     app.solid_action(SolidAction::GroupAsMesh);
+    app.confirm_group_mesh_dialog();
     assert_eq!(app.history.undo_label(), Some("Group 3 parts as a mesh"));
     let mesh = app.selected.unwrap();
     let instance = app.world.get(mesh).unwrap();
@@ -361,6 +362,7 @@ fn a_grouped_build_looks_the_same() {
     let before_atm_unlit = draw(&app, Some(DebugView::Unlit), atm);
     app.select_many(parts);
     app.solid_action(SolidAction::GroupAsMesh);
+    app.confirm_group_mesh_dialog();
     let mesh = app.selected.unwrap();
     assert_eq!(app.world.get(mesh).unwrap().class(), ClassName::MeshPart);
     let summary = app
@@ -465,6 +467,7 @@ fn grouping_whole_examples() {
         app.select_many(roots);
         let started = std::time::Instant::now();
         app.solid_action(SolidAction::GroupAsMesh);
+        app.confirm_group_mesh_dialog();
         let lines: Vec<String> = app
             .output
             .lines()
@@ -475,4 +478,107 @@ fn grouping_whole_examples() {
         println!("{name} ({:?}): {lines:?}", started.elapsed());
         let _ = std::fs::remove_dir_all(&folder);
     }
+}
+
+#[test]
+fn group_as_mesh_offers_choice_between_multi_material_and_single_overwrite() {
+    use super::group_mesh::GroupChoice;
+    let folder = copy_of_example("hello-csg", "group-mesh-multi-mat");
+    let mut app = EditorApp::new(Some(&folder));
+    let wood = part(&mut app, "WoodBlock", [4.0, 1.0, 4.0], [0.0, 0.5, 0.0]);
+    let brick = part(&mut app, "BrickBlock", [4.0, 1.0, 4.0], [4.0, 0.5, 0.0]);
+    app.world
+        .set_property(
+            wood,
+            "Material",
+            Value::Material(axcenity_core::Material::Wood),
+        )
+        .unwrap();
+    app.world
+        .set_property(
+            brick,
+            "Material",
+            Value::Material(axcenity_core::Material::Brick),
+        )
+        .unwrap();
+
+    // Selecting textured parts with different materials opens the choice dialog.
+    app.select_many(vec![wood, brick]);
+    app.solid_action(SolidAction::GroupAsMesh);
+    let dialog = app
+        .group_mesh_dialog
+        .as_ref()
+        .expect("dialog opens when textures or multiple materials are detected");
+    assert_eq!(dialog.choice, GroupChoice::MultiMaterial);
+    assert_eq!(dialog.materials.len(), 2);
+    assert!(dialog.materials.iter().all(|m| m.textured));
+
+    // Confirming Multi-Material preserves both embedded PBR material slots!
+    app.confirm_group_mesh_dialog();
+    let mesh = app.selected.unwrap();
+    let mesh_id = app
+        .world
+        .get(mesh)
+        .unwrap()
+        .property("MeshId")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    let multi = app
+        .assets
+        .model_blocking(&mesh_id)
+        .expect("loads multi-material glb");
+    assert_eq!(
+        multi.primitives.len(),
+        2,
+        "two distinct material slots kept"
+    );
+    assert!(
+        multi
+            .primitives
+            .iter()
+            .all(|p| p.material.base_color_texture.is_some()),
+        "both Wood and Brick embedded textures preserved"
+    );
+
+    // Undo and re-group using Overwrite with Single Material (Plain Plastic).
+    app.undo();
+    app.select_many(vec![wood, brick]);
+    app.solid_action(SolidAction::GroupAsMesh);
+    {
+        let dialog = app.group_mesh_dialog.as_mut().unwrap();
+        dialog.choice = GroupChoice::OverwriteSingle;
+        // Selecting the index past detected materials picks Plain untextured (Plastic).
+        dialog.overwrite_index = dialog.materials.len();
+    }
+    app.confirm_group_mesh_dialog();
+    let mesh2 = app.selected.unwrap();
+    let mesh_id2 = app
+        .world
+        .get(mesh2)
+        .unwrap()
+        .property("MeshId")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    let single = app
+        .assets
+        .model_blocking(&mesh_id2)
+        .expect("loads single-material glb");
+    assert_eq!(
+        single.primitives.len(),
+        1,
+        "overwritten into one material slot"
+    );
+    assert!(
+        single.primitives[0].material.base_color_texture.is_none(),
+        "plain overwrite has no texture"
+    );
+    assert_eq!(
+        single.primitives[0].indices.len() / 3,
+        12,
+        "two touching plain boxes merge into a 12-triangle box"
+    );
+
+    let _ = std::fs::remove_dir_all(&folder);
 }

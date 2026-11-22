@@ -972,3 +972,127 @@ fn a_turn_reports_how_far_it_has_turned_and_shows_no_snap_points() {
     assert!((radians - std::f32::consts::FRAC_PI_2).abs() < 0.01);
     assert!(report.targets.is_empty());
 }
+
+#[test]
+fn custom_pivot_places_handles_and_rotates_part_around_pivot_and_angle() {
+    let mut world = World::new();
+    let part = world.create(ClassName::Part).unwrap();
+    world.set_parent(part, Some(world.workspace())).unwrap();
+    world
+        .set_property(
+            part,
+            "Position",
+            Value::Vector3(Vector3::new(0.0, 0.0, 0.0)),
+        )
+        .unwrap();
+    world
+        .set_property(part, "Size", Value::Vector3(Vector3::new(4.0, 1.0, 1.0)))
+        .unwrap();
+    // Place the pivot on the left edge (-2, 0, 0), tilted 45° around Y.
+    let pivot_rot = Quat::from_rotation_y(45f32.to_radians());
+    let offset = CFrame {
+        position: Vector3::new(-2.0, 0.0, 0.0),
+        rotation: pivot_rot.to_array(),
+    };
+    world
+        .set_property(part, "PivotOffset", Value::CFrame(offset))
+        .unwrap();
+
+    let instance = world.get(part).unwrap();
+    let base = Pose::of(instance).unwrap();
+    let wp = part_world_pivot(instance).unwrap();
+    assert!((wp.position - Vec3::new(-2.0, 0.0, 0.0)).length() < 1e-5);
+    assert!(wp.rotation.abs_diff_eq(pivot_rot, 1e-5));
+
+    // Rotate handle frame sits at the custom pivot position AND angle.
+    let frame = handle_frame_with_pivot(Tool::Rotate, Modes::default(), &[base], Some(wp)).unwrap();
+    assert!((frame.position - wp.position).length() < 1e-5);
+    assert!(frame.rotation.abs_diff_eq(wp.rotation, 1e-5));
+
+    // Default Move (MoveAxes::Global) AND Local Move both place handles at the
+    // custom pivot position AND tilt their axes to the pivot's angle.
+    for axes in [MoveAxes::Global, MoveAxes::Local, MoveAxes::Last] {
+        let modes = Modes {
+            axes,
+            ..Modes::default()
+        };
+        let move_frame = handle_frame_with_pivot(Tool::Move, modes, &[base], Some(wp)).unwrap();
+        assert!((move_frame.position - wp.position).length() < 1e-5);
+        assert!(move_frame.rotation.abs_diff_eq(pivot_rot, 1e-5));
+    }
+
+    // Dragging Move's X arrow in default mode slides the part along the pivot's
+    // tilted X axis (cos 45°, 0, -sin 45°), not world +X.
+    let top_screen = Screen::new(
+        Camera {
+            position: wp.position + Vec3::new(0.0, 20.0, 0.1),
+            look_at: wp.position,
+            fov_y_degrees: 50.0,
+        },
+        egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0)),
+    );
+    let move_frame =
+        handle_frame_with_pivot(Tool::Move, Modes::default(), &[base], Some(wp)).unwrap();
+    let tilted_x = pivot_rot * Vec3::X;
+    let p0 = top_screen.point(wp.position).unwrap();
+    let p1 = top_screen.point(wp.position + tilted_x * 4.0).unwrap();
+    let mut move_drag = Drag::start_many(
+        Handle::Move(Axis::X),
+        move_frame,
+        vec![(part, base)],
+        Modes::default(),
+        &top_screen,
+        p0,
+    )
+    .unwrap();
+    let moved_values = move_drag
+        .update(Pointer::on(&top_screen, p1, false), &NO_SNAP)
+        .unwrap();
+    let moved_pos = moved_values
+        .iter()
+        .find(|(n, _)| *n == "Position")
+        .and_then(|(_, v)| v.as_vector3())
+        .unwrap();
+    let expected = base.position + tilted_x * 4.0;
+    let actual = Vec3::new(moved_pos.x, moved_pos.y, moved_pos.z);
+    assert!(
+        (actual - expected).length() < 0.05,
+        "Move should slide along tilted pivot axis: expected {expected:?}, got {actual:?}"
+    );
+
+    // Rotating 90° around Y through the custom pivot moves the center to (-2, 0, -2)
+    // (orbiting around (-2, 0, 0) instead of spinning in place at (0, 0, 0)).
+    let screen = screen_along_z(wp.position, 0.0);
+    let y_frame = Pose {
+        position: wp.position,
+        rotation: Quat::IDENTITY,
+        size: base.size,
+    };
+    let grab = ring_point(&screen, y_frame, Axis::Z, 0.0);
+    let mut drag = Drag::start_many(
+        Handle::Rotate(Axis::Z),
+        y_frame,
+        vec![(part, base)],
+        Modes::default(),
+        &screen,
+        grab,
+    )
+    .unwrap();
+    let values = turn_along(&mut drag, &screen, grab, points_for(90.0), &NO_SNAP);
+    let pos = values
+        .iter()
+        .find(|(n, _)| *n == "Position")
+        .and_then(|(_, v)| v.as_vector3())
+        .unwrap();
+    // (+2, 0, 0) rotated 90° around Z becomes (0, +2, 0) relative to pivot (-2, 0, 0) => (-2, 2, 0).
+    let actual = Vec3::new(pos.x, pos.y, pos.z);
+    assert!(
+        (actual - Vec3::new(-2.0, 2.0, 0.0)).length() < 0.05,
+        "center should orbit around custom pivot: got {actual:?}"
+    );
+
+    // Converting world pivot back to Part local offset round-trips cleanly.
+    let round_trip = world_pivot_to_part_offset(base, wp);
+    assert!((round_trip.position.x - (-2.0)).abs() < 1e-4);
+    assert!(Quat::from_array(round_trip.rotation).abs_diff_eq(pivot_rot, 1e-4));
+}

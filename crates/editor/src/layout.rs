@@ -138,7 +138,86 @@ pub enum Pane {
     Plugin(u64),
 }
 
+/// One category of closable panels shown as a submenu under `View ▸ Panels`.
+#[derive(Clone, Copy, Debug)]
+pub struct PaneGroup {
+    pub label: &'static str,
+    pub icon: &'static str,
+    pub panes: &'static [Pane],
+}
+
 impl Pane {
+    /// The core workspace panels shown directly on the Home tab's Panels group.
+    pub const CORE: [Pane; 4] = [
+        Pane::Explorer,
+        Pane::Properties,
+        Pane::Console,
+        Pane::Assets,
+    ];
+
+    /// Every closable panel organized into tidy categories for the `View` menu
+    /// (instead of one long flat list).
+    pub const GROUPS: [PaneGroup; 6] = [
+        PaneGroup {
+            label: "Core",
+            icon: icons::SQUARES_FOUR,
+            panes: &Self::CORE,
+        },
+        PaneGroup {
+            label: "World & Scene",
+            icon: icons::GLOBE_HEMISPHERE_WEST,
+            panes: &[
+                Pane::Terrain,
+                Pane::Scatter,
+                Pane::Levels,
+                Pane::Layers,
+                Pane::Tags,
+            ],
+        },
+        PaneGroup {
+            label: "Modeling & Assets",
+            icon: icons::CUBE,
+            panes: &[
+                Pane::ModelStudio,
+                Pane::Material,
+                Pane::ObjectViewer,
+                Pane::Toolbox,
+                Pane::Inventory,
+            ],
+        },
+        PaneGroup {
+            label: "Animation & UI",
+            icon: icons::FILM_SLATE,
+            panes: &[
+                Pane::Animation,
+                Pane::Sequencer,
+                Pane::Effect,
+                Pane::CharacterStudio,
+                Pane::UiDesigner,
+            ],
+        },
+        PaneGroup {
+            label: "Logic & Data",
+            icon: icons::BRAIN,
+            panes: &[Pane::BehaviorTree, Pane::Dialogue, Pane::DataTable],
+        },
+        PaneGroup {
+            label: "Diagnostics & Team",
+            icon: icons::GAUGE,
+            panes: &[
+                Pane::Profiler,
+                Pane::Mixer,
+                Pane::AssetCheck,
+                Pane::LodInspector,
+                Pane::Tests,
+                Pane::Plugins,
+                Pane::TeamCreate,
+                Pane::TeamBoard,
+                Pane::VersionExplorer,
+            ],
+        },
+    ];
+
     /// The panels that can be closed and opened again, in menu order.
     pub const CLOSABLE: [Pane; 31] = [
         Pane::Explorer,
@@ -985,5 +1064,30 @@ mod tests {
         let loaded = Layout::from_text(&layout.to_text());
         assert!(loaded.is_open(Pane::Welcome));
         assert!(!loaded.is_open(Pane::Scene));
+    }
+
+    #[test]
+    fn pane_groups_cover_every_closable_panel_once() {
+        let mut seen = std::collections::HashSet::new();
+        for group in Pane::GROUPS {
+            assert!(
+                !group.panes.is_empty(),
+                "{} should not be empty",
+                group.label
+            );
+            for &pane in group.panes {
+                assert!(
+                    seen.insert(pane),
+                    "{pane:?} appeared in more than one PaneGroup"
+                );
+            }
+        }
+        for pane in Pane::CLOSABLE {
+            assert!(
+                seen.contains(&pane),
+                "{pane:?} is in Pane::CLOSABLE but missing from Pane::GROUPS"
+            );
+        }
+        assert_eq!(seen.len(), Pane::CLOSABLE.len());
     }
 }

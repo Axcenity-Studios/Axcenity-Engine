@@ -334,16 +334,35 @@ impl Viewport {
             selected,
             selection,
             modes,
+            edit_pivot,
         } = chosen;
         // The handles act on every selected part (and the parts inside
         // selected Models), with the last selected one last, and on lights
         // and emitters standing free.
         let parts = movable_parts(world, selection, selected);
         let poses: Vec<Pose> = parts.iter().map(|(_, pose)| *pose).collect();
-        let shapes = if tool.has_handles() {
-            gizmo::shapes_for(tool, modes, &poses, screen)
+        let target_pivot = pivot_target(world, selection, selected);
+        let custom_pivot = target_pivot.and_then(|(id, _, pivot, _)| {
+            world
+                .get(id)
+                .and_then(gizmo::pivot_offset_of)
+                .map(|_| pivot)
+        });
+        let (shapes, pivot_indicator) = if edit_pivot {
+            match target_pivot {
+                Some((_, _, world_pivot, _)) => (
+                    gizmo::pivot_shapes(world_pivot, screen),
+                    Some((world_pivot, true)),
+                ),
+                None => (Vec::new(), None),
+            }
+        } else if tool.has_handles() {
+            (
+                gizmo::shapes_for_pivot(tool, modes, &poses, custom_pivot, screen),
+                custom_pivot.map(|pivot| (pivot, false)),
+            )
         } else {
-            Vec::new()
+            (Vec::new(), None)
         };
         let (pressed, down, pointer, press_origin, alt, shift) = ui.input(|input| {
             (
@@ -380,6 +399,22 @@ impl Viewport {
                 .map(|drag| Dragging::Ui(Box::new(drag)));
         } else if pressed
             && !alt
+            && edit_pivot
+            && let (Some(handle), Some(pointer), Some((target_id, base, world_pivot, is_model))) =
+                (hovered, pointer, target_pivot)
+        {
+            self.drag = gizmo::PivotDrag::start(
+                target_id,
+                handle,
+                world_pivot,
+                base,
+                is_model,
+                screen,
+                pointer,
+            )
+            .map(Dragging::Pivot);
+        } else if pressed
+            && !alt
             && let (Some(handle), Some(pointer)) = (hovered, pointer)
             && let Some(frame) = gizmo::frame_of(&shapes, handle)
         {
@@ -388,14 +423,37 @@ impl Viewport {
             let reach = screen.studs_per_point(frame.position) * snapping::SNAP_POINTS;
             let obstacles = snapping::obstacles(world, &moving);
             let sites = snapping::points::sites(world, &moving);
-            self.drag = Drag::start_many(handle, frame, parts.clone(), modes, screen, pointer)
-                .map(|drag| Dragging::Handle(drag.among(obstacles, reach).with_sites(sites)));
+            let part_pivots: Vec<(Vec3, Quat)> = parts
+                .iter()
+                .map(|&(id, pose)| {
+                    world
+                        .get(id)
+                        .and_then(gizmo::part_world_pivot)
+                        .map_or((pose.position, pose.rotation), |p| (p.position, p.rotation))
+                })
+                .collect();
+            self.drag = Drag::start_many(handle, frame, parts.clone(), modes, screen, pointer).map(
+                |drag| {
+                    let mut drag = drag
+                        .among(obstacles, reach)
+                        .with_sites(sites)
+                        .with_part_pivots(part_pivots);
+                    if let Some((model_id, _, world_pivot, true)) = target_pivot
+                        && custom_pivot.is_some()
+                    {
+                        drag = drag.with_model_pivot(model_id, world_pivot);
+                    }
+                    Dragging::Handle(drag)
+                },
+            );
         }
         // A UI element or part's body only once the mouse has moved far
         // enough to be a drag, so a plain click still just selects. It's
         // grabbed where the button went down. UI is on top, so it goes first.
-        let body_drag =
-            self.drag.is_none() && !alt && response.drag_started_by(egui::PointerButton::Primary);
+        let body_drag = !edit_pivot
+            && self.drag.is_none()
+            && !alt
+            && response.drag_started_by(egui::PointerButton::Primary);
         if body_drag
             && let Some(origin) = press_origin
             && let Some(id) = ui_scene.hit(origin)
@@ -472,6 +530,7 @@ impl Viewport {
 
         input.highlighted = match &self.drag {
             Some(Dragging::Handle(drag)) => Some(drag.handle),
+            Some(Dragging::Pivot(drag)) => Some(drag.handle),
             _ => hovered,
         };
         input.ui_highlighted = match &self.drag {
@@ -498,6 +557,16 @@ impl Viewport {
             } else if let Some(pointer) = pointer {
                 let ray = screen.ray(pointer);
                 input.edit = match dragging {
+                    Dragging::Pivot(drag) => {
+                        let at = gizmo::Pointer::on(screen, pointer, shift);
+                        drag.update(at, &snap).map(|(_, offset)| DragEdit {
+                            kind: DragKind::Pivot,
+                            parts: vec![(
+                                drag.target,
+                                vec![("PivotOffset", Value::CFrame(offset))],
+                            )],
+                        })
+                    }
                     Dragging::Handle(drag) => {
                         // Shift turns a ring finely.
                         let at = gizmo::Pointer::on(screen, pointer, shift);
@@ -570,6 +639,7 @@ impl Viewport {
             }
         }
         input.shapes = shapes;
+        input.pivot_indicator = pivot_indicator;
         input
     }
 

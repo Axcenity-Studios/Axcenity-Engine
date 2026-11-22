@@ -330,7 +330,7 @@ pub(super) fn legend_lines(volumes: &[VolumeView], eye: Vec3) -> Vec<(Option<Col
 
 fn show_legend(ui: &egui::Ui, rect: egui::Rect, lines: &[(Option<Color32>, String)]) {
     egui::Area::new(egui::Id::new("light probe overlay legend"))
-        .order(egui::Order::Foreground)
+        .order(ui.layer_id().order)
         .pivot(egui::Align2::RIGHT_BOTTOM)
         .fixed_pos(rect.right_bottom() + egui::vec2(-10.0, -10.0))
         .constrain_to(rect)

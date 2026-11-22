@@ -920,6 +920,7 @@ impl EditorApp {
                 }
                 StudioAction::Animate(object) => self.animate(object),
                 StudioAction::Show => self.layout.open(Pane::Animation),
+                StudioAction::SetPivot { id, offset } => self.set_pivot_offset(id, offset),
                 StudioAction::SetController {
                     part,
                     animator,
@@ -1208,6 +1209,7 @@ impl EditorApp {
                             tool,
                             snap: self.snap,
                             modes: self.modes,
+                            edit_pivot: self.edit_pivot,
                             preview: &preview,
                             emits: &emits,
                             stylesheets,
@@ -1319,8 +1321,12 @@ impl EditorApp {
             .inner;
         self.swap_play_effects();
         if let Some(rect) = self.viewport_rect {
-            let draw_calls = output.render.map(|render| render.stats.draw_calls);
-            self.viewport_bar(&ctx, rect, draw_calls);
+            let play_cpu = self
+                .play
+                .as_ref()
+                .and_then(|play| play.cost())
+                .map_or(std::time::Duration::ZERO, |cost| cost.total);
+            self.viewport_bar(&ctx, rect, ui.layer_id().order, output.render, play_cpu);
         }
         if let Some(render) = output.render {
             self.profiler.record_render(render);

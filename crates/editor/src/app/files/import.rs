@@ -275,6 +275,9 @@ impl EditorApp {
         if files.is_empty() {
             return;
         }
+        if self.try_drop_branding(ctx, &files) {
+            return;
+        }
         if self.project.is_none() {
             self.start
                 .set_notice("Open a project, then drop files on it to import them.".to_owned());

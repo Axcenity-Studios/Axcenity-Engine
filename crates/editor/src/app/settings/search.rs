@@ -37,8 +37,21 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         setting(
             Appearance,
             "Theme",
-            &["Dark mode", "Light mode", "Match system", "Colors"],
-            "Dark, light, or match the computer's setting.",
+            &[
+                "Dark mode",
+                "Light mode",
+                "Match system",
+                "Colors",
+                "Dracula",
+                "Gruvbox",
+                "Nord",
+                "Catppuccin",
+                "Tokyo Night",
+                "One Dark",
+                "Solarized",
+                "Rose Pine",
+            ],
+            "Dark, light, System, or a curated preset theme.",
         ),
         setting(
             Appearance,
@@ -79,18 +92,20 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
             Typography,
             "Code and Output",
             &[
+                "Code font",
                 "Code font size",
                 "Console font",
                 "Monospace",
+                "Monospace font",
                 "Script text size",
             ],
-            "The size of code in scripts and the Console.",
+            "The typeface and size of code in scripts and the Console.",
         ),
         setting(
             Typography,
             "Interface font",
-            &["Font", "Typeface"],
-            "The fonts the editor uses.",
+            &["Font", "Typeface", "Import font", "Custom font", "UI font"],
+            "Pick a built-in interface font or import your own .ttf/.otf file.",
         ),
         setting(
             Layout,
@@ -472,8 +487,15 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         setting(
             Shortcuts,
             "Shortcuts",
-            &["Keyboard shortcuts", "Hotkeys", "Keybindings", "Keys"],
-            "The keys the editor knows.",
+            &[
+                "Keyboard shortcuts",
+                "Hotkeys",
+                "Keybindings",
+                "Keys",
+                "Rebind",
+                "Customize shortcuts",
+            ],
+            "Search and rebind the keys the editor knows.",
         ),
         setting(
             Accessibility,
@@ -534,7 +556,16 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         setting(
             Ai,
             "Allow AI connections",
-            &["MCP", "Claude Code", "Cursor", "Codex", "AI agent"],
+            &[
+                "MCP",
+                "Claude Code",
+                "Google Antigravity",
+                "Antigravity",
+                "ChatGPT",
+                "Cursor",
+                "Codex",
+                "AI agent",
+            ],
             "Let AI clients work in this window instead of a copy without one.",
         ),
         setting(

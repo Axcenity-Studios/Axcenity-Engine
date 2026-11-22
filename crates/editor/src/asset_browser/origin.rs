@@ -485,6 +485,12 @@ mod tests {
         assert!(drawn.contains("Rock030"));
         assert!(!drawn.contains("Hero"));
         browser.source_filter = None;
+        // Switching to linear List view shows collapsible sections for each source.
+        browser.source_layout = crate::asset_browser::SourceLayout::List;
+        let drawn = text(&mut browser, 760.0, "list");
+        assert!(drawn.contains("Made in Axcenity"));
+        assert!(drawn.contains("Linear sections"));
+        browser.source_layout = crate::asset_browser::SourceLayout::Tabbed;
         browser.folded.insert(Origin::BuiltIn);
         browser.flat = true;
         let drawn = text(&mut browser, 760.0, "flat");

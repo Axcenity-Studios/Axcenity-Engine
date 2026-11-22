@@ -6,7 +6,7 @@ use axcenity_editor_kit::theme::icons;
 use eframe::egui;
 
 /// One of the Terrain Studio's tools.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TerrainTool {
     Raise,
     Smooth,

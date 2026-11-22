@@ -675,17 +675,28 @@ impl EditorApp {
 impl EditorApp {
     /// Settings > AI connections.
     pub(crate) fn ai_page(&mut self, ui: &mut egui::Ui) {
+        use super::check::AiClientGuide;
         use crate::app::settings;
-        use crate::theme::{self, icons};
+        use crate::theme::{self, icons, space, type_scale};
         use crate::widgets;
+        use axcenity_mcp::Profile;
+
         settings::page_title(
             ui,
             "AI connections",
-            "Let AI clients such as Claude Code, Cursor or Codex work in this window (MCP).",
+            "Connect Claude Code, Google Antigravity, Codex, Cursor, VS Code or local models \
+             to this window over MCP.",
         );
         let palette = theme::palette(ui.ctx());
         let weak = |ui: &mut egui::Ui, text: &str| {
-            ui.add(egui::Label::new(egui::RichText::new(text).color(palette.text_weak)).wrap());
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(text)
+                        .size(type_scale::SMALL)
+                        .color(palette.text_weak),
+                )
+                .wrap(),
+            );
         };
         settings::section(ui, "Allow AI connections");
         ui.checkbox(
@@ -704,18 +715,23 @@ impl EditorApp {
                 "Off: a client opens its own copy of the project without a window. Don't edit \
                  the project here at the same time; your saves would overwrite each other.",
             ),
-            (_, Some(error), _) => weak(ui, error),
-            (_, _, None) => weak(ui, "Open a project to take connections."),
+            (_, Some(error), _) => {
+                ui.colored_label(palette.error, theme::with_icon(icons::WARNING, error));
+            }
+            (_, _, None) => weak(ui, "Open a project to take live connections."),
             (None, _, Some(_)) => weak(ui, "Starting…"),
             (Some(live), _, Some(project)) => {
-                ui.label(format!(
-                    "Taking connections for {} (port {})",
-                    project.name,
-                    live.port()
-                ));
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Taking connections for {} (port {})",
+                        project.name,
+                        live.port()
+                    ))
+                    .color(palette.success),
+                );
                 let clients = live.clients();
                 if clients.is_empty() {
-                    weak(ui, "No client is connected.");
+                    weak(ui, "No client is connected yet.");
                 }
                 for client in clients {
                     ui.label(format!(
@@ -727,33 +743,168 @@ impl EditorApp {
                 }
             }
         }
-        if let Some(project) = &self.project {
-            ui.add_space(theme::space::L);
-            settings::section(ui, "Add to a client");
-            weak(ui, "Claude Code, from a terminal:");
-            let command = super::check::claude_code_command(&project.folder);
-            ui.add(
-                egui::Label::new(egui::RichText::new(&command).monospace())
-                    .wrap()
-                    .selectable(true),
-            );
-            if ui
-                .add(widgets::button(
-                    widgets::Role::Secondary,
-                    Some(icons::COPY),
-                    "Copy",
-                    &palette,
-                ))
-                .clicked()
-            {
-                ui.ctx().copy_text(command);
+
+        ui.add_space(space::L);
+        settings::section(ui, "Implementation guide");
+        let client_id = egui::Id::new("ai guide selected client");
+        let profile_id = egui::Id::new("ai guide selected profile");
+        let copied_id = egui::Id::new("ai guide copied until");
+        let mut selected_client = ui
+            .ctx()
+            .data(|data| data.get_temp::<AiClientGuide>(client_id))
+            .unwrap_or_default();
+        let mut selected_profile = ui
+            .ctx()
+            .data(|data| data.get_temp::<Profile>(profile_id))
+            .unwrap_or(Profile::Standard);
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+            for client in AiClientGuide::ALL {
+                if widgets::chip(ui, client.label(), selected_client == client).clicked() {
+                    selected_client = client;
+                    if client == AiClientGuide::LocalModels {
+                        selected_profile = Profile::Lite;
+                    } else if selected_profile == Profile::Lite {
+                        selected_profile = Profile::Standard;
+                    }
+                }
             }
-            weak(
-                ui,
-                "Other clients: axcenity-editor --mcp --check <project> prints their settings \
-                 (docs/mcp/README.md). A client that was already running connects here once \
-                 it restarts its server.",
+        });
+
+        ui.add_space(space::S);
+        ui.horizontal_wrapped(|ui| {
+            ui.label(
+                egui::RichText::new("Tool profile")
+                    .size(type_scale::SMALL)
+                    .color(palette.text_secondary),
             );
-        }
+            widgets::segmented(
+                ui,
+                &mut selected_profile,
+                &[
+                    (Profile::Lite, None, "Lite (13)"),
+                    (Profile::Standard, None, "Standard (22)"),
+                    (Profile::Full, None, "Full (29)"),
+                ],
+            );
+        });
+        ui.ctx().data_mut(|data| {
+            data.insert_temp(client_id, selected_client);
+            data.insert_temp(profile_id, selected_profile);
+        });
+
+        ui.add_space(space::S);
+        let placeholder_folder = std::path::PathBuf::from("/path/to/your-project");
+        let folder = self
+            .project
+            .as_ref()
+            .map_or(placeholder_folder.as_path(), |project| {
+                project.folder.as_path()
+            });
+        let snippet = selected_client.snippet(folder, selected_profile);
+
+        egui::Frame::new()
+            .fill(palette.surface)
+            .stroke(egui::Stroke::new(1.0_f32, palette.border))
+            .corner_radius(theme::radius::CARD)
+            .inner_margin(space::margin(space::M, space::S))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(
+                    egui::RichText::new(selected_client.label())
+                        .family(theme::heading_family())
+                        .color(palette.text_strong),
+                );
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(selected_client.config_where())
+                            .size(type_scale::SMALL)
+                            .color(palette.text_secondary),
+                    )
+                    .wrap(),
+                );
+                if self.project.is_none() {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(
+                                "Open a project to fill in your exact project path automatically.",
+                            )
+                            .size(type_scale::CAPTION)
+                            .color(palette.warning),
+                        )
+                        .wrap(),
+                    );
+                }
+                ui.add_space(space::XS);
+                for (index, step) in selected_client.steps().iter().enumerate() {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(format!("{}. {step}", index + 1))
+                                .size(type_scale::SMALL)
+                                .color(palette.text),
+                        )
+                        .wrap(),
+                    );
+                }
+                ui.add_space(space::S);
+                egui::Frame::new()
+                    .fill(palette.inset)
+                    .stroke(egui::Stroke::new(1.0_f32, palette.border))
+                    .corner_radius(theme::radius::CONTROL)
+                    .inner_margin(space::margin(space::S, space::S))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&snippet)
+                                    .monospace()
+                                    .size(type_scale::SMALL)
+                                    .color(palette.text),
+                            )
+                            .wrap()
+                            .selectable(true),
+                        );
+                    });
+                ui.add_space(space::S);
+                let now = ui.ctx().input(|input| input.time);
+                let copied_until = ui
+                    .ctx()
+                    .data(|data| data.get_temp::<f64>(copied_id))
+                    .unwrap_or(0.0);
+                let just_copied = now < copied_until;
+                ui.horizontal(|ui| {
+                    let label = if just_copied { "Copied!" } else { "Copy" };
+                    let icon = if just_copied {
+                        icons::CHECK
+                    } else {
+                        icons::COPY
+                    };
+                    if ui
+                        .add(widgets::button(
+                            widgets::Role::Secondary,
+                            Some(icon),
+                            label,
+                            &palette,
+                        ))
+                        .clicked()
+                    {
+                        ui.ctx().copy_text(snippet.clone());
+                        ui.ctx()
+                            .data_mut(|data| data.insert_temp(copied_id, now + 1.5));
+                    }
+                    if just_copied {
+                        ui.ctx().request_repaint();
+                    }
+                });
+            });
+
+        ui.add_space(space::S);
+        weak(
+            ui,
+            "Tip: run `axcenity-editor --mcp --check <project>` in a terminal to verify your \
+             setup and print configs for all clients (docs/mcp/README.md). A client that was \
+             already running connects here once it restarts its server.",
+        );
     }
 }

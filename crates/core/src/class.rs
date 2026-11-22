@@ -1122,10 +1122,15 @@ impl ClassName {
                 vec![("SourceFile", Value::String(String::new()))]
             }
             // How it streams (Phase 80): Default, Atomic or Persistent.
-            ClassName::Model => vec![(
-                "ModelStreamingMode",
-                crate::streaming::streaming_mode("Default"),
-            )],
+            ClassName::Model => vec![
+                (
+                    "ModelStreamingMode",
+                    crate::streaming::streaming_mode("Default"),
+                ),
+                // Offset and angle of the Model's pivot relative to its
+                // bounding-box middle (edited with the Pivot tool).
+                ("PivotOffset", Value::CFrame(CFrame::IDENTITY)),
+            ],
             // An IntValue's number is always whole (`World::set_property`
             // rounds it).
             ClassName::TextChatService => vec![
@@ -2260,6 +2265,9 @@ impl ClassName {
                     // Rotation in degrees around X, Y and Z, applied Z first, then X, then Y.
                     ("Orientation", Value::Vector3(Vector3::new(0.0, 0.0, 0.0))),
                     ("Size", Value::Vector3(Vector3::new(4.0, 1.0, 2.0))),
+                    // Offset and angle of the part's pivot relative to its center
+                    // (edited with the Pivot tool, as in Studio).
+                    ("PivotOffset", Value::CFrame(CFrame::IDENTITY)),
                     ("Color", Value::Color3(Color3::new(0.64, 0.64, 0.64))),
                     ("Material", Value::Material(material)),
                     // A material file in the project, such as
@@ -2434,6 +2442,7 @@ impl ClassName {
                     ("Orientation", Value::Vector3(Vector3::new(0.0, 0.0, 0.0))),
                     // The model is stretched so its bounding box is this size.
                     ("Size", Value::Vector3(Vector3::new(2.0, 2.0, 2.0))),
+                    ("PivotOffset", Value::CFrame(CFrame::IDENTITY)),
                     ("CastShadow", Value::Bool(true)),
                     ("Transparency", Value::Number(0.0)),
                     ("CanCollide", Value::Bool(true)),
@@ -2457,6 +2466,7 @@ impl ClassName {
                     ("Orientation", Value::Vector3(Vector3::new(0.0, 0.0, 0.0))),
                     // The model is stretched so its bounding box is this size.
                     ("Size", Value::Vector3(Vector3::new(2.0, 2.0, 2.0))),
+                    ("PivotOffset", Value::CFrame(CFrame::IDENTITY)),
                     // On, the whole solid is drawn in Color; off, each face
                     // keeps the color and material of the part it came from.
                     ("UsePartColor", Value::Bool(false)),

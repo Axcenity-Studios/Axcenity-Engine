@@ -30,7 +30,7 @@
 //! Everything here is plain math on rays and points, so tests can drive a
 //! drag without a window; `viewport.rs` feeds it the mouse as a [`Pointer`].
 
-use axcenity_core::{Instance, InstanceId, Value, Vector3};
+use axcenity_core::{CFrame, ClassName, Instance, InstanceId, Value, Vector3, World};
 use axcenity_render::glam::{Quat, Vec3};
 use axcenity_scene::{Ray, orientation_from_rotation, rotation_from_orientation};
 use eframe::egui;
@@ -88,7 +88,7 @@ const TURN_CHECK_STEP: f32 = 0.035;
 /// selection, and the others
 /// (modelled on F3X Building Tools) show an options panel in the viewport
 /// that acts on every selected part (see `build_tools.rs`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Tool {
     #[default]
     Select,
@@ -434,6 +434,203 @@ pub struct Modes {
     pub pivot: RotatePivot,
 }
 
+/// The custom `PivotOffset` on `instance`, or `None` when it is at the
+/// default identity pivot.
+pub fn pivot_offset_of(instance: &Instance) -> Option<(Vec3, Quat)> {
+    let Some(Value::CFrame(cf)) = instance.property("PivotOffset") else {
+        return None;
+    };
+    if cf.is_identity() {
+        return None;
+    }
+    let rotation = Quat::from_array(cf.rotation);
+    let rotation = if rotation.length_squared() > 1e-8 {
+        rotation.normalize()
+    } else {
+        Quat::IDENTITY
+    };
+    Some((to_vec3(cf.position), rotation))
+}
+
+/// The world-space pivot pose of a BasePart (`Position` and `Orientation`
+/// followed by `PivotOffset`), or `None` for anything without a part pose.
+pub fn part_world_pivot(instance: &Instance) -> Option<Pose> {
+    let pose = Pose::of(instance)?;
+    let Some((offset_pos, offset_rot)) = pivot_offset_of(instance) else {
+        return Some(pose);
+    };
+    Some(Pose {
+        position: pose.position + pose.rotation * offset_pos,
+        rotation: (pose.rotation * offset_rot).normalize(),
+        size: pose.size,
+    })
+}
+
+/// The world-aligned bounding-box middle of the visible parts inside
+/// `model` (skipping parts kept inside a union or grouped mesh).
+pub fn model_bbox_center(world: &World, model: InstanceId) -> Option<Vec3> {
+    let poses: Vec<Pose> = world
+        .descendants(model)
+        .into_iter()
+        .filter(|&id| !axcenity_core::csg::out_of_world(world, id))
+        .filter_map(|id| world.get(id).and_then(Pose::of))
+        .collect();
+    (!poses.is_empty()).then(|| middle_of(&poses))
+}
+
+/// The world-space pivot pose of a `Model`: its bounding-box middle shifted
+/// and rotated by its `PivotOffset`.
+pub fn model_world_pivot(world: &World, model: InstanceId) -> Option<Pose> {
+    let instance = world.get(model)?;
+    if instance.class() != ClassName::Model {
+        return None;
+    }
+    let center = model_bbox_center(world, model)?;
+    let (offset_pos, offset_rot) =
+        pivot_offset_of(instance).unwrap_or((Vec3::ZERO, Quat::IDENTITY));
+    Some(Pose {
+        position: center + offset_pos,
+        rotation: offset_rot,
+        size: Vec3::ONE,
+    })
+}
+
+/// Converts a world-space pivot `world_pivot` back into a Part's local
+/// `PivotOffset` CFrame.
+pub fn world_pivot_to_part_offset(part: Pose, world_pivot: Pose) -> CFrame {
+    let inv = part.rotation.inverse();
+    let local_pos = inv * (world_pivot.position - part.position);
+    let local_rot = (inv * world_pivot.rotation).normalize();
+    tidy_cframe(local_pos, local_rot)
+}
+
+/// Converts a world-space pivot `world_pivot` back into a Model's
+/// `PivotOffset` CFrame (relative to its bounding-box center).
+pub fn world_pivot_to_model_offset(bbox_center: Vec3, world_pivot: Pose) -> CFrame {
+    tidy_cframe(
+        world_pivot.position - bbox_center,
+        world_pivot.rotation.normalize(),
+    )
+}
+
+fn tidy_cframe(position: Vec3, rotation: Quat) -> CFrame {
+    let tidy = |v: f32| {
+        let rounded = (v * 1000.0).round() / 1000.0;
+        if rounded.abs() < 1e-5 { 0.0 } else { rounded }
+    };
+    let rotation = if rotation.w < 0.0 {
+        -rotation
+    } else {
+        rotation
+    };
+    let cf = CFrame {
+        position: Vector3::new(tidy(position.x), tidy(position.y), tidy(position.z)),
+        rotation: rotation.normalize().to_array(),
+    };
+    if cf.is_identity() {
+        CFrame::IDENTITY
+    } else {
+        cf
+    }
+}
+
+/// Where `tool`'s handles go for the selected parts `poses`, placing them at
+/// `custom_pivot` when one is active (a single selected Part or Model with a
+/// custom `PivotOffset`).
+pub fn handle_frame_with_pivot(
+    tool: Tool,
+    modes: Modes,
+    poses: &[Pose],
+    custom_pivot: Option<Pose>,
+) -> Option<Pose> {
+    let Some(pivot) = custom_pivot else {
+        return handle_frame(tool, modes, poses);
+    };
+    let last = *poses.last()?;
+    Some(match tool {
+        Tool::Move | Tool::Transform | Tool::Rotate => Pose {
+            position: pivot.position,
+            rotation: pivot.rotation,
+            size: last.size,
+        },
+        Tool::Scale => last,
+        _ => last,
+    })
+}
+
+/// The handles `tool` shows for `poses`, respecting `custom_pivot` when set.
+pub fn shapes_for_pivot(
+    tool: Tool,
+    modes: Modes,
+    poses: &[Pose],
+    custom_pivot: Option<Pose>,
+    screen: &Screen,
+) -> Vec<Shape> {
+    if custom_pivot.is_none() {
+        return shapes_for(tool, modes, poses, screen);
+    }
+    if tool == Tool::Transform {
+        return [Tool::Rotate, Tool::Scale, Tool::Transform]
+            .into_iter()
+            .filter_map(|sub| {
+                Some((
+                    sub,
+                    handle_frame_with_pivot(sub, modes, poses, custom_pivot)?,
+                ))
+            })
+            .flat_map(|(sub, frame)| handles_of(sub, frame, screen))
+            .collect();
+    }
+    handle_frame_with_pivot(tool, modes, poses, custom_pivot)
+        .map_or_else(Vec::new, |frame| shapes(tool, frame, screen))
+}
+
+/// The Edit Pivot gizmo's handles: Move arrows and Rotate rings around
+/// `pivot`, with no Resize balls.
+pub fn pivot_shapes(pivot: Pose, screen: &Screen) -> Vec<Shape> {
+    [Tool::Rotate, Tool::Transform]
+        .into_iter()
+        .flat_map(|tool| handles_of(tool, pivot, screen))
+        .collect()
+}
+
+/// Paints a Roblox Studio-style pivot indicator (a ringed dot with small
+/// local X/Y/Z axis ticks) at `pivot`.
+pub fn paint_pivot_indicator(painter: &egui::Painter, screen: &Screen, pivot: Pose, editing: bool) {
+    let Some(center) = screen.point(pivot.position) else {
+        return;
+    };
+    let tick_points = if editing { 18.0 } else { 12.0 };
+    let tick_studs = screen.studs_per_point(pivot.position) * tick_points;
+    let width = if editing { 2.0 } else { 1.5 };
+    for axis in Axis::ALL {
+        let dir = pivot.rotation * axis.vector();
+        if let Some(line) = screen.line(pivot.position, pivot.position + dir * tick_studs) {
+            painter.line_segment(line, egui::Stroke::new(width, axis.color()));
+        }
+    }
+    let radius = if editing { 6.0 } else { 4.5 };
+    let fill = if editing {
+        crate::theme::overlay::HOVER
+    } else {
+        egui::Color32::WHITE
+    };
+    painter.circle_filled(
+        center,
+        radius + 1.5,
+        egui::Color32::from_rgba_unmultiplied(15, 18, 24, 220),
+    );
+    painter.circle_filled(center, radius, fill);
+    painter.circle_stroke(
+        center,
+        radius + 1.5,
+        egui::Stroke::new(
+            1.2,
+            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 190),
+        ),
+    );
+}
+
 /// Where `tool`'s handles go for the selected parts `poses` (the last one
 /// is the last selected): a center and the axes they follow, with the last
 /// part's size for the Resize balls. Transform's handles each go where
@@ -696,8 +893,17 @@ pub struct Drag {
     free_turn: f32,
     /// The Attachments around it, as snap points (see [`Drag::among`]).
     sites: Box<Sites>,
+    /// Optional custom pivot state (boxed so `Drag` stays compact when no
+    /// custom pivot is active).
+    pivots: Option<Box<DragPivots>>,
     /// A move's distance and markers, for drawing.
     report: Option<Box<DragReport>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct DragPivots {
+    parts: Vec<(Vec3, Quat)>,
+    model: Option<(InstanceId, Pose)>,
 }
 
 /// A ring drag that follows the mouse round the ring.
@@ -845,8 +1051,24 @@ impl Drag {
             reach: 0.0,
             free_turn: 0.0,
             sites: Box::default(),
+            pivots: None,
             report: None,
         })
+    }
+
+    /// Sets each part's world-space pivot `(position, rotation)`, aligned
+    /// with `parts`, so Local moves and rotations honor each part's custom
+    /// `PivotOffset`.
+    pub fn with_part_pivots(mut self, pivots: Vec<(Vec3, Quat)>) -> Self {
+        self.pivots.get_or_insert_with(Default::default).parts = pivots;
+        self
+    }
+
+    /// When a single `Model` with a custom `PivotOffset` is being rotated,
+    /// keeps the Model's `PivotOffset` pinned to its rotated world pivot.
+    pub fn with_model_pivot(mut self, model: InstanceId, pivot: Pose) -> Self {
+        self.pivots.get_or_insert_with(Default::default).model = Some((model, pivot));
+        self
     }
 
     /// The drag with the other parts around it (see `snapping::obstacles`),
@@ -947,7 +1169,11 @@ impl Drag {
             return;
         };
         let (pivot, rotation) = match self.modes.pivot {
-            RotatePivot::Local => (last.position, last.rotation),
+            RotatePivot::Local => self
+                .pivots
+                .as_deref()
+                .and_then(|p| p.parts.last().copied())
+                .unwrap_or((last.position, last.rotation)),
             RotatePivot::Center | RotatePivot::Last => (self.frame.position, self.frame.rotation),
         };
         let mut report = DragReport::new(pivot, Vec3::ZERO, None, Vec::new(), None);
@@ -1025,8 +1251,16 @@ impl Drag {
                 let directions: Vec<Vec3> = self
                     .parts
                     .iter()
-                    .map(|(_, start)| match modes.axes {
-                        MoveAxes::Local => start.rotation * axis.vector(),
+                    .enumerate()
+                    .map(|(i, (_, start))| match modes.axes {
+                        MoveAxes::Local => {
+                            let rot = self
+                                .pivots
+                                .as_deref()
+                                .and_then(|p| p.parts.get(i))
+                                .map_or(start.rotation, |&(_, rot)| rot);
+                            rot * axis.vector()
+                        }
                         MoveAxes::Global | MoveAxes::Last => direction,
                     })
                     .collect();
@@ -1175,12 +1409,17 @@ impl Drag {
                 let turned_by = |radians: f32| -> Vec<(InstanceId, Pose, Pose)> {
                     self.parts
                         .iter()
-                        .map(|&(id, start)| {
+                        .enumerate()
+                        .map(|(i, &(id, start))| {
                             let (turn, pivot) = match modes.pivot {
-                                RotatePivot::Local => (
-                                    Quat::from_axis_angle(start.rotation * axis.vector(), radians),
-                                    start.position,
-                                ),
+                                RotatePivot::Local => {
+                                    let (p_pos, p_rot) = self
+                                        .pivots
+                                        .as_deref()
+                                        .and_then(|p| p.parts.get(i).copied())
+                                        .unwrap_or((start.position, start.rotation));
+                                    (Quat::from_axis_angle(p_rot * axis.vector(), radians), p_pos)
+                                }
                                 RotatePivot::Center | RotatePivot::Last => {
                                     (Quat::from_axis_angle(world_axis, radians), frame.position)
                                 }
@@ -1221,9 +1460,10 @@ impl Drag {
                     radians = free;
                     self.free_turn = free;
                 }
-                let values: PartValues = turned_by(radians)
-                    .into_iter()
-                    .map(|(id, start, pose)| {
+                let rotated = turned_by(radians);
+                let mut values: PartValues = rotated
+                    .iter()
+                    .map(|&(id, start, pose)| {
                         let orientation = orientation_from_rotation(pose.rotation);
                         let mut values = vec![("Orientation", Value::Vector3(orientation))];
                         if !pose.position.abs_diff_eq(start.position, 1e-5) {
@@ -1232,10 +1472,106 @@ impl Drag {
                         (id, values)
                     })
                     .collect();
+                if let Some((model_id, start_pivot)) = self.pivots.as_deref().and_then(|p| p.model)
+                {
+                    let poses_after: Vec<Pose> = rotated.iter().map(|&(_, _, pose)| pose).collect();
+                    let new_center = middle_of(&poses_after);
+                    let turn = Quat::from_axis_angle(world_axis, radians);
+                    let new_pivot = Pose {
+                        position: frame.position,
+                        rotation: (turn * start_pivot.rotation).normalize(),
+                        size: Vec3::ONE,
+                    };
+                    let offset = world_pivot_to_model_offset(new_center, new_pivot);
+                    values.push((model_id, vec![("PivotOffset", Value::CFrame(offset))]));
+                }
                 self.note_turn(axis, radians);
                 Some(values)
             }
         }
+    }
+}
+
+/// Dragging a Part's or Model's pivot handle in Edit Pivot mode: moves or
+/// turns only the pivot point (`PivotOffset`) without moving the geometry.
+#[derive(Clone, Debug)]
+pub struct PivotDrag {
+    pub target: InstanceId,
+    pub handle: Handle,
+    /// Part pose (when `!is_model`), or `(bbox_center, IDENTITY)` when
+    /// `is_model`.
+    base: Pose,
+    is_model: bool,
+    start_pivot: Pose,
+    drag: Drag,
+}
+
+impl PivotDrag {
+    pub fn start(
+        target: InstanceId,
+        handle: Handle,
+        world_pivot: Pose,
+        base: Pose,
+        is_model: bool,
+        screen: &Screen,
+        at: egui::Pos2,
+    ) -> Option<PivotDrag> {
+        let modes = Modes {
+            axes: MoveAxes::Local,
+            directions: ResizeDirections::Normal,
+            pivot: RotatePivot::Local,
+        };
+        let drag = Drag::start_many(
+            handle,
+            world_pivot,
+            vec![(target, world_pivot)],
+            modes,
+            screen,
+            at,
+        )?;
+        Some(PivotDrag {
+            target,
+            handle,
+            base,
+            is_model,
+            start_pivot: world_pivot,
+            drag,
+        })
+    }
+
+    pub fn report(&self) -> Option<&DragReport> {
+        self.drag.report()
+    }
+
+    /// Updates the pivot drag for `pointer` and `snap`, returning the new
+    /// world pivot pose and the resulting `PivotOffset` CFrame.
+    pub fn update(&mut self, pointer: Pointer, snap: &Snap) -> Option<(Pose, CFrame)> {
+        // Edit Pivot uses Move/Rotate snapping without surface/collision body constraints.
+        let pivot_snap = Snap {
+            surfaces: false,
+            collisions: false,
+            join: false,
+            points: false,
+            ..*snap
+        };
+        let parts = self.drag.update_all(pointer, &pivot_snap)?;
+        let (_, values) = parts.into_iter().next()?;
+        let mut world_pivot = self.start_pivot;
+        for (name, value) in values {
+            match (name, value) {
+                ("Position", Value::Vector3(v)) => world_pivot.position = to_vec3(v),
+                ("Orientation", Value::Vector3(v)) => {
+                    world_pivot.rotation = rotation_from_orientation(v);
+                }
+                _ => {}
+            }
+        }
+        let offset = if self.is_model {
+            world_pivot_to_model_offset(self.base.position, world_pivot)
+        } else {
+            world_pivot_to_part_offset(self.base, world_pivot)
+        };
+        Some((world_pivot, offset))
     }
 }
 

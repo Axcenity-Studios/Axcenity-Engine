@@ -70,7 +70,7 @@ mod overlays;
 mod plugin_drawings;
 mod plugin_handles;
 mod probe_overlay;
-mod ray_badge;
+pub(crate) mod ray_badge;
 mod skeleton_overlay;
 mod streaming_overlay;
 pub use plugin_handles::HandleMove;
@@ -153,6 +153,7 @@ pub enum DragKind {
     Move,
     Resize,
     Rotate,
+    Pivot,
 }
 
 impl DragKind {
@@ -328,6 +329,9 @@ pub struct ViewportScene<'a> {
     pub snap: Snap,
     /// The Move, Resize and Rotate tools' options.
     pub modes: Modes,
+    /// When true, the handles move and rotate only the selected object's
+    /// pivot (`PivotOffset`) without moving its geometry.
+    pub edit_pivot: bool,
     /// Outlines of parts about to be placed (the Angular tool's copies).
     pub preview: &'a [Pose],
     /// Particle bursts asked for this frame (`Emit` from scripts, or the
@@ -497,6 +501,8 @@ impl OverlayToggles {
 enum Dragging {
     /// A handle of the selected part.
     Handle(Drag),
+    /// A handle of the selected part's or Model's pivot in Edit Pivot mode.
+    Pivot(gizmo::PivotDrag),
     /// A part, by its body, and the other selected parts that move with
     /// it, each with where it was at the start.
     Body(PlaceDrag, Vec<(InstanceId, Vec3)>),
@@ -551,6 +557,37 @@ struct DragSelection<'a> {
     selected: Option<InstanceId>,
     selection: &'a [InstanceId],
     modes: Modes,
+    edit_pivot: bool,
+}
+
+/// The single selected BasePart or Model whose pivot can be edited or used as
+/// a custom transform origin: `(id, base_pose, world_pivot, is_model)`.
+pub(crate) fn pivot_target(
+    world: &World,
+    selection: &[InstanceId],
+    selected: Option<InstanceId>,
+) -> Option<(InstanceId, Pose, Pose, bool)> {
+    if selection.len() > 1 {
+        return None;
+    }
+    let id = selected.or_else(|| selection.first().copied())?;
+    let instance = world.get(id)?;
+    if axcenity_core::csg::out_of_world(world, id) || world.is_locked(id) {
+        return None;
+    }
+    if instance.class() == ClassName::Model {
+        let center = gizmo::model_bbox_center(world, id)?;
+        let pivot = gizmo::model_world_pivot(world, id)?;
+        let base = Pose {
+            position: center,
+            rotation: Quat::IDENTITY,
+            size: Vec3::ONE,
+        };
+        return Some((id, base, pivot, true));
+    }
+    let base = Pose::of(instance)?;
+    let pivot = gizmo::part_world_pivot(instance)?;
+    Some((id, base, pivot, false))
 }
 
 /// The parts the transform tools act on: each selected part, and the parts
@@ -690,6 +727,8 @@ struct DragInput {
     /// The handles to draw, and which one to highlight.
     shapes: Vec<gizmo::Shape>,
     highlighted: Option<Handle>,
+    /// Pivot indicator to paint over the viewport: `(world_pivot, editing)`.
+    pivot_indicator: Option<(Pose, bool)>,
     /// The selected UI element's handle under the mouse or being dragged.
     ui_highlighted: Option<Grip>,
     /// True if the left button is (or just was) dragging something, so the
@@ -1103,6 +1142,7 @@ impl Viewport {
     fn drag_report(&self) -> Option<&crate::snapping::points::DragReport> {
         match self.drag.as_ref()? {
             Dragging::Handle(drag) => drag.report(),
+            Dragging::Pivot(drag) => drag.report(),
             Dragging::Body(place, _) => place.report.as_deref(),
             Dragging::Icon(drag, _) => drag.report.as_deref(),
             Dragging::Ui(_) => None,
@@ -1135,6 +1175,7 @@ impl Viewport {
             tool,
             snap,
             modes,
+            edit_pivot,
             preview,
             emits,
             stylesheets,
@@ -1414,6 +1455,7 @@ impl Viewport {
                 selected,
                 selection,
                 modes,
+                edit_pivot,
             },
             drag_tool,
             snap,
@@ -1775,6 +1817,9 @@ impl Viewport {
             }
         }
         gizmo::paint(&ui.painter_at(rect), &drag.shapes, drag.highlighted);
+        if let Some((pivot, editing_pivot)) = drag.pivot_indicator {
+            gizmo::paint_pivot_indicator(&ui.painter_at(rect), &screen, pivot, editing_pivot);
+        }
         if move_guide && let Some(report) = self.drag_report() {
             move_overlay::paint(&ui.painter_at(rect), &screen, rect, report);
         }

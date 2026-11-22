@@ -3,25 +3,115 @@
 
 use super::*;
 
+use crate::theme::{CodeFont, CustomFont, UiFont};
+
 pub(super) fn appearance_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
     page_title(
         ui,
         "Appearance",
         "The theme, the accent colour and how big everything is.",
     );
+    let palette = theme::palette(ui.ctx());
     section(ui, "Theme");
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(
+                "Pick a dark or light preset to stylize every panel, menu, toolbar and graph.",
+            )
+            .size(type_scale::SMALL)
+            .color(palette.text_secondary),
+        )
+        .wrap(),
+    );
+    ui.add_space(space::XS);
+
+    let avail = ui.available_width();
+    let cols = if avail >= 420.0 { 3 } else { 2 };
+    let gap = 10.0;
+    let card_w = ((avail - gap * (cols - 1) as f32 - 2.0) / cols as f32)
+        .floor()
+        .clamp(112.0, 162.0);
+    let mut picked_theme = None;
+
+    // System mode row.
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;
-        for choice in ThemeChoice::ALL {
-            if theme_preview(ui, choice, appearance.accent, appearance.theme == choice).clicked() {
-                appearance.theme = choice;
-            }
+        if theme_preview(
+            ui,
+            ThemeChoice::System,
+            appearance.accent,
+            appearance.theme == ThemeChoice::System,
+            card_w,
+        )
+        .clicked()
+        {
+            picked_theme = Some(ThemeChoice::System);
         }
+        let desc_w = (avail - card_w - 14.0).max(120.0);
+        ui.vertical(|ui| {
+            ui.set_max_width(desc_w);
+            ui.add_space(space::S);
+            ui.label(
+                egui::RichText::new("Match operating system")
+                    .family(theme::medium_family())
+                    .color(palette.text_strong),
+            );
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(
+                        "Automatically switches between neutral Dark and Light when your OS \
+                         appearance changes.",
+                    )
+                    .size(type_scale::SMALL)
+                    .color(palette.text_secondary),
+                )
+                .wrap(),
+            );
+        });
     });
+
+    let mut theme_grid = |ui: &mut egui::Ui, heading: &str, presets: &[ThemeChoice]| {
+        ui.add_space(space::M);
+        ui.label(widgets::micro(heading, palette.text_weak));
+        ui.add_space(space::XS);
+        for (row_idx, row) in presets.chunks(cols).enumerate() {
+            if row_idx > 0 {
+                ui.add_space(gap);
+            }
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = gap;
+                for &choice in row {
+                    let preview_accent = choice.suggested_accent().unwrap_or(appearance.accent);
+                    let card_accent = if appearance.theme == choice {
+                        appearance.accent
+                    } else {
+                        preview_accent
+                    };
+                    if theme_preview(ui, choice, card_accent, appearance.theme == choice, card_w)
+                        .clicked()
+                    {
+                        picked_theme = Some(choice);
+                    }
+                }
+            });
+        }
+    };
+    theme_grid(ui, "Dark themes", &ThemeChoice::DARK_PRESETS);
+    theme_grid(ui, "Light themes", &ThemeChoice::LIGHT_PRESETS);
+
+    if let Some(choice) = picked_theme
+        && appearance.theme != choice
+    {
+        appearance.theme = choice;
+        if let Some(suggested) = choice.suggested_accent() {
+            appearance.accent = suggested;
+        }
+    }
+
     ui.add_space(space::L);
     section(ui, "Accent");
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 10.0;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(10.0, 8.0);
         for accent in Accent::ALL {
             if accent_swatch(ui, accent, appearance.accent == accent).clicked() {
                 appearance.accent = accent;
@@ -74,11 +164,51 @@ pub(super) fn appearance_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
     );
 }
 
+fn font_error_id() -> egui::Id {
+    egui::Id::new("axcenity font import error")
+}
+
+/// Copies an imported font into `<storage_dir>/fonts/` (when available) so it
+/// stays available even if the original file moves, and validates its header.
+fn import_custom_font(source: &std::path::Path) -> Result<CustomFont, String> {
+    let bytes = std::fs::read(source).map_err(|err| format!("Couldn't read font file: {err}"))?;
+    theme::validate_font_bytes(&bytes).map_err(|err| err.to_owned())?;
+    let name = source
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.replace(['-', '_'], " "))
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "Custom Font".to_owned());
+    let file_name = source
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("custom.ttf");
+    let final_path = if let Some(dir) = eframe::storage_dir(crate::APP_ID) {
+        let fonts_dir = dir.join("fonts");
+        if std::fs::create_dir_all(&fonts_dir).is_ok() {
+            let dest = fonts_dir.join(file_name);
+            if std::fs::write(&dest, &bytes).is_ok() {
+                dest
+            } else {
+                source.to_path_buf()
+            }
+        } else {
+            source.to_path_buf()
+        }
+    } else {
+        source.to_path_buf()
+    };
+    Ok(CustomFont {
+        name,
+        path: final_path.to_string_lossy().into_owned(),
+    })
+}
+
 pub(super) fn typography_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
     page_title(
         ui,
         "Text & density",
-        "How much room controls get, and the size of code.",
+        "How much room controls get, interface fonts, and the size of code.",
     );
     section(ui, "Density");
     widgets::segmented(
@@ -96,6 +226,90 @@ pub(super) fn typography_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
     );
     ui.add_space(space::L);
     section(ui, "Code and Output");
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(
+                "Pick the typeface and size used in script editors, the Console log, and code \
+                 snippets, or import your own .ttf / .otf font.",
+            )
+            .size(type_scale::SMALL)
+            .color(palette.text_secondary),
+        )
+        .wrap(),
+    );
+    ui.add_space(space::XS);
+    ui.horizontal_wrapped(|ui| {
+        egui::ComboBox::from_id_salt("code font selector")
+            .selected_text(format!(
+                "{} · {}",
+                appearance.code_font.label(),
+                appearance.code_font.kind()
+            ))
+            .width(240.0)
+            .show_ui(ui, |ui| {
+                ui.label(widgets::micro("Built-in", palette.text_weak));
+                for font in CodeFont::BUILT_IN {
+                    let label = format!("{}  ({})", font.label(), font.kind());
+                    ui.selectable_value(&mut appearance.code_font, font, label);
+                }
+                if !appearance.custom_fonts.is_empty() {
+                    ui.separator();
+                    ui.label(widgets::micro("Imported", palette.text_weak));
+                    for custom in &appearance.custom_fonts {
+                        let choice = CodeFont::Custom {
+                            name: custom.name.clone(),
+                            path: custom.path.clone(),
+                        };
+                        let label = format!("{}  (Imported)", custom.name);
+                        ui.selectable_value(&mut appearance.code_font, choice, label);
+                    }
+                }
+            });
+
+        if ui
+            .add(widgets::button(
+                widgets::Role::Secondary,
+                Some(icons::UPLOAD_SIMPLE),
+                "Import font…",
+                &palette,
+            ))
+            .on_hover_text("Import a .ttf or .otf font file to use for code and the Console.")
+            .clicked()
+            && let Some(file) = rfd::FileDialog::new()
+                .set_title("Import code font")
+                .add_filter("Font files", &["ttf", "otf", "ttc"])
+                .pick_file()
+        {
+            match import_custom_font(&file) {
+                Ok(custom) => {
+                    appearance
+                        .custom_fonts
+                        .retain(|existing| existing.path != custom.path);
+                    appearance.code_font = CodeFont::Custom {
+                        name: custom.name.clone(),
+                        path: custom.path.clone(),
+                    };
+                    appearance.custom_fonts.push(custom);
+                    ui.ctx()
+                        .data_mut(|data| data.remove_temp::<String>(font_error_id()));
+                }
+                Err(error) => {
+                    ui.ctx()
+                        .data_mut(|data| data.insert_temp(font_error_id(), error));
+                }
+            }
+        }
+
+        if appearance.code_font != CodeFont::JetBrainsMono
+            && ui
+                .button("Reset")
+                .on_hover_text("Switch back to JetBrains Mono (Default).")
+                .clicked()
+        {
+            appearance.code_font = CodeFont::JetBrainsMono;
+        }
+    });
+    ui.add_space(space::XS);
     ui.add(
         egui::Slider::new(&mut appearance.code_font_size, Appearance::CODE_FONT_SIZES)
             .step_by(0.5)
@@ -122,10 +336,201 @@ pub(super) fn typography_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
         });
     ui.add_space(space::L);
     section(ui, "Interface font");
-    ui.label(
-        egui::RichText::new("Inter for the interface and JetBrains Mono for code, both built in.")
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(
+                "Choose a built-in typeface for panels, menus and labels, or import your own .ttf \
+                 or .otf font file. Icons always stay crisp with Phosphor.",
+            )
+            .size(type_scale::SMALL)
             .color(palette.text_secondary),
+        )
+        .wrap(),
     );
+    ui.add_space(space::XS);
+    ui.horizontal_wrapped(|ui| {
+        egui::ComboBox::from_id_salt("interface font selector")
+            .selected_text(format!(
+                "{} · {}",
+                appearance.ui_font.label(),
+                appearance.ui_font.kind()
+            ))
+            .width(240.0)
+            .show_ui(ui, |ui| {
+                ui.label(widgets::micro("Built-in", palette.text_weak));
+                for font in UiFont::BUILT_IN {
+                    let label = format!("{}  ({})", font.label(), font.kind());
+                    ui.selectable_value(&mut appearance.ui_font, font, label);
+                }
+                if !appearance.custom_fonts.is_empty() {
+                    ui.separator();
+                    ui.label(widgets::micro("Imported", palette.text_weak));
+                    for custom in &appearance.custom_fonts {
+                        let choice = UiFont::Custom {
+                            name: custom.name.clone(),
+                            path: custom.path.clone(),
+                        };
+                        let label = format!("{}  (Imported)", custom.name);
+                        ui.selectable_value(&mut appearance.ui_font, choice, label);
+                    }
+                }
+            });
+
+        if ui
+            .add(widgets::button(
+                widgets::Role::Secondary,
+                Some(icons::UPLOAD_SIMPLE),
+                "Import font…",
+                &palette,
+            ))
+            .on_hover_text("Import a .ttf or .otf font file to use for the editor interface.")
+            .clicked()
+            && let Some(file) = rfd::FileDialog::new()
+                .set_title("Import interface font")
+                .add_filter("Font files", &["ttf", "otf", "ttc"])
+                .pick_file()
+        {
+            match import_custom_font(&file) {
+                Ok(custom) => {
+                    appearance
+                        .custom_fonts
+                        .retain(|existing| existing.path != custom.path);
+                    appearance.ui_font = UiFont::Custom {
+                        name: custom.name.clone(),
+                        path: custom.path.clone(),
+                    };
+                    appearance.custom_fonts.push(custom);
+                    ui.ctx()
+                        .data_mut(|data| data.remove_temp::<String>(font_error_id()));
+                }
+                Err(error) => {
+                    ui.ctx()
+                        .data_mut(|data| data.insert_temp(font_error_id(), error));
+                }
+            }
+        }
+
+        if appearance.ui_font != UiFont::Inter
+            && ui
+                .button("Reset")
+                .on_hover_text("Switch back to Inter (Default).")
+                .clicked()
+        {
+            appearance.ui_font = UiFont::Inter;
+        }
+    });
+
+    if let Some(err) = ui
+        .ctx()
+        .data(|data| data.get_temp::<String>(font_error_id()))
+    {
+        ui.add_space(space::XXS);
+        ui.colored_label(palette.error, theme::with_icon(icons::WARNING, &err));
+    }
+
+    if !appearance.custom_fonts.is_empty() {
+        ui.add_space(space::XS);
+        let mut remove_index = None;
+        ui.horizontal_wrapped(|ui| {
+            for (idx, custom) in appearance.custom_fonts.iter().enumerate() {
+                let active = matches!(
+                    &appearance.ui_font,
+                    UiFont::Custom { path, .. } if path == &custom.path
+                ) || matches!(
+                    &appearance.code_font,
+                    CodeFont::Custom { path, .. } if path == &custom.path
+                );
+                egui::Frame::new()
+                    .fill(if active {
+                        palette.accent_soft
+                    } else {
+                        palette.surface
+                    })
+                    .stroke(egui::Stroke::new(
+                        1.0_f32,
+                        if active {
+                            palette.accent
+                        } else {
+                            palette.border
+                        },
+                    ))
+                    .corner_radius(theme::radius::CONTROL)
+                    .inner_margin(egui::Margin::symmetric(8, 3))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            let pick = ui
+                                .add(
+                                    egui::Label::new(
+                                        egui::RichText::new(&custom.name)
+                                            .size(type_scale::SMALL)
+                                            .color(if active {
+                                                palette.accent_text
+                                            } else {
+                                                palette.text
+                                            }),
+                                    )
+                                    .sense(egui::Sense::click()),
+                                )
+                                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                            if pick.clicked() {
+                                appearance.ui_font = UiFont::Custom {
+                                    name: custom.name.clone(),
+                                    path: custom.path.clone(),
+                                };
+                            }
+                            if widgets::icon_button(ui, icons::X, "Remove imported font", false)
+                                .clicked()
+                            {
+                                remove_index = Some(idx);
+                            }
+                        });
+                    });
+            }
+        });
+        if let Some(idx) = remove_index {
+            let removed = appearance.custom_fonts.remove(idx);
+            if matches!(
+                &appearance.ui_font,
+                UiFont::Custom { path, .. } if path == &removed.path
+            ) {
+                appearance.ui_font = UiFont::Inter;
+            }
+            if matches!(
+                &appearance.code_font,
+                CodeFont::Custom { path, .. } if path == &removed.path
+            ) {
+                appearance.code_font = CodeFont::JetBrainsMono;
+            }
+        }
+    }
+
+    ui.add_space(space::S);
+    egui::Frame::new()
+        .fill(palette.surface)
+        .stroke(egui::Stroke::new(1.0_f32, palette.border))
+        .corner_radius(theme::radius::CARD)
+        .inner_margin(egui::Margin::symmetric(12, 10))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                egui::RichText::new(format!("Preview — {}", appearance.ui_font.label()))
+                    .family(theme::heading_family())
+                    .size(type_scale::HEADING)
+                    .color(palette.text_strong),
+            );
+            ui.label(
+                egui::RichText::new(
+                    "The quick brown fox jumps over 123 glowing parts in Workspace.",
+                )
+                .color(palette.text),
+            );
+            ui.label(
+                egui::RichText::new("Secondary metadata · Position (0.00, 4.50, -12.00) · 60 FPS")
+                    .size(type_scale::SMALL)
+                    .color(palette.text_secondary),
+            );
+        });
 }
 
 pub(super) fn accessibility_page(ui: &mut egui::Ui, appearance: &mut Appearance) {
@@ -219,8 +624,10 @@ pub(super) fn theme_preview(
     choice: ThemeChoice,
     accent: Accent,
     selected: bool,
+    width: f32,
 ) -> egui::Response {
-    let size = egui::vec2(148.0, 112.0);
+    let pic_h = (width * 0.46).round().clamp(56.0, 74.0);
+    let size = egui::vec2(width, pic_h + 24.0);
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(
@@ -231,18 +638,34 @@ pub(super) fn theme_preview(
         )
     });
     let current = theme::palette(ui.ctx());
-    let picture = egui::Rect::from_min_size(rect.min, egui::vec2(size.x, 84.0));
+    let picture = egui::Rect::from_min_size(rect.min, egui::vec2(size.x, pic_h));
     match choice {
-        ThemeChoice::Dark => mini_editor(ui, picture, &Palette::new(true, accent)),
-        ThemeChoice::Light => mini_editor(ui, picture, &Palette::new(false, accent)),
         ThemeChoice::System => {
             let half = picture.center().x;
-            let mut left = ui.new_child(egui::UiBuilder::new().max_rect(picture));
-            left.set_clip_rect(picture.with_max_x(half));
-            mini_editor(&left, picture, &Palette::new(true, accent));
-            let mut right = ui.new_child(egui::UiBuilder::new().max_rect(picture));
-            right.set_clip_rect(picture.with_min_x(half));
-            mini_editor(&right, picture, &Palette::new(false, accent));
+            let left_clip = ui.clip_rect().intersect(picture.with_max_x(half));
+            if left_clip.is_positive() {
+                let mut left = ui.new_child(egui::UiBuilder::new().max_rect(picture));
+                left.set_clip_rect(left_clip);
+                mini_editor(
+                    &left,
+                    picture,
+                    &Palette::for_theme(ThemeChoice::Dark, true, accent),
+                );
+            }
+            let right_clip = ui.clip_rect().intersect(picture.with_min_x(half));
+            if right_clip.is_positive() {
+                let mut right = ui.new_child(egui::UiBuilder::new().max_rect(picture));
+                right.set_clip_rect(right_clip);
+                mini_editor(
+                    &right,
+                    picture,
+                    &Palette::for_theme(ThemeChoice::Light, false, accent),
+                );
+            }
+        }
+        preset => {
+            let dark = preset.is_dark().unwrap_or(true);
+            mini_editor(ui, picture, &Palette::for_theme(preset, dark, accent));
         }
     }
     let t = theme::ease(
@@ -257,22 +680,25 @@ pub(super) fn theme_preview(
     };
     ui.painter().rect_stroke(
         picture,
-        8,
+        6,
         egui::Stroke::new(if selected { 2.0_f32 } else { 1.0 }, ring),
-        egui::StrokeKind::Outside,
+        egui::StrokeKind::Inside,
     );
     let label_color = if selected {
         current.text_strong
     } else {
         current.text_secondary
     };
-    ui.painter().text(
-        egui::pos2(rect.left() + 2.0, picture.bottom() + 16.0),
-        egui::Align2::LEFT_CENTER,
-        theme::with_icon(choice.icon(), choice.label()),
-        egui::FontId::new(type_scale::BODY, theme::medium_family()),
-        label_color,
-    );
+    let label_clip = ui.clip_rect().intersect(rect);
+    if label_clip.is_positive() {
+        ui.painter().with_clip_rect(label_clip).text(
+            egui::pos2(rect.left() + 2.0, picture.bottom() + 13.0),
+            egui::Align2::LEFT_CENTER,
+            theme::with_icon(choice.icon(), choice.label()),
+            egui::FontId::new(type_scale::SMALL, theme::medium_family()),
+            label_color,
+        );
+    }
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -280,37 +706,48 @@ pub(super) fn theme_preview(
 /// and an accent button.
 pub(super) fn mini_editor(ui: &egui::Ui, rect: egui::Rect, p: &Palette) {
     let painter = ui.painter();
-    painter.rect_filled(rect, 8, p.app_bg);
-    let header = egui::Rect::from_min_size(rect.min, egui::vec2(rect.width(), 12.0));
+    let sx = (rect.width() / 166.0).clamp(0.65, 1.15);
+    let sy = (rect.height() / 76.0).clamp(0.65, 1.15);
+    painter.rect_filled(rect, 6, p.app_bg);
+    let header_h = (12.0 * sy).max(9.0);
+    let header = egui::Rect::from_min_size(rect.min, egui::vec2(rect.width(), header_h));
     painter.circle_filled(
-        header.left_center() + egui::vec2(8.0, 0.0),
-        2.5,
+        header.left_center() + egui::vec2(8.0 * sx, 0.0),
+        (2.5 * sx).max(1.8),
         p.text_muted,
     );
     for (x, w) in [(16.0, 14.0), (34.0, 12.0), (50.0, 12.0)] {
         painter.rect_filled(
-            egui::Rect::from_min_size(header.min + egui::vec2(x, 5.0), egui::vec2(w, 2.5)),
+            egui::Rect::from_min_size(
+                header.min + egui::vec2(x * sx, (header_h - 2.5) * 0.5),
+                egui::vec2(w * sx, 2.5),
+            ),
             1,
             p.text_weak,
         );
     }
+    let pad = 4.0;
     let body = egui::Rect::from_min_max(
-        header.left_bottom() + egui::vec2(4.0, 0.0),
-        rect.max - egui::vec2(4.0, 4.0),
+        header.left_bottom() + egui::vec2(pad, 0.0),
+        rect.max - egui::vec2(pad, pad),
     );
-    let explorer = egui::Rect::from_min_size(body.min, egui::vec2(42.0, body.height()));
+    let explorer_w = (body.width() * 0.27).clamp(26.0, 44.0);
+    let explorer = egui::Rect::from_min_size(body.min, egui::vec2(explorer_w, body.height()));
     painter.rect_filled(explorer, 4, p.panel);
+    let row_step = ((explorer.height() - 10.0) / 5.0).max(7.0);
     for row in 0..5 {
-        let y = explorer.top() + 7.0 + row as f32 * 10.0;
+        let y = explorer.top() + 5.0 + row as f32 * row_step;
+        let indent = 4.0 + (row % 2) as f32 * (4.0 * sx);
+        let line_w = (explorer.width() - indent - 5.0).max(8.0);
         let line = egui::Rect::from_min_size(
-            egui::pos2(explorer.left() + 5.0 + (row % 2) as f32 * 5.0, y),
-            egui::vec2(24.0, 3.0),
+            egui::pos2(explorer.left() + indent, y),
+            egui::vec2(line_w, 2.5),
         );
         if row == 2 {
             painter.rect_filled(
                 egui::Rect::from_min_size(
-                    egui::pos2(explorer.left() + 2.0, y - 3.0),
-                    egui::vec2(38.0, 9.0),
+                    egui::pos2(explorer.left() + 2.0, y - 2.5),
+                    egui::vec2((explorer.width() - 4.0).max(6.0), (row_step - 1.0).max(6.0)),
                 ),
                 2,
                 p.accent_soft,
@@ -323,23 +760,33 @@ pub(super) fn mini_editor(ui: &egui::Ui, rect: egui::Rect, p: &Palette) {
     let viewport =
         egui::Rect::from_min_max(egui::pos2(explorer.right() + 4.0, body.top()), body.max);
     painter.rect_filled(viewport, 4, theme::mix(p.app_bg, p.panel, 0.5));
+    let ground_inset = (viewport.width() * 0.14).max(6.0);
     let ground = egui::Rect::from_min_max(
-        egui::pos2(viewport.left() + 14.0, viewport.center().y + 6.0),
-        egui::pos2(viewport.right() - 14.0, viewport.center().y + 14.0),
+        egui::pos2(
+            viewport.left() + ground_inset,
+            viewport.center().y + 5.0 * sy,
+        ),
+        egui::pos2(
+            viewport.right() - ground_inset,
+            viewport.center().y + 12.0 * sy,
+        ),
     );
     painter.rect_filled(ground, 2, p.border_strong);
+    let cube = (13.0 * sy).clamp(9.0, 15.0);
     painter.rect_filled(
         egui::Rect::from_center_size(
-            viewport.center() - egui::vec2(0.0, 2.0),
-            egui::vec2(14.0, 14.0),
+            viewport.center() - egui::vec2(0.0, 2.0 * sy),
+            egui::vec2(cube, cube),
         ),
         2,
         p.text_weak,
     );
+    let btn_w = (20.0 * sx).clamp(14.0, 22.0);
+    let btn_h = (7.5 * sy).clamp(5.5, 8.5);
     painter.rect_filled(
         egui::Rect::from_min_size(
-            viewport.right_top() + egui::vec2(-26.0, 5.0),
-            egui::vec2(20.0, 8.0),
+            viewport.right_top() + egui::vec2(-(btn_w + 5.0), 5.0),
+            egui::vec2(btn_w, btn_h),
         ),
         2,
         p.accent_solid,

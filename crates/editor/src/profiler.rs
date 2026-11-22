@@ -1120,7 +1120,9 @@ fn frame_graph(ui: &mut egui::Ui, frames: &[FrameTimes]) {
             for (name, ms, color) in frame.parts(colors).into_iter().rev() {
                 ui.label(RichText::new(format!("{name}: {ms:.2} ms")).color(color));
             }
-            let gpu = frame.gpu.map_or("not measured".to_owned(), |ms| format!("{ms:.2} ms"));
+            let gpu = frame
+                .gpu
+                .map_or("not measured".to_owned(), |ms| format!("{ms:.2} ms"));
             ui.label(RichText::new(format!("GPU: {gpu}")).color(gpu_color(ui)));
         });
     }

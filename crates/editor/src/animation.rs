@@ -247,6 +247,12 @@ pub enum StudioAction {
     },
     /// Bring the Animation tab to the front.
     Show,
+    /// Update `PivotOffset` on a Part or Model edited inside the Animation
+    /// preview's Edit Pivot mode.
+    SetPivot {
+        id: InstanceId,
+        offset: axcenity_core::CFrame,
+    },
     /// Record a property-clip file rewrite for undo.
     RecordFile {
         path: String,

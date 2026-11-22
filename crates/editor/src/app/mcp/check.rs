@@ -158,7 +158,7 @@ fn client_lines(exe: &Path, folder: &Path, options: &Options) -> String {
         "Claude Code:".to_owned(),
         format!("  claude mcp add axcenity -- {} {shell_args}", shell(&exe)),
         String::new(),
-        "Claude Desktop, Cursor, Windsurf, Cline, LM Studio, Gemini CLI (\"mcpServers\" JSON):"
+        "Google Antigravity, Claude Desktop, Cursor, Windsurf, Cline, LM Studio, Gemini CLI (\"mcpServers\" JSON):"
             .to_owned(),
         format!(
             "  {{\"mcpServers\": {{\"axcenity\": {{\"command\": {command}, \"args\": [{json_args}]}}}}}}"
@@ -177,14 +177,154 @@ fn client_lines(exe: &Path, folder: &Path, options: &Options) -> String {
     .join("\n")
 }
 
+/// Which AI client guide is shown in Settings ▸ AI connections.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum AiClientGuide {
+    #[default]
+    ClaudeCode,
+    Antigravity,
+    Codex,
+    Cursor,
+    ClaudeDesktop,
+    VsCode,
+    GeminiCli,
+    LocalModels,
+}
+
+impl AiClientGuide {
+    pub(crate) const ALL: [AiClientGuide; 8] = [
+        AiClientGuide::ClaudeCode,
+        AiClientGuide::Antigravity,
+        AiClientGuide::Codex,
+        AiClientGuide::Cursor,
+        AiClientGuide::ClaudeDesktop,
+        AiClientGuide::VsCode,
+        AiClientGuide::GeminiCli,
+        AiClientGuide::LocalModels,
+    ];
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            AiClientGuide::ClaudeCode => "Claude Code",
+            AiClientGuide::Antigravity => "Google Antigravity",
+            AiClientGuide::Codex => "ChatGPT / Codex",
+            AiClientGuide::Cursor => "Cursor",
+            AiClientGuide::ClaudeDesktop => "Claude Desktop",
+            AiClientGuide::VsCode => "VS Code",
+            AiClientGuide::GeminiCli => "Gemini CLI / Windsurf",
+            AiClientGuide::LocalModels => "Local models",
+        }
+    }
+
+    pub(crate) fn config_where(self) -> &'static str {
+        match self {
+            AiClientGuide::ClaudeCode => "Run in a terminal (or put the JSON in .mcp.json)",
+            AiClientGuide::Antigravity => {
+                "~/.gemini/antigravity/mcp_config.json (Manage MCP Servers → View raw config)"
+            }
+            AiClientGuide::Codex => "Run in a terminal, or add to ~/.codex/config.toml",
+            AiClientGuide::Cursor => {
+                ".cursor/mcp.json in the project, or ~/.cursor/mcp.json globally"
+            }
+            AiClientGuide::ClaudeDesktop => {
+                "claude_desktop_config.json (%APPDATA%\\Claude\\ on Windows, ~/Library/Application Support/Claude/ on macOS, ~/.config/Claude/ on Linux)"
+            }
+            AiClientGuide::VsCode => ".vscode/mcp.json in your workspace (Copilot Agent mode)",
+            AiClientGuide::GeminiCli => {
+                "~/.gemini/settings.json (Gemini CLI) or Windsurf / Cline mcp_settings.json"
+            }
+            AiClientGuide::LocalModels => {
+                "LM Studio mcp.json, Jan (Settings → MCP Servers), or ollmcp for Ollama"
+            }
+        }
+    }
+
+    pub(crate) fn steps(self) -> &'static [&'static str] {
+        match self {
+            AiClientGuide::ClaudeCode => &[
+                "Turn on \"Allow AI connections\" above so Claude works directly in this window.",
+                "Copy and run the terminal command below.",
+                "Start Claude Code and ask it to inspect or build in your scene. Use /mcp__axcenity__axcenity_build for guided builds.",
+            ],
+            AiClientGuide::Antigravity => &[
+                "Turn on \"Allow AI connections\" above so Antigravity edits live in this window.",
+                "In Google Antigravity, open the MCP Servers panel → Manage MCP Servers → View raw config (mcp_config.json).",
+                "Paste the JSON block below into mcpServers, save, and refresh/restart the MCP server.",
+            ],
+            AiClientGuide::Codex => &[
+                "Turn on \"Allow AI connections\" above so Codex edits live in this window.",
+                "Run the codex mcp add command below, or paste the TOML block into ~/.codex/config.toml.",
+                "Note: ChatGPT web & OpenAI's Responses API only connect over HTTP, while this server speaks stdio — use OpenAI Codex CLI / IDE extension.",
+            ],
+            AiClientGuide::Cursor => &[
+                "Turn on \"Allow AI connections\" above so Cursor edits live in this window.",
+                "Create or open .cursor/mcp.json in your project (or ~/.cursor/mcp.json for all projects).",
+                "Paste the JSON below, save, then enable \"axcenity\" in Cursor Settings → Tools & MCP.",
+            ],
+            AiClientGuide::ClaudeDesktop => &[
+                "Turn on \"Allow AI connections\" above so Claude Desktop edits live in this window.",
+                "Open claude_desktop_config.json (Developer → Edit Config inside Claude Desktop).",
+                "Paste the JSON below into mcpServers, save, and fully restart Claude Desktop.",
+            ],
+            AiClientGuide::VsCode => &[
+                "Turn on \"Allow AI connections\" above so Copilot edits live in this window.",
+                "Create or open .vscode/mcp.json in your project workspace.",
+                "Paste the JSON below, click Start above the server entry, and switch Copilot Chat to Agent mode.",
+            ],
+            AiClientGuide::GeminiCli => &[
+                "Turn on \"Allow AI connections\" above so the client edits live in this window.",
+                "Open ~/.gemini/settings.json (for Gemini CLI) or the MCP config file in Windsurf / Cline.",
+                "Paste the JSON below into mcpServers, save, and restart the client.",
+            ],
+            AiClientGuide::LocalModels => &[
+                "Pick the \"lite\" profile (13 tools, ~2.1k tokens) and set context length to at least 32k tokens.",
+                "Use a model with native tool calling (e.g. Qwen 3 8B+, Qwen 2.5, gpt-oss-20b, Ministral) and enable tool use in LM Studio or Jan.",
+                "Paste the JSON below into LM Studio's mcp.json (or enter Command + Arguments in Jan / ollmcp).",
+            ],
+        }
+    }
+
+    /// Formats the copyable command or configuration snippet for `folder` and `profile`.
+    pub(crate) fn snippet(self, folder: &Path, profile: Profile) -> String {
+        let exe_str = this_binary().display().to_string();
+        let folder_str = folder.display().to_string();
+        let mut args = vec!["--mcp".to_owned(), folder_str];
+        if profile != Profile::Standard {
+            args.extend(["--profile".to_owned(), profile.name().to_owned()]);
+        }
+        let json_args = args.iter().map(|a| quote(a)).collect::<Vec<_>>().join(", ");
+        let shell_args = args.iter().map(|a| shell(a)).collect::<Vec<_>>().join(" ");
+        let cmd_json = quote(&exe_str);
+        match self {
+            AiClientGuide::ClaudeCode => {
+                format!(
+                    "claude mcp add axcenity -- {} {shell_args}",
+                    shell(&exe_str)
+                )
+            }
+            AiClientGuide::Codex => format!(
+                "# Terminal:\ncodex mcp add axcenity -- {} {shell_args}\n\n# Or ~/.codex/config.toml:\n[mcp_servers.axcenity]\ncommand = {cmd_json}\nargs = [{json_args}]\nstartup_timeout_sec = 30",
+                shell(&exe_str)
+            ),
+            AiClientGuide::VsCode => format!(
+                "{{\n  \"servers\": {{\n    \"axcenity\": {{\n      \"type\": \"stdio\",\n      \"command\": {cmd_json},\n      \"args\": [{json_args}]\n    }}\n  }}\n}}"
+            ),
+            AiClientGuide::Antigravity
+            | AiClientGuide::Cursor
+            | AiClientGuide::ClaudeDesktop
+            | AiClientGuide::GeminiCli
+            | AiClientGuide::LocalModels => format!(
+                "{{\n  \"mcpServers\": {{\n    \"axcenity\": {{\n      \"command\": {cmd_json},\n      \"args\": [{json_args}]\n    }}\n  }}\n}}"
+            ),
+        }
+    }
+}
+
 /// The line that adds the server for `folder` to Claude Code, with this
-/// binary's path: for the Settings page.
+/// binary's path: for the Settings page and tests.
+#[allow(dead_code)]
 pub(crate) fn claude_code_command(folder: &Path) -> String {
-    format!(
-        "claude mcp add axcenity -- {} --mcp {}",
-        shell(&this_binary().display().to_string()),
-        shell(&folder.display().to_string())
-    )
+    AiClientGuide::ClaudeCode.snippet(folder, Profile::Standard)
 }
 
 /// The binary clients should start: this one.

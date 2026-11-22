@@ -37,8 +37,12 @@ const GI_MASK_CASTERS: u32 = 3u;
 // The most lamps one hit is lit by: the first so many of the frame's.
 const GI_MOST_LAMPS: u32 = 16u;
 // The share of a probe's rays finding the backs of solid things past which
-// it's inside something.
-const GI_INSIDE: f32 = 0.25;
+// it's inside something. Hysteresis prevents probes near a surface from
+// chattering between valid and invalid as ray rotations vary.
+const GI_INSIDE_ENTER: f32 = 0.35;
+const GI_INSIDE_EXIT: f32 = 0.20;
+// Clamp extreme single-ray bounce radiance so one lucky ray can't flash a probe.
+const GI_MAX_RADIANCE: f32 = 32.0;
 
 // Must match `RayGiUniform` in renderer/ray_gi.rs.
 struct RayGi {
@@ -53,12 +57,14 @@ struct RayGi {
 }
 
 // What a ray found (`gi_trace`): whether it hit, how far along it, the
-// TLAS slot it hit and whether that's the front of a triangle.
+// TLAS slot it hit, whether that's the front of a triangle, and the hit
+// normal (geometric in software, -direction in hardware).
 struct GiHit {
     found: bool,
     t: f32,
     slot: u32,
     front_face: bool,
+    normal: vec3<f32>,
 }
 
 // Binding 0 is the scene rays are traced through, and 5 to 8 cut-outs'
@@ -80,18 +86,16 @@ struct GiHit {
 var<workgroup> gi_sums: array<array<vec3<f32>, 5>, GI_THREADS>;
 
 // Direction `i` of `count` spread evenly over the sphere (a spherical
-// Fibonacci spiral), turned by `turn`.
+// Fibonacci spiral), rotated azimuthally around Y by `turn`. Keeping the
+// elevation `y` upright preserves an exact 50/50 upper/lower hemisphere
+// balance on every update so sky vs. ground probes never flicker as `turn`
+// advances.
 fn gi_direction(i: u32, count: u32, turn: f32) -> vec3<f32> {
     let golden = 2.39996323;
     let y = 1.0 - (f32(i) + 0.5) * 2.0 / f32(count);
     let r = sqrt(max(1.0 - y * y, 0.0));
     let a = f32(i) * golden + turn;
-    let d = vec3<f32>(cos(a) * r, y, sin(a) * r);
-    // Tipped a different way each update too, so the poles move.
-    let tip = turn * 0.6180339;
-    let c = cos(tip);
-    let s = sin(tip);
-    return vec3<f32>(d.x, c * d.y - s * d.z, s * d.y + c * d.z);
+    return vec3<f32>(cos(a) * r, y, sin(a) * r);
 }
 
 // Whether anything casts a shadow between `origin` and `distance` along
@@ -156,10 +160,12 @@ fn gi_ray_light(origin: vec3<f32>, direction: vec3<f32>) -> vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
     let glow = gi_surfaces[surface + 1u].rgb;
-    // Facing back along the ray: the ray tracing doesn't give the
-    // triangle's own normal. A cut-out (a leaf card) is lit on either side.
+    // Use the hit surface normal facing the ray (geometric normal in software
+    // tracing; -direction in hardware where ray queries don't provide normals).
+    let n = select(hit.normal, -hit.normal, dot(hit.normal, direction) > 0.0);
     let position = origin + direction * hit.t;
-    return vec4<f32>(glow + gi_hit_light(position, -direction, color.rgb), 0.0);
+    let bounced = min(glow + gi_hit_light(position, n, color.rgb), vec3<f32>(GI_MAX_RADIANCE));
+    return vec4<f32>(bounced, 0.0);
 }
 
 @compute @workgroup_size(64)
@@ -205,11 +211,33 @@ fn cs_trace_probes(
         // light_probe_sum.wgsl stores them.
         let scale = 4.0 * PI / f32(max(rays, 1u));
         let place = 4u * bitcast<u32>(probe.w);
-        let inside = gi_sums[0][4].x > GI_INSIDE * f32(max(rays, 1u));
-        // Nothing worth keeping from a probe not usable until now.
+        let old0 = light_probes[place];
+        let was_invalid = old0.w > 0.5;
+        let inside_threshold = select(GI_INSIDE_ENTER, GI_INSIDE_EXIT, was_invalid);
+        let inside = gi_sums[0][4].x > inside_threshold * f32(max(rays, 1u));
+        // Adaptive hysteresis (DDGI-style): measure relative change across all
+        // four SH bands. On a still scene (small Monte Carlo noise), hold
+        // strongly (0.92) so probes never flicker; when the lighting genuinely
+        // changes in brightness or direction, drop smoothly to `kept` so the
+        // probe still settles quickly. Untraced / previously inside probes
+        // take their first valid update whole.
         let kept = select(gi.settings.x, gi.settings.w, group.x < gi.counts.w);
-        let keep = select(kept, 0.0, light_probes[place].w > 0.5);
-        let baked_inside = abs(light_probes[place].w - 1.0) < 0.5;
+        var diff_sq = 0.0;
+        var base_sq = 0.0;
+        for (var k = 0u; k < 4u; k++) {
+            let band = select(2.0 / 3.0, 1.0, k == 0u);
+            let fresh_k = gi_sums[0][k] * scale * band;
+            let old_k = light_probes[place + k].rgb;
+            let d = fresh_k - old_k;
+            diff_sq += dot(d, d);
+            base_sq += dot(old_k, old_k);
+        }
+        let rel_change = sqrt(diff_sq) / max(sqrt(base_sq), 0.15);
+        let change_blend = smoothstep(0.02, 0.08, rel_change);
+        let steady_keep = max(kept, 0.88);
+        let adaptive_keep = mix(steady_keep, kept, change_blend);
+        let keep = select(adaptive_keep, 0.0, was_invalid);
+        let baked_inside = abs(old0.w - 1.0) < 0.5;
         for (var k = 0u; k < 4u; k++) {
             let band = select(2.0 / 3.0, 1.0, k == 0u);
             let fresh = gi_sums[0][k] * scale * band;

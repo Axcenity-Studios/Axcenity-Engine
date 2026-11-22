@@ -130,41 +130,255 @@ pub mod overlay {
     pub const AXIS_Z: Color32 = Color32::from_rgb(55, 125, 245);
 }
 
-/// The light or dark theme, or whichever the system uses.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// The editor's colour theme: neutral dark or light, System, or a curated
+/// dark/light preset that stylizes every panel, menu, toolbar and graph.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ThemeChoice {
     #[default]
     Dark,
     Light,
     System,
+    Dracula,
+    GruvboxDark,
+    Nord,
+    CatppuccinMocha,
+    TokyoNight,
+    OneDark,
+    SolarizedDark,
+    RosePine,
+    GruvboxLight,
+    CatppuccinLatte,
+    SolarizedLight,
+    NordLight,
 }
 
 impl ThemeChoice {
-    pub const ALL: [ThemeChoice; 3] = [ThemeChoice::Dark, ThemeChoice::Light, ThemeChoice::System];
+    pub const ALL: [ThemeChoice; 15] = [
+        ThemeChoice::Dark,
+        ThemeChoice::Light,
+        ThemeChoice::System,
+        ThemeChoice::Dracula,
+        ThemeChoice::GruvboxDark,
+        ThemeChoice::Nord,
+        ThemeChoice::CatppuccinMocha,
+        ThemeChoice::TokyoNight,
+        ThemeChoice::OneDark,
+        ThemeChoice::SolarizedDark,
+        ThemeChoice::RosePine,
+        ThemeChoice::GruvboxLight,
+        ThemeChoice::CatppuccinLatte,
+        ThemeChoice::SolarizedLight,
+        ThemeChoice::NordLight,
+    ];
+
+    pub const DARK_PRESETS: [ThemeChoice; 9] = [
+        ThemeChoice::Dark,
+        ThemeChoice::Dracula,
+        ThemeChoice::GruvboxDark,
+        ThemeChoice::Nord,
+        ThemeChoice::CatppuccinMocha,
+        ThemeChoice::TokyoNight,
+        ThemeChoice::OneDark,
+        ThemeChoice::SolarizedDark,
+        ThemeChoice::RosePine,
+    ];
+
+    pub const LIGHT_PRESETS: [ThemeChoice; 5] = [
+        ThemeChoice::Light,
+        ThemeChoice::GruvboxLight,
+        ThemeChoice::CatppuccinLatte,
+        ThemeChoice::SolarizedLight,
+        ThemeChoice::NordLight,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
             ThemeChoice::Dark => "Dark",
             ThemeChoice::Light => "Light",
             ThemeChoice::System => "System",
+            ThemeChoice::Dracula => "Dracula",
+            ThemeChoice::GruvboxDark => "Gruvbox Dark",
+            ThemeChoice::Nord => "Nord",
+            ThemeChoice::CatppuccinMocha => "Catppuccin Mocha",
+            ThemeChoice::TokyoNight => "Tokyo Night",
+            ThemeChoice::OneDark => "One Dark",
+            ThemeChoice::SolarizedDark => "Solarized Dark",
+            ThemeChoice::RosePine => "Rosé Pine",
+            ThemeChoice::GruvboxLight => "Gruvbox Light",
+            ThemeChoice::CatppuccinLatte => "Catppuccin Latte",
+            ThemeChoice::SolarizedLight => "Solarized Light",
+            ThemeChoice::NordLight => "Nord Light",
         }
     }
 
     pub fn icon(self) -> &'static str {
         match self {
-            ThemeChoice::Dark => icons::MOON,
-            ThemeChoice::Light => icons::SUN,
             ThemeChoice::System => icons::DESKTOP,
+            choice if choice.is_dark() == Some(false) => icons::SUN,
+            _ => icons::MOON,
+        }
+    }
+
+    /// `Some(true)` for dark themes, `Some(false)` for light themes, `None` for System.
+    pub fn is_dark(self) -> Option<bool> {
+        match self {
+            ThemeChoice::System => None,
+            ThemeChoice::Light
+            | ThemeChoice::GruvboxLight
+            | ThemeChoice::CatppuccinLatte
+            | ThemeChoice::SolarizedLight
+            | ThemeChoice::NordLight => Some(false),
+            _ => Some(true),
+        }
+    }
+
+    /// Signature accent for stylized presets, applied as a starting point when
+    /// switching to that preset (the user can still pick any accent afterward).
+    pub fn suggested_accent(self) -> Option<Accent> {
+        match self {
+            ThemeChoice::Dark | ThemeChoice::Light | ThemeChoice::System => None,
+            ThemeChoice::Dracula | ThemeChoice::CatppuccinMocha | ThemeChoice::CatppuccinLatte => {
+                Some(Accent::Violet)
+            }
+            ThemeChoice::GruvboxDark | ThemeChoice::GruvboxLight => Some(Accent::Orange),
+            ThemeChoice::Nord | ThemeChoice::SolarizedDark => Some(Accent::Teal),
+            ThemeChoice::TokyoNight
+            | ThemeChoice::OneDark
+            | ThemeChoice::SolarizedLight
+            | ThemeChoice::NordLight => Some(Accent::Blue),
+            ThemeChoice::RosePine => Some(Accent::Pink),
         }
     }
 
     pub fn preference(self) -> egui::ThemePreference {
-        match self {
-            ThemeChoice::Dark => egui::ThemePreference::Dark,
-            ThemeChoice::Light => egui::ThemePreference::Light,
-            ThemeChoice::System => egui::ThemePreference::System,
+        match self.is_dark() {
+            Some(true) => egui::ThemePreference::Dark,
+            Some(false) => egui::ThemePreference::Light,
+            None => egui::ThemePreference::System,
         }
     }
+}
+
+/// An imported custom interface font kept by display name and file path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomFont {
+    pub name: String,
+    pub path: String,
+}
+
+/// Which typeface draws the editor interface (panels, menus, buttons, labels).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UiFont {
+    #[default]
+    Inter,
+    Roboto,
+    Poppins,
+    Nunito,
+    Montserrat,
+    Lora,
+    JetBrainsMono,
+    Custom {
+        name: String,
+        path: String,
+    },
+}
+
+impl UiFont {
+    pub const BUILT_IN: [UiFont; 7] = [
+        UiFont::Inter,
+        UiFont::Roboto,
+        UiFont::Poppins,
+        UiFont::Nunito,
+        UiFont::Montserrat,
+        UiFont::Lora,
+        UiFont::JetBrainsMono,
+    ];
+
+    pub fn label(&self) -> &str {
+        match self {
+            UiFont::Inter => "Inter (Default)",
+            UiFont::Roboto => "Roboto",
+            UiFont::Poppins => "Poppins",
+            UiFont::Nunito => "Nunito",
+            UiFont::Montserrat => "Montserrat",
+            UiFont::Lora => "Lora",
+            UiFont::JetBrainsMono => "JetBrains Mono",
+            UiFont::Custom { name, .. } => name.as_str(),
+        }
+    }
+
+    pub fn kind(&self) -> &'static str {
+        match self {
+            UiFont::Inter | UiFont::Roboto | UiFont::Poppins | UiFont::Montserrat => "Sans-serif",
+            UiFont::Nunito => "Rounded",
+            UiFont::Lora => "Serif",
+            UiFont::JetBrainsMono => "Monospace",
+            UiFont::Custom { .. } => "Imported",
+        }
+    }
+}
+
+/// Which typeface draws code editors, scripts, and the Console log.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CodeFont {
+    #[default]
+    JetBrainsMono,
+    Hack,
+    PressStart2P,
+    Inter,
+    Roboto,
+    Custom {
+        name: String,
+        path: String,
+    },
+}
+
+impl CodeFont {
+    pub const BUILT_IN: [CodeFont; 5] = [
+        CodeFont::JetBrainsMono,
+        CodeFont::Hack,
+        CodeFont::PressStart2P,
+        CodeFont::Inter,
+        CodeFont::Roboto,
+    ];
+
+    pub fn label(&self) -> &str {
+        match self {
+            CodeFont::JetBrainsMono => "JetBrains Mono (Default)",
+            CodeFont::Hack => "Hack",
+            CodeFont::PressStart2P => "Press Start 2P",
+            CodeFont::Inter => "Inter",
+            CodeFont::Roboto => "Roboto",
+            CodeFont::Custom { name, .. } => name.as_str(),
+        }
+    }
+
+    pub fn kind(&self) -> &'static str {
+        match self {
+            CodeFont::JetBrainsMono | CodeFont::Hack => "Monospace",
+            CodeFont::PressStart2P => "Pixel monospace",
+            CodeFont::Inter | CodeFont::Roboto => "Sans-serif",
+            CodeFont::Custom { .. } => "Imported",
+        }
+    }
+}
+
+/// Checks that `bytes` looks like a TrueType (`.ttf`), OpenType (`.otf`), or
+/// TrueType collection (`.ttc`) font file.
+pub fn validate_font_bytes(bytes: &[u8]) -> Result<(), &'static str> {
+    if bytes.len() < 12 {
+        return Err("file is too small to be a font");
+    }
+    let header = &bytes[..4];
+    let valid = header == [0x00, 0x01, 0x00, 0x00]
+        || header == b"OTTO"
+        || header == b"true"
+        || header == b"typ1"
+        || header == b"ttcf";
+    if !valid {
+        return Err("not a supported .ttf or .otf font file");
+    }
+    Ok(())
 }
 
 /// The one colour used for emphasis: selection, focus, the active tab and
@@ -413,6 +627,15 @@ pub struct Appearance {
     /// back when it was the default doesn't keep the old look.
     #[serde(rename = "ribbon_align")]
     pub ribbon: RibbonAlign,
+    /// The interface font family (built-in or user-imported `.ttf`/`.otf`).
+    #[serde(default)]
+    pub ui_font: UiFont,
+    /// The code and Console font family (built-in or user-imported `.ttf`/`.otf`).
+    #[serde(default)]
+    pub code_font: CodeFont,
+    /// Custom fonts imported by the user, listed in Settings > Text & density.
+    #[serde(default)]
+    pub custom_fonts: Vec<CustomFont>,
 }
 
 impl Default for Appearance {
@@ -429,6 +652,9 @@ impl Default for Appearance {
             steady_hz: 60,
             menu_icons: MenuIcons::Left,
             ribbon: RibbonAlign::Left,
+            ui_font: UiFont::Inter,
+            code_font: CodeFont::JetBrainsMono,
+            custom_fonts: Vec::new(),
         }
     }
 }
@@ -513,72 +739,436 @@ pub struct Palette {
     pub error: Color32,
 }
 
+/// Moves `color` toward `toward` until its WCAG contrast against every
+/// background in `backgrounds` reaches `min_ratio`.
+fn ensure_contrast(
+    color: Color32,
+    backgrounds: &[Color32],
+    min_ratio: f32,
+    toward: Color32,
+) -> Color32 {
+    if backgrounds
+        .iter()
+        .all(|&bg| contrast(color, bg) >= min_ratio)
+    {
+        return color;
+    }
+    let mut best = color;
+    for step in 1..=50 {
+        let t = step as f32 / 50.0;
+        let candidate = mix(color, toward, t);
+        best = candidate;
+        if backgrounds
+            .iter()
+            .all(|&bg| contrast(candidate, bg) >= min_ratio)
+        {
+            return candidate;
+        }
+    }
+    best
+}
+
+fn rgb_hex(rgb: u32) -> Color32 {
+    Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8)
+}
+
+struct ThemeTokens {
+    dark: bool,
+    app_bg: u32,
+    panel: u32,
+    surface: u32,
+    elevated: u32,
+    inset: u32,
+    control: u32,
+    control_hover: u32,
+    control_active: u32,
+    border: u32,
+    border_strong: u32,
+    text: u32,
+    text_strong: u32,
+    text_secondary: u32,
+    text_weak: u32,
+    text_muted: u32,
+    success: u32,
+    warning: u32,
+    error: u32,
+}
+
 impl Palette {
     pub fn new(dark: bool, accent: Accent) -> Self {
-        let hex = |rgb: u32| Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8);
-        let (accent_fg, accent_solid) = accent.colors(dark);
-        if dark {
-            let panel = hex(0x1E1E1E);
-            Self {
-                dark,
-                high_contrast: false,
-                app_bg: hex(0x171717),
-                panel,
-                surface: hex(0x242424),
-                elevated: hex(0x292929),
-                inset: hex(0x191919),
-                control: hex(0x2A2A2A),
-                control_hover: hex(0x323232),
-                control_active: hex(0x3A3A3A),
-                border: hex(0x303030),
-                border_strong: hex(0x424242),
-                text: hex(0xE8E8EA),
-                text_strong: hex(0xFAFAFA),
-                text_secondary: hex(0xA1A1AA),
-                text_weak: hex(0x8E8E96),
-                text_muted: hex(0x63636B),
-                accent: accent_fg,
-                accent_solid,
-                on_accent: Color32::WHITE,
-                accent_soft: mix(panel, accent_fg, 0.24),
-                accent_text: mix(accent_fg, Color32::WHITE, 0.45),
-                success: hex(0x4CC38A),
-                warning: hex(0xE5B454),
-                error: hex(0xF07178),
-            }
+        let choice = if dark {
+            ThemeChoice::Dark
         } else {
-            // Off-white, cool-grey tiers rather than pure white, so panels
-            // part from the bars around them and sit easier beside the
-            // viewport: bars and headers #F1F3F5, panels #F8F9FA, and
-            // white kept for fields, cards and menus.
-            let panel = hex(0xF8F9FA);
-            Self {
-                dark,
-                high_contrast: false,
-                app_bg: hex(0xF1F3F5),
-                panel,
-                surface: Color32::WHITE,
-                elevated: Color32::WHITE,
-                inset: Color32::WHITE,
-                control: hex(0xECEEF1),
-                control_hover: hex(0xE3E6EA),
-                control_active: hex(0xD9DDE2),
-                border: hex(0xDFE2E6),
-                border_strong: hex(0xCACED4),
-                text: hex(0x27272A),
-                text_strong: hex(0x18181B),
-                text_secondary: hex(0x52525B),
-                text_weak: hex(0x6B6B73),
-                text_muted: hex(0xA1A1AA),
-                accent: accent_fg,
-                accent_solid,
-                on_accent: Color32::WHITE,
-                accent_soft: mix(panel, accent_fg, 0.12),
-                accent_text: mix(accent_fg, Color32::BLACK, 0.15),
-                success: hex(0x1C7547),
-                warning: hex(0x8F5F00),
-                error: hex(0xC42B2B),
+            ThemeChoice::Light
+        };
+        Self::for_theme(choice, dark, accent)
+    }
+
+    /// Full semantic palette for `choice` (using `system_dark` when `choice`
+    /// is [`ThemeChoice::System`]) paired with `accent`. Guarantees WCAG AA
+    /// readability across all panels, menus, controls and accents.
+    pub fn for_theme(choice: ThemeChoice, system_dark: bool, accent: Accent) -> Self {
+        let resolved = match choice {
+            ThemeChoice::System => {
+                if system_dark {
+                    ThemeChoice::Dark
+                } else {
+                    ThemeChoice::Light
+                }
             }
+            other => other,
+        };
+        let tokens = match resolved {
+            ThemeChoice::Dark | ThemeChoice::System => ThemeTokens {
+                dark: true,
+                app_bg: 0x171717,
+                panel: 0x1E1E1E,
+                surface: 0x242424,
+                elevated: 0x292929,
+                inset: 0x191919,
+                control: 0x2A2A2A,
+                control_hover: 0x323232,
+                control_active: 0x3A3A3A,
+                border: 0x303030,
+                border_strong: 0x424242,
+                text: 0xE8E8EA,
+                text_strong: 0xFAFAFA,
+                text_secondary: 0xA1A1AA,
+                text_weak: 0x8E8E96,
+                text_muted: 0x63636B,
+                success: 0x4CC38A,
+                warning: 0xE5B454,
+                error: 0xF07178,
+            },
+            ThemeChoice::Light => ThemeTokens {
+                dark: false,
+                app_bg: 0xF1F3F5,
+                panel: 0xF8F9FA,
+                surface: 0xFFFFFF,
+                elevated: 0xFFFFFF,
+                inset: 0xFFFFFF,
+                control: 0xECEEF1,
+                control_hover: 0xE3E6EA,
+                control_active: 0xD9DDE2,
+                border: 0xDFE2E6,
+                border_strong: 0xCACED4,
+                text: 0x27272A,
+                text_strong: 0x18181B,
+                text_secondary: 0x52525B,
+                text_weak: 0x6B6B73,
+                text_muted: 0xA1A1AA,
+                success: 0x1C7547,
+                warning: 0x8F5F00,
+                error: 0xC42B2B,
+            },
+            ThemeChoice::Dracula => ThemeTokens {
+                dark: true,
+                app_bg: 0x21222C,
+                panel: 0x282A36,
+                surface: 0x313442,
+                elevated: 0x383B4B,
+                inset: 0x1E1F29,
+                control: 0x3B3E50,
+                control_hover: 0x44475A,
+                control_active: 0x4E5268,
+                border: 0x44475A,
+                border_strong: 0x5A5E77,
+                text: 0xF8F8F2,
+                text_strong: 0xFFFFFF,
+                text_secondary: 0xC6C8E0,
+                text_weak: 0xA2A9CE,
+                text_muted: 0x6272A4,
+                success: 0x50FA7B,
+                warning: 0xF1FA8C,
+                error: 0xFF6E6E,
+            },
+            ThemeChoice::GruvboxDark => ThemeTokens {
+                dark: true,
+                app_bg: 0x1D2021,
+                panel: 0x282828,
+                surface: 0x32302F,
+                elevated: 0x3C3836,
+                inset: 0x1D2021,
+                control: 0x3C3836,
+                control_hover: 0x47423E,
+                control_active: 0x504945,
+                border: 0x47413D,
+                border_strong: 0x665C54,
+                text: 0xEBDBB2,
+                text_strong: 0xFBF1C7,
+                text_secondary: 0xD5C4A1,
+                text_weak: 0xBDAE93,
+                text_muted: 0x7C6F64,
+                success: 0xB8BB26,
+                warning: 0xFABD2F,
+                error: 0xFB4934,
+            },
+            ThemeChoice::Nord => ThemeTokens {
+                dark: true,
+                app_bg: 0x242933,
+                panel: 0x2E3440,
+                surface: 0x353C4A,
+                elevated: 0x3B4252,
+                inset: 0x262B35,
+                control: 0x3B4252,
+                control_hover: 0x434C5E,
+                control_active: 0x4C566A,
+                border: 0x434C5E,
+                border_strong: 0x566178,
+                text: 0xECEFF4,
+                text_strong: 0xF8FAFC,
+                text_secondary: 0xD8DEE9,
+                text_weak: 0xABB7CE,
+                text_muted: 0x6C7A96,
+                success: 0xA3BE8C,
+                warning: 0xEBCB8B,
+                error: 0xE27882,
+            },
+            ThemeChoice::CatppuccinMocha => ThemeTokens {
+                dark: true,
+                app_bg: 0x181825,
+                panel: 0x1E1E2E,
+                surface: 0x262637,
+                elevated: 0x2E2E42,
+                inset: 0x161622,
+                control: 0x313244,
+                control_hover: 0x3B3D52,
+                control_active: 0x45475A,
+                border: 0x383A4E,
+                border_strong: 0x52556F,
+                text: 0xCDD6F4,
+                text_strong: 0xECEFFF,
+                text_secondary: 0xBAC2DE,
+                text_weak: 0xA6ADC8,
+                text_muted: 0x6C7086,
+                success: 0xA6E3A1,
+                warning: 0xF9E2AF,
+                error: 0xF38BA8,
+            },
+            ThemeChoice::TokyoNight => ThemeTokens {
+                dark: true,
+                app_bg: 0x16161E,
+                panel: 0x1A1B26,
+                surface: 0x212333,
+                elevated: 0x282B3E,
+                inset: 0x14151D,
+                control: 0x292E42,
+                control_hover: 0x323850,
+                control_active: 0x3B4261,
+                border: 0x2F354C,
+                border_strong: 0x454E70,
+                text: 0xC0CAF5,
+                text_strong: 0xE2E8FF,
+                text_secondary: 0xA9B1D6,
+                text_weak: 0x9099C2,
+                text_muted: 0x565F89,
+                success: 0x9ECE6A,
+                warning: 0xE0AF68,
+                error: 0xF7768E,
+            },
+            ThemeChoice::OneDark => ThemeTokens {
+                dark: true,
+                app_bg: 0x21252B,
+                panel: 0x282C34,
+                surface: 0x2F343F,
+                elevated: 0x353B47,
+                inset: 0x1E2228,
+                control: 0x363C47,
+                control_hover: 0x3E4552,
+                control_active: 0x48505F,
+                border: 0x3B414D,
+                border_strong: 0x525A6A,
+                text: 0xD7DAE0,
+                text_strong: 0xF3F4F6,
+                text_secondary: 0xB4BCCB,
+                text_weak: 0x9CA5B7,
+                text_muted: 0x636D83,
+                success: 0x98C379,
+                warning: 0xE5C07B,
+                error: 0xE06C75,
+            },
+            ThemeChoice::SolarizedDark => ThemeTokens {
+                dark: true,
+                app_bg: 0x00212B,
+                panel: 0x002B36,
+                surface: 0x063541,
+                elevated: 0x0A3D4B,
+                inset: 0x00212B,
+                control: 0x073B48,
+                control_hover: 0x0D4756,
+                control_active: 0x145364,
+                border: 0x124653,
+                border_strong: 0x246272,
+                text: 0xEEE8D5,
+                text_strong: 0xFDF6E3,
+                text_secondary: 0xC2CDD0,
+                text_weak: 0x9FB1B5,
+                text_muted: 0x657B83,
+                success: 0x85B93A,
+                warning: 0xD6A732,
+                error: 0xEC6663,
+            },
+            ThemeChoice::RosePine => ThemeTokens {
+                dark: true,
+                app_bg: 0x13111C,
+                panel: 0x191724,
+                surface: 0x211E30,
+                elevated: 0x28243A,
+                inset: 0x15131F,
+                control: 0x2A263E,
+                control_hover: 0x332E4A,
+                control_active: 0x3D3758,
+                border: 0x312C46,
+                border_strong: 0x4A4369,
+                text: 0xE0DEF4,
+                text_strong: 0xF5F4FC,
+                text_secondary: 0xBDB8D8,
+                text_weak: 0xA29BC2,
+                text_muted: 0x6E6A86,
+                success: 0x9CCFD8,
+                warning: 0xF6C177,
+                error: 0xEB6F92,
+            },
+            ThemeChoice::GruvboxLight => ThemeTokens {
+                dark: false,
+                app_bg: 0xF2E5BC,
+                panel: 0xFBF1C7,
+                surface: 0xFFF8DB,
+                elevated: 0xFFFBEF,
+                inset: 0xFFFDF3,
+                control: 0xEBDBB2,
+                control_hover: 0xE2CFA1,
+                control_active: 0xD5C4A1,
+                border: 0xD8C69B,
+                border_strong: 0xBDAE88,
+                text: 0x3C3836,
+                text_strong: 0x1D2021,
+                text_secondary: 0x504945,
+                text_weak: 0x635952,
+                text_muted: 0x928374,
+                success: 0x5A6605,
+                warning: 0x8F5B00,
+                error: 0x9D0006,
+            },
+            ThemeChoice::CatppuccinLatte => ThemeTokens {
+                dark: false,
+                app_bg: 0xE6E9EF,
+                panel: 0xEFF1F5,
+                surface: 0xF8F9FC,
+                elevated: 0xFFFFFF,
+                inset: 0xFFFFFF,
+                control: 0xDCE0E8,
+                control_hover: 0xCFD5E0,
+                control_active: 0xC3C9D6,
+                border: 0xCCD0DA,
+                border_strong: 0xB4BAC8,
+                text: 0x4C4F69,
+                text_strong: 0x292C3C,
+                text_secondary: 0x5C5F77,
+                text_weak: 0x656880,
+                text_muted: 0x8C8FA1,
+                success: 0x2B7A23,
+                warning: 0x995B00,
+                error: 0xB80E2F,
+            },
+            ThemeChoice::SolarizedLight => ThemeTokens {
+                dark: false,
+                app_bg: 0xEEE8D5,
+                panel: 0xFDF6E3,
+                surface: 0xFFFDF5,
+                elevated: 0xFFFDF5,
+                inset: 0xFFFDF7,
+                control: 0xEAE2CC,
+                control_hover: 0xDFD6BC,
+                control_active: 0xD3C9AC,
+                border: 0xDCD3B9,
+                border_strong: 0xC3B99D,
+                text: 0x073642,
+                text_strong: 0x002B36,
+                text_secondary: 0x3E575E,
+                text_weak: 0x526970,
+                text_muted: 0x839496,
+                success: 0x5A7300,
+                warning: 0x8B6300,
+                error: 0xBC2624,
+            },
+            ThemeChoice::NordLight => ThemeTokens {
+                dark: false,
+                app_bg: 0xE5E9F0,
+                panel: 0xECEFF4,
+                surface: 0xF7F9FC,
+                elevated: 0xFFFFFF,
+                inset: 0xFFFFFF,
+                control: 0xD8DEE9,
+                control_hover: 0xCBD3E2,
+                control_active: 0xBEC8DA,
+                border: 0xCDD4E2,
+                border_strong: 0xB2BCCF,
+                text: 0x2E3440,
+                text_strong: 0x1E222B,
+                text_secondary: 0x434C5E,
+                text_weak: 0x525D72,
+                text_muted: 0x818DA3,
+                success: 0x3C6E47,
+                warning: 0x8C5D0A,
+                error: 0xB03341,
+            },
+        };
+
+        let dark = tokens.dark;
+        let toward_fg = if dark { Color32::WHITE } else { Color32::BLACK };
+        let app_bg = rgb_hex(tokens.app_bg);
+        let panel = rgb_hex(tokens.panel);
+        let surface = rgb_hex(tokens.surface);
+        let elevated = rgb_hex(tokens.elevated);
+        let backgrounds = [app_bg, panel, surface, elevated];
+
+        let (raw_accent, accent_solid) = accent.colors(dark);
+        let accent_fg = ensure_contrast(raw_accent, &[panel], 4.5, toward_fg);
+        let accent_soft = mix(panel, accent_fg, if dark { 0.24 } else { 0.14 });
+        let raw_accent_text = if dark {
+            mix(accent_fg, Color32::WHITE, 0.45)
+        } else {
+            mix(accent_fg, Color32::BLACK, 0.15)
+        };
+        let accent_text = ensure_contrast(raw_accent_text, &[accent_soft], 4.5, toward_fg);
+
+        let text = ensure_contrast(rgb_hex(tokens.text), &backgrounds, 4.5, toward_fg);
+        let text_strong =
+            ensure_contrast(rgb_hex(tokens.text_strong), &backgrounds, 4.5, toward_fg);
+        let text_secondary =
+            ensure_contrast(rgb_hex(tokens.text_secondary), &backgrounds, 4.5, toward_fg);
+        let text_weak = ensure_contrast(rgb_hex(tokens.text_weak), &[panel], 4.5, toward_fg);
+        let success = ensure_contrast(rgb_hex(tokens.success), &[panel], 4.5, toward_fg);
+        let warning = ensure_contrast(rgb_hex(tokens.warning), &[panel], 4.5, toward_fg);
+        let error = ensure_contrast(rgb_hex(tokens.error), &[panel], 4.5, toward_fg);
+
+        Self {
+            dark,
+            high_contrast: false,
+            app_bg,
+            panel,
+            surface,
+            elevated,
+            inset: rgb_hex(tokens.inset),
+            control: rgb_hex(tokens.control),
+            control_hover: rgb_hex(tokens.control_hover),
+            control_active: rgb_hex(tokens.control_active),
+            border: rgb_hex(tokens.border),
+            border_strong: rgb_hex(tokens.border_strong),
+            text,
+            text_strong,
+            text_secondary,
+            text_weak,
+            text_muted: rgb_hex(tokens.text_muted),
+            accent: accent_fg,
+            accent_solid,
+            on_accent: Color32::WHITE,
+            accent_soft,
+            accent_text,
+            success,
+            warning,
+            error,
         }
     }
 }
@@ -591,16 +1181,27 @@ impl Palette {
         if !high {
             return self;
         }
-        let hex = |rgb: u32| Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8);
+        let toward_fg = if self.dark {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
+        let surfaces = [
+            self.app_bg,
+            self.panel,
+            self.surface,
+            self.elevated,
+            self.inset,
+        ];
         self.high_contrast = true;
         self.border = self.border_strong;
-        if self.dark {
-            self.border_strong = hex(0x76767E);
-            self.text_muted = hex(0x8E8E96);
-        } else {
-            self.border_strong = hex(0x86868E);
-            self.text_muted = hex(0x6B6B73);
-        }
+        self.border_strong = ensure_contrast(
+            mix(self.border_strong, toward_fg, 0.35),
+            &surfaces,
+            3.0,
+            toward_fg,
+        );
+        self.text_muted = ensure_contrast(self.text_muted, &[self.panel], 4.5, toward_fg);
         self
     }
 
@@ -678,48 +1279,68 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new(p: &Palette) -> Self {
-        let rgb = Color32::from_rgb;
+        let toward_fg = if p.dark {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
+        let background = if p.dark {
+            mix(p.app_bg, p.inset, 0.5)
+        } else {
+            mix(p.app_bg, p.border, 0.25)
+        };
+        let node_body = p.surface;
+        let label_fill = p.elevated;
+        let node_text = ensure_contrast(p.text, &[node_body, label_fill], 4.5, toward_fg);
+        let node_text_strong =
+            ensure_contrast(p.text_strong, &[node_body, label_fill], 4.5, toward_fg);
+        let node_text_weak = ensure_contrast(p.text_weak, &[node_body, label_fill], 4.5, toward_fg);
+        let wire = ensure_contrast(p.text_secondary, &[background], 3.0, toward_fg);
+        let comment_text = ensure_contrast(p.text, &[background], 4.5, toward_fg);
+        let selected = ensure_contrast(p.accent, &[background], 3.0, toward_fg);
+        let error = ensure_contrast(p.error, &[background], 3.0, toward_fg);
+        let warning = ensure_contrast(p.warning, &[label_fill], 4.5, toward_fg);
         if p.dark {
             Self {
-                background: rgb(22, 24, 29),
+                background,
                 grid: Color32::from_white_alpha(10),
-                node_body: rgb(30, 32, 40),
-                node_edge: rgb(12, 13, 17),
-                node_text: rgb(214, 218, 228),
-                node_text_strong: Color32::WHITE,
-                node_text_weak: rgb(150, 154, 166),
+                node_body,
+                node_edge: mix(p.app_bg, Color32::BLACK, 0.35),
+                node_text,
+                node_text_strong,
+                node_text_weak,
                 header_text: Color32::WHITE,
-                wire: rgb(200, 204, 214),
-                label_fill: rgb(40, 43, 54),
+                wire,
+                label_fill,
                 comment_fill: Color32::from_rgba_unmultiplied(120, 130, 150, 40),
                 comment_header: Color32::from_rgba_unmultiplied(120, 130, 150, 90),
                 comment_edge: Color32::from_rgba_unmultiplied(160, 170, 190, 90),
-                comment_text: rgb(214, 218, 228),
-                selected: p.accent,
-                error: p.error,
+                comment_text,
+                selected,
+                error,
                 live: p.success,
-                warning: p.warning,
+                warning,
             }
         } else {
             Self {
-                background: rgb(236, 238, 242),
+                background,
                 grid: Color32::from_black_alpha(14),
-                node_body: Color32::WHITE,
-                node_edge: rgb(196, 199, 207),
-                node_text: p.text,
-                node_text_strong: p.text_strong,
-                node_text_weak: p.text_weak,
+                node_body,
+                node_edge: p.border_strong,
+                node_text,
+                node_text_strong,
+                node_text_weak,
                 header_text: Color32::WHITE,
-                wire: rgb(70, 72, 80),
-                label_fill: Color32::WHITE,
+                wire,
+                label_fill,
                 comment_fill: Color32::from_rgba_unmultiplied(110, 120, 140, 30),
                 comment_header: Color32::from_rgba_unmultiplied(110, 120, 140, 56),
                 comment_edge: Color32::from_rgba_unmultiplied(110, 120, 140, 120),
-                comment_text: p.text,
-                selected: p.accent,
-                error: p.error,
+                comment_text,
+                selected,
+                error,
                 live: p.success,
-                warning: p.warning,
+                warning,
             }
         }
     }
@@ -869,6 +1490,25 @@ fn contrast_id() -> egui::Id {
     egui::Id::new("axcenity increase contrast")
 }
 
+fn theme_choice_id() -> egui::Id {
+    egui::Id::new("axcenity theme choice")
+}
+
+fn applied_font_id() -> egui::Id {
+    egui::Id::new("axcenity applied fonts")
+}
+
+fn font_generation_id() -> egui::Id {
+    egui::Id::new("axcenity font generation")
+}
+
+/// Increments whenever the active UI or code font changes, so panels caching
+/// text layout metrics (such as the Console log) know to re-measure.
+pub fn font_generation(ctx: &egui::Context) -> u64 {
+    ctx.data(|data| data.get_temp::<u64>(font_generation_id()))
+        .unwrap_or(0)
+}
+
 /// The density picked in Settings, for widgets that change shape with it
 /// (such as the ribbon, which drops its captions when compact).
 pub fn density(ctx: &egui::Context) -> Density {
@@ -884,22 +1524,25 @@ pub fn palette(ctx: &egui::Context) -> Palette {
     let high = ctx
         .data(|data| data.get_temp::<bool>(contrast_id()))
         .unwrap_or(false);
-    Palette::new(ctx.global_style().visuals.dark_mode, accent).with_contrast(high)
+    let choice = ctx
+        .data(|data| data.get_temp::<ThemeChoice>(theme_choice_id()))
+        .unwrap_or(ThemeChoice::System);
+    Palette::for_theme(choice, ctx.global_style().visuals.dark_mode, accent).with_contrast(high)
 }
 
-/// The font family of headings, panel titles and emphasis (Inter SemiBold).
+/// The font family of headings, panel titles and emphasis.
 pub fn heading_family() -> FontFamily {
     FontFamily::Name("heading".into())
 }
 
 /// The font family of tabs, buttons that need weight, and labels that lead
-/// a group (Inter Medium).
+/// a group.
 pub fn medium_family() -> FontFamily {
     FontFamily::Name("medium".into())
 }
 
-/// The font family of page and dialog titles and the wordmark (Plus Jakarta
-/// Sans Bold). Pair it with [`DISPLAY_TRACKING`] at display sizes.
+/// The font family of page and dialog titles and the wordmark. Pair it with
+/// [`DISPLAY_TRACKING`] at display sizes.
 pub fn display_family() -> FontFamily {
     FontFamily::Name("display".into())
 }
@@ -912,22 +1555,52 @@ pub fn filled() -> FontFamily {
 /// Sets the fonts and the default look. Called once, when the window opens;
 /// [`apply`] then changes the look as Settings change.
 pub fn install(ctx: &egui::Context) {
-    ctx.set_fonts(fonts());
-    apply(ctx, &Appearance::default());
+    let default = Appearance::default();
+    ctx.set_fonts(fonts_for(&default.ui_font, &default.code_font));
+    ctx.data_mut(|data| {
+        data.insert_temp(
+            applied_font_id(),
+            (default.ui_font.clone(), default.code_font.clone()),
+        );
+        data.insert_temp(font_generation_id(), 0_u64);
+    });
+    apply(ctx, &default);
 }
 
-/// Sets both themes' colours and sizes from `appearance`, and shows the
-/// theme it asks for. Cheap enough to call whenever a setting changes.
+/// Sets both themes' colours and sizes from `appearance`, updates fonts if
+/// the interface or code font changed, and shows the theme it asks for. Cheap
+/// enough to call whenever a setting changes.
 pub fn apply(ctx: &egui::Context, appearance: &Appearance) {
-    ctx.data_mut(|data| {
+    let font_changed = ctx.data_mut(|data| {
         data.insert_temp(accent_id(), appearance.accent);
         data.insert_temp(density_id(), appearance.density);
         data.insert_temp(contrast_id(), appearance.increase_contrast);
         data.insert_temp(menu_icons_id(), appearance.menu_icons);
+        data.insert_temp(theme_choice_id(), appearance.theme);
+        let desired = (appearance.ui_font.clone(), appearance.code_font.clone());
+        let prev = data.get_temp::<(UiFont, CodeFont)>(applied_font_id());
+        if prev.as_ref() != Some(&desired) {
+            data.insert_temp(applied_font_id(), desired);
+            let next = data
+                .get_temp::<u64>(font_generation_id())
+                .unwrap_or(0)
+                .wrapping_add(1);
+            data.insert_temp(font_generation_id(), next);
+            true
+        } else {
+            false
+        }
     });
+    if font_changed {
+        ctx.set_fonts(fonts_for(&appearance.ui_font, &appearance.code_font));
+    }
     for theme in [egui::Theme::Dark, egui::Theme::Light] {
-        let palette = Palette::new(theme == egui::Theme::Dark, appearance.accent)
-            .with_contrast(appearance.increase_contrast);
+        let palette = Palette::for_theme(
+            appearance.theme,
+            theme == egui::Theme::Dark,
+            appearance.accent,
+        )
+        .with_contrast(appearance.increase_contrast);
         ctx.set_visuals_of(theme, visuals(&palette));
         ctx.style_mut_of(theme, |style| set_sizes(style, appearance));
     }
@@ -937,10 +1610,11 @@ pub fn apply(ctx: &egui::Context, appearance: &Appearance) {
     }
 }
 
-/// Inter, Plus Jakarta Sans and JetBrains Mono first, with Phosphor after each for icons,
-/// then egui's own fonts for anything they don't have (such as ⌫).
-fn fonts() -> egui::FontDefinitions {
-    // `static` font files are built into the program, like the window icon.
+/// Builds egui's font definitions with `ui_font` as the interface typeface and
+/// `code_font` as the monospace code/Console typeface, keeping Phosphor right
+/// after each family for icons and Inter / JetBrains Mono + egui's defaults as
+/// fallbacks for any missing glyphs.
+pub fn fonts_for(ui_font: &UiFont, code_font: &CodeFont) -> egui::FontDefinitions {
     let font = |bytes: &'static [u8]| Arc::new(FontData::from_static(bytes));
     let mut fonts = egui::FontDefinitions::default();
     for (name, data) in [
@@ -980,27 +1654,176 @@ fn fonts() -> egui::FontDefinitions {
         fonts.font_data.insert(name.to_string(), data);
     }
 
+    let (body_name, medium_name, heading_name, display_name) = match ui_font {
+        UiFont::Inter => (
+            "Inter",
+            "Inter Medium",
+            "Inter SemiBold",
+            "Plus Jakarta Sans",
+        ),
+        UiFont::Roboto => {
+            fonts.font_data.insert(
+                "Roboto".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Roboto-Variable.ttf")),
+            );
+            ("Roboto", "Roboto", "Roboto", "Roboto")
+        }
+        UiFont::Poppins => {
+            fonts.font_data.insert(
+                "Poppins".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Poppins-Regular.ttf")),
+            );
+            fonts.font_data.insert(
+                "Poppins Bold".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Poppins-Bold.ttf")),
+            );
+            ("Poppins", "Poppins", "Poppins Bold", "Poppins Bold")
+        }
+        UiFont::Nunito => {
+            fonts.font_data.insert(
+                "Nunito".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Nunito-Variable.ttf")),
+            );
+            ("Nunito", "Nunito", "Nunito", "Nunito")
+        }
+        UiFont::Montserrat => {
+            fonts.font_data.insert(
+                "Montserrat".to_owned(),
+                font(include_bytes!(
+                    "../../../assets/fonts/Montserrat-Regular.ttf"
+                )),
+            );
+            fonts.font_data.insert(
+                "Montserrat SemiBold".to_owned(),
+                font(include_bytes!(
+                    "../../../assets/fonts/Montserrat-SemiBold.ttf"
+                )),
+            );
+            fonts.font_data.insert(
+                "Montserrat Bold".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Montserrat-Bold.ttf")),
+            );
+            (
+                "Montserrat",
+                "Montserrat SemiBold",
+                "Montserrat SemiBold",
+                "Montserrat Bold",
+            )
+        }
+        UiFont::Lora => {
+            fonts.font_data.insert(
+                "Lora".to_owned(),
+                font(include_bytes!("../../../assets/fonts/Lora-Variable.ttf")),
+            );
+            ("Lora", "Lora", "Lora", "Lora")
+        }
+        UiFont::JetBrainsMono => {
+            fonts.font_data.insert(
+                "JetBrains Mono Bold".to_owned(),
+                font(include_bytes!(
+                    "../../../assets/fonts/JetBrainsMono-Bold.ttf"
+                )),
+            );
+            (
+                "JetBrains Mono",
+                "JetBrains Mono",
+                "JetBrains Mono Bold",
+                "JetBrains Mono Bold",
+            )
+        }
+        UiFont::Custom { path, .. } => match std::fs::read(path)
+            .ok()
+            .filter(|bytes| validate_font_bytes(bytes).is_ok())
+        {
+            Some(bytes) => {
+                fonts.font_data.insert(
+                    "Custom UI".to_owned(),
+                    Arc::new(FontData::from_owned(bytes)),
+                );
+                ("Custom UI", "Custom UI", "Custom UI", "Custom UI")
+            }
+            None => (
+                "Inter",
+                "Inter Medium",
+                "Inter SemiBold",
+                "Plus Jakarta Sans",
+            ),
+        },
+    };
+
+    let code_name = match code_font {
+        CodeFont::JetBrainsMono => "JetBrains Mono",
+        CodeFont::Hack => {
+            if fonts.font_data.contains_key("Hack") {
+                "Hack"
+            } else {
+                "JetBrains Mono"
+            }
+        }
+        CodeFont::PressStart2P => {
+            fonts
+                .font_data
+                .entry("Press Start 2P".to_owned())
+                .or_insert_with(|| {
+                    font(include_bytes!(
+                        "../../../assets/fonts/PressStart2P-Regular.ttf"
+                    ))
+                });
+            "Press Start 2P"
+        }
+        CodeFont::Inter => "Inter",
+        CodeFont::Roboto => {
+            fonts
+                .font_data
+                .entry("Roboto".to_owned())
+                .or_insert_with(|| {
+                    font(include_bytes!("../../../assets/fonts/Roboto-Variable.ttf"))
+                });
+            "Roboto"
+        }
+        CodeFont::Custom { path, .. } => match std::fs::read(path)
+            .ok()
+            .filter(|bytes| validate_font_bytes(bytes).is_ok())
+        {
+            Some(bytes) => {
+                fonts.font_data.insert(
+                    "Custom Code".to_owned(),
+                    Arc::new(FontData::from_owned(bytes)),
+                );
+                "Custom Code"
+            }
+            None => "JetBrains Mono",
+        },
+    };
+
     let fallbacks = fonts.families[&FontFamily::Proportional].clone();
     let family = |first: &str| {
         let mut names = vec![first.to_string(), "Phosphor".to_string()];
+        if first != "Inter" {
+            names.push("Inter".to_string());
+        }
         names.extend(fallbacks.iter().cloned());
         names
     };
+    let mut mono = vec![code_name.to_string(), "Phosphor".to_string()];
+    if code_name != "JetBrains Mono" {
+        mono.push("JetBrains Mono".to_string());
+    }
+    if code_name != "Inter" {
+        mono.push("Inter".to_string());
+    }
+    mono.extend(fallbacks.iter().cloned());
     fonts
         .families
-        .insert(FontFamily::Proportional, family("Inter"));
+        .insert(FontFamily::Proportional, family(body_name));
+    fonts.families.insert(FontFamily::Monospace, mono);
     fonts
         .families
-        .insert(FontFamily::Monospace, family("JetBrains Mono"));
+        .insert(heading_family(), family(heading_name));
+    fonts.families.insert(medium_family(), family(medium_name));
     fonts
         .families
-        .insert(heading_family(), family("Inter SemiBold"));
-    fonts
-        .families
-        .insert(medium_family(), family("Inter Medium"));
-    fonts
-        .families
-        .insert(display_family(), family("Plus Jakarta Sans"));
+        .insert(display_family(), family(display_name));
     // Every family needs a font with `◻` or `?` in it, which egui draws
     // for characters no font has; without one it warns at startup.
     fonts.families.insert(filled(), family("Phosphor Fill"));
@@ -1698,25 +2521,71 @@ mod tests {
     }
 
     #[test]
-    fn text_and_every_accent_meet_wcag_aa_in_both_themes() {
-        for (dark, high) in [(true, false), (false, false), (true, true), (false, true)] {
-            for accent in Accent::ALL {
-                let p = Palette::new(dark, accent).with_contrast(high);
-                let label = format!("{accent:?}, dark {dark}, increased contrast {high}");
-                for background in [p.app_bg, p.panel, p.surface, p.elevated] {
-                    for text in [p.text, p.text_strong, p.text_secondary] {
-                        assert!(contrast(text, background) >= 4.5, "{label}");
+    fn text_and_every_accent_meet_wcag_aa_in_every_theme() {
+        for choice in ThemeChoice::ALL {
+            for (system_dark, high) in [(true, false), (false, false), (true, true), (false, true)]
+            {
+                for accent in Accent::ALL {
+                    let p = Palette::for_theme(choice, system_dark, accent).with_contrast(high);
+                    let label =
+                        format!("{choice:?}, {accent:?}, system_dark {system_dark}, high {high}");
+                    for background in [p.app_bg, p.panel, p.surface, p.elevated] {
+                        for text in [p.text, p.text_strong, p.text_secondary] {
+                            assert!(
+                                contrast(text, background) >= 4.5,
+                                "{label}: {:.2}",
+                                contrast(text, background)
+                            );
+                        }
                     }
-                }
-                assert!(contrast(p.text_weak, p.panel) >= 4.5, "{label}");
-                assert!(contrast(p.accent, p.panel) >= 4.5, "{label}");
-                assert!(contrast(p.on_accent, p.accent_solid) >= 4.5, "{label}");
-                assert!(contrast(p.accent_text, p.accent_soft) >= 4.5, "{label}");
-                for status in [p.success, p.warning, p.error] {
-                    assert!(contrast(status, p.panel) >= 4.5, "{label}");
+                    assert!(contrast(p.text_weak, p.panel) >= 4.5, "{label}");
+                    assert!(contrast(p.accent, p.panel) >= 4.5, "{label}");
+                    assert!(contrast(p.on_accent, p.accent_solid) >= 4.5, "{label}");
+                    assert!(contrast(p.accent_text, p.accent_soft) >= 4.5, "{label}");
+                    for status in [p.success, p.warning, p.error] {
+                        assert!(contrast(status, p.panel) >= 4.5, "{label}");
+                    }
                 }
             }
         }
+    }
+
+    #[test]
+    fn ui_and_code_fonts_build_and_validate() {
+        for font in UiFont::BUILT_IN {
+            let defs = fonts_for(&font, &CodeFont::JetBrainsMono);
+            assert!(defs.families.contains_key(&FontFamily::Proportional));
+            assert!(defs.families.contains_key(&heading_family()));
+            assert!(defs.families.contains_key(&display_family()));
+        }
+        for code_font in CodeFont::BUILT_IN {
+            let defs = fonts_for(&UiFont::Inter, &code_font);
+            assert!(defs.families.contains_key(&FontFamily::Monospace));
+            let first = defs.families[&FontFamily::Monospace].first().unwrap();
+            assert!(
+                defs.font_data.contains_key(first),
+                "missing font data {first}"
+            );
+        }
+        assert!(validate_font_bytes(b"not a font").is_err());
+        assert!(validate_font_bytes(b"\x00\x01\x00\x0012345678").is_ok());
+        assert!(validate_font_bytes(b"OTTO12345678").is_ok());
+    }
+
+    #[test]
+    fn font_generation_advances_when_ui_or_code_font_changes() {
+        let ctx = test_context();
+        let g0 = font_generation(&ctx);
+        let mut appearance = Appearance::default();
+        apply(&ctx, &appearance);
+        assert_eq!(font_generation(&ctx), g0);
+        appearance.code_font = CodeFont::Hack;
+        apply(&ctx, &appearance);
+        let g1 = font_generation(&ctx);
+        assert!(g1 > g0);
+        appearance.ui_font = UiFont::Roboto;
+        apply(&ctx, &appearance);
+        assert!(font_generation(&ctx) > g1);
     }
 
     /// Increase contrast (design system V18): outlines of controls and
@@ -1874,7 +2743,7 @@ mod tests {
     #[test]
     fn appearance_survives_saving_and_bad_values_are_fixed() {
         let appearance = Appearance {
-            theme: ThemeChoice::Light,
+            theme: ThemeChoice::Dracula,
             accent: Accent::Violet,
             density: Density::Compact,
             reduce_motion: true,
@@ -1885,6 +2754,12 @@ mod tests {
             steady_hz: 30,
             menu_icons: MenuIcons::Centered,
             ribbon: RibbonAlign::Centered,
+            ui_font: UiFont::Poppins,
+            code_font: CodeFont::Hack,
+            custom_fonts: vec![CustomFont {
+                name: "MyFont".to_owned(),
+                path: "/tmp/MyFont.ttf".to_owned(),
+            }],
         };
         assert_eq!(Appearance::from_text(&appearance.to_text()), appearance);
         assert_eq!(Appearance::from_text("not json"), Appearance::default());

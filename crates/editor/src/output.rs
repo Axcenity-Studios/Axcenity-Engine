@@ -149,7 +149,7 @@ pub struct Output {
     /// `heights_for`: as last drawn, or worked out until it's drawn; `None`
     /// until it's needed.
     heights: Vec<Option<f32>>,
-    heights_for: (u32, u32),
+    heights_for: (u32, u32, u64),
     /// Kinds of line switched off with the filter buttons. Only what's
     /// shown changes; every line is kept.
     hidden: Vec<OutputKind>,
@@ -271,8 +271,7 @@ impl Output {
         let lines = &self.lines;
         let shown = (start..lines.len()).filter(|&index| {
             let line = &lines[index];
-            !key.hidden.contains(&line.kind)
-                && (key.filter.is_empty() || line.matches(&key.filter))
+            !key.hidden.contains(&line.kind) && (key.filter.is_empty() || line.matches(&key.filter))
         });
         let rows = if key.collapse {
             // How many of each message, and where its newest is.
@@ -426,8 +425,8 @@ impl Output {
                 {
                     self.collapse = !self.collapse;
                 }
-                let width = (ui.available_width() - widgets::SEARCH_FIELD_MARGINS - 4.0)
-                    .clamp(40.0, 220.0);
+                let width =
+                    (ui.available_width() - widgets::SEARCH_FIELD_MARGINS - 4.0).clamp(40.0, 220.0);
                 widgets::search_field(ui, &mut self.filter, "Filter logs…", width);
             });
         });
@@ -440,14 +439,21 @@ impl Output {
         let (gone, dropped) = (self.gone, self.dropped);
         let filtering = !self.filter.trim().is_empty();
         self.update_rows();
-        let rows = self.rows.as_ref().map_or(&[][..], |(_, rows)| rows.as_slice());
+        let rows = self
+            .rows
+            .as_ref()
+            .map_or(&[][..], |(_, rows)| rows.as_slice());
         let lines = &self.lines;
         let heights = &mut self.heights;
         let heights_for = &mut self.heights_for;
+        let avail_h = ui.available_height().max(0.0);
+        let font_gen = theme::font_generation(ui.ctx());
         egui::ScrollArea::vertical()
             // Keep showing the newest line, unless the user scrolled up to
             // read, or a line is being revealed (sticking would pull back).
             .stick_to_bottom(reveal.is_none())
+            .min_scrolled_height(0.0)
+            .max_height(avail_h)
             .auto_shrink(false)
             .show_viewport(ui, |ui, viewport| {
                 let origin = ui.max_rect().top();
@@ -478,7 +484,7 @@ impl Output {
                 // Lines wrap, so each has its own height: as last drawn, or
                 // worked out from its length until it has been.
                 let width = ui.available_width();
-                let key = (width.to_bits(), font.size.to_bits());
+                let key = (width.to_bits(), font.size.to_bits(), font_gen);
                 if *heights_for != key {
                     heights.fill(None);
                     *heights_for = key;
@@ -504,7 +510,9 @@ impl Output {
                     }
                     y += height + LINE_GAP;
                 }
-                ui.add_space(above);
+                if above > 0.0 {
+                    ui.add_space(above);
+                }
                 for (index, count) in visible {
                     let line = &lines[index];
                     let (row, link) = draw_line(ui, line, count, &font, &palette);
@@ -521,7 +529,9 @@ impl Output {
                         );
                     }
                 }
-                ui.add_space(below);
+                if below > 0.0 {
+                    ui.add_space(below);
+                }
                 if let Some((y, height)) = reveal_at {
                     let rect = egui::Rect::from_min_size(
                         egui::pos2(ui.max_rect().left(), origin + y),
@@ -553,20 +563,28 @@ fn draw_line(
     let (icon, icon_color, color) = line_style(line.kind, palette);
     let mut clicked = None;
     let row = ui.horizontal_top(|ui| {
-        ui.label(
-            egui::RichText::new(clock(line.time))
-                .font(stamp_font(font))
-                .color(palette.text_muted),
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(clock(line.time))
+                    .font(stamp_font(font))
+                    .color(palette.text_muted),
+            )
+            .extend(),
         );
-        ui.label(
-            egui::RichText::new(icon)
-                .font(egui::FontId::proportional(font.size))
-                .color(icon_color),
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(icon)
+                    .font(egui::FontId::proportional(font.size))
+                    .color(icon_color),
+            )
+            .extend(),
         );
         if count > 1 {
             count_badge(ui, count, icon_color, palette);
         }
+        let text_width = ui.available_width().max(40.0);
         ui.vertical(|ui| {
+            ui.set_max_width(text_width);
             if let Some(location) =
                 text_or_link(ui, &line.text, &line.location, font.clone(), color)
             {
@@ -575,15 +593,19 @@ fn draw_line(
             for frame in &line.trace {
                 ui.horizontal_top(|ui| {
                     ui.add_space(TRACE_INDENT);
-                    if let Some(location) = text_or_link(
-                        ui,
-                        &frame.text,
-                        &frame.location,
-                        font.clone(),
-                        palette.text_weak,
-                    ) {
-                        clicked = Some(location);
-                    }
+                    let trace_w = ui.available_width().max(40.0);
+                    ui.vertical(|ui| {
+                        ui.set_max_width(trace_w);
+                        if let Some(location) = text_or_link(
+                            ui,
+                            &frame.text,
+                            &frame.location,
+                            font.clone(),
+                            palette.text_weak,
+                        ) {
+                            clicked = Some(location);
+                        }
+                    });
                 });
             }
         });
@@ -591,7 +613,7 @@ fn draw_line(
     let rect = row.response.rect;
     if ui.rect_contains_pointer(rect) {
         let button = egui::Rect::from_min_size(
-            egui::pos2(rect.right() - 22.0, rect.top() - 1.0),
+            egui::pos2(rect.right() - 22.0, rect.top()),
             egui::vec2(22.0, 20.0),
         );
         ui.painter()
@@ -1066,5 +1088,81 @@ mod bounded_tests {
             "{texts:?}"
         );
         assert_eq!(output.marked, Some(1_000));
+    }
+
+    #[test]
+    fn console_log_clips_above_command_bar_and_never_overlaps_on_font_change() {
+        let ctx = theme::test_context();
+        let mut output = Output::default();
+        for index in 0..25 {
+            output.info(format!(
+                "log entry {index}: a long message that wraps across lines when narrow"
+            ));
+        }
+        let mut command_top = 0.0_f32;
+        let mut draw_short = |ctx: &egui::Context, output: &mut Output| {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(520.0, 120.0),
+                )),
+                ..Default::default()
+            };
+            crate::theme::run(ctx, input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    let bottom = egui::Panel::bottom("test console command")
+                        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(0, 4)))
+                        .show_separator_line(false)
+                        .resizable(false)
+                        .show(ui, |ui| {
+                            ui.label("> Lua, or a command");
+                        });
+                    command_top = bottom.response.rect.top();
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::NONE)
+                        .show(ui, |ui| {
+                            output.show(ui);
+                        });
+                });
+            })
+        };
+        let _ = draw_short(&ctx, &mut output);
+        let appearance = theme::Appearance {
+            code_font: theme::CodeFont::Hack,
+            code_font_size: 15.0,
+            ..Default::default()
+        };
+        theme::apply(&ctx, &appearance);
+        let _ = draw_short(&ctx, &mut output);
+        let frame = draw_short(&ctx, &mut output);
+
+        // Every clipped log text shape stays strictly above the command bar.
+        let mut log_rows: Vec<(f32, f32)> = Vec::new();
+        for clipped in &frame.shapes {
+            if let egui::Shape::Text(text) = &clipped.shape {
+                let s = text.galley.text();
+                if s.starts_with("log entry ") {
+                    assert!(
+                        clipped.clip_rect.bottom() <= command_top + 0.5,
+                        "log clip rect bottom {} ran into command bar top {}",
+                        clipped.clip_rect.bottom(),
+                        command_top
+                    );
+                    let top = text.pos.y;
+                    let bottom = top + text.galley.size().y;
+                    log_rows.push((top, bottom));
+                }
+            }
+        }
+        assert!(!log_rows.is_empty(), "expected visible log entries");
+        log_rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for pair in log_rows.windows(2) {
+            assert!(
+                pair[0].1 <= pair[1].0 + 0.5,
+                "console rows overlapped: {:?} vs {:?}",
+                pair[0],
+                pair[1]
+            );
+        }
     }
 }

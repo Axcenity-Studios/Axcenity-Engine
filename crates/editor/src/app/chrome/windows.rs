@@ -559,7 +559,12 @@ impl EditorApp {
             self.undo();
         }
         if let Some(tool) = keys.tool {
-            self.toggle_tool(tool);
+            if tool == Tool::Select {
+                self.tool = Tool::Select;
+                self.edit_pivot = false;
+            } else {
+                self.toggle_tool(tool);
+            }
         }
         if keys.toggle && self.tool == Tool::Angular {
             self.extend_angular();

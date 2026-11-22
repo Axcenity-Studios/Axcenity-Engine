@@ -36,7 +36,7 @@ mod asset_import;
 mod asset_manage;
 mod batch;
 mod changes;
-mod check;
+pub(in crate::app) mod check;
 mod data_edit;
 mod docs;
 mod env_set;

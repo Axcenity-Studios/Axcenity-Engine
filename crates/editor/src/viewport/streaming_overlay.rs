@@ -212,7 +212,7 @@ fn name_of(world: &World, id: InstanceId) -> String {
 
 fn show_legend(ui: &egui::Ui, rect: egui::Rect, lines: &[(Option<Color32>, String)]) {
     egui::Area::new(egui::Id::new("streaming overlay legend"))
-        .order(egui::Order::Foreground)
+        .order(ui.layer_id().order)
         .pivot(egui::Align2::LEFT_BOTTOM)
         .fixed_pos(rect.left_bottom() + egui::vec2(10.0, -10.0))
         .constrain_to(rect)

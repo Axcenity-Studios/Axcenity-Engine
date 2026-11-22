@@ -221,14 +221,22 @@ impl GlobalPage {
             && ui.is_rect_visible(rect)
             && matches!(
                 card.entry.kind,
-                AssetKind::Image | AssetKind::Texture | AssetKind::TextureSet | AssetKind::Particle
+                AssetKind::Image
+                    | AssetKind::Texture
+                    | AssetKind::TextureSet
+                    | AssetKind::Material
+                    | AssetKind::Particle
+                    | AssetKind::Sky
             ))
         .then(|| {
-            self.thumbnails.get(
-                ui.ctx(),
-                &card.entry.path,
-                card.entry.kind == AssetKind::TextureSet,
-            )
+            let kind = match card.entry.kind {
+                AssetKind::TextureSet => {
+                    crate::asset_browser::thumbnails::ThumbnailKind::TextureSet
+                }
+                AssetKind::Material => crate::asset_browser::thumbnails::ThumbnailKind::Material,
+                _ => crate::asset_browser::thumbnails::ThumbnailKind::Image,
+            };
+            self.thumbnails.get(ui.ctx(), &card.entry.path, kind)
         })
         .flatten();
         let painter = ui.painter();

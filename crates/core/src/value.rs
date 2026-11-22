@@ -90,6 +90,20 @@ impl CFrame {
         position: Vector3::new(0.0, 0.0, 0.0),
         rotation: [0.0, 0.0, 0.0, 1.0],
     };
+
+    /// True when the offset is zero and the rotation is the identity turn
+    /// (allowing either quaternion sign `+w` or `-w`, within `1e-5`).
+    pub fn is_identity(&self) -> bool {
+        let p = self.position;
+        let [x, y, z, w] = self.rotation;
+        p.x.abs() < 1e-5
+            && p.y.abs() < 1e-5
+            && p.z.abs() < 1e-5
+            && x.abs() < 1e-5
+            && y.abs() < 1e-5
+            && z.abs() < 1e-5
+            && (w.abs() - 1.0).abs() < 1e-5
+    }
 }
 
 impl Default for CFrame {

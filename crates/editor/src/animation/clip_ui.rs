@@ -246,6 +246,9 @@ impl AnimationStudio {
                         let objects = &self.clip.objects;
                         doc.edit_from(edits, self.clip.record, |edit| objects.rest_value(edit));
                     }
+                    PreviewEvent::SetPivot { id, offset } => {
+                        self.written.push(StudioAction::SetPivot { id, offset });
+                    }
                     // Said in Output where the preview is drawn.
                     PreviewEvent::Warn(_) => {}
                 }

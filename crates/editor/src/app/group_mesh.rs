@@ -12,12 +12,18 @@
 //! (`History::record_world`); the `.glb` stays when it's undone, like a
 //! union's.
 
-use axcenity_core::{CFrame, ClassName, InstanceId, Value, Vector3, World};
+use std::sync::OnceLock;
+
+use axcenity_core::{CFrame, ClassName, InstanceId, Material, Value, Vector3, World};
+use axcenity_mesh_edit::{EmbeddedImage, EmbeddedMaps, GroupLook, GroupMode};
 use axcenity_render::glam::{EulerRot, Quat, Vec3};
+use eframe::egui;
 
 use super::EditorApp;
 use crate::history::{self, Place};
+use crate::theme::{self, icons};
 use crate::tree;
+use crate::widgets::{self, Role};
 
 /// The properties the grouped MeshPart takes from the first part.
 const FROM_FIRST: [&str; 8] = [
@@ -30,6 +36,80 @@ const FROM_FIRST: [&str; 8] = [
     "CustomPhysicalProperties",
     "Massless",
 ];
+
+/// Cached embedded PNG textures for built-in procedural materials (`Wood`,
+/// `Brick`, `Concrete`, …) so grouping many parts encodes each material once.
+fn built_in_embedded(kind: Material) -> Option<EmbeddedMaps> {
+    static CACHE: [OnceLock<Option<EmbeddedMaps>>; Material::ALL.len()] =
+        [const { OnceLock::new() }; Material::ALL.len()];
+    let index = Material::ALL.iter().position(|&m| m == kind)?;
+    CACHE[index]
+        .get_or_init(|| {
+            let maps = axcenity_scene::built_in_maps(kind)?;
+            Some(EmbeddedMaps {
+                base_color: EmbeddedImage::from_rgba(maps.width, maps.height, &maps.color),
+                metal_rough: EmbeddedImage::from_rgba(maps.width, maps.height, &maps.metal_rough),
+                normal: EmbeddedImage::from_rgba(maps.width, maps.height, &maps.normal),
+                occlusion: EmbeddedImage::from_rgba(maps.width, maps.height, &maps.occlusion),
+                emissive: None,
+            })
+        })
+        .clone()
+}
+
+/// How the user wants Group as Mesh to handle existing textures & materials.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GroupChoice {
+    /// Keep every distinct material and texture as its own material slot.
+    MultiMaterial,
+    /// Overwrite every part's texture with one uniform material.
+    OverwriteSingle,
+}
+
+/// One distinct material detected on the parts about to be grouped.
+#[derive(Clone, Debug)]
+pub struct DetectedMaterial {
+    pub name: String,
+    pub textured: bool,
+    pub look: GroupLook,
+    pub count: usize,
+}
+
+/// The Group as Mesh choice modal, shown when selected objects have existing
+/// textures or multiple distinct materials.
+pub struct GroupMeshDialog {
+    pub part_count: usize,
+    pub materials: Vec<DetectedMaterial>,
+    pub choice: GroupChoice,
+    /// Which material to apply in `OverwriteSingle` mode: `0..materials.len()`
+    /// picks one of the detected materials; `materials.len()` picks plain Plastic.
+    pub overwrite_index: usize,
+}
+
+impl GroupMeshDialog {
+    /// The `GroupMode` the dialog's current selection produces.
+    pub fn mode(&self) -> GroupMode {
+        match self.choice {
+            GroupChoice::MultiMaterial => GroupMode::MultiMaterial,
+            GroupChoice::OverwriteSingle => {
+                let look = self
+                    .materials
+                    .get(self.overwrite_index)
+                    .map(|m| m.look.clone())
+                    .unwrap_or_else(GroupLook::plain_plastic);
+                GroupMode::SingleMaterial(Box::new(look))
+            }
+        }
+    }
+
+    fn overwrite_label(&self, index: usize) -> String {
+        match self.materials.get(index) {
+            Some(mat) if mat.textured => format!("{} (textured)", mat.name),
+            Some(mat) => mat.name.clone(),
+            None => "Plain untextured (Plastic)".to_owned(),
+        }
+    }
+}
 
 impl EditorApp {
     /// The parts Group as Mesh would group: the selected parts and the
@@ -80,8 +160,252 @@ impl EditorApp {
             .collect()
     }
 
-    /// Groups the selected parts into one MeshPart.
-    pub(in crate::app) fn group_as_mesh(&mut self) {
+    /// Entry point for the ribbon button, Explorer menu and command palette:
+    /// inspects the selected parts' materials and textures, and asks the user
+    /// to choose between creating a multi-material mesh or overwriting textures
+    /// with a single material whenever existing textures or multiple materials
+    /// are detected. Plain, single-material selections group immediately.
+    pub(in crate::app) fn request_group_as_mesh(&mut self) {
+        let parts = self.group_parts();
+        if parts.len() < 2 {
+            self.output
+                .warning("Select two or more parts, or a Model with them, to group as a mesh.");
+            return;
+        }
+        if self.project.is_none() {
+            self.output
+                .warning("Open or save a project first: the grouped mesh is saved in it.");
+            return;
+        }
+        let mut materials: Vec<DetectedMaterial> = Vec::new();
+        let mut keys: Vec<String> = Vec::new();
+        for &part in &parts {
+            match axcenity_mesh_edit::group_source_with(
+                &self.world,
+                &self.assets,
+                part,
+                built_in_embedded,
+            ) {
+                Ok((source, _)) => {
+                    if !source.drawn || source.mesh.is_empty() {
+                        continue;
+                    }
+                    for look in source.looks {
+                        let key = look.key();
+                        if let Some(pos) = keys.iter().position(|seen| *seen == key) {
+                            materials[pos].count += 1;
+                        } else {
+                            keys.push(key);
+                            materials.push(DetectedMaterial {
+                                name: look.display_name(),
+                                textured: look.has_textures(),
+                                look,
+                                count: 1,
+                            });
+                        }
+                    }
+                }
+                Err(problem) => {
+                    self.output.warning(format!(
+                        "Could not group the parts: {problem}. Nothing was changed."
+                    ));
+                    return;
+                }
+            }
+        }
+        let any_textured = materials.iter().any(|m| m.textured);
+        if materials.len() > 1 || any_textured {
+            self.group_mesh_dialog = Some(GroupMeshDialog {
+                part_count: parts.len(),
+                materials,
+                choice: GroupChoice::MultiMaterial,
+                overwrite_index: 0,
+            });
+        } else {
+            self.group_as_mesh_with_mode(GroupMode::MultiMaterial);
+        }
+    }
+
+    /// Confirms the open Group as Mesh dialog (if any) with its chosen mode.
+    #[cfg(test)]
+    pub(in crate::app) fn confirm_group_mesh_dialog(&mut self) {
+        if let Some(dialog) = self.group_mesh_dialog.take() {
+            self.group_as_mesh_with_mode(dialog.mode());
+        }
+    }
+
+    /// Draws the Group as Mesh choice modal when open.
+    pub(super) fn group_mesh_window(&mut self, ctx: &egui::Context) {
+        let Some(mut dialog) = self.group_mesh_dialog.take() else {
+            return;
+        };
+        let mut open = true;
+        let mut confirm = false;
+        let mut cancel = false;
+        let palette = theme::palette(ctx);
+        egui::Window::new("Group as Mesh")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .default_width(420.0)
+            .max_width(420.0)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                let textured_count = dialog.materials.iter().filter(|m| m.textured).count();
+                let mat_names: Vec<&str> = dialog
+                    .materials
+                    .iter()
+                    .take(5)
+                    .map(|m| m.name.as_str())
+                    .collect();
+                let extra = dialog.materials.len().saturating_sub(5);
+                let mut summary = format!(
+                    "{} parts selected with {} {} ({} textured): {}",
+                    dialog.part_count,
+                    dialog.materials.len(),
+                    if dialog.materials.len() == 1 {
+                        "material"
+                    } else {
+                        "materials"
+                    },
+                    textured_count,
+                    mat_names.join(", "),
+                );
+                if extra > 0 {
+                    summary.push_str(&format!(", +{extra} more"));
+                }
+                summary.push('.');
+                ui.label(egui::RichText::new(summary).color(palette.text_secondary));
+                ui.add_space(theme::space::S);
+
+                let card = |ui: &mut egui::Ui,
+                            selected: bool,
+                            title: &str,
+                            icon: &str,
+                            desc: &str|
+                 -> bool {
+                    let fill = if selected {
+                        palette.control_active
+                    } else {
+                        palette.surface
+                    };
+                    let stroke = egui::Stroke::new(
+                        if selected { 1.5 } else { 1.0 },
+                        if selected {
+                            palette.accent
+                        } else {
+                            palette.border
+                        },
+                    );
+                    let mut radio_clicked = false;
+                    let resp = egui::Frame::NONE
+                        .fill(fill)
+                        .stroke(stroke)
+                        .corner_radius(theme::radius::CARD)
+                        .inner_margin(egui::Margin::same(10))
+                        .show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                if ui.radio(selected, "").clicked() {
+                                    radio_clicked = true;
+                                }
+                                ui.vertical(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(theme::with_icon(icon, title))
+                                            .family(theme::heading_family())
+                                            .color(palette.text_strong),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(desc)
+                                            .size(theme::type_scale::SMALL)
+                                            .color(palette.text_weak),
+                                    );
+                                });
+                            });
+                        })
+                        .response
+                        .interact(egui::Sense::click());
+                    resp.clicked() || radio_clicked
+                };
+
+                if card(
+                    ui,
+                    dialog.choice == GroupChoice::MultiMaterial,
+                    "Create Multi-Material Mesh",
+                    icons::SWATCHES,
+                    "Preserves each object's existing textures and materials as separate \
+                     material slots on the grouped mesh.",
+                ) {
+                    dialog.choice = GroupChoice::MultiMaterial;
+                }
+                ui.add_space(theme::space::XS);
+                if card(
+                    ui,
+                    dialog.choice == GroupChoice::OverwriteSingle,
+                    "Overwrite with Single Material",
+                    icons::PAINT_BUCKET,
+                    "Replaces all textures with one shared material so touching flat faces \
+                     merge into fewer triangles.",
+                ) {
+                    dialog.choice = GroupChoice::OverwriteSingle;
+                }
+
+                if dialog.choice == GroupChoice::OverwriteSingle {
+                    ui.add_space(theme::space::S);
+                    ui.horizontal(|ui| {
+                        ui.label("Material:");
+                        let selected_text = dialog.overwrite_label(dialog.overwrite_index);
+                        egui::ComboBox::from_id_salt("group_mesh_overwrite_material")
+                            .selected_text(selected_text)
+                            .width(280.0)
+                            .show_ui(ui, |ui| {
+                                for i in 0..=dialog.materials.len() {
+                                    let label = dialog.overwrite_label(i);
+                                    ui.selectable_value(&mut dialog.overwrite_index, i, label);
+                                }
+                            });
+                    });
+                }
+
+                ui.add_space(theme::space::M);
+                ui.separator();
+                ui.add_space(theme::space::XS);
+                ui.horizontal(|ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add(widgets::button(
+                                Role::Primary,
+                                Some(icons::ARROWS_MERGE),
+                                "Group as Mesh",
+                                &palette,
+                            ))
+                            .clicked()
+                        {
+                            confirm = true;
+                        }
+                        if ui
+                            .add(widgets::button(Role::Secondary, None, "Cancel", &palette))
+                            .clicked()
+                        {
+                            cancel = true;
+                        }
+                    });
+                });
+                if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    cancel = true;
+                } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    confirm = true;
+                }
+            });
+        if confirm {
+            self.group_as_mesh_with_mode(dialog.mode());
+        } else if open && !cancel {
+            self.group_mesh_dialog = Some(dialog);
+        }
+    }
+
+    /// Groups the selected parts into one MeshPart using `mode`.
+    pub(in crate::app) fn group_as_mesh_with_mode(&mut self, mode: GroupMode) {
         let roots = self.group_roots();
         let parts = self.group_parts();
         if parts.len() < 2 {
@@ -97,7 +421,12 @@ impl EditorApp {
         let mut sources = Vec::with_capacity(parts.len());
         let mut notes = Vec::new();
         for &part in &parts {
-            match axcenity_mesh_edit::group_source(&self.world, &self.assets, part) {
+            match axcenity_mesh_edit::group_source_with(
+                &self.world,
+                &self.assets,
+                part,
+                built_in_embedded,
+            ) {
                 Ok((mut source, more)) => {
                     precise_collision(&self.world, &self.assets, part, &mut source);
                     sources.push(source);
@@ -111,7 +440,8 @@ impl EditorApp {
                 }
             }
         }
-        let grouped = match axcenity_mesh_edit::group(&sources) {
+        let single = matches!(mode, GroupMode::SingleMaterial(_));
+        let grouped = match axcenity_mesh_edit::group_with_mode(&sources, mode) {
             Ok(grouped) => grouped,
             Err(problem) => {
                 self.output.warning(format!(
@@ -167,6 +497,27 @@ impl EditorApp {
         for (name, value) in properties {
             let _ = self.world.set_property(mesh, name, value);
         }
+        // Attach a SurfaceAppearance child for any material slot that needs
+        // maps beyond glTF (e.g. DirectX normals, separate metal/rough,
+        // opacity or specular maps), matched by its unique MaterialName.
+        for look in &grouped.looks {
+            if let Some(props) = &look.surface_properties {
+                let sa = self
+                    .world
+                    .create(ClassName::SurfaceAppearance)
+                    .expect("a SurfaceAppearance can be made");
+                let _ = self.world.set_name(sa, look.material.name.clone());
+                let _ = self.world.set_property(
+                    sa,
+                    "MaterialName",
+                    Value::String(look.material.name.clone()),
+                );
+                for (prop_name, value) in props {
+                    let _ = self.world.set_property(sa, prop_name, value.clone());
+                }
+                let _ = self.world.set_parent(sa, Some(mesh));
+            }
+        }
         // Where the MeshPart is now, read back as stored, so Ungroup Mesh
         // finds it unmoved exactly.
         let kept = self
@@ -190,8 +541,17 @@ impl EditorApp {
         let label = format!("Group {} parts as a mesh", parts.len());
         self.history.record_world(&mut self.world, label, before);
         self.select_from_viewport(Some(mesh));
-        self.output
-            .info(format!("{} Saved in {path}.", grouped.stats.summary()));
+        let mat_info = if single {
+            "single material".to_owned()
+        } else if grouped.looks.len() == 1 {
+            "1 material".to_owned()
+        } else {
+            format!("{} materials", grouped.looks.len())
+        };
+        self.output.info(format!(
+            "{} ({mat_info}) Saved in {path}.",
+            grouped.stats.summary()
+        ));
         for note in notes {
             self.output.warning(note);
         }

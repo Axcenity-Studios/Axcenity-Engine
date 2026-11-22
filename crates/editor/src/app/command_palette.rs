@@ -222,6 +222,8 @@ pub(super) enum Command {
     Run,
     Stop,
     Tool(Tool),
+    EditPivot,
+    ResetPivot,
     Snap(SnapSwitch),
     CollisionGroups,
     Insert(Insertable),
@@ -1015,6 +1017,31 @@ impl EditorApp {
                 Ok(()),
             );
         }
+        add(
+            Command::EditPivot,
+            "Edit Pivot",
+            &ribbon("Tools"),
+            &["Pivot", "Pivot Point", "Pivot Tool"],
+            None,
+            when(!playing, "Press Stop to edit."),
+        );
+        add(
+            Command::ResetPivot,
+            "Reset Pivot",
+            &ribbon("Tools"),
+            &["Center Pivot"],
+            None,
+            when(
+                !playing
+                    && crate::viewport::pivot_target(&self.world, &self.selection, self.selected)
+                        .is_some(),
+                if playing {
+                    "Press Stop to edit."
+                } else {
+                    "Select a Part or Model first."
+                },
+            ),
+        );
         for switch in SnapSwitch::ALL {
             add(
                 Command::Snap(switch),
@@ -1392,6 +1419,9 @@ impl EditorApp {
             }
             Command::Stop => self.stop(),
             Command::Tool(tool) => self.toggle_tool(tool),
+            Command::EditPivot if !playing => self.edit_pivot = !self.edit_pivot,
+            Command::ResetPivot if !playing => self.reset_pivot(),
+            Command::EditPivot | Command::ResetPivot => {}
             Command::Snap(switch) => {
                 let flag = switch.flag(&mut self.snap);
                 *flag = !*flag;

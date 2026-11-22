@@ -402,6 +402,7 @@ impl EditorApp {
             DragKind::Move => ("Position", "Move"),
             DragKind::Resize => ("Size", "Resize"),
             DragKind::Rotate => ("Orientation", "Rotate"),
+            DragKind::Pivot => ("PivotOffset", "Edit Pivot"),
         };
         let label = match edit.parts.len() {
             1 => format!("{verb} {}", instance.name()),
@@ -510,7 +511,90 @@ impl EditorApp {
                     edits,
                 );
             }
+            ToolAction::ToggleEditPivot => {
+                self.edit_pivot = !self.edit_pivot;
+            }
+            ToolAction::ResetPivot => {
+                self.reset_pivot();
+            }
+            ToolAction::SetPivot { target, offset } => {
+                self.set_pivot_offset(target, offset);
+            }
         }
+    }
+
+    /// Sets `PivotOffset` on `target` (a Part or Model) as an undoable edit.
+    pub(in crate::app) fn set_pivot_offset(
+        &mut self,
+        target: InstanceId,
+        offset: axcenity_core::CFrame,
+    ) {
+        if self.playing() || self.world.is_locked(target) {
+            return;
+        }
+        let Some(name) = self.world.get(target).map(|i| i.name().to_owned()) else {
+            return;
+        };
+        self.change(
+            target,
+            Field::Property("PivotOffset"),
+            format!("Edit Pivot of {name}"),
+            vec![Edit::Property("PivotOffset", Value::CFrame(offset))],
+        );
+    }
+
+    /// Resets `PivotOffset` to identity on the selected Part(s) or Model(s)
+    /// as one undo step.
+    pub(in crate::app) fn reset_pivot(&mut self) {
+        if self.playing() {
+            return;
+        }
+        let mut targets: Vec<InstanceId> = self
+            .selection
+            .iter()
+            .copied()
+            .filter(|&id| {
+                !self.world.is_locked(id)
+                    && self
+                        .world
+                        .get(id)
+                        .is_some_and(|i| i.property("PivotOffset").is_some())
+            })
+            .collect();
+        if let Some(id) = self.selected
+            && !targets.contains(&id)
+            && !self.world.is_locked(id)
+            && self
+                .world
+                .get(id)
+                .is_some_and(|i| i.property("PivotOffset").is_some())
+        {
+            targets.push(id);
+        }
+        if targets.is_empty() {
+            return;
+        }
+        let label = match targets.as_slice() {
+            [only] => format!(
+                "Reset Pivot of {}",
+                self.world.get(*only).map_or("object", |i| i.name())
+            ),
+            many => format!("Reset Pivot of {} objects", many.len()),
+        };
+        let edits = targets
+            .into_iter()
+            .map(|id| {
+                (
+                    id,
+                    vec![Edit::Property(
+                        "PivotOffset",
+                        Value::CFrame(axcenity_core::CFrame::IDENTITY),
+                    )],
+                )
+            })
+            .collect();
+        self.change_many(Field::Property("PivotOffset"), label, edits);
+        self.history.seal();
     }
     /// Sets `property` to `value` on each of `parts` that has it, as one step.
     pub(super) fn set_on_parts(
@@ -690,13 +774,17 @@ impl EditorApp {
         self.set_on_parts(&parts, "Color", color);
         self.history.seal();
     }
-    /// The selected building tool's options panel, at the top left of the viewport.
+    /// The selected building tool's options panel, at the top left of the
+    /// viewport, below the viewport bar when it's shown.
     pub(super) fn tool_panel(&mut self, ctx: &egui::Context, viewport: egui::Rect) {
-        if self.tool == Tool::Select || self.playing() {
+        if (self.tool == Tool::Select && !self.edit_pivot) || self.playing() {
             return;
         }
         let parts = self.tool_parts();
-        let materials: Vec<String> = if self.tool == Tool::Material {
+        let pivot_target =
+            crate::viewport::pivot_target(&self.world, &self.selection, self.selected)
+                .map(|(id, _, _, _)| id);
+        let materials: Vec<String> = if self.tool == Tool::Material && !self.edit_pivot {
             self.asset_browser
                 .entries()
                 .into_iter()
@@ -710,12 +798,16 @@ impl EditorApp {
             world: &self.world,
             parts: &parts,
             materials: &materials,
+            pivot_target,
+            edit_pivot: self.edit_pivot,
         };
+        let below_bar = super::viewport_bar::below_bar(viewport, self.viewport_bar);
         let (tool, settings, modes, snap) =
             (self.tool, &mut self.build, &mut self.modes, &mut self.snap);
         let actions = egui::Area::new(egui::Id::new("building tool panel"))
-            .fixed_pos(viewport.min + egui::vec2(10.0, 10.0))
-            .order(egui::Order::Foreground)
+            .fixed_pos(below_bar.min + egui::vec2(10.0, 10.0))
+            .constrain_to(below_bar)
+            .order(egui::Order::Background)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style())
                     .corner_radius(0)

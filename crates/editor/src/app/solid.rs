@@ -190,7 +190,7 @@ impl EditorApp {
             SolidAction::Intersect => self.combine_selected(Operation::Intersect),
             SolidAction::Negate => self.negate_selected(),
             SolidAction::Separate => self.separate_selected(),
-            SolidAction::GroupAsMesh => self.group_as_mesh(),
+            SolidAction::GroupAsMesh => self.request_group_as_mesh(),
             SolidAction::UngroupMesh => self.ungroup_mesh(),
             SolidAction::ToTerrain => self.convert_to_terrain(),
             SolidAction::ConformToTerrain => self.conform_to_terrain(),

@@ -24,14 +24,22 @@ const SOFT_STACK: u32 = 32u;
 // on a surface doesn't find it.
 const SOFT_NEAREST: f32 = 0.0001;
 
-// What a ray found: whether it hit, how far along it, the item's slot and
+// What a ray found: whether it hit, how far along it, the item's slot,
 // whether it hit the front (the side the triangle's corners go
-// counter-clockwise from, as meshes face outward).
+// counter-clockwise from, as meshes face outward) and the hit triangle's
+// outward world-space normal.
 struct SoftHit {
     found: bool,
     t: f32,
     slot: u32,
     front_face: bool,
+    normal: vec3<f32>,
+}
+
+struct SoftMeshHit {
+    t: f32,
+    front_face: bool,
+    normal: vec3<f32>,
 }
 
 fn soft_u32(value: f32) -> u32 {
@@ -68,41 +76,42 @@ fn soft_hash(seed: u32) -> u32 {
 }
 
 // Where a ray (in a mesh's own space) meets the triangle at `at`: how far
-// along it (or a huge number for a miss) and whether that's its front.
-fn soft_triangle(at: u32, origin: vec3<f32>, direction: vec3<f32>) -> vec2<f32> {
+// along it (or a huge number for a miss), whether that's its front, and its
+// unnormalized local geometric normal (`cross(e1, e2)`).
+fn soft_triangle(at: u32, origin: vec3<f32>, direction: vec3<f32>) -> SoftMeshHit {
+    let miss = SoftMeshHit(3.4e38, false, vec3<f32>(0.0));
     let v0 = soft_scene[at].xyz;
     let e1 = soft_scene[at + 1u].xyz;
     let e2 = soft_scene[at + 2u].xyz;
     let p = cross(direction, e2);
     let det = dot(e1, p);
     if abs(det) < 1e-12 {
-        return vec2<f32>(3.4e38, 0.0);
+        return miss;
     }
     let inv_det = 1.0 / det;
     let s = origin - v0;
     let u = dot(s, p) * inv_det;
     if u < 0.0 || u > 1.0 {
-        return vec2<f32>(3.4e38, 0.0);
+        return miss;
     }
     let q = cross(s, e1);
     let v = dot(direction, q) * inv_det;
     if v < 0.0 || u + v > 1.0 {
-        return vec2<f32>(3.4e38, 0.0);
+        return miss;
     }
     let t = dot(e2, q) * inv_det;
     if t <= SOFT_NEAREST {
-        return vec2<f32>(3.4e38, 0.0);
+        return miss;
     }
     // Counter-clockwise seen from the ray's start: its front.
-    return vec2<f32>(t, select(0.0, 1.0, det > 0.0));
+    return SoftMeshHit(t, det > 0.0, cross(e1, e2));
 }
 
 // The nearest hit (or, with `any_hit`, the first found) of a ray in a
 // mesh's own space with the mesh whose BVH's root is `root`, nearer than
-// `t_max`: x how far (huge for none), y 1 for its front. A cut-out's
-// triangles (`cut_out`) are passed half the time, by `seed`.
-fn soft_mesh(root: u32, origin: vec3<f32>, direction: vec3<f32>, t_max: f32, any_hit: bool, cut_out: bool, seed: u32) -> vec2<f32> {
-    var best = vec2<f32>(3.4e38, 0.0);
+// `t_max`. A cut-out's triangles (`cut_out`) are passed half the time, by `seed`.
+fn soft_mesh(root: u32, origin: vec3<f32>, direction: vec3<f32>, t_max: f32, any_hit: bool, cut_out: bool, seed: u32) -> SoftMeshHit {
+    var best = SoftMeshHit(3.4e38, false, vec3<f32>(0.0));
     var reach = t_max;
     let inverse = soft_inverse(direction);
     var stack: array<u32, SOFT_STACK>;
@@ -129,14 +138,14 @@ fn soft_mesh(root: u32, origin: vec3<f32>, direction: vec3<f32>, t_max: f32, any
         for (var k = 0u; k < count; k++) {
             let at = first + 3u * k;
             let hit = soft_triangle(at, origin, direction);
-            if hit.x >= reach {
+            if hit.t >= reach {
                 continue;
             }
             if cut_out && (soft_hash(seed ^ (at * 2654435761u)) & 1u) == 0u {
                 continue;
             }
             best = hit;
-            reach = hit.x;
+            reach = hit.t;
             if any_hit {
                 return best;
             }
@@ -149,7 +158,7 @@ fn soft_mesh(root: u32, origin: vec3<f32>, direction: vec3<f32>, t_max: f32, any
 // `t_max` with the items whose mask shares a bit with `mask`; with
 // `any_hit`, the first hit found (for shadow rays).
 fn soft_trace(origin: vec3<f32>, direction: vec3<f32>, t_max: f32, mask: u32, any_hit: bool) -> SoftHit {
-    var found = SoftHit(false, t_max, 0u, false);
+    var found = SoftHit(false, t_max, 0u, false, vec3<f32>(0.0));
     let header = soft_scene[0];
     if soft_u32(header.y) == 0u {
         return found;
@@ -193,8 +202,13 @@ fn soft_trace(origin: vec3<f32>, direction: vec3<f32>, t_max: f32, mask: u32, an
                 dot(r2.xyz, origin) + r2.w);
             let d = vec3<f32>(dot(r0.xyz, direction), dot(r1.xyz, direction), dot(r2.xyz, direction));
             let hit = soft_mesh(item.x, o, d, found.t, any_hit, item.w == 1u, seed ^ item.z);
-            if hit.x < found.t {
-                found = SoftHit(true, hit.x, item.z, hit.y > 0.5);
+            if hit.t < found.t {
+                // Transform local normal to world space by the inverse-transpose
+                // (transpose of the world-to-mesh 3x3 rows r0, r1, r2).
+                let wn = r0.xyz * hit.normal.x + r1.xyz * hit.normal.y + r2.xyz * hit.normal.z;
+                let len = length(wn);
+                let world_n = select(-direction, wn / len, len > 1e-12);
+                found = SoftHit(true, hit.t, item.z, hit.front_face, world_n);
                 if any_hit {
                     return found;
                 }

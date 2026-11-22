@@ -25,7 +25,7 @@ This page is for people using it. How it works inside, and every tool's paramete
 
 4. **Keep it.** Object edits stay in memory until the assistant calls `project_save`, which asks first. Scripts are saved as soon as they're written. Open the project in the editor afterwards to see the result.
 
-> **Working in the editor window.** Turn on **Settings ▸ AI connections ▸ Allow AI connections** in the editor and keep the project open there. The assistant's server then connects to that window: you see its changes as it makes them, and each one is a step you can undo with Ctrl+Z. The same page lists the connected assistants and has a Copy button for the Claude Code line. With the setting off, the server opens its own copy of the project without a window: don't edit the project in the editor at the same time, or your saves would overwrite each other (the editor warns in Output when it opens a project a windowless server has open). An assistant that was already running connects to the window once it restarts its server.
+> **Working in the editor window.** Turn on **Settings ▸ AI connections ▸ Allow AI connections** in the editor and keep the project open there. The assistant's server then connects to that window: you see its changes as it makes them, and each one is a step you can undo with Ctrl+Z. The same page lists the connected assistants and includes interactive setup guides and copy buttons for Claude Code, Google Antigravity, ChatGPT / Codex, Cursor, Claude Desktop, VS Code, Gemini CLI / Windsurf and local models. With the setting off, the server opens its own copy of the project without a window: don't edit the project in the editor at the same time, or your saves would overwrite each other (the editor warns in Output when it opens a project a windowless server has open). An assistant that was already running connects to the window once it restarts its server.
 
 ## Clients
 
@@ -34,6 +34,7 @@ This page is for people using it. How it works inside, and every tool's paramete
 | Client | Where it goes | What to add |
 |---|---|---|
 | Claude Code | a terminal | `claude mcp add axcenity -- EDITOR --mcp PROJECT`, or `.mcp.json` in the project with the JSON below |
+| Google Antigravity | `~/.gemini/antigravity/mcp_config.json` (MCP Servers → Manage MCP Servers → View raw config) | the `mcpServers` JSON below |
 | Claude Desktop | `claude_desktop_config.json`. Windows: `%APPDATA%\Claude\`. macOS: `~/Library/Application Support/Claude/`. Linux: `~/.config/Claude/` | `{"mcpServers": {"axcenity": {"command": "EDITOR", "args": ["--mcp", "PROJECT"]}}}` |
 | Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` | the same `mcpServers` JSON |
 | VS Code (Copilot agent mode) | `.vscode/mcp.json` | `{"servers": {"axcenity": {"type": "stdio", "command": "EDITOR", "args": ["--mcp", "PROJECT"]}}}` |

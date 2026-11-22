@@ -144,15 +144,22 @@ use graphics::*;
 use search::*;
 pub(super) use search::{SEARCHABLE, find_setting, section};
 
-/// Whether Settings is open, and on which page.
+/// Whether Settings is open, on which page, and transient Shortcuts UI state.
 #[derive(Default)]
 pub(super) struct SettingsWindow {
     pub open: bool,
     pub page: SettingsPage,
+    pub shortcut_query: String,
+    pub recording_shortcut: Option<shortcuts::Action>,
+    pub shortcut_conflict: Option<(
+        shortcuts::Action,
+        egui::KeyboardShortcut,
+        Vec<shortcuts::Action>,
+    )>,
 }
 
-const WINDOW_SIZE: egui::Vec2 = egui::vec2(700.0, 470.0);
-const NAV_WIDTH: f32 = 170.0;
+const WINDOW_SIZE: egui::Vec2 = egui::vec2(780.0, 540.0);
+const NAV_WIDTH: f32 = 172.0;
 
 impl EditorApp {
     /// Changes the look to `appearance`, fading from the old background if
@@ -173,6 +180,7 @@ impl EditorApp {
     /// The Settings window, while it's open.
     pub(super) fn settings_window(&mut self, ctx: &egui::Context) {
         if !self.settings.open {
+            self.settings.recording_shortcut = None;
             return;
         }
         let mut open = true;
@@ -182,6 +190,11 @@ impl EditorApp {
             .id("settings window")
             .fixed(WINDOW_SIZE)
             .show(ctx, &mut open, |ui| {
+                // Keep the inner layout strictly within the fixed window width so
+                // wide page content can never push the body past the top bar.
+                let body_width = ui.available_width();
+                let body_height = ui.available_height().max(WINDOW_SIZE.y - 36.0);
+                ui.set_max_width(body_width);
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.set_width(NAV_WIDTH);
@@ -204,18 +217,24 @@ impl EditorApp {
                             if widgets::nav_item(ui, page.icon(), page.label(), None, selected)
                                 .clicked()
                             {
+                                if self.settings.page != page {
+                                    self.settings.recording_shortcut = None;
+                                }
                                 self.settings.page = page;
                             }
                         }
                     });
                     ui.separator();
+                    let page_width = (ui.available_width() - 2.0).max(240.0);
                     egui::ScrollArea::vertical()
                         .id_salt("settings page")
-                        .max_height(WINDOW_SIZE.y)
+                        .max_width(page_width)
+                        .max_height(body_height)
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
-                            ui.set_min_height(WINDOW_SIZE.y);
-                            ui.set_width(ui.available_width());
+                            ui.set_min_height(body_height);
+                            ui.set_width(page_width - 12.0);
+                            ui.set_max_width(page_width - 12.0);
                             ui.add_space(space::XXS);
                             ui.vertical(|ui| match self.settings.page {
                                 SettingsPage::Appearance => appearance_page(ui, &mut appearance),
@@ -228,7 +247,7 @@ impl EditorApp {
                                     let capabilities = self.capabilities.unwrap_or_default();
                                     restart |= graphics_page(ui, &mut self.graphics, &capabilities);
                                 }
-                                SettingsPage::Shortcuts => shortcuts_page(ui),
+                                SettingsPage::Shortcuts => self.shortcuts_page(ui),
                                 SettingsPage::Accessibility => {
                                     accessibility_page(ui, &mut appearance);
                                 }
@@ -244,6 +263,7 @@ impl EditorApp {
         self.set_appearance(ctx, appearance);
         if !open {
             self.settings.open = false;
+            self.settings.recording_shortcut = None;
         }
         if restart {
             self.restart_editor();
@@ -903,66 +923,360 @@ pub(super) fn page_title(ui: &mut egui::Ui, title: &str, subtitle: &str) {
     ui.add_space(14.0);
 }
 
-/// The keyboard shortcuts, as a table. Shortcuts are fixed for now, so this
-/// is a reference.
-fn shortcuts_page(ui: &mut egui::Ui) {
-    page_title(
-        ui,
-        "Shortcuts",
-        "Every key the editor knows, by where it works.",
-    );
-    let palette = theme::palette(ui.ctx());
-    let actions = shortcuts::Action::all();
-    // One width for every group's names, so the keys line up down the page;
-    // a longer name wraps.
-    let name_width = (ui.available_width() * 0.55).clamp(160.0, 320.0);
-    for context in shortcuts::Context::ALL {
-        widgets::section_label(ui, context.label());
-        ui.label(
-            egui::RichText::new(context.about())
-                .size(type_scale::SMALL)
-                .color(palette.text_weak),
+impl EditorApp {
+    /// Searchable, rebindable keyboard shortcuts table (V23).
+    fn shortcuts_page(&mut self, ui: &mut egui::Ui) {
+        page_title(
+            ui,
+            "Shortcuts",
+            "Search every key the editor knows, or click any shortcut to rebind it.",
         );
-        ui.add_space(space::XS);
-        egui::Grid::new(("shortcuts", context.label()))
-            .num_columns(2)
-            .min_col_width(name_width)
-            .spacing([12.0, 6.0])
-            .show(ui, |ui| {
-                for action in actions.iter().filter(|action| action.context() == context) {
-                    let name = egui::RichText::new(action.label()).color(palette.text_secondary);
-                    ui.vertical(|ui| {
-                        ui.set_max_width(name_width);
-                        ui.add(egui::Label::new(name).wrap());
-                    });
-                    keycap(ui, &action.text(ui.ctx()));
-                    ui.end_row();
+        let palette = theme::palette(ui.ctx());
+
+        // Capture key presses while recording a new shortcut. Consuming Escape
+        // here prevents ToolWindow from closing Settings while canceling.
+        if let Some(recording) = self.settings.recording_shortcut
+            && let Some(event) = ui.ctx().input_mut(shortcuts::capture_shortcut)
+        {
+            match event {
+                shortcuts::CaptureEvent::Cancel => {
+                    self.settings.recording_shortcut = None;
+                }
+                shortcuts::CaptureEvent::Captured(chord) => {
+                    let clashes = shortcuts::conflicts(recording, &chord);
+                    shortcuts::set_override(recording, vec![chord]);
+                    self.settings.recording_shortcut = None;
+                    self.settings.shortcut_conflict =
+                        (!clashes.is_empty()).then_some((recording, chord, clashes));
+                }
+            }
+        }
+
+        // Top search bar + customized count + Reset all button.
+        let customized = shortcuts::customized_count();
+        ui.horizontal(|ui| {
+            let search_w = (ui.available_width() - 120.0).max(160.0);
+            ui.allocate_ui(egui::vec2(search_w, 26.0), |ui| {
+                widgets::search_field(
+                    ui,
+                    &mut self.settings.shortcut_query,
+                    "Search shortcuts by action, category or key…",
+                    search_w,
+                );
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add_enabled(
+                        customized > 0,
+                        widgets::button(
+                            widgets::Role::Secondary,
+                            Some(icons::ARROW_COUNTER_CLOCKWISE),
+                            "Reset all",
+                            &palette,
+                        ),
+                    )
+                    .on_hover_text("Restore every shortcut to its built-in default.")
+                    .clicked()
+                {
+                    shortcuts::reset_all();
+                    self.settings.recording_shortcut = None;
+                    self.settings.shortcut_conflict = None;
                 }
             });
-        ui.add_space(space::M);
+        });
+
+        if customized > 0 {
+            ui.add_space(space::XXS);
+            ui.label(
+                egui::RichText::new(format!(
+                    "{customized} custom {} active (saved automatically).",
+                    if customized == 1 {
+                        "shortcut"
+                    } else {
+                        "shortcuts"
+                    }
+                ))
+                .size(type_scale::CAPTION)
+                .color(palette.accent),
+            );
+        }
+
+        // Conflict banner when a newly bound chord overlaps another action.
+        if let Some((bound_action, chord, clashes)) = self.settings.shortcut_conflict.clone() {
+            ui.add_space(space::XS);
+            egui::Frame::new()
+                .fill(theme::mix(palette.surface, palette.warning, 0.14))
+                .stroke(egui::Stroke::new(1.0_f32, palette.warning))
+                .corner_radius(theme::radius::CONTROL)
+                .inner_margin(space::margin(space::S, space::XS))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    let clash_names: Vec<String> = clashes
+                        .iter()
+                        .map(|a| format!("{} ({})", a.label(), a.context().label()))
+                        .collect();
+                    let chord_label = shortcuts::format_chord(ui.ctx(), &chord);
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(format!(
+                                "{} {} ({chord_label}) also matches: {}",
+                                icons::WARNING,
+                                bound_action.label(),
+                                clash_names.join(", ")
+                            ))
+                            .size(type_scale::SMALL)
+                            .color(palette.text_strong),
+                        )
+                        .wrap(),
+                    );
+                    ui.add_space(space::XXS);
+                    ui.horizontal(|ui| {
+                        let any_rebindable = clashes.iter().any(|a| a.is_rebindable());
+                        if any_rebindable
+                            && ui
+                                .button("Unbind conflicting")
+                                .on_hover_text(
+                                    "Removes this chord from the conflicting rebindable action(s).",
+                                )
+                                .clicked()
+                        {
+                            for clash in &clashes {
+                                if clash.is_rebindable() {
+                                    let kept: Vec<_> = clash
+                                        .keys()
+                                        .iter()
+                                        .copied()
+                                        .filter(|k| k != &chord)
+                                        .collect();
+                                    shortcuts::set_override(*clash, kept);
+                                }
+                            }
+                            self.settings.shortcut_conflict = None;
+                        }
+                        if ui.button("Dismiss").clicked() {
+                            self.settings.shortcut_conflict = None;
+                        }
+                    });
+                });
+        }
+
+        ui.add_space(space::S);
+
+        let query = self.settings.shortcut_query.trim().to_lowercase();
+        let actions = shortcuts::Action::all();
+        let row_width = ui.available_width();
+        let mut total_shown = 0usize;
+
+        for context in shortcuts::Context::ALL {
+            let ctx_matches = !query.is_empty()
+                && (context.label().to_lowercase().contains(&query)
+                    || context.about().to_lowercase().contains(&query));
+            let matching: Vec<shortcuts::Action> = actions
+                .iter()
+                .copied()
+                .filter(|action| action.context() == context)
+                .filter(|action| {
+                    if query.is_empty() || ctx_matches {
+                        return true;
+                    }
+                    action.label().to_lowercase().contains(&query)
+                        || action.text(ui.ctx()).to_lowercase().contains(&query)
+                })
+                .collect();
+            if matching.is_empty() {
+                continue;
+            }
+            total_shown += matching.len();
+
+            widgets::section_label(ui, context.label());
+            ui.label(
+                egui::RichText::new(context.about())
+                    .size(type_scale::SMALL)
+                    .color(palette.text_weak),
+            );
+            ui.add_space(space::XS);
+
+            for (row_idx, action) in matching.into_iter().enumerate() {
+                let is_recording = self.settings.recording_shortcut == Some(action);
+                let is_custom = action.is_customized();
+                let rebindable = action.is_rebindable();
+                let keys_text = action.text(ui.ctx());
+
+                let row_bg = if is_recording {
+                    palette.accent_soft
+                } else if row_idx % 2 == 1 {
+                    theme::mix(palette.panel, palette.surface, 0.55)
+                } else {
+                    egui::Color32::TRANSPARENT
+                };
+
+                egui::Frame::new()
+                    .fill(row_bg)
+                    .corner_radius(theme::radius::CONTROL)
+                    .inner_margin(egui::Margin::symmetric(6, 4))
+                    .show(ui, |ui| {
+                        ui.set_width((row_width - 4.0).max(200.0));
+                        ui.horizontal(|ui| {
+                            let right_reserve = if rebindable { 195.0 } else { 150.0 };
+                            let left_width = (ui.available_width() - right_reserve).max(120.0);
+                            ui.allocate_ui(egui::vec2(left_width, 20.0), |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 5.0;
+                                    ui.label(egui::RichText::new(action.label()).color(
+                                        if is_recording {
+                                            palette.accent_text
+                                        } else if is_custom {
+                                            palette.text_strong
+                                        } else {
+                                            palette.text_secondary
+                                        },
+                                    ));
+                                    if is_custom {
+                                        ui.label(egui::RichText::new("•").color(palette.accent))
+                                            .on_hover_text("Customized shortcut");
+                                    }
+                                });
+                            });
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.spacing_mut().item_spacing.x = 4.0;
+                                    if rebindable {
+                                        if is_custom
+                                            && widgets::icon_button(
+                                                ui,
+                                                icons::ARROW_COUNTER_CLOCKWISE,
+                                                "Reset to default",
+                                                false,
+                                            )
+                                            .clicked()
+                                        {
+                                            shortcuts::reset(action);
+                                            if self.settings.recording_shortcut == Some(action) {
+                                                self.settings.recording_shortcut = None;
+                                            }
+                                            self.settings.shortcut_conflict = None;
+                                        }
+                                        if !action.keys().is_empty()
+                                            && is_recording
+                                            && widgets::icon_button(
+                                                ui,
+                                                icons::PROHIBIT,
+                                                "Unbind shortcut",
+                                                false,
+                                            )
+                                            .clicked()
+                                        {
+                                            shortcuts::set_override(action, Vec::new());
+                                            self.settings.recording_shortcut = None;
+                                            self.settings.shortcut_conflict = None;
+                                        }
+                                        let display = if is_recording {
+                                            "Press keys… (Esc)".to_owned()
+                                        } else if keys_text.is_empty() {
+                                            "Unbound".to_owned()
+                                        } else {
+                                            keys_text
+                                        };
+                                        let clicked = keycap_button(
+                                            ui,
+                                            &display,
+                                            is_recording,
+                                            is_custom,
+                                            display == "Unbound",
+                                        )
+                                        .on_hover_text(if is_recording {
+                                            "Press the new key combination, or Esc to cancel."
+                                        } else {
+                                            "Click to rebind this shortcut."
+                                        })
+                                        .clicked();
+                                        if clicked {
+                                            self.settings.recording_shortcut =
+                                                if is_recording { None } else { Some(action) };
+                                        }
+                                    } else {
+                                        keycap(ui, &keys_text);
+                                    }
+                                },
+                            );
+                        });
+                    });
+            }
+            ui.add_space(space::M);
+        }
+
+        if total_shown == 0 {
+            ui.add_space(space::L);
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "No shortcuts match \"{}\".",
+                        self.settings.shortcut_query.trim()
+                    ))
+                    .color(palette.text_secondary),
+                );
+                if ui.button("Clear search").clicked() {
+                    self.settings.shortcut_query.clear();
+                }
+            });
+        } else {
+            ui.label(
+                egui::RichText::new(
+                    "In any field, menu or dialog, Enter confirms and Esc cancels or closes.",
+                )
+                .size(type_scale::SMALL)
+                .color(palette.text_weak),
+            );
+        }
     }
-    ui.label(
-        egui::RichText::new(
-            "In any field, menu or dialog, Enter confirms and Esc cancels or closes.",
-        )
-        .color(palette.text_weak),
-    );
 }
 
-/// Keys drawn like a key on a keyboard.
+/// Interactive keycap button for rebindable shortcuts.
+fn keycap_button(
+    ui: &mut egui::Ui,
+    keys: &str,
+    recording: bool,
+    customized: bool,
+    unbound: bool,
+) -> egui::Response {
+    let palette = theme::palette(ui.ctx());
+    let (fill, stroke_color, text_color) = if recording {
+        (palette.accent_solid, palette.accent, palette.on_accent)
+    } else if customized {
+        (palette.accent_soft, palette.accent, palette.accent_text)
+    } else if unbound {
+        (palette.inset, palette.border, palette.text_muted)
+    } else {
+        (palette.control, palette.border, palette.text)
+    };
+    let button = egui::Button::new(
+        egui::RichText::new(keys)
+            .monospace()
+            .size(type_scale::SMALL)
+            .color(text_color),
+    )
+    .fill(fill)
+    .stroke(egui::Stroke::new(1.0_f32, stroke_color))
+    .corner_radius(theme::radius::CONTROL);
+    ui.add(button)
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// Keys drawn like a key on a keyboard (for fixed gestures / multi-key sets).
 fn keycap(ui: &mut egui::Ui, keys: &str) {
     let palette = theme::palette(ui.ctx());
     egui::Frame::new()
         .fill(palette.control)
         .stroke(egui::Stroke::new(1.0_f32, palette.border))
         .corner_radius(theme::radius::CONTROL)
-        .inner_margin(egui::Margin::symmetric(6, 1))
+        .inner_margin(egui::Margin::symmetric(6, 2))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(keys)
                     .monospace()
                     .size(type_scale::SMALL)
-                    .color(palette.text),
+                    .color(palette.text_secondary),
             );
         });
 }

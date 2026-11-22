@@ -127,8 +127,8 @@ impl EditorApp {
         };
         match self.materials.save(&folder) {
             Ok(written) => {
-                if !written.is_empty() {
-                    self.asset_browser.refresh();
+                for path in &written {
+                    self.asset_browser.file_changed(path);
                 }
                 saved.extend(written);
                 true

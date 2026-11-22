@@ -21,6 +21,10 @@ impl AssetBrowser {
         if let Some(index) = ui.data_mut(|data| data.get_persisted::<usize>(size_memory)) {
             self.tile_size = TileSize::ALL.get(index).copied().unwrap_or_default();
         }
+        let layout_memory = egui::Id::new(SOURCE_LAYOUT_MEMORY);
+        if let Some(index) = ui.data_mut(|data| data.get_persisted::<usize>(layout_memory)) {
+            self.source_layout = SourceLayout::ALL.get(index).copied().unwrap_or_default();
+        }
         self.thumbnails.poll(ui.ctx());
         self.global_thumbnails.poll(ui.ctx());
         let width = ui.available_width();
@@ -89,7 +93,7 @@ impl AssetBrowser {
         }
 
         let search = self.search.trim().to_lowercase();
-        let entries: Vec<AssetEntry> = self
+        let base_entries: Vec<AssetEntry> = self
             .entries()
             .into_iter()
             .filter(|entry| {
@@ -97,11 +101,6 @@ impl AssetBrowser {
                     || (self.category == Category::Particles && is_effect(&entry.path))
             })
             .filter(|entry| self.category != Category::Global || self.is_global(&entry.path))
-            .filter(|entry| {
-                self.source_filter
-                    .as_ref()
-                    .is_none_or(|origin| self.origins.of(entry) == *origin)
-            })
             .filter(|entry| {
                 // A source's name finds its assets too ("poly haven").
                 search.is_empty()
@@ -119,6 +118,17 @@ impl AssetBrowser {
                         .unused
                         .as_ref()
                         .is_some_and(|unused| unused.contains(&entry.path))
+            })
+            .collect();
+        if !self.flat {
+            self.source_bar(ui, &base_entries);
+        }
+        let entries: Vec<AssetEntry> = base_entries
+            .into_iter()
+            .filter(|entry| {
+                self.source_filter
+                    .as_ref()
+                    .is_none_or(|origin| self.origins.of(entry) == *origin)
             })
             .collect();
         if self.unused_only && self.unused.is_none() && action.is_none() {
@@ -145,7 +155,7 @@ impl AssetBrowser {
         }
         let in_folder = open.is_some() && search.is_empty();
         let searching = !search.is_empty() || self.unused_only;
-        let shown = if self.flat {
+        let shown = if self.flat || self.source_layout == SourceLayout::Tabbed {
             shown(entries, &packages, open, searching)
         } else {
             grouped(entries, &packages, open, searching, &self.origins)
@@ -192,8 +202,7 @@ impl AssetBrowser {
                 }
                 // A readable list in a narrow column, tiles where there's
                 // room or when they're Large.
-                let list =
-                    ui.available_width() < LIST_BELOW && self.tile_size != TileSize::Large;
+                let list = ui.available_width() < LIST_BELOW && self.tile_size != TileSize::Large;
                 for block in shown {
                     if let Some(origin) = &block.origin {
                         let open = !self.folded.contains(origin);
@@ -444,8 +453,88 @@ impl AssetBrowser {
         clicked
     }
 
-    /// The Source menu: every source, or one; and whether the grid is in a
-    /// section per source.
+    /// Quick source filter tabs (or linear sections indicator) plus a toggle to
+    /// switch between Tabbed view and Linear list view.
+    fn source_bar(&mut self, ui: &mut egui::Ui, entries: &[AssetEntry]) {
+        let present = self.origins.present(entries);
+        if present.is_empty() {
+            return;
+        }
+        let palette = theme::palette(ui.ctx());
+        let mut counts: std::collections::HashMap<Origin, usize> = std::collections::HashMap::new();
+        for entry in entries {
+            *counts.entry(self.origins.of(entry)).or_default() += 1;
+        }
+
+        let mut next_layout = self.source_layout;
+        responsive::toolbar(ui, |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+            if self.source_layout == SourceLayout::Tabbed {
+                let all_on = self.source_filter.is_none();
+                if source_tab(ui, None, "All", entries.len(), all_on, &palette)
+                    .on_hover_text("Show assets from every source.")
+                    .clicked()
+                {
+                    self.source_filter = None;
+                }
+                for origin in &present {
+                    let count = counts.get(origin).copied().unwrap_or(0);
+                    let on = self.source_filter.as_ref() == Some(origin);
+                    if source_tab(
+                        ui,
+                        Some(origin.icon()),
+                        &origin.label(),
+                        count,
+                        on,
+                        &palette,
+                    )
+                    .on_hover_text(origin.hover())
+                    .clicked()
+                    {
+                        self.source_filter = if on { None } else { Some(origin.clone()) };
+                    }
+                }
+            } else {
+                ui.label(
+                    egui::RichText::new(theme::with_icon(icons::LIST_BULLETS, "Linear sections"))
+                        .size(theme::type_scale::SMALL)
+                        .color(palette.text_secondary),
+                );
+                if let Some(active) = self.source_filter.clone()
+                    && ui
+                        .add(widgets::button(
+                            widgets::Role::Ghost,
+                            Some(icons::X),
+                            &format!("Clear {}", active.label()),
+                            &palette,
+                        ))
+                        .clicked()
+                {
+                    self.source_filter = None;
+                }
+            }
+
+            // Segmented switcher between quick Tabs and Linear list sections.
+            responsive::room_for(ui, 132.0);
+            let changed = widgets::segmented(
+                ui,
+                &mut next_layout,
+                &[
+                    (SourceLayout::Tabbed, Some(icons::SQUARES_FOUR), "Tabs"),
+                    (SourceLayout::List, Some(icons::LIST_BULLETS), "List"),
+                ],
+            );
+            if changed {
+                let layout_memory = egui::Id::new(SOURCE_LAYOUT_MEMORY);
+                ui.data_mut(|data| data.insert_persisted(layout_memory, next_layout.index()));
+            }
+        });
+        self.source_layout = next_layout;
+        ui.add_space(4.0);
+    }
+
+    /// The Source menu: every source, or one; and whether sources show as
+    /// quick tabs, stacked linear sections, or one flat grid.
     pub(super) fn source_menu(&mut self, ui: &mut egui::Ui) {
         let all = self.entries();
         let present = self.origins.present(&all);
@@ -454,6 +543,7 @@ impl AssetBrowser {
             .as_ref()
             .map_or("All sources".to_owned(), Origin::label);
         let mut grouped = !self.flat;
+        let mut next_layout = self.source_layout;
         egui::ComboBox::from_id_salt("assets source")
             .selected_text(theme::with_icon(icons::FUNNEL, &selected))
             .show_ui(ui, |ui| {
@@ -474,12 +564,38 @@ impl AssetBrowser {
                     }
                 }
                 ui.separator();
+                if ui
+                    .selectable_label(
+                        grouped && next_layout == SourceLayout::Tabbed,
+                        theme::with_icon(icons::SQUARES_FOUR, "Quick source tabs"),
+                    )
+                    .clicked()
+                {
+                    grouped = true;
+                    next_layout = SourceLayout::Tabbed;
+                }
+                if ui
+                    .selectable_label(
+                        grouped && next_layout == SourceLayout::List,
+                        theme::with_icon(icons::LIST_BULLETS, "Linear source sections"),
+                    )
+                    .clicked()
+                {
+                    grouped = true;
+                    next_layout = SourceLayout::List;
+                }
+                ui.separator();
                 ui.checkbox(&mut grouped, "Group by source")
-                    .on_hover_text("Show the assets in a section for each place they came from.");
+                    .on_hover_text("Organize assets by where they came from (tabs or sections).");
             })
             .response
             .on_hover_text("Show the assets from one place: built-in, made here, imported, a Toolbox source or global.");
         self.flat = !grouped;
+        if next_layout != self.source_layout {
+            self.source_layout = next_layout;
+            let layout_memory = egui::Id::new(SOURCE_LAYOUT_MEMORY);
+            ui.data_mut(|data| data.insert_persisted(layout_memory, next_layout.index()));
+        }
     }
 
     /// The category chips, which pick what's shown.
@@ -875,6 +991,7 @@ impl AssetBrowser {
                 AssetKind::Image
                     | AssetKind::Texture
                     | AssetKind::TextureSet
+                    | AssetKind::Material
                     | AssetKind::Particle
                     | AssetKind::Sky
             ))
@@ -1256,4 +1373,106 @@ fn import_preset_menu(ui: &mut egui::Ui, folder: &std::path::Path, path: &str) -
         "How this texture is compressed and how big it's kept. Undo puts the last one back.",
     );
     chosen
+}
+
+/// One clickable quick-filter source tab in the Assets panel's Tabbed view:
+/// optional Phosphor icon, source label, and compact item count pill.
+fn source_tab(
+    ui: &mut egui::Ui,
+    icon: Option<&str>,
+    label: &str,
+    count: usize,
+    active: bool,
+    palette: &theme::Palette,
+) -> egui::Response {
+    let text = match icon {
+        Some(glyph) => format!("{glyph}  {label}"),
+        None => label.to_owned(),
+    };
+    let count_text = count.to_string();
+    let label_color = if active {
+        palette.accent_text
+    } else {
+        palette.text_secondary
+    };
+    let label_galley = ui.painter().layout_no_wrap(
+        text,
+        egui::FontId::new(
+            theme::type_scale::SMALL,
+            if active {
+                theme::medium_family()
+            } else {
+                egui::FontFamily::Proportional
+            },
+        ),
+        label_color,
+    );
+    let count_galley = ui.painter().layout_no_wrap(
+        count_text,
+        egui::FontId::new(theme::type_scale::CAPTION, theme::medium_family()),
+        if active {
+            palette.accent_text
+        } else {
+            palette.text_muted
+        },
+    );
+    let badge_w = (count_galley.size().x + 8.0).max(16.0);
+    let width = 8.0 + label_galley.size().x + 6.0 + badge_w + 6.0;
+    let height = 22.0;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, active, label)
+    });
+    let fill = if active {
+        palette.accent_soft
+    } else if response.hovered() {
+        palette.control_hover
+    } else {
+        palette.surface
+    };
+    let stroke_color = if active {
+        palette.accent
+    } else if response.hovered() {
+        palette.border_strong
+    } else {
+        palette.border
+    };
+    ui.painter().rect(
+        rect,
+        theme::radius::CONTROL,
+        fill,
+        egui::Stroke::new(1.0_f32, stroke_color),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter().galley(
+        egui::pos2(
+            rect.left() + 8.0,
+            rect.center().y - label_galley.size().y / 2.0,
+        ),
+        label_galley,
+        label_color,
+    );
+    let badge_rect = egui::Rect::from_center_size(
+        egui::pos2(rect.right() - 6.0 - badge_w / 2.0, rect.center().y),
+        egui::vec2(badge_w, 14.0),
+    );
+    ui.painter().rect_filled(
+        badge_rect,
+        7.0,
+        if active {
+            palette.accent.gamma_multiply(0.22)
+        } else {
+            palette.elevated
+        },
+    );
+    ui.painter().galley(
+        badge_rect.center() - count_galley.size() / 2.0,
+        count_galley,
+        if active {
+            palette.accent_text
+        } else {
+            palette.text_muted
+        },
+    );
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

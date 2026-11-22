@@ -19,7 +19,9 @@ fn every_settings_page_draws_and_changes_apply_to_the_look() {
                 if matches!(
                     page,
                     SettingsPage::Appearance
+                        | SettingsPage::Typography
                         | SettingsPage::Graphics
+                        | SettingsPage::Shortcuts
                         | SettingsPage::Updates
                         | SettingsPage::Ai
                 ) =>
@@ -542,5 +544,206 @@ fn the_layout_page_draws_in_both_themes() {
                 app.settings_window(ctx);
             },
         );
+    }
+}
+
+/// Regression check for the Shortcuts window glitch: on every Settings page
+/// (especially Shortcuts), the rendered window width stays within WINDOW_SIZE
+/// and never stretches past the top bar.
+#[test]
+fn settings_window_fits_its_top_bar_on_every_page() {
+    let ctx = theme::test_context();
+    let mut app = EditorApp::new(None);
+    app.settings.open = true;
+    for page in SettingsPage::ALL {
+        app.settings.page = page;
+        let mut output = None;
+        for _ in 0..3 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1280.0, 800.0),
+                )),
+                ..Default::default()
+            };
+            output = Some(crate::theme::run(&ctx, input, |ui| {
+                let ctx = &ui.ctx().clone();
+                egui::CentralPanel::default().show(ui, |_| {});
+                app.settings_window(ctx);
+            }));
+        }
+        let window_id = egui::Id::new("settings window");
+        let area = ctx
+            .memory(|mem| mem.area_rect(window_id))
+            .expect("settings window has an area rect");
+        // Margins around WINDOW_SIZE add at most 2 * window_margin (~32 pt);
+        // the old Shortcuts Grid bug pushed the body >80 pt past the top bar.
+        let max_expected = WINDOW_SIZE.x + 40.0;
+        assert!(
+            area.width() <= max_expected,
+            "Settings page {page:?} overflowed its top bar: width {:.1} > {max_expected:.1}",
+            area.width()
+        );
+        let _ = output;
+    }
+}
+
+/// Brand kit supports importing external images into `assets/branding/` and
+/// handling drag-and-drop onto the branding section.
+#[test]
+fn branding_imports_external_files_and_handles_drops() {
+    let folder = crate::app::tests::copy_of_example("hello-part", "branding-drop");
+    let external =
+        std::env::temp_dir().join(format!("axcenity-brand-drop-{}.png", std::process::id()));
+    image::RgbaImage::from_pixel(256, 256, image::Rgba([40, 140, 220, 255]))
+        .save(&external)
+        .unwrap();
+    let rel = super::super::branding::import_branding_file(&folder, &external).unwrap();
+    assert_eq!(
+        rel,
+        format!(
+            "assets/branding/{}",
+            external.file_name().unwrap().to_string_lossy()
+        )
+    );
+    assert!(folder.join(&rel).exists());
+
+    // Dropping an image over the Icon drop zone in Settings > This project assigns it.
+    let mut app = EditorApp::new(Some(&folder));
+    app.settings.open = true;
+    app.settings.page = SettingsPage::Project;
+    let ctx = theme::test_context();
+    for _ in 0..2 {
+        let _ = crate::theme::run(&ctx, Default::default(), |ui| {
+            let ctx = &ui.ctx().clone();
+            egui::CentralPanel::default().show(ui, |_| {});
+            app.settings_window(ctx);
+        });
+    }
+    let drop_pos = app
+        .branding_previews
+        .icon_drop_rect
+        .expect("icon drop rect recorded")
+        .center();
+    let handled = {
+        let mut got = false;
+        let input = egui::RawInput {
+            events: vec![egui::Event::PointerMoved(drop_pos)],
+            ..Default::default()
+        };
+        let _ = crate::theme::run(&ctx, input, |ui| {
+            got = app.try_drop_branding(ui.ctx(), std::slice::from_ref(&external));
+        });
+        got
+    };
+    assert!(handled, "branding drop zone accepted dropped icon");
+    assert_eq!(
+        app.project.as_ref().unwrap().branding.icon.as_deref(),
+        Some(rel.as_str())
+    );
+    std::fs::remove_file(&external).ok();
+}
+
+/// Every AI client guide generates a valid snippet with the project path.
+#[test]
+fn ai_connections_guides_cover_all_clients() {
+    use super::super::mcp::check::AiClientGuide;
+    let folder = PathBuf::from("/tmp/example-game");
+    for client in AiClientGuide::ALL {
+        let snippet = client.snippet(&folder, axcenity_mcp::Profile::Standard);
+        assert!(
+            snippet.contains("/tmp/example-game"),
+            "{client:?} missing project path: {snippet}"
+        );
+        assert!(!client.steps().is_empty(), "{client:?} needs steps");
+    }
+    let antigravity = AiClientGuide::Antigravity.snippet(&folder, axcenity_mcp::Profile::Standard);
+    assert!(antigravity.contains("\"mcpServers\""));
+    let codex = AiClientGuide::Codex.snippet(&folder, axcenity_mcp::Profile::Standard);
+    assert!(codex.contains("codex mcp add") && codex.contains("[mcp_servers.axcenity]"));
+    let local = AiClientGuide::LocalModels.snippet(&folder, axcenity_mcp::Profile::Lite);
+    assert!(local.contains("\"--profile\", \"lite\""));
+}
+
+/// Viewport HUD overlays (FPS bar and ray tracing badge) stay behind Settings
+/// and theme cards stay inside Settings even at 125% UI scale.
+#[test]
+fn viewport_overlays_stay_behind_settings_and_theme_cards_stay_inside() {
+    let mut app = EditorApp::new(None);
+    app.settings.open = true;
+    app.settings.page = SettingsPage::Appearance;
+    let ctx = theme::test_context();
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(1024.0, 720.0),
+        )),
+        ..Default::default()
+    };
+    let badge = crate::viewport::ray_badge::Badge {
+        text: "Ray traced (software)".to_owned(),
+        detail: "Software BVH".to_owned(),
+        warning: false,
+        restart: false,
+        compare: Some(false),
+    };
+    for _ in 0..2 {
+        let _ = crate::theme::run(&ctx, input.clone(), |ui| {
+            let ctx = ui.ctx().clone();
+            egui::CentralPanel::default().show(ui, |ui| {
+                let rect = ui.max_rect();
+                app.viewport_bar(
+                    &ctx,
+                    rect,
+                    ui.layer_id().order,
+                    None,
+                    std::time::Duration::ZERO,
+                );
+                crate::viewport::ray_badge::paint(ui, rect, &badge);
+            });
+            app.settings_window(&ctx);
+        });
+    }
+    let settings_layer = egui::LayerId::new(egui::Order::Middle, egui::Id::new("settings window"));
+    let bar_layer = egui::LayerId::new(egui::Order::Background, egui::Id::new("viewport bar"));
+    let badge_layer =
+        egui::LayerId::new(egui::Order::Background, egui::Id::new("ray tracing badge"));
+    let (settings_rect, bar_rect, badge_rect) = ctx.memory(|memory| {
+        (
+            memory.area_rect(settings_layer.id),
+            memory.area_rect(bar_layer.id),
+            memory.area_rect(badge_layer.id),
+        )
+    });
+    assert!(settings_rect.is_some(), "settings window was drawn");
+    assert!(bar_rect.is_some(), "viewport bar was drawn");
+    assert!(badge_rect.is_some(), "ray tracing badge was drawn");
+    assert!(
+        bar_layer.order < settings_layer.order && badge_layer.order < settings_layer.order,
+        "viewport overlays must paint below Settings"
+    );
+
+    // At 125% UI scale on a compact screen, every theme preview stays within Settings.
+    app.appearance.ui_scale = 1.25;
+    theme::apply(&ctx, &app.appearance);
+    let output = crate::theme::run(&ctx, input, |ui| {
+        let ctx = ui.ctx().clone();
+        egui::CentralPanel::default().show(ui, |_| {});
+        app.settings_window(&ctx);
+    });
+    let win_rect = ctx
+        .memory(|m| m.area_rect(settings_layer.id))
+        .expect("settings rect at 125%");
+    for clipped in &output.shapes {
+        if let egui::Shape::Text(text) = &clipped.shape {
+            let bounds = egui::Rect::from_min_size(text.pos, text.galley.size());
+            assert!(
+                bounds.max.x <= win_rect.max.x + 2.0,
+                "settings text {:?} at {:?} extended past settings window {:?}",
+                text.galley.text(),
+                bounds,
+                win_rect
+            );
+        }
     }
 }
