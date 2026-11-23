@@ -43,24 +43,29 @@
 pub mod bake;
 mod collision;
 mod lods;
+pub mod materials;
 mod modal;
 mod modifiers;
 pub mod paint;
 mod proportional;
 pub mod rig;
 pub mod sculpt;
+mod surface;
 mod tools;
 pub mod uv_editor;
+mod validation;
 mod view;
 
 pub use bake::BakeState;
 pub use collision::{COLLISION_HEADER, CollisionShape};
+pub use materials::{MaterialDropTarget, MaterialState};
 pub use modal::{Modal, ModalKind};
 pub use paint::PaintState;
 pub use proportional::{Falloff, Pivot, Proportional};
 pub use rig::RigState;
 pub use sculpt::SculptState;
 pub use uv_editor::UvEditor;
+pub use validation::GameReadyReport;
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -133,6 +138,13 @@ pub enum StudioAction {
     /// Open the model file at this project path again, in place of the
     /// open one: it changed on disk and the user chose to load it.
     Reload(String),
+    /// A material asset (`.material.json` / `.vmat`) was dropped onto a
+    /// hierarchy material slot or a viewport face; the editor resolves it
+    /// into a `ModelMaterial` and calls [`ModelStudio::apply_loaded_material`].
+    ApplyMaterialAsset {
+        path: String,
+        target: MaterialDropTarget,
+    },
 }
 
 /// Everything an undo step puts back.
@@ -188,9 +200,10 @@ pub struct StudioDoc {
     /// The high-poly object Make Low Poly copies and Bake bakes from
     /// (Phase 61). Not an undo step.
     pub reference: Option<usize>,
-    /// The level of detail the view draws objects at (R15.3's Preview
-    /// LOD): 0 is the full objects.
-    pub lod_preview: usize,
+    /// The level of detail the view draws objects at: `None` is Auto (swaps
+    /// dynamically by screen size using the renderer's `LOD_SCREEN_SIZES`),
+    /// `Some(level)` locks the viewport to that level.
+    pub lod_preview: Option<usize>,
     /// The shares of the triangles Generate LODs keeps in `_LOD1` and
     /// `_LOD2`.
     pub lod_ratios: [f32; 2],
@@ -228,7 +241,7 @@ impl StudioDoc {
             last_op: None,
             modifier_edit: None,
             reference: None,
-            lod_preview: 0,
+            lod_preview: None,
             lod_ratios: lods::default_ratios(),
             lod_rows: None,
             show_collision: true,
@@ -783,6 +796,39 @@ impl MoveSettings {
     }
 }
 
+/// Undockable inspector icon tabs along the edge of Model Studio.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum InspectorTab {
+    #[default]
+    ObjectPhysics,
+    MaterialsLods,
+    RiggingWeights,
+}
+
+impl InspectorTab {
+    pub const ALL: [InspectorTab; 3] = [
+        InspectorTab::ObjectPhysics,
+        InspectorTab::MaterialsLods,
+        InspectorTab::RiggingWeights,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            InspectorTab::ObjectPhysics => "Object / Physics",
+            InspectorTab::MaterialsLods => "Materials / LODs",
+            InspectorTab::RiggingWeights => "Rigging / Weights",
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            InspectorTab::ObjectPhysics => icons::CUBE,
+            InspectorTab::MaterialsLods => icons::PAINT_BRUSH,
+            InspectorTab::RiggingWeights => icons::BONE,
+        }
+    }
+}
+
 /// The Model Studio tab.
 pub struct ModelStudio {
     pub doc: Option<StudioDoc>,
@@ -794,6 +840,8 @@ pub struct ModelStudio {
     pub axes: MoveAxes,
     /// Draw each face's normal.
     pub show_normals: bool,
+    /// When true (Alt+Z), Edit-mode overlays and selection pass through the mesh.
+    pub xray: bool,
     /// The pivot, the 3D cursor and proportional editing.
     pub moves: MoveSettings,
     /// The UV editor pane and the uv tools' settings.
@@ -806,6 +854,13 @@ pub struct ModelStudio {
     pub bake: BakeState,
     /// The active bone, the weight brush and the pose tested (Phase 62).
     pub rig: RigState,
+    /// Material slots & direct face material painting state.
+    pub materials: MaterialState,
+    /// Path of a material asset currently being dragged from the Assets panel
+    /// (set by the editor each frame while hovering).
+    pub dragged_material: Option<String>,
+    /// Path of a material asset released this frame from the Assets panel.
+    pub dropped_material: Option<String>,
     /// The project's images, for a paint brush's image.
     pub images: Vec<String>,
     /// A keyboard move under way, and what it moves.
@@ -828,6 +883,12 @@ pub struct ModelStudio {
     mode_note: Option<(Mode, &'static str)>,
     /// Lines for the Console.
     pub notices: Vec<String>,
+    /// Active inspector icon tab in the side panel.
+    pub inspector_tab: InspectorTab,
+    /// Inspector tabs popped out into floating windows (multi-monitor friendly).
+    pub undocked_tabs: BTreeSet<InspectorTab>,
+    /// Last mode seen, so mode switches auto-focus the matching inspector tab.
+    last_mode: Mode,
     /// The active object's modifiers that couldn't run, worked out for
     /// this revision and object.
     stack_errors: (u64, usize, Vec<(usize, String)>),
@@ -841,12 +902,16 @@ impl Default for ModelStudio {
             tool: Tool::Select,
             axes: MoveAxes::Global,
             show_normals: false,
+            xray: false,
             moves: MoveSettings::default(),
             uv: UvEditor::default(),
             paint: PaintState::default(),
             sculpt: SculptState::default(),
             bake: BakeState::default(),
             rig: RigState::default(),
+            materials: MaterialState::default(),
+            dragged_material: None,
+            dropped_material: None,
             images: Vec::new(),
             modal: None,
             tools: tools::Tools::default(),
@@ -857,6 +922,9 @@ impl Default for ModelStudio {
             written: None,
             mode_note: None,
             notices: Vec::new(),
+            inspector_tab: InspectorTab::ObjectPhysics,
+            undocked_tabs: BTreeSet::new(),
+            last_mode: Mode::Object,
             stack_errors: (0, 0, Vec::new()),
         }
     }
@@ -889,6 +957,33 @@ impl ModelStudio {
             || self.paint.busy()
             || self.sculpt.busy()
             || self.rig.busy()
+            || self.materials.busy()
+    }
+
+    /// Applies a material asset resolved by the editor onto a hierarchy slot
+    /// or onto viewport face(s).
+    pub fn apply_loaded_material(
+        &mut self,
+        target: MaterialDropTarget,
+        material: axcenity_assets::ModelMaterial,
+    ) {
+        let Some(doc) = &mut self.doc else {
+            return;
+        };
+        match target {
+            MaterialDropTarget::Slot { object, slot } => {
+                if doc.replace_material_slot(object, slot, material) {
+                    self.materials.active_slot = slot;
+                    self.paint.slot = slot as u32;
+                }
+            }
+            MaterialDropTarget::Faces { object, faces } => {
+                if let Some(slot) = doc.paint_faces_with_material(object, &faces, material) {
+                    self.materials.active_slot = slot;
+                    self.paint.slot = slot as u32;
+                }
+            }
+        }
     }
 
     /// Shows `doc`, unless the open one has unsaved changes: then it waits
@@ -909,6 +1004,7 @@ impl ModelStudio {
         self.sculpt.forget();
         self.bake.forget();
         self.rig.forget();
+        self.materials.forget();
         self.view.frame_doc(&doc);
         self.doc = Some(doc);
         self.changed_on_disk = false;
@@ -984,32 +1080,169 @@ impl ModelStudio {
             );
             return actions;
         };
-        responsive::split(ui, 420.0, 0.28, |ui, pane| {
-            if pane == 0 {
-                egui::ScrollArea::vertical()
-                    .id_salt("studio side")
-                    .show(ui, |ui| {
-                        self.object_list(ui);
-                        ui.add_space(8.0);
-                        match self.doc.as_ref().map(|d| d.mode) {
-                            Some(Mode::Paint) => self.paint_panel(ui, editable, &mut actions),
-                            Some(Mode::Sculpt) => self.sculpt_panel(ui, editable),
-                            Some(Mode::Armature | Mode::Weights | Mode::Pose) => {
-                                self.rig_panel(ui, editable)
-                            }
-                            _ => {
-                                self.modifier_panel(ui, editable);
-                                self.bake_panel(ui, editable, &mut actions);
+
+        // Auto-switch the docked inspector tab when the user changes Studio mode.
+        if let Some(mode) = self.doc.as_ref().map(|d| d.mode)
+            && mode != self.last_mode
+        {
+            self.last_mode = mode;
+            self.inspector_tab = match mode {
+                Mode::Paint => InspectorTab::MaterialsLods,
+                Mode::Armature | Mode::Weights | Mode::Pose => InspectorTab::RiggingWeights,
+                Mode::Object | Mode::Edit | Mode::Sculpt => InspectorTab::ObjectPhysics,
+            };
+        }
+
+        // Reserve space at the bottom for the one-click Game Ready validation bar.
+        let bar_height = 26.0;
+        let main_height = (ui.available_height() - bar_height).max(64.0);
+        ui.allocate_ui(egui::vec2(ui.available_width(), main_height), |ui| {
+            responsive::split(ui, 420.0, 0.28, |ui, pane| {
+                if pane == 0 {
+                    // Clean icon tab bar along the top edge of the inspector,
+                    // with an undock/pop-out button per tab.
+                    ui.horizontal(|ui| {
+                        for tab in InspectorTab::ALL {
+                            let undocked = self.undocked_tabs.contains(&tab);
+                            let tip = if undocked {
+                                format!("{} (undocked — click to dock back)", tab.label())
+                            } else {
+                                tab.label().to_owned()
+                            };
+                            if widgets::icon_button(
+                                ui,
+                                tab.icon(),
+                                &tip,
+                                !undocked && self.inspector_tab == tab,
+                            )
+                            .clicked()
+                            {
+                                self.undocked_tabs.remove(&tab);
+                                self.inspector_tab = tab;
                             }
                         }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let current = self.inspector_tab;
+                            let is_undocked = self.undocked_tabs.contains(&current);
+                            if widgets::icon_button(
+                                ui,
+                                icons::ARROW_SQUARE_OUT,
+                                if is_undocked {
+                                    "Dock this inspector tab back into the side panel"
+                                } else {
+                                    "Undock this inspector tab into a floating window (multi-monitor friendly)"
+                                },
+                                is_undocked,
+                            )
+                            .clicked()
+                            {
+                                if is_undocked {
+                                    self.undocked_tabs.remove(&current);
+                                } else {
+                                    self.undocked_tabs.insert(current);
+                                }
+                            }
+                        });
                     });
-            } else if self.uv.open && self.doc.as_ref().is_some_and(|doc| shows_uvs(doc.mode)) {
-                self.view_and_uvs(ui, render_state, snap, editable);
-            } else {
-                self.viewport(ui, render_state, snap, editable);
-            }
+                    ui.separator();
+                    let active_tab = self.inspector_tab;
+                    egui::ScrollArea::vertical()
+                        .id_salt(("studio side", active_tab))
+                        .show(ui, |ui| {
+                            if self.undocked_tabs.contains(&active_tab) {
+                                ui.weak(format!(
+                                    "{} is open in a floating window.",
+                                    active_tab.label()
+                                ));
+                                if ui.button("Dock back here").clicked() {
+                                    self.undocked_tabs.remove(&active_tab);
+                                }
+                            } else {
+                                self.inspector_tab_contents(ui, active_tab, editable, &mut actions);
+                            }
+                        });
+                } else if self.uv.open && self.doc.as_ref().is_some_and(|doc| shows_uvs(doc.mode))
+                {
+                    self.view_and_uvs(ui, render_state, snap, editable, &mut actions);
+                } else {
+                    self.viewport(ui, render_state, snap, editable, &mut actions);
+                }
+            });
         });
+
+        // Floating windows for any undocked inspector tabs.
+        self.show_undocked_tabs(ui.ctx(), editable, &mut actions);
+
+        // One-click "Game Ready" validation status bar along the bottom edge.
+        self.validation_bar(ui, editable);
+
         actions
+    }
+
+    /// Renders the contents of one inspector tab (either docked or in a
+    /// floating undocked window).
+    fn inspector_tab_contents(
+        &mut self,
+        ui: &mut egui::Ui,
+        tab: InspectorTab,
+        editable: bool,
+        actions: &mut Vec<StudioAction>,
+    ) {
+        match tab {
+            InspectorTab::ObjectPhysics => {
+                self.object_list(ui, editable, actions);
+                ui.add_space(8.0);
+                if self.doc.as_ref().is_some_and(|d| d.mode == Mode::Sculpt) {
+                    self.sculpt_panel(ui, editable);
+                } else {
+                    self.modifier_panel(ui, editable);
+                    self.bake_panel(ui, editable, actions);
+                }
+            }
+            InspectorTab::MaterialsLods => {
+                if let Some(doc) = &mut self.doc {
+                    materials::panel(ui, doc, &mut self.materials, editable);
+                    ui.add_space(8.0);
+                    lods::panel(ui, doc, editable, &mut self.notices);
+                }
+                if self.doc.as_ref().is_some_and(|d| d.mode == Mode::Paint) {
+                    ui.add_space(8.0);
+                    self.paint_panel(ui, editable, actions);
+                }
+            }
+            InspectorTab::RiggingWeights => {
+                self.rig_panel(ui, editable);
+            }
+        }
+    }
+
+    /// Renders any undocked inspector tabs as movable, resizable floating
+    /// windows. Closing a window docks the tab back.
+    fn show_undocked_tabs(
+        &mut self,
+        ctx: &egui::Context,
+        editable: bool,
+        actions: &mut Vec<StudioAction>,
+    ) {
+        let tabs: Vec<InspectorTab> = self.undocked_tabs.iter().copied().collect();
+        for tab in tabs {
+            let mut open = true;
+            egui::Window::new(theme::with_icon(tab.icon(), tab.label()))
+                .id(egui::Id::new(("studio undocked", tab)))
+                .open(&mut open)
+                .default_width(300.0)
+                .resizable(true)
+                .show(ctx, |ui| {
+                    egui::ScrollArea::vertical()
+                        .id_salt(("studio undocked scroll", tab))
+                        .show(ui, |ui| {
+                            self.inspector_tab_contents(ui, tab, editable, actions);
+                        });
+                });
+            if !open {
+                self.undocked_tabs.remove(&tab);
+            }
+        }
     }
 
     /// Offers to load the open model's file again after another program
@@ -1280,6 +1513,26 @@ impl ModelStudio {
                 {
                     self.show_normals = !self.show_normals;
                 }
+                if widgets::icon_button(
+                    ui,
+                    icons::EYE,
+                    "X-Ray / Select Through (Alt+Z): draw and pick occluded back-faces",
+                    self.xray,
+                )
+                .clicked()
+                {
+                    self.xray = !self.xray;
+                }
+                if widgets::icon_button(
+                    ui,
+                    icons::SHIELD,
+                    "Show Collisions: toggle green wireframe collision hulls",
+                    doc.show_collision,
+                )
+                .clicked()
+                {
+                    doc.show_collision = !doc.show_collision;
+                }
             }
             ui.separator();
             let undo = doc
@@ -1419,42 +1672,228 @@ impl ModelStudio {
         .clicked()
     }
 
-    /// The file's objects, indented inside their groups. Clicking one picks
-    /// it and makes it the one Edit mode edits.
-    fn object_list(&mut self, ui: &mut egui::Ui) {
+    /// The file's objects, indented inside their groups. Collision pieces
+    /// (`_COL`) are visually parented under their visual mesh with a green
+    /// shield icon, active material slots appear as sub-item badges (accepting
+    /// drag-and-drop material assets), and each visual mesh row offers a quick
+    /// inline menu to Auto-Generate Box / Convex Hull / Capsule / Convex Pieces.
+    fn object_list(&mut self, ui: &mut egui::Ui, editable: bool, actions: &mut Vec<StudioAction>) {
         let Some(doc) = &mut self.doc else {
             return;
         };
         widgets::section_label(ui, "Objects");
+        let palette = theme::palette(ui.ctx());
+        let collision_color = egui::Color32::from_rgb(64, 217, 102);
         let mut clicked = None;
-        for (index, object) in doc.model.objects.iter().enumerate() {
+        let mut gen_col: Option<(usize, CollisionShape)> = None;
+        let mut remove_col: Option<usize> = None;
+        let mut picked_slot: Option<(usize, usize)> = None;
+
+        // Track which collision pieces are rendered as children of their owner
+        // so we don't draw them twice as flat siblings.
+        let mut owned_pieces: BTreeSet<usize> = BTreeSet::new();
+        for index in 0..doc.model.objects.len() {
+            for piece in doc.model.collision_pieces(index) {
+                owned_pieces.insert(piece);
+            }
+        }
+
+        let count = doc.model.objects.len();
+        for index in 0..count {
+            if owned_pieces.contains(&index) {
+                continue;
+            }
+            let object = &doc.model.objects[index];
+            let has_mesh = object.mesh.is_some();
+            let depth = object.depth;
+            let name = object.name.clone();
+            let is_lod = doc.model.is_lod_copy(index);
+            let is_col = doc.model.is_collision_piece(index);
+            let pieces = doc.model.collision_pieces(index);
+            let is_visual_mesh = has_mesh && !is_lod && !is_col;
+
             ui.horizontal(|ui| {
-                ui.add_space(object.depth as f32 * 12.0);
-                let icon = if object.mesh.is_some() {
+                ui.add_space(depth as f32 * 12.0);
+                let icon = if is_col {
+                    icons::SHIELD
+                } else if has_mesh {
                     icons::CUBE
                 } else {
                     icons::FOLDER_OPEN
                 };
-                let mut text = theme::with_icon(icon, &object.name);
-                if index == doc.active && object.mesh.is_some() {
+                let mut text = theme::with_icon(icon, &name);
+                if index == doc.active && has_mesh {
                     text.push_str("  ·  active");
                 }
-                let mut response = ui.selectable_label(doc.objects.contains(&index), text);
-                if doc.model.is_lod_copy(index) {
+                let label = if is_col {
+                    egui::RichText::new(text).color(collision_color)
+                } else {
+                    egui::RichText::new(text)
+                };
+                let mut response = ui.selectable_label(doc.objects.contains(&index), label);
+                if is_lod {
                     response =
                         response.on_hover_text("A far-away copy: games draw it, this view doesn't");
-                } else if doc.model.is_collision_piece(index) {
+                } else if is_col {
                     response = response.on_hover_text(
                         "A collision piece: games collide with it and don't draw it",
                     );
                 }
-                if response.clicked() && object.mesh.is_some() {
+                if response.clicked() && has_mesh {
                     clicked = Some((index, ui.input(|i| i.modifiers.shift)));
                 }
+                // Quick inline Auto-Generate Collision menu on each visual mesh row
+                if is_visual_mesh && editable {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.menu_button(
+                            egui::RichText::new(icons::SHIELD).color(if pieces.is_empty() {
+                                theme::palette(ui.ctx()).text_secondary
+                            } else {
+                                collision_color
+                            }),
+                            |ui| {
+                                ui.label(egui::RichText::new("Auto-Generate Collision").strong());
+                                if ui.button("Convex Hull").clicked() {
+                                    gen_col = Some((index, CollisionShape::Hull));
+                                    ui.close();
+                                }
+                                if ui.button("Box").clicked() {
+                                    gen_col = Some((index, CollisionShape::Box));
+                                    ui.close();
+                                }
+                                if ui.button("Capsule").clicked() {
+                                    gen_col = Some((index, CollisionShape::Capsule));
+                                    ui.close();
+                                }
+                                if ui
+                                    .button(format!("Convex Pieces (≤{})", doc.collision_pieces))
+                                    .clicked()
+                                {
+                                    gen_col =
+                                        Some((index, CollisionShape::Pieces(doc.collision_pieces)));
+                                    ui.close();
+                                }
+                                if !pieces.is_empty() {
+                                    ui.separator();
+                                    if ui.button("Remove Collision").clicked() {
+                                        remove_col = Some(index);
+                                        ui.close();
+                                    }
+                                }
+                            },
+                        )
+                        .response
+                        .on_hover_text("Auto-Generate Box / Convex Hull / Capsule collision");
+                    });
+                }
             });
+
+            // Active material slots displayed as sub-item badges under this visual mesh
+            if is_visual_mesh {
+                let face_counts = doc.slot_face_counts(index);
+                let mats: Vec<(String, [f32; 4])> = doc.model.objects[index]
+                    .materials
+                    .iter()
+                    .map(|m| (m.name.clone(), m.base_color))
+                    .collect();
+                for (slot, (mat_name, color)) in mats.into_iter().enumerate() {
+                    let faces = face_counts.get(slot).copied().unwrap_or(0);
+                    let row_resp = ui.horizontal(|ui| {
+                        ui.add_space((depth + 1) as f32 * 12.0);
+                        let (swatch_rect, _) =
+                            ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                        ui.painter().rect_filled(
+                            swatch_rect,
+                            2.0,
+                            materials::swatch_color(color),
+                        );
+                        ui.painter().rect_stroke(
+                            swatch_rect,
+                            2.0,
+                            egui::Stroke::new(1.0, palette.border),
+                            egui::StrokeKind::Inside,
+                        );
+                        let is_sel = index == doc.active && self.materials.active_slot == slot;
+                        let resp = ui
+                            .selectable_label(
+                                is_sel,
+                                egui::RichText::new(format!("{mat_name} ({faces})")).small(),
+                            )
+                            .on_hover_text(
+                                "Material slot: click to select, or drop a material asset here to replace all faces using it",
+                            );
+                        if resp.clicked() {
+                            picked_slot = Some((index, slot));
+                        }
+                        resp
+                    });
+                    let row_rect = row_resp.response.rect;
+                    let pointer_over = ui.rect_contains_pointer(row_rect);
+                    if editable && pointer_over && self.dragged_material.is_some() {
+                        ui.painter().rect_stroke(
+                            row_rect,
+                            3.0,
+                            egui::Stroke::new(1.5, palette.accent),
+                            egui::StrokeKind::Inside,
+                        );
+                    }
+                    if editable
+                        && pointer_over
+                        && let Some(path) = self.dropped_material.take()
+                    {
+                        actions.push(StudioAction::ApplyMaterialAsset {
+                            path,
+                            target: MaterialDropTarget::Slot {
+                                object: index,
+                                slot,
+                            },
+                        });
+                    }
+                }
+            }
+
+            // Visually parent owned `_COL` pieces under this visual mesh
+            for piece_idx in pieces {
+                let piece = &doc.model.objects[piece_idx];
+                ui.horizontal(|ui| {
+                    ui.add_space((depth + 1) as f32 * 12.0);
+                    let mut text = theme::with_icon(icons::SHIELD, &piece.name);
+                    if piece_idx == doc.active {
+                        text.push_str("  ·  active");
+                    }
+                    let response = ui
+                        .selectable_label(
+                            doc.objects.contains(&piece_idx),
+                            egui::RichText::new(text).color(collision_color),
+                        )
+                        .on_hover_text(
+                            "Collision hull parented to this mesh (green wireframe in viewport)",
+                        );
+                    if response.clicked() {
+                        clicked = Some((piece_idx, ui.input(|i| i.modifiers.shift)));
+                    }
+                });
+            }
         }
         if let Some((index, extend)) = clicked {
             doc.click_object(Some(index), extend);
+        }
+        if let Some((index, slot)) = picked_slot {
+            doc.click_object(Some(index), false);
+            self.materials.active_slot = slot;
+            self.paint.slot = slot as u32;
+        }
+        if let Some((index, shape)) = gen_col {
+            doc.click_object(Some(index), false);
+            if let Err(why) = doc.generate_collision(shape) {
+                self.notices.push(why);
+            }
+        }
+        if let Some(index) = remove_col {
+            doc.click_object(Some(index), false);
+            if let Err(why) = doc.remove_collision() {
+                self.notices.push(why);
+            }
         }
     }
 
@@ -1479,8 +1918,8 @@ impl ModelStudio {
                 .unwrap_or_default();
             self.stack_errors = (doc.revision, doc.active, errors);
         }
+        surface::panel(ui, doc, editable);
         modifiers::panel(ui, doc, &self.stack_errors.2, editable, &mut self.notices);
-        lods::panel(ui, doc, editable, &mut self.notices);
         collision::panel(ui, doc, editable, &mut self.notices);
     }
 
@@ -1491,6 +1930,7 @@ impl ModelStudio {
         render_state: Option<&RenderState>,
         snap: Snap,
         editable: bool,
+        actions: &mut Vec<StudioAction>,
     ) {
         let size = ui.available_size().max(egui::vec2(64.0, 64.0));
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
@@ -1509,6 +1949,7 @@ impl ModelStudio {
             },
             axes: self.axes,
             show_normals: self.show_normals,
+            xray: self.xray,
             cursor: self.moves.cursor,
             checker: self
                 .uv
@@ -1518,6 +1959,10 @@ impl ModelStudio {
             sculpt: self.sculpt_items(),
         };
         if editable && response.contains_pointer() {
+            // Alt+Z toggles X-Ray / Select Through in the viewport.
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::ALT, egui::Key::Z)) {
+                self.xray = !self.xray;
+            }
             if painting || sculpting || rigging {
                 if painting {
                     self.paint_keys(ui);
@@ -1561,6 +2006,46 @@ impl ModelStudio {
         let event = self
             .view
             .show(ui, &context, render_state, doc, modal, &extras);
+        let screen_size = self.view.screen_size(doc);
+        lods::viewport_ribbon(ui, rect, doc, screen_size);
+
+        // Drag-and-drop a material asset directly onto a viewport face.
+        if editable && ui.rect_contains_pointer(rect) {
+            if self.dragged_material.is_some() {
+                let accent = theme::palette(ui.ctx()).accent;
+                ui.painter().rect_stroke(
+                    rect.shrink(2.0),
+                    4.0,
+                    egui::Stroke::new(2.0, accent),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            if let Some(path) = self.dropped_material.take()
+                && let Some(at) = event.pointer
+            {
+                let ray = event.screen.ray(at);
+                if let Some(mesh) = doc.mesh()
+                    && let Some((hit_face, _)) = view::pick_face(mesh, ray)
+                {
+                    let faces = if doc.mode == Mode::Edit
+                        && doc.selection.mode == SelectMode::Face
+                        && doc.selection.faces.contains(&hit_face)
+                    {
+                        doc.selection.faces.iter().copied().collect()
+                    } else {
+                        vec![hit_face]
+                    };
+                    actions.push(StudioAction::ApplyMaterialAsset {
+                        path,
+                        target: MaterialDropTarget::Faces {
+                            object: doc.active,
+                            faces,
+                        },
+                    });
+                }
+            }
+        }
+
         if rigging {
             self.paint_bones(&ui.painter_at(rect), &event.screen);
             if editable {
@@ -1573,6 +2058,29 @@ impl ModelStudio {
                 self.paint_in_view(ui, &response, &event.screen);
             } else if editable {
                 self.sculpt_in_view(ui, &response, &event.screen);
+            }
+            return;
+        }
+        // Direct Face Material Painting brush when toggled on in Object/Edit mode.
+        if editable && self.materials.face_paint {
+            let (pressed, down) =
+                ui.input(|i| (i.pointer.primary_pressed(), i.pointer.primary_down()));
+            let over =
+                event.pointer.is_some_and(|at| rect.contains(at)) && response.contains_pointer();
+            if pressed && over {
+                self.materials.begin_stroke(doc);
+            }
+            if down
+                && over
+                && self.materials.busy()
+                && let Some(at) = event.pointer
+                && let Some(mesh) = doc.mesh()
+                && let Some((face, _)) = view::pick_face(mesh, event.screen.ray(at))
+            {
+                self.materials.paint_face(doc, face);
+            }
+            if !down && self.materials.busy() {
+                self.materials.end_stroke(doc);
             }
             return;
         }
@@ -1591,6 +2099,7 @@ impl ModelStudio {
         render_state: Option<&RenderState>,
         snap: Snap,
         editable: bool,
+        actions: &mut Vec<StudioAction>,
     ) {
         let size = ui.available_size();
         let wide = size.x >= 520.0;
@@ -1607,7 +2116,7 @@ impl ModelStudio {
         ui.with_layout(layout, |ui| {
             let top_down = egui::Layout::top_down(egui::Align::Min);
             ui.allocate_ui_with_layout(half, top_down, |ui| {
-                self.viewport(ui, render_state, snap, editable);
+                self.viewport(ui, render_state, snap, editable, actions);
             });
             ui.separator();
             ui.allocate_ui_with_layout(half, top_down, |ui| {
@@ -1939,6 +2448,8 @@ pub mod rig_tests;
 #[cfg(any(test, feature = "test-support"))]
 #[cfg_attr(not(test), allow(dead_code, unused_imports))]
 pub mod sculpt_tests;
+#[cfg(test)]
+mod studio_upgrade_tests;
 #[cfg(any(test, feature = "test-support"))]
 #[cfg_attr(not(test), allow(dead_code, unused_imports))]
 pub mod tests;

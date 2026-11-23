@@ -65,6 +65,8 @@ pub struct Frame<'a> {
     pub tool: Tool,
     pub axes: MoveAxes,
     pub show_normals: bool,
+    /// When true (Alt+Z), Edit-mode overlays and selection pass through the mesh.
+    pub xray: bool,
     pub cursor: Vec3,
     /// The uv channel to draw a checker on, if any.
     pub checker: Option<usize>,
@@ -154,6 +156,9 @@ pub struct View {
     /// The key of the model the Studio handed over (Weights and Pose
     /// mode), drawn in place of the document's own.
     handed: Option<u64>,
+    /// Cached BVH of the active object's mesh for depth-tested Edit-mode
+    /// overlays and picking, keyed by `(doc.revision, doc.active)`.
+    bvh: Option<(u64, usize, axcenity_mesh_edit::Reference)>,
 }
 
 impl Default for View {
@@ -184,6 +189,7 @@ impl Default for View {
             drag: None,
             moving: None,
             handed: None,
+            bvh: None,
         }
     }
 }
@@ -267,14 +273,36 @@ impl View {
         }
     }
 
+    /// The share of the viewport height the model's bounding sphere covers,
+    /// matching the renderer's `LOD_SCREEN_SIZES` metric.
+    pub fn screen_size(&self, doc: &StudioDoc) -> f32 {
+        let (min, max) = bounds(doc);
+        let center = (min + max) * 0.5;
+        let radius = (max - min).length() * 0.5;
+        let camera = self.camera();
+        let distance = center.distance(camera.position);
+        let tan_half = (camera.fov_y_degrees.to_radians() * 0.5).tan().max(1e-4);
+        if distance <= radius {
+            f32::INFINITY
+        } else {
+            radius / (distance * tan_half)
+        }
+    }
+
     /// Puts the model's current meshes in the view's world, with the
     /// checker on `checker`'s uv channel if it's on, and without object
     /// `skip` (drawn by the Studio while it's sculpted).
-    fn refresh(&mut self, doc: &StudioDoc, checker: Option<usize>, skip: Option<usize>) {
+    fn refresh(
+        &mut self,
+        doc: &StudioDoc,
+        checker: Option<usize>,
+        skip: Option<usize>,
+        lod_level: usize,
+    ) {
         if self.handed.is_some() {
             return;
         }
-        if self.shown == (doc.revision, checker, skip, doc.lod_preview) {
+        if self.shown == (doc.revision, checker, skip, lod_level) {
             if self.painted == doc.paint_revision || checker.is_some() {
                 return;
             }
@@ -291,7 +319,7 @@ impl View {
             }
             return;
         }
-        self.shown = (doc.revision, checker, skip, doc.lod_preview);
+        self.shown = (doc.revision, checker, skip, lod_level);
         self.painted = doc.paint_revision;
         let model = match (checker, skip) {
             (_, Some(skip)) => {
@@ -301,7 +329,7 @@ impl View {
             (Some(channel), None) => doc.model.to_model_on(channel).map(with_checker),
             (None, None) => doc
                 .model
-                .to_model_at_level(doc.lod_preview)
+                .to_model_at_level(lod_level)
                 .map(|(model, slots)| {
                     self.drawn = Some((model.with_materials(|_| None), slots));
                     model
@@ -342,6 +370,25 @@ impl View {
             .set_property(self.part, "MeshId", Value::String(MESH_ID.to_owned()));
     }
 
+    /// Ensures the cached occlusion BVH matches `doc`'s active object.
+    fn active_bvh(&mut self, doc: &StudioDoc) -> Option<&axcenity_mesh_edit::Reference> {
+        let key = (doc.revision, doc.active);
+        let fresh = self
+            .bvh
+            .as_ref()
+            .is_some_and(|(rev, obj, _)| (*rev, *obj) == key);
+        if !fresh {
+            self.bvh = doc.mesh().map(|mesh| {
+                (
+                    doc.revision,
+                    doc.active,
+                    axcenity_mesh_edit::Reference::new(mesh),
+                )
+            });
+        }
+        self.bvh.as_ref().map(|(_, _, bvh)| bvh)
+    }
+
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -355,7 +402,9 @@ impl View {
         let response = frame.response;
         self.aspect = rect.width() / rect.height().max(1.0);
         let skip = frame.sculpt.as_ref().map(|_| doc.active);
-        self.refresh(doc, frame.checker, skip);
+        let screen_size = self.screen_size(doc);
+        let lod_level = doc.active_lod_level(screen_size);
+        self.refresh(doc, frame.checker, skip, lod_level);
         self.orbit(ui, response);
         let screen = Screen::new(self.camera(), rect);
         let mut event = Event {
@@ -395,6 +444,10 @@ impl View {
             }
             _ => None,
         };
+        let camera_pos = self.camera().position;
+        if doc.mode == Mode::Edit && !frame.xray {
+            let _ = self.active_bvh(doc);
+        }
         if modal.is_none() {
             event.action = self.interact(
                 &screen, frame, doc, pose, hovered, pointer, modifiers, pressed, down,
@@ -415,11 +468,16 @@ impl View {
         let painter = ui.painter_at(rect);
         // A sculpt's many faces would bury it in lines; rigging shows bones.
         if matches!(doc.mode, Mode::Object | Mode::Edit | Mode::Paint) {
+            let occluder = (!frame.xray && doc.mode == Mode::Edit)
+                .then(|| self.bvh.as_ref().map(|(_, _, bvh)| bvh))
+                .flatten();
             paint_overlay(
                 &painter,
                 &screen,
                 doc,
                 frame.show_normals,
+                camera_pos,
+                occluder,
                 theme::palette(ui.ctx()).accent,
             );
         }
@@ -554,6 +612,10 @@ impl View {
                 .interact_pointer_pos()
                 .map(|at| at - response.drag_delta());
         }
+        let occluder = (!frame.xray && doc.mode == Mode::Edit)
+            .then(|| self.bvh.as_ref().map(|(_, _, bvh)| bvh))
+            .flatten();
+        let camera_pos = self.camera().position;
         if let Some(start) = self.box_start
             && (response.drag_stopped_by(egui::PointerButton::Primary) || !down)
         {
@@ -562,9 +624,9 @@ impl View {
                 return ViewAction::None;
             };
             let area = egui::Rect::from_two_pos(start, end);
-            let elements = doc
-                .mesh()
-                .map(|mesh| boxed(mesh, doc.selection.mode, screen, area));
+            let elements = doc.mesh().map(|mesh| {
+                boxed_visible(mesh, doc.selection.mode, screen, area, camera_pos, occluder)
+            });
             return ViewAction::Box {
                 elements: elements.unwrap_or_default(),
                 extend: modifiers.shift,
@@ -594,15 +656,25 @@ impl View {
                     return ViewAction::None;
                 };
                 if modifiers.alt {
-                    return match nearest_edge(mesh, screen, at, EDGE_PICK * 1.5) {
+                    return match nearest_edge_visible(
+                        mesh,
+                        screen,
+                        at,
+                        EDGE_PICK * 1.5,
+                        camera_pos,
+                        occluder,
+                    ) {
                         Some(edge) => ViewAction::Loop { edge, extend },
                         None => ViewAction::None,
                     };
                 }
                 let element = match doc.selection.mode {
-                    SelectMode::Vertex => nearest_vertex(mesh, screen, at),
+                    SelectMode::Vertex => {
+                        nearest_vertex_visible(mesh, screen, at, camera_pos, occluder)
+                    }
                     SelectMode::Edge => {
-                        nearest_edge(mesh, screen, at, EDGE_PICK).map(|e| mesh.edge_key(e))
+                        nearest_edge_visible(mesh, screen, at, EDGE_PICK, camera_pos, occluder)
+                            .map(|e| mesh.edge_key(e))
                     }
                     SelectMode::Face => pick_face(mesh, ray).map(|(face, _)| face),
                 };
@@ -827,11 +899,54 @@ fn pick_object(doc: &StudioDoc, ray: Ray) -> Option<usize> {
         .map(|(index, _)| index)
 }
 
+/// True when `point` is not hidden behind closer geometry of `occluder`
+/// from `camera_pos` (with a small depth bias toward the camera so surface
+/// elements don't self-occlude). When `occluder` is `None` (X-Ray mode),
+/// everything is visible.
+pub(super) fn point_visible(
+    occluder: Option<&axcenity_mesh_edit::Reference>,
+    camera_pos: Vec3,
+    point: Vec3,
+    normal_hint: Option<Vec3>,
+) -> bool {
+    let Some(bvh) = occluder else {
+        return true;
+    };
+    let to_cam = camera_pos - point;
+    let dist = to_cam.length();
+    if dist < 1e-5 {
+        return true;
+    }
+    let dir = to_cam / dist;
+    if let Some(normal) = normal_hint
+        && normal.dot(dir) <= -0.02
+    {
+        return false;
+    }
+    let bias = (bvh.size() * 4e-3).max(2e-3);
+    let limit = (dist - bias * 2.0).max(0.0);
+    if limit <= 0.0 {
+        return true;
+    }
+    !bvh.occluded(point + dir * bias, dir, limit)
+}
+
 /// The vertex shown nearest `at`, within [`VERTEX_PICK`] points.
 pub(super) fn nearest_vertex(mesh: &EditMesh, screen: &Screen, at: egui::Pos2) -> Option<u32> {
+    nearest_vertex_visible(mesh, screen, at, Vec3::ZERO, None)
+}
+
+pub(super) fn nearest_vertex_visible(
+    mesh: &EditMesh,
+    screen: &Screen,
+    at: egui::Pos2,
+    camera_pos: Vec3,
+    occluder: Option<&axcenity_mesh_edit::Reference>,
+) -> Option<u32> {
     mesh.positions()
         .iter()
         .enumerate()
+        .filter(|(_, p)| point_visible(occluder, camera_pos, **p, None))
         .filter_map(|(index, &p)| Some((index as u32, screen.point(p)?.distance(at))))
         .filter(|(_, distance)| *distance <= VERTEX_PICK)
         .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -845,11 +960,30 @@ pub(super) fn nearest_edge(
     at: egui::Pos2,
     reach: f32,
 ) -> Option<u32> {
+    nearest_edge_visible(mesh, screen, at, reach, Vec3::ZERO, None)
+}
+
+pub(super) fn nearest_edge_visible(
+    mesh: &EditMesh,
+    screen: &Screen,
+    at: egui::Pos2,
+    reach: f32,
+    camera_pos: Vec3,
+    occluder: Option<&axcenity_mesh_edit::Reference>,
+) -> Option<u32> {
     mesh.edges()
         .into_iter()
         .filter_map(|edge| {
             let (a, b) = mesh.ends(edge);
-            let [a, b] = screen.line(mesh.position(a), mesh.position(b))?;
+            let (pa, pb) = (mesh.position(a), mesh.position(b));
+            if occluder.is_some()
+                && !point_visible(occluder, camera_pos, (pa + pb) * 0.5, None)
+                && !point_visible(occluder, camera_pos, pa, None)
+                && !point_visible(occluder, camera_pos, pb, None)
+            {
+                return None;
+            }
+            let [a, b] = screen.line(pa, pb)?;
             Some((edge, distance_to_segment(at, a, b)))
         })
         .filter(|(_, distance)| *distance <= reach)
@@ -865,27 +999,49 @@ fn distance_to_segment(p: egui::Pos2, a: egui::Pos2, b: egui::Pos2) -> f32 {
 
 /// The elements of `mesh` (by `mode`) shown inside `area`: vertices, edges
 /// with both ends inside, or faces whose middle is.
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn boxed(
     mesh: &EditMesh,
     mode: SelectMode,
     screen: &Screen,
     area: egui::Rect,
 ) -> Vec<u32> {
-    let inside = |p: Vec3| screen.point(p).is_some_and(|at| area.contains(at));
+    boxed_visible(mesh, mode, screen, area, Vec3::ZERO, None)
+}
+
+pub(super) fn boxed_visible(
+    mesh: &EditMesh,
+    mode: SelectMode,
+    screen: &Screen,
+    area: egui::Rect,
+    camera_pos: Vec3,
+    occluder: Option<&axcenity_mesh_edit::Reference>,
+) -> Vec<u32> {
+    let inside = |p: Vec3, normal: Option<Vec3>| {
+        point_visible(occluder, camera_pos, p, normal)
+            && screen.point(p).is_some_and(|at| area.contains(at))
+    };
     match mode {
         SelectMode::Vertex => (0..mesh.vertex_count() as u32)
-            .filter(|&v| inside(mesh.position(v)))
+            .filter(|&v| inside(mesh.position(v), None))
             .collect(),
         SelectMode::Edge => mesh
             .edges()
             .into_iter()
             .filter(|&edge| {
                 let (a, b) = mesh.ends(edge);
-                inside(mesh.position(a)) && inside(mesh.position(b))
+                let (pa, pb) = (mesh.position(a), mesh.position(b));
+                let visible = occluder.is_none()
+                    || point_visible(occluder, camera_pos, (pa + pb) * 0.5, None)
+                    || (point_visible(occluder, camera_pos, pa, None)
+                        && point_visible(occluder, camera_pos, pb, None));
+                visible
+                    && screen.point(pa).is_some_and(|at| area.contains(at))
+                    && screen.point(pb).is_some_and(|at| area.contains(at))
             })
             .collect(),
         SelectMode::Face => (0..mesh.face_count() as u32)
-            .filter(|&face| inside(mesh.face_center(face)))
+            .filter(|&face| inside(mesh.face_center(face), Some(mesh.face_normal(face))))
             .collect(),
     }
 }
@@ -897,6 +1053,8 @@ fn paint_overlay(
     screen: &Screen,
     doc: &StudioDoc,
     normals: bool,
+    camera_pos: Vec3,
+    occluder: Option<&axcenity_mesh_edit::Reference>,
     accent: egui::Color32,
 ) {
     let wire = egui::Color32::from_black_alpha(150);
@@ -948,9 +1106,17 @@ fn paint_overlay(
         let selection = &doc.selection;
         let picked_vertices: std::collections::BTreeSet<u32> =
             selection.vertices_of(mesh).into_iter().collect();
-        // Picked faces, tinted.
+        // Picked faces, tinted (front-facing / unoccluded unless X-Ray is on).
         if selection.mode == SelectMode::Face {
             for &face in &selection.faces {
+                if !point_visible(
+                    occluder,
+                    camera_pos,
+                    mesh.face_center(face),
+                    Some(mesh.face_normal(face)),
+                ) {
+                    continue;
+                }
                 for triangle in mesh.triangles(face) {
                     let points: Option<Vec<egui::Pos2>> = triangle
                         .iter()
@@ -968,6 +1134,14 @@ fn paint_overlay(
         }
         for edge in mesh.edges() {
             let (a, b) = mesh.ends(edge);
+            let (pa, pb) = (mesh.position(a), mesh.position(b));
+            if occluder.is_some()
+                && !point_visible(occluder, camera_pos, (pa + pb) * 0.5, None)
+                && !point_visible(occluder, camera_pos, pa, None)
+                && !point_visible(occluder, camera_pos, pb, None)
+            {
+                continue;
+            }
             let picked = match selection.mode {
                 SelectMode::Edge => selection.edges.contains(&edge),
                 _ => picked_vertices.contains(&a) && picked_vertices.contains(&b),
@@ -979,11 +1153,14 @@ fn paint_overlay(
             } else {
                 egui::Stroke::new(1.0_f32, wire)
             };
-            line(mesh.position(a), mesh.position(b), stroke);
+            line(pa, pb, stroke);
         }
         match selection.mode {
             SelectMode::Vertex => {
                 for (vertex, &p) in mesh.positions().iter().enumerate() {
+                    if !point_visible(occluder, camera_pos, p, None) {
+                        continue;
+                    }
                     if let Some(at) = screen.point(p) {
                         let color = if selection.vertices.contains(&(vertex as u32)) {
                             accent
@@ -996,7 +1173,11 @@ fn paint_overlay(
             }
             SelectMode::Face => {
                 for face in 0..mesh.face_count() as u32 {
-                    if let Some(at) = screen.point(mesh.face_center(face)) {
+                    let center = mesh.face_center(face);
+                    if !point_visible(occluder, camera_pos, center, Some(mesh.face_normal(face))) {
+                        continue;
+                    }
+                    if let Some(at) = screen.point(center) {
                         let color = if selection.faces.contains(&face) {
                             accent
                         } else {

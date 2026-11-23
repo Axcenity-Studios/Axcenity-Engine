@@ -125,6 +125,7 @@ impl StudioDoc {
             paint: Vec::new(),
             skin: None,
             mask: Vec::new(),
+            surface: Default::default(),
         };
         // After the reference and what's inside it.
         let at = (index + 1..self.model.objects.len())

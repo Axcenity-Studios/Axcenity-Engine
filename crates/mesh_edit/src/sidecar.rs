@@ -22,6 +22,7 @@ use crate::model_doc::ModelDoc;
 use crate::modifiers::Modifier;
 use crate::paint::{PaintData, PaintSet};
 use crate::rig::{Armature, Skin};
+use crate::surface::SurfaceProperties;
 
 const VERSION: u32 = 1;
 
@@ -56,6 +57,10 @@ struct SidecarObject {
     /// Its sculpt mask: each masked vertex of `mesh` and how much (R15.1b).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     mask: Vec<(u32, f32)>,
+    /// Physical surface properties, mass/friction/bounciness overrides, and
+    /// impact decal/sound set links.
+    #[serde(default, skip_serializing_if = "SurfaceProperties::is_default")]
+    surface: SurfaceProperties,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -113,6 +118,7 @@ impl ModelDoc {
                     || !object.paint.is_empty()
                     || marked
                     || object.mask().is_some()
+                    || !object.surface.is_default()
             })
             .filter_map(|(index, object)| {
                 Some(SidecarObject {
@@ -124,6 +130,7 @@ impl ModelDoc {
                     paint: object.paint.iter().map(|set| set.data(index)).collect(),
                     skin: object.skin.clone(),
                     mask: object.mask().map_or(Vec::new(), masked),
+                    surface: object.surface.clone(),
                 })
             })
             .collect();
@@ -213,6 +220,7 @@ impl ModelDoc {
             object.mask = mask_of(&saved.mask, mesh.vertex_count());
             object.mesh = Some(mesh);
             object.modifiers = saved.modifiers;
+            object.surface = saved.surface;
             if saved.skin.is_some() {
                 object.skin = saved.skin;
             }

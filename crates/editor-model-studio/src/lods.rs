@@ -6,6 +6,7 @@
 //! (decision D3 in `docs/research/model-studio-r15.md`).
 
 use axcenity_mesh_edit::{LOD_RATIOS, MIN_LOD_RATIO};
+use axcenity_render::LOD_SCREEN_SIZES;
 use eframe::egui;
 
 use super::{Mode, StudioDoc};
@@ -99,6 +100,135 @@ impl StudioDoc {
         self.lod_rows = Some((key, rows.clone()));
         rows
     }
+
+    /// The LOD level that `screen_size` selects automatically, using the
+    /// renderer's `LOD_SCREEN_SIZES` thresholds and the active object's
+    /// available LOD copies.
+    pub fn auto_lod_level(&self, screen_size: f32) -> usize {
+        let levels = self.model.lod_copies(self.active).len() + 1;
+        if levels <= 1 {
+            return 0;
+        }
+        LOD_SCREEN_SIZES[..(levels - 1).min(LOD_SCREEN_SIZES.len())]
+            .iter()
+            .filter(|&&threshold| screen_size < threshold)
+            .count()
+    }
+
+    /// The LOD level currently drawn in the viewport (either locked via
+    /// `lod_preview` or dynamically chosen from `screen_size` in Auto mode).
+    pub fn active_lod_level(&self, screen_size: f32) -> usize {
+        match self.lod_preview {
+            Some(level) => level,
+            None => self.auto_lod_level(screen_size),
+        }
+    }
+}
+
+/// Compact floating LOD Ribbon at the top edge of the 3D viewport:
+/// `[Auto] | LOD 0 (100%) | LOD 1 (50%) | LOD 2 (25%)`, plus a subtle HUD
+/// readout in the top-right corner.
+pub(super) fn viewport_ribbon(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    doc: &mut StudioDoc,
+    screen_size: f32,
+) {
+    let palette = theme::palette(ui.ctx());
+    let rows = doc.lod_rows();
+    let full = rows.first().map_or(0, |r| r.triangles).max(1);
+    let current = doc.active_lod_level(screen_size);
+    let current_tris = rows
+        .get(current)
+        .or_else(|| rows.last())
+        .map_or(0, |r| r.triangles);
+
+    // Top-left compact LOD Ribbon pill bar
+    let ribbon_pos = rect.left_top() + egui::vec2(8.0, 8.0);
+    egui::Area::new(ui.id().with("studio lod ribbon"))
+        .fixed_pos(ribbon_pos)
+        .order(egui::Order::Foreground)
+        .show(ui.ctx(), |ui| {
+            egui::Frame::NONE
+                .fill(palette.surface.gamma_multiply(0.88))
+                .stroke(egui::Stroke::new(1.0, palette.border))
+                .corner_radius(6.0)
+                .inner_margin(egui::Margin::symmetric(6, 3))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        let auto_selected = doc.lod_preview.is_none();
+                        if ui
+                            .selectable_label(auto_selected, "Auto")
+                            .on_hover_text(
+                                "Dynamically swap LODs by camera distance (uses renderer screen-size thresholds)",
+                            )
+                            .clicked()
+                        {
+                            doc.lod_preview = None;
+                        }
+                        for row in &rows {
+                            let pct = if row.level == 0 {
+                                100.0
+                            } else {
+                                (row.triangles as f32 / full as f32 * 100.0).round()
+                            };
+                            let label = format!("LOD {} ({pct:.0}%)", row.level);
+                            let locked = doc.lod_preview == Some(row.level);
+                            let active_auto = auto_selected && current == row.level;
+                            let text = if active_auto {
+                                egui::RichText::new(label).color(palette.accent)
+                            } else {
+                                egui::RichText::new(label)
+                            };
+                            if ui
+                                .selectable_label(locked, text)
+                                .on_hover_text(format!(
+                                    "Lock viewport to LOD {} ({} triangles)",
+                                    row.level,
+                                    thousands(row.triangles)
+                                ))
+                                .clicked()
+                            {
+                                doc.lod_preview = Some(row.level);
+                            }
+                        }
+                    });
+                });
+        });
+
+    // Subtle HUD readout in the top-right corner of the viewport
+    let screen_pct = if screen_size.is_finite() {
+        format!("{:.0}%", (screen_size * 100.0).min(999.0))
+    } else {
+        "100%+".to_owned()
+    };
+    let mode_tag = if doc.lod_preview.is_some() {
+        " (Locked)"
+    } else {
+        ""
+    };
+    let hud = format!(
+        "Current: LOD {current}{mode_tag}  |  Triangles: {}  |  Screen Size: {screen_pct}",
+        thousands(current_tris),
+    );
+    let painter = ui.painter_at(rect);
+    let font = egui::FontId::proportional(11.5);
+    let galley = painter.layout_no_wrap(hud, font, palette.text_secondary);
+    let pad = egui::vec2(8.0, 4.0);
+    let box_size = galley.size() + pad * 2.0;
+    let box_rect = egui::Rect::from_min_size(
+        egui::pos2(rect.right() - box_size.x - 8.0, rect.top() + 8.0),
+        box_size,
+    );
+    painter.rect_filled(box_rect, 5.0, palette.surface.gamma_multiply(0.82));
+    painter.rect_stroke(
+        box_rect,
+        5.0,
+        egui::Stroke::new(1.0, palette.border),
+        egui::StrokeKind::Inside,
+    );
+    painter.galley(box_rect.min + pad, galley, palette.text_secondary);
 }
 
 /// The fold, under the Modifiers panel.
@@ -118,8 +248,8 @@ pub(super) fn panel(
     let mut header = egui::CollapsingHeader::new(LODS_HEADER)
         .id_salt("studio lods")
         .default_open(false);
-    // Previewing a level keeps the fold open, so it can be turned off.
-    if doc.lod_preview > 0 {
+    // Previewing a locked level keeps the fold open, so it can be turned off.
+    if doc.lod_preview.is_some_and(|level| level > 0) {
         header = header.open(Some(true));
     }
     header
@@ -217,14 +347,16 @@ fn sections(ui: &mut egui::Ui, doc: &mut StudioDoc, editable: bool, notices: &mu
     });
 
     ui.add_space(4.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label("Preview");
+        ui.selectable_value(&mut doc.lod_preview, None, "Auto")
+            .on_hover_text("Swap LODs dynamically as you zoom the camera");
         for level in 0..=LOD_RATIOS.len() {
-            ui.selectable_value(&mut doc.lod_preview, level, format!("LOD {level}"))
+            ui.selectable_value(&mut doc.lod_preview, Some(level), format!("LOD {level}"))
                 .on_hover_text(if level == 0 {
-                    "Draw the full objects"
+                    "Lock to the full objects"
                 } else {
-                    "Draw every object as its copy at this level, as the game does far away"
+                    "Lock every object to its copy at this level"
                 });
         }
     });

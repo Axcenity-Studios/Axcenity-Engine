@@ -119,6 +119,7 @@ impl ModelDoc {
                     paint: Vec::new(),
                     skin: None,
                     mask: Vec::new(),
+                    surface: Default::default(),
                 },
             );
         }
@@ -173,6 +174,100 @@ pub fn box_piece(corners: &[Vec3]) -> Option<PieceMesh> {
         .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])
         .collect();
     Some((corners, triangles))
+}
+
+/// A convex capsule around `corners`, oriented along the longest bounding-box
+/// axis, with hemispherical caps and a cylindrical barrel.
+pub fn capsule_piece(corners: &[Vec3]) -> Option<PieceMesh> {
+    let first = *corners.first()?;
+    let (min, max) = corners
+        .iter()
+        .fold((first, first), |(min, max), &p| (min.min(p), max.max(p)));
+    let center = (min + max) * 0.5;
+    let ext = (max - min).max(Vec3::splat(1e-3));
+    // Pick the longest axis as the capsule's spine.
+    let (axis, u, v, half_len, radius) = if ext.y >= ext.x && ext.y >= ext.z {
+        let r = (ext.x.max(ext.z) * 0.5).max(1e-3);
+        (Vec3::Y, Vec3::X, Vec3::Z, (ext.y * 0.5 - r).max(0.0), r)
+    } else if ext.x >= ext.y && ext.x >= ext.z {
+        let r = (ext.y.max(ext.z) * 0.5).max(1e-3);
+        (Vec3::X, Vec3::Z, Vec3::Y, (ext.x * 0.5 - r).max(0.0), r)
+    } else {
+        let r = (ext.x.max(ext.y) * 0.5).max(1e-3);
+        (Vec3::Z, Vec3::Y, Vec3::X, (ext.z * 0.5 - r).max(0.0), r)
+    };
+
+    let segs: usize = 12;
+    let cap_rings: usize = 3;
+    let mut pts = Vec::new();
+    let mut tris: Vec<[u32; 3]> = Vec::new();
+
+    // Top pole
+    let top_pole = pts.len() as u32;
+    pts.push(center + axis * (half_len + radius));
+
+    // Upper hemisphere rings (excluding pole, including equator)
+    let mut rings: Vec<Vec<u32>> = Vec::new();
+    for r_i in 1..=cap_rings {
+        let phi = (r_i as f32 / cap_rings as f32) * std::f32::consts::FRAC_PI_2;
+        let ring_r = radius * phi.sin();
+        let ring_h = half_len + radius * phi.cos();
+        let mut ring = Vec::with_capacity(segs);
+        for s in 0..segs {
+            let theta = (s as f32 / segs as f32) * std::f32::consts::TAU;
+            let p = center + axis * ring_h + (u * theta.cos() + v * theta.sin()) * ring_r;
+            ring.push(pts.len() as u32);
+            pts.push(p);
+        }
+        rings.push(ring);
+    }
+
+    // Lower hemisphere rings (starting at lower equator, excluding bottom pole)
+    for r_i in 0..cap_rings {
+        let phi = (r_i as f32 / cap_rings as f32) * std::f32::consts::FRAC_PI_2;
+        let ring_r = radius * phi.cos();
+        let ring_h = -half_len - radius * phi.sin();
+        let mut ring = Vec::with_capacity(segs);
+        for s in 0..segs {
+            let theta = (s as f32 / segs as f32) * std::f32::consts::TAU;
+            let p = center + axis * ring_h + (u * theta.cos() + v * theta.sin()) * ring_r;
+            ring.push(pts.len() as u32);
+            pts.push(p);
+        }
+        rings.push(ring);
+    }
+
+    // Bottom pole
+    let bot_pole = pts.len() as u32;
+    pts.push(center - axis * (half_len + radius));
+
+    // Top cap fan (outward winding: pole -> next -> curr since u x v = -axis? Let's verify:
+    // For Y axis: u = X, v = Z, X x Z = -Y. At theta=0 -> +X, theta=pi/2 -> +Z.
+    // From outside looking at top pole (+Y), +X to +Z is clockwise, so CCW is (pole, next, curr).
+    let first_ring = &rings[0];
+    for s in 0..segs {
+        let next = (s + 1) % segs;
+        tris.push([top_pole, first_ring[next], first_ring[s]]);
+    }
+
+    // Ring strips
+    for pair in rings.windows(2) {
+        let (a, b) = (&pair[0], &pair[1]);
+        for s in 0..segs {
+            let next = (s + 1) % segs;
+            tris.push([a[s], a[next], b[next]]);
+            tris.push([a[s], b[next], b[s]]);
+        }
+    }
+
+    // Bottom cap fan
+    let last_ring = rings.last().unwrap();
+    for s in 0..segs {
+        let next = (s + 1) % segs;
+        tris.push([bot_pole, last_ring[s], last_ring[next]]);
+    }
+
+    Some((pts, tris))
 }
 
 /// The name of the object a piece named `name` belongs to (`Rock` for

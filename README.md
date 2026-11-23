@@ -1,172 +1,121 @@
-# Axcenity Engine
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/branding/wordmark-white.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/branding/wordmark.png">
+    <img alt="Axcenity" src="assets/branding/wordmark.png" width="360">
+  </picture><sup>™</sup>
+</p>
 
-*Axcenity* is pronounced **ax-SEN-ih-tee**.
+<p align="center">
+  <strong>A free, open-source 3D game engine and editor written in Rust.</strong><br>
+  <em>Axcenity</em> is pronounced <strong>ax-SEN-ih-tee</strong>.
+</p>
 
-A free, open-source 3D game engine and editor inspired by Roblox Studio. Build worlds from parts, script them in **Luau** or with **Scratch-style blocks**, press Play to test, and export standalone games for **Windows, macOS and Linux**. Written in Rust.
+<p align="center">
+  <a href="https://axcenity.com">Website</a> ·
+  <a href="https://axcenity.com/docs">Documentation</a> ·
+  <a href="https://axcenity.com/discussions">Forums</a> ·
+  <a href="https://github.com/MrBearson321/Axcenity-Engine/releases">Releases</a>
+</p>
 
-> **Status:** early development. Every phase of the [v1 plan](plans/axcenity-engine-v1.md) has been built; the plan's unticked boxes are the checks still to do (most need a person, another OS or a GPU benchmark). Right now the player loads a project folder, runs its Lua scripts (which can pause with `task.wait` and react to parts touching with `part.Touched:Connect`), simulates physics (unanchored parts fall and collide), and draws its parts (blocks, balls, cylinders and wedges in plastic, metal, glass or neon), and you can fly around the scene. The first version of the editor opens a project and shows it in a 3D viewport, with an Explorer tree, a Properties panel and an Output panel. You can select parts, move, scale and rotate them with handles (with grid snapping), edit their properties, insert new parts, Models and Folders, rename, duplicate and delete them, drag them around the Explorer to regroup them, undo and redo all of it, and save the project. **Play** runs the game right in the editor, and **Stop** puts the world back exactly as it was. Scripts open in tabs with Lua syntax highlighting (double-click one in the Explorer, or press **Script** in the toolbar to make a new one). Edits made in VS Code show up within a second, clicking a script error in Output jumps to its line, and a damaged file is reported and skipped instead of stopping the whole project from opening. Games are split into a server side (`Script`s) and a player's side (`LocalScript`s, which can read the keyboard and move the camera), which talk through `RemoteEvent`s, as in Roblox. Shared code goes in `ModuleScript`s that scripts load with `require`, and a script stuck in an endless loop is stopped after 3 seconds with an error instead of freezing everything. Scripts can react to changes (`part.Changed`, `workspace.ChildAdded`) and run code every frame (`RunService.Heartbeat`), and **File > Set Up VS Code Autocomplete** makes VS Code autocomplete the engine's API in your scripts.
+---
 
-## Getting started
+Axcenity™ Engine is a cross-platform 3D game engine and editor inspired by Roblox Studio. Build worlds, script them in **Luau** or with **visual blocks**, test directly in the editor, and export standalone games for **Windows, macOS, and Linux**.
 
-Alpha installers are on [GitHub Releases](https://github.com/MrBearson321/Axcenity-Engine/releases): a Windows `.exe` setup wizard, a macOS `.dmg`, and Linux `.deb`, `.rpm`, `.pkg.tar.zst`, `.tar.gz` and AppImage. How to install each one: [docs/project/install.md](docs/project/install.md). Tags look like `v0.1.0-alpha.1` ([versioning](docs/project/releases.md)).
+> **Status:** Early development (alpha). Expect bugs and breaking changes between releases. For full feature overviews, guides, and API documentation, visit [axcenity.com](https://axcenity.com) and [axcenity.com/docs](https://axcenity.com/docs). Join the community on the [forums](https://axcenity.com/discussions).
 
-### Build requirements
+## Supported hardware
 
-To build from source, you need [Rust](https://rustup.rs) (`rust-toolchain.toml` pins the version, and rustup installs it on the first build), a C and C++ compiler (Luau and some dependencies are compiled from C/C++ source), and a few system libraries. Without the compiler, every crate fails with `linker 'cc' not found`.
+Axcenity renders with **wgpu** using **DirectX 12** on Windows (optional Vulkan), **Vulkan** on Linux, and **Metal** on macOS.
 
-**Windows 10 or 11**
+| | Minimum | Recommended | High end |
+|---|---|---|---|
+| **Operating system** | Windows 10 64-bit, Linux 64-bit (glibc 2.35+, e.g. Ubuntu 22.04), macOS 11 Big Sur | Windows 11 or a current Linux distribution | Windows 11 or a current Linux distribution |
+| **Processor** | 64-bit, 4 cores, AVX (or Apple silicon) | 6–8 cores (Ryzen 5 5600 / Core i5-12400 class) | 8+ fast cores (Ryzen 7 7800X3D / Core i7-13700K class) |
+| **Memory** | 8 GB RAM | 16 GB RAM | 32 GB+ RAM |
+| **Graphics** | DirectX 12 (FL 11_0+), Vulkan, or Metal GPU with 2 GB VRAM (integrated graphics supported) | Dedicated GPU with 8 GB VRAM (RX 6600 / RTX 3060 / Arc A750 class) | 12–16 GB VRAM (RX 9070 XT / RTX 4070 Ti Super or better) |
+| **Storage** | 1 GB free | SSD with 20 GB free | NVMe SSD with 50 GB free |
+| **Display** | 1280 × 720 | 1920 × 1080 | 2560 × 1440 or higher |
 
-- [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) 17.11 or later, or its Build Tools, with:
-  - the **Desktop development with C++** workload
-  - the individual component **C++ ATL for latest v143 build tools (x86 & x64)** (without it the link fails with `LNK1104: cannot open file 'atls.lib'`)
-- rustup offers to install the C++ Build Tools for you, but that doesn't include ATL, so add it in the Visual Studio Installer.
-- `curl` and `tar` (Windows 10 and 11 include both) are used to download the DXC shader compiler during the build.
+- **Platforms:** Windows 10/11 (x86-64) and Linux (x86-64, X11 or Wayland) are the primary platforms; macOS 11+ (universal Apple silicon and Intel) ships with every release. Dedicated servers run headless on Windows and Linux.
+- **Not currently supported:** 32-bit systems, Windows/Linux on Arm, Windows 7/8, mobile (Android, iOS), web browsers, and game consoles.
+- **Ray tracing (optional):** Groundwork is in place for DXR 1.1 (Windows), `VK_KHR_ray_query` (Linux), and macOS 15+ (Apple M3+), and is never required to run the engine.
 
-**macOS**
+For full details, graphics preset budgets, and network requirements, see [System requirements](documentation/reference/system-requirements.md).
 
-- The Xcode Command Line Tools: `xcode-select --install`. Nothing else is needed; graphics use Metal and audio uses Core Audio.
+## Getting the engine
 
-**Linux**
+Prebuilt alpha releases are available from [axcenity.com](https://axcenity.com) and [GitHub Releases](https://github.com/MrBearson321/Axcenity-Engine/releases):
 
-A C/C++ compiler, `pkg-config`, and development packages for ALSA (audio), libudev (gamepads) and D-Bus, plus a Vulkan driver to run the engine:
+- **Windows (x86-64):** `.exe` setup wizard
+- **macOS (Apple silicon & Intel):** universal `.dmg`
+- **Linux (x86-64):** `.deb`, `.rpm`, `.pkg.tar.zst`, portable `.tar.gz`, and `AppImage`
 
-| Distribution | Command |
-|---|---|
-| Fedora | `sudo dnf install gcc gcc-c++ pkgconf-pkg-config alsa-lib-devel systemd-devel dbus-devel libxkbcommon-devel wayland-devel mesa-vulkan-drivers vulkan-loader` |
-| Ubuntu, Debian | `sudo apt install build-essential pkg-config libasound2-dev libudev-dev libdbus-1-dev libxkbcommon-dev libwayland-dev mesa-vulkan-drivers` |
-| Arch | `sudo pacman -S --needed base-devel alsa-lib systemd-libs dbus libxkbcommon wayland vulkan-icd-loader` plus your GPU's Vulkan driver (`vulkan-radeon`, `vulkan-intel` or `nvidia-utils`) |
+Each editor download bundles the game player for Windows, macOS, and Linux so you can export standalone games for any supported desktop platform.
 
-On NVIDIA with the proprietary driver, the Vulkan driver comes with the NVIDIA driver package instead of Mesa.
+> Alpha builds are not code-signed. See [docs/project/install.md](docs/project/install.md) for platform-specific installation notes, checksum verification, and updating instructions.
 
-### Running from source
+## Building from source
 
-Once the [build requirements](#build-requirements) are installed:
+You only need to build from source if you want to modify or contribute to the engine itself. Plan for **16 GB RAM** (8 GB works with `cargo build -j 4`) and roughly **30 GB of free disk space** for build artifacts.
 
-1. Install Rust with [rustup](https://rustup.rs) if you haven't yet.
-2. From this folder, run the player with the example project:
+### Prerequisites
 
-   ```bash
-   cargo run -p axcenity-player -- examples/hello-part
-   ```
+1. **Rust:** Install [rustup](https://rustup.rs). The repository's [`rust-toolchain.toml`](rust-toolchain.toml) pins the exact Rust version and `rustup` installs it automatically on the first build.
+2. **C/C++ compiler & system libraries** (needed for Luau and native dependencies):
 
-   Try editing `examples/hello-part/world.json` (for example the block's `Color`, `Metalness` or `Roughness`) and running it again. For more log output, set `RUST_LOG=info` first. While developing, `cargo run -p axcenity-player -- --watch <project-folder>` reloads models, textures, sounds, fonts, clips and state machines in `assets/` as you save them, without restarting; built games never watch.
+   - **Windows 10 / 11:** [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) (17.11 or later) or its Build Tools with:
+     - the **Desktop development with C++** workload
+     - the individual component **C++ ATL for latest v143 build tools (x86 & x64)**
+     - `curl` and `tar` (included with Windows 10 and 11) to download the DXC shader compiler during the build.
+   - **macOS:** Xcode Command Line Tools:
+     ```bash
+     xcode-select --install
+     ```
+   - **Linux:** A C/C++ compiler, `pkg-config`, development headers for ALSA, libudev, D-Bus, libxkbcommon, and Wayland, plus a Vulkan driver:
 
-3. For every shape and material, run `examples/primitives` instead.
-4. For Lua scripting, run `examples/hello-script`. Its `scripts/build.server.lua` moves the red block and builds a row of glowing balls, and anything it `print`s appears in the terminal. Every `*.server.lua` file in a project's `scripts` folder starts when the game starts; a script error shows the file and line, and the other scripts keep running.
-5. For timed scripts, run `examples/hello-tasks`. The lamp switches between red and blue every second (`task.wait(1)` in a loop), the bar spins (`task.spawn`), and a ball appears after 3 seconds (`task.delay`), while the terminal prints `blink 1`, `blink 2`, and so on.
-6. For physics, run `examples/hello-physics`. Parts fall, stack and roll down a ramp onto an anchored floor. After 2 seconds `scripts/drop.server.lua` releases the red block (`Anchored = false`), freezes it in mid-air (`Anchored = true`), then lets it drop onto the tower, and `scripts/reset.server.lua` teleports the green ball back up every 5 seconds. Parts are unanchored by default, so add `"Anchored": true` to floors and walls in your own `world.json`.
-7. For events, run `examples/hello-touched` (the Milestone 1 demo). A red ball drops onto a pad; `scripts/pad.server.lua` connects to `pad.Touched`, so each landing changes the pad's color, makes it glow for half a second, and prints `Ball touched the pad` (a bounce counts as a second landing). A blue ball drops at 3 seconds; at 6 seconds the script calls `:Disconnect()`, and the last ball lands without any reaction.
+     | Distribution | Command |
+     |---|---|
+     | Fedora | `sudo dnf install gcc gcc-c++ pkgconf-pkg-config alsa-lib-devel systemd-devel dbus-devel libxkbcommon-devel wayland-devel mesa-vulkan-drivers vulkan-loader` |
+     | Ubuntu / Debian | `sudo apt install build-essential pkg-config libasound2-dev libudev-dev libdbus-1-dev libxkbcommon-dev libwayland-dev mesa-vulkan-drivers` |
+     | Arch | `sudo pacman -S --needed base-devel alsa-lib systemd-libs dbus libxkbcommon wayland vulkan-icd-loader` plus your GPU driver (`vulkan-radeon`, `vulkan-intel`, or `nvidia-utils`) |
 
-8. For the server/client split, run `examples/hello-remote` and hold the **arrow keys**: the blue block slides around. `scripts/keys.client.lua` is a LocalScript (it runs on the player's side, so it can read the keyboard with `UserInputService`) and sends the direction through the `MoveRequest` RemoteEvent in `ReplicatedStorage`; `scripts/mover.server.lua` is a Script (it runs on the server) and moves the block when the message arrives. Every `*.client.lua` file becomes a LocalScript.
-9. For shared code, run `examples/hello-modules`: a staircase of colored steps appears, and the terminal prints `Built 8 steps with the Builder module`. `scripts/shared/Palette.module.lua` and `Builder.module.lua` are ModuleScripts (they appear in `ReplicatedStorage`); `scripts/stairs.server.lua` loads one with `require(game.ReplicatedStorage.Builder)`, which in turn requires `Palette`. Every `*.module.lua` file becomes a ModuleScript.
-10. For change events, run `examples/hello-events`. The blue bar spins (`RunService.Heartbeat` runs every frame), the terminal prints `the ball reached the floor` (the ball's `GetPropertyChangedSignal("Position")` fires as physics moves it), `Crate was added to the Workspace` (`workspace.ChildAdded`) and `Lamp's Color changed` (`lamp.Changed`).
-11. For an imported 3D model, run `examples/hello-mesh`. The checkered pyramid is a glTF model (`assets/models/pyramid.gltf`) in two MeshParts: an anchored one the red ball rolls off (it collides as the model's shape, not its box), and a smaller one that tumbles onto the floor. The terminal prints `Ball touched the pyramid`.
-12. For animation, run `examples/hello-animation`. The green noodle is a rigged FBX model (`assets/models/noodle.fbx`: three bones, a rigid hat and three takes) with an **Animator** playing `assets/animations/noodle.controller.json`. Its default state, Locomotion, is a blend tree that mixes Idle, Walk and Run by the Number parameter Speed. `scripts/Keys.client.blocks.json` is a block script that drives it: hold **W** to walk (and **Shift** to run), press **Space** to hop and **E** to wave (Triggers, which play once from the Any State and return to Locomotion by their Return settings), or **Q** to play the Wave state directly; each state change is printed.
-13. For a character, run `examples/hello-character`. The blue body has a **ThirdPersonController**: **W A S D** (or the arrows) walk it across the floor and the camera follows behind (right-drag orbits, and the mouse wheel zooms between the controller's `CameraMinZoomDistance` and `CameraMaxZoomDistance`; set them equal to lock it). Hold **Shift** to run (`scripts/run.client.lua` sets `Movement` to `"Run"`), or press **2** and **1** to switch to running and walking from a block script (`scripts/modes.client.blocks.json`). **Space** jumps, as do **J** (Lua) and **3** (blocks). Hold **C** to crouch; **K** (Lua) toggles it, and **4** and **5** (blocks) crouch and stand. Crouch to get under the green low ceiling beyond the ramp; standing waits until the character is out. The grey step and ramp on the right are climbed; the red ones on the left are too tall or steep. The crate still falls and lands; the character is moved kinematically, never as a physics body. For first person, open it in the editor, delete `Character`'s ThirdPersonController, select `Character` and insert **First Person** (Model tab, Effects); during Play the camera sits at the character's eyes. The scripts that switch modes name the third-person controller, so they report errors in that setup.
-14. For tweens, run `examples/hello-tween`. After a second the orange block rises 4 studs and turns blue, slowing down at the end: `scripts/block.server.lua` uses `TweenService:Create` with `TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)` and prints when the tween's `Completed` fires. The menu slides in from the left, then fades out and hides after 3 seconds, from the Tweens blocks in `scripts/menu.client.blocks.json`.
-15. For rich text, run `examples/hello-rich-text`. Each label has **RichText** on, so tags in its `Text` style parts of it: "Press **E** to open" has a bold E and a red "open" (`<b>` and `<font color="#ff0000">`), and the next label shows italic, underline, strikethrough, `<uc>`, a line break, a Bangers outline and `&lt;` escapes. After a second `scripts/status.client.lua` and the block script `scripts/hint.client.blocks.json` set rich text at runtime. The last label, `<b>open`, is never closed, so it's drawn as typed and the terminal warns once.
-16. For hover, press and disabled states, run `examples/hello-buttons`. Point at **Play**: it eases to a darker blue (`transition: all 0.15s ease` in `ui.css`), the cursor becomes a hand, a click sound plays, and after a moment the tooltip "Start the game" shows. Hold it down and it shrinks to 0.95 (`#play:active`). `scripts/status.client.lua` sets the status line from `MouseEnter`, `MouseLeave` and `Activated`, and the block script `scripts/hover.client.blocks.json` prints from "when mouse enters" and "when mouse leaves". **Locked** has `Interactable` off: it's grey (`#locked:disabled`), shows the not-allowed cursor, and takes no hover or clicks.
-17. For ready-made widgets, run `examples/hello-settings`. Drag the **Volume** slider (it moves in steps of 5), click the **Fullscreen** switch, and open **Quality** to pick from its list, which is drawn over everything and closes on a click outside. Each one fires `ValueChanged`: `scripts/settings.client.lua` writes the status line and sets the **Loudness** bar's `Value` to the volume, which moves it, and the block script `scripts/settings.client.blocks.json` prints from "when *widget* value changes". `ui.css` styles their parts with `::track`, `::fill`, `::thumb`, `::list` and `::option`, and `#fullscreen:checked::track` turns the switch green while it's on.
-18. For keyboard and controller menus, run `examples/hello-menu`. Press **Tab** (or the d-pad on a game controller) to focus the name box, then the **arrow keys** to move down the menu: the buttons turn blue (`TextButton:focus` in `ui.css`), and the name box and Volume slider, which have no `:focus` rule, get the default focus ring. **Enter** (or A) clicks the focused button and `scripts/menu.client.lua` writes which one in the status line; on the slider, **left** and **right** move it. On the name box, Enter starts typing, and Enter or Escape finishes and fires `FocusLost`. Quit's `NextSelectionDown` is `playername`, so pressing down on Quit wraps round to the top. The mouse still works as before.
-19. For a UI Event Graph, run `examples/hello-ui-graph`. Click **Settings** and **Back** to switch pages, and the terminal prints `Back on the home page`. Nothing is written in Lua: `ui/Menu.uigraph.json` is the Menu ScreenGui's graph of nodes and wires, compiled at load to a LocalScript called `EventGraph`. Open it in the editor's UI Designer (**Event Graph** tab) to see and edit it.
-20. For pathfinding, run `examples/hello-agent`. The red Guard has a **NavigationAgent** whose `Destination`, set in Properties, is the yellow Goal behind the wall: it walks round the wall's end and stops there. Press **P** to send it somewhere else from Lua (`scripts/patrol.client.lua`), or **1** from blocks (`scripts/go.client.blocks.json`). **2** sends it to the green island across the gap: it stays where it is, its `Status` becomes `Unreachable`, and the terminal says no walkable route leads there. **3** and **4** set and clear a `Velocity` from blocks, and holding **V** does it from Lua: the Guard moves straight, with no path, and stops where it's left. In the editor, turn on **Viewport > Overlays > Agent Paths** to see the path it's walking during Play, and **Nav Mesh** to see where it can walk.
-21. For perception, run `examples/hello-perception`. You start hidden behind the wall from the grey Guard, whose **NavigationAgent** sees 30 studs and 90° across (`SightRange`, `SightAngle`) and hears 25 studs (`HearingRange`). Walk out to the side with **A** or **D**: it sees you, turns red, and the terminal prints `Guard: I see you!` from its `PlayerSensed` event (`scripts/watch.client.lua`). Step back behind the wall and it loses sight of you. Press **F** to whistle (a Sound in your character): it hears you through the wall, from Lua and from the block script `scripts/listen.client.blocks.json`.
-22. For behavior trees, run `examples/hello-behavior`. The grey Guard's **NavigationAgent** runs `assets/ai/Guard.behaviortree.json` (its `BehaviorTree`): it patrols between two points, and when it sees you it turns red and chases you; get out of its sight and it goes back to its rounds. In the editor, select the Guard and open **View > Behavior Tree** to see and edit the tree. The yellow Courier has no tree: `scripts/courier.server.lua` walks it back and forth by setting its `Destination`.
-23. For saves and checkpoints, run `examples/hello-saves`. Walk into the yellow coins to collect them and onto the green pad to make it your checkpoint (`scripts/coins.server.lua`, with `SaveService`). Press **K** to save to slot 1 and **L** to load it, and **R** to go back to the checkpoint, from the block script `scripts/keys.client.blocks.json`. Walk off the edge of the floor and you're back on the pad with the coins you had there. The slot is kept in your data for the game (on macOS, `~/Library/Application Support/Axcenity/Saves/Hello Saves`), never in the project, and the next run starts from it.
-24. For the graphics reference scene, run `examples/hello-graphics`: plastic, metal, glass and Neon parts, a textured PBR panel, a block tiled with a SurfaceAppearance (`TileSize`), a stretched wedge, a warm point light and a blue spot light in their lamps, sun shadows near and far, and a glowing orange ball that blooms. Its `reference.png` is what it should look like, and a test keeps it that way.
-25. For scripts inside objects, run `examples/hello-object-scripts`. The two brown doors are copies of one prefab (`assets/prefabs/Door.prefab.json`) holding a Script whose `SourceFile` is `objects/Door/Open.server.lua`: each copy runs that one file with its own `script.Parent`, so both doors slide up every three seconds and the terminal prints `FrontDoor opens` and `BackDoor opens`. The Coin in ServerStorage is a template whose script doesn't run there; `scripts/coins.server.lua` clones it three times into the Workspace, where each copy's script starts and spins it.
-26. For the default humanoid, run `examples/hello-humanoid`: three copies of the skinned character (`assets/models/Humanoid/Humanoid.glb`, from `assets/characters/humanoid`) idle, walk on the spot and wave, each an **Animator** playing a clip linked to a take in `HumanoidAnimations.glb`, a glTF file of 32 starter animations.
-
-Camera controls: hold the **right mouse button** and move the mouse to look around. **W A S D** move, **E** and **Q** go up and down, and holding **Shift** moves slowly.
-
-### The editor
+### Build and run
 
 ```bash
+git clone https://github.com/MrBearson321/Axcenity-Engine.git
+cd Axcenity-Engine
+
+# Run the editor (opens the start screen, or pass a project folder)
+cargo run -p axcenity-editor
 cargo run -p axcenity-editor -- examples/hello-touched
+
+# Run the standalone player with an example project
+cargo run -p axcenity-player -- examples/hello-part
 ```
 
-Without a project, the editor opens on its start screen: your recent projects as cards (search them, sort them, or switch to a list), **New Project** from a template (Baseplate, Empty, or a small playable game: First Person, Third Person, Vehicle, Top Down or Multiplayer Arena), a **Learn** page, and a searchable **API Reference** of every class, property, event and function scripts can use.
-
-The editor shows the project in a 3D viewport, the **Explorer** (right) lists every object from `Game` down (click the arrows to open and close branches), and the **Output** panel (bottom) shows messages, load errors, and what scripts print. Use **File > Open Project…** to open another project folder.
-
-**Panels and ribbon tabs:** every panel (Scene, Explorer, Properties, Output, Assets) is a tab you can drag, like Unity: drop it on another panel's tabs to join them, on a panel's side to split it, or anywhere else to float it. Close panels with their ×, and bring them back from **View > Panels** (or the **View** ribbon tab); **Reset Layout** puts everything back. The ribbon has Studio-style tabs. **Home** is play, the move tools, snapping and parts. **Model** is paint, materials and import. **Terrain**, **UI**, **Script**, **Test** and **View** each keep their own buttons. Press **+** after them to make your own tab from any groups; right-click it to edit or delete it. The layout and your tabs are remembered between runs.
-
-**Light cones and wind:** select a SpotLight (or the part it's in) to see its cone, the beam's direction and where it lands; **Viewport > Light Cones** shows every light's. Set the Workspace's **GlobalWind** to blow particles from emitters with **WindAffectsDrag** (and a Drag above 0) and unanchored parts with **WindAffected**.
-
-**Selecting and editing:** click a part in the viewport, or a row in the Explorer, to select it. It gets a blue box in the viewport and its row is highlighted. The **Properties** panel (under the Explorer) shows its properties: drag a number sideways to scrub it, or click it to type a value, and pick colors, materials and shapes from their controls. Changes show in the viewport immediately. **File > Save** (Ctrl+S, or Cmd+S on macOS) writes `world.json`. While there are unsaved changes the title shows a `*`, and closing or opening another project asks whether to save first.
-
-**Moving, scaling and rotating:** pick a tool in the toolbar under the menu bar, or press **1** (Move), **2** (Scale), **3** (Rotate) or **4** (Transform, all three at once with a panel for typing Position, Rotation and Size); **Escape** goes back to Select. The selected part gets handles: drag a **Move** arrow to slide it along that axis, a **Scale** ball to push or pull that face (the opposite face stays put), or a **Rotate** ring to turn it. In the Home tab's Snapping group, **Surfaces** snaps parts flush against the faces of parts near them, **Collisions** stops them going into solid parts, and **Join Surfaces** welds a moved part to what it's left touching. The cube in the viewport's top-right corner shows which way you're facing; click a face to look from that side. Handles turn yellow under the mouse. **Snap move** (studs, also used by Scale) and **Snap rotate** (degrees) in the toolbar can be switched off, and their step sizes changed by dragging or clicking the number.
-
-**Dragging parts:** with any tool, drag a part by its body (anywhere but a handle) to move it: it slides over whatever is under the mouse and rests on it, so you can drop it on the floor, stack it on another part or push it against a wall. With **Snap move** on, it lands on the 1-stud grid (or whatever step you set).
-
-**Building the tree:** the **Block**, **Sphere**, **Cylinder** and **Wedge** buttons at the right of the toolbar insert a part at the point the camera is looking at. Right-click a row in the Explorer for **Insert** (parts, **Model**, **Folder**), **Rename**, **Duplicate** and **Delete**. New things go inside the selected Model or Folder, or into the Workspace otherwise, and get a name no sibling has (`Part`, `Part2`, …). Shortcuts: **F2** renames (Enter keeps it, Escape cancels), **Ctrl+D** (Cmd+D) duplicates, **Delete** deletes. Drag a row in the Explorer onto another row to move it inside that one; rows you can't drop on show a "not allowed" cursor and the reason. Services and scripts can't be moved or copied, nothing can be put inside a script, and services can't be deleted.
-
-**Importing:** **File > Import…** (or **Import…** in the ribbon, the Assets panel or the Animation tab, or drop files onto the editor) takes models, images, sounds and prefabs. Images and sounds are copied straight in. A model is a `.gltf`, `.glb` or `.fbx` file, such as one exported from Blender, Maya or 3ds Max. It's copied into the project's `assets/models` folder and appears as a **MeshPart** at the point the camera is looking at, drawn with its own materials and textures. Move, scale, rotate, duplicate and save it like any part; in Play it falls and collides. A file that can't be loaded is reported in Output and not imported. An FBX file's textures must be next to it (or in a `textures` folder beside it) as PNG, JPEG, TGA or BMP, or be embedded in it; one that isn't is reported in Output and the model is drawn without it. A model with several objects, texture maps or animation opens the Import dialog, with Objects, Materials and Animation tabs and a summary of what Import will create. An animated FBX shows its skeleton and takes there, where you can split takes into named clips by frame; importing writes the clips and an animator controller to `assets/animations` and gives the MeshPart an **Animator**, which plays during Play.
-
-**Animation:** the **Animation** tab beside the Scene is the Animation Studio. Its Library lists the project's clips (search, New clip from any take, and Rename, Duplicate or Delete from the right-click menu). Click one to preview it on its model (drag to turn the camera, scroll to zoom), scrub its timeline, drag its start and end, and set its speed, looping, root motion (the character walks forward instead of in place) and events (named moments, such as footsteps, that fire `animator.AnimationEvent`). Changes save as you make them. Controllers open as a state machine graph, like Unity's Animator: right-click to add states and make transitions, pick each transition's conditions (on Bool, Trigger and Number parameters), blend time (Instant, Smooth or Slow), exit time, interruption and priority, and test it all in the live preview with the parameters' checkboxes, sliders and Fire buttons. Scripts drive the parameters with `animator:SetBool`, `SetNumber` and `SetTrigger`. The step bar at the top walks you through animating a model. A state can also play a **blend tree**: clips at thresholds of a Number parameter, such as Idle at 0, Walk at 2 and Run at 6 by Speed (Add Locomotion makes that one), mixed smoothly as the value changes. A state's **Return when** setting sends it back by itself (when its clip finishes, a Bool changes, a Trigger is set or some seconds pass), making the transition for you. Block scripts have an **Animation** category: set trigger, set bool, set number and play state, when an animator changes state or reaches an event, and parameter and current state reporters, so "when Space key pressed → set trigger Jump" needs no Lua.
-
-**Play and Stop:** press **▶ Play** at the left of the toolbar (or **F5**) to run the game in the viewport: scripts run, parts fall, and `print` output and script errors appear in Output. If there are unsaved changes, Play saves them first. While the game plays, the Explorer and Properties show the live world (click things to inspect them). You can change properties in the Properties panel, and the game's scripts see the change (`Changed` fires), but those changes are undone at Stop; everything else is off until Stop. **■ Stop** (or **Shift+F5**) ends the game and puts every object and property back as it was before Play. Play runs each script file as it is on disk at that moment, so you can edit scripts in another program and press Play again. If the engine itself crashes during Play, Output says so and the editor goes back to editing instead of closing; in debug builds, **Debug > Panic during Play** triggers this on purpose.
-
-**Scripts:** double-click a Script in the Explorer (under ServerScriptService) to open it in a tab above the viewport; the **World** tab goes back to the 3D view. Press **Script** in the toolbar (or right-click > Insert > Script) to make a new one: it creates `scripts/Script.server.lua` and opens it. **Ctrl+S** saves the world and every changed script (unsaved tabs show a ●), and Play saves them first too. Rename a script with **F2** in the Explorer (this renames its file); deleting one asks first, because it deletes the file. You can also edit scripts in VS Code while the editor is open: saved changes show up in the editor within a second. When a script error appears in Output, click it to open the script at that line. A damaged file (such as a broken `world.json`) is reported in Output and skipped, and the rest of the project still opens; if you save over a world file the editor couldn't load, the old one is kept as `world.backup.json`.
-
-**Server and client:** the **LocalScript** button (or right-click > Insert > LocalScript) makes `scripts/LocalScript.client.lua`, a script that runs on the player's side, in **StarterPlayer > StarterPlayerScripts**. Right-click > Insert > **RemoteEvent** adds a RemoteEvent to **ReplicatedStorage**, which is saved in `world.json` like the Workspace. If a script uses something from the wrong side, such as `UserInputService` (the keyboard) in a Script, a **⚠** appears next to it in the Explorer (and on a closed folder holding it) and on its tab; hover it, or open the script, to see why and what to do instead. During Play, the keyboard goes to LocalScripts (except while you type in a text box).
-
-**Modules and the watchdog:** the **ModuleScript** button (or right-click > Insert > ModuleScript) makes `scripts/ModuleScript.module.lua` in **ReplicatedStorage**. Put functions in its table, and use them from any Script or LocalScript with `local Utils = require(game.ReplicatedStorage.ModuleScript)`. If a script runs for 3 seconds without pausing (for example `while true do end`, a loop with no `task.wait()`), the editor freezes for those 3 seconds, then the script is stopped, Output shows the error with a link to the line, and the rest of the game keeps running.
-
-**Autocomplete in VS Code:** **File > Set Up VS Code Autocomplete** adds the engine's API to the project for the Luau extension (luau-lsp): `.axcenity/axcenity.d.luau`, `.vscode/settings.json` and `.vscode/extensions.json`. Open the project folder in VS Code and install the Luau extension when it asks; typing `Instance.new(`, `part.` or `task.` then lists what's there, Luau syntax such as `+=` and `continue` is understood, and mistakes such as `task.wiat()` are underlined (start a script with `--!strict` to also catch ones such as `part.Size = 5`). When you open the project with a newer editor, the definitions are updated.
-
-**On-screen UI:** run `examples/hello-ui` to try CSS hover/press states and a `TextButton.Activated` LocalScript. The editor previews UI while you edit and while playing; the player activates buttons on click or tap. The toolbar's **UI** group inserts frames, text, buttons and images (into a ScreenGui, made for you if there isn't one). Drag a selected element's handles in the viewport to place and size it, as in Roblox Studio, or style it with CSS: the **Style (CSS)** section of Properties lists the CSS rules that apply to it, lets you change any value in place, and **Add a style** writes a rule for that element alone. Stylesheets edited in VS Code update the viewport when you save them.
-
-**Blocks:** the toolbar's **Server Blocks** and **Client Blocks** make a block script, edited like Scratch: pick a category on the left, drag blocks from the palette onto the canvas, and snap them under an event such as "when game starts". Round and pointed reporter blocks (maths, comparisons, `pick random`, a part's property) drop into the slots of other blocks. Drag a block back to the palette to delete it, right-click it to duplicate it, and press **View as Lua** to see the Lua it becomes. If a block's code fails during Play, clicking the error in Output outlines that block in red.
-
-**Lighting and shadows:** select **Lighting** in the Explorer. Shadows are sharp near the camera and soften with distance from what casts them; **ShadowSoftness** (0 is crisp) sets how much, and **ShadowsEnabled** turns them off. Turn off a part's **CastShadow** to stop it casting one.
-
-**Sound:** insert a Sound into a part, pick its file with the folder button next to **SoundId** (it's copied into `assets/audio`), and press ▶ to hear it without playing the game. Turn on **Playing** to start it with the game, and change **Volume** or **PlaybackSpeed** while it plays. Scripts and blocks can play, stop, pause and resume it, and `Ended` fires when it finishes.
-
-**Building a game:** use **File > Build Game** to create a single `game.axgame` plus a player executable and `LICENSES.txt`. The current-OS player must be beside the editor. To build for another OS, provide its player executable under `players/windows`, `players/macos` or `players/linux` beside the editor. Cross-OS builds cannot be run on the build machine unless it can run that OS.
-
-**Undo and redo:** **Ctrl+Z** undoes and **Ctrl+Y** (or Ctrl+Shift+Z) redoes, also under the **Edit** menu, which names the step ("Undo Move Pad"). A whole drag or a typed name is one step. Saving keeps the history, so you can still undo after saving.
-
-In the viewport, the player's camera controls work while the mouse is over it, plus: the **mouse wheel** zooms, **middle-drag** pans, and **Alt + left-drag** orbits around the point you're looking at. To fly faster or slower, scroll with **Shift** held, or scroll while holding the **right mouse button**; the new speed pops up in the middle of the viewport.
-
-Useful commands:
+Common workspace commands:
 
 | Task | Command |
 |---|---|
 | Build everything | `cargo build --workspace` |
+| Release build | `cargo build --workspace --release` |
 | Run tests | `cargo nextest run --workspace` (or `cargo test --workspace`) |
-| After changing dependencies | `cargo hakari generate` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format | `cargo fmt --all` |
+| Update workspace-hack after dependency changes | `cargo hakari generate` |
 
-System packages for each OS are listed under [Build requirements](#build-requirements). Install the test runner and the workspace-hack tool with `cargo install cargo-nextest cargo-hakari --locked`; [docs/development.md](docs/development.md) explains both and how to keep builds fast on a laptop.
+See [docs/development.md](docs/development.md) for development setup details and tips for faster local builds.
 
-### Changing the engine while it runs
+## License and trademark
 
-Game files reload while the game runs, in any editor: save a script during Play and it runs its new code with its state kept, and a changed model, texture, sound or clip swaps in (see [docs/editor/scripts.md](docs/editor/scripts.md)).
-
-For the engine's own Rust code, build the editor with the dev-only `engine-dev` feature:
-
-```bash
-cargo run -p axcenity-editor --features engine-dev -- examples/hello-touched
-```
-
-Turn on **Settings > Engine > Rebuild when engine code changes**, and each saved change to `crates/` rebuilds the editor in the background; **Relaunch** then starts the new one with the same project, unsaved edits, camera, selection and Play. Editors built without the feature, release builds and the player have none of this.
-
-## Project layout
-
-- `crates/`: the engine, split into focused crates (see [docs/architecture.md](docs/architecture.md))
-- `examples/`: example project folders
-- `assets/branding/`: the engine's logo and icons
-- `definitions/`: the luau-lsp definitions for the script API (generated)
-- `docs/`: design notes per subsystem
-- `prd/`: the product requirements for v1
-- `plans/`: the phase-by-phase implementation plan
-
-## License
+### License
 
 Axcenity Engine is licensed under the [Apache License 2.0](LICENSE).
 
-- **Your games are yours.** Games you make with Axcenity belong entirely to you: no royalties, no fees, sell or share them however you like. Exported games include a credits file with the engine's [NOTICE](NOTICE); the export tool adds it for you.
-- **Forks are welcome.** You may fork and modify the engine freely. Keep the `LICENSE` and `NOTICE` files, mark files you changed, and give your fork its own name. The Apache License does not grant use of the Axcenity name.
-- **macOS builds are unsigned.** To open an export, Control-click `AxcenityPlayer.app`, choose **Open**, then confirm. If macOS still blocks it, use **System Settings > Privacy & Security > Open Anyway** after checking that you trust the source.
+- **Your games are yours.** Games you create with Axcenity belong entirely to you—no royalties and no fees. Sell or distribute them however you choose. Exported games automatically include a credits file containing the engine's [NOTICE](NOTICE).
+- **Forks are welcome.** You may fork and modify the engine freely under the Apache License 2.0. Keep the `LICENSE` and `NOTICE` files, mark any files you modify, and distribute your fork under a different name.
+
+### Pending trademark
+
+**Axcenity™** and **Axcenity Engine™** (the word marks) are pending trademarks of Paul Janota. Trademark protection is claimed **only for the words**, not for the Axcenity geometric logo mark. The Apache License 2.0 does not grant permission to use the Axcenity name or trademarks, except as required for reasonable and customary use in describing the origin of the work and reproducing the content of the `NOTICE` file.

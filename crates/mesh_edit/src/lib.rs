@@ -92,6 +92,7 @@ mod sidecar;
 mod solid;
 #[cfg(test)]
 mod studio_tests;
+pub mod surface;
 #[cfg(test)]
 mod tests;
 pub mod uv;
@@ -110,7 +111,8 @@ pub use group::{
 pub use half_edge::{EditMesh, Face, HalfEdge, Polygon};
 pub use low_poly::{decimate_to, relax};
 pub use model_doc::{
-    DocObject, LOD_RATIOS, MIN_LOD_RATIO, ModelDoc, PIECE_COLOR, PieceMesh, box_piece, from_model,
+    DocObject, LOD_RATIOS, MIN_LOD_RATIO, ModelDoc, PIECE_COLOR, PieceMesh, box_piece,
+    capsule_piece, from_model,
 };
 pub use modifiers::{
     Axis, Evaluated, MAX_COPIES, MAX_LEVELS, Modifier, ModifierKind, Purpose, clip, evaluate,
@@ -126,6 +128,7 @@ pub use sculpt::{MeshFilter, Sculpt, subdivide, voxel_remesh};
 pub use select::{SelectMode, Selection, edge_loop, face_loop};
 pub use sidecar::sidecar_path;
 pub use solid::{Combined, Solid, combine, combine_parts, save_pieces, save_union, solid_of};
+pub use surface::{SurfacePreset, SurfaceProperties};
 pub use uv::{
     AlignAxis, Projection, Stretch, average_island_scale, overlapping_islands, pack_islands,
     project, smart_project, stretch, unwrap, uv_islands,

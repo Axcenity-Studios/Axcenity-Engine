@@ -13,9 +13,9 @@ use axcenity_mesh_edit::{ModelDoc, paint_folder, sidecar_path};
 use eframe::egui_wgpu::RenderState;
 
 use super::*;
-use crate::asset_browser::AssetKind;
+use crate::asset_browser::{AssetKind, AssetPayload};
 use crate::history::BlobChange;
-use crate::model_studio::{StudioAction, StudioDoc};
+use crate::model_studio::{MaterialDropTarget, StudioAction, StudioDoc};
 
 impl EditorApp {
     pub(in crate::app) fn model_studio_pane(
@@ -35,10 +35,30 @@ impl EditorApp {
         };
         let models = of_kind(&[AssetKind::Model]);
         self.model_studio.images = of_kind(&[AssetKind::Image, AssetKind::Texture]);
+        // Forward dragged/dropped material assets from the Assets panel.
+        let dragged_mat = egui::DragAndDrop::payload::<AssetPayload>(ui.ctx())
+            .filter(|payload| {
+                payload.0.kind == AssetKind::Material
+                    || payload.0.path.ends_with(".material.json")
+                    || payload.0.path.ends_with(".vmat")
+            })
+            .map(|payload| payload.0.path.clone());
+        let pointer_released = ui.input(|i| i.pointer.any_released());
+        self.model_studio.dragged_material = dragged_mat.clone();
+        self.model_studio.dropped_material = if pointer_released && dragged_mat.is_some() {
+            dragged_mat
+        } else {
+            None
+        };
         let editable = self.project.is_some() && !self.playing();
         let actions = self
             .model_studio
             .show(ui, render_state, &models, self.snap, editable);
+        if self.model_studio.dropped_material.is_none() && pointer_released {
+            let _ = egui::DragAndDrop::take_payload::<AssetPayload>(ui.ctx());
+        }
+        self.model_studio.dragged_material = None;
+        self.model_studio.dropped_material = None;
         for notice in std::mem::take(&mut self.model_studio.notices) {
             self.output.info(notice);
         }
@@ -80,7 +100,39 @@ impl EditorApp {
                 }
                 self.open_in_model_studio(&path);
             }
+            StudioAction::ApplyMaterialAsset { path, target } => {
+                self.apply_material_asset_to_studio(&path, target);
+            }
         }
+    }
+
+    /// Loads a `.material.json` (or `.vmat`) asset and applies it to a Model
+    /// Studio material slot or face selection.
+    fn apply_material_asset_to_studio(&mut self, path: &str, target: MaterialDropTarget) {
+        let name = std::path::Path::new(path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Material")
+            .trim_end_matches(".material")
+            .to_owned();
+        let mut model_mat = axcenity_assets::ModelMaterial {
+            name,
+            ..axcenity_assets::ModelMaterial::default()
+        };
+        if let Some(mat) = self.assets.material(path) {
+            model_mat.base_color = [mat.color[0], mat.color[1], mat.color[2], mat.opacity];
+            model_mat.metalness = mat.metalness;
+            model_mat.roughness = mat.roughness;
+            model_mat.emissive = [
+                mat.emissive_color[0] * mat.emissive_strength,
+                mat.emissive_color[1] * mat.emissive_strength,
+                mat.emissive_color[2] * mat.emissive_strength,
+            ];
+            model_mat.double_sided = mat.double_sided;
+            model_mat.uv_scale = mat.tiling;
+            model_mat.uv_offset = mat.offset;
+        }
+        self.model_studio.apply_loaded_material(target, model_mat);
     }
 
     /// Opens the model at `mesh_id` (a project path or asset ID, maybe

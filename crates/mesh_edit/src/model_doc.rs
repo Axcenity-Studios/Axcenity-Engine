@@ -32,7 +32,7 @@ use serde_json::{Value, json};
 
 mod collision;
 
-pub use collision::{PIECE_COLOR, PieceMesh, box_piece};
+pub use collision::{PIECE_COLOR, PieceMesh, box_piece, capsule_piece};
 
 use crate::glb::{File, Vertices};
 use crate::half_edge::{EditMesh, Polygon, newell};
@@ -40,6 +40,7 @@ use crate::modifiers::{Modifier, ModifierKind, Purpose, evaluate};
 use crate::paint::PaintSet;
 use crate::primitives::PrimitiveSettings;
 use crate::rig::{Armature, Skin, vertex_skinning};
+use crate::surface::SurfaceProperties;
 
 /// The share of triangles Generate LODs keeps in `_LOD1` and `_LOD2`, as
 /// the renderer's own simplified copies do.
@@ -76,9 +77,28 @@ pub struct DocObject {
     /// (masked). Empty when nothing was masked. A `.glb` can't hold it, so
     /// it's kept in the sidecar; see [`DocObject::mask`].
     pub mask: Vec<f32>,
+    /// Physical surface properties preset, mass/friction/bounciness overrides,
+    /// and impact decal/sound set links (kept in the sidecar).
+    pub surface: SurfaceProperties,
 }
 
 impl DocObject {
+    /// Bounding-box volume of the object's evaluated mesh (in cubic units),
+    /// used to auto-calculate mass from its surface preset's density.
+    pub fn bounding_box_volume(&self) -> f32 {
+        let Some(mesh) = self.evaluated(Purpose::Export) else {
+            return 0.0;
+        };
+        let positions = mesh.positions();
+        let Some(&first) = positions.first() else {
+            return 0.0;
+        };
+        let (min, max) = positions
+            .iter()
+            .fold((first, first), |(lo, hi), &p| (lo.min(p), hi.max(p)));
+        let ext = max - min;
+        (ext.x * ext.y * ext.z).max(0.0)
+    }
     /// Its mask, if something is masked and the mask still fits its mesh
     /// (an operation that changed the vertices leaves it behind).
     pub fn mask(&self) -> Option<&[f32]> {
@@ -127,6 +147,7 @@ impl ModelDoc {
                 paint: Vec::new(),
                 skin: None,
                 mask: Vec::new(),
+                surface: SurfaceProperties::default(),
             }],
             armature: None,
         }
@@ -183,6 +204,7 @@ impl ModelDoc {
                 paint: Vec::new(),
                 skin,
                 mask: Vec::new(),
+                surface: SurfaceProperties::default(),
             });
         }
         if objects.iter().all(|object| object.mesh.is_none()) {

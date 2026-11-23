@@ -125,6 +125,7 @@ struct TexelCache {
     revision: u64,
     mesh: EditMesh,
     map: TexelMap,
+    occluder: axcenity_mesh_edit::Reference,
 }
 
 /// A stroke under way.
@@ -159,9 +160,13 @@ impl PaintState {
         self.slot = 0;
     }
 
-    /// The texel map for `doc`'s active object and the slot, built if the
-    /// mesh changed since.
-    fn texels(&mut self, doc: &StudioDoc, size: u32) -> Option<&TexelMap> {
+    /// The texel map and occlusion BVH for `doc`'s active object and the
+    /// slot, built if the mesh changed since.
+    fn texels_and_occluder(
+        &mut self,
+        doc: &StudioDoc,
+        size: u32,
+    ) -> Option<(&TexelMap, &axcenity_mesh_edit::Reference)> {
         let mesh = doc.mesh()?;
         let fresh = self.texels.as_ref().is_some_and(|cache| {
             cache.object == doc.active
@@ -177,11 +182,18 @@ impl PaintState {
                 revision: doc.revision,
                 mesh: mesh.clone(),
                 map: TexelMap::build(mesh, self.slot, size),
+                occluder: axcenity_mesh_edit::Reference::new(mesh),
             });
         }
         let cache = self.texels.as_mut()?;
         cache.revision = doc.revision;
-        Some(&cache.map)
+        Some((&cache.map, &cache.occluder))
+    }
+
+    /// The texel map for `doc`'s active object and the slot, built if the
+    /// mesh changed since.
+    fn texels(&mut self, doc: &StudioDoc, size: u32) -> Option<&TexelMap> {
+        self.texels_and_occluder(doc, size).map(|(map, _)| map)
     }
 
     /// The pen's pressure from this frame's touches (kept while it's down).
@@ -441,7 +453,7 @@ impl ModelStudio {
         let Some(doc) = &self.doc else {
             return;
         };
-        let Some(texels) = self.paint.texels(doc, size) else {
+        let Some((texels, occluder)) = self.paint.texels_and_occluder(doc, size) else {
             return;
         };
         let hit_uv = texels.uv_at(face, point);
@@ -469,7 +481,15 @@ impl ModelStudio {
                 };
                 dab.with_symmetry(symmetry)
                     .iter()
-                    .flat_map(|copy| texels.touches(copy, falloff, &project))
+                    .flat_map(|copy| {
+                        texels.touches_visible(
+                            copy,
+                            falloff,
+                            Some(ray.origin),
+                            Some(occluder),
+                            &project,
+                        )
+                    })
                     .collect()
             }
         };

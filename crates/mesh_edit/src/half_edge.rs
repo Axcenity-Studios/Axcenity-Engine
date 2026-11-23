@@ -209,6 +209,19 @@ impl EditMesh {
         &self.faces[face as usize]
     }
 
+    /// Assigns `face` to material slot `slot`. Returns `true` if the face's
+    /// slot changed.
+    pub fn set_face_material(&mut self, face: u32, slot: u32) -> bool {
+        let Some(f) = self.faces.get_mut(face as usize) else {
+            return false;
+        };
+        if f.material == slot {
+            return false;
+        }
+        f.material = slot;
+        true
+    }
+
     /// Auto smooth's angle in radians, if it's on.
     pub fn auto_smooth(&self) -> Option<f32> {
         self.auto_smooth

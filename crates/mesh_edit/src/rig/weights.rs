@@ -306,15 +306,18 @@ pub enum WeightTool {
     Subtract,
     /// The active bone's weight toward its neighbours' average.
     Smooth,
+    /// Scales touched vertices' weights smoothly toward sum = 1.0.
+    Normalize,
     /// Every bone's weight toward its neighbours' average.
     Blur,
 }
 
 impl WeightTool {
-    pub const ALL: [WeightTool; 4] = [
+    pub const ALL: [WeightTool; 5] = [
         WeightTool::Add,
         WeightTool::Subtract,
         WeightTool::Smooth,
+        WeightTool::Normalize,
         WeightTool::Blur,
     ];
 
@@ -323,6 +326,7 @@ impl WeightTool {
             WeightTool::Add => "Add",
             WeightTool::Subtract => "Subtract",
             WeightTool::Smooth => "Smooth",
+            WeightTool::Normalize => "Normalize",
             WeightTool::Blur => "Blur",
         }
     }
@@ -430,6 +434,15 @@ impl WeightPainter {
                     WeightTool::Smooth => {
                         set(&mut list, bone, old + (mean(vertex, bone) - old) * f)
                     }
+                    WeightTool::Normalize => {
+                        let total: f32 = list.iter().map(|&(_, w)| w).sum();
+                        if total > 1e-6 {
+                            for (_, w) in &mut list {
+                                let target = *w / total;
+                                *w += (target - *w) * f;
+                            }
+                        }
+                    }
                     WeightTool::Blur => {
                         let mut bones: Vec<usize> = list.iter().map(|&(b, _)| b as usize).collect();
                         for &v in &self.neighbours[vertex] {
@@ -443,7 +456,7 @@ impl WeightPainter {
                         }
                     }
                 }
-                if brush.auto_normalize {
+                if brush.auto_normalize && brush.tool != WeightTool::Normalize {
                     normalize_keeping(&mut list, (brush.tool != WeightTool::Blur).then_some(bone));
                 }
                 list.sort_by_key(|&(b, _)| b);

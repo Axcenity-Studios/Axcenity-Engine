@@ -7,7 +7,7 @@
 //! whose `CollisionFidelity` is Default collides as them (decision D2 in
 //! `docs/research/model-studio-r15.md`).
 
-use axcenity_mesh_edit::{PieceMesh, box_piece};
+use axcenity_mesh_edit::{PieceMesh, box_piece, capsule_piece};
 use axcenity_render::glam::Vec3;
 use eframe::egui;
 
@@ -26,6 +26,8 @@ pub const DEFAULT_PIECES: u32 = 8;
 pub enum CollisionShape {
     /// The box around the object.
     Box,
+    /// A convex capsule aligned to the object's longest axis.
+    Capsule,
     /// One convex hull of its corners.
     Hull,
     /// At most this many convex pieces following its hollows.
@@ -36,6 +38,7 @@ impl CollisionShape {
     fn label(self) -> &'static str {
         match self {
             CollisionShape::Box => "Generate Box Collision",
+            CollisionShape::Capsule => "Generate Capsule Collision",
             CollisionShape::Hull => "Generate Hull Collision",
             CollisionShape::Pieces(_) => "Generate Convex Pieces",
         }
@@ -58,6 +61,7 @@ impl StudioDoc {
         };
         let pieces: Vec<PieceMesh> = match shape {
             CollisionShape::Box => box_piece(&corners).into_iter().collect(),
+            CollisionShape::Capsule => capsule_piece(&corners).into_iter().collect(),
             CollisionShape::Hull => axcenity_physics::convex_hull_mesh(&array)
                 .map(to_piece)
                 .into_iter()
@@ -168,6 +172,20 @@ fn sections(ui: &mut egui::Ui, doc: &mut StudioDoc, editable: bool, notices: &mu
                 .clicked()
             {
                 generate = Some(CollisionShape::Box);
+            }
+            if ui
+                .add(widgets::button(
+                    Role::Secondary,
+                    Some(icons::CIRCLE),
+                    "Capsule",
+                    &palette,
+                ))
+                .on_hover_text(
+                    "One capsule aligned to its longest axis: smooth for characters and cylinders",
+                )
+                .clicked()
+            {
+                generate = Some(CollisionShape::Capsule);
             }
             if ui
                 .add(widgets::button(

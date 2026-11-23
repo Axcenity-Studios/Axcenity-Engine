@@ -248,13 +248,58 @@ impl TexelMap {
         falloff: BrushFalloff,
         project: &dyn Fn(Vec3) -> Option<Vec2>,
     ) -> Vec<Touch> {
+        self.touches_visible(dab, falloff, None, None, project)
+    }
+
+    /// Like [`TexelMap::touches`], plus optional camera backface culling
+    /// (`view_origin`) and surface occlusion testing (`occluder`). Rejects
+    /// any texel whose surface normal faces away from `view_origin` or that
+    /// is occluded by closer geometry along the ray to `view_origin`.
+    pub fn touches_visible(
+        &self,
+        dab: &Dab,
+        falloff: BrushFalloff,
+        view_origin: Option<Vec3>,
+        occluder: Option<&crate::Reference>,
+        project: &dyn Fn(Vec3) -> Option<Vec2>,
+    ) -> Vec<Touch> {
         let radius = dab.radius.max(1e-6);
+        let mirrored_view = view_origin.map(|origin| {
+            let mut v = origin;
+            for axis in 0..3 {
+                if dab.mirror[axis] {
+                    v[axis] = -v[axis];
+                }
+            }
+            v
+        });
+        let bias = occluder
+            .map(|r| (r.size() * 2e-3).max(1e-4))
+            .unwrap_or(1e-4);
         self.near(dab.center, radius)
             .into_iter()
             .filter_map(|(texel, place, normal, triangle)| {
                 let facing = normal.dot(dab.normal);
                 if facing <= 0.0 {
                     return None;
+                }
+                if let Some(eye) = mirrored_view {
+                    let to_eye = eye - place;
+                    let dist = to_eye.length();
+                    if dist > 1e-6 {
+                        let dir = to_eye / dist;
+                        // Backface culling: reject surfaces facing away from the camera.
+                        if normal.dot(dir) <= 0.0 {
+                            return None;
+                        }
+                        // Occlusion / depth check: reject surfaces hidden behind closer geometry.
+                        if let Some(bvh) = occluder {
+                            let limit = (dist - bias * 2.0).max(0.0);
+                            if limit > 0.0 && bvh.occluded(place + normal * bias, dir, limit) {
+                                return None;
+                            }
+                        }
+                    }
                 }
                 // Full strength up to 45° off, none side-on.
                 let facing = (facing / std::f32::consts::FRAC_1_SQRT_2).min(1.0);
