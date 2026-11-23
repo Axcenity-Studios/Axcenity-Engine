@@ -1,10 +1,8 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/branding/wordmark-white.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/branding/wordmark.png">
-    <img alt="Axcenity" src="assets/branding/wordmark.png" width="360">
-  </picture><sup>™</sup>
+  <img alt="Axcenity logo" src="assets/branding/icon.png" width="120">
 </p>
+
+<h1 align="center">Axcenity™</h1>
 
 <p align="center">
   <strong>A free, open-source 3D game engine and editor written in Rust.</strong><br>
