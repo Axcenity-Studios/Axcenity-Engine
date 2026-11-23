@@ -16,14 +16,14 @@ use crate::lua::{self, Expr, ExprKind, FunctionBody, Stat, StatKind, SyntaxError
 use crate::{
     ATMOSPHERE_NUMBERS, Block, BlockKind, BlockScript, BlockShape, CAMERA_TYPES, Comparison,
     EASING_DIRECTIONS, EASING_STYLES, Expression, GRAPHICS_NUMBERS, GRAPHICS_OPTIONS,
-    GRAPHICS_QUALITIES, GRAPHICS_SWITCHES, LogicOp, MathFunction, MathOp, PRESET, SIGNAL_METHODS,
-    TONE_MAPPINGS, TableField, binary_priority, block_lua, expression_lua, graphics_choices,
-    needs_brackets, translate,
+    GRAPHICS_QUALITIES, GRAPHICS_SWITCHES, LIGHTING_PROPERTIES, LogicOp, MATERIALS, MathFunction,
+    MathOp, ObjectRef, PRESET, SIGNAL_METHODS, TONE_MAPPINGS, TableField, binary_priority,
+    block_lua, expression_lua, graphics_choices, needs_brackets, translate,
 };
 
 /// The services blocks get with `game:GetService`, which the translation
 /// declares at the top itself when blocks need them.
-const SERVICES: [&str; 14] = [
+const SERVICES: [&str; 16] = [
     "UserInputService",
     "RunService",
     "Debris",
@@ -38,6 +38,8 @@ const SERVICES: [&str; 14] = [
     "DataService",
     "ConsoleService",
     "DataLayerService",
+    "CollectionService",
+    "Players",
 ];
 
 /// Why some Lua couldn't become blocks.
@@ -172,7 +174,9 @@ fn variable_declaration(stat: &Stat) -> Option<String> {
             if names.len() == 1
                 && crate::valid_identifier(&names[0])
                 && values.len() == 1
-                && matches!(values[0].kind, ExprKind::Number(Some(value)) if value == 0.0) =>
+                && (matches!(values[0].kind, ExprKind::Number(Some(value)) if value == 0.0)
+                    || (names[0] == "_connections"
+                        && matches!(&values[0].kind, ExprKind::Table(fields) if fields.is_empty()))) =>
         {
             Some(names[0].clone())
         }
@@ -220,8 +224,14 @@ fn used_by(script: &BlockScript) -> (BTreeSet<String>, BTreeSet<String>) {
             Expression::KeyDown { .. } => {
                 services.insert("UserInputService".to_owned());
             }
-            Expression::DataRow { .. } => {
+            Expression::DataRow { .. } | Expression::DataTableRowCount { .. } => {
                 services.insert("DataService".to_owned());
+            }
+            Expression::SlotExists { .. } => {
+                services.insert("SaveService".to_owned());
+            }
+            Expression::IsHost | Expression::IsConnected => {
+                services.insert("NetworkService".to_owned());
             }
             Expression::LayerActive { .. } => {
                 services.insert("DataLayerService".to_owned());
@@ -237,8 +247,22 @@ fn used_by(script: &BlockScript) -> (BTreeSet<String>, BTreeSet<String>) {
             BlockKind::SetVariable { name, .. } | BlockKind::ChangeVariable { name, .. } => {
                 variables.insert(name.clone());
             }
-            BlockKind::WhenKeyPressed { .. } => {
+            BlockKind::WhenKeyPressed { .. } | BlockKind::WhenKeyReleased { .. } => {
                 services.insert("UserInputService".to_owned());
+            }
+            BlockKind::WhenPlayerJoins { .. }
+            | BlockKind::WhenPlayerLeaves { .. }
+            | BlockKind::WhenCharacterSpawns { .. }
+            | BlockKind::WhenPlayerDies { .. } => {
+                services.insert("Players".to_owned());
+            }
+            BlockKind::WhenTagAdded { .. }
+            | BlockKind::WhenTagRemoved { .. }
+            | BlockKind::ForEachTagged { .. } => {
+                services.insert("CollectionService".to_owned());
+            }
+            BlockKind::DestroyScript => {
+                variables.insert("_connections".to_owned());
             }
             BlockKind::EveryFrame { .. }
             | BlockKind::BeforePhysics { .. }
@@ -260,8 +284,13 @@ fn used_by(script: &BlockScript) -> (BTreeSet<String>, BTreeSet<String>) {
             kind if kind.networks() => {
                 services.insert("NetworkService".to_owned());
             }
-            BlockKind::SendChatMessage { .. } | BlockKind::ShowSystemMessage { .. } => {
+            BlockKind::SendChatMessage { .. }
+            | BlockKind::ShowSystemMessage { .. }
+            | BlockKind::WhenChatMessageReceived { .. } => {
                 services.insert("TextChatService".to_owned());
+            }
+            BlockKind::ForEachRow { .. } => {
+                services.insert("DataService".to_owned());
             }
             BlockKind::WhenLayerChanged { .. } | BlockKind::SetLayerActive { .. } => {
                 services.insert("DataLayerService".to_owned());
@@ -410,8 +439,29 @@ impl<'a> Converter<'a> {
     /// What `stat` is at the top level if it's a stack of its own: an event
     /// block that writes the same code, or else a signal connection.
     fn top_event(&self, stat: &Stat) -> Option<Block> {
+        let compare_span = match &stat.kind {
+            StatKind::Call(Expr {
+                kind: ExprKind::Call(function, args),
+                ..
+            }) if self.variables.contains("_connections")
+                && self.is_field(function, "table", "insert") =>
+            {
+                match args.as_slice() {
+                    [
+                        Expr {
+                            kind: ExprKind::Name(list),
+                            ..
+                        },
+                        inner,
+                    ] if list == "_connections" => inner.span.clone(),
+                    _ => stat.span.clone(),
+                }
+            }
+            _ => stat.span.clone(),
+        };
         if let Some(event) = self.event(stat)
-            && self.writes_statement(&event, stat, false)
+            && block_lua(&event, false)
+                .is_ok_and(|written| lua::same_code(&self.source[compare_span.clone()], &written))
         {
             return Some(event);
         }
@@ -422,7 +472,9 @@ impl<'a> Converter<'a> {
             params,
             body,
         });
-        self.writes_statement(&event, stat, false).then_some(event)
+        block_lua(&event, false)
+            .is_ok_and(|written| lua::same_code(&self.source[compare_span], &written))
+            .then_some(event)
     }
 
     /// `signal:Connect(function(params) ... end)`, as its pieces.
@@ -477,6 +529,22 @@ impl<'a> Converter<'a> {
         let StatKind::Call(call) = &stat.kind else {
             return None;
         };
+        let mut call = call;
+        // Unwrap `table.insert(_connections, <event>)` emitted when DestroyScript is used.
+        if self.variables.contains("_connections")
+            && let ExprKind::Call(function, args) = &call.kind
+            && self.is_field(function, "table", "insert")
+            && let [
+                Expr {
+                    kind: ExprKind::Name(list),
+                    ..
+                },
+                inner,
+            ] = args.as_slice()
+            && list == "_connections"
+        {
+            call = inner;
+        }
         // task.spawn(function() ... end)
         if let ExprKind::Call(function, args) = &call.kind
             && self.is_field(function, "task", "spawn")
@@ -500,6 +568,7 @@ impl<'a> Converter<'a> {
             return Some(Block::new(BlockKind::WhenCommandRun {
                 command: self.expression(command, scope),
                 help: self.expression(help, scope),
+                admin_only: None,
                 body: self.body(&function.body, scope),
             }));
         }
@@ -566,13 +635,25 @@ impl<'a> Converter<'a> {
                 {
                     return None;
                 }
-                Some(Block::new(BlockKind::WhenTouched { part, body }))
+                Some(Block::new(BlockKind::WhenTouched {
+                    part,
+                    filter: String::new(),
+                    filter_value: None,
+                    cooldown: None,
+                    body,
+                }))
             }
             "StreamedIn" => {
                 let target = self.target(object)?;
                 let function = self.handler(handler, 0)?;
                 let body = self.body(&function.body, Scope::default());
                 Some(Block::new(BlockKind::WhenStreamedIn { target, body }))
+            }
+            "StreamedOut" => {
+                let target = self.target(object)?;
+                let function = self.handler(handler, 0)?;
+                let body = self.body(&function.body, Scope::default());
+                Some(Block::new(BlockKind::WhenStreamedOut { target, body }))
             }
             "Triggered" | "MouseClick" => {
                 let target = self.target(object)?;
@@ -581,11 +662,13 @@ impl<'a> Converter<'a> {
                 Some(Block::new(if event == "Triggered" {
                     BlockKind::WhenPromptTriggered {
                         prompt: target,
+                        cooldown: None,
                         body,
                     }
                 } else {
                     BlockKind::WhenPartClicked {
                         detector: target,
+                        cooldown: None,
                         body,
                     }
                 }))
@@ -630,7 +713,6 @@ impl<'a> Converter<'a> {
             "ConnectionFailed" if self.is_service(object, "NetworkService") => {
                 let function = self.handler(handler, 1)?;
                 let body = self.body(&function.body, Scope::default());
-                // The blocks can't use the reason.
                 if function
                     .params
                     .iter()
@@ -639,6 +721,18 @@ impl<'a> Converter<'a> {
                     return None;
                 }
                 Some(Block::new(BlockKind::WhenConnectionFails { body }))
+            }
+            "MessageReceived" if self.is_service(object, "TextChatService") => {
+                let function = self.handler(handler, 1)?;
+                let body = self.body(&function.body, Scope::default());
+                if function
+                    .params
+                    .iter()
+                    .any(|param| code_mentions(&body, param))
+                {
+                    return None;
+                }
+                Some(Block::new(BlockKind::WhenChatMessageReceived { body }))
             }
             "Completed" => {
                 let sequence = self.target(object)?;
@@ -664,8 +758,39 @@ impl<'a> Converter<'a> {
                 Some(Block::new(BlockKind::WhenStateChanged { animator, body }))
             }
             "LayerChanged" if self.is_service(object, "DataLayerService") => {
-                let (data_layer, body) = self.one_name_branch(handler)?;
-                Some(Block::new(BlockKind::WhenLayerChanged { data_layer, body }))
+                if let Some((data_layer, body)) = self.one_name_branch(handler) {
+                    return Some(Block::new(BlockKind::WhenLayerChanged { data_layer, body }));
+                }
+                let function = self.handler(handler, 2)?;
+                let param = function.params.first()?;
+                if let [
+                    Stat {
+                        kind: StatKind::If { arms, otherwise },
+                        ..
+                    },
+                ] = function.body.as_slice()
+                    && let ([(condition, inner)], None) = (arms.as_slice(), otherwise)
+                    && let ExprKind::Binary("==", left, right) = &condition.kind
+                    && let (ExprKind::Name(name), ExprKind::Str(value)) = (&left.kind, &right.kind)
+                    && name == param
+                {
+                    let body = self.body(inner, Scope::default());
+                    if !function.params.iter().any(|p| code_mentions(&body, p)) {
+                        return Some(Block::new(BlockKind::WhenLayerChanged {
+                            data_layer: value.clone(),
+                            body,
+                        }));
+                    }
+                    return None;
+                }
+                let body = self.body(&function.body, Scope::default());
+                if function.params.iter().any(|p| code_mentions(&body, p)) {
+                    return None;
+                }
+                Some(Block::new(BlockKind::WhenLayerChanged {
+                    data_layer: "Any".to_owned(),
+                    body,
+                }))
             }
             "AnimationEvent" => {
                 let animator = self.target(object)?;
@@ -678,27 +803,71 @@ impl<'a> Converter<'a> {
             }
             "PlayerSensed" => {
                 let agent = self.target(object)?;
-                let (sense, body) = self.one_name_branch(handler)?;
-                if !crate::SENSES.contains(&sense.as_str()) {
-                    return None;
+                if let Some((sense, body)) = self.one_name_branch(handler) {
+                    if !crate::SENSES.contains(&sense.as_str()) {
+                        return None;
+                    }
+                    Some(Block::new(BlockKind::WhenAgentSenses {
+                        agent,
+                        sense,
+                        body,
+                    }))
+                } else {
+                    let function = self.handler(handler, 1)?;
+                    Some(Block::new(BlockKind::WhenAgentSenses {
+                        agent,
+                        sense: "Any".to_owned(),
+                        body: self.body(&function.body, Scope::default()),
+                    }))
                 }
-                Some(Block::new(BlockKind::WhenAgentSenses {
+            }
+            "PlayerLost" => {
+                let agent = self.target(object)?;
+                if let Some((sense, body)) = self.one_name_branch(handler) {
+                    if !crate::SENSES.contains(&sense.as_str()) {
+                        return None;
+                    }
+                    Some(Block::new(BlockKind::WhenAgentLosesPlayer {
+                        agent,
+                        sense,
+                        body,
+                    }))
+                } else {
+                    let function = self.handler(handler, 1)?;
+                    Some(Block::new(BlockKind::WhenAgentLosesPlayer {
+                        agent,
+                        sense: "Any".to_owned(),
+                        body: self.body(&function.body, Scope::default()),
+                    }))
+                }
+            }
+            "DestinationReached" => {
+                let agent = self.target(object)?;
+                let function = self.handler(handler, 0)?;
+                Some(Block::new(BlockKind::WhenAgentArrives {
                     agent,
-                    sense,
-                    body,
+                    body: self.body(&function.body, Scope::default()),
                 }))
             }
             "Reached" => {
                 let follower = self.target(object)?;
-                let (which, body) = self.one_name_branch(handler)?;
-                if !crate::SPLINE_ENDS.contains(&which.as_str()) {
-                    return None;
+                if let Some((which, body)) = self.one_name_branch(handler) {
+                    if !crate::SPLINE_ENDS.contains(&which.as_str()) {
+                        return None;
+                    }
+                    Some(Block::new(BlockKind::WhenSplineReached {
+                        follower,
+                        which,
+                        body,
+                    }))
+                } else {
+                    let function = self.handler(handler, 1)?;
+                    Some(Block::new(BlockKind::WhenSplineReached {
+                        follower,
+                        which: "Any".to_owned(),
+                        body: self.body(&function.body, Scope::default()),
+                    }))
                 }
-                Some(Block::new(BlockKind::WhenSplineReached {
-                    follower,
-                    which,
-                    body,
-                }))
             }
             "Heartbeat" if self.is_service(object, "RunService") => {
                 let function = self.handler(handler, 1)?;
@@ -969,22 +1138,28 @@ impl<'a> Converter<'a> {
             return None;
         };
         match (field.as_str(), items.as_slice()) {
-            ("FilterDescendantsInstances", [lua::TableField::Item(item)]) => self.target(item),
+            ("FilterDescendantsInstances", [lua::TableField::Item(item)]) => self.target_path(item),
             _ => None,
         }
     }
 
     /// Like [`Self::target`], with `workspace` itself as the empty path.
-    fn container(&self, expr: &Expr) -> Option<String> {
+    fn container(&self, expr: &Expr) -> Option<ObjectRef> {
         match &expr.kind {
-            ExprKind::Name(name) if name == "workspace" => Some(String::new()),
+            ExprKind::Name(name) if name == "workspace" => Some(ObjectRef::default()),
             _ => self.target(expr),
         }
     }
 
     /// An object under the Workspace, such as `workspace.Pad.Chime`, as its
+    /// [`ObjectRef`] path `Pad.Chime`.
+    fn target(&self, expr: &Expr) -> Option<ObjectRef> {
+        self.target_path(expr).map(ObjectRef::path)
+    }
+
+    /// An object under the Workspace, such as `workspace.Pad.Chime`, as its
     /// path `Pad.Chime`.
-    fn target(&self, expr: &Expr) -> Option<String> {
+    fn target_path(&self, expr: &Expr) -> Option<String> {
         fn parts(expr: &Expr, out: &mut Vec<String>) -> Option<()> {
             match &expr.kind {
                 ExprKind::Name(name) if name == "workspace" => Some(()),
@@ -1205,6 +1380,16 @@ impl<'a> Converter<'a> {
                 value,
             } => self.add_to(target, value, scope),
             StatKind::While { condition, body } => self.while_loop(condition, body, scope),
+            StatKind::Repeat { body, condition } => {
+                let (last, rest) = body.split_last()?;
+                if !self.is_empty_wait(last) {
+                    return None;
+                }
+                Some(BlockKind::RepeatUntil {
+                    condition: self.condition(condition, scope),
+                    body: self.body(rest, scope),
+                })
+            }
             StatKind::NumericFor {
                 variable,
                 start,
@@ -1257,6 +1442,8 @@ impl<'a> Converter<'a> {
                             center: self.expression(center, scope),
                             radius: self.expression(radius, scope),
                             variable: variable.clone(),
+                            players_only: false,
+                            ignore: None,
                             body: self.body(body, inner),
                         })
                     }
@@ -1264,6 +1451,24 @@ impl<'a> Converter<'a> {
                         Some(BlockKind::ForEachPartTouching {
                             target: self.target(part)?,
                             variable: variable.clone(),
+                            players_only: false,
+                            ignore: None,
+                            body: self.body(body, inner),
+                        })
+                    }
+                    ("GetTagged", [tag])
+                        if self.is_service(object, "CollectionService")
+                            && variable == "instance" =>
+                    {
+                        Some(BlockKind::ForEachTagged {
+                            tag: self.expression(tag, scope),
+                            body: self.body(body, inner),
+                        })
+                    }
+                    ("GetRows", []) if variable == "row" => {
+                        let table = self.data_table(object)?;
+                        Some(BlockKind::ForEachRow {
+                            table,
                             body: self.body(body, inner),
                         })
                     }
@@ -1275,7 +1480,9 @@ impl<'a> Converter<'a> {
                 Some(BlockKind::StopScript)
             }
             StatKind::Do(body) => self
-                .slide_in(body, scope)
+                .destroy_script(body)
+                .or_else(|| self.slide_in(body, scope))
+                .or_else(|| self.fade_in_out(body, scope))
                 .or_else(|| self.set_friction(body, scope)),
             StatKind::Return(values) if values.is_empty() => Some(BlockKind::StopScript),
             _ => None,
@@ -1344,7 +1551,7 @@ impl<'a> Converter<'a> {
             // workspace.CurrentCamera:Shake(intensity, seconds)
             ExprKind::Method(object, method, args)
                 if method == "Shake"
-                    && self.target(object).as_deref() == Some("CurrentCamera")
+                    && self.target_path(object).as_deref() == Some("CurrentCamera")
                     && args.len() == 2 =>
             {
                 Some(BlockKind::ShakeCamera {
@@ -1354,16 +1561,16 @@ impl<'a> Converter<'a> {
             }
             ExprKind::Method(object, method, args)
                 if method == "WaitForChild"
-                    && let [
-                        Expr {
-                            kind: ExprKind::Str(name),
-                            ..
-                        },
-                    ] = args.as_slice() =>
+                    && matches!(args.first().map(|a| &a.kind), Some(ExprKind::Str(_)))
+                    && (args.len() == 1 || args.len() == 2) =>
             {
+                let ExprKind::Str(name) = &args[0].kind else {
+                    return None;
+                };
                 Some(BlockKind::WaitForChild {
                     target: self.container(object)?,
                     name: name.clone(),
+                    timeout: args.get(1).map(|t| self.expression(t, scope)),
                 })
             }
             // object:SetAttribute("Name", value)
@@ -1450,14 +1657,19 @@ impl<'a> Converter<'a> {
                 Some(BlockKind::PlayAnimation {
                     animator: self.target(animator)?,
                     animation: self.target(&loaded[0])?,
+                    fade_time: None,
+                    speed: None,
+                    weight: None,
+                    wait_until_done: false,
                 })
             }
-            // game.ReplicatedStorage.Scored:Fire()
+            // game.ReplicatedStorage.Scored:Fire(data?)
             ExprKind::Method(object, method, args)
-                if method == "Fire" && args.is_empty() && self.stored(object).is_some() =>
+                if method == "Fire" && args.len() <= 1 && self.stored(object).is_some() =>
             {
                 Some(BlockKind::FireEvent {
                     event: self.stored(object)?,
+                    data: args.first().map(|d| self.expression(d, scope)),
                 })
             }
             // Debris:AddItem(workspace.Spark, 2)
@@ -1497,6 +1709,17 @@ impl<'a> Converter<'a> {
                     spline: self.target(&args[0])?,
                 })
             }
+            // obj:PivotTo(...) -> MoveTo / MoveBy / TurnBy
+            ExprKind::Method(object, method, args) if method == "PivotTo" && args.len() == 1 => {
+                self.pivot_to(object, &args[0], scope)
+            }
+            // seat:Sit(controller)
+            ExprKind::Method(object, method, args) if method == "Sit" && args.len() == 1 => {
+                Some(BlockKind::SitInSeat {
+                    seat: self.target(object)?,
+                    controller: self.target(&args[0])?,
+                })
+            }
             // workspace.Ball:ApplyImpulse(Vector3.new(0, 50, 0))
             ExprKind::Method(object, method, args)
                 if method == "ApplyImpulse" && args.len() == 1 =>
@@ -1531,14 +1754,25 @@ impl<'a> Converter<'a> {
                     reason: self.expression(&args[0], scope),
                 })
             }
+            ExprKind::Method(object, method, args) if method == "Emit" && args.len() == 1 => {
+                Some(BlockKind::EmitParticles {
+                    target: self.target(object)?,
+                    count: self.expression(&args[0], scope),
+                })
+            }
             ExprKind::Method(object, method, args) if args.is_empty() => {
                 let target = self.target(object)?;
                 Some(match method.as_str() {
-                    "Play" => BlockKind::PlaySound { target },
+                    "Play" => BlockKind::PlaySound {
+                        target,
+                        pitch: None,
+                        wait_until_done: false,
+                    },
                     "Stop" => BlockKind::StopSound { target },
                     "Pause" => BlockKind::PauseSound { target },
                     "Resume" => BlockKind::ResumeSound { target },
                     "Destroy" => BlockKind::Destroy { target },
+                    "Cancel" => BlockKind::CancelTween { tween: target },
                     "SetNetworkOwnershipAuto" => BlockKind::SetNetworkOwnershipAuto { target },
                     _ => return None,
                 })
@@ -1561,6 +1795,9 @@ impl<'a> Converter<'a> {
                 slot: self.expression(slot, scope),
             },
             ("LoadSlot", [slot]) => BlockKind::LoadSlot {
+                slot: self.expression(slot, scope),
+            },
+            ("DeleteSlot", [slot]) => BlockKind::DeleteSlot {
                 slot: self.expression(slot, scope),
             },
             ("SetCheckpoint", [checkpoint]) => BlockKind::SetCheckpoint {
@@ -1678,10 +1915,20 @@ impl<'a> Converter<'a> {
                     let seconds = self.expression(seconds, scope);
                     match value.kind {
                         ExprKind::Number(Some(0.0)) => {
-                            return Some(BlockKind::FadeIn { target, seconds });
+                            return Some(BlockKind::FadeIn {
+                                target: target.into(),
+                                seconds,
+                                wait_until_done: false,
+                                completed: Vec::new(),
+                            });
                         }
                         ExprKind::Number(Some(1.0)) => {
-                            return Some(BlockKind::FadeOut { target, seconds });
+                            return Some(BlockKind::FadeOut {
+                                target: target.into(),
+                                seconds,
+                                wait_until_done: false,
+                                completed: Vec::new(),
+                            });
                         }
                         _ => {}
                     }
@@ -1697,12 +1944,16 @@ impl<'a> Converter<'a> {
             _ => return None,
         };
         Some(BlockKind::Tween {
-            target,
+            target: target.into(),
             property,
             value: self.expression(value, scope),
             seconds: self.expression(seconds, scope),
             style,
             direction,
+            repeat_count: None,
+            reverses: false,
+            wait_until_done: false,
+            completed: Vec::new(),
         })
     }
 
@@ -1731,13 +1982,35 @@ impl<'a> Converter<'a> {
         let [lua::TableField::Named(property, value)] = fields.as_slice() else {
             return None;
         };
-        Some((self.target(object)?, info, property.clone(), value))
+        Some((self.target_path(object)?, info, property.clone(), value))
     }
 
-    /// The `do … end` that "slide in" writes.
+    /// The `do … end` that "slide in" writes (both the `_RestPos` + `Visible`
+    /// form and the legacy 4-statement form).
     fn slide_in(&self, body: &[Stat], scope: Scope) -> Option<BlockKind> {
-        let [info, goal, moved, play] = body else {
-            return None;
+        let (info, target, moved, play) = match body {
+            [info, goal, moved, play] => {
+                let ExprKind::Field(object, position) = &local(goal, "goal")?.kind else {
+                    return None;
+                };
+                let target = self
+                    .target_path(object)
+                    .filter(|_| position == "Position")?;
+                (info, target, moved, play)
+            }
+            [info, goal, _cache_if, _visible, moved, play] => {
+                let ExprKind::Method(object, method, args) = &local(goal, "goal")?.kind else {
+                    return None;
+                };
+                if method != "GetAttribute"
+                    || !matches!(args.as_slice(), [Expr { kind: ExprKind::Str(s), .. }] if s == "_RestPos")
+                {
+                    return None;
+                }
+                let target = self.target_path(object)?;
+                (info, target, moved, play)
+            }
+            _ => return None,
         };
         let is_name = |expr: &Expr, wanted: &str| matches!(&expr.kind, ExprKind::Name(name) if name == wanted);
         let ExprKind::Call(new, info) = &local(info, "info")?.kind else {
@@ -1746,10 +2019,6 @@ impl<'a> Converter<'a> {
         let ([seconds], true) = (info.as_slice(), self.is_field(new, "TweenInfo", "new")) else {
             return None;
         };
-        let ExprKind::Field(object, position) = &local(goal, "goal")?.kind else {
-            return None;
-        };
-        let target = self.target(object).filter(|_| position == "Position")?;
         let StatKind::Assign { targets, values } = &moved.kind else {
             return None;
         };
@@ -1758,7 +2027,7 @@ impl<'a> Converter<'a> {
         };
         let same_position = |expr: &Expr| {
             matches!(&expr.kind, ExprKind::Field(inner, name)
-                if name == "Position" && self.target(inner).as_deref() == Some(target.as_str()))
+                if name == "Position" && self.target_path(inner).as_deref() == Some(target.as_str()))
         };
         if !same_position(moved_object) {
             return None;
@@ -1798,10 +2067,83 @@ impl<'a> Converter<'a> {
             return None;
         }
         Some(BlockKind::SlideIn {
-            target,
+            target: target.into(),
             from: from.to_owned(),
             seconds: self.expression(seconds, scope),
+            wait_until_done: false,
+            completed: Vec::new(),
         })
+    }
+
+    /// The multi-target `do … end` that `FadeIn` / `FadeOut` writes.
+    fn fade_in_out(&self, body: &[Stat], scope: Scope) -> Option<BlockKind> {
+        let [t_stat, info_stat, goals_stat, if_stat, ..] = body else {
+            return None;
+        };
+        let target = self.target(local(t_stat, "_t")?)?;
+        let ExprKind::Call(new, info_args) = &local(info_stat, "_info")?.kind else {
+            return None;
+        };
+        let ([seconds], true) = (info_args.as_slice(), self.is_field(new, "TweenInfo", "new"))
+        else {
+            return None;
+        };
+        if !matches!(local(goals_stat, "_goals")?.kind, ExprKind::Table(ref f) if f.is_empty()) {
+            return None;
+        }
+        let StatKind::If { arms, .. } = &if_stat.kind else {
+            return None;
+        };
+        let [(_, then_body)] = arms.as_slice() else {
+            return None;
+        };
+        let [
+            Stat {
+                kind: StatKind::Assign { targets, values },
+                ..
+            },
+        ] = then_body.as_slice()
+        else {
+            return None;
+        };
+        let (
+            [
+                Expr {
+                    kind: ExprKind::Field(g, prop),
+                    ..
+                },
+            ],
+            [
+                Expr {
+                    kind: ExprKind::Number(Some(val)),
+                    ..
+                },
+            ],
+        ) = (targets.as_slice(), values.as_slice())
+        else {
+            return None;
+        };
+        if !matches!(&g.kind, ExprKind::Name(n) if n == "_goals") || prop != "Transparency" {
+            return None;
+        }
+        let seconds = self.expression(seconds, scope);
+        if *val == 0.0 && body.len() == 5 {
+            Some(BlockKind::FadeIn {
+                target,
+                seconds,
+                wait_until_done: false,
+                completed: Vec::new(),
+            })
+        } else if *val == 1.0 && body.len() == 7 {
+            Some(BlockKind::FadeOut {
+                target,
+                seconds,
+                wait_until_done: false,
+                completed: Vec::new(),
+            })
+        } else {
+            None
+        }
     }
 
     /// The `do` block "set friction" translates to: the friction in a
@@ -1826,7 +2168,7 @@ impl<'a> Converter<'a> {
         };
         let same_custom = matches!(&custom.kind, ExprKind::Field(inner, name)
             if name == "CustomPhysicalProperties"
-                && self.target(inner).as_deref() == Some(target.as_str()));
+                && self.target(inner).as_ref() == Some(&target));
         let ExprKind::Call(new, args) = &made.kind else {
             return None;
         };
@@ -1888,6 +2230,7 @@ impl<'a> Converter<'a> {
         Some(BlockKind::SetGraphicsOption {
             setting: property.to_owned(),
             choice,
+            value: None,
         })
     }
 
@@ -1896,14 +2239,30 @@ impl<'a> Converter<'a> {
             if !self.variables.contains(name) {
                 return None;
             }
-            // name = name + n
-            if let ExprKind::Binary("+", left, right) = &value.kind
-                && matches!(&left.kind, ExprKind::Name(same) if same == name)
-            {
-                return Some(BlockKind::ChangeVariable {
-                    name: name.clone(),
-                    by: self.expression(right, scope),
-                });
+            // name = name + n, or name = (tonumber(name) or 0) + n
+            if let ExprKind::Binary("+", left, right) = &value.kind {
+                let is_self_add = matches!(&left.kind, ExprKind::Name(same) if same == name)
+                    || matches!(
+                        &left.kind,
+                        ExprKind::Paren(inner)
+                            if matches!(
+                                &inner.kind,
+                                ExprKind::Binary("or", call, fallback)
+                                    if matches!(&fallback.kind, ExprKind::Number(Some(n)) if *n == 0.0)
+                                        && matches!(
+                                            &call.kind,
+                                            ExprKind::Call(func, args)
+                                                if matches!(&func.kind, ExprKind::Name(f) if f == "tonumber")
+                                                    && matches!(args.as_slice(), [arg] if matches!(&arg.kind, ExprKind::Name(same) if same == name))
+                                        )
+                            )
+                    );
+                if is_self_add {
+                    return Some(BlockKind::ChangeVariable {
+                        name: name.clone(),
+                        by: self.expression(right, scope),
+                    });
+                }
             }
             return Some(BlockKind::SetVariable {
                 name: name.clone(),
@@ -1922,6 +2281,10 @@ impl<'a> Converter<'a> {
             return Some(BlockKind::CloneInto {
                 target: self.target(original)?,
                 parent: self.container(value)?,
+                count: None,
+                position: None,
+                offset_per_clone: None,
+                per_clone_positions: None,
             });
         }
         // Lighting.ToneMapping = Enum.ToneMapping.Neutral
@@ -1934,6 +2297,14 @@ impl<'a> Converter<'a> {
         if property == "ClockTime" && self.is_service(object, "Lighting") {
             return Some(BlockKind::SetClockTime {
                 time: self.expression(value, scope),
+                duration: None,
+            });
+        }
+        // Lighting.<property> = value
+        if self.is_service(object, "Lighting") && LIGHTING_PROPERTIES.contains(&property.as_str()) {
+            return Some(BlockKind::SetLightingProperty {
+                property: property.clone(),
+                value: self.expression(value, scope),
             });
         }
         // Lighting.Atmosphere.Haze = 2
@@ -1945,6 +2316,7 @@ impl<'a> Converter<'a> {
             return Some(BlockKind::SetAtmosphere {
                 property: property.clone(),
                 value: self.expression(value, scope),
+                duration: None,
             });
         }
         if self.is_service(object, "UserGameSettings") {
@@ -1957,7 +2329,8 @@ impl<'a> Converter<'a> {
             });
         }
         // workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
-        if property == "CameraType" && self.target(object).as_deref() == Some("CurrentCamera") {
+        if property == "CameraType" && self.target_path(object).as_deref() == Some("CurrentCamera")
+        {
             return Some(BlockKind::SetCameraType {
                 camera_type: enum_item(value, "CameraType", &CAMERA_TYPES)?,
             });
@@ -1965,7 +2338,7 @@ impl<'a> Converter<'a> {
         let path = self.target(object)?;
         let same_property = |expr: &Expr| {
             matches!(&expr.kind, ExprKind::Field(inner, name)
-                if name == property && self.target(inner).as_deref() == Some(path.as_str()))
+                if name == property && self.target(inner).as_ref() == Some(&path))
         };
         // object.CFrame = CFrame.lookAt(object.Position, v)
         if property == "CFrame"
@@ -1973,10 +2346,10 @@ impl<'a> Converter<'a> {
             && self.is_field(function, "CFrame", "lookAt")
             && let [from, position] = args.as_slice()
             && matches!(&from.kind, ExprKind::Field(inner, name)
-                if name == "Position" && self.target(inner).as_deref() == Some(path.as_str()))
+                if name == "Position" && self.target(inner).as_ref() == Some(&path))
         {
             let position = self.expression(position, scope);
-            if path == "CurrentCamera" {
+            if path.as_path() == Some("CurrentCamera") {
                 return Some(BlockKind::PointCameraAt { position });
             }
             return Some(BlockKind::LookAt {
@@ -2008,6 +2381,7 @@ impl<'a> Converter<'a> {
                     return Some(BlockKind::TurnBy {
                         target: path,
                         rotation: by,
+                        space: "Local".to_owned(),
                     });
                 }
                 _ => {}
@@ -2071,6 +2445,28 @@ impl<'a> Converter<'a> {
                 target: path,
                 volume: converted(),
             },
+            "PlaybackSpeed" => BlockKind::SetSoundPitch {
+                target: path,
+                pitch: converted(),
+            },
+            "Looped" => BlockKind::SetSoundLooping {
+                target: path,
+                looped: converted(),
+            },
+            "TimePosition" => BlockKind::SetSoundTime {
+                target: path,
+                time: converted(),
+            },
+            "Enabled" => BlockKind::SetEffectEnabled {
+                target: path,
+                enabled: converted(),
+            },
+            "Material" if enum_item(value, "Material", &MATERIALS).is_some() => {
+                BlockKind::SetMaterial {
+                    target: path,
+                    material: enum_item(value, "Material", &MATERIALS)?,
+                }
+            }
             "Value" => BlockKind::SetValue {
                 target: path,
                 value: converted(),
@@ -2090,6 +2486,14 @@ impl<'a> Converter<'a> {
                 target: path,
                 velocity: converted(),
             },
+            "AssemblyAngularVelocity" => BlockKind::SetAngularVelocity {
+                target: path,
+                velocity: converted(),
+            },
+            "Speed" => BlockKind::SetSplineSpeed {
+                follower: path,
+                speed: converted(),
+            },
             _ => BlockKind::SetProperty {
                 target: path,
                 property: property.clone(),
@@ -2099,7 +2503,7 @@ impl<'a> Converter<'a> {
     }
 
     /// The distance in `object.CFrame.LookVector * n`, where `object` is at `path`.
-    fn forward_distance<'e>(&self, path: &str, expr: &'e Expr) -> Option<&'e Expr> {
+    fn forward_distance<'e>(&self, path: &ObjectRef, expr: &'e Expr) -> Option<&'e Expr> {
         let ExprKind::Binary("*", look, distance) = &expr.kind else {
             return None;
         };
@@ -2111,7 +2515,7 @@ impl<'a> Converter<'a> {
         };
         (name == "LookVector"
             && cframe_name == "CFrame"
-            && self.target(object).as_deref() == Some(path))
+            && self.target(object).as_ref() == Some(path))
         .then_some(distance.as_ref())
     }
 
@@ -2141,6 +2545,7 @@ impl<'a> Converter<'a> {
                     "Orientation" => Some(BlockKind::TurnBy {
                         target,
                         rotation: by,
+                        space: "Local".to_owned(),
                     }),
                     _ => None,
                 }
@@ -2149,14 +2554,150 @@ impl<'a> Converter<'a> {
         }
     }
 
-    fn while_loop(&self, condition: &Expr, body: &[Stat], scope: Scope) -> Option<BlockKind> {
-        let waits_a_frame = |stat: &Stat| {
-            matches!(&stat.kind, StatKind::Call(call)
-                if matches!(&call.kind, ExprKind::Call(function, args)
-                    if args.is_empty() && self.is_field(function, "task", "wait")))
+    fn pivot_to(&self, object: &Expr, arg: &Expr, scope: Scope) -> Option<BlockKind> {
+        let target = self.target(object)?;
+        let is_get_pivot = |expr: &Expr| -> bool {
+            matches!(&expr.kind, ExprKind::Method(o, m, args) if m == "GetPivot" && args.is_empty() && self.target(o).as_ref() == Some(&target))
         };
+        let is_pivot_rotation = |expr: &Expr| -> bool {
+            matches!(&expr.kind, ExprKind::Field(o, f) if f == "Rotation" && is_get_pivot(o))
+        };
+        let is_pivot_position = |expr: &Expr| -> bool {
+            matches!(&expr.kind, ExprKind::Field(o, f) if f == "Position" && is_get_pivot(o))
+        };
+        let cframe_angles_deg = |expr: &Expr| -> Option<Expression> {
+            let ExprKind::Call(func, args) = &expr.kind else {
+                return None;
+            };
+            let ExprKind::Field(lib, name) = &func.kind else {
+                return None;
+            };
+            if name != "Angles" || !matches!(&lib.kind, ExprKind::Name(n) if n == "CFrame") {
+                return None;
+            }
+            let [rx, ry, rz] = args.as_slice() else {
+                return None;
+            };
+            let rad_num = |e: &Expr| -> Option<f64> {
+                let ExprKind::Call(f, a) = &e.kind else {
+                    return None;
+                };
+                let ExprKind::Field(l, m) = &f.kind else {
+                    return None;
+                };
+                if m != "rad" || !matches!(&l.kind, ExprKind::Name(n) if n == "math") {
+                    return None;
+                }
+                let [val] = a.as_slice() else {
+                    return None;
+                };
+                match self.expression(val, scope) {
+                    Expression::Number { value } => Some(value),
+                    _ => None,
+                }
+            };
+            Some(Expression::Vector3 {
+                x: rad_num(rx)?,
+                y: rad_num(ry)?,
+                z: rad_num(rz)?,
+            })
+        };
+        match &arg.kind {
+            // obj:PivotTo(obj:GetPivot() + offset)
+            ExprKind::Binary("+", left, right) if is_get_pivot(left) => Some(BlockKind::MoveBy {
+                target,
+                offset: self.expression(right, scope),
+            }),
+            // obj:PivotTo(CFrame.new(pos) * obj:GetPivot().Rotation)
+            // obj:PivotTo(obj:GetPivot() * CFrame.Angles(...))
+            // obj:PivotTo(CFrame.new(obj:GetPivot().Position) * CFrame.Angles(...) * obj:GetPivot().Rotation)
+            ExprKind::Binary("*", left, right) => {
+                if is_pivot_rotation(right) {
+                    // Check CFrame.new(pos) * obj:GetPivot().Rotation -> MoveTo
+                    if let ExprKind::Call(func, args) = &left.kind
+                        && args.len() == 1
+                        && matches!(&func.kind, ExprKind::Field(lib, new)
+                            if new == "new" && matches!(&lib.kind, ExprKind::Name(n) if n == "CFrame"))
+                    {
+                        return Some(BlockKind::MoveTo {
+                            target,
+                            position: self.expression(&args[0], scope),
+                        });
+                    }
+                    // Check (CFrame.new(obj:GetPivot().Position) * CFrame.Angles(...)) * obj:GetPivot().Rotation -> TurnBy World
+                    if let ExprKind::Binary("*", ll, lr) = &left.kind
+                        && let ExprKind::Call(func, args) = &ll.kind
+                        && args.len() == 1
+                        && is_pivot_position(&args[0])
+                        && matches!(&func.kind, ExprKind::Field(lib, new)
+                            if new == "new" && matches!(&lib.kind, ExprKind::Name(n) if n == "CFrame"))
+                        && let Some(rotation) = cframe_angles_deg(lr)
+                    {
+                        return Some(BlockKind::TurnBy {
+                            target,
+                            rotation,
+                            space: "World".to_owned(),
+                        });
+                    }
+                }
+                if is_get_pivot(left)
+                    && let Some(rotation) = cframe_angles_deg(right)
+                {
+                    return Some(BlockKind::TurnBy {
+                        target,
+                        rotation,
+                        space: "Local".to_owned(),
+                    });
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn destroy_script(&self, body: &[Stat]) -> Option<BlockKind> {
+        if !self.variables.contains("_connections") {
+            return None;
+        }
+        let [for_stat, destroy_stat, ret_stat] = body else {
+            return None;
+        };
+        let StatKind::GenericFor { names, values, .. } = &for_stat.kind else {
+            return None;
+        };
+        if names.as_slice() != ["_", "_conn"]
+            || !matches!(values.as_slice(), [Expr { kind: ExprKind::Name(n), .. }] if n == "_connections")
+        {
+            return None;
+        }
+        let StatKind::Call(Expr {
+            kind: ExprKind::Method(obj, method, args),
+            ..
+        }) = &destroy_stat.kind
+        else {
+            return None;
+        };
+        if !matches!(&obj.kind, ExprKind::Name(n) if n == "script")
+            || method != "Destroy"
+            || !args.is_empty()
+        {
+            return None;
+        }
+        if !matches!(&ret_stat.kind, StatKind::Return(vals) if vals.is_empty()) {
+            return None;
+        }
+        Some(BlockKind::DestroyScript)
+    }
+
+    fn is_empty_wait(&self, stat: &Stat) -> bool {
+        matches!(&stat.kind, StatKind::Call(call)
+            if matches!(&call.kind, ExprKind::Call(function, args)
+                if args.is_empty() && self.is_field(function, "task", "wait")))
+    }
+
+    fn while_loop(&self, condition: &Expr, body: &[Stat], scope: Scope) -> Option<BlockKind> {
         let (last, rest) = body.split_last()?;
-        if !waits_a_frame(last) {
+        if !self.is_empty_wait(last) {
             return None;
         }
         if matches!(condition.kind, ExprKind::True) {
@@ -2493,13 +3034,15 @@ impl<'a> Converter<'a> {
                             return Some(Expression::Raycast {
                                 origin: boxed(origin),
                                 direction: boxed(direction),
+                                output: String::new(),
+                                ignore: None,
                             });
                         }
                         [origin, direction, params] => {
                             return Some(Expression::RaycastIgnoring {
                                 origin: boxed(origin),
                                 direction: boxed(direction),
-                                ignore: self.ignored(params)?,
+                                ignore: self.ignored(params)?.into(),
                             });
                         }
                         _ => {}
@@ -2566,6 +3109,20 @@ impl<'a> Converter<'a> {
                         table,
                         key: boxed(key),
                     });
+                }
+                // DataService:GetTable("weapons"):Count()
+                if method == "Count"
+                    && args.is_empty()
+                    && let Some(table) = self.data_table(object)
+                {
+                    return Some(Expression::DataTableRowCount { table });
+                }
+                // SaveService:HasSlot(slot)
+                if method == "HasSlot"
+                    && self.is_service(object, "SaveService")
+                    && let [slot] = args.as_slice()
+                {
+                    return Some(Expression::SlotExists { slot: boxed(slot) });
                 }
                 if method == "IsLayerActive"
                     && self.is_service(object, "DataLayerService")
@@ -2638,6 +3195,16 @@ impl<'a> Converter<'a> {
                     row: boxed(row),
                 }
             }
+            ExprKind::Field(object, property)
+                if property == "IsHost" && self.is_service(object, "NetworkService") =>
+            {
+                Expression::IsHost
+            }
+            ExprKind::Field(object, property)
+                if property == "IsConnected" && self.is_service(object, "NetworkService") =>
+            {
+                Expression::IsConnected
+            }
             ExprKind::Field(object, property) => Expression::Property {
                 target: self.target(object)?,
                 property: property.clone(),
@@ -2661,6 +3228,26 @@ impl<'a> Converter<'a> {
             let [r, g, b] = numbers()?;
             return Some(Expression::Color3 { r, g, b });
         }
+        if self.is_field(function, "Color3", "fromRGB") {
+            let [r, g, b] = args else {
+                return None;
+            };
+            return Some(Expression::MakeColorRgb {
+                r: Box::new(self.expression(r, scope)),
+                g: Box::new(self.expression(g, scope)),
+                b: Box::new(self.expression(b, scope)),
+            });
+        }
+        if self.is_field(function, "Color3", "fromHSV") {
+            let [h, s, v] = args else {
+                return None;
+            };
+            return Some(Expression::MakeColorHsv {
+                h: Box::new(self.expression(h, scope)),
+                s: Box::new(self.expression(s, scope)),
+                v: Box::new(self.expression(v, scope)),
+            });
+        }
         let ExprKind::Field(object, name) = &function.kind else {
             return None;
         };
@@ -2680,6 +3267,35 @@ impl<'a> Converter<'a> {
             "abs" => one(MathFunction::Abs),
             "ceil" => one(MathFunction::Ceil),
             "sqrt" => one(MathFunction::Sqrt),
+            "sin" => one(MathFunction::Sin),
+            "cos" => one(MathFunction::Cos),
+            "tan" => one(MathFunction::Tan),
+            "asin" => one(MathFunction::Asin),
+            "acos" => one(MathFunction::Acos),
+            "atan" => one(MathFunction::Atan),
+            "log" => one(MathFunction::Log),
+            "exp" => one(MathFunction::Exp),
+            "sign" => one(MathFunction::Sign),
+            "clamp" => {
+                let [value, min, max] = args else {
+                    return None;
+                };
+                Some(Expression::Clamp {
+                    value: Box::new(self.expression(value, scope)),
+                    min: Box::new(self.expression(min, scope)),
+                    max: Box::new(self.expression(max, scope)),
+                })
+            }
+            "min" | "max" => {
+                let [left, right] = args else {
+                    return None;
+                };
+                Some(Expression::MinMax {
+                    op: name.clone(),
+                    left: Box::new(self.expression(left, scope)),
+                    right: Box::new(self.expression(right, scope)),
+                })
+            }
             "floor" => {
                 // math.floor(x + 0.5) is rounding.
                 if let [value] = args

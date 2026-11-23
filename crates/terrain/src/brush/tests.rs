@@ -554,3 +554,48 @@ fn water_fills_the_cells_under_the_brush_at_its_level_and_undoes() {
     );
     assert!(!data.has_water());
 }
+
+#[test]
+fn water_brush_falloff_blends_existing_water_levels_smoothly() {
+    let (mut data, placement) = flat(0.2);
+    // Fill a wide area at level 20 (0.20 normalized) first.
+    let base_brush = Brush {
+        radius: 16.0,
+        falloff: 0.0,
+        ..Brush::default()
+    };
+    apply(
+        &mut data,
+        &placement,
+        &base_brush,
+        &Operation::Water {
+            level: 20.0,
+            erase: false,
+        },
+        Vec3::new(0.0, 15.0, 0.0),
+    );
+    // Now paint a smaller higher-level stroke with smooth falloff over the center.
+    let soft_brush = Brush {
+        radius: 10.0,
+        falloff: 1.0,
+        strength: 0.5,
+        ..Brush::default()
+    };
+    apply(
+        &mut data,
+        &placement,
+        &soft_brush,
+        &Operation::Water {
+            level: 40.0,
+            erase: false,
+        },
+        Vec3::new(0.0, 15.0, 0.0),
+    );
+    let center = data.water_at(32, 32).unwrap();
+    let mid = data.water_at(34, 32).unwrap();
+    let outside = data.water_at(38, 32).unwrap();
+    assert!(
+        center > mid && mid > outside,
+        "falloff smoothly blends water levels: center={center}, mid={mid}, outside={outside}"
+    );
+}

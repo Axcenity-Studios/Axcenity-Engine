@@ -32,3 +32,19 @@ DataTable:Keys(): { string }
 
 Every row's key, in the table's order. A new list each call.
 
+#### Count
+
+```luau
+DataTable:Count(): number
+```
+
+How many rows the table has.
+
+#### GetRows
+
+```luau
+DataTable:GetRows(): { DataRow }
+```
+
+Every row in the table's order as a 1-indexed list. A new list each call.
+

@@ -79,7 +79,9 @@ fn scripts_switch_to_blocks_and_can_be_edited_saved_and_reloaded() {
         panic!("a new script's code is a RunScript stack");
     };
     let play_sound = Block::new(BlockKind::PlaySound {
-        target: "Chime".to_owned(),
+        target: "Chime".to_owned().into(),
+        pitch: None,
+        wait_until_done: false,
     });
     let play_sound_id = play_sound.id;
     body.push(play_sound);

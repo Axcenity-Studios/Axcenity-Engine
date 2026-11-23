@@ -429,7 +429,8 @@ fn each_tool_shows_its_own_handles() {
     };
     assert!(handles(Tool::Select).is_empty());
     assert_eq!(handles(Tool::Move), Axis::ALL.map(Handle::Move).to_vec());
-    assert_eq!(handles(Tool::Scale).len(), 6);
+    assert_eq!(handles(Tool::Scale).len(), 7);
+    assert!(handles(Tool::Scale).contains(&Handle::ScaleUniform));
     assert_eq!(
         handles(Tool::Rotate),
         Axis::ALL.map(Handle::Rotate).to_vec()

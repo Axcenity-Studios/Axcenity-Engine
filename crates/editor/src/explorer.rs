@@ -402,7 +402,8 @@ impl Explorer {
     }
 
     /// Opens every branch above `id`, so its row is visible, and scrolls to
-    /// it on the next frame. Used when a part is selected in the viewport.
+    /// it on the next frame if it isn't already in view. Used when a part is
+    /// selected in the viewport.
     pub fn reveal(&mut self, world: &World, id: InstanceId) {
         let mut parent = world.get(id).and_then(|instance| instance.parent());
         while let Some(next) = parent {
@@ -412,6 +413,12 @@ impl Explorer {
             parent = world.get(next).and_then(|instance| instance.parent());
         }
         self.scroll_to = Some(id);
+    }
+
+    /// Scrolls just enough to bring `id` into view if it is outside the
+    /// visible scroll area, leaving the scroll position unchanged otherwise.
+    pub fn keep_in_view(&mut self, id: InstanceId) {
+        self.keep_in_view = Some(id);
     }
 
     /// Whether the arrow keys, Home, End and Enter are the Explorer's: it
@@ -689,13 +696,19 @@ impl Explorer {
         let in_view = self.keep_in_view.take();
         let index_of = |id: InstanceId| rows.iter().position(|row| row.id == id);
         if let Some(index) = scroll_to.and_then(index_of) {
-            let view = ui.available_height();
-            let middle = index as f32 * row_height - (view - row_height) / 2.0;
-            area = area.vertical_scroll_offset(middle.max(0.0));
+            let top = index as f32 * row_height;
+            let already_visible = self
+                .view
+                .is_some_and(|(offset, view)| top >= offset && top + row_height <= offset + view);
+            if !already_visible {
+                let view = ui.available_height();
+                let middle = top - (view - row_height) / 2.0;
+                area = area.vertical_scroll_offset(middle.max(0.0));
+            }
         } else if let Some(index) = in_view.and_then(index_of)
             && let Some((offset, view)) = self.view
         {
-            // The keyboard scrolls only as far as it takes to show the row.
+            // Nearest-edge scroll: only move if the row is outside the visible area.
             let top = index as f32 * row_height;
             if top < offset {
                 area = area.vertical_scroll_offset(top);

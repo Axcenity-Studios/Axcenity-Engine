@@ -231,6 +231,20 @@ impl UserData for LuaSaveService {
                 })
             },
         );
+        methods.add_method(
+            "DeleteSlot",
+            |lua, _, (number, player): (mlua::Value, mlua::Value)| {
+                let slot = slot(lua, &number, "DeleteSlot")?;
+                let user = user_of(lua, &player, "DeleteSlot")?;
+                let saves = saves(lua)?;
+                let removed = match user {
+                    Some(user) => saves.borrow_mut().for_player(user).delete_slot(slot),
+                    None => saves.borrow().delete_slot(slot),
+                }
+                .map_err(failed)?;
+                Ok(removed)
+            },
+        );
         // With a Player first, that player's own data, kept by their UserId
         // (on a server, Phase 67).
         methods.add_method("SetPlayerData", |lua, _, args: mlua::MultiValue| {

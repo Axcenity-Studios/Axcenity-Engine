@@ -169,6 +169,7 @@ fn a_script_sets_the_weather_and_it_saves_with_the_world() {
     let snowy = axcenity_render::Weather {
         wetness: 0.0,
         snow: 0.75,
+        snow_thickness: axcenity_render::DEFAULT_SNOW_THICKNESS,
     };
     assert_eq!(drawn(&world), snowy);
 

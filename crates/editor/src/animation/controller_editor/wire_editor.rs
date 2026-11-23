@@ -4,7 +4,7 @@
 //! settings.
 
 use super::*;
-use crate::animation::graph::{self, words};
+use crate::animation::graph::words;
 
 /// A parameter being typed into a wire's label editor: for condition
 /// `condition` (or a new one), of `kind`.
@@ -30,54 +30,19 @@ pub(super) fn tests_for(kind: Option<ParameterKind>) -> &'static [(Test, &'stati
     }
 }
 
-/// The parameter panel beside (or above, when narrow) the graph.
-const PANEL_WIDTH: f32 = 132.0;
-/// Below this width the chips go above the graph.
-const SIDE_PANEL_FROM: f32 = 460.0;
-
 impl ControllerDoc {
-    /// The parameter chips and the graph, filling `ui`, and the label
-    /// editor if one is open. Does what was done, and returns the state
-    /// double-clicked, to open its clip.
+    /// The graph, filling `ui`, and the label editor if one is open. Does what
+    /// was done, and returns the state double-clicked, to open its clip.
+    /// (Parameters live in the unified Parameters panel in the right inspector.)
     pub fn graph_ui(&mut self, ui: &mut egui::Ui, clips: &[String]) -> Option<usize> {
         let live = self.live();
         let selected = self.selected;
-        let mut events = Vec::new();
-        if ui.available_width() >= SIDE_PANEL_FROM {
-            let height = ui.available_height();
-            ui.horizontal_top(|ui| {
-                ui.allocate_ui_with_layout(
-                    egui::vec2(PANEL_WIDTH, height),
-                    egui::Layout::top_down(egui::Align::Min),
-                    |ui| {
-                        ui.set_min_size(egui::vec2(PANEL_WIDTH, height));
-                        egui::ScrollArea::vertical()
-                            .id_salt("parameter chips")
-                            .show(ui, |ui| {
-                                events.extend(graph::parameters_panel(
-                                    ui,
-                                    &self.file.parameters,
-                                    &mut self.view.chips,
-                                ));
-                            });
-                    },
-                );
-                let size = ui.available_size();
-                ui.allocate_ui(size, |ui| {
-                    events.extend(self.view.show(ui, &self.file, selected, live, clips));
-                });
-            });
-        } else {
-            events.extend(graph::parameters_panel(
-                ui,
-                &self.file.parameters,
-                &mut self.view.chips,
-            ));
-            let size = ui.available_size();
-            ui.allocate_ui(size, |ui| {
-                events.extend(self.view.show(ui, &self.file, selected, live, clips));
-            });
-        }
+        let size = ui.available_size();
+        let mut events = ui
+            .allocate_ui(size, |ui| {
+                self.view.show(ui, &self.file, selected, live, clips)
+            })
+            .inner;
         let mut open = None;
         events.retain(|event| match event {
             GraphEvent::Open(index) => {

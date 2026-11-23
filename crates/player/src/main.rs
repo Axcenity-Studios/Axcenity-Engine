@@ -661,6 +661,13 @@ fn fire_sensed(scripts: &mut ScriptRuntime, world: &mut World, agents: &mut Agen
         let sense = sensed.sense.as_str().to_owned();
         scripts.fire_instance_event(world, sensed.agent, "PlayerSensed", &[sense]);
     }
+    for lost in agents.take_lost() {
+        let sense = lost.sense.as_str().to_owned();
+        scripts.fire_instance_event(world, lost.agent, "PlayerLost", &[sense]);
+    }
+    for agent in agents.take_arrived() {
+        scripts.fire_instance_event(world, agent, "DestinationReached", &[]);
+    }
 }
 
 /// Passes on what the UI did: `MouseEnter` and `MouseLeave` to

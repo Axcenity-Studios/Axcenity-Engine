@@ -722,3 +722,29 @@ fn a_quick_filter_shows_only_its_kind_and_narrows_the_text_filter() {
     explorer.kind = None;
     assert!(!explorer.filtering());
 }
+
+#[test]
+fn reveal_and_keep_in_view_do_not_scroll_when_row_is_already_visible() {
+    let (world, mut explorer, _, parts) = big_folder(200);
+    let ctx = theme::test_context();
+    for _ in 0..2 {
+        frame(&ctx, &mut explorer, &world, Vec::new());
+    }
+    let initial_view = explorer.view.expect("view tracked after drawing");
+    let visible_part = parts[3];
+    explorer.reveal(&world, visible_part);
+    frame(&ctx, &mut explorer, &world, Vec::new());
+    assert_eq!(
+        explorer.view.unwrap().0,
+        initial_view.0,
+        "reveal should not scroll when row is already visible"
+    );
+
+    explorer.keep_in_view(visible_part);
+    frame(&ctx, &mut explorer, &world, Vec::new());
+    assert_eq!(
+        explorer.view.unwrap().0,
+        initial_view.0,
+        "keep_in_view should not scroll when row is already visible"
+    );
+}

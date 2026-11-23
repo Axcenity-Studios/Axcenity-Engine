@@ -40,6 +40,14 @@ SaveService:HasSlot(slot: number): boolean
 
 True if slot `slot` has been saved.
 
+#### DeleteSlot
+
+```luau
+SaveService:DeleteSlot(slot: number): boolean
+```
+
+Deletes save slot `slot` if it exists. Returns true if a saved file was removed, false otherwise.
+
 #### SetPlayerData
 
 ```luau

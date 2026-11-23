@@ -356,10 +356,99 @@ pub(super) fn break_value(script: &mut BlockScript, at: &ValueAt) {
     if slot.is_literal() {
         return;
     }
+    if matches!(slot, Expression::BlockOutput { .. }) {
+        *slot = kind.empty();
+        return;
+    }
     let taken = std::mem::replace(slot, kind.empty());
     let loose = LooseValue::new(taken);
     rekey(&mut script.graph, at, &ValueAt::loose(loose.id));
     script.graph.loose.push(loose);
+}
+
+/// Wires right-side data output `output` of block `from` into slot `to`.
+pub(super) fn connect_block_output(
+    script: &mut BlockScript,
+    from: u64,
+    output: usize,
+    to: &ValueAt,
+) -> Result<(), Refusal> {
+    if to.owner == from {
+        return Err("That would loop back into itself.");
+    }
+    let Some(kind) = slot_kind(script, to) else {
+        return Err("That isn't an input.");
+    };
+    let clone_ids = clone_identifiers(script);
+    let out = find_block(script, from)
+        .and_then(|block| {
+            block_value_outs(&block.kind, block.id, &clone_ids)
+                .into_iter()
+                .nth(output)
+        })
+        .ok_or("That output pin is gone.")?;
+    let expr = Expression::BlockOutput {
+        block: from,
+        output,
+        name: out.lua_name,
+    };
+    if !kind.accepts(expr.shape()) {
+        return Err("That value doesn't fit this input.");
+    }
+    if let Some(slot) = value_mut(script, to) {
+        let displaced = std::mem::replace(slot, expr);
+        if !displaced.is_literal() && !matches!(displaced, Expression::BlockOutput { .. }) {
+            let loose = LooseValue::new(displaced);
+            rekey(&mut script.graph, to, &ValueAt::loose(loose.id));
+            script.graph.loose.push(loose);
+        }
+    }
+    Ok(())
+}
+
+/// Disconnects all slots wired from `Pin::BlockOutput(from, output)`.
+pub(super) fn break_block_output(script: &mut BlockScript, from: u64, output: usize) {
+    fn clear_expr(expr: &mut Expression, slot_kinds: &[SlotKind], from: u64, output: usize) {
+        for (idx, child) in expr.children_mut().into_iter().enumerate() {
+            if matches!(
+                child,
+                Expression::BlockOutput { block, output: out, .. }
+                    if *block == from && *out == output
+            ) {
+                let kind = slot_kinds.get(idx).copied().unwrap_or(SlotKind::Any);
+                *child = kind.empty();
+            } else {
+                let nested = value_slots(child);
+                clear_expr(child, &nested, from, output);
+            }
+        }
+    }
+    fn walk(blocks: &mut [Block], from: u64, output: usize) {
+        for block in blocks {
+            let kinds = block_slots(&block.kind);
+            for (idx, expr) in block.kind.expressions_mut().into_iter().enumerate() {
+                if matches!(
+                    expr,
+                    Expression::BlockOutput { block: b, output: out, .. }
+                        if *b == from && *out == output
+                ) {
+                    let kind = kinds.get(idx).copied().unwrap_or(SlotKind::Any);
+                    *expr = kind.empty();
+                } else {
+                    let nested = value_slots(expr);
+                    clear_expr(expr, &nested, from, output);
+                }
+            }
+            for body in block.kind.bodies_mut() {
+                walk(body, from, output);
+            }
+        }
+    }
+    walk(&mut script.blocks, from, output);
+    for loose in &mut script.graph.loose {
+        let nested = value_slots(&loose.value);
+        clear_expr(&mut loose.value, &nested, from, output);
+    }
 }
 
 /// Wires value node `from`'s output to slot `to`. A loose node moves there;

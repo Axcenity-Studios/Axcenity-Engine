@@ -178,7 +178,6 @@ use crate::watcher::Watcher;
 use crate::widgets;
 use crate::window_frame;
 use eframe::egui_wgpu::RenderState;
-use egui_dock::DockState;
 
 /// The hover text of Import…, in the File menu and the ribbon.
 const IMPORT_HOVER: &str = "Import models (.gltf, .glb, .fbx, .obj, or USD, converted to .glb), images, sounds and prefabs. A \
@@ -244,6 +243,9 @@ pub struct EditorApp {
     /// The Scene's tab was closed while the dock was out being drawn; the
     /// welcome page takes its place once it's back (`Layout::close_scene`).
     pending_close_scene: bool,
+    /// Opening the Scene was requested from inside a pane (such as the welcome
+    /// page) while `self.layout.dock` was swapped out for drawing.
+    pending_open_scene: bool,
     /// The editor's icon, for panel windows' title bars and taskbar buttons.
     window_icon: Option<std::sync::Arc<egui::IconData>>,
     /// The New Custom Material window's form, while it's open.
@@ -516,6 +518,8 @@ pub struct EditorApp {
     ui_designer: UiDesigner,
     /// The Terrain panel's tools, settings, previews and work under way.
     terrain: TerrainStudio,
+    /// Environment Weather Inspector state (custom profiles & surface mask brush).
+    weather_ui: crate::weather_inspector::WeatherInspectorState,
     /// The Scatter pane's palettes, brush and stroke under way.
     scatter: crate::scatter_pane::ScatterPane,
     /// Where the dockable panels are. Saved between runs.
@@ -1046,6 +1050,7 @@ impl EditorApp {
             main_window_pixels: None,
             pending_main_dock: None,
             pending_close_scene: false,
+            pending_open_scene: false,
             window_icon: None,
             custom_material: None,
             group_mesh_dialog: None,
@@ -1167,6 +1172,7 @@ impl EditorApp {
             scene_drawn_pass: None,
             ui_designer: UiDesigner::default(),
             terrain: TerrainStudio::default(),
+            weather_ui: crate::weather_inspector::WeatherInspectorState::default(),
             scatter: Default::default(),
             layout: Layout::default(),
             saved_layouts: Default::default(),
@@ -1872,7 +1878,7 @@ impl EditorApp {
             self.layout.keep_a_document();
             self.layout.remember_homes();
             // Taken out while it's drawn, so the panels can borrow the app.
-            let mut dock = std::mem::replace(&mut self.layout.dock, DockState::new(Vec::new()));
+            let mut dock = self.layout.take_dock();
             dock.translations.tab_context_menu.eject_button = "Float in New Window".to_owned();
             let dock_id = floating::main_area(self.layout.dock_generation);
             let mut viewer = DockViewer {
@@ -1899,9 +1905,15 @@ impl EditorApp {
             if layout::dock_chrome::decorate(ui, &mut dock, &tab_rects) {
                 ctx.request_repaint();
             }
-            self.layout.dock = dock;
+            if self.layout.restore_dock(dock) {
+                ctx.request_repaint();
+            }
             if std::mem::take(&mut self.pending_close_scene) {
                 self.layout.close_scene();
+            }
+            if std::mem::take(&mut self.pending_open_scene) {
+                self.layout.open(Pane::Scene);
+                ctx.request_repaint();
             }
             self.after_main_dock(ctx);
             self.floating_windows(ctx, render_state, &palette);
@@ -1910,6 +1922,7 @@ impl EditorApp {
                 // The panels were drawn before it ran.
                 ctx.request_repaint();
             }
+            self.poll_toolbox_background(ctx);
         } else if self.character_workspace.is_some() {
             self.character_workspace_ui(ui, render_state);
         } else {

@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{Discard, EditorApp};
 use crate::explorer::Action;
-use crate::layout::Pane;
 use crate::shortcuts::Action as Shortcut;
 use crate::start::Brand;
 use crate::theme::{self, icons};
@@ -116,7 +115,7 @@ impl EditorApp {
                 .text
                 .gamma_multiply(if palette.dark { 0.07 } else { 0.09 });
             ui.painter_at(rect).image(
-                brand.mark().id(),
+                brand.mark_large().id(),
                 mark,
                 egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                 tint,
@@ -196,7 +195,7 @@ impl EditorApp {
                 ui.add_space(theme::space::XL);
             });
         match picked {
-            Some(Picked::ShowScene) => self.layout.open(Pane::Scene),
+            Some(Picked::ShowScene) => self.pending_open_scene = true,
             Some(Picked::NewScript) => self.act(Action::InsertScript(ClassName::Script)),
             Some(Picked::Search) => self.palette.toggle(),
             Some(Picked::OpenAnother) => self.request_and_go_ahead(&ctx, Discard::OpenAnother),

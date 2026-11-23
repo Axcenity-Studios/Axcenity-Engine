@@ -58,6 +58,7 @@ impl Writer {
 
     pub(super) fn write_connect(
         &mut self,
+        block_id: u64,
         signal: &Expression,
         method: &str,
         params: &str,
@@ -68,9 +69,35 @@ impl Writer {
             return Err(TranslateError::InvalidProperty(method.to_owned()));
         }
         let signal = self.receiver(signal)?;
-        self.line(format!("{signal}:{method}(function({params})"));
-        self.nested(body, ids)?;
-        self.line("end)");
+        let param_count = params
+            .split(',')
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .count();
+        let conn_referenced = self
+            .referenced_output_pins
+            .contains(&(block_id, param_count));
+        if conn_referenced {
+            self.line(format!(
+                "local conn_{block_id} = {signal}:{method}(function({params})"
+            ));
+            self.nested(body, ids)?;
+            self.line("end)");
+            if self.track_connections {
+                self.line(format!("table.insert(_connections, conn_{block_id})"));
+            }
+        } else {
+            let call = format!("{signal}:{method}(function({params})");
+            let close = if self.track_connections {
+                self.line(format!("table.insert(_connections, {call}"));
+                "end))"
+            } else {
+                self.line(call);
+                "end)"
+            };
+            self.nested(body, ids)?;
+            self.line(close);
+        }
         Ok(())
     }
 
@@ -124,17 +151,24 @@ impl Writer {
 
     pub(super) fn write_luau(
         &mut self,
+        block_id: u64,
         kind: &BlockKind,
         ids: &mut HashSet<u64>,
     ) -> Result<(), TranslateError> {
         match kind {
             BlockKind::Comment { text } => self.code(text),
             BlockKind::Local { names, values } if values.is_empty() => {
-                self.line(format!("local {names}"));
+                if !self.hoisted_locals.contains(&block_id) {
+                    self.line(format!("local {names}"));
+                }
             }
             BlockKind::Local { names, values } => {
                 let values = self.list(values)?;
-                self.line(format!("local {names} = {values}"));
+                if self.hoisted_locals.contains(&block_id) {
+                    self.line(format!("{names} = {values}"));
+                } else {
+                    self.line(format!("local {names} = {values}"));
+                }
             }
             BlockKind::Assign { targets, values } => {
                 let (targets, values) = (self.list(targets)?, self.list(values)?);

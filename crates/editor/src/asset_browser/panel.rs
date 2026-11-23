@@ -143,6 +143,20 @@ impl AssetBrowser {
             self.unused = Some(HashSet::new());
             action = Some(BrowserAction::FindUnused(candidates));
         }
+        // If a custom folder is open, clear it if it no longer exists on disk.
+        if let Some(open_dir) = &self.open_custom_folder
+            && !self.custom_folders.iter().any(|f| f == open_dir)
+        {
+            self.open_custom_folder = None;
+        }
+        // Filter entries to the open custom folder when not searching.
+        let mut entries = entries;
+        if let Some(open_dir) = self.open_custom_folder.clone()
+            && search.is_empty()
+        {
+            let prefix = format!("{open_dir}/");
+            entries.retain(|entry| entry.path.starts_with(&prefix));
+        }
         let packages = packages::packages(&self.files_and_shared());
         // A folder that's gone (deleted, or another project) closes.
         let open = self.open_package.as_ref().and_then(|name| {
@@ -153,13 +167,104 @@ impl AssetBrowser {
         if open.is_none() {
             self.open_package = None;
         }
-        let in_folder = open.is_some() && search.is_empty();
+        let in_folder = (open.is_some() || self.open_custom_folder.is_some()) && search.is_empty();
         let searching = !search.is_empty() || self.unused_only;
         let shown = if self.flat || self.source_layout == SourceLayout::Tabbed {
             shown(entries, &packages, open, searching)
         } else {
             grouped(entries, &packages, open, searching, &self.origins)
         };
+        if let Some(open_dir) = self.open_custom_folder.clone()
+            && search.is_empty()
+        {
+            let palette = theme::palette(ui.ctx());
+            ui.horizontal(|ui| {
+                if ui
+                    .add(widgets::button(
+                        widgets::Role::Ghost,
+                        Some(icons::ARROW_LEFT),
+                        "All",
+                        &palette,
+                    ))
+                    .clicked()
+                {
+                    self.open_custom_folder = None;
+                }
+                ui.label(
+                    egui::RichText::new(format!("{} {open_dir}", icons::FOLDER_OPEN))
+                        .strong()
+                        .color(palette.text),
+                );
+            });
+            ui.add_space(4.0);
+        } else if search.is_empty() && open.is_none() {
+            // Show custom folders matching this category (with drag-and-drop to move assets into them).
+            let base = self.category.base_folder();
+            let base_prefix = format!("{base}/");
+            let visible_folders: Vec<String> = self
+                .custom_folders
+                .iter()
+                .filter(|dir| {
+                    if self.category == Category::All {
+                        true
+                    } else if self.category == Category::Textures {
+                        dir.starts_with("assets/textures/") || dir.starts_with("assets/materials/")
+                    } else {
+                        dir.starts_with(&base_prefix)
+                    }
+                })
+                .filter(|dir| {
+                    // Don't duplicate model/animation package folders already shown as Packages.
+                    !packages.iter().any(|p| {
+                        dir.eq_ignore_ascii_case(&format!("assets/models/{}", p.name))
+                            || dir.eq_ignore_ascii_case(&format!("assets/animations/{}", p.name))
+                    })
+                })
+                .cloned()
+                .collect();
+            if !visible_folders.is_empty() {
+                let palette = theme::palette(ui.ctx());
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
+                    for dir in visible_folders {
+                        let label = dir.rsplit('/').next().unwrap_or(&dir);
+                        let resp = ui
+                            .add(widgets::button(
+                                widgets::Role::Secondary,
+                                Some(icons::FOLDER),
+                                label,
+                                &palette,
+                            ))
+                            .on_hover_text(format!(
+                                "Open folder `{dir}` (or drop an asset here to move it)"
+                            ));
+                        if resp.clicked() {
+                            self.open_custom_folder = Some(dir.clone());
+                        }
+                        if resp.dnd_hover_payload::<AssetPayload>().is_some() {
+                            ui.painter().rect_stroke(
+                                resp.rect,
+                                theme::radius::CONTROL,
+                                egui::Stroke::new(2.0, palette.accent),
+                                egui::StrokeKind::Outside,
+                            );
+                        }
+                        if let Some(payload) = resp.dnd_release_payload::<AssetPayload>() {
+                            let file_name =
+                                payload.0.path.rsplit('/').next().unwrap_or(&payload.0.path);
+                            let to = format!("{dir}/{file_name}");
+                            if to != payload.0.path {
+                                action = Some(BrowserAction::RenameAsset {
+                                    from: payload.0.path.clone(),
+                                    to,
+                                });
+                            }
+                        }
+                    }
+                });
+                ui.add_space(4.0);
+            }
+        }
         if let Some(package) = open
             && search.is_empty()
             && self.folder_header(ui, package)
@@ -743,16 +848,48 @@ impl AssetBrowser {
             .on_disabled_hover_text("Select parts, Models or UI to save as a prefab.")
             .clicked()
         };
+        let mut new_folder = false;
+        let mut add_folder = |ui: &mut egui::Ui| {
+            if ui
+                .add_enabled(
+                    can_edit && self.folder.is_some(),
+                    widgets::button(
+                        widgets::Role::Secondary,
+                        Some(icons::FOLDER_PLUS),
+                        "Folder",
+                        &palette,
+                    )
+                    .min_size(egui::vec2(0.0, 24.0)),
+                )
+                .on_hover_text("Create a custom folder to organize textures, materials, or assets.")
+                .clicked()
+            {
+                new_folder = true;
+            }
+        };
         let saved = if right_to_left {
             let saved = save(ui);
+            add_folder(ui);
             import(ui);
             get_texture(ui);
             saved
         } else {
             get_texture(ui);
             import(ui);
+            add_folder(ui);
             save(ui)
         };
+        if new_folder {
+            let parent = self
+                .open_custom_folder
+                .clone()
+                .unwrap_or_else(|| self.category.base_folder().to_owned());
+            self.dialog = Some(AssetDialog::NewFolder {
+                parent,
+                name: String::new(),
+                error: None,
+            });
+        }
         if saved {
             action = Some(BrowserAction::SavePrefab);
         }
@@ -856,6 +993,56 @@ impl AssetBrowser {
                                 to: target,
                             });
                             close = true;
+                        }
+                        Some(_) => close = true,
+                        None => {}
+                    }
+                }
+                AssetDialog::NewFolder {
+                    parent,
+                    name,
+                    error,
+                } => {
+                    let message = format!("Create a subfolder inside `{parent}/`.");
+                    dialog::header(
+                        ui,
+                        icons::FOLDER_PLUS,
+                        Tone::Question,
+                        "New folder",
+                        Some(&message),
+                    );
+                    ui.add(dialog::text_field(name));
+                    if let Some(problem) = error {
+                        ui.colored_label(palette.error, problem.as_str());
+                    }
+                    let trimmed = name.trim();
+                    let valid = !trimmed.is_empty()
+                        && !trimmed.contains('/')
+                        && !trimmed.contains('\\')
+                        && !trimmed.starts_with('.');
+                    let picked = dialog::buttons(
+                        ui,
+                        &[
+                            Button::cancel(),
+                            Button::new(icons::CHECK, "Create", Kind::Main).enabled(valid),
+                        ],
+                        Enter::FromField,
+                    );
+                    match picked {
+                        Some(1) if valid => {
+                            let rel = format!("{parent}/{trimmed}");
+                            if let Some(root) = &folder {
+                                match std::fs::create_dir_all(root.join(&rel)) {
+                                    Ok(()) => {
+                                        self.open_custom_folder = Some(rel);
+                                        self.scanned_at = None;
+                                        close = true;
+                                    }
+                                    Err(err) => {
+                                        *error = Some(format!("Could not create folder: {err}"));
+                                    }
+                                }
+                            }
                         }
                         Some(_) => close = true,
                         None => {}

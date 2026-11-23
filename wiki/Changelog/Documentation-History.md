@@ -12,6 +12,8 @@ Every change to this wiki, newest first: one line each. Keep the five newest als
 
 | Date | Pages | Change | By |
 |---|---|---|---|
+| 2026-11-22 | Terrain | Painted water border feathering, corner level blending, immediate GPU upload anti-flicker, and non-linear organic wave dynamics (`water.wgsl`, `terrain_water.rs`, `brush.rs`, `scene.rs`) | Antigravity |
+| 2026-11-22 | Blocks and graphs, Home | Visual scripting, Graph Editor & Compiler overhaul (Phases 1–9): `ObjectRef` dynamic object sockets, `BlockOutput` value pins, expanded Events/Control/Motion/Sensing/Appearance/Sound/Operators/Animation/Tweens/Data/World/Networking/Chat blocks, catalogue cards, and `from_lua` round-trip | Antigravity |
 | 2026-11-16 | Terrain, Specialized editors, File formats, Home | The Scatter pane replaces the Terrain Studio's Foliage tool: per-project `.axscatter` palettes, `Operation::Scatter` (weighted mix, spacing, erase palette or everything), `foliage.json` keeping lean and sink | Claude |
 | 2026-11-16 | Terrain, File formats, Home | Painted terrain water (the Water brush): a level per cell, its own chunk versions, `water.png`, a mesh of the cells that show; waves varied from place to place (`WaveVariation`) | Claude |
 | 2026-11-16 | ADR-0039 (new, Proposed), ADR index, Mesh editing and CSG, Known limitations, Home | Group as Mesh and Ungroup Mesh: parts into one MeshPart with one optimized `.group.glb`, the parts kept in a `GroupedParts`; the optimizer's passes and measurements; what isn't carried; a SurfaceAppearance normal map drawn without tangents, found on the way | Claude |

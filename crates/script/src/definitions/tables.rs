@@ -1145,6 +1145,18 @@ pub(super) const VALUE_TYPES: &[ValueType] = &[
                 params: &[],
                 returns: "{ string }",
             },
+            Function {
+                name: "Count",
+                doc: "How many rows the table has.",
+                params: &[],
+                returns: "number",
+            },
+            Function {
+                name: "GetRows",
+                doc: "Every row in the table's order as a 1-indexed list. A new list each call.",
+                params: &[],
+                returns: "{ DataRow }",
+            },
         ],
     },
     ValueType {
@@ -1263,6 +1275,12 @@ pub(super) const VALUE_TYPES: &[ValueType] = &[
                 returns: "boolean",
             },
             Function {
+                name: "DeleteSlot",
+                doc: "Deletes save slot `slot` if it exists. Returns true if a saved file was removed, false otherwise.",
+                params: &[("slot", "number")],
+                returns: "boolean",
+            },
+            Function {
                 name: "SetPlayerData",
                 doc: "Keeps `value` for the player under `name`, such as `SaveService:SetPlayerData(\"Coins\", 10)`: a boolean, number, string, Vector3, Vector2, Color3, UDim2 or EnumItem. nil removes it. Saved in slots and captured at checkpoints.",
                 params: &[("name", "string"), ("value", "any")],
@@ -1346,11 +1364,23 @@ pub(super) const VALUE_TYPES: &[ValueType] = &[
     ValueType {
         class: "NetworkService",
         doc: "Hosting and joining games, from `game:GetService(\"NetworkService\")`, so a menu can do them. Players who join appear in `Players` on every device (the worlds aren't shared yet). Both sides have it; in the editor's Play, Host and Join fail and FindLanGames finds nothing.",
-        fields: &[Field {
-            name: "ConnectionFailed",
-            ty: "Signal",
-            doc: "Fires with why when hosting or joining fails, a join is refused (such as a version mismatch, a wrong password or a full game) or the connection is lost: `function(reason) ... end`.",
-        }],
+        fields: &[
+            Field {
+                name: "IsHost",
+                ty: "boolean",
+                doc: "True while this device is hosting a multiplayer game. Read-only.",
+            },
+            Field {
+                name: "IsConnected",
+                ty: "boolean",
+                doc: "True while this device is hosting or joined to a multiplayer game. Read-only.",
+            },
+            Field {
+                name: "ConnectionFailed",
+                ty: "Signal",
+                doc: "Fires with why when hosting or joining fails, a join is refused (such as a version mismatch, a wrong password or a full game) or the connection is lost: `function(reason) ... end`.",
+            },
+        ],
         operators: &[],
         methods: &[
             Function {
@@ -2027,6 +2057,10 @@ pub(super) const INSTANCE_EVENT_DOCS: &[(&str, &str)] = &[
         "Fires on a device when world streaming brings this Instance back, or a Model's contents arrive. Connect to it on a Model that's still away, or a part kept from before it went.",
     ),
     (
+        "StreamedOut",
+        "Fires on a device when world streaming takes this Instance away, or a Model's contents leave.",
+    ),
+    (
         "AttributeChanged",
         "Fires when an attribute gets a different value or is removed. The handler gets the attribute's name.",
     ),
@@ -2570,6 +2604,15 @@ pub(super) const CLASS_METHODS: &[(ClassName, Function)] = &[
             doc: "Every Player in the game.",
             params: &[],
             returns: "{Player}",
+        },
+    ),
+    (
+        ClassName::Players,
+        Function {
+            name: "GetPlayerFromCharacter",
+            doc: "The Player whose Character is `character`, or nil if none matches.",
+            params: &[("character", "Instance?")],
+            returns: "Player?",
         },
     ),
     (
@@ -3841,6 +3884,14 @@ pub(super) const CLASS_FIELDS: &[(ClassName, Field)] = &[
             name: "CurrentCamera",
             ty: "Camera",
             doc: "The camera the player sees through.",
+        },
+    ),
+    (
+        ClassName::Workspace,
+        Field {
+            name: "DistributedGameTime",
+            ty: "number",
+            doc: "Seconds of game time elapsed since the session started. Read-only.",
         },
     ),
     (

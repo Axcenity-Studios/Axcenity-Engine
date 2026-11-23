@@ -138,6 +138,11 @@ impl Harness {
             if let Some(during) = during.take() {
                 during(ctx);
             }
+            egui::Panel::right("test inspector")
+                .default_size(260.0)
+                .show(ui, |ui| {
+                    self.doc.inspector(ui, &self.clips);
+                });
             egui::CentralPanel::default().show(ui, |ui| {
                 self.doc.graph_ui(ui, &self.clips);
             });

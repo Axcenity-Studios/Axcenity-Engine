@@ -68,8 +68,10 @@ fn behaviour(file: &StateMachineFile) -> StateMachineFile {
     let mut file = file.clone();
     file.any_state_position = None;
     file.entry_position = None;
+    file.groups.clear();
     for state in &mut file.states {
         state.position = [0.0, 0.0];
+        state.group = None;
     }
     file
 }
@@ -237,8 +239,56 @@ impl ControllerDoc {
                     self.add_condition(transition, &parameter);
                     self.selected = Selected::Transition(transition);
                 }
+                #[cfg(test)]
                 GraphEvent::AddParameter(kind) => {
                     self.add_parameter(kind);
+                }
+                GraphEvent::AddGroup(at) => {
+                    let name = (1u32..)
+                        .map(|n| format!("Group {n}"))
+                        .find(|name| !self.file.groups.iter().any(|g| g.name == *name))
+                        .expect("some group name is always free");
+                    self.file.groups.push(files::StateGroupDef::new(&name, at));
+                }
+                GraphEvent::ToggleGroup(index) => {
+                    if let Some(group) = self.file.groups.get_mut(index) {
+                        group.collapsed = !group.collapsed;
+                    }
+                }
+                GraphEvent::MoveGroup(index, delta) => {
+                    if let Some(group) = self.file.groups.get_mut(index) {
+                        group.position[0] += delta[0];
+                        group.position[1] += delta[1];
+                        let group_name = group.name.clone();
+                        for state in &mut self.file.states {
+                            if state.group.as_deref() == Some(group_name.as_str()) {
+                                state.position[0] += delta[0];
+                                state.position[1] += delta[1];
+                            }
+                        }
+                    }
+                }
+                GraphEvent::SetStateGroup(index, group) => {
+                    if let Some(state) = self.file.states.get_mut(index) {
+                        if let Some(ref gname) = group
+                            && !self.file.groups.iter().any(|g| g.name == *gname)
+                        {
+                            self.file
+                                .groups
+                                .push(files::StateGroupDef::new(gname, state.position));
+                        }
+                        state.group = group;
+                    }
+                }
+                GraphEvent::DeleteGroup(index) => {
+                    if index < self.file.groups.len() {
+                        let name = self.file.groups.remove(index).name;
+                        for state in &mut self.file.states {
+                            if state.group.as_deref() == Some(name.as_str()) {
+                                state.group = None;
+                            }
+                        }
+                    }
                 }
             }
         }

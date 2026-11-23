@@ -33,13 +33,15 @@ pub(super) fn palette_parts(
     variables: &[String],
 ) -> (Vec<PaletteItem>, Vec<PaletteItem>) {
     let first = |filter: Filter| {
-        objects
-            .iter()
-            .find(|object| filter.matches(object.class))
-            .map_or_else(
-                || filter.placeholder().to_owned(),
-                |object| object.path.clone(),
-            )
+        ObjectRef::path(
+            objects
+                .iter()
+                .find(|object| filter.matches(object.class))
+                .map_or_else(
+                    || filter.placeholder().to_owned(),
+                    |object| object.path.clone(),
+                ),
+        )
     };
     let number = |value| Expression::Number { value };
     let name = |name: &str| Expression::Name {
@@ -83,23 +85,43 @@ pub(super) fn palette_parts(
             block(BlockKind::WhenStarted { body: Vec::new() }),
             block(BlockKind::WhenTouched {
                 part: part.clone(),
+                filter: "Any Part".to_owned(),
+                filter_value: None,
+                cooldown: None,
                 body: Vec::new(),
             }),
+            block(BlockKind::WhenTouchEnds {
+                part: part.clone(),
+                filter: "Any Part".to_owned(),
+                filter_value: None,
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenPlayerJoins { body: Vec::new() }),
+            block(BlockKind::WhenPlayerLeaves { body: Vec::new() }),
+            block(BlockKind::WhenCharacterSpawns { body: Vec::new() }),
+            block(BlockKind::WhenPlayerDies { body: Vec::new() }),
             block(BlockKind::WhenKeyPressed {
+                key: "Space".to_owned(),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenKeyReleased {
                 key: "Space".to_owned(),
                 body: Vec::new(),
             }),
             block(BlockKind::WhenPromptTriggered {
                 prompt: first(Filter::Prompts),
+                cooldown: None,
                 body: Vec::new(),
             }),
             block(BlockKind::WhenPartClicked {
                 detector: first(Filter::ClickDetectors),
+                cooldown: None,
                 body: Vec::new(),
             }),
             block(BlockKind::WhenCommandRun {
                 command: text("heal"),
                 help: text("Heals the player"),
+                admin_only: None,
                 body: Vec::new(),
             }),
             block(BlockKind::WhenClicked {
@@ -118,6 +140,27 @@ pub(super) fn palette_parts(
                 widget: first(Filter::Widgets),
                 body: Vec::new(),
             }),
+            block(BlockKind::WhenChildAdded {
+                target: ObjectRef::default(),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenChildRemoved {
+                target: ObjectRef::default(),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenTagAdded {
+                tag: text("Hazard"),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenTagRemoved {
+                tag: text("Hazard"),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenRemoteFires {
+                remote: ObjectRef::default(),
+                side: "Server (OnServerEvent)".to_owned(),
+                body: Vec::new(),
+            }),
             block(BlockKind::EveryFrame { body: Vec::new() }),
             block(BlockKind::BeforePhysics { body: Vec::new() }),
             block(BlockKind::BeforeRender { body: Vec::new() }),
@@ -127,6 +170,12 @@ pub(super) fn palette_parts(
             }),
             block(BlockKind::FireEvent {
                 event: bindable.clone(),
+                data: None,
+            }),
+            block(BlockKind::Disconnect {
+                connection: Expression::Name {
+                    name: "connection".to_owned(),
+                },
             }),
             block(BlockKind::WhenSoundEnded {
                 sound: sound.clone(),
@@ -147,11 +196,34 @@ pub(super) fn palette_parts(
             block(BlockKind::Wait {
                 seconds: number(1.0),
             }),
+            block(BlockKind::WaitUntil {
+                condition: condition(),
+            }),
             block(BlockKind::Repeat {
                 count: number(10.0),
                 body: Vec::new(),
             }),
+            block(BlockKind::RepeatUntil {
+                condition: condition(),
+                body: Vec::new(),
+            }),
             block(BlockKind::Forever { body: Vec::new() }),
+            block(BlockKind::ForRange {
+                start: number(1.0),
+                end: number(10.0),
+                step: number(1.0),
+                body: Vec::new(),
+            }),
+            block(BlockKind::ForEachInList {
+                list: Expression::Variable {
+                    name: variable.clone(),
+                },
+                body: Vec::new(),
+            }),
+            block(BlockKind::ForEachTagged {
+                tag: text("Enemy"),
+                body: Vec::new(),
+            }),
             block(BlockKind::If {
                 condition: condition(),
                 body: Vec::new(),
@@ -161,16 +233,22 @@ pub(super) fn palette_parts(
                 then_body: Vec::new(),
                 else_body: Vec::new(),
             }),
-            block(BlockKind::WaitUntil {
-                condition: condition(),
+            block(BlockKind::Sequence {
+                branches: vec![Vec::new(), Vec::new()],
             }),
-            block(BlockKind::RepeatUntil {
-                condition: condition(),
+            block(BlockKind::CooldownGate {
+                cooldown: number(1.0),
                 body: Vec::new(),
             }),
+            block(BlockKind::SpawnAsync {
+                delay: number(0.0),
+                body: Vec::new(),
+            }),
+            block(BlockKind::Break),
+            block(BlockKind::DestroyScript),
             block(BlockKind::StopScript),
             block(BlockKind::ForEachChild {
-                target: String::new(),
+                target: ObjectRef::default(),
                 variable: "child".to_owned(),
                 body: Vec::new(),
             }),
@@ -178,20 +256,28 @@ pub(super) fn palette_parts(
                 center: vector(0.0, 0.0, 0.0),
                 radius: number(10.0),
                 variable: "part".to_owned(),
+                players_only: false,
+                ignore: None,
                 body: Vec::new(),
             }),
             block(BlockKind::ForEachPartTouching {
                 target: part.clone(),
                 variable: "part".to_owned(),
+                players_only: false,
+                ignore: None,
                 body: Vec::new(),
             }),
             block(BlockKind::WaitForChild {
-                target: String::new(),
+                target: ObjectRef::default(),
                 name: NameKind::Child.example().to_owned(),
+                timeout: None,
             }),
             block(BlockKind::WaitForEvent {
                 target: part.clone(),
                 event: NameKind::Signal.example().to_owned(),
+            }),
+            block(BlockKind::Destroy {
+                target: part.clone(),
             }),
             block(BlockKind::DestroyAfter {
                 target: part.clone(),
@@ -222,10 +308,31 @@ pub(super) fn palette_parts(
             block(BlockKind::TurnBy {
                 target: part.clone(),
                 rotation: vector(0.0, 15.0, 0.0),
+                space: axcenity_blocks::SPACE_MODES[0].to_owned(),
+            }),
+            block(BlockKind::SlideTo {
+                target: part.clone(),
+                position: vector(0.0, 10.0, 0.0),
+                duration: number(1.0),
+                easing: axcenity_blocks::EASING_STYLES[1].to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            }),
+            block(BlockKind::RotateTo {
+                target: part.clone(),
+                rotation: vector(0.0, 90.0, 0.0),
+                duration: number(1.0),
+                easing: axcenity_blocks::EASING_STYLES[1].to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
             }),
             block(BlockKind::SetAnchored {
                 target: part.clone(),
                 anchored: Expression::Boolean { value: true },
+            }),
+            block(BlockKind::SetGravity {
+                target: part.clone(),
+                multiplier: number(0.0),
             }),
             block(BlockKind::PushWithForce {
                 target: part.clone(),
@@ -235,6 +342,15 @@ pub(super) fn palette_parts(
                 target: part.clone(),
                 velocity: vector(0.0, 20.0, 0.0),
             }),
+            block(BlockKind::SetAngularVelocity {
+                target: part.clone(),
+                velocity: vector(0.0, 5.0, 0.0),
+            }),
+            block(BlockKind::LaunchPart {
+                target: part.clone(),
+                direction: vector(0.0, 1.0, 0.0),
+                speed: number(50.0),
+            }),
             block(BlockKind::SetFriction {
                 target: part.clone(),
                 friction: number(0.1),
@@ -243,6 +359,13 @@ pub(super) fn palette_parts(
                 agent: first(Filter::Agents),
                 position: vector(10.0, 0.0, 0.0),
             }),
+            block(BlockKind::FollowTarget {
+                agent: first(Filter::Agents),
+                target: part.clone(),
+            }),
+            block(BlockKind::StopAgent {
+                agent: first(Filter::Agents),
+            }),
             block(BlockKind::SetVelocity {
                 agent: first(Filter::Agents),
                 velocity: vector(0.0, 0.0, 0.0),
@@ -250,6 +373,15 @@ pub(super) fn palette_parts(
             block(BlockKind::WhenAgentSenses {
                 agent: first(Filter::Agents),
                 sense: axcenity_blocks::SENSES[0].to_owned(),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenAgentLosesPlayer {
+                agent: first(Filter::Agents),
+                sense: axcenity_blocks::SENSES[0].to_owned(),
+                body: Vec::new(),
+            }),
+            block(BlockKind::WhenAgentArrives {
+                agent: first(Filter::Agents),
                 body: Vec::new(),
             }),
             block(BlockKind::Patrol {
@@ -261,6 +393,14 @@ pub(super) fn palette_parts(
                 spline: first(Filter::Splines),
                 distance: number(0.0),
             }),
+            block(BlockKind::ControlSpline {
+                follower: first(Filter::SplineFollowers),
+                action: axcenity_blocks::SPLINE_ACTIONS[0].to_owned(),
+            }),
+            block(BlockKind::SetSplineSpeed {
+                follower: first(Filter::SplineFollowers),
+                speed: number(10.0),
+            }),
             block(BlockKind::WhenSplineReached {
                 follower: first(Filter::SplineFollowers),
                 which: axcenity_blocks::SPLINE_ENDS[0].to_owned(),
@@ -269,6 +409,14 @@ pub(super) fn palette_parts(
             block(BlockKind::WhenSeatOccupied {
                 seat: first(Filter::Seats),
                 body: Vec::new(),
+            }),
+            block(BlockKind::WhenSeatVacated {
+                seat: first(Filter::Seats),
+                body: Vec::new(),
+            }),
+            block(BlockKind::SitInSeat {
+                seat: first(Filter::Seats),
+                controller: first(Filter::Controllers),
             }),
             block(BlockKind::LeaveSeat {
                 controller: first(Filter::Controllers),
@@ -312,6 +460,38 @@ pub(super) fn palette_parts(
             block(BlockKind::Hide {
                 target: first(Filter::Gui),
             }),
+            block(BlockKind::ToggleVisibility {
+                target: first(Filter::Gui),
+            }),
+            block(BlockKind::SetTransparency {
+                target: part.clone(),
+                transparency: number(0.5),
+            }),
+            block(BlockKind::SetMaterial {
+                target: part.clone(),
+                material: axcenity_blocks::MATERIALS[0].to_owned(),
+            }),
+            block(BlockKind::EmitParticles {
+                target: part.clone(),
+                count: number(20.0),
+            }),
+            block(BlockKind::SetEffectEnabled {
+                target: part.clone(),
+                enabled: Expression::Boolean { value: true },
+            }),
+            block(BlockKind::SetImage {
+                target: first(Filter::Gui),
+                image: text("assets/textures/icon.png"),
+            }),
+            block(BlockKind::TweenProperty {
+                target: part.clone(),
+                property: "Transparency".to_owned(),
+                value: number(1.0),
+                duration: number(1.0),
+                easing: axcenity_blocks::EASING_STYLES[1].to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            }),
             block(BlockKind::ShowPage {
                 layout: first(Filter::PageLayouts),
                 page: text("Home"),
@@ -330,21 +510,29 @@ pub(super) fn palette_parts(
                 property: "Size".to_owned(),
                 value: vector(4.0, 1.0, 2.0),
             }),
-            block(BlockKind::SetAttribute {
-                target: part.clone(),
-                attribute: NameKind::Attribute.example().to_owned(),
-                value: number(100.0),
-            }),
             block(BlockKind::SetLanguage {
                 language: text("English"),
             }),
             block(BlockKind::SetToneMapping {
                 curve: "Neutral".to_owned(),
             }),
-            block(BlockKind::SetClockTime { time: number(18.0) }),
+            block(BlockKind::SetClockTime {
+                time: number(18.0),
+                duration: None,
+            }),
             block(BlockKind::SetAtmosphere {
                 property: "Haze".to_owned(),
                 value: number(2.0),
+                duration: None,
+            }),
+            block(BlockKind::SetLightingProperty {
+                property: axcenity_blocks::LIGHTING_PROPERTIES[0].to_owned(),
+                value: number(1.0),
+            }),
+            block(BlockKind::SetPostProcessing {
+                effect: axcenity_blocks::POST_PROCESSING_EFFECTS[0].to_owned(),
+                property: "Intensity".to_owned(),
+                value: number(0.5),
             }),
             block(BlockKind::SetGraphicsQuality {
                 quality: "High".to_owned(),
@@ -352,15 +540,20 @@ pub(super) fn palette_parts(
             block(BlockKind::SetGraphicsOption {
                 setting: "ShadowQuality".to_owned(),
                 choice: "High".to_owned(),
-            }),
-            block(BlockKind::SetGraphicsNumber {
-                setting: "RenderScale".to_owned(),
-                value: number(1.0),
+                value: None,
             }),
         ],
         Category::Sound => vec![
             block(BlockKind::PlaySound {
                 target: sound.clone(),
+                pitch: None,
+                wait_until_done: false,
+            }),
+            block(BlockKind::PlaySoundAtPosition {
+                target: sound.clone(),
+                position: vector(0.0, 0.0, 0.0),
+                volume: None,
+                pitch: None,
             }),
             block(BlockKind::StopSound {
                 target: sound.clone(),
@@ -372,8 +565,30 @@ pub(super) fn palette_parts(
                 target: sound.clone(),
             }),
             block(BlockKind::SetVolume {
-                target: sound,
+                target: sound.clone(),
                 volume: number(0.5),
+            }),
+            block(BlockKind::FadeVolume {
+                target: sound.clone(),
+                volume: number(0.0),
+                duration: number(1.0),
+                wait_until_done: false,
+            }),
+            block(BlockKind::SetSoundPitch {
+                target: sound.clone(),
+                pitch: number(1.0),
+            }),
+            block(BlockKind::SetSoundLooping {
+                target: sound.clone(),
+                looped: Expression::Boolean { value: true },
+            }),
+            block(BlockKind::SetSoundTime {
+                target: sound.clone(),
+                time: number(0.0),
+            }),
+            R(Expression::SoundProperty {
+                target: sound,
+                property: axcenity_blocks::SOUND_PROPERTIES[0].to_owned(),
             }),
         ],
         Category::Operators => {
@@ -412,9 +627,19 @@ pub(super) fn palette_parts(
                     max: Box::new(number(1.0)),
                 }),
                 R(Expression::Lerp {
-                    from: Box::new(vector(0.0, 0.0, 0.0)),
-                    to: Box::new(vector(0.0, 10.0, 0.0)),
+                    from: Box::new(number(0.0)),
+                    to: Box::new(number(10.0)),
                     alpha: Box::new(number(0.5)),
+                }),
+                R(Expression::Clamp {
+                    value: Box::new(number(5.0)),
+                    min: Box::new(number(0.0)),
+                    max: Box::new(number(10.0)),
+                }),
+                R(Expression::MinMax {
+                    op: "min".to_owned(),
+                    left: Box::new(number(0.0)),
+                    right: Box::new(number(10.0)),
                 }),
                 compare(Comparison::Greater, 50.0),
                 compare(Comparison::Less, 50.0),
@@ -428,10 +653,51 @@ pub(super) fn palette_parts(
                     left: Box::new(text("apple ")),
                     right: Box::new(text("banana")),
                 }),
+                R(Expression::StringLength {
+                    text: Box::new(text("hello")),
+                }),
+                R(Expression::StringContains {
+                    text: Box::new(text("hello")),
+                    substring: Box::new(text("ell")),
+                }),
+                R(Expression::FormatNumber {
+                    value: Box::new(number(12.345)),
+                    decimals: Box::new(number(2.0)),
+                }),
                 math(MathOp::Modulo),
                 R(Expression::Function {
                     function: MathFunction::Round,
                     value: Box::new(number(0.0)),
+                }),
+                R(Expression::MakeVector3 {
+                    x: Box::new(number(0.0)),
+                    y: Box::new(number(0.0)),
+                    z: Box::new(number(0.0)),
+                }),
+                R(Expression::VectorAxis {
+                    axis: "Y".to_owned(),
+                    vector: Box::new(vector(0.0, 0.0, 0.0)),
+                }),
+                R(Expression::Distance {
+                    from: Box::new(vector(0.0, 0.0, 0.0)),
+                    to: Box::new(vector(0.0, 10.0, 0.0)),
+                }),
+                R(Expression::Direction {
+                    from: Box::new(vector(0.0, 0.0, 0.0)),
+                    to: Box::new(vector(0.0, 10.0, 0.0)),
+                }),
+                R(Expression::Magnitude {
+                    vector: Box::new(vector(0.0, 10.0, 0.0)),
+                }),
+                R(Expression::MakeColorRgb {
+                    r: Box::new(number(255.0)),
+                    g: Box::new(number(128.0)),
+                    b: Box::new(number(0.0)),
+                }),
+                R(Expression::MakeColorHsv {
+                    h: Box::new(number(0.5)),
+                    s: Box::new(number(1.0)),
+                    v: Box::new(number(1.0)),
                 }),
             ]
         }
@@ -447,14 +713,68 @@ pub(super) fn palette_parts(
                 value: number(0.0),
             }));
             items.push(block(BlockKind::ChangeVariable {
-                name: variable,
+                name: variable.clone(),
                 by: number(1.0),
+            }));
+            items.push(block(BlockKind::SetAttribute {
+                target: part.clone(),
+                attribute: NameKind::Attribute.example().to_owned(),
+                value: number(100.0),
+            }));
+            items.push(R(Expression::Attribute {
+                target: part.clone(),
+                attribute: NameKind::Attribute.example().to_owned(),
+            }));
+            let list_var = Expression::Variable {
+                name: "items".to_owned(),
+            };
+            items.push(block(BlockKind::ListCreate {
+                name: "items".to_owned(),
+                items: Vec::new(),
+            }));
+            items.push(block(BlockKind::ListAdd {
+                list: list_var.clone(),
+                value: text("item"),
+            }));
+            items.push(block(BlockKind::ListInsert {
+                list: list_var.clone(),
+                index: number(1.0),
+                value: text("item"),
+            }));
+            items.push(block(BlockKind::ListRemoveIndex {
+                list: list_var.clone(),
+                index: number(1.0),
+            }));
+            items.push(block(BlockKind::ListRemoveValue {
+                list: list_var.clone(),
+                value: text("item"),
+            }));
+            items.push(block(BlockKind::ListClear {
+                list: list_var.clone(),
+            }));
+            items.push(R(Expression::ListItem {
+                list: Box::new(list_var.clone()),
+                index: Box::new(number(1.0)),
+            }));
+            items.push(R(Expression::ListLength {
+                list: Box::new(list_var.clone()),
+            }));
+            items.push(R(Expression::ListContains {
+                list: Box::new(list_var),
+                value: Box::new(text("item")),
             }));
             items
         }
         Category::Sensing => vec![
             R(Expression::TouchingPart),
+            R(Expression::TriggeringPlayer),
+            R(Expression::CommandArgs),
+            R(Expression::DeltaTime),
+            R(Expression::GameTime),
             R(Expression::PartUnderMouse),
+            R(Expression::MouseHitPosition),
+            R(Expression::CameraPosition),
+            R(Expression::CameraLookDirection),
             R(Expression::KeyDown {
                 key: "Space".to_owned(),
             }),
@@ -462,18 +782,29 @@ pub(super) fn palette_parts(
                 target: part.clone(),
                 property: "Position".to_owned(),
             }),
-            R(Expression::Attribute {
-                target: part.clone(),
-                attribute: NameKind::Attribute.example().to_owned(),
-            }),
             R(Expression::Raycast {
                 origin: Box::new(vector(0.0, 10.0, 0.0)),
                 direction: Box::new(vector(0.0, -20.0, 0.0)),
+                output: axcenity_blocks::RAYCAST_OUTPUTS[0].to_owned(),
+                ignore: None,
             }),
-            R(Expression::RaycastIgnoring {
-                origin: Box::new(vector(0.0, 10.0, 0.0)),
-                direction: Box::new(vector(0.0, -20.0, 0.0)),
-                ignore: part,
+            R(Expression::NearestPlayerTo {
+                position: Box::new(vector(0.0, 0.0, 0.0)),
+            }),
+            R(Expression::PlayerOfPart { part: part.clone() }),
+            R(Expression::PlayerIsAlive {
+                player: ObjectRef(Box::new(Expression::TriggeringPlayer)),
+            }),
+            R(Expression::ParentOf {
+                target: part.clone(),
+            }),
+            R(Expression::ChildOf {
+                name: Box::new(text("Humanoid")),
+                target: part.clone(),
+            }),
+            R(Expression::HasTag {
+                target: part,
+                tag: Box::new(text("Hazard")),
             }),
             R(Expression::SplinePosition {
                 spline: first(Filter::Splines),
@@ -490,10 +821,11 @@ pub(super) fn palette_parts(
         ],
         Category::Animation => {
             let animator = first(Filter::Animators);
+            let animator_path = animator.as_path().unwrap_or("");
             let name = |kind: NameKind| {
                 objects
                     .iter()
-                    .find(|object| object.path == animator)
+                    .find(|object| object.path == animator_path)
                     .and_then(|object| object.names.iter().find(|(of, _)| *of == kind))
                     .map_or_else(|| kind.example().to_owned(), |(_, name)| name.clone())
             };
@@ -529,12 +861,48 @@ pub(super) fn palette_parts(
                 block(BlockKind::PlayAnimation {
                     animator: animator.clone(),
                     animation: first(Filter::Animations),
+                    fade_time: None,
+                    speed: None,
+                    weight: None,
+                    wait_until_done: false,
+                }),
+                block(BlockKind::StopAnimation {
+                    animator: animator.clone(),
+                    animation: None,
+                    fade_time: None,
+                }),
+                block(BlockKind::SetAnimatorSpeed {
+                    animator: animator.clone(),
+                    speed: number(1.0),
+                }),
+                block(BlockKind::SetIkTarget {
+                    ik_control: first(Filter::IkControls),
+                    target: part.clone(),
+                    weight: None,
+                }),
+                block(BlockKind::SetRagdollEnabled {
+                    ragdoll: first(Filter::Ragdolls),
+                    enabled: Expression::Boolean { value: true },
                 }),
                 block(BlockKind::PlayCutscene {
                     sequence: first(Filter::Sequences),
                 }),
+                block(BlockKind::PauseCutscene {
+                    sequence: first(Filter::Sequences),
+                }),
+                block(BlockKind::ResumeCutscene {
+                    sequence: first(Filter::Sequences),
+                }),
+                block(BlockKind::StopCutscene {
+                    sequence: first(Filter::Sequences),
+                }),
                 block(BlockKind::WhenCutsceneFinished {
                     sequence: first(Filter::Sequences),
+                    body: Vec::new(),
+                }),
+                block(BlockKind::WhenAnimationFinished {
+                    animator: animator.clone(),
+                    animation: first(Filter::Animations),
                     body: Vec::new(),
                 }),
                 block(BlockKind::WhenStateChanged {
@@ -546,6 +914,9 @@ pub(super) fn palette_parts(
                     event: name(NameKind::Event),
                     body: Vec::new(),
                 }),
+                R(Expression::AnimatorNewState),
+                R(Expression::AnimatorPreviousState),
+                R(Expression::AnimationEventName),
                 R(Expression::AnimatorBool {
                     animator: animator.clone(),
                     parameter: name(NameKind::Bool),
@@ -574,39 +945,89 @@ pub(super) fn palette_parts(
                     seconds: number(1.0),
                     style: "Quad".to_owned(),
                     direction: "Out".to_owned(),
+                    repeat_count: None,
+                    reverses: false,
+                    wait_until_done: false,
+                    completed: Vec::new(),
+                }),
+                block(BlockKind::TweenPivot {
+                    target: part.clone(),
+                    position: vector(0.0, 10.0, 0.0),
+                    duration: number(1.0),
+                    easing: "Quad".to_owned(),
+                    direction: "Out".to_owned(),
+                    wait_until_done: false,
+                    completed: Vec::new(),
                 }),
                 block(BlockKind::SlideIn {
                     target: gui.clone(),
                     from: "Left".to_owned(),
                     seconds: number(0.5),
+                    wait_until_done: false,
+                    completed: Vec::new(),
+                }),
+                block(BlockKind::SlideOut {
+                    target: gui.clone(),
+                    to: "Left".to_owned(),
+                    seconds: number(0.5),
+                    wait_until_done: false,
+                    completed: Vec::new(),
                 }),
                 block(BlockKind::FadeIn {
                     target: gui.clone(),
                     seconds: number(0.5),
+                    wait_until_done: false,
+                    completed: Vec::new(),
                 }),
                 block(BlockKind::FadeOut {
                     target: gui,
                     seconds: number(0.5),
+                    wait_until_done: false,
+                    completed: Vec::new(),
                 }),
+                block(BlockKind::PulseScale {
+                    target: part.clone(),
+                    scale: number(1.2),
+                    duration: number(0.3),
+                    wait_until_done: false,
+                }),
+                block(BlockKind::CancelTween { tween: part }),
             ]
         }
-        Category::More => vec![
+        Category::DataAndSaves => vec![
             block(BlockKind::Print {
                 value: text("Hello!"),
             }),
-            block(BlockKind::Destroy {
-                target: first(Filter::Parts),
-            }),
-            block(BlockKind::CloneInto {
-                target: first(Filter::Parts),
-                parent: String::new(),
-            }),
             block(BlockKind::SaveSlot { slot: number(1.0) }),
             block(BlockKind::LoadSlot { slot: number(1.0) }),
+            block(BlockKind::DeleteSlot { slot: number(1.0) }),
+            R(Expression::SlotExists {
+                slot: Box::new(number(1.0)),
+            }),
             block(BlockKind::SetCheckpoint {
                 checkpoint: first(Filter::Checkpoints),
             }),
             block(BlockKind::RestoreCheckpoint),
+            R(Expression::DataValue {
+                column: storage_name(NameKind::Column),
+                row: Box::new(Expression::DataRow {
+                    table: storage_name(NameKind::DataTable),
+                    key: Box::new(text("sword")),
+                }),
+            }),
+            R(Expression::DataRow {
+                table: storage_name(NameKind::DataTable),
+                key: Box::new(text("sword")),
+            }),
+            R(Expression::DataTableRowCount {
+                table: storage_name(NameKind::DataTable),
+            }),
+            block(BlockKind::ForEachRow {
+                table: storage_name(NameKind::DataTable),
+                body: Vec::new(),
+            }),
+        ],
+        Category::WorldAndLevels => vec![
             block(BlockKind::LoadLevel {
                 level: text("Castle"),
                 spawn: text("Gate"),
@@ -617,43 +1038,19 @@ pub(super) fn palette_parts(
             block(BlockKind::RemoveLevel {
                 level: text("Dungeon"),
             }),
-            block(BlockKind::HostGame {
-                port: number(47800.0),
-            }),
-            block(BlockKind::JoinGame {
-                address: text("192.168.1.20:47800"),
-            }),
-            block(BlockKind::LeaveGame),
-            block(BlockKind::SetNetworkOwner {
-                target: part.clone(),
-                owner: Expression::Variable {
-                    name: "player".to_owned(),
-                },
-            }),
-            block(BlockKind::SetNetworkOwnershipAuto {
-                target: part.clone(),
-            }),
-            block(BlockKind::SendChatMessage {
-                text: text("Hello"),
-            }),
-            block(BlockKind::ShowSystemMessage {
-                text: text("Round over"),
-            }),
-            block(BlockKind::WhenLayerChanged {
-                data_layer: "Night".to_owned(),
-                body: Vec::new(),
-            }),
             block(BlockKind::SetLayerActive {
                 data_layer: "Night".to_owned(),
                 active: Expression::Boolean { value: true },
             }),
-            block(BlockKind::KickPlayer {
-                player: Expression::Variable {
-                    name: "player".to_owned(),
-                },
-                reason: text("Cheating"),
+            block(BlockKind::WhenLayerChanged {
+                data_layer: "Any".to_owned(),
+                body: Vec::new(),
             }),
-            block(BlockKind::WhenConnectionFails { body: Vec::new() }),
+            R(Expression::LayerActive {
+                data_layer: "Night".to_owned(),
+            }),
+            R(Expression::ChangedLayerName),
+            R(Expression::ChangedLayerActive),
             block(BlockKind::RequestStreamAround {
                 player: Expression::Variable {
                     name: "player".to_owned(),
@@ -668,19 +1065,66 @@ pub(super) fn palette_parts(
                 target: part.clone(),
                 body: Vec::new(),
             }),
-            R(Expression::DataValue {
-                column: storage_name(NameKind::Column),
-                row: Box::new(Expression::DataRow {
-                    table: storage_name(NameKind::DataTable),
-                    key: Box::new(text("sword")),
-                }),
+            block(BlockKind::WhenStreamedOut {
+                target: part.clone(),
+                body: Vec::new(),
             }),
-            R(Expression::DataRow {
-                table: storage_name(NameKind::DataTable),
-                key: Box::new(text("sword")),
+            R(Expression::IsStreamedIn {
+                value: Box::new(part.as_expr().clone()),
             }),
-            R(Expression::LayerActive {
-                data_layer: "Night".to_owned(),
+            R(Expression::ChildOf {
+                name: Box::new(text("Humanoid")),
+                target: part.clone(),
+            }),
+            block(BlockKind::CloneInto {
+                target: first(Filter::Parts),
+                parent: ObjectRef::default(),
+                count: Some(number(1.0)),
+                position: None,
+                offset_per_clone: None,
+                per_clone_positions: None,
+            }),
+            block(BlockKind::Destroy {
+                target: first(Filter::Parts),
+            }),
+        ],
+        Category::MultiplayerAndChat => vec![
+            block(BlockKind::HostGame {
+                port: number(47800.0),
+            }),
+            block(BlockKind::JoinGame {
+                address: text("192.168.1.20:47800"),
+            }),
+            block(BlockKind::LeaveGame),
+            R(Expression::IsHost),
+            R(Expression::IsConnected),
+            block(BlockKind::WhenConnectionFails { body: Vec::new() }),
+            R(Expression::ConnectionFailureReason),
+            block(BlockKind::WhenPlayerJoins { body: Vec::new() }),
+            block(BlockKind::WhenPlayerLeaves { body: Vec::new() }),
+            block(BlockKind::SetNetworkOwner {
+                target: part.clone(),
+                owner: Expression::Variable {
+                    name: "player".to_owned(),
+                },
+            }),
+            block(BlockKind::SetNetworkOwnershipAuto {
+                target: part.clone(),
+            }),
+            block(BlockKind::KickPlayer {
+                player: Expression::Variable {
+                    name: "player".to_owned(),
+                },
+                reason: text("Cheating"),
+            }),
+            block(BlockKind::WhenChatMessageReceived { body: Vec::new() }),
+            R(Expression::ChatMessageText),
+            R(Expression::ChatMessageSender),
+            block(BlockKind::SendChatMessage {
+                text: text("Hello"),
+            }),
+            block(BlockKind::ShowSystemMessage {
+                text: text("Round over"),
             }),
         ],
         // Grey blocks only come from code, so there are none of those.
@@ -912,20 +1356,37 @@ pub(super) fn lua_hint(
     }
 }
 
+/// Parses an initial value string from the variable-creation UI into a literal
+/// [`Expression`] (number, boolean, or text).
+fn parse_initial_value(raw: &str) -> Expression {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Expression::Number { value: 0.0 };
+    }
+    if let Ok(value) = trimmed.parse::<f64>()
+        && value.is_finite()
+    {
+        return Expression::Number { value };
+    }
+    match trimmed {
+        "true" => Expression::Boolean { value: true },
+        "false" => Expression::Boolean { value: false },
+        _ => Expression::Text {
+            value: trimmed.to_owned(),
+        },
+    }
+}
+
 pub(super) fn show_palette(
     ui: &mut egui::Ui,
     rect: Rect,
+    script: &mut BlockScript,
     state: &mut State,
     context: &BlockContext,
     variables: &[String],
 ) {
     let background = ui.visuals().faint_bg_color;
     ui.painter().rect_filled(rect, 0, background);
-    ui.painter().vline(
-        rect.right() - 0.5,
-        rect.y_range(),
-        ui.visuals().widgets.noninteractive.bg_stroke,
-    );
     // The search box, then the blocks under it.
     let search_rect = Rect::from_min_size(rect.min, vec2(rect.width(), SEARCH_HEIGHT));
     let mut search_ui = ui.new_child(
@@ -951,10 +1412,14 @@ pub(super) fn show_palette(
     child.set_clip_rect(list_rect);
     let scroll_to = state.scroll_to.take();
     let mut new_variable = state.new_variable.take();
-    let mut made = None;
+    let mut made: Option<(String, String, bool)> = None;
     let mut started = None;
+    let clone_pills: Vec<(u64, String)> = clone_identifiers(script)
+        .into_iter()
+        .map(|(id, (single, _))| (id, single))
+        .collect();
     let search = state.search.trim().to_owned();
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt(("block palette", context.key, search.is_empty()))
         .auto_shrink(false)
         .show(&mut child, |ui| {
@@ -963,6 +1428,18 @@ pub(super) fn show_palette(
             for category in Category::ALL {
                 let (mut items, mut luau) =
                     palette_parts(category, context.client, context.objects, variables);
+                if category == Category::Variables {
+                    for (block_id, single_name) in &clone_pills {
+                        items.insert(
+                            1,
+                            PaletteItem::Reporter(Expression::BlockOutput {
+                                block: *block_id,
+                                output: 0,
+                                name: single_name.clone(),
+                            }),
+                        );
+                    }
+                }
                 if !search.is_empty() {
                     for list in [&mut items, &mut luau] {
                         list.retain(|item| {
@@ -1002,7 +1479,11 @@ pub(super) fn show_palette(
                             .family(theme::heading_family()),
                     );
                     if scroll_to == Some(category) {
-                        heading.scroll_to_me(Some(egui::Align::TOP));
+                        let row_rect = Rect::from_min_max(
+                            pos2(swatch.left() - 12.0, heading.rect.top()),
+                            heading.rect.max,
+                        );
+                        ui.scroll_to_rect(row_rect, Some(egui::Align::TOP));
                     }
                 });
                 ui.add_space(6.0);
@@ -1025,17 +1506,68 @@ pub(super) fn show_palette(
                         match item {
                             PaletteItem::NewVariable => {
                                 if let Some(name) = &mut new_variable {
-                                    let edit = ui.add(
-                                        egui::TextEdit::singleline(name)
-                                            .hint_text("Variable name")
-                                            .desired_width(150.0),
-                                    );
-                                    edit.request_focus();
-                                    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
-                                    if enter || ui.button("OK").clicked() {
-                                        made = Some(name.clone());
-                                    } else if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                                        made = Some(String::new());
+                                    let resp = ui.vertical(|ui| {
+                                        let edit = ui.add(
+                                            egui::TextEdit::singleline(name)
+                                                .hint_text("Variable name")
+                                                .desired_width(150.0),
+                                        );
+                                        let just_opened =
+                                            std::mem::take(&mut state.focus_new_variable);
+                                        if just_opened {
+                                            edit.request_focus();
+                                        }
+                                        let mut enter = (edit.lost_focus() || edit.has_focus())
+                                            && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                                        let init_edit = ui.horizontal(|ui| {
+                                            ui.label("Initial:");
+                                            ui.add(
+                                                egui::TextEdit::singleline(
+                                                    &mut state.new_variable_initial,
+                                                )
+                                                .hint_text("0")
+                                                .desired_width(90.0),
+                                            )
+                                        });
+                                        if (init_edit.inner.lost_focus()
+                                            || init_edit.inner.has_focus())
+                                            && ui.input(|i| i.key_pressed(egui::Key::Enter))
+                                        {
+                                            enter = true;
+                                        }
+                                        let ok = ui
+                                            .horizontal(|ui| {
+                                                ui.checkbox(
+                                                    &mut state.new_variable_global,
+                                                    "Global / Shared",
+                                                )
+                                                .on_hover_text(
+                                                    "Checked: shared across scripts (_G). \
+                                                     Unchecked: local to this script.",
+                                                );
+                                                ui.button("OK")
+                                            })
+                                            .inner;
+                                        (just_opened, enter, ok.clicked())
+                                    });
+                                    let (just_opened, enter, ok_clicked) = resp.inner;
+                                    let modal_rect = resp.response.rect;
+                                    let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
+                                    let clicked_outside = !just_opened
+                                        && ui.input(|i| {
+                                            i.pointer.any_pressed()
+                                                && i.pointer
+                                                    .interact_pos()
+                                                    .is_some_and(|pos| !modal_rect.contains(pos))
+                                        });
+                                    if enter || ok_clicked {
+                                        made = Some((
+                                            name.clone(),
+                                            state.new_variable_initial.clone(),
+                                            state.new_variable_global,
+                                        ));
+                                    } else if escape || clicked_outside {
+                                        new_variable = None;
                                     }
                                 } else if ui
                                     .button("Make a Variable")
@@ -1046,6 +1578,9 @@ pub(super) fn show_palette(
                                     .clicked()
                                 {
                                     new_variable = Some(String::new());
+                                    state.new_variable_initial = "0".to_owned();
+                                    state.new_variable_global = false;
+                                    state.focus_new_variable = true;
                                 }
                             }
                             PaletteItem::Block(kind) => {
@@ -1056,13 +1591,55 @@ pub(super) fn show_palette(
                                 }
                             }
                             PaletteItem::Reporter(expression) => {
+                                let var_name = match &expression {
+                                    Expression::Variable { name } => Some(name.clone()),
+                                    _ => None,
+                                };
                                 if let Some(drag) =
                                     palette_reporter(ui, expression, context, variables)
                                 {
                                     started = Some(drag);
                                 }
+                                if category == Category::Variables
+                                    && let Some(var_name) = var_name
+                                {
+                                    let (mut global, mut watched) = script
+                                        .variables
+                                        .iter()
+                                        .find(|d| d.name == var_name)
+                                        .map_or((false, false), |d| (d.global, d.watched));
+                                    let prev = (global, watched);
+                                    let scope_label = if global { "Global" } else { "Local" };
+                                    if ui
+                                        .small_button(scope_label)
+                                        .on_hover_text(
+                                            "Toggle variable scope: Local (this script) vs Global (_G shared)",
+                                        )
+                                        .clicked()
+                                    {
+                                        global = !global;
+                                    }
+                                    ui.checkbox(&mut watched, "")
+                                        .on_hover_text("Watch live value in Play HUD");
+                                    if (global, watched) != prev {
+                                        if let Some(def) = script
+                                            .variables
+                                            .iter_mut()
+                                            .find(|d| d.name == var_name)
+                                        {
+                                            def.global = global;
+                                            def.watched = watched;
+                                        } else {
+                                            let mut def = VariableDef::new(var_name);
+                                            def.global = global;
+                                            def.watched = watched;
+                                            script.variables.push(def);
+                                        }
+                                    }
+                                }
                             }
                         }
+                        ui.add_space(16.0);
                     });
                     ui.add_space(8.0);
                 }
@@ -1078,11 +1655,25 @@ pub(super) fn show_palette(
                 });
             }
         });
-    if let Some(name) = made {
+    if let Some((name, initial_str, global)) = made {
         new_variable = None;
         let name = name.trim().to_owned();
-        if valid_identifier(&name) && !variables.contains(&name) {
-            state.variables.push(name);
+        if valid_identifier(&name) {
+            if !variables.contains(&name) {
+                state.variables.push(name.clone());
+            }
+            let initial = parse_initial_value(&initial_str);
+            if let Some(def) = script.variables.iter_mut().find(|d| d.name == name) {
+                def.initial = initial;
+                def.global = global;
+            } else {
+                script.variables.push(VariableDef {
+                    name,
+                    initial,
+                    global,
+                    watched: false,
+                });
+            }
         }
     }
     state.new_variable = new_variable;

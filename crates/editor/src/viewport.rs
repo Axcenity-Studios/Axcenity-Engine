@@ -160,7 +160,7 @@ impl DragKind {
     pub fn of(handle: Handle) -> DragKind {
         match handle {
             Handle::Move(_) => DragKind::Move,
-            Handle::Scale(..) => DragKind::Resize,
+            Handle::Scale(..) | Handle::ScaleUniform => DragKind::Resize,
             Handle::Rotate(_) => DragKind::Rotate,
         }
     }
@@ -2026,9 +2026,11 @@ const SCENERY_FPS: f32 = 30.0;
 /// How far a part must be from how it started to count as changed.
 const CHANGED: f32 = 0.0005;
 
-/// While parts are being moved, resized or turned: where each is now and
-/// what turns its transform now into the one it started with.
-fn moving_parts(drag: Option<&Dragging>, world: &World) -> Vec<(Vec3, Mat4)> {
+/// While parts are being moved, resized or turned: each moving piece's
+/// `(item_id, current_world_position, transform_back_to_start)`. Capsules
+/// emit three draw items (cylinder + two end spheres) with `item_id == 0`,
+/// so we include all three piece centers so the whole capsule ghosts together.
+fn moving_parts(drag: Option<&Dragging>, world: &World) -> Vec<(u64, Vec3, Mat4)> {
     let now_of = |id: InstanceId| Pose::of(world.get(id)?);
     let starts: Vec<(InstanceId, Pose)> = match drag {
         Some(Dragging::Handle(drag)) => drag.starts().to_vec(),
@@ -2048,16 +2050,36 @@ fn moving_parts(drag: Option<&Dragging>, world: &World) -> Vec<(Vec3, Mat4)> {
     };
     let matrix =
         |pose: Pose| Mat4::from_scale_rotation_translation(pose.size, pose.rotation, pose.position);
-    starts
-        .into_iter()
-        .filter_map(|(id, start)| {
-            let now = now_of(id)?;
-            let changed = now.position.distance(start.position) >= CHANGED
-                || (now.size - start.size).length() >= CHANGED
-                || now.rotation.angle_between(start.rotation) >= CHANGED;
-            changed.then(|| (now.position, matrix(start) * matrix(now).inverse()))
-        })
-        .collect()
+    let mut out = Vec::new();
+    for (id, start) in starts {
+        let Some(now) = now_of(id) else { continue };
+        let changed = now.position.distance(start.position) >= CHANGED
+            || (now.size - start.size).length() >= CHANGED
+            || now.rotation.angle_between(start.rotation) >= CHANGED;
+        if !changed {
+            continue;
+        }
+        let item_id = axcenity_scene::item_id(id);
+        let back = matrix(start) * matrix(now).inverse();
+        out.push((item_id, now.position, back));
+        // A Capsule is rendered as a center cylinder plus two end-cap spheres
+        // offset along its local X axis by `((length - diameter) / 2).max(0)`.
+        let is_capsule = world
+            .get(id)
+            .and_then(|inst| inst.property("Shape"))
+            .and_then(axcenity_core::Value::as_part_type)
+            == Some(axcenity_core::PartType::Capsule);
+        if is_capsule {
+            let diameter = now.size.y.min(now.size.z);
+            let half_span = ((now.size.x - diameter) / 2.0).max(0.0);
+            if half_span > 0.0 {
+                let axis = now.rotation * Vec3::X;
+                out.push((item_id, now.position - axis * half_span, back));
+                out.push((item_id, now.position + axis * half_span, back));
+            }
+        }
+    }
+    out
 }
 
 fn start_camera() -> FlyCamera {

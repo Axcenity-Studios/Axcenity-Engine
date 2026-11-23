@@ -149,6 +149,8 @@ pub(super) enum Pin {
     Input(ValueAt),
     /// A value node's output.
     Output(ValueAt),
+    /// A block node's right-side data output pin (`block_id`, `output_index`).
+    BlockOutput(u64, usize),
 }
 
 impl Pin {
@@ -204,7 +206,9 @@ impl Default for GraphState {
 struct Geometry {
     size: Vec2,
     title: String,
+    icon: &'static str,
     category: Category,
+    is_event: bool,
     layout: Layout,
     /// Each row's height.
     rows: Vec<f32>,
@@ -222,20 +226,35 @@ enum Body<'a> {
 /// event): events and the blocks after them, top-level Lua, and the value
 /// nodes wired into those.
 fn visit_nodes(script: &mut BlockScript, visit: &mut dyn FnMut(NodeRef, Body, bool)) {
+    let mut block_ids = HashSet::new();
+    script.for_each_block(&mut |b| {
+        block_ids.insert(b.id);
+    });
     fn values(
         at: ValueAt,
         value: &mut Expression,
         runs: bool,
+        block_ids: &HashSet<u64>,
         visit: &mut dyn FnMut(NodeRef, Body, bool),
     ) {
+        if let Expression::BlockOutput { block, .. } = value
+            && block_ids.contains(block)
+        {
+            return;
+        }
         visit(NodeRef::Value(at.clone()), Body::Value(value), runs);
         for (index, child) in value.children_mut().into_iter().enumerate() {
             if !child.is_literal() {
-                values(at.child(index), child, runs, visit);
+                values(at.child(index), child, runs, block_ids, visit);
             }
         }
     }
-    fn visit_block(block: &mut Block, runs: bool, visit: &mut dyn FnMut(NodeRef, Body, bool)) {
+    fn visit_block(
+        block: &mut Block,
+        runs: bool,
+        block_ids: &HashSet<u64>,
+        visit: &mut dyn FnMut(NodeRef, Body, bool),
+    ) {
         let id = block.id;
         visit(NodeRef::Block(id), Body::Block(&mut block.kind), runs);
         for (slot, value) in block.kind.expressions_mut().into_iter().enumerate() {
@@ -247,13 +266,14 @@ fn visit_nodes(script: &mut BlockScript, visit: &mut dyn FnMut(NodeRef, Body, bo
                     },
                     value,
                     runs,
+                    block_ids,
                     visit,
                 );
             }
         }
         for body in block.kind.bodies_mut() {
             for inner in body {
-                visit_block(inner, runs, visit);
+                visit_block(inner, runs, block_ids, visit);
             }
         }
     }
@@ -261,26 +281,41 @@ fn visit_nodes(script: &mut BlockScript, visit: &mut dyn FnMut(NodeRef, Body, bo
         match &mut top.kind {
             BlockKind::Unattached { body } => {
                 for inner in body {
-                    visit_block(inner, false, visit);
+                    visit_block(inner, false, &block_ids, visit);
                 }
             }
-            _ => visit_block(top, true, visit),
+            _ => visit_block(top, true, &block_ids, visit),
         }
     }
     for loose in &mut script.graph.loose {
-        values(ValueAt::loose(loose.id), &mut loose.value, false, visit);
+        values(
+            ValueAt::loose(loose.id),
+            &mut loose.value,
+            false,
+            &block_ids,
+            visit,
+        );
     }
 }
 
-/// Which exec pins have wires: each output's target, and the blocks with a
-/// wire coming in.
+/// Which exec and block-output pins have wires: each output's target, and the
+/// blocks with a wire coming in.
 #[derive(Default)]
 struct Wiring {
     targets: HashMap<(u64, Out), u64>,
     fed: HashSet<u64>,
+    block_outputs_fed: HashSet<(u64, usize)>,
 }
 
 fn wiring(script: &BlockScript) -> Wiring {
+    fn scan_expr(expr: &Expression, wiring: &mut Wiring) {
+        if let Expression::BlockOutput { block, output, .. } = expr {
+            wiring.block_outputs_fed.insert((*block, *output));
+        }
+        for child in expr.children() {
+            scan_expr(child, wiring);
+        }
+    }
     fn stack(blocks: &[Block], wiring: &mut Wiring, loose: bool) {
         for (index, block) in blocks.iter().enumerate() {
             if index > 0 || !loose {
@@ -289,10 +324,16 @@ fn wiring(script: &BlockScript) -> Wiring {
             if let Some(next) = blocks.get(index + 1) {
                 wiring.targets.insert((block.id, Out::Then), next.id);
             }
+            for expr in block.kind.expressions() {
+                scan_expr(expr, wiring);
+            }
             mouths(block, wiring);
         }
     }
     fn mouths(block: &Block, wiring: &mut Wiring) {
+        for expr in block.kind.expressions() {
+            scan_expr(expr, wiring);
+        }
         for (mouth, body) in block.kind.bodies().into_iter().enumerate() {
             if let Some(first) = body.first() {
                 wiring
@@ -309,16 +350,34 @@ fn wiring(script: &BlockScript) -> Wiring {
             _ => mouths(top, &mut wiring),
         }
     }
+    for loose in &script.graph.loose {
+        scan_expr(&loose.value, &mut wiring);
+    }
     wiring
 }
 
-/// The title, colour and rows of a node.
-fn describe(body: &Body, objects: &[ObjectInfo]) -> (String, Category, Layout) {
+/// The title, colour, icon, event flag and rows of a node.
+fn describe(
+    node: &NodeRef,
+    body: &Body,
+    objects: &[ObjectInfo],
+    clone_ids: &HashMap<u64, (String, String)>,
+) -> (String, Category, &'static str, bool, Layout) {
     match body {
         Body::Block(kind) => {
+            let block_id = match node {
+                NodeRef::Block(id) => *id,
+                NodeRef::Value(_) => 0,
+            };
             let mut probe = (*kind).clone();
-            let layout = block_layout(kind, &block_parts(&mut probe, objects));
-            (block_title(kind), block_category(kind), layout)
+            let layout = block_layout(kind, block_id, &block_parts(&mut probe, objects), clone_ids);
+            (
+                block_title(kind),
+                block_category(kind),
+                block_icon(kind),
+                kind.is_event(),
+                layout,
+            )
         }
         Body::Value(expression) => {
             let mut probe = (*expression).clone();
@@ -326,6 +385,8 @@ fn describe(body: &Body, objects: &[ObjectInfo]) -> (String, Category, Layout) {
             (
                 value_names(expression).0,
                 reporter_category(expression),
+                reporter_icon(expression),
+                false,
                 layout,
             )
         }
@@ -346,14 +407,20 @@ fn item_size(painter: &BlockPainter, ui: &egui::Ui, item: &Item, parts: &mut [Pa
     match item {
         Item::ExecIn | Item::Output(_) => vec2(s(PIN_SPACE), s(ROW)),
         Item::ExecOut(_, name) => vec2(painter.text_width(ui, name) + s(PIN_SPACE + 4.0), s(ROW)),
+        Item::BlockOutput { name, .. } => {
+            vec2(painter.text_width(ui, name) + s(PIN_SPACE + 4.0), s(ROW))
+        }
         Item::Input { part, name, .. } => {
             let mut width = s(PIN_SPACE) + painter.text_width(ui, name);
+            let mut height = s(ROW);
             if let Some(Part::Slot(value, kind)) = parts.get(*part)
                 && value.is_literal()
             {
-                width += s(NAME_GAP) + painter.literal_size(ui, value, *kind).x;
+                let literal = painter.literal_size(ui, value, *kind);
+                width += s(NAME_GAP) + literal.x;
+                height = height.max(literal.y + s(6.0));
             }
-            vec2(width + s(4.0), s(ROW))
+            vec2(width + s(4.0), height)
         }
         Item::Field { part, name } => {
             let field = parts
@@ -361,7 +428,7 @@ fn item_size(painter: &BlockPainter, ui: &egui::Ui, item: &Item, parts: &mut [Pa
                 .map_or(Vec2::ZERO, |part| painter.part_size(ui, part));
             vec2(
                 s(10.0) + painter.text_width(ui, name) + s(NAME_GAP) + field.x + s(4.0),
-                s(ROW).max(field.y + s(4.0)),
+                s(ROW).max(field.y + s(6.0)),
             )
         }
         Item::Code { part } => {
@@ -374,16 +441,20 @@ fn item_size(painter: &BlockPainter, ui: &egui::Ui, item: &Item, parts: &mut [Pa
 }
 
 /// Measures a node at zoom 1.
+#[allow(clippy::too_many_arguments)]
 fn measure(
     painter: &BlockPainter,
     ui: &egui::Ui,
     node: &NodeRef,
     title: String,
     category: Category,
+    icon: &'static str,
+    is_event: bool,
     layout: Layout,
     parts: &mut [Part],
 ) -> Geometry {
-    let mut width = painter.text_width(ui, &title) + 2.0 * 12.0;
+    let header_label = theme::with_icon(icon, &title);
+    let mut width = painter.text_width(ui, &header_label) + 2.0 * 12.0;
     let mut rows = Vec::new();
     for row in 0..layout.rows() {
         let left = layout
@@ -425,14 +496,24 @@ fn measure(
                     pins.push((Pin::Output(at.clone()), vec2(width - PIN - 6.0, middle)));
                 }
             }
+            Some(Item::BlockOutput { index, .. }) => {
+                if let NodeRef::Block(id) = node {
+                    pins.push((
+                        Pin::BlockOutput(*id, *index),
+                        vec2(width - PIN - 6.0, middle),
+                    ));
+                }
+            }
             _ => {}
         }
         y += height;
     }
     Geometry {
-        size: vec2(width, y + 6.0),
+        size: vec2(width, y + 8.0),
         title,
+        icon,
         category,
+        is_event,
         layout,
         rows,
         pins,
@@ -446,6 +527,7 @@ fn measure_all(
     context: &BlockContext,
     variables: &[String],
 ) -> HashMap<NodeRef, Geometry> {
+    let clone_ids = clone_identifiers(script);
     let painter = BlockPainter::new(
         ui.painter().clone(),
         1.0,
@@ -457,9 +539,12 @@ fn measure_all(
     );
     let mut geometry = HashMap::new();
     visit_nodes(script, &mut |node, mut body, _| {
-        let (title, category, layout) = describe(&body, context.objects);
+        let (title, category, icon, is_event, layout) =
+            describe(&node, &body, context.objects, &clone_ids);
         let mut parts = parts_of(&mut body, context.objects);
-        let measured = measure(&painter, ui, &node, title, category, layout, &mut parts);
+        let measured = measure(
+            &painter, ui, &node, title, category, icon, is_event, layout, &mut parts,
+        );
         geometry.insert(node, measured);
     });
     geometry
@@ -476,6 +561,15 @@ enum Event {
     Duplicate(NodeRef),
     /// One more input (true) or one fewer on a call's or a local's node.
     Resize(NodeRef, bool),
+    /// Toggle optional Position input on a `CloneInto` block.
+    ToggleClonePosition(u64),
+    /// Toggle collapsible Advanced settings (Offset / Per-Clone Positions) on `CloneInto`.
+    ToggleCloneAdvanced(u64),
+    /// Toggle an optional input/flag on an Event or Control Flow block.
+    ToggleOptionalPin(u64, &'static str),
+    ToggleRaycastIgnore(NodeRef),
+    /// Add or remove a `Then N` branch on a `Sequence` block.
+    ResizeSequence(u64, bool),
     Delete(NodeRef),
 }
 
@@ -571,10 +665,16 @@ fn show_graph_toolbar(
     {
         add = true;
     }
-    bar.weak("Drag from a pin to wire it. Right-drag to pan.");
+    let narrow = rect.width() < TOOLBAR_WORDS_FROM;
+    let worded = |icon: &str, text: &str| {
+        if narrow {
+            icon.to_owned()
+        } else {
+            theme::with_icon(icon, text)
+        }
+    };
     bar.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let lua = egui::Button::new(theme::with_icon(icons::CODE, "View as Lua"))
-            .selected(state.show_lua);
+        let lua = egui::Button::new(worded(icons::CODE, "View as Lua")).selected(state.show_lua);
         if ui
             .add(lua)
             .on_hover_text("Shows the Lua this graph becomes. It runs exactly like a typed script.")
@@ -588,16 +688,27 @@ fn show_graph_toolbar(
             state.frame_next = true;
         }
         if ui
-            .button(theme::with_icon(icons::BROOM, "Clean up"))
+            .button(worded(icons::BROOM, "Clean up"))
             .on_hover_text("Lays every node out again, left to right")
             .clicked()
         {
             script.graph.nodes.clear();
             state.canvas.pan = GraphState::default().pan;
         }
+        ui.allocate_ui_with_layout(
+            ui.available_size(),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.add(egui::Label::new(egui::RichText::new(GRAPH_TOOLBAR_HINT).weak()).truncate())
+                    .on_hover_text(GRAPH_TOOLBAR_HINT);
+            },
+        );
     });
     add
 }
+
+/// What the Graph toolbar says between Add node and its buttons.
+const GRAPH_TOOLBAR_HINT: &str = "Drag from a pin to wire it. Right-drag to pan.";
 
 /// Stores every node's place, so nothing moves when an edit rewires them.
 fn freeze(graph: &mut Graph, places: &HashMap<NodeRef, Pos2>) {
@@ -695,9 +806,15 @@ fn show_graph_canvas(
         if let Pin::Input(at) = pin
             && let Some(value) = value(script, at)
             && !value.is_literal()
-            && let Some(start) = pin_at(&Pin::Output(at.clone()))
         {
-            draw_wire(&painter, start, *end, pin_color(value_type(value)), 2.0 * z);
+            if let Expression::BlockOutput { block, output, .. } = value {
+                if let Some(start) = pin_at(&Pin::BlockOutput(*block, *output)) {
+                    let color = slot_kind(script, at).map_or(exec_wire, pin_color);
+                    draw_wire(&painter, start, *end, color, 2.0 * z);
+                }
+            } else if let Some(start) = pin_at(&Pin::Output(at.clone())) {
+                draw_wire(&painter, start, *end, pin_color(value_type(value)), 2.0 * z);
+            }
         }
     }
 
@@ -813,6 +930,269 @@ fn show_graph_canvas(
                 freeze(&mut script.graph, &places);
                 resize_inputs(script, &node, grow);
                 edited = true;
+            }
+            Event::ToggleClonePosition(block_id) => {
+                freeze(&mut script.graph, &places);
+                if let Some(block) = script.find_mut(block_id)
+                    && let BlockKind::CloneInto { position, .. } = &mut block.kind
+                {
+                    if position.is_some() {
+                        *position = None;
+                    } else {
+                        *position = Some(Expression::Vector3 {
+                            x: 0.0,
+                            y: 5.0,
+                            z: 0.0,
+                        });
+                    }
+                    edited = true;
+                }
+            }
+            Event::ToggleCloneAdvanced(block_id) => {
+                freeze(&mut script.graph, &places);
+                if let Some(block) = script.find_mut(block_id)
+                    && let BlockKind::CloneInto {
+                        offset_per_clone,
+                        per_clone_positions,
+                        ..
+                    } = &mut block.kind
+                {
+                    if offset_per_clone.is_some() || per_clone_positions.is_some() {
+                        *offset_per_clone = None;
+                        *per_clone_positions = None;
+                    } else {
+                        *offset_per_clone = Some(Expression::Vector3 {
+                            x: 5.0,
+                            y: 0.0,
+                            z: 0.0,
+                        });
+                        *per_clone_positions = Some(Expression::Nil);
+                    }
+                    edited = true;
+                }
+            }
+            Event::ToggleRaycastIgnore(node) => {
+                freeze(&mut script.graph, &places);
+                if let NodeRef::Value(at) = &node
+                    && let Some(Expression::Raycast { ignore, .. }) = value_mut(script, at)
+                {
+                    *ignore = if ignore.is_some() {
+                        None
+                    } else {
+                        Some(ObjectRef::default())
+                    };
+                    edited = true;
+                }
+            }
+            Event::ToggleOptionalPin(block_id, which_pin) => {
+                freeze(&mut script.graph, &places);
+                if let Some(block) = script.find_mut(block_id) {
+                    match (&mut block.kind, which_pin) {
+                        (
+                            BlockKind::WhenTouched { cooldown, .. }
+                            | BlockKind::WhenPromptTriggered { cooldown, .. }
+                            | BlockKind::WhenPartClicked { cooldown, .. },
+                            "cooldown",
+                        ) => {
+                            *cooldown = if cooldown.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 0.5 })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::WhenCommandRun { admin_only, .. }, "admin_only") => {
+                            *admin_only = if admin_only.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Boolean { value: true })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::FireEvent { data, .. }, "data") => {
+                            *data = if data.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Text {
+                                    value: String::new(),
+                                })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::WaitForChild { timeout, .. }, "timeout") => {
+                            *timeout = if timeout.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 5.0 })
+                            };
+                            edited = true;
+                        }
+                        (
+                            BlockKind::ForEachPartInRadius { players_only, .. }
+                            | BlockKind::ForEachPartTouching { players_only, .. },
+                            "players_only",
+                        ) => {
+                            *players_only = !*players_only;
+                            edited = true;
+                        }
+                        (
+                            BlockKind::SlideTo {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::RotateTo {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::TweenProperty {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::PlaySound {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::FadeVolume {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::PlayAnimation {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::Tween {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::SlideIn {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::SlideOut {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::FadeIn {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::FadeOut {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::TweenPivot {
+                                wait_until_done, ..
+                            }
+                            | BlockKind::PulseScale {
+                                wait_until_done, ..
+                            },
+                            "wait_until_done",
+                        ) => {
+                            *wait_until_done = !*wait_until_done;
+                            edited = true;
+                        }
+                        (
+                            BlockKind::PlayAnimation { fade_time, .. }
+                            | BlockKind::StopAnimation { fade_time, .. },
+                            "fade_time",
+                        ) => {
+                            *fade_time = if fade_time.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 0.2 })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::PlayAnimation { speed, .. }, "speed") => {
+                            *speed = if speed.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 1.0 })
+                            };
+                            edited = true;
+                        }
+                        (
+                            BlockKind::PlayAnimation { weight, .. }
+                            | BlockKind::SetIkTarget { weight, .. },
+                            "weight",
+                        ) => {
+                            *weight = if weight.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 1.0 })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::StopAnimation { animation, .. }, "animation") => {
+                            *animation = if animation.is_some() {
+                                None
+                            } else {
+                                Some(ObjectRef::path("Model.Animation"))
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::Tween { repeat_count, .. }, "repeat_count") => {
+                            *repeat_count = if repeat_count.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: -1.0 })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::Tween { reverses, .. }, "reverses") => {
+                            *reverses = !*reverses;
+                            edited = true;
+                        }
+                        (
+                            BlockKind::SetClockTime { duration, .. }
+                            | BlockKind::SetAtmosphere { duration, .. },
+                            "duration",
+                        ) => {
+                            *duration = if duration.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 2.0 })
+                            };
+                            edited = true;
+                        }
+                        (
+                            BlockKind::PlaySound { pitch, .. }
+                            | BlockKind::PlaySoundAtPosition { pitch, .. },
+                            "pitch",
+                        ) => {
+                            *pitch = if pitch.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 1.0 })
+                            };
+                            edited = true;
+                        }
+                        (BlockKind::PlaySoundAtPosition { volume, .. }, "volume") => {
+                            *volume = if volume.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Number { value: 1.0 })
+                            };
+                            edited = true;
+                        }
+                        (
+                            BlockKind::ForEachPartInRadius { ignore, .. }
+                            | BlockKind::ForEachPartTouching { ignore, .. },
+                            "ignore",
+                        ) => {
+                            *ignore = if ignore.is_some() {
+                                None
+                            } else {
+                                Some(Expression::Nil)
+                            };
+                            edited = true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Event::ResizeSequence(block_id, grow) => {
+                freeze(&mut script.graph, &places);
+                if let Some(block) = script.find_mut(block_id)
+                    && let BlockKind::Sequence { branches } = &mut block.kind
+                {
+                    if grow && branches.len() < 12 {
+                        branches.push(Vec::new());
+                        edited = true;
+                    } else if !grow && branches.len() > 2 {
+                        branches.pop();
+                        edited = true;
+                    }
+                }
             }
             Event::Duplicate(node) => {
                 freeze(&mut script.graph, &places);
@@ -985,6 +1365,10 @@ fn join(script: &mut BlockScript, from: &Pin, to: &Pin) -> Result<(), Refusal> {
         (Pin::Output(value), Pin::Input(slot)) | (Pin::Input(slot), Pin::Output(value)) => {
             connect_value(script, value, slot)
         }
+        (Pin::BlockOutput(block, output), Pin::Input(slot))
+        | (Pin::Input(slot), Pin::BlockOutput(block, output)) => {
+            connect_block_output(script, *block, *output, slot)
+        }
         _ => Err("Wire an output to an input."),
     }
 }
@@ -1013,6 +1397,19 @@ fn join_new(script: &mut BlockScript, from: &Pin, node: &NodeRef) -> Result<(), 
                 .ok_or("It has no input this value fits.")?;
             join(script, from, &Pin::Input(node.slots().child(slot)))
         }
+        (Pin::BlockOutput(..), node) => {
+            let slots = match node {
+                NodeRef::Block(id) => {
+                    block_slots(&find_block(script, *id).ok_or("That node is gone.")?.kind)
+                }
+                NodeRef::Value(at) => value_slots(value(script, at).ok_or("That node is gone.")?),
+            };
+            let slot = slots
+                .iter()
+                .position(|kind| kind.accepts(BlockShape::Value))
+                .ok_or("It has no input this value fits.")?;
+            join(script, from, &Pin::Input(node.slots().child(slot)))
+        }
         _ => Err("That node can't be wired there."),
     }
 }
@@ -1023,6 +1420,7 @@ fn break_pin(script: &mut BlockScript, pin: &Pin) {
         Pin::ExecIn(id) => break_exec_in(script, *id),
         Pin::ExecOut(id, out) => break_exec_out(script, *id, *out),
         Pin::Input(at) | Pin::Output(at) => break_value(script, at),
+        Pin::BlockOutput(block, output) => break_block_output(script, *block, *output),
     }
 }
 
@@ -1081,6 +1479,25 @@ fn draw_node(
         Body::Value(value) => value.input_list_mut().is_some(),
     };
 
+    let is_clone = matches!(body, Body::Block(BlockKind::CloneInto { .. }));
+    let clone_has_pos = matches!(
+        body,
+        Body::Block(BlockKind::CloneInto {
+            position: Some(_),
+            ..
+        })
+    );
+    let clone_has_adv = matches!(
+        body,
+        Body::Block(BlockKind::CloneInto {
+            offset_per_clone: Some(_),
+            ..
+        }) | Body::Block(BlockKind::CloneInto {
+            per_clone_positions: Some(_),
+            ..
+        })
+    );
+
     // The node itself: click to select, drag to move.
     if drawer.interactive {
         let response = ui
@@ -1107,7 +1524,331 @@ fn draw_node(
         if response.dragged_by(egui::PointerButton::Primary) {
             events.push(Event::Move(response.drag_delta()));
         }
+        let optional_toggles: Vec<(&'static str, &'static str)> = match body {
+            Body::Block(
+                BlockKind::WhenTouched { cooldown, .. }
+                | BlockKind::WhenPromptTriggered { cooldown, .. }
+                | BlockKind::WhenPartClicked { cooldown, .. },
+            ) => vec![(
+                "cooldown",
+                if cooldown.is_some() {
+                    "Hide Cooldown (s)"
+                } else {
+                    "Show Cooldown (s)"
+                },
+            )],
+            Body::Block(BlockKind::WhenCommandRun { admin_only, .. }) => vec![(
+                "admin_only",
+                if admin_only.is_some() {
+                    "Hide Admin Only"
+                } else {
+                    "Show Admin Only"
+                },
+            )],
+            Body::Block(BlockKind::FireEvent { data, .. }) => vec![(
+                "data",
+                if data.is_some() {
+                    "Hide Payload / Data"
+                } else {
+                    "Show Payload / Data"
+                },
+            )],
+            Body::Block(BlockKind::WaitForChild { timeout, .. }) => vec![(
+                "timeout",
+                if timeout.is_some() {
+                    "Hide Timeout (s)"
+                } else {
+                    "Show Timeout (s)"
+                },
+            )],
+            Body::Block(
+                BlockKind::SlideTo {
+                    wait_until_done, ..
+                }
+                | BlockKind::RotateTo {
+                    wait_until_done, ..
+                }
+                | BlockKind::TweenProperty {
+                    wait_until_done, ..
+                }
+                | BlockKind::FadeVolume {
+                    wait_until_done, ..
+                }
+                | BlockKind::SlideIn {
+                    wait_until_done, ..
+                }
+                | BlockKind::SlideOut {
+                    wait_until_done, ..
+                }
+                | BlockKind::FadeIn {
+                    wait_until_done, ..
+                }
+                | BlockKind::FadeOut {
+                    wait_until_done, ..
+                }
+                | BlockKind::TweenPivot {
+                    wait_until_done, ..
+                }
+                | BlockKind::PulseScale {
+                    wait_until_done, ..
+                },
+            ) => vec![(
+                "wait_until_done",
+                if *wait_until_done {
+                    "Don't Wait Until Done"
+                } else {
+                    "Wait Until Done"
+                },
+            )],
+            Body::Block(BlockKind::Tween {
+                repeat_count,
+                reverses,
+                wait_until_done,
+                ..
+            }) => vec![
+                (
+                    "repeat_count",
+                    if repeat_count.is_some() {
+                        "Hide Repeat Count"
+                    } else {
+                        "Show Repeat Count"
+                    },
+                ),
+                (
+                    "reverses",
+                    if *reverses {
+                        "Disable Reverses"
+                    } else {
+                        "Enable Reverses"
+                    },
+                ),
+                (
+                    "wait_until_done",
+                    if *wait_until_done {
+                        "Don't Wait Until Done"
+                    } else {
+                        "Wait Until Done"
+                    },
+                ),
+            ],
+            Body::Block(BlockKind::PlayAnimation {
+                fade_time,
+                speed,
+                weight,
+                wait_until_done,
+                ..
+            }) => vec![
+                (
+                    "fade_time",
+                    if fade_time.is_some() {
+                        "Hide Fade Time"
+                    } else {
+                        "Show Fade Time"
+                    },
+                ),
+                (
+                    "speed",
+                    if speed.is_some() {
+                        "Hide Speed"
+                    } else {
+                        "Show Speed"
+                    },
+                ),
+                (
+                    "weight",
+                    if weight.is_some() {
+                        "Hide Weight"
+                    } else {
+                        "Show Weight"
+                    },
+                ),
+                (
+                    "wait_until_done",
+                    if *wait_until_done {
+                        "Don't Wait Until Done"
+                    } else {
+                        "Wait Until Done"
+                    },
+                ),
+            ],
+            Body::Block(BlockKind::StopAnimation {
+                animation,
+                fade_time,
+                ..
+            }) => vec![
+                (
+                    "animation",
+                    if animation.is_some() {
+                        "Stop All Animations"
+                    } else {
+                        "Stop Specific Animation"
+                    },
+                ),
+                (
+                    "fade_time",
+                    if fade_time.is_some() {
+                        "Hide Fade Time"
+                    } else {
+                        "Show Fade Time"
+                    },
+                ),
+            ],
+            Body::Block(BlockKind::SetIkTarget { weight, .. }) => vec![(
+                "weight",
+                if weight.is_some() {
+                    "Hide Weight"
+                } else {
+                    "Show Weight"
+                },
+            )],
+            Body::Block(
+                BlockKind::SetClockTime { duration, .. }
+                | BlockKind::SetAtmosphere { duration, .. },
+            ) => vec![(
+                "duration",
+                if duration.is_some() {
+                    "Hide Duration (s)"
+                } else {
+                    "Show Duration (s)"
+                },
+            )],
+            Body::Block(BlockKind::PlaySound {
+                pitch,
+                wait_until_done,
+                ..
+            }) => vec![
+                (
+                    "pitch",
+                    if pitch.is_some() {
+                        "Hide Pitch"
+                    } else {
+                        "Show Pitch"
+                    },
+                ),
+                (
+                    "wait_until_done",
+                    if *wait_until_done {
+                        "Don't Wait Until Done"
+                    } else {
+                        "Wait Until Done"
+                    },
+                ),
+            ],
+            Body::Block(BlockKind::PlaySoundAtPosition { volume, pitch, .. }) => vec![
+                (
+                    "volume",
+                    if volume.is_some() {
+                        "Hide Volume"
+                    } else {
+                        "Show Volume"
+                    },
+                ),
+                (
+                    "pitch",
+                    if pitch.is_some() {
+                        "Hide Pitch"
+                    } else {
+                        "Show Pitch"
+                    },
+                ),
+            ],
+            Body::Block(
+                BlockKind::ForEachPartInRadius {
+                    players_only,
+                    ignore,
+                    ..
+                }
+                | BlockKind::ForEachPartTouching {
+                    players_only,
+                    ignore,
+                    ..
+                },
+            ) => vec![
+                (
+                    "players_only",
+                    if *players_only {
+                        "Filter: Any Part (currently Players Only)"
+                    } else {
+                        "Filter: Players Only"
+                    },
+                ),
+                (
+                    "ignore",
+                    if ignore.is_some() {
+                        "Hide Ignore Input"
+                    } else {
+                        "Show Ignore Input"
+                    },
+                ),
+            ],
+            _ => Vec::new(),
+        };
+        let raycast_has_ignore = match body {
+            Body::Value(Expression::Raycast { ignore, .. }) => Some(ignore.is_some()),
+            _ => None,
+        };
+        let sequence_branches = match body {
+            Body::Block(BlockKind::Sequence { branches }) => Some(branches.len()),
+            _ => None,
+        };
         response.context_menu(|ui| {
+            if is_clone && let NodeRef::Block(block_id) = which {
+                let pos_label = if clone_has_pos {
+                    "Hide Position Input"
+                } else {
+                    "Show Position Input"
+                };
+                if ui.button(pos_label).clicked() {
+                    events.push(Event::ToggleClonePosition(*block_id));
+                    ui.close();
+                }
+                let adv_label = if clone_has_adv {
+                    "Hide Advanced Clone Settings"
+                } else {
+                    "Show Advanced Clone Settings"
+                };
+                if ui.button(adv_label).clicked() {
+                    events.push(Event::ToggleCloneAdvanced(*block_id));
+                    ui.close();
+                }
+                ui.separator();
+            }
+            if !optional_toggles.is_empty()
+                && let NodeRef::Block(block_id) = which
+            {
+                for (key, label) in &optional_toggles {
+                    if ui.button(*label).clicked() {
+                        events.push(Event::ToggleOptionalPin(*block_id, key));
+                        ui.close();
+                    }
+                }
+                ui.separator();
+            }
+            if let Some(has_ignore) = raycast_has_ignore {
+                let label = if has_ignore {
+                    "Hide Ignore Input"
+                } else {
+                    "Show Ignore Input"
+                };
+                if ui.button(label).clicked() {
+                    events.push(Event::ToggleRaycastIgnore(which.clone()));
+                    ui.close();
+                }
+                ui.separator();
+            }
+            if let Some(branch_count) = sequence_branches
+                && let NodeRef::Block(block_id) = which
+            {
+                if branch_count < 12 && ui.button("Add Sequence Branch").clicked() {
+                    events.push(Event::ResizeSequence(*block_id, true));
+                    ui.close();
+                }
+                if branch_count > 2 && ui.button("Remove Last Branch").clicked() {
+                    events.push(Event::ResizeSequence(*block_id, false));
+                    ui.close();
+                }
+                ui.separator();
+            }
             if grows {
                 if ui.button("Add Input").clicked() {
                     events.push(Event::Resize(which.clone(), true));
@@ -1145,7 +1886,12 @@ fn draw_node(
     );
     painter.rect_filled(rect, radius(corner), colors.node_body);
     let header = Rect::from_min_size(rect.min, vec2(rect.width(), drawer.s(HEADER)));
-    let mut fill = geometry.category.fill(&theme::palette(ui.ctx()));
+    let header_category = if geometry.is_event {
+        Category::Events
+    } else {
+        geometry.category
+    };
+    let mut fill = header_category.fill(&theme::palette(ui.ctx()));
     if !runs {
         fill = fill.lerp_to_gamma(Color32::from_gray(90), 0.6);
     }
@@ -1163,7 +1909,7 @@ fn draw_node(
     painter.text(
         pos2(header.left() + drawer.s(10.0), header.center().y),
         egui::Align2::LEFT_CENTER,
-        &geometry.title,
+        theme::with_icon(geometry.icon, &geometry.title),
         FontId::proportional(13.0 * z),
         colors.header_text,
     );
@@ -1248,7 +1994,7 @@ fn draw_node(
                         drawer.draw_field(ui, field, field_rect, id.with(("part", *part)));
                     }
                 }
-                Item::ExecOut(..) | Item::Output(_) => {}
+                Item::ExecOut(..) | Item::Output(_) | Item::BlockOutput { .. } => {}
             }
         }
         if let Some(item) = geometry.layout.right.get(row) {
@@ -1287,6 +2033,27 @@ fn draw_node(
                             &colors,
                         );
                         pin_response(ui, drawer, &pin, pin_at, wire_held, events);
+                    }
+                }
+                Item::BlockOutput { index, kind, name } => {
+                    if let NodeRef::Block(block) = which {
+                        let pin = Pin::BlockOutput(*block, *index);
+                        draw_value_pin(
+                            &painter,
+                            pin_at,
+                            z,
+                            pin_color(*kind),
+                            wired.block_outputs_fed.contains(&(*block, *index)),
+                            &colors,
+                        );
+                        pin_response(ui, drawer, &pin, pin_at, wire_held, events);
+                        painter.text(
+                            pos2(text_right, middle),
+                            egui::Align2::RIGHT_CENTER,
+                            name.as_str(),
+                            drawer.font(),
+                            colors.node_text,
+                        );
                     }
                 }
                 _ => {}

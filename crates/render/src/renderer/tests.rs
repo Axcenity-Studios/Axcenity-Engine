@@ -130,6 +130,7 @@ fn list_of(items: Vec<DrawItem>) -> DrawList {
         fog: crate::Fog::default(),
         clouds: crate::Clouds::default(),
         weather: crate::Weather::default(),
+        weather_field: None,
         camera: Camera {
             position: Vec3::ZERO,
             look_at: Vec3::NEG_Z,

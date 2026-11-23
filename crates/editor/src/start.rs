@@ -84,6 +84,8 @@ pub struct Brand {
     wordmark: egui::TextureHandle,
     /// The A alone, small, for the header and the start screen.
     mark: egui::TextureHandle,
+    /// The A alone, high-resolution (1024x1024), for large watermarks.
+    mark_large: egui::TextureHandle,
 }
 
 impl Brand {
@@ -99,6 +101,11 @@ impl Brand {
                 "mark",
                 include_bytes!("../../../assets/branding/mark-white-small.png"),
             ),
+            mark_large: texture(
+                ctx,
+                "mark_large",
+                include_bytes!("../../../assets/branding/mark-white.png"),
+            ),
         }
     }
 
@@ -107,9 +114,14 @@ impl Brand {
         &self.wordmark
     }
 
-    /// The white A. Tint it with the theme's text colour.
+    /// The white A (small, 48x48). Tint it with the theme's text colour.
     pub fn mark(&self) -> &egui::TextureHandle {
         &self.mark
+    }
+
+    /// The white A (high-resolution, 1024x1024), for large watermarks.
+    pub fn mark_large(&self) -> &egui::TextureHandle {
+        &self.mark_large
     }
 }
 

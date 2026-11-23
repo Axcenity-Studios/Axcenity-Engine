@@ -114,10 +114,24 @@ impl WaterCache {
         flood: Option<f32>,
         (cx, cz): (usize, usize),
     ) -> Option<Arc<PaintedWater>> {
+        let (chunks_x, chunks_z) = data.chunk_counts();
+        let neighbor_water = |dx: isize, dz: isize| -> u64 {
+            let nx = cx as isize + dx;
+            let nz = cz as isize + dz;
+            if nx >= 0 && nz >= 0 && (nx as usize) < chunks_x && (nz as usize) < chunks_z {
+                data.chunk_water_version(nx as usize, nz as usize)
+            } else {
+                0
+            }
+        };
         let mut hasher = DefaultHasher::new();
         (
             data.uid(),
             data.chunk_water_version(cx, cz),
+            neighbor_water(-1, 0),
+            neighbor_water(1, 0),
+            neighbor_water(0, -1),
+            neighbor_water(0, 1),
             data.chunk_height_version(cx, cz),
             flood.map(f32::to_bits),
             placement.position.to_array().map(f32::to_bits),
@@ -251,7 +265,52 @@ impl PaintedWater {
         // Squares a cell is cut into each way, so a chunk is as fine as the
         // water grid.
         let cuts = (WATER_GRID as usize / cells_x.max(cells_z)).max(1);
+        let (total_x, total_z) = data.size();
+        let max_cell_x = total_x.saturating_sub(1);
+        let max_cell_z = total_z.saturating_sub(1);
         let ground = |x: usize, z: usize| placement.world_y(data.height(x as isize, z as isize));
+        let cell_water = |cx: isize, cz: isize| -> Option<f32> {
+            if cx < 0 || cz < 0 || (cx as usize) >= max_cell_x || (cz as usize) >= max_cell_z {
+                return None;
+            }
+            let level = placement.world_y(data.water_at(cx as usize, cz as usize)?);
+            if flood.is_some_and(|flood| level <= flood + 0.01) {
+                return None;
+            }
+            Some(level)
+        };
+        // At sample corner (gx, gz), average the water levels of up to 4
+        // adjacent painted cells so differing stroke levels join smoothly, and
+        // compute an edge mask (0.0 at exposed unpainted borders, 1.0 inside or
+        // where terrain rises to meet the water).
+        let corner_info = |gx: usize, gz: usize, fallback_level: f32| -> (f32, f32) {
+            let mut sum = 0.0f32;
+            let mut count = 0u32;
+            for dz in [-1isize, 0] {
+                for dx in [-1isize, 0] {
+                    if let Some(lvl) = cell_water(gx as isize + dx, gz as isize + dz) {
+                        sum += lvl;
+                        count += 1;
+                    }
+                }
+            }
+            let avg_level = if count > 0 {
+                sum / count as f32
+            } else {
+                fallback_level
+            };
+            let edge_mask = if count == 4 {
+                1.0
+            } else {
+                let g = ground(gx, gz);
+                // If terrain already rises up to or above the water at this
+                // corner, keep full mask so depth-based shoreline feathering
+                // handles the transition cleanly. Otherwise feather exposed
+                // unpainted brush borders softly to 0.
+                if g >= avg_level - 0.05 { 1.0 } else { 0.0 }
+            };
+            (avg_level, edge_mask)
+        };
         let mut mesh = PaintedWater {
             key: 0,
             positions: Vec::new(),
@@ -279,16 +338,31 @@ impl PaintedWater {
                 if corners.iter().all(|&y| y >= level) {
                     continue;
                 }
+                let (y00, m00) = corner_info(x, z, level);
+                let (y10, m10) = corner_info(x + 1, z, level);
+                let (y01, m01) = corner_info(x, z + 1, level);
+                let (y11, m11) = corner_info(x + 1, z + 1, level);
                 let first = mesh.positions.len() as u32;
                 let side = cuts + 1;
                 for j in 0..=cuts {
+                    let tz = j as f32 / cuts as f32;
                     for i in 0..=cuts {
-                        let u = ((x - rect.x0) as f32 + i as f32 / cuts as f32) / cells_x as f32;
-                        let v = ((z - rect.z0) as f32 + j as f32 / cuts as f32) / cells_z as f32;
-                        mesh.positions.push([u - 0.5, level, v - 0.5]);
+                        let tx = i as f32 / cuts as f32;
+                        let u = ((x - rect.x0) as f32 + tx) / cells_x as f32;
+                        let v = ((z - rect.z0) as f32 + tz) / cells_z as f32;
+                        let y_top = y00 + (y10 - y00) * tx;
+                        let y_bot = y01 + (y11 - y01) * tx;
+                        let y = y_top + (y_bot - y_top) * tz;
+                        let m_top = m00 + (m10 - m00) * tx;
+                        let m_bot = m01 + (m11 - m01) * tx;
+                        let edge_mask = (m_top + (m_bot - m_top) * tz).clamp(0.0, 1.0);
+                        mesh.positions.push([u - 0.5, y, v - 0.5]);
                         mesh.normals.push([0.0, 1.0, 0.0]);
                         mesh.uvs.push([u, v]);
-                        mesh.tangents.push([1.0, 0.0, 0.0, -1.0]);
+                        // Encode painted-water edge mask in tangent.w in [-2, -1]:
+                        // `clamp(2.0 + tangent.w, 0.0, 1.0)` gives `edge_mask` in
+                        // water.wgsl while keeping standard meshes (±1 or 0) at 1.0.
+                        mesh.tangents.push([1.0, 0.0, 0.0, -(2.0 - edge_mask)]);
                     }
                 }
                 for j in 0..cuts {

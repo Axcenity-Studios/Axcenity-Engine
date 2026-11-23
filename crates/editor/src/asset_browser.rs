@@ -276,6 +276,22 @@ impl Category {
             _ => IMAGES_FOLDER,
         }
     }
+
+    /// The root folder under `assets/` where custom subfolders for this
+    /// category live.
+    pub fn base_folder(self) -> &'static str {
+        match self {
+            Category::Textures => axcenity_assets::PROJECT_TEXTURES_FOLDER,
+            Category::Images => IMAGES_FOLDER,
+            Category::Models => "assets/models",
+            Category::Prefabs => "assets/prefabs",
+            Category::Audio => "assets/audio",
+            Category::Particles => PARTICLES_FOLDER,
+            Category::Animations => "assets/animations",
+            Category::Skies => "assets/sky",
+            Category::All | Category::Props | Category::Global => "assets",
+        }
+    }
 }
 
 /// What the panel asks the app to do.
@@ -348,6 +364,12 @@ enum AssetDialog {
     },
     /// Rename or move the asset at `from`; `to` is the path being typed.
     Move { from: String, to: String },
+    /// Create a new custom subfolder under `parent` (project-relative).
+    NewFolder {
+        parent: String,
+        name: String,
+        error: Option<String>,
+    },
     /// Delete `files`, the own files of the assets called `name`. `global`
     /// when one of them is a global asset, whose library copy stays.
     Delete {
@@ -368,6 +390,10 @@ pub struct AssetBrowser {
     dialog: Option<AssetDialog>,
     /// The imported model's folder shown (by its name), if one is open.
     open_package: Option<String>,
+    /// Custom subfolders scanned under `assets/` (project-relative, `/`-separated).
+    custom_folders: Vec<String>,
+    /// The custom subfolder currently being browsed, if any.
+    open_custom_folder: Option<String>,
     /// The paths of the assets picked with a click (Ctrl or Cmd adds),
     /// for Export Package….
     picked: Vec<String>,
@@ -728,9 +754,65 @@ impl AssetBrowser {
                 &self.sources,
             );
         }
+        self.custom_folders = self
+            .folder
+            .as_deref()
+            .map(scan_custom_folders)
+            .unwrap_or_default();
         self.thumbnails.forget_missing();
         self.global_thumbnails.forget_missing();
     }
+}
+
+/// Scans subdirectories under `assets/` (relative, `/`-separated, sorted) so
+/// custom folders in Textures, Materials, and other tabs show up even when
+/// empty.
+fn scan_custom_folders(project: &Path) -> Vec<String> {
+    let root = project.join("assets");
+    if !root.is_dir() {
+        return Vec::new();
+    }
+    let mut found = Vec::new();
+    let mut stack = vec![(root, "assets".to_owned())];
+    while let Some((dir, rel)) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if name.starts_with('.') {
+                continue;
+            }
+            let child_rel = format!("{rel}/{name}");
+            // Skip the built-in category root directories themselves; only
+            // list user-created subfolders inside them (or custom top-level
+            // folders under `assets/`).
+            let is_builtin_root = matches!(
+                child_rel.as_str(),
+                "assets/textures"
+                    | "assets/materials"
+                    | "assets/images"
+                    | "assets/models"
+                    | "assets/prefabs"
+                    | "assets/audio"
+                    | "assets/particles"
+                    | "assets/animations"
+                    | "assets/sky"
+            );
+            if !is_builtin_root {
+                found.push(child_rel.clone());
+            }
+            stack.push((path, child_rel));
+        }
+    }
+    found.sort();
+    found
 }
 
 fn uv() -> egui::Rect {

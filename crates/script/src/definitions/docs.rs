@@ -920,6 +920,16 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     ),
     (
         ClassName::Sound,
+        "TimePosition",
+        "Playback position in seconds. Setting it seeks the sound to that time.",
+    ),
+    (
+        ClassName::Sound,
+        "TimeLength",
+        "Total length of the sound clip in seconds. Read-only in scripts.",
+    ),
+    (
+        ClassName::Sound,
         "Spatial",
         "If true, the sound is placed in the world and panned as the camera moves. If false, it plays the same in both ears.",
     ),
@@ -1828,6 +1838,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     ),
     (
         ClassName::Weather,
+        "Enabled",
+        "Turns the weather system on or off (true by default). When false, precipitation stops and surfaces dry and clear over TransitionTime.",
+    ),
+    (
+        ClassName::Weather,
         "Precipitation",
         "What falls around the camera (`Enum.Precipitation`): None, Rain (the default) or Snow. Rain wets surfaces as it falls, up to its Intensity; snow covers the ones facing up.",
     ),
@@ -1848,8 +1863,33 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     ),
     (
         ClassName::Weather,
+        "SnowThickness",
+        "Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.",
+    ),
+    (
+        ClassName::Weather,
         "TransitionTime",
         "Seconds a change takes to ease in (10 by default): rain starting and stopping, surfaces wetting and drying, snow settling and melting. 0 changes at once.",
+    ),
+    (
+        ClassName::Weather,
+        "OcclusionEnabled",
+        "When true (the default), rain and snow are occluded by solid roofs and geometry, and sheltered interior surfaces stay dry and bare.",
+    ),
+    (
+        ClassName::Weather,
+        "FootprintsEnabled",
+        "When true (the default), moving characters and objects press dynamic footprints and trails into snow-covered ground.",
+    ),
+    (
+        ClassName::Weather,
+        "FootprintFadeTime",
+        "Seconds a snow footprint or trail takes to fill back in (30 by default).",
+    ),
+    (
+        ClassName::Weather,
+        "SurfaceMask",
+        "Manual interior/exterior surface mask cells painted in the editor (format: \"x,z:I;x,z:E\"). Overrides automatic sky-visibility detection.",
     ),
     (
         ClassName::ParticleEmitter,
@@ -5702,6 +5742,16 @@ pub(super) const EVENT_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::NavigationAgent,
         "PlayerSensed",
         "Fires when the agent starts seeing or hearing the player character. The handler gets the sense: \"Sight\" or \"Hearing\".",
+    ),
+    (
+        ClassName::NavigationAgent,
+        "PlayerLost",
+        "Fires when the agent stops seeing or hearing the player character. The handler gets the sense: \"Sight\" or \"Hearing\".",
+    ),
+    (
+        ClassName::NavigationAgent,
+        "DestinationReached",
+        "Fires when the agent reaches its Destination. The handler gets no arguments.",
     ),
     (
         ClassName::Sequence,

@@ -248,11 +248,17 @@ pub(super) const GROUPS: [(&str, &[&str]); 36] = [
     (
         "Weather",
         &[
+            "Enabled",
             "Precipitation",
             "Intensity",
             "Wetness",
             "SnowCover",
+            "SnowThickness",
             "TransitionTime",
+            "OcclusionEnabled",
+            "FootprintsEnabled",
+            "FootprintFadeTime",
+            "SurfaceMask",
         ],
     ),
     ("Outlines", &["Enabled", "Thickness"]),

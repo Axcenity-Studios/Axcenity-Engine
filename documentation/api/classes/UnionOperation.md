@@ -54,6 +54,12 @@ UnionOperation.Size: Vector3
 
 The size of the model's box in studs along X, Y and Z. The model stretches to fill it.
 
+#### PivotOffset
+
+```luau
+UnionOperation.PivotOffset: CFrame
+```
+
 #### UsePartColor
 
 ```luau

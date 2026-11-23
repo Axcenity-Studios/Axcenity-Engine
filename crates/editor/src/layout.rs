@@ -375,6 +375,11 @@ pub struct Layout {
     /// True from switching layouts until the scripts come back, which then
     /// go behind the tab the layout puts in front.
     switched: bool,
+    /// True while `self.dock` is temporarily swapped out for `DockArea::show_inside`.
+    dock_borrowed: bool,
+    /// Panes asked to open while `self.dock` was borrowed; opened as soon as
+    /// `restore_dock` puts the real dock back.
+    pending_open: Vec<Pane>,
 }
 
 impl Default for Layout {
@@ -387,11 +392,33 @@ impl Default for Layout {
             last_script: None,
             homes: HashMap::new(),
             switched: false,
+            dock_borrowed: false,
+            pending_open: Vec::new(),
         }
     }
 }
 
 impl Layout {
+    /// Takes `self.dock` out while `DockArea` draws it so panels can borrow
+    /// `EditorApp`. Any `open` calls made during drawing are queued and
+    /// applied by [`restore_dock`](Self::restore_dock).
+    pub fn take_dock(&mut self) -> DockState<Pane> {
+        self.dock_borrowed = true;
+        std::mem::replace(&mut self.dock, DockState::new(Vec::new()))
+    }
+
+    /// Puts `dock` back after `DockArea` finishes drawing and applies any
+    /// queued [`open`](Self::open) calls. Returns true if any pane was opened.
+    pub fn restore_dock(&mut self, dock: DockState<Pane>) -> bool {
+        self.dock = dock;
+        self.dock_borrowed = false;
+        let queued = std::mem::take(&mut self.pending_open);
+        let opened = !queued.is_empty();
+        for pane in queued {
+            self.open(pane);
+        }
+        opened
+    }
     /// True if `pane` is open anywhere, docked or floating.
     pub fn is_open(&self, pane: Pane) -> bool {
         self.dock.find_tab(&pane).is_some() || self.windows.iter().any(|window| window.holds(pane))
@@ -418,6 +445,12 @@ impl Layout {
     /// Shows `pane`: makes it the active tab where it is, or opens it where
     /// it starts out (next to a panel that shares its place by default).
     pub fn open(&mut self, pane: Pane) {
+        if self.dock_borrowed {
+            if !self.pending_open.contains(&pane) {
+                self.pending_open.push(pane);
+            }
+            return;
+        }
         if let Some(found) = self.dock.find_tab(&pane) {
             // Fails only for a tab that isn't there, and this one was just found.
             let _ = self.dock.set_active_tab(found);
@@ -437,6 +470,21 @@ impl Layout {
                 );
             }
             window.focus = true;
+            return;
+        }
+        if pane == Pane::Scene
+            && let Some(found) = self.dock.find_tab(&Pane::Welcome)
+        {
+            for (_, tab) in self.dock.iter_all_tabs_mut() {
+                if *tab == Pane::Welcome {
+                    *tab = Pane::Scene;
+                }
+            }
+            let _ = self.dock.set_active_tab(found);
+            dock_chrome::expand(
+                &mut self.dock,
+                egui_dock::NodePath::new(found.surface, found.node),
+            );
             return;
         }
         let neighbor = match pane {
@@ -620,7 +668,16 @@ impl Layout {
             });
         let welcome = self.dock.find_tab(&Pane::Welcome);
         match (documents, welcome) {
-            (true, Some(_)) => self.dock.retain_tabs(|pane| *pane != Pane::Welcome),
+            (true, Some(found)) => {
+                // `remove_tab` updates the leaf's active tab index, whereas
+                // `retain_tabs` can leave `active` pointing past the end of
+                // the remaining tabs (causing a blank pane until clicked).
+                self.dock.remove_tab(found);
+                // Clean up any stray duplicates just in case.
+                while let Some(extra) = self.dock.find_tab(&Pane::Welcome) {
+                    self.dock.remove_tab(extra);
+                }
+            }
             (false, None) => {
                 // The biggest place in the main window, as it was last drawn.
                 let biggest = self
@@ -1064,6 +1121,37 @@ mod tests {
         let loaded = Layout::from_text(&layout.to_text());
         assert!(loaded.is_open(Pane::Welcome));
         assert!(!loaded.is_open(Pane::Scene));
+    }
+
+    #[test]
+    fn showing_scene_from_welcome_leaves_scene_active() {
+        // Reproduces the bug where closing Scene (leaving Welcome as the only
+        // tab in that leaf) and then calling Show Scene left `leaf.active`
+        // pointing past the end of `leaf.tabs`, rendering a black screen.
+        let mut layout = Layout::default();
+        // Close Animation and UiDesigner so Welcome is the sole tab.
+        layout.toggle(Pane::Animation);
+        layout.toggle(Pane::UiDesigner);
+        layout.close_scene();
+        assert!(layout.is_open(Pane::Welcome));
+        assert!(!layout.is_open(Pane::Scene));
+
+        layout.open(Pane::Scene);
+        layout.keep_a_document();
+        assert!(layout.is_open(Pane::Scene));
+        assert!(!layout.is_open(Pane::Welcome));
+        let found = layout.dock.find_tab(&Pane::Scene).unwrap();
+        let node = &layout.dock[found.surface][found.node];
+        let egui_dock::Node::Leaf(leaf) = node else {
+            panic!("expected leaf node");
+        };
+        assert_eq!(
+            leaf.tabs.get(leaf.active.0),
+            Some(&Pane::Scene),
+            "Scene must be the active tab immediately (active={:?}, tabs={:?})",
+            leaf.active,
+            leaf.tabs
+        );
     }
 
     #[test]

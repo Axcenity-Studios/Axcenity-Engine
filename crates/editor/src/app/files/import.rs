@@ -296,10 +296,10 @@ impl EditorApp {
     /// Output. While the dialog is open for another file, this one waits
     /// its turn.
     pub(in crate::app) fn import_model(&mut self, file: &Path) {
-        if self.project.is_none() || self.playing() || self.viewport.is_dragging() {
+        if self.project.is_none() || self.playing() {
             return;
         }
-        if self.importing.is_some() {
+        if self.importing.is_some() || self.viewport.is_dragging() {
             self.import_queue.push_back(file.to_owned());
             return;
         }

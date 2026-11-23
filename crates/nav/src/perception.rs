@@ -88,8 +88,8 @@ impl Player {
 
 /// Updates what the agent `id`, whose body is `parts`, senses of `player`
 /// after it moved `moved` across this step. Writes `SeesPlayer` and
-/// `HearsPlayer` when they change, and returns the senses that have just
-/// started.
+/// `HearsPlayer` when they change, and returns `(started, lost)`: the senses
+/// that just started and the senses that just stopped.
 pub(crate) fn perceive(
     world: &mut World,
     assets: &Assets,
@@ -98,7 +98,7 @@ pub(crate) fn perceive(
     senses: &mut Senses,
     player: Option<&Player>,
     moved: (f32, f32),
-) -> Vec<Sense> {
+) -> (Vec<Sense>, Vec<Sense>) {
     let across = moved.0.hypot(moved.1);
     if across > 1e-4 {
         senses.facing = Some((moved.0 / across, moved.1 / across));
@@ -121,12 +121,15 @@ pub(crate) fn perceive(
         _ => (false, false),
     };
     let mut started = Vec::new();
+    let mut lost = Vec::new();
     for (sense, now, was, property) in [
         (Sense::Sight, sees, &mut senses.sees, "SeesPlayer"),
         (Sense::Hearing, hears, &mut senses.hears, "HearsPlayer"),
     ] {
         if now && !*was {
             started.push(sense);
+        } else if !now && *was {
+            lost.push(sense);
         }
         *was = now;
         let shown = world
@@ -137,7 +140,7 @@ pub(crate) fn perceive(
             let _ = world.set_property(id, property, Value::Bool(now));
         }
     }
-    started
+    (started, lost)
 }
 
 /// Whether the agent sees either of the player's points: in range, inside

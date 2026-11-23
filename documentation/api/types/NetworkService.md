@@ -8,6 +8,22 @@ Hosting and joining games, from `game:GetService("NetworkService")`, so a menu c
 
 ### Properties
 
+#### IsHost
+
+```luau
+NetworkService.IsHost: boolean
+```
+
+True while this device is hosting a multiplayer game. Read-only.
+
+#### IsConnected
+
+```luau
+NetworkService.IsConnected: boolean
+```
+
+True while this device is hosting or joined to a multiplayer game. Read-only.
+
 #### ConnectionFailed
 
 ```luau

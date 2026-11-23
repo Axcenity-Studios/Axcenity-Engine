@@ -90,33 +90,57 @@ pub fn decorate(ui: &mut egui::Ui, dock: &mut DockState<Pane>, tabs: &TabRects) 
         let Some(&active) = leaf.tabs.get(leaf.active.0) else {
             continue;
         };
-        if let Some((_, rect)) = tabs.iter().find(|(pane, _)| *pane == active) {
-            let color = if focused == Some(path) {
-                palette.accent
-            } else {
-                palette.accent.gamma_multiply(0.7)
-            };
-            let line = egui::Rect::from_min_max(
-                rect.left_top(),
-                egui::pos2(rect.right(), rect.top() + ACTIVE_LINE),
-            );
-            ui.painter().rect_filled(line, 0, color);
+        let bar = leaf.rect;
+        let collapsible = can_collapse(dock, path) && bar.is_positive();
+        let chevron_size = TAB_BAR_HEIGHT - 8.0;
+        // Reserve a solid slot at the right of the tab bar for the collapse
+        // chevron so scrolled tabs and close buttons cannot collide with it.
+        let chevron_slot_left = if collapsible {
+            bar.right() - chevron_size - 8.0
+        } else {
+            bar.right()
+        };
+        if bar.is_positive()
+            && let Some((_, rect)) = tabs.iter().find(|(pane, _)| *pane == active)
+        {
+            // Clip the accent line to the leaf's tab strip bounds so a
+            // horizontally scrolled tab never bleeds into the viewport or
+            // adjacent panels.
+            let left = rect.left().max(bar.left());
+            let right = rect.right().min(chevron_slot_left);
+            if right > left {
+                let color = if focused == Some(path) {
+                    palette.accent
+                } else {
+                    palette.accent.gamma_multiply(0.7)
+                };
+                let line = egui::Rect::from_min_max(
+                    egui::pos2(left, rect.top()),
+                    egui::pos2(right, rect.top() + ACTIVE_LINE),
+                );
+                ui.painter().rect_filled(line, 0, color);
+            }
         }
-        if !can_collapse(dock, path) {
+        if !collapsible {
             continue;
         }
         let collapsed = leaf.collapsed;
-        let bar = leaf.rect;
-        if !bar.is_positive() {
-            continue;
-        }
-        let size = TAB_BAR_HEIGHT - 8.0;
+        let slot = egui::Rect::from_min_max(
+            egui::pos2(chevron_slot_left, bar.top()),
+            egui::pos2(bar.right(), bar.top() + TAB_BAR_HEIGHT - 1.0),
+        );
+        ui.painter().rect_filled(slot, 0, palette.app_bg);
+        ui.painter().vline(
+            slot.left() + 0.5,
+            slot.y_range(),
+            egui::Stroke::new(1.0_f32, palette.border),
+        );
         let button = egui::Rect::from_center_size(
             egui::pos2(
-                bar.right() - 4.0 - size / 2.0,
+                bar.right() - 4.0 - chevron_size / 2.0,
                 bar.top() + TAB_BAR_HEIGHT / 2.0,
             ),
-            egui::vec2(size, size),
+            egui::vec2(chevron_size, chevron_size),
         );
         let (icon, tip) = if collapsed {
             (icons::CARET_UP, "Open this panel again")

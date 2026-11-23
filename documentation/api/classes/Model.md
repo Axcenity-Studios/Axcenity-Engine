@@ -22,6 +22,12 @@ Model.ModelStreamingMode: EnumModelStreamingMode | "Default" | "Atomic" | "Persi
 
 How the Model streams. Default: a Model with no Models inside loads and unloads whole, and one with Models inside streams each piece on its own. Atomic: always whole, with the Models inside. Persistent: always on every device.
 
+#### PivotOffset
+
+```luau
+Model.PivotOffset: CFrame
+```
+
 #### Locked
 
 ```luau

@@ -43,16 +43,6 @@ impl AnimationStudio {
                     });
             });
         } else {
-            // Across the whole body, so the preview has room beside its
-            // parameters; the graph keeps at least half the height, and
-            // starts with two thirds of a short tab.
-            let room = ui.available_height();
-            egui::Panel::bottom("state machine preview")
-                .resizable(true)
-                .default_size(CONTROLLER_PREVIEW.min(room / 3.0).max(100.0))
-                .min_size(100.0)
-                .max_size((room * 0.5).max(100.0))
-                .show(ui, |ui| self.controller_live(ui, assets, render_state, dt));
             if !self.machine.hide_inspector {
                 let room = ui.available_width();
                 egui::Panel::right("state machine inspector")
@@ -65,7 +55,14 @@ impl AnimationStudio {
                             .show(ui, |ui| self.controller_inspector(ui))
                     });
             }
-            egui::CentralPanel::default().show(ui, |ui| go = self.controller_graph(ui));
+            let mut graph_rect = egui::Rect::NOTHING;
+            egui::CentralPanel::default().show(ui, |ui| {
+                graph_rect = ui.max_rect();
+                go = self.controller_graph(ui);
+            });
+            // Dock the 3D Preview cleanly in the bottom-left corner of the graph,
+            // or undock it into a floating window.
+            self.corner_preview(ui.ctx(), graph_rect, assets, render_state, dt);
         }
         if self.machine.doc.as_ref().is_some_and(|doc| doc.playing) {
             ui.ctx().request_repaint();
@@ -118,6 +115,21 @@ impl AnimationStudio {
                 doc.restart();
             }
             ui.separator();
+            let (wires_icon, wires_hover) = if doc.view.show_all_wires {
+                (
+                    icons::EYE,
+                    "Showing all transition wires (click to show only active/hovered)",
+                )
+            } else {
+                (
+                    icons::EYE_SLASH,
+                    "Showing only active/hovered node wires (click to show all)",
+                )
+            };
+            if widgets::icon_button(ui, wires_icon, wires_hover, doc.view.show_all_wires).clicked()
+            {
+                doc.view.show_all_wires = !doc.view.show_all_wires;
+            }
             if !stacked
                 && widgets::icon_button(
                     ui,
@@ -150,7 +162,133 @@ impl AnimationStudio {
         Some(Go::State(state.name.clone(), clip))
     }
 
-    /// The live preview beside its parameters, or above them when narrow.
+    /// The 3D live preview docked in the bottom-left corner of the graph, or
+    /// undocked into a floating window.
+    fn corner_preview(
+        &mut self,
+        ctx: &egui::Context,
+        graph_rect: egui::Rect,
+        assets: &Assets,
+        render_state: Option<&RenderState>,
+        dt: f64,
+    ) {
+        let Some(controller) = &mut self.machine.doc else {
+            return;
+        };
+        if graph_rect.width() < 120.0 || graph_rect.height() < 120.0 {
+            return;
+        }
+        let preview = &mut self.machine.preview;
+        let palette = theme::palette(ctx);
+        let playing_label = controller.live_state_name().unwrap_or("Preview").to_owned();
+
+        if self.machine.preview_undocked {
+            let mut open = true;
+            egui::Window::new(format!("{} 3D Preview — {playing_label}", icons::CUBE))
+                .id(egui::Id::new("state machine preview undocked"))
+                .open(&mut open)
+                .default_size(egui::vec2(280.0, 260.0))
+                .resizable(true)
+                .collapsible(true)
+                .show(ctx, |ui| {
+                    show_model(preview, controller.preview_model.as_deref(), assets);
+                    let posed = match controller.tick(assets, dt) {
+                        Ok(posed) => Some(posed),
+                        Err(problem) => {
+                            ui.colored_label(ui.visuals().warn_fg_color, problem);
+                            None
+                        }
+                    };
+                    let h = ui.available_height().max(120.0);
+                    preview.show(ui, render_state, assets, posed, h);
+                });
+            if !open {
+                self.machine.preview_undocked = false;
+            }
+            return;
+        }
+
+        let card_w = (graph_rect.width() * 0.30).clamp(180.0, 260.0);
+        let card_h = if self.machine.preview_collapsed {
+            28.0
+        } else {
+            (graph_rect.height() * 0.36).clamp(150.0, 220.0)
+        };
+        let pos = egui::pos2(
+            graph_rect.left() + 10.0,
+            graph_rect.bottom() - card_h - 10.0,
+        );
+        egui::Area::new(egui::Id::new("state machine corner preview"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos)
+            .show(ctx, |ui| {
+                egui::Frame::new()
+                    .fill(palette.panel.gamma_multiply(0.95))
+                    .stroke(egui::Stroke::new(1.0_f32, palette.border))
+                    .corner_radius(theme::radius::CARD)
+                    .inner_margin(egui::Margin::same(6))
+                    .show(ui, |ui| {
+                        ui.set_width(card_w);
+                        ui.horizontal(|ui| {
+                            let chev = if self.machine.preview_collapsed {
+                                icons::CARET_RIGHT
+                            } else {
+                                icons::CARET_DOWN
+                            };
+                            if ui
+                                .small_button(chev)
+                                .on_hover_text("Collapse or expand 3D preview")
+                                .clicked()
+                            {
+                                self.machine.preview_collapsed = !self.machine.preview_collapsed;
+                            }
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(format!(
+                                        "{} {playing_label}",
+                                        icons::PLAY_CIRCLE
+                                    ))
+                                    .size(theme::type_scale::SMALL)
+                                    .strong(),
+                                )
+                                .truncate(),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui
+                                        .small_button(icons::ARROW_SQUARE_OUT)
+                                        .on_hover_text("Undock 3D Preview to a floating window")
+                                        .clicked()
+                                    {
+                                        self.machine.preview_undocked = true;
+                                    }
+                                },
+                            );
+                        });
+                        if !self.machine.preview_collapsed {
+                            ui.add_space(4.0);
+                            show_model(preview, controller.preview_model.as_deref(), assets);
+                            let posed = match controller.tick(assets, dt) {
+                                Ok(posed) => Some(posed),
+                                Err(problem) => {
+                                    ui.colored_label(ui.visuals().warn_fg_color, problem);
+                                    None
+                                }
+                            };
+                            preview.show(
+                                ui,
+                                render_state,
+                                assets,
+                                posed,
+                                (card_h - 36.0).max(80.0),
+                            );
+                        }
+                    });
+            });
+    }
+
+    /// The live preview (used in stacked narrow layout).
     pub(super) fn controller_live(
         &mut self,
         ui: &mut egui::Ui,
@@ -165,30 +303,16 @@ impl AnimationStudio {
         let height = ui.available_height().min(CONTROLLER_PREVIEW);
         let size = egui::vec2(ui.available_width(), height);
         ui.allocate_ui(size, |ui| {
-            responsive::split(ui, SPLIT_PREVIEW_BELOW, 0.55, |ui, pane| {
-                if pane == 0 {
-                    show_model(preview, controller.preview_model.as_deref(), assets);
-                    let posed = match controller.tick(assets, dt) {
-                        Ok(posed) => Some(posed),
-                        Err(problem) => {
-                            ui.colored_label(ui.visuals().warn_fg_color, problem);
-                            None
-                        }
-                    };
-                    let height = ui.available_height().clamp(40.0, CONTROLLER_PREVIEW);
-                    preview.show(ui, render_state, assets, posed, height);
-                    return;
+            show_model(preview, controller.preview_model.as_deref(), assets);
+            let posed = match controller.tick(assets, dt) {
+                Ok(posed) => Some(posed),
+                Err(problem) => {
+                    ui.colored_label(ui.visuals().warn_fg_color, problem);
+                    None
                 }
-                // Not the "Parameters" beside the graph, which defines them:
-                // these only try values in the preview.
-                ui.strong("Try parameters").on_hover_text(
-                    "Set these to watch the preview follow the wires. They only change the \
-                     preview: in the game, scripts and blocks set them.",
-                );
-                egui::ScrollArea::vertical()
-                    .id_salt("live parameters")
-                    .show(ui, |ui| controller.live_controls(ui));
-            });
+            };
+            let height = ui.available_height().clamp(80.0, CONTROLLER_PREVIEW);
+            preview.show(ui, render_state, assets, posed, height);
         });
     }
 

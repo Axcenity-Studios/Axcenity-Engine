@@ -169,61 +169,9 @@ impl ControllerDoc {
         self.playing = true;
     }
 
-    /// The preview's parameter controls, the state playing and its blend.
-    pub fn live_controls(&mut self, ui: &mut egui::Ui) {
-        let Some(run) = &mut self.preview else {
-            return;
-        };
-        let state = run
-            .compiled
-            .state_name(run.machine.current.state)
-            .to_owned();
-        ui.horizontal_wrapped(|ui| {
-            ui.strong(format!("{} {state}", icons::PLAY_CIRCLE));
-            if let Some(fade) = run.machine.fade {
-                ui.weak(format!(
-                    "blending from {}: {:.0}% new",
-                    run.compiled.state_name(fade.from.state),
-                    fade.weight() * 100.0
-                ));
-            }
-        });
-        for problem in &run.problems {
-            ui.colored_label(ui.visuals().warn_fg_color, problem);
-        }
-        if self.file.parameters.is_empty() {
-            ui.weak("Add parameters (in the state machine's settings) to drive transitions here.");
-        }
-        let ranges = number_ranges(&self.file);
-        crate::responsive::form(ui, "live parameters", |ui| {
-            for def in &self.file.parameters {
-                let name = def.name().to_owned();
-                ui.label(&name);
-                let slot = run
-                    .parameters
-                    .entry(name.clone())
-                    .or_insert_with(|| def.initial());
-                match slot {
-                    Parameter::Bool(value) => {
-                        ui.checkbox(value, "");
-                    }
-                    Parameter::Number(value) => {
-                        let (low, high) = ranges.get(&name).copied().unwrap_or((0.0, 10.0));
-                        ui.add(egui::Slider::new(value, low..=high));
-                    }
-                    Parameter::Trigger(set) => {
-                        ui.horizontal_wrapped(|ui| {
-                            if ui.button("Fire").clicked() {
-                                *set = true;
-                            }
-                            if *set {
-                                ui.weak("waiting for a transition");
-                            }
-                        });
-                    }
-                }
-                ui.end_row();
-            }
-        });
+    /// Name of the state currently playing in the live preview, if running.
+    pub fn live_state_name(&self) -> Option<&str> {
+        let run = self.preview.as_ref()?;
+        Some(run.compiled.state_name(run.machine.current.state))
     }
 }

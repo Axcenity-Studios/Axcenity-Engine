@@ -98,8 +98,6 @@ const OUTLINE_BELOW: f32 = 720.0;
 const OUTLINE_WIDTH: f32 = 180.0;
 /// The state machine graph's height when the tab is stacked.
 const STACKED_GRAPH: f32 = 280.0;
-/// Narrower than this, a state machine's live preview goes above its controls.
-const SPLIT_PREVIEW_BELOW: f32 = 420.0;
 /// The tallest a picker's list gets before it scrolls.
 const PICKER_HEIGHT: f32 = 320.0;
 /// What a toolbar's preview-model combo box needs on its row.
@@ -247,6 +245,8 @@ pub enum StudioAction {
     },
     /// Bring the Animation tab to the front.
     Show,
+    /// Focus or open the main Scene View (for Sequencer mode).
+    ShowScene,
     /// Update `PivotOffset` on a Part or Model edited inside the Animation
     /// preview's Edit Pivot mode.
     SetPivot {
@@ -342,6 +342,7 @@ impl Badge {
     /// The short form for the outline's rows, where every state of one
     /// model would repeat the same file: a linked clip names only its take
     /// (the file is on hover, and in the clip's toolbar).
+    #[cfg(test)]
     fn short_text(&self) -> String {
         match self {
             Badge::Linked { take, .. } => {
@@ -355,17 +356,6 @@ impl Badge {
     /// The badge as a small, weak label that shortens to fit.
     fn show(&self, ui: &mut egui::Ui) {
         self.label(ui, self.text());
-    }
-
-    /// [`Self::show`] in its short form, for the outline (the whole badge
-    /// on hover).
-    fn show_short(&self, ui: &mut egui::Ui) {
-        let short = self.short_text();
-        let full = self.text();
-        let response = self.label(ui, short.clone());
-        if short != full {
-            response.on_hover_text(full);
-        }
     }
 
     fn label(&self, ui: &mut egui::Ui, text: String) -> egui::Response {
@@ -388,11 +378,13 @@ impl Badge {
 /// What the tab shows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum View {
-    /// The open clip.
+    /// The open clip (Clips & Rigging).
     #[default]
     Clip,
-    /// The open state machine.
+    /// The open state machine (Logic).
     StateMachine,
+    /// Multi-track cinematic timeline (Sequencer).
+    Sequencer,
 }
 
 /// The open clip, its preview, and which parts are shown.
@@ -440,6 +432,10 @@ struct MachineView {
     doc: Option<Box<ControllerDoc>>,
     preview: Preview,
     hide_inspector: bool,
+    /// Corner 3D preview collapsed to its title bar.
+    preview_collapsed: bool,
+    /// Corner 3D preview undocked into a floating window.
+    preview_undocked: bool,
 }
 
 #[derive(Default)]
@@ -478,6 +474,8 @@ pub struct AnimationStudio {
     names: HashMap<String, Vec<(NameKind, String)>>,
     names_read: Option<Instant>,
     outline_folds: OutlineFolds,
+    /// Search filter at the top of the Left Outliner.
+    outline_search: String,
 }
 
 /// Which of the outline's sections are folded.
@@ -785,6 +783,7 @@ impl AnimationStudio {
         let open = match self.view {
             View::Clip => clip.clone().map(|path| (AnimKind::Clip, path)),
             View::StateMachine => machine.clone().map(|path| (AnimKind::StateMachine, path)),
+            View::Sequencer => None,
         };
         let alone = |kind: AnimKind, path: &str| {
             let text = match kind {

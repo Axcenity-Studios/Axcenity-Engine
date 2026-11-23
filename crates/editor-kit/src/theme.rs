@@ -483,11 +483,13 @@ pub enum Hue {
     Cyan,
     Teal,
     Green,
+    Olive,
+    Bronze,
     Slate,
 }
 
 impl Hue {
-    pub const ALL: [Hue; 12] = [
+    pub const ALL: [Hue; 14] = [
         Hue::Amber,
         Hue::Orange,
         Hue::Red,
@@ -499,6 +501,8 @@ impl Hue {
         Hue::Cyan,
         Hue::Teal,
         Hue::Green,
+        Hue::Olive,
+        Hue::Bronze,
         Hue::Slate,
     ];
 
@@ -516,6 +520,8 @@ impl Hue {
             Hue::Cyan => Color32::from_rgb(18, 130, 168),
             Hue::Teal => Color32::from_rgb(22, 138, 112),
             Hue::Green => Color32::from_rgb(64, 138, 58),
+            Hue::Olive => Color32::from_rgb(112, 134, 34),
+            Hue::Bronze => Color32::from_rgb(154, 96, 48),
             Hue::Slate => Color32::from_rgb(92, 100, 120),
         }
     }

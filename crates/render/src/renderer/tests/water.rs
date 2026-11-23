@@ -292,6 +292,7 @@ fn water_draws_with_fog_weather_clouds_and_wind_and_isnt_snowed_on() {
     snowy.weather = Weather {
         wetness: 1.0,
         snow: 1.0,
+        ..Weather::default()
     };
     let [_, snowed] = pixels_of(&mut renderer, &snowy, points);
     assert!(
@@ -350,6 +351,7 @@ fn water_draws_with_fog_weather_clouds_and_wind_and_isnt_snowed_on() {
     stormy.weather = Weather {
         wetness: 1.0,
         snow: 0.0,
+        ..Weather::default()
     };
     stormy.wind = Vec3::new(10.0, 0.0, 0.0);
     stormy.time = 3.0;
@@ -593,5 +595,68 @@ fn varied_waves_gather_into_rougher_and_calmer_patches() {
     assert!(
         varied > even * 1.15,
         "varied waves differ more from place to place: {even} even, {varied} varied"
+    );
+}
+
+#[test]
+fn a_rebuilt_water_mesh_draws_immediately_with_background_uploads() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    struct DynamicWaterQuad {
+        key: u64,
+        positions: [[f32; 3]; 4],
+        normals: [[f32; 3]; 4],
+        uvs: [[f32; 2]; 4],
+        tangents: [[f32; 4]; 4],
+        indices: [u32; 6],
+    }
+    impl MeshSource for DynamicWaterQuad {
+        fn key(&self) -> u64 {
+            self.key
+        }
+        fn positions(&self) -> &[[f32; 3]] {
+            &self.positions
+        }
+        fn normals(&self) -> &[[f32; 3]] {
+            &self.normals
+        }
+        fn uvs(&self) -> &[[f32; 2]] {
+            &self.uvs
+        }
+        fn tangents(&self) -> &[[f32; 4]] {
+            &self.tangents
+        }
+        fn indices(&self) -> &[u32] {
+            &self.indices
+        }
+    }
+    let mesh = std::sync::Arc::new(DynamicWaterQuad {
+        key: 0xDEAD_BEEF_1234_5678,
+        positions: [
+            [-0.5, 0.5, -0.5],
+            [-0.5, 0.5, 0.5],
+            [0.5, 0.5, -0.5],
+            [0.5, 0.5, 0.5],
+        ],
+        normals: [[0.0, 1.0, 0.0]; 4],
+        uvs: [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]],
+        tangents: [[1.0, 0.0, 0.0, -1.0]; 4],
+        indices: [0, 1, 2, 2, 1, 3],
+    });
+    let mut list = pool(None);
+    let mut item = water(0.0);
+    item.shape = Shape::Mesh(mesh);
+    list.items.push(item);
+
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.set_graphics(&graphics(Quality::Medium));
+    renderer.set_background_uploads(true);
+    let [dry] = pixels_of(&mut renderer, &pool(None), [FAR_FLOOR]);
+    let [wet] = pixels_of(&mut renderer, &list, [FAR_FLOOR]);
+    assert!(
+        brightness(wet) < brightness(dry) / 2 && wet[2] > wet[0] + 10,
+        "rebuilt painted water must draw on the very first frame (no flicker): dry {dry:?}, wet {wet:?}"
     );
 }

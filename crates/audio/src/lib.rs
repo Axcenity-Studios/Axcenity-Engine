@@ -277,6 +277,7 @@ struct SoundProperties {
     speed: f64,
     looped: bool,
     playing: bool,
+    time_position: f64,
     spatial: bool,
     min_distance: f32,
     max_distance: f32,
@@ -314,6 +315,7 @@ impl SoundProperties {
             speed: number("PlaybackSpeed", 1.0).clamp(0.01, 20.0),
             looped: flag("Looped"),
             playing: flag("Playing"),
+            time_position: number("TimePosition", 0.0).max(0.0),
             spatial: flag("Spatial"),
             min_distance,
             max_distance,
@@ -659,6 +661,7 @@ where
                         speed: 1.0,
                         looped: false,
                         playing: true,
+                        time_position: 0.0,
                         spatial: false,
                         min_distance: DEFAULT_MIN_DISTANCE as f32,
                         max_distance: DEFAULT_MAX_DISTANCE as f32,
@@ -966,6 +969,9 @@ where
         if wanted.looped != old.looped {
             playback.handle.set_loop_region(loop_region(wanted.looped));
         }
+        if (wanted.time_position - old.time_position).abs() > 1e-4 {
+            playback.handle.seek_to(wanted.time_position);
+        }
         if wanted.playing != old.playing {
             if wanted.playing {
                 playback.handle.resume(tween);
@@ -1014,7 +1020,7 @@ where
         let generation = self.generation_for(settings.group);
         let heard = self.heard(instance, &settings);
         let parent = settings.group.and_then(|group| self.buses.get_mut(&group));
-        let (handle, track, chain, zone, muffler, heard) = if settings.spatial {
+        let (mut handle, track, chain, zone, muffler, heard) = if settings.spatial {
             // Distance is applied here each frame (`attenuate`), along the
             // Sound's RollOffMode, so Kira only pans it.
             let mut builder = SpatialTrackBuilder::new()
@@ -1070,6 +1076,9 @@ where
                 (1.0, mix::OPEN_CUTOFF),
             )
         };
+        if settings.time_position > 0.0 {
+            handle.seek_to(settings.time_position);
+        }
         self.sounds.insert(
             instance,
             Playback {

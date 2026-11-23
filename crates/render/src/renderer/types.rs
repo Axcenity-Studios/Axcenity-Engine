@@ -170,8 +170,12 @@ pub(super) struct FrameUniform {
     /// The layer of cloud in the sky (clouds.wgsl's `Clouds`).
     pub(super) clouds: clouds::CloudsRaw,
     /// x: how wet surfaces are, y: how much snow covers them, each from 0
-    /// to 1 (lighting.wgsl's `weathered`).
+    /// to 1, z: snow layer thickness in studs, w: 1 while `weather_field` is
+    /// populated for this frame (lighting.wgsl's `weathered`).
     pub(super) weather: [f32; 4],
+    /// xy: world X and Z of `weather_field` cell (0, 0), z: cell size in studs,
+    /// w: grid side length in cells.
+    pub(super) weather_bounds: [f32; 4],
     /// x: 1 while ray traced sun shadows are drawn, y: the scene's width in
     /// pixels (to find a pixel in the mask), z: how far they reach in studs
     /// (lighting.wgsl's `ray_traced_sun`).
@@ -1116,6 +1120,12 @@ pub(super) struct ScenePipeline {
     /// and the one blank entry bound in its place otherwise.
     pub(super) ray_reflections: Option<Box<super::ray_reflections::RayReflections>>,
     pub(super) no_ray_reflections: wgpu::Buffer,
+    /// Storage buffer for `DrawList::weather_field` (sky-visibility roof
+    /// heights, manual interior/exterior paint overrides, and snow footprint
+    /// depths), bound at frame binding 19. Starts as 1 blank cell and grows
+    /// on demand.
+    pub(super) weather_field: wgpu::Buffer,
+    pub(super) weather_field_capacity: usize,
     /// The scene GI's rays walk in software, while they're traced so
     /// (renderer/ray_soft.rs).
     pub(super) soft_scene: Option<Box<super::ray_soft::SoftScene>>,

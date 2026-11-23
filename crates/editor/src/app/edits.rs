@@ -29,7 +29,13 @@ impl EditorApp {
         explorer::update_selection(&mut self.selection, id, modifiers, order, keep_group);
         self.selected = self.selection.last().copied();
         if let Some(id) = self.selected {
-            self.explorer.reveal(shown(&self.world, &self.play), id);
+            if order.is_some() {
+                // Clicking inside the Explorer only scrolls minimally if the row
+                // is clipped at the edge, never re-centering the tree.
+                self.explorer.keep_in_view(id);
+            } else {
+                self.explorer.reveal(shown(&self.world, &self.play), id);
+            }
         }
     }
     /// The selected Instances that aren't inside another selected one, so

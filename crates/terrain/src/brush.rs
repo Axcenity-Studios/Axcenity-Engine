@@ -561,8 +561,7 @@ fn apply_one(
     }
 
     if let Operation::Water { level, erase } = operation {
-        // Every cell whose corner the brush reaches, whatever its strength.
-        let level = if *erase {
+        let target = if *erase {
             axcenity_core::NO_WATER
         } else {
             placement.height_of(*level).clamp(0.0, 1.0)
@@ -571,10 +570,26 @@ fn apply_one(
         let mut index = 0;
         for z in rect.z0..rect.z1 {
             for x in rect.x0..rect.x1 {
-                if weights[index] > 0.0 {
-                    water[z * size_x + x] = level;
-                }
+                let weight = weights[index];
                 index += 1;
+                if weight <= 0.0 {
+                    continue;
+                }
+                let cell = &mut water[z * size_x + x];
+                if *erase {
+                    // Only erase where the brush has meaningful coverage so
+                    // feathered brush borders don't chop out distant cells.
+                    if weight >= 0.25 {
+                        *cell = axcenity_core::NO_WATER;
+                    }
+                } else if *cell >= 0.0 && weight < 1.0 {
+                    // Smoothly blend water levels at brush falloff borders when
+                    // painting over existing water, avoiding harsh vertical steps.
+                    let blend = (weight * brush.strength).clamp(0.0, 1.0);
+                    *cell += (target - *cell) * blend;
+                } else {
+                    *cell = target;
+                }
             }
         }
         return rect;

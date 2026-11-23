@@ -54,6 +54,22 @@ Sound.Playing: boolean
 
 True while the sound plays. Set it to false to pause and true to carry on. Saved as true, the sound plays as soon as the game starts, with no script needed.
 
+#### TimePosition
+
+```luau
+Sound.TimePosition: number
+```
+
+Playback position in seconds. Setting it seeks the sound to that time.
+
+#### TimeLength
+
+```luau
+Sound.TimeLength: number
+```
+
+Total length of the sound clip in seconds. Read-only in scripts.
+
 #### Spatial
 
 ```luau

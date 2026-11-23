@@ -36,7 +36,7 @@ pub(super) fn object_menu(
 }
 
 pub(super) fn property_menu(ui: &mut egui::Ui, name: &mut String, class: Option<ClassName>) {
-    let names: Vec<&'static str> = match class {
+    let mut names: Vec<&'static str> = match class {
         Some(class) => class
             .default_properties()
             .into_iter()
@@ -44,6 +44,9 @@ pub(super) fn property_menu(ui: &mut egui::Ui, name: &mut String, class: Option<
             .collect(),
         None => vec![
             "Position",
+            "CFrame",
+            "LookVector",
+            "AssemblyLinearVelocity",
             "Size",
             "Orientation",
             "Color",
@@ -51,6 +54,20 @@ pub(super) fn property_menu(ui: &mut egui::Ui, name: &mut String, class: Option<
             "Visible",
         ],
     };
+    // Include common runtime spatial/physics properties when the class has a Position.
+    if class.is_some() && names.contains(&"Position") {
+        for extra in [
+            "CFrame",
+            "LookVector",
+            "AssemblyLinearVelocity",
+            "Size",
+            "Color",
+        ] {
+            if !names.contains(&extra) {
+                names.push(extra);
+            }
+        }
+    }
     egui::ScrollArea::vertical()
         .max_height(280.0)
         .show(ui, |ui| {

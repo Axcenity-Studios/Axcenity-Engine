@@ -59,6 +59,13 @@ impl ScenePipeline {
         let light_probes = light_probes::LightProbes::new(&device);
         let no_ray_shadows = ray_shadows::stand_in(&device);
         let no_ray_reflections = ray_reflections::stand_in(&device);
+        let weather_field_capacity = 1usize;
+        let weather_field = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("weather field"),
+            size: (weather_field_capacity * size_of::<[f32; 4]>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         // Every animated item, morphed and skinned once a frame (CO8).
         let posing = posing::Posing::new(&device);
         let frame_bind_group = create_frame_bind_group(
@@ -72,6 +79,7 @@ impl ScenePipeline {
                 light_probes.buffer(),
                 &no_ray_shadows,
                 &no_ray_reflections,
+                &weather_field,
             ],
             [
                 &empty_shadow_view,
@@ -391,6 +399,8 @@ impl ScenePipeline {
             no_ray_shadows,
             ray_reflections: None,
             no_ray_reflections,
+            weather_field,
+            weather_field_capacity,
             ray_ao: None,
             ray_gi: None,
             soft_scene: None,
@@ -986,6 +996,31 @@ impl ScenePipeline {
                 }
                 None
             };
+        if let Some(field) = list
+            .weather_field
+            .as_ref()
+            .filter(|field| !list.weather.is_clear() && field.is_valid())
+        {
+            if field.cells.len() > self.weather_field_capacity {
+                self.weather_field_capacity = field.cells.len();
+                self.weather_field = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("weather field"),
+                    size: (self.weather_field_capacity * size_of::<[f32; 4]>()) as u64,
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.bind_frame();
+            }
+            self.queue
+                .write_buffer(&self.weather_field, 0, bytemuck::cast_slice(&field.cells));
+            frame_uniform.weather[3] = 1.0;
+            frame_uniform.weather_bounds = [
+                field.origin[0],
+                field.origin[1],
+                field.cell_size,
+                field.size as f32,
+            ];
+        }
         let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform);
         self.queue
             .write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame_uniform));
@@ -2319,6 +2354,7 @@ impl ScenePipeline {
                     self.light_probes.buffer(),
                     ray_shadow_mask,
                     ray_reflections,
+                    &self.weather_field,
                 ],
                 [
                     sun,
@@ -2790,15 +2826,16 @@ impl ScenePipeline {
     pub(super) fn upload_new(&mut self, list: &DrawList, draws: &[Draw], uses: &FrameUses) {
         let frame = self.frame;
         let arrived = self.finish_background_uploads();
-        // Terrain chunks are small, and switch level (a new mesh) as the
-        // camera moves: each goes up right away, like their weights. Left
-        // to the upload thread, a chunk switching level would be missing
-        // for a few frames, a hole in the ground showing the sky.
+        // Terrain chunks and painted terrain water meshes are small and rebuilt
+        // live as the camera moves or the user paints: each goes up right away,
+        // like terrain weights. Left to the background upload thread, a chunk
+        // switching LOD or a water chunk being painted would disappear for a
+        // few frames and flicker.
         let terrain_meshes: rustc_hash::FxHashSet<u64> = match self.uploader {
             Some(_) => list
                 .items
                 .iter()
-                .filter(|item| item.material.terrain.is_some())
+                .filter(|item| item.material.terrain.is_some() || item.material.water.is_some())
                 .filter_map(|item| match &item.shape {
                     Shape::Mesh(source) => Some(source.key()),
                     _ => None,
@@ -3444,6 +3481,16 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         storage_entry(16),
         storage_entry(17),
         storage_entry(18),
+        wgpu::BindGroupLayoutEntry {
+            binding: 19,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
         skinning::posed_entry(),
         wgpu::BindGroupLayoutEntry {
             binding: 6,

@@ -103,6 +103,7 @@ mod version_explorer;
 mod viewport;
 mod watcher;
 mod watches;
+mod weather_inspector;
 mod window_frame;
 
 use std::path::PathBuf;

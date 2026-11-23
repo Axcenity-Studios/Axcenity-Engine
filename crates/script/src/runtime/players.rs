@@ -147,6 +147,13 @@ impl ScriptRuntime {
         self.client_only
     }
 
+    /// Updates `NetworkService.IsHost` and `NetworkService.IsConnected` on
+    /// both server and client contexts.
+    pub fn set_network_status(&mut self, is_host: bool, is_connected: bool) {
+        self.server.set_network_status(is_host, is_connected);
+        self.client.set_network_status(is_host, is_connected);
+    }
+
     /// This device joined a server elsewhere (Phase 64): every script
     /// stops, `world` becomes `replica` (the server's world as it sent it,
     /// see `World::empty_replica`), and `player` (the server's Player for

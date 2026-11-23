@@ -155,6 +155,22 @@ print(weapons:Get("sword").Damage)
 }
 
 #[test]
+fn data_table_count_and_get_rows_return_ordered_rows() {
+    let folder = project("count-and-rows");
+    let (mut runtime, _world) = run(
+        &folder,
+        r#"
+local weapons = game:GetService("DataService"):GetTable("weapons")
+print(weapons:Count())
+local rows = weapons:GetRows()
+print(#rows, rows[1].Damage, rows[2].Kind)
+"#,
+    );
+    assert_eq!(lines(&mut runtime), ["2", "2 10 Ranged"]);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
 fn a_wrong_table_or_column_name_says_what_there_is() {
     let folder = project("wrong");
     let (mut runtime, _world) = run(

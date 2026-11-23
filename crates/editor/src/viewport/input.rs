@@ -1,5 +1,27 @@
 use super::*;
 
+/// If `id` is inside a character rig (`Model` with a `Humanoid` child),
+/// returns that enclosing `Model` so the character selects and transforms as
+/// one unified instance.
+fn character_model_of(world: &World, mut id: InstanceId) -> Option<InstanceId> {
+    while let Some(parent) = world.get(id).and_then(|i| i.parent()) {
+        let Some(inst) = world.get(parent) else {
+            break;
+        };
+        if inst.class() == axcenity_core::ClassName::Model
+            && inst.children().iter().any(|&child| {
+                world
+                    .get(child)
+                    .is_some_and(|c| c.class() == axcenity_core::ClassName::Humanoid)
+            })
+        {
+            return Some(parent);
+        }
+        id = parent;
+    }
+    None
+}
+
 impl Viewport {
     /// The data layers' sets (R16.2): `hidden` isn't drawn, and a click
     /// goes through `unpickable` (hidden or locked).
@@ -507,16 +529,33 @@ impl Viewport {
             && let Some(mut place) =
                 PlaceDrag::start(world, hit.part, screen.ray(origin).at(hit.distance))
         {
-            // Grabbing a selected part drags the whole selection with it.
-            let others: Vec<(InstanceId, Vec3)> = if selection.contains(&hit.part) {
-                parts
-                    .iter()
-                    .filter(|(id, _)| *id != hit.part)
-                    .map(|(id, pose)| (*id, pose.position))
-                    .collect()
-            } else {
-                Vec::new()
-            };
+            // Grabbing a selected part (or any part of a selected/unselected
+            // character rig) drags the whole selection / character with it.
+            let target = character_model_of(world, hit.part).unwrap_or(hit.part);
+            let others: Vec<(InstanceId, Vec3)> =
+                if selection.contains(&hit.part) || selection.contains(&target) {
+                    parts
+                        .iter()
+                        .filter(|(id, _)| *id != hit.part)
+                        .map(|(id, pose)| (*id, pose.position))
+                        .collect()
+                } else if target != hit.part {
+                    let mut group = Vec::new();
+                    let mut stack = vec![target];
+                    while let Some(id) = stack.pop() {
+                        if let Some(inst) = world.get(id) {
+                            if id != hit.part
+                                && let Some(pose) = Pose::of(inst)
+                            {
+                                group.push((id, pose.position));
+                            }
+                            stack.extend(inst.children().iter().copied());
+                        }
+                    }
+                    group
+                } else {
+                    Vec::new()
+                };
             place.skip = others.iter().map(|(id, _)| *id).collect();
             let mut moving = place.skip.clone();
             moving.push(hit.part);
@@ -525,7 +564,7 @@ impl Viewport {
             place.reach =
                 screen.studs_per_point(screen.ray(origin).at(hit.distance)) * snapping::SNAP_POINTS;
             self.drag = Some(Dragging::Body(place, others));
-            input.grabbed = Some(hit.part);
+            input.grabbed = Some(target);
         }
 
         input.highlighted = match &self.drag {
@@ -658,6 +697,7 @@ impl Viewport {
             return None;
         }
         let pointer = response.interact_pointer_pos()?;
+        let modifiers = ui.input(|input| input.modifiers);
         Some(Clicked {
             part: ui_scene
                 .hit(pointer)
@@ -667,8 +707,17 @@ impl Viewport {
                         .map(|hit| hit.part)
                 })
                 // A road's piece or a scattered tree selects what made it.
-                .map(|id| axcenity_core::spline::generator_of(world, id).unwrap_or(id)),
-            modifiers: ui.input(|input| input.modifiers),
+                .map(|id| axcenity_core::spline::generator_of(world, id).unwrap_or(id))
+                // Clicking a character rig's sub-part selects the unified
+                // Character Model unless Ctrl/Cmd is held to drill in.
+                .map(|id| {
+                    if modifiers.command {
+                        id
+                    } else {
+                        character_model_of(world, id).unwrap_or(id)
+                    }
+                }),
+            modifiers,
             keep_group: false,
         })
     }

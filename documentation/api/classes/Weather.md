@@ -14,6 +14,14 @@ It also has every member of [Instance](Instance.md).
 
 ### Properties
 
+#### Enabled
+
+```luau
+Weather.Enabled: boolean
+```
+
+Turns the weather system on or off (true by default). When false, precipitation stops and surfaces dry and clear over TransitionTime.
+
 #### Precipitation
 
 ```luau
@@ -46,6 +54,14 @@ Weather.SnowCover: number
 
 How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: more cover whitens flat tops fully and reaches further down slopes. Walls stay bare. Falling snow covers them at least as much as its Intensity.
 
+#### SnowThickness
+
+```luau
+Weather.SnowThickness: number
+```
+
+Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.
+
 #### TransitionTime
 
 ```luau
@@ -53,4 +69,36 @@ Weather.TransitionTime: number
 ```
 
 Seconds a change takes to ease in (10 by default): rain starting and stopping, surfaces wetting and drying, snow settling and melting. 0 changes at once.
+
+#### OcclusionEnabled
+
+```luau
+Weather.OcclusionEnabled: boolean
+```
+
+When true (the default), rain and snow are occluded by solid roofs and geometry, and sheltered interior surfaces stay dry and bare.
+
+#### FootprintsEnabled
+
+```luau
+Weather.FootprintsEnabled: boolean
+```
+
+When true (the default), moving characters and objects press dynamic footprints and trails into snow-covered ground.
+
+#### FootprintFadeTime
+
+```luau
+Weather.FootprintFadeTime: number
+```
+
+Seconds a snow footprint or trail takes to fill back in (30 by default).
+
+#### SurfaceMask
+
+```luau
+Weather.SurfaceMask: string
+```
+
+Manual interior/exterior surface mask cells painted in the editor (format: "x,z:I;x,z:E"). Overrides automatic sky-visibility detection.
 

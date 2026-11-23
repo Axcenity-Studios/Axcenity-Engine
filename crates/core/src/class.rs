@@ -29,7 +29,7 @@ pub const TEXTURE_MAP_PROPERTIES: [&str; 9] = [
 pub const DEFAULT_CLOCK_TIME: f64 = 10.2748873292782;
 pub const DEFAULT_LATITUDE: f64 = 14.0362434679265;
 
-pub const INSTANCE_EVENTS: [&str; 9] = [
+pub const INSTANCE_EVENTS: [&str; 10] = [
     "Changed",
     "ChildAdded",
     "ChildRemoved",
@@ -38,6 +38,7 @@ pub const INSTANCE_EVENTS: [&str; 9] = [
     "AncestryChanged",
     "Destroying",
     "StreamedIn",
+    "StreamedOut",
     // Fires with an attribute's name when `SetAttribute` changes it.
     "AttributeChanged",
 ];
@@ -1387,6 +1388,8 @@ impl ClassName {
                 ("Direction", Value::Number(0.0)),
             ],
             ClassName::Weather => vec![
+                // Turns the weather system on or off (eases over TransitionTime).
+                ("Enabled", Value::Bool(true)),
                 // What falls around the camera (`Enum.Precipitation`): None,
                 // Rain or Snow. Rain wets surfaces as it falls, and snow
                 // covers them.
@@ -1404,9 +1407,24 @@ impl ClassName {
                 // after the rain, old snow).
                 ("Wetness", Value::Number(0.0)),
                 ("SnowCover", Value::Number(0.0)),
+                // Snow layer thickness in studs (0 to 2): controls visual
+                // depth, terrain lift, and footprint depression depth.
+                ("SnowThickness", Value::Number(0.35)),
                 // Seconds a change takes to ease in: rain wetting surfaces,
                 // drying, snow settling or melting.
                 ("TransitionTime", Value::Number(10.0)),
+                // Prevents rain/snow from passing through roofs and keeps
+                // sheltered interior surfaces dry and bare via sky-visibility
+                // detection.
+                ("OcclusionEnabled", Value::Bool(true)),
+                // Leaves dynamic footprints and trails where characters or
+                // moving objects travel across snow.
+                ("FootprintsEnabled", Value::Bool(true)),
+                // Seconds a snow footprint or trail takes to fill back in.
+                ("FootprintFadeTime", Value::Number(30.0)),
+                // Manual interior/exterior surface mask overrides painted in
+                // the editor (`"x,z:I;x,z:E"` cell entries).
+                ("SurfaceMask", Value::String(String::new())),
             ],
             ClassName::OutlineEffect => vec![
                 ("Enabled", Value::Bool(true)),
@@ -2163,6 +2181,10 @@ impl ClassName {
                 // True while it plays. Saved true, it plays when the game
                 // starts; set false to pause and true to carry on.
                 ("Playing", Value::Bool(false)),
+                // Playback cursor in seconds; setting it seeks the sound.
+                ("TimePosition", Value::Number(0.0)),
+                // Total duration of the loaded audio clip in seconds (read-only in scripts).
+                ("TimeLength", Value::Number(0.0)),
                 // Off, the sound is the same in both ears, wherever it sits.
                 ("Spatial", Value::Bool(false)),
                 // Used when no ancestor Part, MeshPart or Terrain has a Position.
@@ -3401,9 +3423,10 @@ impl ClassName {
             // `CooldownChanged` with the seconds left, as a cooldown starts
             // and ends.
             ClassName::Ability => &["Activated", "Ended", "CooldownChanged"],
-            // Fires with "Sight" or "Hearing" when it starts seeing or
-            // hearing the player character.
-            ClassName::NavigationAgent => &["PlayerSensed"],
+            // `PlayerSensed` / `PlayerLost` fire with "Sight" or "Hearing"
+            // when it starts or stops seeing/hearing the player character;
+            // `DestinationReached` fires when it arrives at its Destination.
+            ClassName::NavigationAgent => &["PlayerSensed", "PlayerLost", "DestinationReached"],
             // Fires once when it breaks past its BreakForce or BreakTorque.
             ClassName::WeldConstraint
             | ClassName::HingeConstraint

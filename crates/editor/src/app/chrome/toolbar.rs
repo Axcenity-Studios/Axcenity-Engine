@@ -119,34 +119,26 @@ impl EditorApp {
     }
 
     /// Play (or Pause, Continue), Run and Stop at the right of the ribbon's
-    /// tab row, in a small container, on every tab.
+    /// tab row, styled like the navigation tabs, on every tab.
     fn pinned_play(&mut self, ui: &mut egui::Ui, clicks: &mut RibbonClicks) {
-        let palette = theme::palette(ui.ctx());
         let buttons = self.play_buttons(ui.ctx());
-        egui::Frame::new()
-            .fill(palette.panel)
-            .stroke(egui::Stroke::new(1.0_f32, palette.border))
-            .corner_radius(theme::radius::CONTROL)
-            .inner_margin(egui::Margin::same(2))
-            .show(ui, |ui| {
-                // Drawn right to left, so Stop first.
-                ui.spacing_mut().item_spacing.x = 2.0;
-                for (index, button) in buttons.iter().enumerate().rev() {
-                    let clicked = ui
-                        .add_enabled(
-                            button.enabled,
-                            ribbon::PinnedButton::new(button.icon, button.label, button.color),
-                        )
-                        .on_hover_text(&button.hover)
-                        .on_disabled_hover_text(button.disabled_hover)
-                        .clicked();
-                    match index {
-                        0 => clicks.play |= clicked,
-                        1 => clicks.run |= clicked,
-                        _ => clicks.stop |= clicked,
-                    }
-                }
-            });
+        // Drawn right to left, so Stop first.
+        ui.spacing_mut().item_spacing.x = 2.0;
+        for (index, button) in buttons.iter().enumerate().rev() {
+            let clicked = ui
+                .add_enabled(
+                    button.enabled,
+                    ribbon::PinnedButton::new(button.icon, button.label, button.color),
+                )
+                .on_hover_text(&button.hover)
+                .on_disabled_hover_text(button.disabled_hover)
+                .clicked();
+            match index {
+                0 => clicks.play |= clicked,
+                1 => clicks.run |= clicked,
+                _ => clicks.stop |= clicked,
+            }
+        }
     }
 
     /// Play (Pause or Continue while the game runs), Run and Stop, as the
@@ -274,6 +266,7 @@ impl EditorApp {
                                 .on_hover_text("Show the Scene View, to use its tools");
                             if show.clicked() {
                                 self.layout.open(Pane::Scene);
+                                ui.ctx().request_repaint();
                             }
                             ui.add(egui::Separator::default().vertical().spacing(10.0));
                         }

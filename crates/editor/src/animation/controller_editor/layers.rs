@@ -122,8 +122,23 @@ impl ControllerDoc {
     /// The Layers part of the controller's inspector: which layer the graph
     /// shows, and the open layer's weight, mode and mask.
     pub(super) fn layers_section(&mut self, ui: &mut egui::Ui) {
-        ui.strong(format!("{} Layers", icons::STACK));
-        ui.label("Layers: each plays its own states over the ones under it, on the bones its mask picks. An Upper Body layer can reload while the legs run.");
+        let has_layers = match &self.base {
+            Some(base) => !base.layers.is_empty(),
+            None => !self.file.layers.is_empty(),
+        };
+        let header = egui::CollapsingHeader::new(format!("{} Layers", icons::STACK))
+            .id_salt("controller layers accordion")
+            .default_open(has_layers)
+            .icon(crate::widgets::chevron)
+            .show(ui, |ui| {
+                self.layers_section_body(ui);
+            });
+        header.header_response.on_hover_text(
+            "Each layer plays its own states over the ones under it, on the bones its mask picks (e.g. an Upper Body layer reloading while the legs run).",
+        );
+    }
+
+    fn layers_section_body(&mut self, ui: &mut egui::Ui) {
         let names: Vec<String> = match &self.base {
             Some(base) => base.layers.iter().map(|l| l.name.clone()).collect(),
             None => self.file.layers.iter().map(|l| l.name.clone()).collect(),

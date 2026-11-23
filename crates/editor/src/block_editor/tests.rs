@@ -40,7 +40,7 @@ fn palette_blocks_name_the_first_object_of_their_kind() {
     let sound = palette(Category::Sound, false, &objects, &[]);
     assert!(matches!(
         &sound[0],
-        PaletteItem::Block(kind) if matches!(&**kind, BlockKind::PlaySound { target } if target == "Floor.Chime")
+        PaletteItem::Block(kind) if matches!(&**kind, BlockKind::PlaySound { target, .. } if target.as_path() == Some("Floor.Chime"))
     ));
 }
 
@@ -517,7 +517,7 @@ fn hovering_a_palette_block_says_the_lua_it_becomes() {
     assert_eq!(script, before, "hovering changes nothing");
     // The catalogue's card, then the Lua (cohesion pass CW4.2).
     for words in [
-        "When the game starts",
+        "When script starts",
         "Runs the blocks inside once",
         "It becomes this Lua:",
     ] {
@@ -549,7 +549,15 @@ fn luau_blocks_fold_under_their_own_heading_but_stay_in_the_graph_menu() {
     };
     assert!(kinds(&own).iter().all(|kind| matches!(
         **kind,
-        BlockKind::SetVariable { .. } | BlockKind::ChangeVariable { .. }
+        BlockKind::SetVariable { .. }
+            | BlockKind::ChangeVariable { .. }
+            | BlockKind::SetAttribute { .. }
+            | BlockKind::ListCreate { .. }
+            | BlockKind::ListAdd { .. }
+            | BlockKind::ListInsert { .. }
+            | BlockKind::ListRemoveIndex { .. }
+            | BlockKind::ListRemoveValue { .. }
+            | BlockKind::ListClear { .. }
     )));
     assert!(
         kinds(&luau)
@@ -566,29 +574,99 @@ fn luau_blocks_fold_under_their_own_heading_but_stay_in_the_graph_menu() {
     // In the palette: Variables, then open "Lua blocks", then drag
     // "local name = 0" out.
     let mut script = BlockScript::default();
-    let variables = pos2(
-        CATEGORY_WIDTH / 2.0,
-        TOOLBAR_HEIGHT + 8.0 + 56.0 * 6.0 + 27.0,
-    );
-    let heading = pos2(120.0, 291.0);
     let click = |pos, pressed| egui::Event::PointerButton {
         pos,
         button: egui::PointerButton::Primary,
         pressed,
         modifiers: Default::default(),
     };
-    let mut frames = Vec::new();
-    for at in [variables, heading] {
-        frames.extend([
-            vec![egui::Event::PointerMoved(at)],
-            vec![click(at, true)],
-            vec![click(at, false)],
-            Vec::new(),
-            Vec::new(),
-        ]);
+    let ctx = theme::test_context();
+    let mut frame_idx = 0usize;
+    let mut run = |events: Vec<egui::Event>| -> Vec<egui::epaint::ClippedShape> {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 1400.0))),
+            events,
+            time: Some(frame_idx as f64 * 0.5),
+            ..Default::default()
+        };
+        frame_idx += 1;
+        let mut out = crate::theme::run(&ctx, input, |ui| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
+                .show(ui, |ui| {
+                    show(
+                        ui,
+                        &mut script,
+                        BlockContext {
+                            key: "palette-lua-blocks",
+                            client: true,
+                            highlighted: None,
+                            objects: &[],
+                        },
+                    );
+                });
+        });
+        out.textures_delta.clear();
+        out.shapes
+    };
+    fn find_text(
+        shapes: &[egui::epaint::ClippedShape],
+        pred: impl Fn(&egui::epaint::TextShape, Rect) -> bool,
+    ) -> Option<Pos2> {
+        fn walk(
+            shape: &egui::Shape,
+            clip: Rect,
+            pred: &impl Fn(&egui::epaint::TextShape, Rect) -> bool,
+        ) -> Option<Pos2> {
+            match shape {
+                egui::Shape::Text(t) if pred(t, clip) => Some(t.pos),
+                egui::Shape::Vec(v) => v.iter().find_map(|s| walk(s, clip, pred)),
+                _ => None,
+            }
+        }
+        shapes
+            .iter()
+            .find_map(|s| walk(&s.shape, s.clip_rect, &pred))
     }
-    frames.extend(drag_frames(pos2(110.0, 330.0), pos2(700.0, 400.0)));
-    run_editor(&mut script, frames, "palette-lua-blocks");
+    let initial = run(Vec::new());
+    let variables = find_text(&initial, |t, _| {
+        t.galley.text() == "Variables" && t.pos.x < CATEGORY_WIDTH + 16.0
+    })
+    .expect("Variables category button should be rendered")
+        + vec2(10.0, 4.0);
+    for ev in [
+        vec![egui::Event::PointerMoved(variables)],
+        vec![click(variables, true)],
+        vec![click(variables, false)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ] {
+        run(ev);
+    }
+    let shapes = run(Vec::new());
+    let vars_y = find_text(&shapes, |t, _| {
+        t.galley.text() == "Variables" && t.pos.x > CATEGORY_WIDTH + 16.0
+    })
+    .expect("Variables heading should be rendered")
+    .y;
+    let heading = find_text(&shapes, |t, clip| {
+        t.galley.text().contains("Lua blocks") && t.pos.y > vars_y && clip.contains(t.pos)
+    })
+    .expect("Variables Lua blocks heading should be rendered")
+        + vec2(30.0, 8.0);
+    for ev in [
+        vec![egui::Event::PointerMoved(heading)],
+        vec![click(heading, true)],
+        vec![click(heading, false)],
+        Vec::new(),
+        Vec::new(),
+    ] {
+        run(ev);
+    }
+    for ev in drag_frames(heading + vec2(0.0, 36.0), pos2(700.0, 400.0)) {
+        run(ev);
+    }
     assert_eq!(script.blocks.len(), 1, "{script:?}");
     let BlockKind::Unattached { body } = &script.blocks[0].kind else {
         panic!("a loose stack: {script:?}");
@@ -772,4 +850,645 @@ fn every_palette_block_and_reporter_has_a_tooltip_card() {
             }
         }
     }
+}
+
+#[test]
+fn phase7_appearance_vfx_and_sound_pins_and_codegen() {
+    use axcenity_blocks::{Block, BlockKind, BlockScript, Expression, ObjectRef, translate};
+
+    let b = |id, kind| Block {
+        id,
+        kind,
+        position: None,
+        spaced: false,
+        chained: false,
+    };
+    let num = |value| Expression::Number { value };
+    let vec3 = |x, y, z| Expression::Vector3 { x, y, z };
+
+    let script = BlockScript {
+        blocks: vec![b(
+            1,
+            BlockKind::WhenStarted {
+                body: vec![
+                    b(
+                        2,
+                        BlockKind::SpawnDecal {
+                            texture: Expression::Text {
+                                value: "assets/textures/scorch.png".to_owned(),
+                            },
+                            position: vec3(0.0, 0.0, 0.0),
+                            facing: vec3(0.0, 1.0, 0.0),
+                            size: num(2.0),
+                            seconds: num(5.0),
+                        },
+                    ),
+                    b(
+                        3,
+                        BlockKind::Print {
+                            value: Expression::BlockOutput {
+                                block: 2,
+                                output: 0,
+                                name: "decal".to_owned(),
+                            },
+                        },
+                    ),
+                    b(
+                        4,
+                        BlockKind::SetClockTime {
+                            time: num(20.0),
+                            duration: Some(num(3.0)),
+                        },
+                    ),
+                    b(
+                        5,
+                        BlockKind::SetAtmosphere {
+                            property: "Haze".to_owned(),
+                            value: num(4.0),
+                            duration: Some(num(2.0)),
+                        },
+                    ),
+                    b(
+                        6,
+                        BlockKind::SetGraphicsOption {
+                            setting: "RenderScale".to_owned(),
+                            choice: String::new(),
+                            value: Some(num(0.75)),
+                        },
+                    ),
+                    b(
+                        7,
+                        BlockKind::TweenProperty {
+                            target: ObjectRef::path("Lamp"),
+                            property: "Brightness".to_owned(),
+                            value: num(4.0),
+                            duration: num(1.5),
+                            easing: "Quad".to_owned(),
+                            wait_until_done: true,
+                            completed: vec![],
+                        },
+                    ),
+                    b(
+                        8,
+                        BlockKind::Print {
+                            value: Expression::BlockOutput {
+                                block: 7,
+                                output: 0,
+                                name: "tween".to_owned(),
+                            },
+                        },
+                    ),
+                    b(
+                        9,
+                        BlockKind::PlaySound {
+                            target: ObjectRef::path("Chime"),
+                            pitch: Some(num(1.2)),
+                            wait_until_done: true,
+                        },
+                    ),
+                    b(
+                        10,
+                        BlockKind::PlaySoundAtPosition {
+                            target: ObjectRef::path("Boom"),
+                            position: vec3(10.0, 2.0, -5.0),
+                            volume: Some(num(0.8)),
+                            pitch: Some(num(0.9)),
+                        },
+                    ),
+                    b(
+                        11,
+                        BlockKind::FadeVolume {
+                            target: ObjectRef::path("Music"),
+                            volume: num(0.0),
+                            duration: num(2.0),
+                            wait_until_done: true,
+                        },
+                    ),
+                    b(
+                        12,
+                        BlockKind::Print {
+                            value: Expression::SoundProperty {
+                                target: ObjectRef::path("Music"),
+                                property: "Playing".to_owned(),
+                            },
+                        },
+                    ),
+                ],
+            },
+        )],
+        graph: Default::default(),
+        variables: vec![],
+        tabs: false,
+    };
+
+    let lua = translate(&script).unwrap().source;
+    assert!(
+        lua.contains("local TweenService = game:GetService(\"TweenService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("local Lighting = game:GetService(\"Lighting\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("math.abs(_dfacing.Unit.Y) > 0.99 and Vector3.zAxis or Vector3.yAxis"),
+        "{lua}"
+    );
+    assert!(lua.contains("local decal = workspace:SpawnDecal("), "{lua}");
+    assert!(
+        lua.contains("TweenService:Create(Lighting, TweenInfo.new(3), { ClockTime = 20 }):Play()"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains(
+            "TweenService:Create(Lighting.Atmosphere, TweenInfo.new(2), { Haze = 4 }):Play()"
+        ),
+        "{lua}"
+    );
+    assert!(lua.contains("UserGameSettings.RenderScale = 0.75"), "{lua}");
+    assert!(lua.contains("local tween = TweenService:Create("), "{lua}");
+    assert!(lua.contains("tween.Completed:Wait()"), "{lua}");
+    assert!(lua.contains("workspace.Chime.PlaybackSpeed = 1.2"), "{lua}");
+    assert!(lua.contains("workspace.Chime.Ended:Wait()"), "{lua}");
+    assert!(lua.contains("_s.Volume = 0.8"), "{lua}");
+    assert!(lua.contains("_s.PlaybackSpeed = 0.9"), "{lua}");
+    assert!(lua.contains("_tw.Completed:Wait()"), "{lua}");
+    assert!(lua.contains("print(workspace.Music.Playing)"), "{lua}");
+}
+
+#[test]
+fn phase8_operators_animation_and_tween_pins_and_codegen() {
+    use axcenity_blocks::{MathFunction, ObjectRef};
+    let block = |id: u64, kind: BlockKind| Block {
+        id,
+        kind,
+        ..Block::new(BlockKind::StopScript)
+    };
+
+    let script = BlockScript {
+        blocks: vec![
+            block(
+                1,
+                BlockKind::WhenStarted {
+                    body: vec![
+                        // Scalar Lerp + Vector/Math/String/Color reporters
+                        block(
+                            2,
+                            BlockKind::Print {
+                                value: Expression::Lerp {
+                                    from: Box::new(Expression::Number { value: 0.0 }),
+                                    to: Box::new(Expression::Number { value: 10.0 }),
+                                    alpha: Box::new(Expression::Number { value: 0.5 }),
+                                },
+                            },
+                        ),
+                        block(
+                            3,
+                            BlockKind::Print {
+                                value: Expression::Function {
+                                    function: MathFunction::Sin,
+                                    value: Box::new(Expression::Number { value: 1.0 }),
+                                },
+                            },
+                        ),
+                        block(
+                            4,
+                            BlockKind::Print {
+                                value: Expression::Clamp {
+                                    value: Box::new(Expression::Distance {
+                                        from: Box::new(Expression::MakeVector3 {
+                                            x: Box::new(Expression::Number { value: 0.0 }),
+                                            y: Box::new(Expression::Number { value: 0.0 }),
+                                            z: Box::new(Expression::Number { value: 0.0 }),
+                                        }),
+                                        to: Box::new(Expression::Vector3 {
+                                            x: 3.0,
+                                            y: 4.0,
+                                            z: 0.0,
+                                        }),
+                                    }),
+                                    min: Box::new(Expression::Number { value: 0.0 }),
+                                    max: Box::new(Expression::Number { value: 10.0 }),
+                                },
+                            },
+                        ),
+                        block(
+                            5,
+                            BlockKind::Print {
+                                value: Expression::FormatNumber {
+                                    value: Box::new(Expression::Number { value: 12.345 }),
+                                    decimals: Box::new(Expression::Number { value: 2.0 }),
+                                },
+                            },
+                        ),
+                        block(
+                            6,
+                            BlockKind::Print {
+                                value: Expression::StringContains {
+                                    text: Box::new(Expression::Text {
+                                        value: "hello".to_owned(),
+                                    }),
+                                    substring: Box::new(Expression::Text {
+                                        value: "ell".to_owned(),
+                                    }),
+                                },
+                            },
+                        ),
+                        block(
+                            7,
+                            BlockKind::Print {
+                                value: Expression::MakeColorRgb {
+                                    r: Box::new(Expression::Number { value: 255.0 }),
+                                    g: Box::new(Expression::Number { value: 128.0 }),
+                                    b: Box::new(Expression::Number { value: 0.0 }),
+                                },
+                            },
+                        ),
+                        // PlayAnimation with fade/speed/weight/wait + output
+                        block(
+                            8,
+                            BlockKind::PlayAnimation {
+                                animator: ObjectRef::path("Hero.Animator"),
+                                animation: ObjectRef::path("Hero.Slash"),
+                                fade_time: Some(Expression::Number { value: 0.2 }),
+                                speed: Some(Expression::Number { value: 1.5 }),
+                                weight: Some(Expression::Number { value: 1.0 }),
+                                wait_until_done: true,
+                            },
+                        ),
+                        // Tween with repeat/reverses/wait + Tween output referenced by CancelTween
+                        block(
+                            9,
+                            BlockKind::Tween {
+                                target: ObjectRef::path("Door"),
+                                property: "Transparency".to_owned(),
+                                value: Expression::Number { value: 1.0 },
+                                seconds: Expression::Number { value: 0.5 },
+                                style: "Quad".to_owned(),
+                                direction: "Out".to_owned(),
+                                repeat_count: Some(Expression::Number { value: 2.0 }),
+                                reverses: true,
+                                wait_until_done: false,
+                                completed: vec![block(
+                                    10,
+                                    BlockKind::Print {
+                                        value: Expression::Text {
+                                            value: "done".to_owned(),
+                                        },
+                                    },
+                                )],
+                            },
+                        ),
+                        block(
+                            11,
+                            BlockKind::CancelTween {
+                                tween: ObjectRef(Box::new(Expression::BlockOutput {
+                                    block: 9,
+                                    output: 0,
+                                    name: "tween".to_owned(),
+                                })),
+                            },
+                        ),
+                        // SlideIn caches _RestPos and sets Visible = true
+                        block(
+                            12,
+                            BlockKind::SlideIn {
+                                target: ObjectRef::path("Hud.Menu"),
+                                from: "Left".to_owned(),
+                                seconds: Expression::Number { value: 0.3 },
+                                wait_until_done: false,
+                                completed: Vec::new(),
+                            },
+                        ),
+                        // SlideOut hides on completion
+                        block(
+                            13,
+                            BlockKind::SlideOut {
+                                target: ObjectRef::path("Hud.Menu"),
+                                to: "Left".to_owned(),
+                                seconds: Expression::Number { value: 0.3 },
+                                wait_until_done: false,
+                                completed: Vec::new(),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            // WhenAnimationEvent with Any Event + EventName context reporter
+            block(
+                20,
+                BlockKind::WhenAnimationEvent {
+                    animator: ObjectRef::path("Hero.Animator"),
+                    event: "Any".to_owned(),
+                    body: vec![block(
+                        21,
+                        BlockKind::Print {
+                            value: Expression::AnimationEventName,
+                        },
+                    )],
+                },
+            ),
+            // WhenStateChanged with NewState / PreviousState reporters
+            block(
+                22,
+                BlockKind::WhenStateChanged {
+                    animator: ObjectRef::path("Hero.Animator"),
+                    body: vec![block(
+                        23,
+                        BlockKind::Print {
+                            value: Expression::AnimatorNewState,
+                        },
+                    )],
+                },
+            ),
+            // WhenAnimationFinished
+            block(
+                24,
+                BlockKind::WhenAnimationFinished {
+                    animator: ObjectRef::path("Hero.Animator"),
+                    animation: ObjectRef::path("Hero.Slash"),
+                    body: vec![block(
+                        25,
+                        BlockKind::Print {
+                            value: Expression::Text {
+                                value: "finished".to_owned(),
+                            },
+                        },
+                    )],
+                },
+            ),
+        ],
+        graph: Default::default(),
+        variables: vec![],
+        tabs: false,
+    };
+
+    let lua = translate(&script).unwrap().source;
+    assert!(lua.contains("print((0 + (10 - 0) * 0.5))"), "{lua}");
+    assert!(lua.contains("print(math.sin(1))"), "{lua}");
+    assert!(
+        lua.contains("math.clamp((Vector3.new(0, 0, 0) - Vector3.new(3, 4, 0)).Magnitude, 0, 10)"),
+        "{lua}"
+    );
+    assert!(lua.contains("string.format(\"%.2f\", 12.345)"), "{lua}");
+    assert!(
+        lua.contains("string.find(tostring(\"hello\"), tostring(\"ell\"), 1, true) ~= nil"),
+        "{lua}"
+    );
+    assert!(lua.contains("Color3.fromRGB(255, 128, 0)"), "{lua}");
+    assert!(lua.contains("_track:Play(0.2, 1, 1.5)"), "{lua}");
+    assert!(lua.contains("_track.Stopped:Wait()"), "{lua}");
+    assert!(lua.contains("Enum.EasingDirection.Out, 2, true)"), "{lua}");
+    assert!(lua.contains("local tween = TweenService:Create("), "{lua}");
+    assert!(lua.contains("tween:Cancel()"), "{lua}");
+    assert!(lua.contains("GetAttribute(\"_RestPos\")"), "{lua}");
+    assert!(lua.contains("workspace.Hud.Menu.Visible = true"), "{lua}");
+    assert!(lua.contains("workspace.Hud.Menu.Visible = false"), "{lua}");
+    assert!(
+        lua.contains("AnimationEvent:Connect(function(name)\n    print(name)\nend)"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("StateChanged:Connect(function(state, previous)\n    print(state)\nend)"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("LoadAnimation(workspace.Hero.Slash).Stopped:Connect(function()"),
+        "{lua}"
+    );
+}
+
+#[test]
+fn phase9_data_world_network_and_chat_pins_and_codegen() {
+    use axcenity_blocks::ObjectRef;
+
+    let block = |id: u64, kind: BlockKind| Block {
+        id,
+        kind,
+        ..Block::new(BlockKind::StopScript)
+    };
+
+    let script = BlockScript {
+        blocks: vec![
+            block(
+                10,
+                BlockKind::WhenConnectionFails {
+                    body: vec![block(
+                        11,
+                        BlockKind::Print {
+                            value: Expression::ConnectionFailureReason,
+                        },
+                    )],
+                },
+            ),
+            block(
+                20,
+                BlockKind::WhenLayerChanged {
+                    data_layer: "Any".to_owned(),
+                    body: vec![
+                        block(
+                            21,
+                            BlockKind::Print {
+                                value: Expression::ChangedLayerName,
+                            },
+                        ),
+                        block(
+                            22,
+                            BlockKind::Print {
+                                value: Expression::ChangedLayerActive,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            block(
+                30,
+                BlockKind::WhenStreamedOut {
+                    target: ObjectRef::path("Windmill"),
+                    body: vec![block(
+                        31,
+                        BlockKind::Print {
+                            value: Expression::Text {
+                                value: "gone".to_owned(),
+                            },
+                        },
+                    )],
+                },
+            ),
+            block(
+                40,
+                BlockKind::WhenChatMessageReceived {
+                    body: vec![
+                        block(
+                            41,
+                            BlockKind::Print {
+                                value: Expression::ChatMessageText,
+                            },
+                        ),
+                        block(
+                            42,
+                            BlockKind::Print {
+                                value: Expression::ChatMessageSender,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            block(
+                50,
+                BlockKind::WhenStarted {
+                    body: vec![
+                        block(
+                            51,
+                            BlockKind::Print {
+                                value: Expression::IsHost,
+                            },
+                        ),
+                        block(
+                            52,
+                            BlockKind::Print {
+                                value: Expression::IsConnected,
+                            },
+                        ),
+                        block(
+                            53,
+                            BlockKind::Print {
+                                value: Expression::SlotExists {
+                                    slot: Box::new(Expression::Number { value: 1.0 }),
+                                },
+                            },
+                        ),
+                        block(
+                            54,
+                            BlockKind::DeleteSlot {
+                                slot: Expression::Number { value: 1.0 },
+                            },
+                        ),
+                        block(
+                            55,
+                            BlockKind::Print {
+                                value: Expression::DataTableRowCount {
+                                    table: "weapons".to_owned(),
+                                },
+                            },
+                        ),
+                        block(
+                            56,
+                            BlockKind::ForEachRow {
+                                table: "weapons".to_owned(),
+                                body: vec![block(
+                                    57,
+                                    BlockKind::Print {
+                                        value: Expression::BlockOutput {
+                                            block: 56,
+                                            output: 0,
+                                            name: "row_56".to_owned(),
+                                        },
+                                    },
+                                )],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+        graph: Default::default(),
+        variables: vec![],
+        tabs: false,
+    };
+
+    let lua = translate(&script).unwrap().source;
+    assert!(
+        lua.contains("local DataLayerService = game:GetService(\"DataLayerService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("local DataService = game:GetService(\"DataService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("local NetworkService = game:GetService(\"NetworkService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("local SaveService = game:GetService(\"SaveService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("local TextChatService = game:GetService(\"TextChatService\")"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains(
+            "NetworkService.ConnectionFailed:Connect(function(reason)\n    print(reason)\nend)"
+        ),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("DataLayerService.LayerChanged:Connect(function(layerName, active)\n    print(layerName)\n    print(active)\nend)"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("workspace.Windmill.StreamedOut:Connect(function()"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("TextChatService.MessageReceived:Connect(function(message)\n    print(message.Text)\n    print(message.Player)\nend)"),
+        "{lua}"
+    );
+    assert!(lua.contains("print(NetworkService.IsHost)"), "{lua}");
+    assert!(lua.contains("print(NetworkService.IsConnected)"), "{lua}");
+    assert!(lua.contains("print(SaveService:HasSlot(1))"), "{lua}");
+    assert!(lua.contains("SaveService:DeleteSlot(1)"), "{lua}");
+    assert!(
+        lua.contains("print(DataService:GetTable(\"weapons\"):Count())"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("for i_56, row_56 in DataService:GetTable(\"weapons\"):GetRows() do\n        print(row_56)\n    end"),
+        "{lua}"
+    );
+}
+
+#[test]
+fn palette_splitter_drag_resizes_sidebar() {
+    let context = egui::Context::default();
+    theme::install(&context);
+    let mut script = BlockScript::default();
+    let splitter_x = CATEGORY_WIDTH + PALETTE_WIDTH - PALETTE_SPLITTER_WIDTH * 0.5;
+    let start = pos2(splitter_x, TOOLBAR_HEIGHT + 200.0);
+    let end = pos2(splitter_x + 120.0, TOOLBAR_HEIGHT + 200.0);
+    let frames = drag_frames(start, end);
+    let size = vec2(1500.0, 900.0);
+    for events in frames {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
+            ..Default::default()
+        };
+        let mut out = context.run_ui(input, |ui| {
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
+                .show(ui, |ui| {
+                    show(
+                        ui,
+                        &mut script,
+                        BlockContext {
+                            key: "splitter-test",
+                            client: true,
+                            highlighted: None,
+                            objects: &[],
+                        },
+                    );
+                });
+        });
+        out.textures_delta.clear();
+    }
+    let width = context
+        .data_mut(|data| data.get_persisted::<f32>(egui::Id::new("block_editor_palette_width")))
+        .expect("dragging the splitter should persist the resized palette width");
+    assert!(
+        width > PALETTE_WIDTH + 80.0,
+        "expected palette width to grow after dragging splitter right, got {width}"
+    );
 }

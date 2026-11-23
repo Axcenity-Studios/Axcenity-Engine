@@ -25,7 +25,8 @@ impl Menu {
 
 pub(super) struct MenuItem {
     pub(super) category: Category,
-    pub(super) title: String,
+    pub(super) is_event: bool,
+    pub(super) display_title: String,
     pub(super) item: PaletteItem,
     /// What the search box finds it by: its title, and the words and Lua
     /// the Blocks palette's search uses.
@@ -53,6 +54,14 @@ fn fits(script: &BlockScript, item: &PaletteItem, from: Option<&Pin>) -> bool {
             };
             slots.iter().any(|kind| kind.accepts(shape))
         }
+        (Some(Pin::BlockOutput(..)), item) => {
+            let slots = match item {
+                PaletteItem::Block(kind) => block_slots(kind),
+                PaletteItem::Reporter(expression) => value_slots(expression),
+                PaletteItem::NewVariable => Vec::new(),
+            };
+            slots.iter().any(|kind| kind.accepts(BlockShape::Value))
+        }
         _ => false,
     }
 }
@@ -70,11 +79,18 @@ pub(super) fn menu_items(
             if !fits(script, &item, from) {
                 continue;
             }
-            let title = match &item {
-                PaletteItem::Block(kind) => block_names(kind).0.to_owned(),
-                PaletteItem::Reporter(expression) => value_names(expression).0,
+            let (title, icon, is_event) = match &item {
+                PaletteItem::Block(kind) => (
+                    block_names(kind).0.to_owned(),
+                    block_icon(kind),
+                    kind.is_event(),
+                ),
+                PaletteItem::Reporter(expression) => {
+                    (value_names(expression).0, reporter_icon(expression), false)
+                }
                 PaletteItem::NewVariable => continue,
             };
+            let display_title = theme::with_icon(icon, &title);
             let words = format!(
                 "{} {}",
                 title.to_lowercase(),
@@ -82,7 +98,8 @@ pub(super) fn menu_items(
             );
             items.push(MenuItem {
                 category,
-                title,
+                is_event,
+                display_title,
                 item,
                 words,
             });
@@ -102,11 +119,18 @@ pub(super) fn show_menu(
     let palette = theme::palette(ui.ctx());
     let entries: Vec<MenuEntry> = items
         .iter()
-        .map(|item| MenuEntry {
-            group: item.category.name(),
-            color: item.category.fill(&palette),
-            title: &item.title,
-            words: &item.words,
+        .map(|item| {
+            let color_category = if item.is_event {
+                Category::Events
+            } else {
+                item.category
+            };
+            MenuEntry {
+                group: item.category.name(),
+                color: color_category.fill(&palette),
+                title: &item.display_title,
+                words: &item.words,
+            }
         })
         .collect();
     let title = if menu.from.is_some() {

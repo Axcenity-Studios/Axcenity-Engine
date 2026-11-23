@@ -35,7 +35,7 @@ use std::collections::BTreeSet;
 
 use axcenity_blocks::{
     Block, BlockKind, BlockScript, BlockShape, Comparison, Expression, LogicOp, MathFunction,
-    MathOp, TableField, translate, valid_identifier,
+    MathOp, ObjectRef, TableField, VariableDef, clone_identifiers, translate, valid_identifier,
 };
 use axcenity_core::{ClassName, KeyCode};
 use eframe::egui::{
@@ -182,7 +182,10 @@ const REPORTER_MIN_HEIGHT: f32 = 32.0;
 const SNAP: f32 = 34.0;
 const STACK_GAP: f32 = 32.0;
 const CATEGORY_WIDTH: f32 = 74.0;
-const PALETTE_WIDTH: f32 = 270.0;
+const PALETTE_WIDTH: f32 = 360.0;
+const PALETTE_MIN_WIDTH: f32 = 180.0;
+const PALETTE_MAX_WIDTH: f32 = 760.0;
+const PALETTE_SPLITTER_WIDTH: f32 = 8.0;
 const TOOLBAR_HEIGHT: f32 = 40.0;
 
 /// Typed values: dark ink on a light field, 4.5:1 or more.
@@ -204,14 +207,19 @@ enum Category {
     Animation,
     /// Properties moving smoothly (`TweenService`).
     Tweens,
-    More,
+    /// Data tables, save slots, checkpoints and debug print.
+    DataAndSaves,
+    /// Levels, data layers, streaming, cloning and destroying instances.
+    WorldAndLevels,
+    /// Hosting, joining, network ownership and chat.
+    MultiplayerAndChat,
     /// Grey blocks of Lua that have no blocks, from a script switched from
     /// Code. Not in the palette.
     Lua,
 }
 
 impl Category {
-    const ALL: [Category; 11] = [
+    const ALL: [Category; 13] = [
         Category::Events,
         Category::Control,
         Category::Motion,
@@ -222,7 +230,9 @@ impl Category {
         Category::Sensing,
         Category::Animation,
         Category::Tweens,
-        Category::More,
+        Category::DataAndSaves,
+        Category::WorldAndLevels,
+        Category::MultiplayerAndChat,
     ];
 
     fn name(self) -> &'static str {
@@ -237,8 +247,20 @@ impl Category {
             Category::Sensing => "Sensing",
             Category::Animation => "Animation",
             Category::Tweens => "Tweens",
-            Category::More => "More",
+            Category::DataAndSaves => "Data & Saves",
+            Category::WorldAndLevels => "World & Levels",
+            Category::MultiplayerAndChat => "Multiplayer & Chat",
             Category::Lua => "Lua",
+        }
+    }
+
+    /// Short label for the narrow category rail on the left.
+    fn short_name(self) -> &'static str {
+        match self {
+            Category::DataAndSaves => "Data",
+            Category::WorldAndLevels => "World",
+            Category::MultiplayerAndChat => "Network",
+            other => other.name(),
         }
     }
 
@@ -256,14 +278,16 @@ impl Category {
             Category::Events => theme::Hue::Amber,
             Category::Control => theme::Hue::Orange,
             Category::Variables => theme::Hue::Red,
-            Category::More => theme::Hue::Magenta,
-            Category::Sound => theme::Hue::Purple,
+            Category::Sound => theme::Hue::Magenta,
+            Category::DataAndSaves => theme::Hue::Purple,
             Category::Looks => theme::Hue::Violet,
             Category::Tweens => theme::Hue::Indigo,
             Category::Motion => theme::Hue::Blue,
             Category::Sensing => theme::Hue::Cyan,
             Category::Animation => theme::Hue::Teal,
             Category::Operators => theme::Hue::Green,
+            Category::WorldAndLevels => theme::Hue::Olive,
+            Category::MultiplayerAndChat => theme::Hue::Bronze,
             Category::Lua => theme::Hue::Slate,
         }
     }
@@ -294,7 +318,9 @@ impl Category {
             Category::Sensing => icons::HAND_POINTING,
             Category::Animation => icons::PERSON_SIMPLE_RUN,
             Category::Tweens => icons::WAVE_SINE,
-            Category::More => icons::DOTS_THREE_CIRCLE,
+            Category::DataAndSaves => icons::DATABASE,
+            Category::WorldAndLevels => icons::GLOBE,
+            Category::MultiplayerAndChat => icons::USERS,
             Category::Lua => icons::CODE,
         }
     }
@@ -304,7 +330,19 @@ fn block_category(kind: &BlockKind) -> Category {
     match kind {
         BlockKind::WhenStarted { .. }
         | BlockKind::WhenTouched { .. }
+        | BlockKind::WhenTouchEnds { .. }
         | BlockKind::WhenKeyPressed { .. }
+        | BlockKind::WhenKeyReleased { .. }
+        | BlockKind::WhenPlayerJoins { .. }
+        | BlockKind::WhenPlayerLeaves { .. }
+        | BlockKind::WhenCharacterSpawns { .. }
+        | BlockKind::WhenPlayerDies { .. }
+        | BlockKind::WhenChildAdded { .. }
+        | BlockKind::WhenChildRemoved { .. }
+        | BlockKind::WhenTagAdded { .. }
+        | BlockKind::WhenTagRemoved { .. }
+        | BlockKind::WhenRemoteFires { .. }
+        | BlockKind::Disconnect { .. }
         | BlockKind::WhenClicked { .. }
         | BlockKind::WhenMouseEnters { .. }
         | BlockKind::WhenMouseLeaves { .. }
@@ -334,6 +372,13 @@ fn block_category(kind: &BlockKind) -> Category {
         | BlockKind::If { .. }
         | BlockKind::IfElse { .. }
         | BlockKind::StopScript
+        | BlockKind::DestroyScript
+        | BlockKind::ForRange { .. }
+        | BlockKind::ForEachInList { .. }
+        | BlockKind::ForEachTagged { .. }
+        | BlockKind::Sequence { .. }
+        | BlockKind::CooldownGate { .. }
+        | BlockKind::SpawnAsync { .. }
         | BlockKind::ForEachChild { .. }
         | BlockKind::ForEachPartInRadius { .. }
         | BlockKind::ForEachPartTouching { .. }
@@ -355,17 +400,30 @@ fn block_category(kind: &BlockKind) -> Category {
         | BlockKind::MoveForward { .. }
         | BlockKind::TurnTo { .. }
         | BlockKind::TurnBy { .. }
+        | BlockKind::SlideTo { .. }
+        | BlockKind::RotateTo { .. }
+        | BlockKind::SetGravity { .. }
+        | BlockKind::SetAngularVelocity { .. }
+        | BlockKind::LaunchPart { .. }
         | BlockKind::SetAnchored { .. }
         | BlockKind::PushWithForce { .. }
         | BlockKind::SetPartVelocity { .. }
         | BlockKind::SetFriction { .. }
         | BlockKind::SetDestination { .. }
+        | BlockKind::FollowTarget { .. }
+        | BlockKind::StopAgent { .. }
         | BlockKind::SetVelocity { .. }
         | BlockKind::WhenAgentSenses { .. }
+        | BlockKind::WhenAgentLosesPlayer { .. }
+        | BlockKind::WhenAgentArrives { .. }
         | BlockKind::Patrol { .. }
         | BlockKind::PlaceOnSpline { .. }
+        | BlockKind::ControlSpline { .. }
+        | BlockKind::SetSplineSpeed { .. }
         | BlockKind::WhenSplineReached { .. }
         | BlockKind::WhenSeatOccupied { .. }
+        | BlockKind::WhenSeatVacated { .. }
+        | BlockKind::SitInSeat { .. }
         | BlockKind::LeaveSeat { .. }
         | BlockKind::SetCameraType { .. }
         | BlockKind::PointCameraAt { .. }
@@ -374,11 +432,19 @@ fn block_category(kind: &BlockKind) -> Category {
         | BlockKind::SetText { .. }
         | BlockKind::Show { .. }
         | BlockKind::Hide { .. }
+        | BlockKind::ToggleVisibility { .. }
+        | BlockKind::SetTransparency { .. }
+        | BlockKind::SetMaterial { .. }
+        | BlockKind::EmitParticles { .. }
+        | BlockKind::SetEffectEnabled { .. }
+        | BlockKind::SetLightingProperty { .. }
+        | BlockKind::SetPostProcessing { .. }
+        | BlockKind::TweenProperty { .. }
+        | BlockKind::SetImage { .. }
         | BlockKind::ShowPage { .. }
         | BlockKind::ScrollTo { .. }
         | BlockKind::SetValue { .. }
         | BlockKind::SetProperty { .. }
-        | BlockKind::SetAttribute { .. }
         | BlockKind::SetToneMapping { .. }
         | BlockKind::SetClockTime { .. }
         | BlockKind::SetAtmosphere { .. }
@@ -388,12 +454,18 @@ fn block_category(kind: &BlockKind) -> Category {
         | BlockKind::SetGraphicsNumber { .. }
         | BlockKind::SpawnDecal { .. } => Category::Looks,
         BlockKind::PlaySound { .. }
+        | BlockKind::PlaySoundAtPosition { .. }
         | BlockKind::StopSound { .. }
         | BlockKind::PauseSound { .. }
         | BlockKind::ResumeSound { .. }
-        | BlockKind::SetVolume { .. } => Category::Sound,
+        | BlockKind::SetVolume { .. }
+        | BlockKind::FadeVolume { .. }
+        | BlockKind::SetSoundPitch { .. }
+        | BlockKind::SetSoundLooping { .. }
+        | BlockKind::SetSoundTime { .. } => Category::Sound,
         BlockKind::WhenStateChanged { .. }
         | BlockKind::WhenAnimationEvent { .. }
+        | BlockKind::WhenAnimationFinished { .. }
         | BlockKind::SetAnimatorBool { .. }
         | BlockKind::SetAnimatorNumber { .. }
         | BlockKind::SetAnimatorLayerWeight { .. }
@@ -401,38 +473,60 @@ fn block_category(kind: &BlockKind) -> Category {
         | BlockKind::ResetAnimatorTrigger { .. }
         | BlockKind::PlayAnimatorState { .. }
         | BlockKind::PlayAnimation { .. }
-        | BlockKind::PlayCutscene { .. } => Category::Animation,
+        | BlockKind::StopAnimation { .. }
+        | BlockKind::SetAnimatorSpeed { .. }
+        | BlockKind::SetIkTarget { .. }
+        | BlockKind::SetRagdollEnabled { .. }
+        | BlockKind::PlayCutscene { .. }
+        | BlockKind::PauseCutscene { .. }
+        | BlockKind::ResumeCutscene { .. }
+        | BlockKind::StopCutscene { .. } => Category::Animation,
         BlockKind::Tween { .. }
         | BlockKind::SlideIn { .. }
+        | BlockKind::SlideOut { .. }
         | BlockKind::FadeIn { .. }
-        | BlockKind::FadeOut { .. } => Category::Tweens,
+        | BlockKind::FadeOut { .. }
+        | BlockKind::TweenPivot { .. }
+        | BlockKind::PulseScale { .. }
+        | BlockKind::CancelTween { .. } => Category::Tweens,
         BlockKind::SetVariable { .. }
         | BlockKind::ChangeVariable { .. }
+        | BlockKind::SetAttribute { .. }
+        | BlockKind::ListCreate { .. }
+        | BlockKind::ListAdd { .. }
+        | BlockKind::ListInsert { .. }
+        | BlockKind::ListRemoveIndex { .. }
+        | BlockKind::ListRemoveValue { .. }
+        | BlockKind::ListClear { .. }
         | BlockKind::Local { .. }
         | BlockKind::Assign { .. }
         | BlockKind::CompoundAssign { .. } => Category::Variables,
         BlockKind::Print { .. }
-        | BlockKind::Destroy { .. }
-        | BlockKind::CloneInto { .. }
         | BlockKind::SaveSlot { .. }
         | BlockKind::LoadSlot { .. }
+        | BlockKind::DeleteSlot { .. }
+        | BlockKind::ForEachRow { .. }
         | BlockKind::SetCheckpoint { .. }
-        | BlockKind::RestoreCheckpoint
+        | BlockKind::RestoreCheckpoint => Category::DataAndSaves,
+        BlockKind::Destroy { .. }
+        | BlockKind::CloneInto { .. }
         | BlockKind::LoadLevel { .. }
         | BlockKind::AddLevel { .. }
         | BlockKind::RemoveLevel { .. }
-        | BlockKind::HostGame { .. }
+        | BlockKind::RequestStreamAround { .. }
+        | BlockKind::WhenStreamedIn { .. }
+        | BlockKind::WhenStreamedOut { .. }
+        | BlockKind::WhenLayerChanged { .. }
+        | BlockKind::SetLayerActive { .. } => Category::WorldAndLevels,
+        BlockKind::HostGame { .. }
         | BlockKind::JoinGame { .. }
         | BlockKind::LeaveGame
         | BlockKind::SetNetworkOwner { .. }
         | BlockKind::SetNetworkOwnershipAuto { .. }
         | BlockKind::KickPlayer { .. }
-        | BlockKind::RequestStreamAround { .. }
-        | BlockKind::WhenStreamedIn { .. }
+        | BlockKind::WhenChatMessageReceived { .. }
         | BlockKind::SendChatMessage { .. }
-        | BlockKind::ShowSystemMessage { .. }
-        | BlockKind::WhenLayerChanged { .. }
-        | BlockKind::SetLayerActive { .. } => Category::More,
+        | BlockKind::ShowSystemMessage { .. } => Category::MultiplayerAndChat,
         BlockKind::Code { .. }
         | BlockKind::TopCode { .. }
         | BlockKind::Comment { .. }
@@ -443,12 +537,30 @@ fn block_category(kind: &BlockKind) -> Category {
 
 fn reporter_category(expression: &Expression) -> Category {
     match expression {
-        Expression::Variable { .. } => Category::Variables,
+        Expression::Variable { .. }
+        | Expression::BlockOutput { .. }
+        | Expression::Attribute { .. }
+        | Expression::ListItem { .. }
+        | Expression::ListLength { .. }
+        | Expression::ListContains { .. } => Category::Variables,
         Expression::Property { property, .. } if property == "CurrentState" => Category::Animation,
         Expression::Property { .. }
-        | Expression::Attribute { .. }
+        | Expression::ObjectPath { .. }
         | Expression::TouchingPart
+        | Expression::TriggeringPlayer
+        | Expression::CommandArgs
+        | Expression::DeltaTime
         | Expression::PartUnderMouse
+        | Expression::MouseHitPosition
+        | Expression::CameraPosition
+        | Expression::CameraLookDirection
+        | Expression::NearestPlayerTo { .. }
+        | Expression::PlayerOfPart { .. }
+        | Expression::PlayerIsAlive { .. }
+        | Expression::ParentOf { .. }
+        | Expression::ChildOf { .. }
+        | Expression::HasTag { .. }
+        | Expression::GameTime
         | Expression::KeyDown { .. }
         | Expression::Raycast { .. }
         | Expression::RaycastIgnoring { .. }
@@ -458,10 +570,23 @@ fn reporter_category(expression: &Expression) -> Category {
         | Expression::SplineClosestDistance { .. } => Category::Sensing,
         Expression::AnimatorBool { .. }
         | Expression::AnimatorNumber { .. }
-        | Expression::AnimatorLayerWeight { .. } => Category::Animation,
+        | Expression::AnimatorLayerWeight { .. }
+        | Expression::AnimatorNewState
+        | Expression::AnimatorPreviousState
+        | Expression::AnimationEventName => Category::Animation,
+        Expression::SoundProperty { .. } => Category::Sound,
         Expression::DataRow { .. }
         | Expression::DataValue { .. }
-        | Expression::LayerActive { .. } => Category::More,
+        | Expression::SlotExists { .. }
+        | Expression::DataTableRowCount { .. } => Category::DataAndSaves,
+        Expression::LayerActive { .. }
+        | Expression::ChangedLayerName
+        | Expression::ChangedLayerActive => Category::WorldAndLevels,
+        Expression::ConnectionFailureReason
+        | Expression::ChatMessageText
+        | Expression::ChatMessageSender
+        | Expression::IsHost
+        | Expression::IsConnected => Category::MultiplayerAndChat,
         Expression::Code { .. }
         | Expression::Call { .. }
         | Expression::MethodCall { .. }
@@ -470,6 +595,265 @@ fn reporter_category(expression: &Expression) -> Category {
         | Expression::Table { .. }
         | Expression::Cast { .. } => Category::Lua,
         _ => Category::Operators,
+    }
+}
+
+/// Semantic vector icon for each block, shown in both the Blocks and Graph
+/// palettes and node/block headers.
+pub(crate) fn block_icon(kind: &BlockKind) -> &'static str {
+    match kind {
+        BlockKind::WhenStarted { .. } | BlockKind::RunScript { .. } => icons::PLAY,
+        BlockKind::WhenTouched { .. } | BlockKind::WhenTouchEnds { .. } => icons::HAND_POINTING,
+        BlockKind::WhenKeyPressed { .. } | BlockKind::WhenKeyReleased { .. } => icons::KEYBOARD,
+        BlockKind::WhenPlayerJoins { .. }
+        | BlockKind::WhenPlayerLeaves { .. }
+        | BlockKind::WhenCharacterSpawns { .. }
+        | BlockKind::WhenPlayerDies { .. } => icons::USER,
+        BlockKind::WhenChildAdded { .. } | BlockKind::WhenChildRemoved { .. } => icons::FLOW_ARROW,
+        BlockKind::WhenTagAdded { .. }
+        | BlockKind::WhenTagRemoved { .. }
+        | BlockKind::ForEachTagged { .. } => icons::TAG,
+        BlockKind::WhenRemoteFires { .. } => icons::BROADCAST,
+        BlockKind::Disconnect { .. } => icons::LINK_BREAK,
+        BlockKind::WhenClicked { .. } | BlockKind::WhenPartClicked { .. } => icons::CURSOR_CLICK,
+        BlockKind::WhenMouseEnters { .. } | BlockKind::WhenMouseLeaves { .. } => icons::CURSOR,
+        BlockKind::WhenValueChanged { .. }
+        | BlockKind::WhenPropertyChanged { .. }
+        | BlockKind::WhenAttributeChanged { .. } => icons::SLIDERS_HORIZONTAL,
+        BlockKind::EveryFrame { .. }
+        | BlockKind::BeforePhysics { .. }
+        | BlockKind::BeforeRender { .. } => icons::TIMER,
+        BlockKind::WhenEventFired { .. } | BlockKind::FireEvent { .. } => icons::BROADCAST,
+        BlockKind::WhenSoundEnded { .. } => icons::SPEAKER_HIGH,
+        BlockKind::WhenCutsceneFinished { .. } => icons::FILM_STRIP,
+        BlockKind::WhenConnectionFails { .. } => icons::CLOUD_WARNING,
+        BlockKind::WhenPromptTriggered { .. } => icons::LIGHTNING,
+        BlockKind::WhenCommandRun { .. } => icons::TERMINAL_WINDOW,
+        BlockKind::OnSignal { .. } | BlockKind::Connect { .. } => icons::LINK,
+        BlockKind::Unattached { .. } => icons::DOTS_THREE,
+        BlockKind::Wait { .. }
+        | BlockKind::WaitUntil { .. }
+        | BlockKind::WaitForChild { .. }
+        | BlockKind::WaitForEvent { .. } => icons::CLOCK,
+        BlockKind::Repeat { .. }
+        | BlockKind::Forever { .. }
+        | BlockKind::RepeatUntil { .. }
+        | BlockKind::While { .. }
+        | BlockKind::RepeatLoop { .. }
+        | BlockKind::NumericFor { .. }
+        | BlockKind::GenericFor { .. }
+        | BlockKind::ForEachChild { .. }
+        | BlockKind::ForEachPartInRadius { .. }
+        | BlockKind::ForEachPartTouching { .. }
+        | BlockKind::ForRange { .. }
+        | BlockKind::ForEachInList { .. } => icons::REPEAT,
+        BlockKind::If { .. } | BlockKind::IfElse { .. } | BlockKind::Sequence { .. } => {
+            icons::GIT_BRANCH
+        }
+        BlockKind::CooldownGate { .. } => icons::SHIELD,
+        BlockKind::SpawnAsync { .. } => icons::LIGHTNING,
+        BlockKind::StopScript
+        | BlockKind::DestroyScript
+        | BlockKind::Break
+        | BlockKind::Continue
+        | BlockKind::Return { .. } => icons::STOP,
+        BlockKind::DestroyAfter { .. } | BlockKind::Destroy { .. } => icons::TRASH,
+        BlockKind::DoBlock { .. } | BlockKind::DefineFunction { .. } => icons::FLOW_ARROW,
+        BlockKind::MoveTo { .. }
+        | BlockKind::MoveBy { .. }
+        | BlockKind::MoveForward { .. }
+        | BlockKind::SlideTo { .. }
+        | BlockKind::PlaceOnSpline { .. } => icons::ARROWS_OUT_CARDINAL,
+        BlockKind::TurnTo { .. }
+        | BlockKind::TurnBy { .. }
+        | BlockKind::RotateTo { .. }
+        | BlockKind::SetAngularVelocity { .. }
+        | BlockKind::LookAt { .. } => icons::ARROWS_CLOCKWISE,
+        BlockKind::SetAnchored { .. } | BlockKind::SetGravity { .. } => icons::ANCHOR,
+        BlockKind::PushWithForce { .. }
+        | BlockKind::SetPartVelocity { .. }
+        | BlockKind::LaunchPart { .. }
+        | BlockKind::SetFriction { .. } => icons::ARROW_RIGHT,
+        BlockKind::SetDestination { .. }
+        | BlockKind::FollowTarget { .. }
+        | BlockKind::SetVelocity { .. }
+        | BlockKind::Patrol { .. } => icons::PERSON_SIMPLE_RUN,
+        BlockKind::StopAgent { .. } => icons::STOP,
+        BlockKind::ControlSpline { .. } | BlockKind::SetSplineSpeed { .. } => icons::PLAY_CIRCLE,
+        BlockKind::WhenSeatOccupied { .. }
+        | BlockKind::WhenSeatVacated { .. }
+        | BlockKind::SitInSeat { .. }
+        | BlockKind::LeaveSeat { .. } => icons::USER,
+        BlockKind::WhenAgentSenses { .. } | BlockKind::WhenAgentLosesPlayer { .. } => icons::EYES,
+        BlockKind::WhenAgentArrives { .. } | BlockKind::WhenSplineReached { .. } => {
+            icons::FLAG_CHECKERED
+        }
+        BlockKind::SetCameraType { .. }
+        | BlockKind::PointCameraAt { .. }
+        | BlockKind::ShakeCamera { .. } => icons::CAMERA,
+        BlockKind::SetColor { .. }
+        | BlockKind::SetTransparency { .. }
+        | BlockKind::SetMaterial { .. } => icons::PALETTE,
+        BlockKind::SetText { .. } | BlockKind::SetLanguage { .. } => icons::PENCIL_SIMPLE,
+        BlockKind::Show { .. } | BlockKind::ToggleVisibility { .. } => icons::EYE,
+        BlockKind::Hide { .. } => icons::EYE_SLASH,
+        BlockKind::ShowPage { .. }
+        | BlockKind::ScrollTo { .. }
+        | BlockKind::SetValue { .. }
+        | BlockKind::SetProperty { .. } => icons::SLIDERS,
+        BlockKind::SetImage { .. } => icons::IMAGE,
+        BlockKind::EmitParticles { .. } | BlockKind::SetEffectEnabled { .. } => icons::SPARKLE,
+        BlockKind::TweenProperty { .. } => icons::WAVE_SINE,
+        BlockKind::SetAttribute { .. } => icons::TAG,
+        BlockKind::SetToneMapping { .. }
+        | BlockKind::SetClockTime { .. }
+        | BlockKind::SetLightingProperty { .. }
+        | BlockKind::SetPostProcessing { .. } => icons::SUN,
+        BlockKind::SetAtmosphere { .. } => icons::CLOUD_SUN,
+        BlockKind::SetGraphicsQuality { .. }
+        | BlockKind::SetGraphicsOption { .. }
+        | BlockKind::SetGraphicsNumber { .. } => icons::SLIDERS_HORIZONTAL,
+        BlockKind::SpawnDecal { .. } => icons::SPARKLE,
+        BlockKind::PlaySound { .. } | BlockKind::PlaySoundAtPosition { .. } => icons::SPEAKER_HIGH,
+        BlockKind::StopSound { .. } => icons::SPEAKER_SLASH,
+        BlockKind::PauseSound { .. } => icons::PAUSE,
+        BlockKind::ResumeSound { .. } => icons::PLAY_CIRCLE,
+        BlockKind::SetVolume { .. }
+        | BlockKind::FadeVolume { .. }
+        | BlockKind::SetSoundPitch { .. }
+        | BlockKind::SetSoundLooping { .. }
+        | BlockKind::SetSoundTime { .. } => icons::WAVEFORM,
+        BlockKind::SetAnimatorTrigger { .. }
+        | BlockKind::ResetAnimatorTrigger { .. }
+        | BlockKind::SetAnimatorBool { .. }
+        | BlockKind::SetAnimatorNumber { .. }
+        | BlockKind::SetAnimatorLayerWeight { .. }
+        | BlockKind::PlayAnimatorState { .. }
+        | BlockKind::PlayAnimation { .. }
+        | BlockKind::StopAnimation { .. }
+        | BlockKind::SetAnimatorSpeed { .. }
+        | BlockKind::SetIkTarget { .. }
+        | BlockKind::SetRagdollEnabled { .. }
+        | BlockKind::WhenStateChanged { .. }
+        | BlockKind::WhenAnimationEvent { .. }
+        | BlockKind::WhenAnimationFinished { .. } => icons::PERSON_SIMPLE_RUN,
+        BlockKind::PlayCutscene { .. }
+        | BlockKind::PauseCutscene { .. }
+        | BlockKind::ResumeCutscene { .. }
+        | BlockKind::StopCutscene { .. } => icons::FILM_STRIP,
+        BlockKind::Tween { .. }
+        | BlockKind::SlideIn { .. }
+        | BlockKind::SlideOut { .. }
+        | BlockKind::FadeIn { .. }
+        | BlockKind::FadeOut { .. }
+        | BlockKind::TweenPivot { .. }
+        | BlockKind::PulseScale { .. }
+        | BlockKind::CancelTween { .. } => icons::WAVE_SINE,
+        BlockKind::SetVariable { .. }
+        | BlockKind::ChangeVariable { .. }
+        | BlockKind::Local { .. }
+        | BlockKind::Assign { .. }
+        | BlockKind::CompoundAssign { .. } => icons::BRACKETS_CURLY,
+        BlockKind::ListCreate { .. }
+        | BlockKind::ListAdd { .. }
+        | BlockKind::ListInsert { .. }
+        | BlockKind::ListRemoveIndex { .. }
+        | BlockKind::ListRemoveValue { .. }
+        | BlockKind::ListClear { .. } => icons::LIST,
+        BlockKind::Print { .. } => icons::TERMINAL_WINDOW,
+        BlockKind::CloneInto { .. } => icons::COPY,
+        BlockKind::SaveSlot { .. } => icons::FLOPPY_DISK,
+        BlockKind::LoadSlot { .. } => icons::FOLDER_OPEN,
+        BlockKind::DeleteSlot { .. } => icons::TRASH,
+        BlockKind::ForEachRow { .. } => icons::TABLE,
+        BlockKind::SetCheckpoint { .. } | BlockKind::RestoreCheckpoint => icons::FLAG,
+        BlockKind::LoadLevel { .. }
+        | BlockKind::AddLevel { .. }
+        | BlockKind::RemoveLevel { .. } => icons::MAP_TRIFOLD,
+        BlockKind::WhenLayerChanged { .. } | BlockKind::SetLayerActive { .. } => icons::STACK,
+        BlockKind::RequestStreamAround { .. }
+        | BlockKind::WhenStreamedIn { .. }
+        | BlockKind::WhenStreamedOut { .. } => icons::GLOBE,
+        BlockKind::HostGame { .. }
+        | BlockKind::JoinGame { .. }
+        | BlockKind::LeaveGame
+        | BlockKind::SetNetworkOwner { .. }
+        | BlockKind::SetNetworkOwnershipAuto { .. } => icons::USERS,
+        BlockKind::KickPlayer { .. } => icons::USER_MINUS,
+        BlockKind::WhenChatMessageReceived { .. }
+        | BlockKind::SendChatMessage { .. }
+        | BlockKind::ShowSystemMessage { .. } => icons::CHAT_CIRCLE_TEXT,
+        BlockKind::Code { .. }
+        | BlockKind::TopCode { .. }
+        | BlockKind::Comment { .. }
+        | BlockKind::CallFunction { .. }
+        | BlockKind::CallMethod { .. } => icons::CODE,
+    }
+}
+
+/// Semantic vector icon for each reporter/value node.
+pub(crate) fn reporter_icon(expression: &Expression) -> &'static str {
+    match expression {
+        Expression::Variable { .. } | Expression::Name { .. } | Expression::BlockOutput { .. } => {
+            icons::BRACKETS_CURLY
+        }
+        Expression::ListItem { .. }
+        | Expression::ListLength { .. }
+        | Expression::ListContains { .. } => icons::LIST,
+        Expression::ObjectPath { .. } => icons::CUBE,
+        Expression::Property { .. } => icons::SLIDERS,
+        Expression::Attribute { .. } => icons::TAG,
+        Expression::TouchingPart => icons::HAND_POINTING,
+        Expression::TriggeringPlayer
+        | Expression::NearestPlayerTo { .. }
+        | Expression::PlayerOfPart { .. }
+        | Expression::PlayerIsAlive { .. } => icons::USER,
+        Expression::CommandArgs => icons::TERMINAL_WINDOW,
+        Expression::DeltaTime | Expression::GameTime => icons::CLOCK,
+        Expression::PartUnderMouse | Expression::MouseHitPosition => icons::CURSOR_CLICK,
+        Expression::CameraPosition | Expression::CameraLookDirection => icons::CAMERA,
+        Expression::ParentOf { .. } | Expression::ChildOf { .. } => icons::TREE_STRUCTURE,
+        Expression::HasTag { .. } => icons::TAG,
+        Expression::KeyDown { .. } => icons::KEYBOARD,
+        Expression::Raycast { .. } | Expression::RaycastIgnoring { .. } => icons::CROSSHAIR,
+        Expression::IsA { .. } => icons::INFO,
+        Expression::IsStreamedIn { .. } => icons::GLOBE,
+        Expression::SplinePosition { .. } | Expression::SplineClosestDistance { .. } => {
+            icons::RULER
+        }
+        Expression::AnimatorBool { .. }
+        | Expression::AnimatorNumber { .. }
+        | Expression::AnimatorLayerWeight { .. }
+        | Expression::AnimatorNewState
+        | Expression::AnimatorPreviousState
+        | Expression::AnimationEventName => icons::PERSON_SIMPLE_RUN,
+        Expression::DataRow { .. }
+        | Expression::DataValue { .. }
+        | Expression::DataTableRowCount { .. } => icons::TABLE,
+        Expression::SlotExists { .. } => icons::FLOPPY_DISK,
+        Expression::SoundProperty { .. } => icons::WAVEFORM,
+        Expression::LayerActive { .. }
+        | Expression::ChangedLayerName
+        | Expression::ChangedLayerActive => icons::STACK,
+        Expression::ConnectionFailureReason => icons::CLOUD_WARNING,
+        Expression::ChatMessageText | Expression::ChatMessageSender => icons::CHAT_CIRCLE_TEXT,
+        Expression::IsHost | Expression::IsConnected => icons::USERS,
+        Expression::Random { .. } | Expression::RandomNumber { .. } => icons::SHUFFLE,
+        Expression::Lerp { .. } => icons::WAVE_SINE,
+        Expression::MakeColorRgb { .. } | Expression::MakeColorHsv { .. } => icons::PALETTE,
+        Expression::MakeVector3 { .. }
+        | Expression::VectorAxis { .. }
+        | Expression::Distance { .. }
+        | Expression::Direction { .. }
+        | Expression::Magnitude { .. } => icons::COMPASS,
+        Expression::Code { .. }
+        | Expression::Call { .. }
+        | Expression::MethodCall { .. }
+        | Expression::Field { .. }
+        | Expression::Index { .. }
+        | Expression::Table { .. }
+        | Expression::Cast { .. } => icons::CODE,
+        _ => icons::PLUS_MINUS,
     }
 }
 
@@ -487,6 +871,8 @@ enum Filter {
     Gui,
     Animators,
     Animations,
+    IkControls,
+    Ragdolls,
     Sequences,
     /// NavigationAgents.
     Agents,
@@ -520,6 +906,8 @@ impl Filter {
             Filter::Widgets => class.is_value_widget(),
             Filter::Animators => class == ClassName::Animator,
             Filter::Animations => class == ClassName::Animation,
+            Filter::IkControls => class == ClassName::IKControl,
+            Filter::Ragdolls => class == ClassName::Ragdoll,
             Filter::Sequences => class == ClassName::Sequence,
             Filter::Agents => class == ClassName::NavigationAgent,
             Filter::Splines => class == ClassName::Spline,
@@ -564,6 +952,8 @@ impl Filter {
             Filter::Gui => "Frame",
             Filter::Animators => "Model.Animator",
             Filter::Animations => "Model.Animation",
+            Filter::IkControls => "Model.IKControl",
+            Filter::Ragdolls => "Model.Ragdoll",
             Filter::Sequences => "Sequence",
             Filter::Agents => "Model.NavigationAgent",
             Filter::Splines => "Spline",
@@ -591,6 +981,8 @@ enum SlotKind {
     Truth,
     Vector,
     Color,
+    /// A scene object picked from a dropdown, or wired/dropped dynamically.
+    Object(Filter),
 }
 
 impl SlotKind {
@@ -622,6 +1014,9 @@ impl SlotKind {
                 g: 1.0,
                 b: 1.0,
             },
+            SlotKind::Object(_) => Expression::ObjectPath {
+                path: String::new(),
+            },
         }
     }
 }
@@ -631,7 +1026,6 @@ enum Part<'a> {
     Label(String),
     Icon(&'static str),
     Slot(&'a mut Expression, SlotKind),
-    Object(&'a mut String, Filter),
     Property(&'a mut String, Option<ClassName>),
     Variable(&'a mut String),
     Key(&'a mut String),
@@ -685,7 +1079,12 @@ fn label(text: &str) -> Part<'static> {
     Part::Label(text.to_owned())
 }
 
-fn class_of(objects: &[ObjectInfo], path: &str) -> Option<ClassName> {
+fn object(target: &mut ObjectRef, filter: Filter) -> Part<'_> {
+    Part::Slot(target.as_expr_mut(), SlotKind::Object(filter))
+}
+
+fn class_of(objects: &[ObjectInfo], target: &ObjectRef) -> Option<ClassName> {
+    let path = target.as_path()?;
     objects
         .iter()
         .find(|object| object.path == path)
@@ -902,36 +1301,131 @@ fn luau_sections(kind: &mut BlockKind) -> Vec<Section<'_>> {
 /// What a block shows, top to bottom. An event block's own body isn't
 /// here: it's the stack under it.
 fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<'a>> {
-    use Part::{Key, Object, Property, Slot, Variable};
+    use Part::{Key, Property, Slot, Variable};
     use Section::{Mouth, Row};
     match kind {
         BlockKind::WhenStarted { .. } => {
-            vec![Row(vec![label("when game starts")])]
+            vec![Row(vec![label("when script starts")])]
         }
-        BlockKind::WhenTouched { part, .. } => vec![Row(vec![
-            label("when"),
-            Object(part, Filter::Parts),
-            label("is touched"),
-        ])],
+        BlockKind::WhenTouched {
+            part,
+            filter,
+            filter_value,
+            cooldown,
+            ..
+        } => {
+            if filter.is_empty() {
+                *filter = "Any Part".to_owned();
+            }
+            if filter == "Tagged / Named..." && filter_value.is_none() {
+                *filter_value = Some(Expression::Text {
+                    value: String::new(),
+                });
+            } else if filter != "Tagged / Named..." && filter_value.is_some() {
+                *filter_value = None;
+            }
+            let mut row = vec![
+                label("when"),
+                object(part, Filter::Parts),
+                label("is touched"),
+                Part::Choice(filter, &axcenity_blocks::TOUCH_FILTERS),
+            ];
+            if let Some(fv) = filter_value {
+                row.push(Slot(fv, SlotKind::Text));
+            }
+            if let Some(cd) = cooldown {
+                row.push(label("cooldown"));
+                row.push(Slot(cd, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::WhenTouchEnds {
+            part,
+            filter,
+            filter_value,
+            ..
+        } => {
+            if filter.is_empty() {
+                *filter = "Any Part".to_owned();
+            }
+            if filter == "Tagged / Named..." && filter_value.is_none() {
+                *filter_value = Some(Expression::Text {
+                    value: String::new(),
+                });
+            } else if filter != "Tagged / Named..." && filter_value.is_some() {
+                *filter_value = None;
+            }
+            let mut row = vec![
+                label("when"),
+                object(part, Filter::Parts),
+                label("touch ends"),
+                Part::Choice(filter, &axcenity_blocks::TOUCH_FILTERS),
+            ];
+            if let Some(fv) = filter_value {
+                row.push(Slot(fv, SlotKind::Text));
+            }
+            vec![Row(row)]
+        }
         BlockKind::WhenKeyPressed { key, .. } => {
             vec![Row(vec![label("when"), Key(key), label("key pressed")])]
         }
+        BlockKind::WhenKeyReleased { key, .. } => {
+            vec![Row(vec![label("when"), Key(key), label("key released")])]
+        }
+        BlockKind::WhenPlayerJoins { .. } => vec![Row(vec![label("when player joins")])],
+        BlockKind::WhenPlayerLeaves { .. } => vec![Row(vec![label("when player leaves")])],
+        BlockKind::WhenCharacterSpawns { .. } => vec![Row(vec![label("when character spawns")])],
+        BlockKind::WhenPlayerDies { .. } => vec![Row(vec![label("when player dies")])],
+        BlockKind::WhenChildAdded { target, .. } => vec![Row(vec![
+            label("when child added to"),
+            object(target, Filter::Places),
+        ])],
+        BlockKind::WhenChildRemoved { target, .. } => vec![Row(vec![
+            label("when child removed from"),
+            object(target, Filter::Places),
+        ])],
+        BlockKind::WhenTagAdded { tag, .. } => vec![Row(vec![
+            label("when tag"),
+            Slot(tag, SlotKind::Text),
+            label("added"),
+        ])],
+        BlockKind::WhenTagRemoved { tag, .. } => vec![Row(vec![
+            label("when tag"),
+            Slot(tag, SlotKind::Text),
+            label("removed"),
+        ])],
+        BlockKind::WhenRemoteFires { remote, side, .. } => {
+            if side.is_empty() {
+                *side = "Server (OnServerEvent)".to_owned();
+            }
+            vec![Row(vec![
+                label("when remote"),
+                object(remote, Filter::Any),
+                label("fires on"),
+                Part::Choice(side, &axcenity_blocks::REMOTE_SIDES),
+            ])]
+        }
+        BlockKind::Disconnect { connection } => vec![Row(vec![
+            label("disconnect"),
+            Slot(connection, SlotKind::Any),
+        ])],
         BlockKind::WhenClicked { button, .. } => vec![Row(vec![
             label("when"),
-            Object(button, Filter::Buttons),
+            object(button, Filter::Buttons),
             label("is clicked"),
         ])],
         BlockKind::WhenMouseEnters { element, .. } => vec![Row(vec![
             label("when mouse enters"),
-            Object(element, Filter::Gui),
+            object(element, Filter::Gui),
         ])],
         BlockKind::WhenMouseLeaves { element, .. } => vec![Row(vec![
             label("when mouse leaves"),
-            Object(element, Filter::Gui),
+            object(element, Filter::Gui),
         ])],
         BlockKind::WhenValueChanged { widget, .. } => vec![Row(vec![
             label("when"),
-            Object(widget, Filter::Widgets),
+            object(widget, Filter::Widgets),
             label("value changes"),
         ])],
         BlockKind::EveryFrame { .. } => vec![Row(vec![label("every frame")])],
@@ -942,48 +1436,68 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             Part::Name(event, NameKind::Bindable, STORAGE_PATH.to_owned()),
             label("fires"),
         ])],
-        BlockKind::FireEvent { event } => vec![Row(vec![
-            label("fire event"),
-            Part::Name(event, NameKind::Bindable, STORAGE_PATH.to_owned()),
-        ])],
+        BlockKind::FireEvent { event, data } => {
+            let mut row = vec![
+                label("fire event"),
+                Part::Name(event, NameKind::Bindable, STORAGE_PATH.to_owned()),
+            ];
+            if let Some(payload) = data {
+                row.push(label("with"));
+                row.push(Slot(payload, SlotKind::Any));
+            }
+            vec![Row(row)]
+        }
         BlockKind::WhenSoundEnded { sound, .. } => vec![Row(vec![
             label("when"),
-            Object(sound, Filter::Sounds),
+            object(sound, Filter::Sounds),
             label("ends"),
         ])],
         BlockKind::WhenCutsceneFinished { sequence, .. } => vec![Row(vec![
             label("when cutscene"),
-            Object(sequence, Filter::Sequences),
+            object(sequence, Filter::Sequences),
             label("finishes"),
         ])],
         BlockKind::WhenConnectionFails { .. } => vec![Row(vec![label("when connection fails")])],
+        BlockKind::WhenChatMessageReceived { .. } => {
+            vec![Row(vec![label("when chat message received")])]
+        }
         BlockKind::WhenStateChanged { animator, .. } => vec![Row(vec![
             label("when"),
-            Object(animator, Filter::Animators),
+            object(animator, Filter::Animators),
             label("changes state"),
         ])],
         BlockKind::WhenAnimationEvent {
             animator, event, ..
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("when"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
                 label("reaches event"),
                 Part::Name(event, NameKind::Event, path),
             ])]
         }
+        BlockKind::WhenAnimationFinished {
+            animator,
+            animation,
+            ..
+        } => vec![Row(vec![
+            label("when animation"),
+            object(animation, Filter::Animations),
+            label("finishes on"),
+            object(animator, Filter::Animators),
+        ])],
         BlockKind::SetAnimatorBool {
             animator,
             parameter,
             value,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("set"),
                 Part::Name(parameter, NameKind::Bool, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
                 label("to"),
                 Slot(value, SlotKind::Truth),
             ])]
@@ -993,12 +1507,12 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             parameter,
             value,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("set"),
                 Part::Name(parameter, NameKind::Number, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
                 label("to"),
                 Slot(value, SlotKind::Number),
             ])]
@@ -1009,12 +1523,12 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             weight,
             seconds,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("set layer"),
                 Part::Name(layer, NameKind::Layer, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
                 label("to"),
                 Slot(weight, SlotKind::Number),
                 label("over"),
@@ -1026,43 +1540,113 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             animator,
             parameter,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("set trigger"),
                 Part::Name(parameter, NameKind::Trigger, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ])]
         }
         BlockKind::ResetAnimatorTrigger {
             animator,
             parameter,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("reset trigger"),
                 Part::Name(parameter, NameKind::Trigger, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ])]
         }
         BlockKind::PlayAnimatorState { animator, state } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("play state"),
                 Part::Name(state, NameKind::State, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ])]
         }
         BlockKind::PlayAnimation {
             animator,
             animation,
-        } => vec![Row(vec![
-            label("play animation"),
-            Object(animation, Filter::Animations),
-            label("on"),
-            Object(animator, Filter::Animators),
+            fade_time,
+            speed,
+            weight,
+            wait_until_done,
+        } => {
+            let mut row = vec![
+                label("play animation"),
+                object(animation, Filter::Animations),
+                label("on"),
+                object(animator, Filter::Animators),
+            ];
+            if let Some(f) = fade_time {
+                row.push(label("fade"));
+                row.push(Slot(f, SlotKind::Number));
+            }
+            if let Some(s) = speed {
+                row.push(label("speed"));
+                row.push(Slot(s, SlotKind::Number));
+            }
+            if let Some(w) = weight {
+                row.push(label("weight"));
+                row.push(Slot(w, SlotKind::Number));
+            }
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::StopAnimation {
+            animator,
+            animation,
+            fade_time,
+        } => {
+            let mut row = vec![label("stop")];
+            if let Some(anim) = animation {
+                row.push(object(anim, Filter::Animations));
+            } else {
+                row.push(label("all animations"));
+            }
+            row.push(label("on"));
+            row.push(object(animator, Filter::Animators));
+            if let Some(f) = fade_time {
+                row.push(label("fade"));
+                row.push(Slot(f, SlotKind::Number));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::SetAnimatorSpeed { animator, speed } => vec![Row(vec![
+            label("set speed of"),
+            object(animator, Filter::Animators),
+            label("to"),
+            Slot(speed, SlotKind::Number),
+        ])],
+        BlockKind::SetIkTarget {
+            ik_control,
+            target,
+            weight,
+        } => {
+            let mut row = vec![
+                label("set IK"),
+                object(ik_control, Filter::IkControls),
+                label("target to"),
+                object(target, Filter::Any),
+            ];
+            if let Some(w) = weight {
+                row.push(label("weight"));
+                row.push(Slot(w, SlotKind::Number));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::SetRagdollEnabled { ragdoll, enabled } => vec![Row(vec![
+            label("set ragdoll"),
+            object(ragdoll, Filter::Ragdolls),
+            label("enabled"),
+            Slot(enabled, SlotKind::Truth),
         ])],
         BlockKind::Tween {
             target,
@@ -1071,53 +1655,192 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             seconds,
             style,
             direction,
+            repeat_count,
+            reverses,
+            wait_until_done,
+            completed,
         } => {
             let class = class_of(objects, target);
-            vec![
+            let mut row2 = vec![
+                label("over"),
+                Slot(seconds, SlotKind::Number),
+                label("seconds"),
+                Part::Choice(style, &axcenity_blocks::EASING_STYLES),
+                Part::Choice(direction, &axcenity_blocks::EASING_DIRECTIONS),
+            ];
+            if let Some(rep) = repeat_count {
+                row2.push(label("repeat"));
+                row2.push(Slot(rep, SlotKind::Number));
+            }
+            if *reverses {
+                row2.push(label("reverses"));
+            }
+            if *wait_until_done {
+                row2.push(label("and wait"));
+            }
+            let mut out = vec![
                 Row(vec![
                     label("tween"),
                     Property(property, class),
                     label("of"),
-                    Object(target, Filter::Any),
+                    object(target, Filter::Any),
                     label("to"),
                     Slot(value, SlotKind::Any),
                 ]),
-                Row(vec![
-                    label("over"),
-                    Slot(seconds, SlotKind::Number),
-                    label("seconds"),
-                    Part::Choice(style, &axcenity_blocks::EASING_STYLES),
-                    Part::Choice(direction, &axcenity_blocks::EASING_DIRECTIONS),
-                ]),
-            ]
+                Row(row2),
+            ];
+            if !completed.is_empty() {
+                out.push(Row(vec![label("when done")]));
+                out.push(Mouth(completed));
+            }
+            out
         }
         BlockKind::SlideIn {
             target,
             from,
             seconds,
-        } => vec![Row(vec![
-            label("slide"),
-            Object(target, Filter::Gui),
-            label("in from"),
-            Part::Choice(from, &axcenity_blocks::SLIDE_EDGES),
-            label("over"),
-            Slot(seconds, SlotKind::Number),
-            label("seconds"),
-        ])],
-        BlockKind::FadeIn { target, seconds } => vec![Row(vec![
-            label("fade"),
-            Object(target, Filter::Gui),
-            label("in over"),
-            Slot(seconds, SlotKind::Number),
-            label("seconds"),
-        ])],
-        BlockKind::FadeOut { target, seconds } => vec![Row(vec![
-            label("fade"),
-            Object(target, Filter::Gui),
-            label("out over"),
-            Slot(seconds, SlotKind::Number),
-            label("seconds"),
-        ])],
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("slide"),
+                object(target, Filter::Gui),
+                label("in from"),
+                Part::Choice(from, &axcenity_blocks::SLIDE_EDGES),
+                label("over"),
+                Slot(seconds, SlotKind::Number),
+                label("seconds"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![Row(row), Row(vec![label("when done")]), Mouth(completed)]
+            }
+        }
+        BlockKind::SlideOut {
+            target,
+            to,
+            seconds,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("slide"),
+                object(target, Filter::Gui),
+                label("out to"),
+                Part::Choice(to, &axcenity_blocks::SLIDE_EDGES),
+                label("over"),
+                Slot(seconds, SlotKind::Number),
+                label("seconds"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![Row(row), Row(vec![label("when done")]), Mouth(completed)]
+            }
+        }
+        BlockKind::FadeIn {
+            target,
+            seconds,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("fade"),
+                object(target, Filter::Any),
+                label("in over"),
+                Slot(seconds, SlotKind::Number),
+                label("seconds"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![Row(row), Row(vec![label("when done")]), Mouth(completed)]
+            }
+        }
+        BlockKind::FadeOut {
+            target,
+            seconds,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("fade"),
+                object(target, Filter::Any),
+                label("out over"),
+                Slot(seconds, SlotKind::Number),
+                label("seconds"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![Row(row), Row(vec![label("when done")]), Mouth(completed)]
+            }
+        }
+        BlockKind::TweenPivot {
+            target,
+            position,
+            duration,
+            easing,
+            direction,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("tween pivot of"),
+                object(target, Filter::Any),
+                label("to"),
+                Slot(position, SlotKind::Vector),
+                label("over"),
+                Slot(duration, SlotKind::Number),
+                label("s"),
+                Part::Choice(easing, &axcenity_blocks::EASING_STYLES),
+                Part::Choice(direction, &axcenity_blocks::EASING_DIRECTIONS),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![Row(row), Row(vec![label("when done")]), Mouth(completed)]
+            }
+        }
+        BlockKind::PulseScale {
+            target,
+            scale,
+            duration,
+            wait_until_done,
+        } => {
+            let mut row = vec![
+                label("pulse scale of"),
+                object(target, Filter::Any),
+                label("by"),
+                Slot(scale, SlotKind::Number),
+                label("over"),
+                Slot(duration, SlotKind::Number),
+                label("s"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::CancelTween { tween } => {
+            vec![Row(vec![label("cancel tween"), object(tween, Filter::Any)])]
+        }
         BlockKind::Unattached { .. } => Vec::new(),
         BlockKind::Wait { seconds } => vec![Row(vec![
             label("wait"),
@@ -1146,7 +1869,7 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
                 label("for each"),
                 Variable(variable),
                 label("in"),
-                Object(target, Filter::Places),
+                object(target, Filter::Places),
             ]),
             Mouth(body),
         ],
@@ -1154,56 +1877,128 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             center,
             radius,
             variable,
+            ignore,
             body,
-        } => vec![
-            Row(vec![
+            ..
+        } => {
+            let mut row = vec![
                 label("for each part"),
                 Variable(variable),
                 label("within"),
                 Slot(radius, SlotKind::Number),
                 label("studs of"),
                 Slot(center, SlotKind::Vector),
-            ]),
-            Mouth(body),
-        ],
+            ];
+            if let Some(ign) = ignore {
+                row.push(label("ignoring"));
+                row.push(Slot(ign, SlotKind::Any));
+            }
+            vec![Row(row), Mouth(body)]
+        }
         BlockKind::ForEachPartTouching {
             target,
             variable,
+            ignore,
             body,
-        } => vec![
-            Row(vec![
+            ..
+        } => {
+            let mut row = vec![
                 label("for each part"),
                 Variable(variable),
                 label("touching"),
-                Object(target, Filter::Parts),
-            ]),
-            Mouth(body),
-        ],
+                object(target, Filter::Parts),
+            ];
+            if let Some(ign) = ignore {
+                row.push(label("ignoring"));
+                row.push(Slot(ign, SlotKind::Any));
+            }
+            vec![Row(row), Mouth(body)]
+        }
         BlockKind::DestroyAfter { target, seconds } => vec![Row(vec![
             label("destroy"),
-            Object(target, Filter::Any),
+            object(target, Filter::Any),
             label("after"),
             Slot(seconds, SlotKind::Number),
             label("seconds"),
         ])],
         BlockKind::WaitForEvent { target, event } => {
-            let path = target.clone();
+            let path = target.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("wait until"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
                 Part::Name(event, NameKind::Signal, path),
                 label("fires"),
             ])]
         }
-        BlockKind::WaitForChild { target, name } => {
-            let path = target.clone();
-            vec![Row(vec![
+        BlockKind::WaitForChild {
+            target,
+            name,
+            timeout,
+        } => {
+            let path = target.as_path().unwrap_or("").to_owned();
+            let mut row = vec![
                 label("wait for child"),
                 Part::Name(name, NameKind::Child, path),
                 label("in"),
-                Object(target, Filter::Places),
-            ])]
+                object(target, Filter::Places),
+            ];
+            if let Some(secs) = timeout {
+                row.push(label("timeout"));
+                row.push(Slot(secs, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
         }
+        BlockKind::ForRange {
+            start,
+            end,
+            step,
+            body,
+        } => vec![
+            Row(vec![
+                label("for i from"),
+                Slot(start, SlotKind::Number),
+                label("to"),
+                Slot(end, SlotKind::Number),
+                label("step"),
+                Slot(step, SlotKind::Number),
+            ]),
+            Mouth(body),
+        ],
+        BlockKind::ForEachInList { list, body } => vec![
+            Row(vec![label("for each item in"), Slot(list, SlotKind::Any)]),
+            Mouth(body),
+        ],
+        BlockKind::ForEachTagged { tag, body } => vec![
+            Row(vec![label("for each tagged"), Slot(tag, SlotKind::Text)]),
+            Mouth(body),
+        ],
+        BlockKind::Sequence { branches } => {
+            let mut out = vec![Row(vec![label("sequence")])];
+            for (index, branch) in branches.iter_mut().enumerate() {
+                if index > 0 {
+                    out.push(Row(vec![Part::Label(format!("then {index}"))]));
+                }
+                out.push(Mouth(branch));
+            }
+            out
+        }
+        BlockKind::CooldownGate { cooldown, body } => vec![
+            Row(vec![
+                label("do once / cooldown"),
+                Slot(cooldown, SlotKind::Number),
+                label("s"),
+            ]),
+            Mouth(body),
+        ],
+        BlockKind::SpawnAsync { delay, body } => vec![
+            Row(vec![
+                label("spawn async after"),
+                Slot(delay, SlotKind::Number),
+                label("s"),
+            ]),
+            Mouth(body),
+        ],
         BlockKind::RepeatUntil { condition, body } => vec![
             Row(vec![
                 label("repeat until"),
@@ -1234,27 +2029,28 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             Mouth(else_body),
         ],
         BlockKind::StopScript => vec![Row(vec![label("stop this script")])],
+        BlockKind::DestroyScript => vec![Row(vec![label("destroy / stop script")])],
         BlockKind::MoveTo { target, position } => vec![Row(vec![
             label("move"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to"),
             Slot(position, SlotKind::Vector),
         ])],
         BlockKind::MoveBy { target, offset } => vec![Row(vec![
             label("move"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("by"),
             Slot(offset, SlotKind::Vector),
         ])],
         BlockKind::LookAt { target, position } => vec![Row(vec![
             label("turn"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to look at"),
             Slot(position, SlotKind::Vector),
         ])],
         BlockKind::MoveForward { target, distance } => vec![Row(vec![
             label("move"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("forward by"),
             Slot(distance, SlotKind::Number),
         ])],
@@ -1263,37 +2059,136 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             orientation,
         } => vec![Row(vec![
             label("turn"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to"),
             Slot(orientation, SlotKind::Vector),
             label("degrees"),
         ])],
-        BlockKind::TurnBy { target, rotation } => vec![Row(vec![
+        BlockKind::TurnBy {
+            target,
+            rotation,
+            space,
+        } => vec![Row(vec![
             label("turn"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("by"),
             Slot(rotation, SlotKind::Vector),
-            label("degrees"),
+            label("degrees in"),
+            Part::Choice(space, &axcenity_blocks::SPACE_MODES),
+            label("space"),
+        ])],
+        BlockKind::SlideTo {
+            target,
+            position,
+            duration,
+            easing,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("slide"),
+                object(target, Filter::Parts),
+                label("to"),
+                Slot(position, SlotKind::Vector),
+                label("over"),
+                Slot(duration, SlotKind::Number),
+                label("s"),
+                Part::Choice(easing, &axcenity_blocks::EASING_STYLES),
+            ];
+            if *wait_until_done {
+                row.push(label("(wait)"));
+            }
+            vec![Row(row), Mouth(completed)]
+        }
+        BlockKind::RotateTo {
+            target,
+            rotation,
+            duration,
+            easing,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("rotate"),
+                object(target, Filter::Parts),
+                label("to"),
+                Slot(rotation, SlotKind::Vector),
+                label("over"),
+                Slot(duration, SlotKind::Number),
+                label("s"),
+                Part::Choice(easing, &axcenity_blocks::EASING_STYLES),
+            ];
+            if *wait_until_done {
+                row.push(label("(wait)"));
+            }
+            vec![Row(row), Mouth(completed)]
+        }
+        BlockKind::SetGravity { target, multiplier } => vec![Row(vec![
+            label("set gravity of"),
+            object(target, Filter::Parts),
+            label("to"),
+            Slot(multiplier, SlotKind::Number),
+            label("×"),
+        ])],
+        BlockKind::SetAngularVelocity { target, velocity } => vec![Row(vec![
+            label("set angular velocity of"),
+            object(target, Filter::Parts),
+            label("to"),
+            Slot(velocity, SlotKind::Vector),
+        ])],
+        BlockKind::LaunchPart {
+            target,
+            direction,
+            speed,
+        } => vec![Row(vec![
+            label("launch"),
+            object(target, Filter::Parts),
+            label("along"),
+            Slot(direction, SlotKind::Vector),
+            label("at speed"),
+            Slot(speed, SlotKind::Number),
         ])],
         BlockKind::WhenAgentSenses { agent, sense, .. } => vec![Row(vec![
             label("when"),
-            Object(agent, Filter::Agents),
+            object(agent, Filter::Agents),
             label("senses the player by"),
             Part::Choice(sense, &axcenity_blocks::SENSES),
+        ])],
+        BlockKind::WhenAgentLosesPlayer { agent, sense, .. } => vec![Row(vec![
+            label("when"),
+            object(agent, Filter::Agents),
+            label("loses the player by"),
+            Part::Choice(sense, &axcenity_blocks::SENSES),
+        ])],
+        BlockKind::WhenAgentArrives { agent, .. } => vec![Row(vec![
+            label("when"),
+            object(agent, Filter::Agents),
+            label("arrives"),
         ])],
         BlockKind::WhenSplineReached {
             follower, which, ..
         } => vec![Row(vec![
             label("when"),
-            Object(follower, Filter::SplineFollowers),
+            object(follower, Filter::SplineFollowers),
             label("reaches the"),
             Part::Choice(which, &axcenity_blocks::SPLINE_ENDS),
         ])],
+        BlockKind::ControlSpline { follower, action } => vec![Row(vec![
+            Part::Choice(action, &axcenity_blocks::SPLINE_ACTIONS),
+            label("spline"),
+            object(follower, Filter::SplineFollowers),
+        ])],
+        BlockKind::SetSplineSpeed { follower, speed } => vec![Row(vec![
+            label("set spline speed of"),
+            object(follower, Filter::SplineFollowers),
+            label("to"),
+            Slot(speed, SlotKind::Number),
+        ])],
         BlockKind::Patrol { agent, spline } => vec![Row(vec![
             label("patrol"),
-            Object(agent, Filter::Agents),
+            object(agent, Filter::Agents),
             label("along"),
-            Object(spline, Filter::Splines),
+            object(spline, Filter::Splines),
         ])],
         BlockKind::PlaceOnSpline {
             target,
@@ -1301,29 +2196,61 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             distance,
         } => vec![Row(vec![
             label("put"),
-            Object(target, Filter::Any),
+            object(target, Filter::Any),
             label("on"),
-            Object(spline, Filter::Splines),
+            object(spline, Filter::Splines),
             label("at"),
             Slot(distance, SlotKind::Number),
             label("studs"),
         ])],
-        BlockKind::WhenPromptTriggered { prompt, .. } => vec![Row(vec![
-            label("when prompt"),
-            Object(prompt, Filter::Prompts),
-            label("is triggered"),
-        ])],
-        BlockKind::WhenPartClicked { detector, .. } => vec![Row(vec![
-            label("when"),
-            Object(detector, Filter::ClickDetectors),
-            label("is clicked"),
-        ])],
-        BlockKind::WhenCommandRun { command, help, .. } => vec![Row(vec![
-            label("when console command"),
-            Slot(command, SlotKind::Text),
-            label("is run, help"),
-            Slot(help, SlotKind::Text),
-        ])],
+        BlockKind::WhenPromptTriggered {
+            prompt, cooldown, ..
+        } => {
+            let mut row = vec![
+                label("when prompt"),
+                object(prompt, Filter::Prompts),
+                label("is triggered"),
+            ];
+            if let Some(cd) = cooldown {
+                row.push(label("cooldown"));
+                row.push(Slot(cd, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::WhenPartClicked {
+            detector, cooldown, ..
+        } => {
+            let mut row = vec![
+                label("when"),
+                object(detector, Filter::ClickDetectors),
+                label("is clicked"),
+            ];
+            if let Some(cd) = cooldown {
+                row.push(label("cooldown"));
+                row.push(Slot(cd, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::WhenCommandRun {
+            command,
+            help,
+            admin_only,
+            ..
+        } => {
+            let mut row = vec![
+                label("when console command"),
+                Slot(command, SlotKind::Text),
+                label("is run, help"),
+                Slot(help, SlotKind::Text),
+            ];
+            if let Some(admin) = admin_only {
+                row.push(label("admin only"));
+                row.push(Slot(admin, SlotKind::Truth));
+            }
+            vec![Row(row)]
+        }
         BlockKind::WhenPropertyChanged {
             target, property, ..
         } => {
@@ -1332,90 +2259,110 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
                 label("when"),
                 Property(property, class),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
                 label("changes"),
             ])]
         }
         BlockKind::WhenAttributeChanged {
             target, attribute, ..
         } => {
-            let path = target.clone();
+            let path = target.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("when attribute"),
                 Part::Name(attribute, NameKind::Attribute, path),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
                 label("changes"),
             ])]
         }
         BlockKind::WhenSeatOccupied { seat, .. } => vec![Row(vec![
             label("when someone sits on"),
-            Object(seat, Filter::Seats),
+            object(seat, Filter::Seats),
+        ])],
+        BlockKind::WhenSeatVacated { seat, .. } => vec![Row(vec![
+            label("when someone leaves"),
+            object(seat, Filter::Seats),
+        ])],
+        BlockKind::SitInSeat { seat, controller } => vec![Row(vec![
+            label("sit in"),
+            object(seat, Filter::Seats),
+            label("controller"),
+            object(controller, Filter::Controllers),
         ])],
         BlockKind::LeaveSeat { controller } => vec![Row(vec![
             label("make"),
-            Object(controller, Filter::Controllers),
+            object(controller, Filter::Controllers),
             label("leave the seat"),
         ])],
         BlockKind::SetDestination { agent, position } => vec![Row(vec![
             label("walk"),
-            Object(agent, Filter::Agents),
+            object(agent, Filter::Agents),
             label("to"),
             Slot(position, SlotKind::Vector),
         ])],
+        BlockKind::FollowTarget { agent, target } => vec![Row(vec![
+            label("have"),
+            object(agent, Filter::Agents),
+            label("follow"),
+            object(target, Filter::Any),
+        ])],
+        BlockKind::StopAgent { agent } => vec![Row(vec![
+            label("stop agent"),
+            object(agent, Filter::Agents),
+        ])],
         BlockKind::SetVelocity { agent, velocity } => vec![Row(vec![
-            label("set velocity of"),
-            Object(agent, Filter::Agents),
+            label("set agent velocity of"),
+            object(agent, Filter::Agents),
             label("to"),
             Slot(velocity, SlotKind::Vector),
         ])],
         BlockKind::SetAnchored { target, anchored } => vec![Row(vec![
             label("set"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("anchored to"),
             Slot(anchored, SlotKind::Truth),
         ])],
         BlockKind::PushWithForce { target, force } => vec![Row(vec![
             label("push"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("with force"),
             Slot(force, SlotKind::Vector),
         ])],
         BlockKind::SetPartVelocity { target, velocity } => vec![Row(vec![
             label("set velocity of"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to"),
             Slot(velocity, SlotKind::Vector),
         ])],
         BlockKind::SetFriction { target, friction } => vec![Row(vec![
             label("set friction of"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to"),
             Slot(friction, SlotKind::Number),
         ])],
         BlockKind::SetColor { target, color } => vec![Row(vec![
             label("set color of"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("to"),
             Slot(color, SlotKind::Color),
         ])],
         BlockKind::SetText { target, text } => vec![Row(vec![
             label("set text of"),
-            Object(target, Filter::Texts),
+            object(target, Filter::Texts),
             label("to"),
             Slot(text, SlotKind::Text),
         ])],
-        BlockKind::Show { target } => vec![Row(vec![label("show"), Object(target, Filter::Gui)])],
-        BlockKind::Hide { target } => vec![Row(vec![label("hide"), Object(target, Filter::Gui)])],
+        BlockKind::Show { target } => vec![Row(vec![label("show"), object(target, Filter::Gui)])],
+        BlockKind::Hide { target } => vec![Row(vec![label("hide"), object(target, Filter::Gui)])],
         BlockKind::ShowPage { layout, page } => vec![Row(vec![
             label("show page"),
             Slot(page, SlotKind::Text),
             label("of"),
-            Object(layout, Filter::PageLayouts),
+            object(layout, Filter::PageLayouts),
         ])],
         BlockKind::ScrollTo { target, x, y } => vec![Row(vec![
             label("scroll"),
-            Object(target, Filter::ScrollingFrames),
+            object(target, Filter::ScrollingFrames),
             label("to x"),
             Slot(x, SlotKind::Number),
             label("y"),
@@ -1432,7 +2379,7 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             };
             vec![Row(vec![
                 label("set value of"),
-                Object(target, Filter::Widgets),
+                object(target, Filter::Widgets),
                 label("to"),
                 Slot(value, kind),
             ])]
@@ -1447,7 +2394,7 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
                 label("set"),
                 Property(property, class),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
                 label("to"),
                 Slot(value, SlotKind::Any),
             ])]
@@ -1457,51 +2404,139 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             attribute,
             value,
         } => {
-            let path = target.clone();
+            let path = target.as_path().unwrap_or("").to_owned();
             vec![Row(vec![
                 label("set attribute"),
                 Part::Name(attribute, NameKind::Attribute, path),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
                 label("to"),
                 Slot(value, SlotKind::Any),
             ])]
         }
-        BlockKind::PlaySound { target } => {
-            vec![Row(vec![
+        BlockKind::PlaySound {
+            target,
+            pitch,
+            wait_until_done,
+        } => {
+            let mut row = vec![label("play sound"), object(target, Filter::Sounds)];
+            if let Some(p) = pitch {
+                row.push(label("pitch"));
+                row.push(Slot(p, SlotKind::Number));
+            }
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::PlaySoundAtPosition {
+            target,
+            position,
+            volume,
+            pitch,
+        } => {
+            let mut row = vec![
                 label("play sound"),
-                Object(target, Filter::Sounds),
-            ])]
+                object(target, Filter::Sounds),
+                label("at"),
+                Slot(position, SlotKind::Vector),
+            ];
+            if let Some(v) = volume {
+                row.push(label("vol"));
+                row.push(Slot(v, SlotKind::Number));
+            }
+            if let Some(p) = pitch {
+                row.push(label("pitch"));
+                row.push(Slot(p, SlotKind::Number));
+            }
+            vec![Row(row)]
         }
         BlockKind::PlayCutscene { sequence } => {
             vec![Row(vec![
                 label("play cutscene"),
-                Object(sequence, Filter::Sequences),
+                object(sequence, Filter::Sequences),
+            ])]
+        }
+        BlockKind::PauseCutscene { sequence } => {
+            vec![Row(vec![
+                label("pause cutscene"),
+                object(sequence, Filter::Sequences),
+            ])]
+        }
+        BlockKind::ResumeCutscene { sequence } => {
+            vec![Row(vec![
+                label("resume cutscene"),
+                object(sequence, Filter::Sequences),
+            ])]
+        }
+        BlockKind::StopCutscene { sequence } => {
+            vec![Row(vec![
+                label("stop cutscene"),
+                object(sequence, Filter::Sequences),
             ])]
         }
         BlockKind::StopSound { target } => {
             vec![Row(vec![
                 label("stop sound"),
-                Object(target, Filter::Sounds),
+                object(target, Filter::Sounds),
             ])]
         }
         BlockKind::PauseSound { target } => {
             vec![Row(vec![
                 label("pause sound"),
-                Object(target, Filter::Sounds),
+                object(target, Filter::Sounds),
             ])]
         }
         BlockKind::ResumeSound { target } => {
             vec![Row(vec![
                 label("resume sound"),
-                Object(target, Filter::Sounds),
+                object(target, Filter::Sounds),
             ])]
         }
         BlockKind::SetVolume { target, volume } => vec![Row(vec![
             label("set volume of"),
-            Object(target, Filter::Sounds),
+            object(target, Filter::Sounds),
             label("to"),
             Slot(volume, SlotKind::Number),
+        ])],
+        BlockKind::FadeVolume {
+            target,
+            volume,
+            duration,
+            wait_until_done,
+        } => {
+            let mut row = vec![
+                label("fade volume of"),
+                object(target, Filter::Sounds),
+                label("to"),
+                Slot(volume, SlotKind::Number),
+                label("over"),
+                Slot(duration, SlotKind::Number),
+                label("s"),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::SetSoundPitch { target, pitch } => vec![Row(vec![
+            label("set pitch of"),
+            object(target, Filter::Sounds),
+            label("to"),
+            Slot(pitch, SlotKind::Number),
+        ])],
+        BlockKind::SetSoundLooping { target, looped } => vec![Row(vec![
+            label("set looping of"),
+            object(target, Filter::Sounds),
+            label("to"),
+            Slot(looped, SlotKind::Truth),
+        ])],
+        BlockKind::SetSoundTime { target, time } => vec![Row(vec![
+            label("seek"),
+            object(target, Filter::Sounds),
+            label("to"),
+            Slot(time, SlotKind::Number),
+            label("s"),
         ])],
         BlockKind::SetVariable { name, value } => vec![Row(vec![
             label("set"),
@@ -1515,16 +2550,92 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             label("by"),
             Slot(by, SlotKind::Number),
         ])],
+        BlockKind::ListCreate { name, items } => {
+            let mut row = vec![label("create list"), Variable(name)];
+            if !items.is_empty() {
+                row.push(label("with"));
+                for (index, item) in items.iter_mut().enumerate() {
+                    if index > 0 {
+                        row.push(label(","));
+                    }
+                    row.push(Slot(item, SlotKind::Any));
+                }
+            }
+            vec![Row(row)]
+        }
+        BlockKind::ListAdd { list, value } => vec![Row(vec![
+            label("add"),
+            Slot(value, SlotKind::Any),
+            label("to list"),
+            Slot(list, SlotKind::Any),
+        ])],
+        BlockKind::ListInsert { list, index, value } => vec![Row(vec![
+            label("insert"),
+            Slot(value, SlotKind::Any),
+            label("at"),
+            Slot(index, SlotKind::Number),
+            label("of list"),
+            Slot(list, SlotKind::Any),
+        ])],
+        BlockKind::ListRemoveIndex { list, index } => vec![Row(vec![
+            label("remove item"),
+            Slot(index, SlotKind::Number),
+            label("of list"),
+            Slot(list, SlotKind::Any),
+        ])],
+        BlockKind::ListRemoveValue { list, value } => vec![Row(vec![
+            label("remove"),
+            Slot(value, SlotKind::Any),
+            label("from list"),
+            Slot(list, SlotKind::Any),
+        ])],
+        BlockKind::ListClear { list } => {
+            vec![Row(vec![label("clear list"), Slot(list, SlotKind::Any)])]
+        }
         BlockKind::Print { value } => vec![Row(vec![label("print"), Slot(value, SlotKind::Any)])],
         BlockKind::Destroy { target } => {
-            vec![Row(vec![label("destroy"), Object(target, Filter::Any)])]
+            vec![Row(vec![label("destroy"), object(target, Filter::Any)])]
         }
-        BlockKind::CloneInto { target, parent } => vec![Row(vec![
-            label("clone"),
-            Object(target, Filter::Any),
-            label("into"),
-            Object(parent, Filter::Places),
-        ])],
+        BlockKind::CloneInto {
+            target,
+            parent,
+            count,
+            position,
+            offset_per_clone,
+            per_clone_positions,
+        } => {
+            let mut rows = vec![Row(vec![
+                label("clone"),
+                object(target, Filter::Any),
+                label("into"),
+                object(parent, Filter::Places),
+            ])];
+            let mut row2 = Vec::new();
+            if let Some(count) = count {
+                row2.push(label("count"));
+                row2.push(Slot(count, SlotKind::Number));
+            }
+            if let Some(position) = position {
+                row2.push(label("at"));
+                row2.push(Slot(position, SlotKind::Vector));
+            }
+            if !row2.is_empty() {
+                rows.push(Row(row2));
+            }
+            let mut row3 = Vec::new();
+            if let Some(offset) = offset_per_clone {
+                row3.push(label("offset"));
+                row3.push(Slot(offset, SlotKind::Vector));
+            }
+            if let Some(positions) = per_clone_positions {
+                row3.push(label("positions"));
+                row3.push(Slot(positions, SlotKind::Any));
+            }
+            if !row3.is_empty() {
+                rows.push(Row(row3));
+            }
+            rows
+        }
         BlockKind::SaveSlot { slot } => vec![Row(vec![
             label("save game to slot"),
             Slot(slot, SlotKind::Number),
@@ -1533,9 +2644,20 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             label("load game from slot"),
             Slot(slot, SlotKind::Number),
         ])],
+        BlockKind::DeleteSlot { slot } => vec![Row(vec![
+            label("delete save slot"),
+            Slot(slot, SlotKind::Number),
+        ])],
+        BlockKind::ForEachRow { table, body } => vec![
+            Row(vec![
+                label("for each row in"),
+                Part::Name(table, NameKind::DataTable, STORAGE_PATH.to_owned()),
+            ]),
+            Mouth(body),
+        ],
         BlockKind::SetCheckpoint { checkpoint } => vec![Row(vec![
             label("set checkpoint to"),
-            Object(checkpoint, Filter::Checkpoints),
+            object(checkpoint, Filter::Checkpoints),
         ])],
         BlockKind::RestoreCheckpoint => vec![Row(vec![label("go back to checkpoint")])],
         BlockKind::LoadLevel { level, spawn } => vec![Row(vec![
@@ -1564,11 +2686,11 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             label("let"),
             Slot(owner, SlotKind::Any),
             label("simulate"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
         ])],
         BlockKind::SetNetworkOwnershipAuto { target } => vec![Row(vec![
             label("let the nearest player simulate"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
         ])],
         BlockKind::SendChatMessage { text } => vec![Row(vec![
             label("send chat message"),
@@ -1590,15 +2712,20 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             Slot(active, SlotKind::Truth),
         ])],
         BlockKind::RequestStreamAround { player, position } => vec![Row(vec![
-            label("load around"),
-            Slot(position, SlotKind::Any),
-            label("for"),
+            label("load for"),
             Slot(player, SlotKind::Any),
+            label("around"),
+            Slot(position, SlotKind::Vector),
         ])],
         BlockKind::WhenStreamedIn { target, .. } => vec![Row(vec![
             label("when"),
-            Object(target, Filter::Parts),
+            object(target, Filter::Parts),
             label("streams in"),
+        ])],
+        BlockKind::WhenStreamedOut { target, .. } => vec![Row(vec![
+            label("when"),
+            object(target, Filter::Parts),
+            label("streams out"),
         ])],
         BlockKind::KickPlayer { player, reason } => vec![Row(vec![
             label("kick"),
@@ -1652,35 +2779,165 @@ fn sections<'a>(kind: &'a mut BlockKind, objects: &[ObjectInfo]) -> Vec<Section<
             label("set tone mapping to"),
             Part::Choice(curve, &axcenity_blocks::TONE_MAPPINGS),
         ])],
-        BlockKind::SetClockTime { time } => vec![Row(vec![
-            label("set time of day to"),
-            Part::Slot(time, SlotKind::Number),
-            label("hours"),
+        BlockKind::SetClockTime { time, duration } => {
+            let mut row = vec![
+                label("set time of day to"),
+                Part::Slot(time, SlotKind::Number),
+                label("hours"),
+            ];
+            if let Some(dur) = duration {
+                row.push(label("over"));
+                row.push(Part::Slot(dur, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::SetAtmosphere {
+            property,
+            value,
+            duration,
+        } => {
+            let mut row = vec![
+                label("set atmosphere"),
+                Part::Choice(property, &axcenity_blocks::ATMOSPHERE_NUMBERS),
+                label("to"),
+                Part::Slot(value, SlotKind::Number),
+            ];
+            if let Some(dur) = duration {
+                row.push(label("over"));
+                row.push(Part::Slot(dur, SlotKind::Number));
+                row.push(label("s"));
+            }
+            vec![Row(row)]
+        }
+        BlockKind::ToggleVisibility { target } => vec![Row(vec![
+            label("toggle visibility of"),
+            object(target, Filter::Any),
         ])],
-        BlockKind::SetAtmosphere { property, value } => vec![Row(vec![
-            label("set atmosphere"),
-            Part::Choice(property, &axcenity_blocks::ATMOSPHERE_NUMBERS),
+        BlockKind::SetTransparency {
+            target,
+            transparency,
+        } => vec![Row(vec![
+            label("set transparency of"),
+            object(target, Filter::Any),
             label("to"),
-            Part::Slot(value, SlotKind::Number),
+            Part::Slot(transparency, SlotKind::Number),
+        ])],
+        BlockKind::SetMaterial { target, material } => vec![Row(vec![
+            label("set material of"),
+            object(target, Filter::Parts),
+            label("to"),
+            Part::Choice(material, &axcenity_blocks::MATERIALS),
+        ])],
+        BlockKind::EmitParticles { target, count } => vec![Row(vec![
+            label("emit particles from"),
+            object(target, Filter::Any),
+            label("count"),
+            Part::Slot(count, SlotKind::Number),
+        ])],
+        BlockKind::SetEffectEnabled { target, enabled } => vec![Row(vec![
+            label("set effect"),
+            object(target, Filter::Any),
+            label("enabled"),
+            Part::Slot(enabled, SlotKind::Truth),
+        ])],
+        BlockKind::SetLightingProperty { property, value } => vec![Row(vec![
+            label("set lighting"),
+            Part::Choice(property, &axcenity_blocks::LIGHTING_PROPERTIES),
+            label("to"),
+            Part::Slot(value, SlotKind::Any),
+        ])],
+        BlockKind::SetPostProcessing {
+            effect,
+            property,
+            value,
+        } => {
+            let props = axcenity_blocks::post_processing_properties(effect);
+            if !props.contains(&property.as_str())
+                && let Some(first) = props.first()
+            {
+                *property = (*first).to_owned();
+            }
+            vec![Row(vec![
+                label("set"),
+                Part::Choice(effect, &axcenity_blocks::POST_PROCESSING_EFFECTS),
+                Part::Choice(property, props),
+                label("to"),
+                Part::Slot(value, SlotKind::Any),
+            ])]
+        }
+        BlockKind::TweenProperty {
+            target,
+            property,
+            value,
+            duration,
+            easing,
+            wait_until_done,
+            completed,
+        } => {
+            let mut row = vec![
+                label("tween"),
+                Part::Property(property, class_of(objects, target)),
+                label("of"),
+                object(target, Filter::Any),
+                label("to"),
+                Part::Slot(value, SlotKind::Any),
+                label("over"),
+                Part::Slot(duration, SlotKind::Number),
+                label("s"),
+                Part::Choice(easing, &axcenity_blocks::EASING_STYLES),
+            ];
+            if *wait_until_done {
+                row.push(label("and wait"));
+            }
+            if completed.is_empty() {
+                vec![Row(row)]
+            } else {
+                vec![
+                    Row(row),
+                    Row(vec![label("when done")]),
+                    Section::Mouth(completed),
+                ]
+            }
+        }
+        BlockKind::SetImage { target, image } => vec![Row(vec![
+            label("set image of"),
+            object(target, Filter::Any),
+            label("to"),
+            Part::Slot(image, SlotKind::Text),
         ])],
         BlockKind::SetGraphicsQuality { quality } => vec![Row(vec![
             label("set graphics quality to"),
             Part::Choice(quality, &axcenity_blocks::GRAPHICS_QUALITIES),
         ])],
-        BlockKind::SetGraphicsOption { setting, choice } => {
-            // A choice the newly picked setting doesn't have becomes its first.
-            let choices = axcenity_blocks::graphics_choices(setting);
-            if !choices.contains(&choice.as_str())
-                && let Some(first) = choices.first()
-            {
-                *choice = (*first).to_owned();
+        BlockKind::SetGraphicsOption {
+            setting,
+            choice,
+            value,
+        } => {
+            if axcenity_blocks::GRAPHICS_NUMBERS.contains(&setting.as_str()) {
+                let v = value.get_or_insert_with(|| Expression::Number { value: 1.0 });
+                vec![Row(vec![
+                    label("set graphics"),
+                    Part::Choice(setting, &axcenity_blocks::ALL_GRAPHICS_SETTINGS),
+                    label("to"),
+                    Part::Slot(v, SlotKind::Number),
+                ])]
+            } else {
+                *value = None;
+                let choices = axcenity_blocks::graphics_choices(setting);
+                if !choices.contains(&choice.as_str())
+                    && let Some(first) = choices.first()
+                {
+                    *choice = (*first).to_owned();
+                }
+                vec![Row(vec![
+                    label("set graphics"),
+                    Part::Choice(setting, &axcenity_blocks::ALL_GRAPHICS_SETTINGS),
+                    label("to"),
+                    Part::Choice(choice, choices),
+                ])]
             }
-            vec![Row(vec![
-                label("set graphics"),
-                Part::Choice(setting, &axcenity_blocks::GRAPHICS_OPTIONS),
-                label("to"),
-                Part::Choice(choice, choices),
-            ])]
         }
         BlockKind::SetGraphicsNumber { setting, value } => vec![Row(vec![
             label("set graphics"),
@@ -1725,13 +2982,26 @@ fn push_slots<'a>(values: &'a mut [Expression], parts: &mut Vec<Part<'a>>) {
 /// What a reporter shows. Its slots are in the order of
 /// [`Expression::children_mut`].
 fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) -> Vec<Part<'a>> {
-    use Part::{Key, Object, Property, Slot};
+    use Part::{Key, Property, Slot};
     match expression {
         Expression::Variable { name } => vec![Part::Label(name.clone())],
+        Expression::BlockOutput { name, .. } => vec![Part::Label(name.clone())],
+        Expression::ListItem { list, index } => vec![
+            label("item"),
+            Slot(index, SlotKind::Number),
+            label("of"),
+            Slot(list, SlotKind::Any),
+        ],
+        Expression::ListLength { list } => vec![label("length of"), Slot(list, SlotKind::Any)],
+        Expression::ListContains { list, value } => vec![
+            Slot(list, SlotKind::Any),
+            label("contains"),
+            Slot(value, SlotKind::Any),
+        ],
         Expression::Math { op, left, right } => vec![
-            Slot(left, SlotKind::Number),
+            Slot(left, SlotKind::Any),
             Part::Math(op),
-            Slot(right, SlotKind::Number),
+            Slot(right, SlotKind::Any),
         ],
         Expression::Function { function, value } => vec![
             Part::Function(function),
@@ -1739,15 +3009,15 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
             Slot(value, SlotKind::Number),
         ],
         Expression::Random { min, max } => vec![
-            label("pick random"),
+            label("random integer"),
             Slot(min, SlotKind::Number),
             label("to"),
             Slot(max, SlotKind::Number),
         ],
         Expression::RandomNumber { min, max } => vec![
-            label("random number between"),
+            label("random decimal"),
             Slot(min, SlotKind::Number),
-            label("and"),
+            label("to"),
             Slot(max, SlotKind::Number),
         ],
         Expression::Lerp { from, to, alpha } => vec![
@@ -1757,6 +3027,104 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
             Slot(to, SlotKind::Any),
             label("by"),
             Slot(alpha, SlotKind::Number),
+        ],
+        Expression::MakeVector3 { x, y, z } => vec![
+            label("vector ("),
+            Slot(x, SlotKind::Number),
+            label(","),
+            Slot(y, SlotKind::Number),
+            label(","),
+            Slot(z, SlotKind::Number),
+            label(")"),
+        ],
+        Expression::VectorAxis { axis, vector } => vec![
+            Part::Choice(axis, &axcenity_blocks::VECTOR_AXES),
+            label("of"),
+            Slot(vector, SlotKind::Vector),
+        ],
+        Expression::Distance { from, to } => vec![
+            label("distance"),
+            Slot(from, SlotKind::Vector),
+            label("to"),
+            Slot(to, SlotKind::Vector),
+        ],
+        Expression::Direction { from, to } => vec![
+            label("direction"),
+            Slot(from, SlotKind::Vector),
+            label("to"),
+            Slot(to, SlotKind::Vector),
+        ],
+        Expression::Magnitude { vector } => {
+            vec![label("magnitude of"), Slot(vector, SlotKind::Vector)]
+        }
+        Expression::Clamp { value, min, max } => vec![
+            label("clamp"),
+            Slot(value, SlotKind::Number),
+            label("between"),
+            Slot(min, SlotKind::Number),
+            label("and"),
+            Slot(max, SlotKind::Number),
+        ],
+        Expression::MinMax { op, left, right } => vec![
+            Part::Choice(op, &axcenity_blocks::MIN_MAX_OPS),
+            label("of"),
+            Slot(left, SlotKind::Number),
+            label("and"),
+            Slot(right, SlotKind::Number),
+        ],
+        Expression::StringLength { text } => {
+            vec![label("length of text"), Slot(text, SlotKind::Text)]
+        }
+        Expression::StringContains { text, substring } => vec![
+            Slot(text, SlotKind::Text),
+            label("contains"),
+            Slot(substring, SlotKind::Text),
+        ],
+        Expression::FormatNumber { value, decimals } => vec![
+            label("format"),
+            Slot(value, SlotKind::Number),
+            label("to"),
+            Slot(decimals, SlotKind::Number),
+            label("decimals"),
+        ],
+        Expression::MakeColorRgb { r, g, b } => vec![
+            label("rgb ("),
+            Slot(r, SlotKind::Number),
+            label(","),
+            Slot(g, SlotKind::Number),
+            label(","),
+            Slot(b, SlotKind::Number),
+            label(")"),
+        ],
+        Expression::MakeColorHsv { h, s, v } => vec![
+            label("hsv ("),
+            Slot(h, SlotKind::Number),
+            label(","),
+            Slot(s, SlotKind::Number),
+            label(","),
+            Slot(v, SlotKind::Number),
+            label(")"),
+        ],
+        Expression::AnimatorNewState => vec![label("new state")],
+        Expression::AnimatorPreviousState => vec![label("previous state")],
+        Expression::AnimationEventName => vec![label("event name")],
+        Expression::ConnectionFailureReason => vec![label("failure reason")],
+        Expression::ChangedLayerName => vec![label("layer name")],
+        Expression::ChangedLayerActive => vec![label("layer is active")],
+        Expression::ChatMessageText => vec![label("chat message")],
+        Expression::ChatMessageSender => vec![label("chat sender")],
+        Expression::IsHost => vec![label("is host")],
+        Expression::IsConnected => vec![label("is connected")],
+        Expression::SlotExists { slot } => {
+            vec![
+                label("save slot"),
+                Slot(slot, SlotKind::Number),
+                label("exists"),
+            ]
+        }
+        Expression::DataTableRowCount { table } => vec![
+            label("number of rows in"),
+            Part::Name(table, NameKind::DataTable, STORAGE_PATH.to_owned()),
         ],
         Expression::Join { left, right } => vec![
             label("join"),
@@ -1779,24 +3147,46 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
             vec![
                 Property(property, class),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
             ]
         }
         Expression::Attribute { target, attribute } => {
-            let path = target.clone();
+            let path = target.as_path().unwrap_or("").to_owned();
             vec![
                 label("attribute"),
                 Part::Name(attribute, NameKind::Attribute, path),
                 label("of"),
-                Object(target, Filter::Any),
+                object(target, Filter::Any),
             ]
         }
-        Expression::Raycast { origin, direction } => vec![
-            label("raycast from"),
-            Slot(origin, SlotKind::Vector),
-            label("along"),
-            Slot(direction, SlotKind::Vector),
+        Expression::SoundProperty { target, property } => vec![
+            Part::Choice(property, &axcenity_blocks::SOUND_PROPERTIES),
+            label("of sound"),
+            object(target, Filter::Sounds),
         ],
+        Expression::Raycast {
+            origin,
+            direction,
+            output,
+            ignore,
+        } => {
+            if output.is_empty() {
+                *output = "Result".to_owned();
+            }
+            let mut parts = vec![
+                label("raycast"),
+                Part::Choice(output, &axcenity_blocks::RAYCAST_OUTPUTS),
+                label("from"),
+                Slot(origin, SlotKind::Vector),
+                label("along"),
+                Slot(direction, SlotKind::Vector),
+            ];
+            if let Some(ig) = ignore {
+                parts.push(label("ignoring"));
+                parts.push(object(ig, Filter::Any));
+            }
+            parts
+        }
         Expression::RaycastIgnoring {
             origin,
             direction,
@@ -1807,10 +3197,40 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
             label("along"),
             Slot(direction, SlotKind::Vector),
             label("ignoring"),
-            Object(ignore, Filter::Any),
+            object(ignore, Filter::Any),
         ],
         Expression::TouchingPart => vec![label("touching part")],
+        Expression::TriggeringPlayer => vec![label("triggering player")],
+        Expression::CommandArgs => vec![label("command args")],
+        Expression::DeltaTime => vec![label("delta time")],
         Expression::PartUnderMouse => vec![label("part under mouse")],
+        Expression::MouseHitPosition => vec![label("mouse hit position")],
+        Expression::CameraPosition => vec![label("camera position")],
+        Expression::CameraLookDirection => vec![label("camera look direction")],
+        Expression::NearestPlayerTo { position } => {
+            vec![label("nearest player to"), Slot(position, SlotKind::Vector)]
+        }
+        Expression::PlayerOfPart { part } => {
+            vec![label("player of"), object(part, Filter::Parts)]
+        }
+        Expression::PlayerIsAlive { player } => {
+            vec![object(player, Filter::Any), label("is alive")]
+        }
+        Expression::ParentOf { target } => {
+            vec![label("parent of"), object(target, Filter::Any)]
+        }
+        Expression::ChildOf { name, target } => vec![
+            label("child"),
+            Slot(name, SlotKind::Text),
+            label("of"),
+            object(target, Filter::Any),
+        ],
+        Expression::HasTag { target, tag } => vec![
+            object(target, Filter::Any),
+            label("has tag"),
+            Slot(tag, SlotKind::Text),
+        ],
+        Expression::GameTime => vec![label("game time")],
         Expression::KeyDown { key } => vec![label("key"), Key(key), label("pressed?")],
         Expression::LayerActive { data_layer } => {
             vec![label("layer"), Part::Text(data_layer), label("is active")]
@@ -1827,42 +3247,42 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
             animator,
             parameter,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![
                 Part::Name(parameter, NameKind::Bool, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ]
         }
         Expression::AnimatorLayerWeight { animator, layer } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![
                 label("weight of layer"),
                 Part::Name(layer, NameKind::Layer, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ]
         }
         Expression::AnimatorNumber {
             animator,
             parameter,
         } => {
-            let path = animator.clone();
+            let path = animator.as_path().unwrap_or("").to_owned();
             vec![
                 Part::Name(parameter, NameKind::Number, path),
                 label("of"),
-                Object(animator, Filter::Animators),
+                object(animator, Filter::Animators),
             ]
         }
         Expression::SplinePosition { spline, t } => vec![
             label("point"),
             Slot(t, SlotKind::Number),
             label("of the way along"),
-            Object(spline, Filter::Splines),
+            object(spline, Filter::Splines),
         ],
         Expression::SplineClosestDistance { spline, position } => vec![
             label("distance along"),
-            Object(spline, Filter::Splines),
+            object(spline, Filter::Splines),
             label("nearest"),
             Slot(position, SlotKind::Vector),
         ],
@@ -1987,6 +3407,7 @@ fn reporter_parts<'a>(expression: &'a mut Expression, objects: &[ObjectInfo]) ->
         | Expression::Boolean { .. }
         | Expression::Vector3 { .. }
         | Expression::Color3 { .. }
+        | Expression::ObjectPath { .. }
         | Expression::Nil
         | Expression::Vararg
         | Expression::Name { .. }
@@ -2071,6 +3492,12 @@ struct State {
     drag: Option<Drag>,
     /// The name being typed for a new variable, while the box is open.
     new_variable: Option<String>,
+    /// Initial value typed for a new variable (parsed as number, bool, or text).
+    new_variable_initial: String,
+    /// Whether a new variable is Global / Shared (`_G`) instead of This Script.
+    new_variable_global: bool,
+    /// Focus the new-variable text box on the frame it opens.
+    focus_new_variable: bool,
     /// Variables made with "Make a Variable" that no block uses yet.
     variables: Vec<String>,
     /// Typed in the palette's search box: only matching blocks are shown.
@@ -2089,6 +3516,9 @@ impl Default for State {
             show_lua: false,
             drag: None,
             new_variable: None,
+            new_variable_initial: "0".to_owned(),
+            new_variable_global: false,
+            focus_new_variable: false,
             variables: Vec::new(),
             search: String::new(),
             luau_open: Vec::new(),
@@ -2108,6 +3538,9 @@ enum Action {
 /// Every variable the script uses, and those just made, sorted.
 fn known_variables(script: &BlockScript, made: &[String]) -> Vec<String> {
     let mut names: BTreeSet<String> = made.iter().cloned().collect();
+    for def in &script.variables {
+        names.insert(def.name.clone());
+    }
     fn visit(expression: &Expression, names: &mut BTreeSet<String>) {
         if let Expression::Variable { name } = expression {
             names.insert(name.clone());
@@ -2117,8 +3550,9 @@ fn known_variables(script: &BlockScript, made: &[String]) -> Vec<String> {
         }
     }
     script.for_each_block(&mut |block| {
-        if let BlockKind::SetVariable { name, .. } | BlockKind::ChangeVariable { name, .. } =
-            &block.kind
+        if let BlockKind::SetVariable { name, .. }
+        | BlockKind::ChangeVariable { name, .. }
+        | BlockKind::ListCreate { name, .. } = &block.kind
         {
             names.insert(name.clone());
         }
@@ -2142,26 +3576,93 @@ pub fn show(ui: &mut egui::Ui, script: &mut BlockScript, context: BlockContext) 
     let toolbar = Rect::from_min_size(full.min, vec2(full.width(), TOOLBAR_HEIGHT));
     let body = Rect::from_min_max(pos2(full.left(), toolbar.bottom()), full.max);
     let categories = Rect::from_min_size(body.min, vec2(CATEGORY_WIDTH, body.height()));
-    let palette_rect = Rect::from_min_max(
-        pos2(categories.right(), body.top()),
-        pos2(categories.right() + PALETTE_WIDTH, body.bottom()),
-    );
     let lua_width = if state.show_lua {
         (body.width() * 0.3).clamp(260.0, 460.0)
     } else {
         0.0
     };
+    let palette_width_id = egui::Id::new("block_editor_palette_width");
+    let max_palette = PALETTE_MAX_WIDTH
+        .min((body.width() - CATEGORY_WIDTH - lua_width - 140.0).max(PALETTE_MIN_WIDTH));
+    let mut palette_width = ui
+        .data_mut(|data| data.get_persisted::<f32>(palette_width_id))
+        .unwrap_or(PALETTE_WIDTH)
+        .clamp(PALETTE_MIN_WIDTH, max_palette);
+    // Dedicated non-overlapping strip between the palette and the canvas so
+    // neither the palette scrollbar nor the canvas steals hover/drag events.
+    let splitter_rect = Rect::from_min_max(
+        pos2(
+            categories.right() + palette_width - PALETTE_SPLITTER_WIDTH,
+            body.top(),
+        ),
+        pos2(categories.right() + palette_width, body.bottom()),
+    );
+    let splitter = ui
+        .interact(
+            splitter_rect,
+            egui::Id::new(("block palette splitter", context.key)),
+            Sense::drag(),
+        )
+        .on_hover_cursor(CursorIcon::ResizeHorizontal)
+        .on_hover_text("Drag to resize the blocks sidebar");
+    if splitter.dragged() {
+        palette_width =
+            (palette_width + splitter.drag_delta().x).clamp(PALETTE_MIN_WIDTH, max_palette);
+        ui.data_mut(|data| data.insert_persisted(palette_width_id, palette_width));
+    }
+    let splitter_rect = Rect::from_min_max(
+        pos2(
+            categories.right() + palette_width - PALETTE_SPLITTER_WIDTH,
+            body.top(),
+        ),
+        pos2(categories.right() + palette_width, body.bottom()),
+    );
+    let palette_rect = Rect::from_min_max(
+        pos2(categories.right(), body.top()),
+        pos2(splitter_rect.left(), body.bottom()),
+    );
     let canvas = Rect::from_min_max(
-        pos2(palette_rect.right(), body.top()),
+        pos2(splitter_rect.right(), body.top()),
         pos2(body.right() - lua_width, body.bottom()),
     );
     let lua_rect = Rect::from_min_max(pos2(canvas.right(), body.top()), body.max);
 
     show_toolbar(ui, toolbar, &mut state, &context, script);
     show_categories(ui, categories, &mut state);
-    show_palette(ui, palette_rect, &mut state, &context, &variables);
+    show_palette(ui, palette_rect, script, &mut state, &context, &variables);
     let (stack_spots, slot_spots) =
         show_canvas(ui, canvas, script, &mut state, &context, &variables);
+    // Paint the resize handle between palette and canvas so it is always visible.
+    {
+        let painter = ui.painter();
+        let active = splitter.hovered() || splitter.dragged();
+        let bg = if active {
+            theme::palette(ui.ctx()).accent.gamma_multiply(0.18)
+        } else {
+            ui.visuals().faint_bg_color
+        };
+        painter.rect_filled(splitter_rect, 0, bg);
+        let line_color = if active {
+            theme::palette(ui.ctx()).accent
+        } else {
+            ui.visuals().widgets.noninteractive.bg_stroke.color
+        };
+        painter.vline(
+            splitter_rect.right() - 0.5,
+            splitter_rect.y_range(),
+            Stroke::new(if active { 2.0 } else { 1.0 }, line_color),
+        );
+        let grip = Rect::from_center_size(splitter_rect.center(), vec2(3.0, 36.0));
+        painter.rect_filled(
+            grip,
+            1.5,
+            if active {
+                theme::palette(ui.ctx()).accent
+            } else {
+                ui.visuals().weak_text_color().gamma_multiply(0.55)
+            },
+        );
+    }
     if state.show_lua {
         show_lua(ui, lua_rect, script);
     }
@@ -2172,7 +3673,7 @@ pub fn show(ui: &mut egui::Ui, script: &mut BlockScript, context: BlockContext) 
         &context,
         &variables,
         canvas,
-        palette_rect.union(categories),
+        palette_rect.union(categories).union(splitter_rect),
         &stack_spots,
         &slot_spots,
     );
@@ -2286,7 +3787,8 @@ fn show_toolbar(
             ui.available_size(),
             egui::Layout::left_to_right(egui::Align::Center),
             |ui| {
-                ui.add(egui::Label::new(egui::RichText::new(TOOLBAR_HINT).weak()).truncate());
+                ui.add(egui::Label::new(egui::RichText::new(TOOLBAR_HINT).weak()).truncate())
+                    .on_hover_text(TOOLBAR_HINT);
             },
         );
     });
@@ -2307,58 +3809,65 @@ fn show_categories(ui: &mut egui::Ui, rect: Rect, state: &mut State) {
         rect.y_range(),
         visuals.widgets.noninteractive.bg_stroke,
     );
-    let mut y = rect.top() + 8.0;
-    for category in Category::ALL {
-        let item = Rect::from_min_size(pos2(rect.left(), y), vec2(rect.width(), 54.0));
-        let response = ui
-            .interact(
-                item,
-                egui::Id::new(("block category", category.name())),
-                Sense::click(),
-            )
-            .on_hover_cursor(CursorIcon::PointingHand);
-        if category == state.category && state.search.is_empty() {
-            ui.painter().rect_filled(
-                item.shrink(3.0),
-                6,
-                visuals.selection.bg_fill.gamma_multiply(0.4),
-            );
-        } else if response.hovered() {
-            ui.painter()
-                .rect_filled(item.shrink(3.0), 6, visuals.widgets.hovered.weak_bg_fill);
-        }
-        // A rounded swatch in the category's colour, with its icon.
-        let palette = theme::palette(ui.ctx());
-        let swatch =
-            Rect::from_center_size(pos2(item.center().x, item.top() + 19.0), vec2(26.0, 26.0));
-        ui.painter().rect_filled(
-            swatch.translate(vec2(0.0, DROP)),
-            8,
-            category.edge(&palette),
-        );
-        ui.painter().rect_filled(swatch, 8, category.fill(&palette));
-        ui.painter().text(
-            swatch.center(),
-            egui::Align2::CENTER_CENTER,
-            category.icon(),
-            FontId::proportional(15.0),
-            Color32::WHITE,
-        );
-        ui.painter().text(
-            pos2(item.center().x, item.top() + 42.0),
-            egui::Align2::CENTER_CENTER,
-            category.name(),
-            FontId::new(10.5, theme::medium_family()),
-            visuals.text_color(),
-        );
-        if response.clicked() {
-            state.category = category;
-            state.scroll_to = Some(category);
-            // A category shows all its blocks, not just the ones searched for.
-            state.search.clear();
-        }
-        y += 56.0;
-    }
+    let mut rail = ui.new_child(egui::UiBuilder::new().max_rect(rect));
+    rail.set_clip_rect(rect);
+    egui::ScrollArea::vertical()
+        .id_salt("block category rail")
+        .auto_shrink(false)
+        .show(&mut rail, |ui| {
+            ui.add_space(6.0);
+            for category in Category::ALL {
+                let (item, response) =
+                    ui.allocate_exact_size(vec2(rect.width(), 52.0), Sense::click());
+                let response = response
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                    .on_hover_text(category.name());
+                if category == state.category && state.search.is_empty() {
+                    ui.painter().rect_filled(
+                        item.shrink(3.0),
+                        6,
+                        visuals.selection.bg_fill.gamma_multiply(0.4),
+                    );
+                } else if response.hovered() {
+                    ui.painter().rect_filled(
+                        item.shrink(3.0),
+                        6,
+                        visuals.widgets.hovered.weak_bg_fill,
+                    );
+                }
+                let palette = theme::palette(ui.ctx());
+                let swatch = Rect::from_center_size(
+                    pos2(item.center().x, item.top() + 18.0),
+                    vec2(26.0, 26.0),
+                );
+                ui.painter().rect_filled(
+                    swatch.translate(vec2(0.0, DROP)),
+                    8,
+                    category.edge(&palette),
+                );
+                ui.painter().rect_filled(swatch, 8, category.fill(&palette));
+                ui.painter().text(
+                    swatch.center(),
+                    egui::Align2::CENTER_CENTER,
+                    category.icon(),
+                    FontId::proportional(15.0),
+                    Color32::WHITE,
+                );
+                ui.painter().text(
+                    pos2(item.center().x, item.top() + 41.0),
+                    egui::Align2::CENTER_CENTER,
+                    category.short_name(),
+                    FontId::new(10.5, theme::medium_family()),
+                    visuals.text_color(),
+                );
+                if response.clicked() {
+                    state.category = category;
+                    state.scroll_to = Some(category);
+                    state.search.clear();
+                }
+            }
+            ui.add_space(6.0);
+        });
 }
 
 #[cfg(test)]

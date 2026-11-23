@@ -101,29 +101,52 @@ fn water_noise(p: vec2<f32>) -> vec3<f32> {
 // waves. All of it is smooth and its slopes go into the normal, so the
 // lighting follows the shape.
 fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f32) -> Waves {
-    var turns = array<f32, 7>(0.0, 0.55, -0.8, 1.3, -1.9, 2.4, 0.9);
-    var lengths = array<f32, 7>(1.0, 0.62, 0.41, 0.27, 0.13, 0.083, 0.052);
-    var heights = array<f32, 7>(1.0, 0.55, 0.32, 0.2, 0.08, 0.05, 0.03);
-    var mixes = array<f32, 7>(0.0, 2.1, 4.0, 1.1, 5.2, 3.1, 0.6);
+    // Irrational-ratio angles and wavelengths so wave trains never lock into a
+    // repeating lattice.
+    var turns = array<f32, 7>(0.0, 0.58, -0.87, 1.34, -1.93, 2.47, 0.94);
+    var lengths = array<f32, 7>(1.0, 0.618, 0.407, 0.263, 0.131, 0.082, 0.051);
+    var heights = array<f32, 7>(1.0, 0.54, 0.31, 0.19, 0.085, 0.052, 0.032);
+    var mixes = array<f32, 7>(0.0, 2.13, 4.07, 1.17, 5.23, 3.11, 0.67);
+
+    if look.height <= 1e-6 {
+        return Waves(vec3<f32>(0.0), vec3<f32>(0.0, 1.0, 0.0));
+    }
 
     let variation = clamp(look.variation, 0.0, 1.0);
     // Noise per stud: patches about three of the biggest waves across.
     let scale = 1.0 / (look.length * 3.0);
-    let drift = vec2<f32>(0.021, 0.013) * time * look.speed;
-    let p = rest * scale + drift;
-    let swell_a = water_noise(p);
-    let swell_b = water_noise(p * 1.37 + vec2<f32>(17.3, -9.1));
-    let warp_a = water_noise(p * 0.8 + vec2<f32>(-31.7, 5.9));
-    let warp_b = water_noise(p * 0.8 + vec2<f32>(11.2, 43.5));
+    let main_dir = vec2<f32>(cos(look.direction), sin(look.direction));
+    let perp_dir = vec2<f32>(-main_dir.y, main_dir.x);
+    let t = time * look.speed;
+    // Counter-drifting, wind-relative patch velocities so wave groups swell,
+    // interfere, and dissipate organically instead of scrolling rigidly.
+    let drift_a = (main_dir * 0.021 + perp_dir * 0.013) * t;
+    let drift_b = (main_dir * 0.014 - perp_dir * 0.017) * t;
+    let drift_c = (-main_dir * 0.009 + perp_dir * 0.019) * t;
+    let p_a = rest * scale + drift_a;
+    let p_b = rest * (scale * 1.37) + drift_b + vec2<f32>(17.3, -9.1);
+    let swell_a = water_noise(p_a);
+    let swell_b = water_noise(p_b);
+    let warp_a = water_noise(rest * (scale * 0.8) + drift_a * 0.85 + vec2<f32>(-31.7, 5.9));
+    let warp_b = water_noise(rest * (scale * 0.8) + drift_b * 0.9 + vec2<f32>(11.2, 43.5));
+    // Secondary higher-frequency meander bends wave crests non-linearly.
+    let meander = water_noise(rest * (scale * 1.93) + drift_c + vec2<f32>(-7.4, 23.1));
+    // Shared wind-gust envelope gathers waves into distinct rougher and calmer
+    // patches while individual waves still vary independently inside them.
+    let gust_env = clamp(1.0 + 1.25 * variation * (swell_a.x * 0.8 + swell_b.x * 0.2), 0.08, 2.0);
     // How much each wave's height swings around itself (a patch can calm
     // it to a sixth), and how far the warp pushes, in studs.
     let swing = 1.6 * variation;
-    let lowest = 0.16;
-    let highest = 1.0 + swing;
+    let lowest = 0.1;
+    let highest = (1.0 + swing) * 1.1;
     let push = 0.9 * look.length * variation;
+    let meander_push = 0.22 * look.length * variation;
 
     var offset = vec3<f32>(0.0);
     var normal = vec3<f32>(0.0, 1.0, 0.0);
+    // Track normalized primary swell height so shorter chop non-linearly
+    // steepens on swell crests and relaxes in troughs.
+    var swell_lift = 0.0;
     for (var i = 0u; i < count; i++) {
         let angle = look.direction + turns[i];
         let direction = vec2<f32>(cos(angle), sin(angle));
@@ -137,16 +160,19 @@ fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f3
         let m = vec2<f32>(cos(mixes[i]), sin(mixes[i]));
         let swell = swell_a * m.x + swell_b * vec3<f32>(m.y, m.y * 1.37, m.y * 1.37);
         // The warp, turned: how far along the wave this point is pushed,
-        // and how that changes along the rest surface.
+        // plus a secondary meander so crests curve organically.
         let warp = (warp_a * m.x - warp_b * m.y) * direction.x + (warp_a * m.y + warp_b * m.x) * direction.y;
-        let pushed = push * warp.x;
-        let pushed_slope = push * scale * 0.8 * warp.yz;
-        let phase = k * (dot(direction, rest) + pushed) - speed * time + f32(i) * 1.7;
+        let m_sign = select(-1.0, 1.0, (i & 1u) == 0u);
+        let pushed = push * warp.x + meander_push * m_sign * meander.x;
+        let pushed_slope = push * scale * 0.8 * warp.yz + meander_push * m_sign * scale * 1.93 * meander.yz;
+        // Non-linear phase and amplitude coupling from primary swells to chop.
+        let couple = select(0.0, 0.22 * variation * clamp(swell_lift, -1.0, 1.0), i >= 2u);
+        let phase = k * (dot(direction, rest) + pushed) - speed * time + f32(i) * 1.7 + couple * 0.6;
         let along = k * (direction + pushed_slope);
         // The swell, kept above `lowest` (flat there).
-        let raw = 1.0 + swing * swell.x * 0.7071;
+        let raw = (1.0 + swing * swell.x * 0.7071) * gust_env * (1.0 + couple);
         let amount = max(raw, lowest);
-        let amount_slope = select(vec2<f32>(0.0), swing * swell.yz * 0.7071 * scale, raw > lowest);
+        let amount_slope = select(vec2<f32>(0.0), swing * swell.yz * 0.7071 * scale * gust_env * (1.0 + couple), raw > lowest);
         let height = base * amount;
         let kh = k * height;
         // How far the corners circle along the wave, as a share of its
@@ -156,10 +182,43 @@ fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f3
         let c = cos(phase);
         let s = sin(phase);
         offset += vec3<f32>(direction.x * pinch * height * c, height * s, direction.y * pinch * height * c);
+        if i < 2u {
+            swell_lift += s * heights[i];
+        }
         // The height's slope: the wave's, plus its swing's.
         let slope = height * c * along + base * s * amount_slope;
         normal -= vec3<f32>(slope.x, pinch * kh * s, slope.y);
     }
+
+    // In the fragment shader, layer two counter-drifting domain-warped organic
+    // capillary ripple fields (with analytic slopes, faded by pixel footprint)
+    // modulated by the local wind-gust patch so calm patches stay glassy while
+    // rougher patches carry rich, non-linear micro-ripples.
+    if count == ALL_WAVES && variation > 0.0 {
+        let cap_len_a = look.length * 0.115;
+        let cap_len_b = look.length * 0.063;
+        let fade_a = clamp((cap_len_a / max(cell, 1e-6) - 2.0) * 0.5, 0.0, 1.0);
+        let fade_b = clamp((cap_len_b / max(cell, 1e-6) - 2.0) * 0.5, 0.0, 1.0);
+        let gust = smoothstep(-0.25, 0.65, swell_a.x * 0.7 + swell_b.x * 0.3);
+        let cap_strength = min(look.height / max(look.length, 0.5), 0.18) * variation * gust;
+        if fade_a > 0.0 && cap_strength > 0.0 {
+            let freq_a = 1.0 / cap_len_a;
+            let uv_a = rest * freq_a + (main_dir * 0.42 + perp_dir * 0.27) * t
+                + vec2<f32>(warp_a.x, warp_b.x) * 0.45;
+            let r_a = water_noise(uv_a);
+            let s_a = r_a.yz * (cap_strength * 0.55 * fade_a);
+            normal -= vec3<f32>(s_a.x, 0.0, s_a.y);
+        }
+        if fade_b > 0.0 && cap_strength > 0.0 {
+            let freq_b = 1.0 / cap_len_b;
+            let uv_b = rest * freq_b + (main_dir * 0.31 - perp_dir * 0.49) * t
+                + vec2<f32>(warp_b.x, -warp_a.x) * 0.35 + vec2<f32>(29.3, -14.7);
+            let r_b = water_noise(uv_b);
+            let s_b = r_b.yz * (cap_strength * 0.35 * fade_b);
+            normal -= vec3<f32>(s_b.x, 0.0, s_b.y);
+        }
+    }
+
     return Waves(offset, normalize(normal));
 }
 
@@ -173,6 +232,8 @@ struct WaterOut {
     // The item's color (what's under is tinted by it) and opacity.
     @location(3) tint: vec4<f32>,
     @location(4) @interpolate(flat) fade: f32,
+    // Soft edge mask for painted water borders (1.0 for standard water meshes).
+    @location(5) edge_mask: f32,
 }
 
 @vertex
@@ -180,10 +241,13 @@ fn vs_water(vertex: VertexIn, instance: InstanceIn) -> WaterOut {
     let model = mat4x4<f32>(instance.model_0, instance.model_1, instance.model_2, instance.model_3);
     let normal_matrix = mat3x3<f32>(instance.normal_0, instance.normal_1, instance.normal_2);
     let rest = (model * vec4<f32>(vertex.position, 1.0)).xyz;
+    // Painted terrain water encodes an edge mask in tangent.w in [-2, -1];
+    // standard meshes (tangent.w = ±1 or 0) clamp to 1.0.
+    let edge_mask = clamp(2.0 + vertex.tangent.w, 0.0, 1.0);
     // The grid's spacing in studs, the coarser way.
     let cell = max(length(model[0].xyz), length(model[2].xyz)) / WATER_GRID_CELLS;
     let waves = water_waves(rest.xz, frame.clock.x, water_look(), CORNER_WAVES, cell);
-    let world = rest + waves.offset;
+    let world = rest + waves.offset * edge_mask;
     var out: WaterOut;
     out.clip_position = frame.view_proj * vec4<f32>(world, 1.0);
     out.world_position = world;
@@ -191,6 +255,7 @@ fn vs_water(vertex: VertexIn, instance: InstanceIn) -> WaterOut {
     out.up = normal_matrix * vertex.normal;
     out.tint = instance.base_color;
     out.fade = instance.emissive_fade.w;
+    out.edge_mask = edge_mask;
     return out;
 }
 
@@ -307,32 +372,40 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let scattered = look.deep * lit;
     let through = 1.0 - reflectance.x;
 
+    let edge_fade = smoothstep(0.0, 1.0, clamp(in.edge_mask, 0.0, 1.0));
     var alpha = 1.0;
     if frame.reflection_probes.z != 0u {
-        // What's under, bent by the waves (less where it's shallow), unless
-        // the bent point shows something in front of the water.
+        // What's under, bent by the waves (less where it's shallow or near
+        // a feathered painted border), unless the bent point shows something
+        // in front of the water.
         let shallow = clamp(straight.a - dist, 0.0, 1.0);
-        let bend = (n - up) * look.refraction * shallow;
+        let bend = (n - up) * look.refraction * shallow * edge_fade;
         var under = scene_copy(screen_point(in.world_position + vec3<f32>(bend.x, 0.0, bend.z)).xy);
         if under.a < dist {
             under = straight;
         }
         let depth = max(under.a - dist, 0.0);
+        let vertical_depth = depth * max(dot(v, up), 0.05);
+        // Smooth shoreline feather over the shallowest 0.14 studs so water
+        // blends seamlessly into terrain without a harsh or flickering seam.
+        let shore_fade = smoothstep(0.0, 0.14, vertical_depth);
         let clear = exp(-depth / look.clarity);
         var water = color + through * (under.rgb * in.tint.rgb * clear + scattered * (1.0 - clear));
         if look.foam > 0.0 {
             // Depth straight down, from depth along the view.
-            let edge = 1.0 - smoothstep(0.0, look.foam, depth * max(dot(v, up), 0.05));
+            let edge = 1.0 - smoothstep(0.0, look.foam, vertical_depth);
+            let foam_contact = smoothstep(0.0, 0.05, vertical_depth);
             let drift = vec2<f32>(0.15, 0.11) * time * look.speed;
             let pattern = smoothstep(0.3, 0.7, cloud_noise2(in.rest * 0.9 + drift) + 0.6 * edge - 0.3);
-            water = mix(water, vec3<f32>(0.9) * lit, edge * pattern);
+            water = mix(water, vec3<f32>(0.9) * lit, edge * foam_contact * pattern);
         }
-        // A see-through part's water fades out over what's behind it.
-        color = mix(straight.rgb, water, clamp(in.tint.a, 0.0, 1.0));
+        // A see-through part's water, shallow shorelines, and painted water
+        // borders fade smoothly over what's behind them.
+        color = mix(straight.rgb, water, clamp(in.tint.a * shore_fade * edge_fade, 0.0, 1.0));
     } else {
         // Low: no copy of the scene, so the water is blended over it.
         color += through * scattered;
-        alpha = clamp(in.tint.a * mix(0.75, 1.0, reflectance.x), 0.0, 1.0);
+        alpha = clamp(in.tint.a * edge_fade * mix(0.75, 1.0, reflectance.x), 0.0, 1.0);
     }
     return vec4<f32>(fogged(frame.fog, eye, in.world_position, color), alpha);
 }

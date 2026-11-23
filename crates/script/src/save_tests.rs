@@ -233,3 +233,31 @@ print(SaveService:GetPlayerData("Coins"), tostring(SaveService))
     }
     assert_eq!(lines[6], "nil\tSaveService");
 }
+
+#[test]
+fn delete_slot_removes_saved_slot_and_reports_presence() {
+    let folder = save_folder("delete-slot");
+    let (mut world, _, _) = level();
+    let mut runtime = ScriptRuntime::new();
+    runtime.set_save_folder(Some(folder.clone()));
+    run(
+        &mut runtime,
+        &mut world,
+        ClassName::Script,
+        "scripts/delete.server.lua",
+        r#"
+local SaveService = game:GetService("SaveService")
+print(SaveService:DeleteSlot(1))
+SaveService:SaveSlot(1)
+print(SaveService:HasSlot(1))
+print(SaveService:DeleteSlot(1))
+print(SaveService:HasSlot(1))
+print(SaveService:DeleteSlot(1))
+"#,
+    );
+    assert_eq!(
+        output(&mut runtime),
+        ["false", "true", "true", "false", "false"]
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

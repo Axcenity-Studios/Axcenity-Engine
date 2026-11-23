@@ -27,6 +27,10 @@ pub struct DrawList {
     /// How wet and snow-covered surfaces are, which every lit item and
     /// the terrain show.
     pub weather: Weather,
+    /// Optional 2D world-space weather field around the camera carrying
+    /// sky-visibility ceiling heights, manual interior/exterior masks, and
+    /// dynamic snow footprint depression depths.
+    pub weather_field: Option<Arc<WeatherField>>,
     /// The wind (the Workspace's `GlobalWind`), in studs a second. Items
     /// with a [`DrawItem::sway`] bend along its level part.
     pub wind: Vec3,
@@ -1439,6 +1443,12 @@ impl PartialEq for ColorLookup {
     }
 }
 
+/// Default side length of the square world-space weather field around the camera.
+pub const WEATHER_FIELD_SIZE: u32 = 64;
+
+/// Default snow layer thickness in studs when a [`Weather`] doesn't override it.
+pub const DEFAULT_SNOW_THICKNESS: f32 = 0.35;
+
 /// How wet and snow-covered surfaces are (Lighting's `Weather`): parts,
 /// models and terrain all read it. The default is dry, with no snow.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1450,12 +1460,48 @@ pub struct Weather {
     /// cover whitens flat tops fully and reaches further down slopes; walls
     /// stay bare.
     pub snow: f32,
+    /// Snow layer thickness in studs (0 to 2; 0 uses [`DEFAULT_SNOW_THICKNESS`]
+    /// when `snow > 0`). Controls terrain snow lift and footprint depth.
+    pub snow_thickness: f32,
 }
 
 impl Weather {
     /// Whether surfaces are dry and bare, so the shaders skip the weather.
     pub fn is_clear(&self) -> bool {
         !(self.wetness > 0.0 || self.snow > 0.0)
+    }
+}
+
+/// World-space 2D grid around the camera carrying sky-visibility ceiling
+/// heights, manual interior/exterior paint overrides, and snow footprint
+/// depression depths.
+///
+/// Cell `(x, z)` covers world coordinates `[origin[0] + x * cell_size, ...)`
+/// and is stored at index `z * size + x` as `[roof_y, manual_mask, footprint_depth, 0.0]`:
+/// - `roof_y`: highest solid blocker Y seen from above (`-1e9` if open sky).
+/// - `manual_mask`: `0.0` = auto, `-1.0` = painted Interior, `+1.0` = painted Exterior.
+/// - `footprint_depth`: `0.0` = untouched snow, `1.0` = deeply compressed footprint/trail.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WeatherField {
+    /// World X and Z of cell `(0, 0)`'s corner.
+    pub origin: [f32; 2],
+    /// World studs per cell (typically `1.0`).
+    pub cell_size: f32,
+    /// Number of cells along X and Z (typically [`WEATHER_FIELD_SIZE`]).
+    pub size: u32,
+    /// `size * size` cells, row-major (`z * size + x`).
+    pub cells: Vec<[f32; 4]>,
+}
+
+impl WeatherField {
+    /// True when the field has valid dimensions and matching cell data.
+    pub fn is_valid(&self) -> bool {
+        self.size > 0
+            && self.cell_size > 0.0
+            && self.cell_size.is_finite()
+            && self.origin[0].is_finite()
+            && self.origin[1].is_finite()
+            && self.cells.len() == (self.size as usize) * (self.size as usize)
     }
 }
 

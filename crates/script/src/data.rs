@@ -105,6 +105,22 @@ impl UserData for LuaDataTable {
             let table = table(lua, &this.name)?;
             lua.create_sequence_from(table.rows.iter().map(|row| row.key.as_str()))
         });
+        methods.add_method("Count", |lua, this, ()| {
+            let table = table(lua, &this.name)?;
+            Ok(table.rows.len())
+        });
+        methods.add_method("GetRows", |lua, this, ()| {
+            let table = table(lua, &this.name)?;
+            let rows = lua.create_table_with_capacity(table.rows.len(), 0)?;
+            for index in 0..table.rows.len() {
+                rows.raw_push(LuaDataRow {
+                    table_name: this.name.clone(),
+                    table: table.clone(),
+                    index,
+                })?;
+            }
+            Ok(rows)
+        });
         methods.add_meta_method(
             MetaMethod::NewIndex,
             |_, this, (key, _): (String, Value)| {

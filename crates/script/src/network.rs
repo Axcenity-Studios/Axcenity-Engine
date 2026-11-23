@@ -104,6 +104,23 @@ impl StreamWaits {
 #[derive(Default)]
 pub(crate) struct StreamedOut(pub HashSet<InstanceId>);
 
+/// Whether this device is hosting or connected to a multiplayer session,
+/// exposed as `NetworkService.IsHost` and `NetworkService.IsConnected`.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct NetworkStatus {
+    pub is_host: bool,
+    pub is_connected: bool,
+}
+
+/// Updates the multiplayer status seen by `NetworkService.IsHost` and
+/// `NetworkService.IsConnected`.
+pub(crate) fn set_status(lua: &Lua, is_host: bool, is_connected: bool) {
+    lua.set_app_data(NetworkStatus {
+        is_host,
+        is_connected,
+    });
+}
+
 /// Whether `id` isn't on this device: streamed out, or destroyed.
 pub(crate) fn is_streamed_out(lua: &Lua, id: InstanceId, exists: bool) -> bool {
     !exists
@@ -298,6 +315,16 @@ pub struct LuaNetworkService;
 
 impl UserData for LuaNetworkService {
     fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("IsHost", |lua, _| {
+            Ok(lua
+                .app_data_ref::<NetworkStatus>()
+                .is_some_and(|status| status.is_host))
+        });
+        fields.add_field_method_get("IsConnected", |lua, _| {
+            Ok(lua
+                .app_data_ref::<NetworkStatus>()
+                .is_some_and(|status| status.is_connected))
+        });
         fields.add_field_method_get("ConnectionFailed", |_, _| {
             Ok(LuaSignal::named(Owner::NetworkService, "ConnectionFailed"))
         });

@@ -125,6 +125,14 @@ for _, player in Players:GetPlayers() do
 end
 ```
 
+#### GetPlayerFromCharacter
+
+```luau
+Players:GetPlayerFromCharacter(character: Instance?): Player?
+```
+
+The Player whose Character is `character`, or nil if none matches.
+
 #### CreateHumanoidModelFromDescription
 
 ```luau

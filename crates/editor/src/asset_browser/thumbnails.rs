@@ -142,8 +142,12 @@ fn load(folder: &Path, path: &str, kind: ThumbnailKind) -> Option<egui::ColorIma
         ThumbnailKind::TextureSet => {
             let relative = axcenity_assets::safe_path(path)?;
             let set = axcenity_assets::read_texture_set(&folder.join(relative)).ok()?;
-            let color_path = set.path(axcenity_assets::MapSlot::BaseColor)?;
-            load_image(folder, color_path)
+            // Prefer BaseColor, falling back to any other map slot so normal/
+            // roughness/emissive packs still show a real texture preview.
+            let preview_path = set
+                .path(axcenity_assets::MapSlot::BaseColor)
+                .or_else(|| set.maps.first().map(|m| m.path.as_str()))?;
+            load_image(folder, preview_path)
         }
         ThumbnailKind::Material => load_material(folder, path),
     }
@@ -165,7 +169,13 @@ fn load_material(folder: &Path, path: &str) -> Option<egui::ColorImage> {
     let material = axcenity_assets::read_resolved_material(folder, path)?;
     if let Some(color_map) = &material.maps.color {
         let resolved_path = resolve_texture_ref(folder, &color_map.path);
-        if let Some(mut image) = load_image(folder, &resolved_path) {
+        let loaded = load_image(folder, &resolved_path).or_else(|| {
+            // Also check relative to the material's own folder so custom
+            // materials inside subfolders resolve sibling textures cleanly.
+            let parent = path.rsplit_once('/').map(|(dir, _)| dir)?;
+            load_image(folder, &format!("{parent}/{resolved_path}"))
+        });
+        if let Some(mut image) = loaded {
             if material.color != [1.0, 1.0, 1.0] {
                 tint_image(&mut image, material.color);
             }

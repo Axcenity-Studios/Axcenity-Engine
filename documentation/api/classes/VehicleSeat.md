@@ -54,6 +54,12 @@ VehicleSeat.Size: Vector3
 
 The part's size in studs along X, Y and Z.
 
+#### PivotOffset
+
+```luau
+VehicleSeat.PivotOffset: CFrame
+```
+
 #### Color
 
 ```luau

@@ -6,8 +6,8 @@ implementation: implemented
 crates: [blocks-runtime, blocks]
 source: [crates/blocks-runtime/src/lib.rs, crates/blocks-runtime/src/translate.rs, crates/blocks-runtime/src/node_graph.rs, crates/blocks-runtime/src/ui_graph.rs, crates/blocks-runtime/src/behavior_tree.rs, crates/blocks/src/lib.rs, crates/blocks/src/lua.rs, crates/project/src/ui_graphs.rs]
 docs: [docs/scripting/blocks.md, docs/scripting/graphs.md, docs/scripting/ui-graphs.md, crates/blocks-runtime/CLAUDE.md, crates/blocks/CLAUDE.md]
-verified: 2026-11-11
-verified_commit: 19c7179d
+verified: 2026-11-22
+verified_commit: dc487f0d
 tags: [system/blocks, visual-scripting]
 ---
 
@@ -29,9 +29,10 @@ flowchart LR
 ```
 
 - **One-way at runtime.** `project::load` translates block scripts and UI graphs; the player never sees blocks ([ADR-0004](../Architecture/Architecture-Decisions/ADR-0004-Luau-As-The-Only-Script-Runtime.md)). The Lua is never saved; the JSON is the source.
-- **Blocks ↔ Graph** are two views of one `BlockScript` (`graph.shown` remembers which). Code ↔ Blocks replaces the file.
+- **Blocks ↔ Graph** are two views of one `BlockScript` (`graph.shown` remembers which). Code ↔ Blocks replaces the file. Object inputs use `ObjectRef` (wrapping an `Expression`), so every object socket accepts either a scene path or a wired/dropped expression (such as `Expression::BlockOutput` from events, loops, clones, tweens, and animations).
 - **`from_lua`** (editor only) parses Luau (`crates/blocks/src/lua.rs`), picks the friendliest block for each statement, and checks each choice writes the same tokens (`lua::same_code`). What no block can write stays word for word in a grey Lua block, so nothing is lost.
 - `Translation::block_lines` maps each block to its first Lua line, so a runtime error highlights its block.
+- **Catalogue and tooltips.** `crates/blocks-runtime/src/catalogue.rs` provides exhaustive help cards and field descriptions for every `BlockKind` and `Expression`, rendered by the Blocks palette and all graph editors ([ADR-0024](../Architecture/Architecture-Decisions/ADR-0024-Shared-Editor-Foundations-For-The-Cohesion-Pass.md)).
 - **Material graphs are not here**: they compile to WGSL in the editor (`editor/src/material_graph.rs`), never to Lua ([Rendering](Rendering.md#architecture)).
 
 ## Source code

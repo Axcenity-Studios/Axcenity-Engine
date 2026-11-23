@@ -163,6 +163,10 @@ pub struct GraphView {
     pub rect: Rect,
     /// Where each parameter chip was drawn last, on screen.
     pub chips: Vec<(String, Rect)>,
+    /// Show all transition wires instead of only the active/hovered node's.
+    pub show_all_wires: bool,
+    /// Node hovered last frame (drives active-wire highlighting).
+    hovered_node: Option<Node>,
 }
 
 impl Default for GraphView {
@@ -177,6 +181,8 @@ impl Default for GraphView {
             labels: Vec::new(),
             rect: Rect::NOTHING,
             chips: Vec::new(),
+            show_all_wires: false,
+            hovered_node: None,
         }
     }
 }
@@ -219,7 +225,18 @@ pub enum GraphEvent {
     Paste(axcenity_anim::files::StateDef),
     /// A parameter chip was dropped on this transition's wire.
     AddCondition(usize, String),
+    #[cfg(test)]
     AddParameter(ParameterKind),
+    /// Add a collapsible group container at this graph position.
+    AddGroup([f32; 2]),
+    /// Expand or collapse a group by index.
+    ToggleGroup(usize),
+    /// Move a group (and its member states) by a graph-space delta.
+    MoveGroup(usize, [f32; 2]),
+    /// Assign or remove a state's group.
+    SetStateGroup(usize, Option<String>),
+    /// Remove a group container (ungrouping its states).
+    DeleteGroup(usize),
 }
 
 /// The state playing in the preview, to show in the graph.
@@ -394,9 +411,119 @@ impl GraphView {
             draw_guide(&painter, rect, file);
         }
 
-        // Wires, under the nodes.
+        // Determine which groups are collapsed so their member states are hidden.
+        let collapsed_groups: std::collections::HashSet<&str> = file
+            .groups
+            .iter()
+            .filter(|g| g.collapsed)
+            .map(|g| g.name.as_str())
+            .collect();
+        let state_hidden = |index: usize| -> bool {
+            file.states
+                .get(index)
+                .and_then(|s| s.group.as_deref())
+                .is_some_and(|g| collapsed_groups.contains(g))
+        };
+
+        let mut hit_node = false;
+        // Draw expanded group containers behind wires and nodes.
+        for (group_idx, group) in file.groups.iter().enumerate() {
+            if group.collapsed {
+                continue;
+            }
+            let members: Vec<usize> = file
+                .states
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.group.as_deref() == Some(group.name.as_str()))
+                .map(|(i, _)| i)
+                .collect();
+            let box_rect = if members.is_empty() {
+                Rect::from_center_size(
+                    self.to_screen(rect, group.position),
+                    Vec2::new(220.0, 110.0) * z,
+                )
+            } else {
+                let mut bounds = self.node_rect(rect, file, Node::State(members[0]));
+                for &m in &members[1..] {
+                    bounds = bounds.union(self.node_rect(rect, file, Node::State(m)));
+                }
+                Rect::from_min_max(
+                    Pos2::new(bounds.left() - 18.0 * z, bounds.top() - (HEADER + 14.0) * z),
+                    Pos2::new(bounds.right() + 18.0 * z, bounds.bottom() + 18.0 * z),
+                )
+            };
+            let (header_rect, toggle_rect) =
+                draw_group_expanded(&painter, box_rect, &group.name, members.len(), z);
+            let toggle_resp = ui.interact(
+                toggle_rect,
+                ui.id().with(("group toggle", group_idx)),
+                egui::Sense::click(),
+            );
+            if toggle_resp.clicked() {
+                events.push(GraphEvent::ToggleGroup(group_idx));
+                hit_node = true;
+            }
+            let header_resp = ui.interact(
+                header_rect,
+                ui.id().with(("group header", group_idx)),
+                egui::Sense::click_and_drag(),
+            );
+            if header_resp.hovered() || toggle_resp.hovered() {
+                hit_node = true;
+            }
+            if header_resp.dragged_by(egui::PointerButton::Primary) {
+                let delta = header_resp.drag_delta() / z;
+                events.push(GraphEvent::MoveGroup(group_idx, [delta.x, delta.y]));
+            }
+            header_resp.context_menu(|ui| {
+                if ui.button("Collapse group").clicked() {
+                    events.push(GraphEvent::ToggleGroup(group_idx));
+                    ui.close();
+                }
+                if ui.button("Ungroup / Delete group").clicked() {
+                    events.push(GraphEvent::DeleteGroup(group_idx));
+                    ui.close();
+                }
+            });
+        }
+
+        // Focused node determines which wires are visible by default.
+        let focus_node = self.hovered_node.or(match selected {
+            Selected::Node(node) => Some(node),
+            _ => None,
+        });
+        let outgoing_color = Color32::from_rgb(76, 178, 138);
+        let incoming_color = colors.wire.gamma_multiply(0.55);
+
+        // Wires, under the nodes. Only draw active/focused wires by default.
         let mut curves = Vec::new();
         for index in 0..file.transitions.len() {
+            let transition = &file.transitions[index];
+            let Some(from) = from_node(file, &transition.from) else {
+                continue;
+            };
+            let Some(to_idx) = file.states.iter().position(|s| s.name == transition.to) else {
+                continue;
+            };
+            let from_hidden = matches!(from, Node::State(i) if state_hidden(i));
+            let to_hidden = state_hidden(to_idx);
+            if from_hidden || to_hidden {
+                continue;
+            }
+            let is_selected_wire =
+                selected == Selected::Transition(index) || self.editing == Some(index);
+            let is_live_fade = live.fade.is_some_and(|(_, t, _)| t == Some(index));
+            let is_connected_to_focus =
+                focus_node.is_some_and(|focus| focus == from || focus == Node::State(to_idx));
+            let visible = self.show_all_wires
+                || chip.is_some()
+                || is_selected_wire
+                || is_live_fade
+                || is_connected_to_focus;
+            if !visible {
+                continue;
+            }
             if let Some(points) = self.wire(rect, file, index) {
                 curves.push((index, points, sample_wire(points)));
             }
@@ -409,14 +536,28 @@ impl GraphView {
             let active = live.fade.is_some_and(|(_, t, _)| t == Some(*index));
             let chosen = selected == Selected::Transition(*index)
                 || chip_target.is_some_and(|(target, _)| target == *index);
-            let color = if chosen {
-                colors.selected
+            let from = from_node(file, &transition.from);
+            let to_node = file
+                .states
+                .iter()
+                .position(|s| s.name == transition.to)
+                .map(Node::State);
+            let (color, width_base) = if chosen {
+                (colors.selected, 3.0)
             } else if active {
-                colors.live
+                (colors.live, 2.5)
+            } else if let Some(focus) = focus_node {
+                if from == Some(focus) {
+                    (outgoing_color, 2.2)
+                } else if to_node == Some(focus) {
+                    (incoming_color, 1.6)
+                } else {
+                    (colors.wire, 1.8)
+                }
             } else {
-                colors.wire
+                (colors.wire, 1.8)
             };
-            let width = if chosen { 3.0 } else { 2.0 } * z.max(0.7);
+            let width = width_base * z.max(0.7);
             draw_wire(
                 &painter,
                 *points,
@@ -426,7 +567,9 @@ impl GraphView {
                 transition.generated,
             );
         }
-        if let Some(to) = entry_target(file) {
+        if let Some(to) = entry_target(file)
+            && !state_hidden(to)
+        {
             let start = self.pin(rect, file, Node::Entry, true);
             let end = self.pin(rect, file, Node::State(to), false);
             let points = wire_points(start, end, 0.0, z);
@@ -457,35 +600,108 @@ impl GraphView {
             self.linking = None;
         }
 
-        // The nodes: states, the Any State and Entry.
-        let mut nodes: Vec<Node> = (0..file.states.len()).map(Node::State).collect();
+        // Draw collapsed group cards.
+        for (group_idx, group) in file.groups.iter().enumerate() {
+            if !group.collapsed {
+                continue;
+            }
+            let members: Vec<usize> = file
+                .states
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.group.as_deref() == Some(group.name.as_str()))
+                .map(|(i, _)| i)
+                .collect();
+            let center = if members.is_empty() {
+                group.position
+            } else {
+                let sum = members.iter().fold([0.0f32; 2], |acc, &i| {
+                    [
+                        acc[0] + file.states[i].position[0],
+                        acc[1] + file.states[i].position[1],
+                    ]
+                });
+                [sum[0] / members.len() as f32, sum[1] / members.len() as f32]
+            };
+            let card_rect = Rect::from_center_size(self.to_screen(rect, center), STATE * z);
+            let id = ui.id().with(("collapsed group", group_idx));
+            let resp = ui.interact(card_rect, id, egui::Sense::click_and_drag());
+            if resp.hovered() {
+                hit_node = true;
+            }
+            let playing = live.state.is_some_and(|(s, _)| members.contains(&s));
+            let toggle_rect = draw_group_collapsed(
+                &painter,
+                card_rect,
+                &group.name,
+                members.len(),
+                playing,
+                resp.hovered(),
+                z,
+            );
+            let toggle_resp = ui.interact(toggle_rect, id.with("expand"), egui::Sense::click());
+            if toggle_resp.clicked() || resp.double_clicked() {
+                events.push(GraphEvent::ToggleGroup(group_idx));
+            }
+            if resp.dragged_by(egui::PointerButton::Primary) {
+                let delta = resp.drag_delta() / z;
+                events.push(GraphEvent::MoveGroup(group_idx, [delta.x, delta.y]));
+            }
+            resp.context_menu(|ui| {
+                if ui.button("Expand group").clicked() {
+                    events.push(GraphEvent::ToggleGroup(group_idx));
+                    ui.close();
+                }
+                if ui.button("Ungroup / Delete group").clicked() {
+                    events.push(GraphEvent::DeleteGroup(group_idx));
+                    ui.close();
+                }
+            });
+        }
+
+        // The nodes: visible states, the Any State and Entry.
+        let mut nodes: Vec<Node> = (0..file.states.len())
+            .filter(|&i| !state_hidden(i))
+            .map(Node::State)
+            .collect();
         nodes.extend([Node::Any, Node::Entry]);
-        let mut hit_node = false;
+        let wiring_active = self.wiring.is_some() || self.linking.is_some();
+        let mut next_hovered = None;
         for node in nodes {
             let node_rect = self.node_rect(rect, file, node);
             let id = ui.id().with(("graph node", node_id(node)));
             let response = ui.interact(node_rect, id, egui::Sense::click_and_drag());
             if response.hovered() {
                 hit_node = true;
+                next_hovered = Some(node);
             }
             let playing = match (node, live.state) {
                 (Node::State(index), Some((state, progress))) if index == state => Some(progress),
                 _ => None,
             };
-            let wired_out = match node {
-                Node::Entry => entry_target(file).is_some(),
-                Node::Any => file.transitions.iter().any(|t| t.from == ANY_STATE),
+            let out_count = match node {
+                Node::Entry => usize::from(entry_target(file).is_some()),
+                Node::Any => file
+                    .transitions
+                    .iter()
+                    .filter(|t| t.from == ANY_STATE)
+                    .count(),
                 Node::State(index) => file
                     .transitions
                     .iter()
-                    .any(|t| t.from == file.states[index].name),
+                    .filter(|t| t.from == file.states[index].name)
+                    .count(),
             };
-            let wired_in = match node {
+            let in_count = match node {
                 Node::State(index) => {
                     let name = &file.states[index].name;
-                    entry_target(file) == Some(index)
-                        || file.transitions.iter().any(|t| &t.to == name)
+                    file.transitions.iter().filter(|t| &t.to == name).count()
                 }
+                _ => 0,
+            };
+            let wired_out = out_count > 0;
+            let wired_in = match node {
+                Node::State(index) => entry_target(file) == Some(index) || in_count > 0,
                 _ => false,
             };
             draw_node(
@@ -500,6 +716,9 @@ impl GraphView {
                     playing,
                     wired_in,
                     wired_out,
+                    out_count,
+                    in_count,
+                    wiring_active,
                 },
             );
 
@@ -542,6 +761,35 @@ impl GraphView {
                             events.push(GraphEvent::Rename(index));
                             ui.close();
                         }
+                        crate::widgets::menu_button(ui, None, "Group", |ui| {
+                            if ui.button(format!("{} New group", icons::PLUS)).clicked() {
+                                let name = format!("Group {}", file.groups.len() + 1);
+                                events.push(GraphEvent::AddGroup(file.states[index].position));
+                                events.push(GraphEvent::SetStateGroup(index, Some(name)));
+                                ui.close();
+                            }
+                            if !file.groups.is_empty() {
+                                ui.separator();
+                                for group in &file.groups {
+                                    let in_group = file.states[index].group.as_deref()
+                                        == Some(group.name.as_str());
+                                    if ui.selectable_label(in_group, &group.name).clicked() {
+                                        events.push(GraphEvent::SetStateGroup(
+                                            index,
+                                            Some(group.name.clone()),
+                                        ));
+                                        ui.close();
+                                    }
+                                }
+                            }
+                            if file.states[index].group.is_some() {
+                                ui.separator();
+                                if ui.button("Remove from group").clicked() {
+                                    events.push(GraphEvent::SetStateGroup(index, None));
+                                    ui.close();
+                                }
+                            }
+                        });
                         if ui.button("Delete").clicked() {
                             events.push(GraphEvent::Delete(Selected::Node(node)));
                             ui.close();
@@ -585,6 +833,7 @@ impl GraphView {
                 }
             }
         }
+        self.hovered_node = next_hovered;
 
         // The labels, over everything: click one to edit its transition.
         self.labels.clear();
@@ -664,6 +913,15 @@ impl GraphView {
                     ui.close();
                 }
             });
+            ui.separator();
+            if ui
+                .button(format!("{} Add Group", icons::STACK))
+                .on_hover_text("Create a collapsible group container for related states")
+                .clicked()
+            {
+                events.push(GraphEvent::AddGroup(at));
+                ui.close();
+            }
         });
 
         // Drops.
@@ -909,6 +1167,7 @@ fn clip_list(ui: &mut egui::Ui, clips: &[String], needle: &str) -> Option<String
 /// The parameters as chips with type icons, each of which can be dragged
 /// onto a wire, and + to add one. Returns what was asked for, and puts
 /// where each chip was drawn in `chips`.
+#[cfg(test)]
 pub fn parameters_panel(
     ui: &mut egui::Ui,
     parameters: &[ParameterDef],
@@ -966,6 +1225,7 @@ pub fn parameters_panel(
 }
 
 /// How wide a parameter chip for `name` is drawn, margins included.
+#[cfg(test)]
 fn chip_width(ui: &egui::Ui, kind: ParameterKind, name: &str) -> f32 {
     let text = ui.painter().layout_no_wrap(
         format!("{} {name}", kind.icon()),

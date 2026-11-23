@@ -64,7 +64,19 @@ struct TerrainOut {
 @vertex
 fn vs_terrain(vertex: TerrainIn, chunk: ChunkIn) -> TerrainOut {
     let model = mat4x4<f32>(chunk.model_0, chunk.model_1, chunk.model_2, chunk.model_3);
-    let world_position = model * vec4<f32>(vertex.position, 1.0);
+    var world_position = model * vec4<f32>(vertex.position, 1.0);
+    // Deformable snow accumulation lift on exposed upward-facing terrain,
+    // depressed where footprints/trails are stamped in `weather_field`.
+    let cover = frame.weather.y;
+    let thickness = frame.weather.z;
+    if cover > 0.0 && thickness > 0.0 {
+        let snow = clamp(1.5 * cover - 2.5 * (1.0 - vertex.normal.y), 0.0, 1.0);
+        if snow > 0.0 {
+            let sample = weather_sample(world_position.xyz);
+            let lift = snow * thickness * 0.35 * sample.x * (1.0 - sample.y * 0.85);
+            world_position.y += lift;
+        }
+    }
     var out: TerrainOut;
     out.clip_position = frame.view_proj * world_position;
     out.world_position = world_position.xyz;

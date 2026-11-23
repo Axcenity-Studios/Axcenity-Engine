@@ -921,55 +921,66 @@ impl ClipDoc {
         });
 
         ui.separator();
-        ui.strong("Events");
-        ui.weak("Fire the Animator's AnimationEvent as the clip passes them.");
-        let mut remove = None;
-        let fps = self.frame_rate();
-        let length_frames = self.frames(self.file.length());
-        egui::Grid::new("clip events")
-            .num_columns(3)
-            .spacing([8.0, 4.0])
-            .show(ui, |ui| {
-                for (index, event) in self.file.events.iter_mut().enumerate() {
-                    ui.add(egui::TextEdit::singleline(&mut event.name).desired_width(110.0));
-                    let mut frame = (event.time * f64::from(fps)).round().max(0.0) as u32;
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut frame)
-                                .range(0..=length_frames)
-                                .prefix("frame "),
-                        )
-                        .changed()
-                    {
-                        event.time = f64::from(frame) / f64::from(fps);
+        let events_header = egui::CollapsingHeader::new(format!(
+            "{} Events ({})",
+            icons::FLAG,
+            self.file.events.len()
+        ))
+        .id_salt("clip events accordion")
+        .default_open(!self.file.events.is_empty())
+        .icon(crate::widgets::chevron)
+        .show(ui, |ui| {
+            let mut remove = None;
+            let fps = self.frame_rate();
+            let length_frames = self.frames(self.file.length());
+            egui::Grid::new("clip events")
+                .num_columns(3)
+                .spacing([8.0, 4.0])
+                .show(ui, |ui| {
+                    for (index, event) in self.file.events.iter_mut().enumerate() {
+                        ui.add(egui::TextEdit::singleline(&mut event.name).desired_width(110.0));
+                        let mut frame = (event.time * f64::from(fps)).round().max(0.0) as u32;
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut frame)
+                                    .range(0..=length_frames)
+                                    .prefix("frame "),
+                            )
+                            .changed()
+                        {
+                            event.time = f64::from(frame) / f64::from(fps);
+                        }
+                        if ui.small_button(icons::X).on_hover_text("Remove").clicked() {
+                            remove = Some(index);
+                        }
+                        ui.end_row();
                     }
-                    if ui.small_button(icons::X).on_hover_text("Remove").clicked() {
-                        remove = Some(index);
-                    }
-                    ui.end_row();
+                });
+            if let Some(index) = remove {
+                self.file.events.remove(index);
+            }
+            ui.horizontal_wrapped(|ui| {
+                ui.add(egui::TextEdit::singleline(&mut self.new_event).desired_width(110.0));
+                if ui
+                    .add_enabled(
+                        !self.new_event.trim().is_empty(),
+                        egui::Button::new(format!("{} Add at playhead", icons::PLUS)),
+                    )
+                    .clicked()
+                {
+                    let speed = self.file.speed.abs().max(1e-3);
+                    let time = (self.playhead * speed).clamp(0.0, self.file.length());
+                    self.file.events.push(ClipEvent {
+                        time: (time * f64::from(fps)).round() / f64::from(fps),
+                        name: self.new_event.trim().to_owned(),
+                    });
+                    self.file.events.sort_by(|a, b| a.time.total_cmp(&b.time));
                 }
             });
-        if let Some(index) = remove {
-            self.file.events.remove(index);
-        }
-        ui.horizontal_wrapped(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut self.new_event).desired_width(110.0));
-            if ui
-                .add_enabled(
-                    !self.new_event.trim().is_empty(),
-                    egui::Button::new(format!("{} Add at playhead", icons::PLUS)),
-                )
-                .clicked()
-            {
-                let speed = self.file.speed.abs().max(1e-3);
-                let time = (self.playhead * speed).clamp(0.0, self.file.length());
-                self.file.events.push(ClipEvent {
-                    time: (time * f64::from(fps)).round() / f64::from(fps),
-                    name: self.new_event.trim().to_owned(),
-                });
-                self.file.events.sort_by(|a, b| a.time.total_cmp(&b.time));
-            }
         });
+        events_header
+            .header_response
+            .on_hover_text("Fire the Animator's AnimationEvent as the clip passes them.");
 
         ui.separator();
         ui.horizontal_wrapped(|ui| {

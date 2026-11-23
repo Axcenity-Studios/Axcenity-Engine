@@ -14,7 +14,7 @@
 //! in [`Spawned`] for the runtime to fire on both sides.
 
 use axcenity_core::{ClassName, Color3, InstanceId, STARTER_CHARACTER, Value, Vector3, World};
-use mlua::{Function, Lua};
+use mlua::{Function, IntoLua, Lua};
 
 use crate::instance::{LuaInstance, destroyed, world, world_mut};
 use crate::random::LuaRandom;
@@ -490,6 +490,19 @@ pub fn methods(lua: &Lua) -> mlua::Result<Vec<(ClassName, &'static str, Function
         let ids = players(&*world(lua)?);
         list(lua, ids)
     })?;
+    let get_player_from_character =
+        lua.create_function(|lua, (_, character): (LuaInstance, mlua::Value)| {
+            let mlua::Value::UserData(data) = character else {
+                return Ok(mlua::Value::Nil);
+            };
+            let Ok(character) = data.borrow::<LuaInstance>() else {
+                return Ok(mlua::Value::Nil);
+            };
+            let world = world(lua)?;
+            let found = player_of(&world, character.0);
+            drop(world);
+            found.map(LuaInstance).into_lua(lua)
+        })?;
     let team_get_players = lua.create_function(|lua, this: LuaInstance| {
         let ids = team_players(&*world(lua)?, this.0);
         list(lua, ids)
@@ -500,6 +513,11 @@ pub fn methods(lua: &Lua) -> mlua::Result<Vec<(ClassName, &'static str, Function
         (ClassName::Player, "Kick", kick),
         (ClassName::Player, "RequestStreamAroundAsync", stream_around),
         (ClassName::Players, "GetPlayers", get_players),
+        (
+            ClassName::Players,
+            "GetPlayerFromCharacter",
+            get_player_from_character,
+        ),
         (ClassName::Team, "GetPlayers", team_get_players),
     ])
 }

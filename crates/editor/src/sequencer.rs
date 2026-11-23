@@ -129,6 +129,7 @@ enum Grab {
 }
 
 /// What's selected in the Explorer, for binding new tracks and keying it.
+#[derive(Clone)]
 pub struct Picked {
     pub id: InstanceId,
     /// Its path binding (`Workspace/Door`).

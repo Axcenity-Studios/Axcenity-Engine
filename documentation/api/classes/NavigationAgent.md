@@ -112,6 +112,22 @@ NavigationAgent.PlayerSensed: Signal
 
 Fires when the agent starts seeing or hearing the player character. The handler gets the sense: "Sight" or "Hearing".
 
+#### PlayerLost
+
+```luau
+NavigationAgent.PlayerLost: Signal
+```
+
+Fires when the agent stops seeing or hearing the player character. The handler gets the sense: "Sight" or "Hearing".
+
+#### DestinationReached
+
+```luau
+NavigationAgent.DestinationReached: Signal
+```
+
+Fires when the agent reaches its Destination. The handler gets no arguments.
+
 ### Functions
 
 #### Patrol

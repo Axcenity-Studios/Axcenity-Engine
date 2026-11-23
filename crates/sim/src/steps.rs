@@ -221,6 +221,15 @@ fn agents_sensed(ctx: &mut FrameCtx) {
             sim.scripts
                 .fire_instance_event(&mut sim.world, sensed.agent, "PlayerSensed", &[sense]);
         }
+        for lost in sim.agents.take_lost() {
+            let sense = lost.sense.as_str().to_owned();
+            sim.scripts
+                .fire_instance_event(&mut sim.world, lost.agent, "PlayerLost", &[sense]);
+        }
+        for agent in sim.agents.take_arrived() {
+            sim.scripts
+                .fire_instance_event(&mut sim.world, agent, "DestinationReached", &[]);
+        }
     }
     ctx.io.flush_output();
 }

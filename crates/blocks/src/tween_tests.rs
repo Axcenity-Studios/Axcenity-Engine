@@ -80,7 +80,7 @@ fn tween_blocks() -> BlockScript {
         block(
             2,
             BlockKind::Tween {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 property: "Position".to_owned(),
                 value: Expression::Vector3 {
                     x: 10.0,
@@ -90,14 +90,20 @@ fn tween_blocks() -> BlockScript {
                 seconds: seconds(1.0),
                 style: "Back".to_owned(),
                 direction: "InOut".to_owned(),
+                repeat_count: None,
+                reverses: false,
+                wait_until_done: false,
+                completed: Vec::new(),
             },
         ),
         block(
             3,
             BlockKind::SlideIn {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 from: "Left".to_owned(),
                 seconds: seconds(0.5),
+                wait_until_done: false,
+                completed: Vec::new(),
             },
         ),
         block(
@@ -109,8 +115,10 @@ fn tween_blocks() -> BlockScript {
         block(
             5,
             BlockKind::FadeOut {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 seconds: seconds(0.5),
+                wait_until_done: false,
+                completed: Vec::new(),
             },
         ),
     ])
@@ -164,31 +172,39 @@ fn every_slide_edge_and_fade_switches_to_code_and_back() {
         body.push(block(
             10 + index as u64,
             BlockKind::SlideIn {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 from: (*edge).to_owned(),
                 seconds: Expression::Variable {
                     name: "goal".to_owned(),
                 },
+                wait_until_done: false,
+                completed: Vec::new(),
             },
         ));
     }
     body.push(block(
         20,
         BlockKind::FadeIn {
-            target: "Hud.Menu".to_owned(),
+            target: "Hud.Menu".to_owned().into(),
             seconds: seconds(0.25),
+            wait_until_done: false,
+            completed: Vec::new(),
         },
     ));
     for (index, style) in EASING_STYLES.iter().enumerate() {
         body.push(block(
             30 + index as u64,
             BlockKind::Tween {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 property: "Transparency".to_owned(),
                 value: seconds(0.5),
                 seconds: seconds(2.0),
                 style: (*style).to_owned(),
                 direction: EASING_DIRECTIONS[index % 3].to_owned(),
+                repeat_count: None,
+                reverses: false,
+                wait_until_done: false,
+                completed: Vec::new(),
             },
         ));
     }
@@ -239,12 +255,16 @@ end)
     assert_eq!(
         body[0].kind,
         BlockKind::Tween {
-            target: "Pad".to_owned(),
+            target: "Pad".to_owned().into(),
             property: "Transparency".to_owned(),
             value: seconds(1.0),
             seconds: seconds(2.0),
             style: "Quad".to_owned(),
             direction: "Out".to_owned(),
+            repeat_count: None,
+            reverses: false,
+            wait_until_done: false,
+            completed: Vec::new(),
         }
     );
     // Two goals, or a style without a direction, are plain method calls.
@@ -257,21 +277,27 @@ end)
 fn a_misspelled_easing_or_edge_is_reported() {
     let script = |kind| started(vec![block(2, kind)]);
     let tween = BlockKind::Tween {
-        target: "Pad".to_owned(),
+        target: "Pad".to_owned().into(),
         property: "Transparency".to_owned(),
         value: seconds(1.0),
         seconds: seconds(1.0),
         style: "Quadratic".to_owned(),
         direction: "Out".to_owned(),
+        repeat_count: None,
+        reverses: false,
+        wait_until_done: false,
+        completed: Vec::new(),
     };
     assert_eq!(
         translate(&script(tween)).unwrap_err().to_string(),
         "`Quadratic` isn't an easing style; choose from Linear, Sine, Quad, Cubic, Back, Bounce, Elastic"
     );
     let slide = BlockKind::SlideIn {
-        target: "Hud.Menu".to_owned(),
+        target: "Hud.Menu".to_owned().into(),
         from: "Up".to_owned(),
         seconds: seconds(1.0),
+        wait_until_done: false,
+        completed: Vec::new(),
     };
     assert_eq!(
         translate(&script(slide)).unwrap_err().to_string(),

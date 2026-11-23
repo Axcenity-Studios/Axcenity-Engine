@@ -365,6 +365,74 @@ fn handlers_on_a_streamed_out_instance_survive_until_it_comes_back() {
     assert_eq!(lines(&mut runtime), ["true"]);
 }
 
+#[test]
+fn streamed_out_distributed_game_time_network_status_players_and_sound_time() {
+    let mut world = World::new();
+    let away = part(&mut world, "Away");
+    let sound = world.create(ClassName::Sound).unwrap();
+    world.set_name(sound, "Theme").unwrap();
+    world.set_parent(sound, Some(world.workspace())).unwrap();
+    let player = world.create(ClassName::Player).unwrap();
+    world.set_name(player, "Hero").unwrap();
+    world.set_parent(player, Some(world.players())).unwrap();
+    let character = world.create(ClassName::Model).unwrap();
+    world.set_name(character, "HeroChar").unwrap();
+    world
+        .set_parent(character, Some(world.workspace()))
+        .unwrap();
+    world
+        .set_property(
+            player,
+            "Character",
+            axcenity_core::Value::Instance(Some(character)),
+        )
+        .unwrap();
+
+    let mut runtime = ScriptRuntime::new();
+    runtime.set_network_status(true, true);
+    let script = world.create(ClassName::LocalScript).unwrap();
+    world
+        .set_parent(script, Some(world.starter_player_scripts()))
+        .unwrap();
+    runtime.start_script(
+        &mut world,
+        script,
+        "scripts/phase4.client.lua",
+        r#"
+        local away = workspace.Away
+        away.StreamedOut:Connect(function() print("streamed-out") end)
+        away.StreamedIn:Connect(function() print("streamed-in") end)
+        local Net = game:GetService("NetworkService")
+        print("net", Net.IsHost, Net.IsConnected)
+        local Players = game:GetService("Players")
+        local found = Players:GetPlayerFromCharacter(workspace.HeroChar)
+        print("player", found and found.Name, Players:GetPlayerFromCharacter(workspace.Away), Players:GetPlayerFromCharacter(nil))
+        local s = workspace.Theme
+        s.TimePosition = 2.5
+        print("sound", s.TimePosition, s.TimeLength, (pcall(function() s.TimeLength = 1 end)))
+        print("t0", workspace.DistributedGameTime, (pcall(function() workspace.DistributedGameTime = 1 end)))
+        task.delay(0.2, function()
+            print("t1", string.format("%.1f", workspace.DistributedGameTime))
+        end)
+        "#,
+    );
+    runtime.note_streaming(&mut world, &[away], &[]);
+    runtime.note_streaming(&mut world, &[], &[away]);
+    step_frames(&mut runtime, &mut world, 0.1, 2);
+    assert_eq!(
+        lines(&mut runtime),
+        [
+            "net\ttrue\ttrue",
+            "player\tHero\tnil\tnil",
+            "sound\t2.5\t0\tfalse",
+            "t0\t0\tfalse",
+            "streamed-out",
+            "streamed-in",
+            "t1\t0.2",
+        ]
+    );
+}
+
 fn count_connected(lua: &Lua) -> usize {
     lua.app_data_ref::<events::Connections>()
         .map_or(0, |connections| connections.len())

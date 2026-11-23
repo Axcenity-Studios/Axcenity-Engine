@@ -1154,4 +1154,51 @@ mod tests {
                 .all(|item| matches!(&item.shape, Shape::Mesh(mesh) if mesh.key() == axcenity_render::water_surface().key()))
         );
     }
+
+    #[test]
+    fn painted_water_feathers_exposed_outer_edges_and_blends_adjacent_levels() {
+        let (mut world, terrain) = world_with_terrain();
+        let ground = {
+            let data = world.terrain(terrain).unwrap();
+            -32.0 + data.height(48, 48) * 128.0
+        };
+        let low = (ground + 2.0 + 32.0) / 128.0;
+        let high = (ground + 4.0 + 32.0) / 128.0;
+        let data = world.terrain_mut(terrain).unwrap();
+        let all = data.bounds();
+        let water = data.water_mut_in(all);
+        // 2x2 block of cells: left column at `low`, right column at `high`.
+        water[48 * 257 + 48] = low;
+        water[49 * 257 + 48] = low;
+        water[48 * 257 + 49] = high;
+        water[49 * 257 + 49] = high;
+
+        let mut cache = TerrainCache::new();
+        let assets = Assets::default();
+        let camera = camera_at(Vec3::new(0.0, 50.0, 0.0));
+        let mut items = Vec::new();
+        cache.draw_all(&world, &assets, &camera, &mut items, &mut Vec::new());
+        let water = water_items(&items);
+        assert_eq!(water.len(), 1);
+        let Shape::Mesh(mesh) = &water[0].shape else {
+            panic!("expected painted water mesh");
+        };
+        // Center vertex (shared by all 4 cells) must have full edge mask (-1.0)
+        // and the averaged height of low and high (ground + 3.0).
+        let has_interior_averaged = mesh
+            .positions()
+            .iter()
+            .zip(mesh.tangents())
+            .any(|(p, t)| (p[1] - (ground + 3.0)).abs() < 1e-2 && (t[3] - (-1.0)).abs() < 1e-4);
+        assert!(
+            has_interior_averaged,
+            "shared interior corner averages adjacent levels and keeps full opacity"
+        );
+        // Exposed outer border vertices must carry tangent.w == -2.0 (edge_mask 0.0).
+        let has_feathered_border = mesh.tangents().iter().any(|t| (t[3] - (-2.0)).abs() < 1e-4);
+        assert!(
+            has_feathered_border,
+            "exposed unpainted border vertices are feathered to 0"
+        );
+    }
 }

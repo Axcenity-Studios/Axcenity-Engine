@@ -452,7 +452,8 @@ pub(super) fn create_frame_bind_group(
         light_probe_buffer,
         ray_shadow_mask,
         ray_reflections,
-    ]: [&wgpu::Buffer; 7],
+        weather_field,
+    ]: [&wgpu::Buffer; 8],
     [
         shadow_view,
         spot_shadow_view,
@@ -500,6 +501,10 @@ pub(super) fn create_frame_bind_group(
             wgpu::BindGroupEntry {
                 binding: 18,
                 resource: ray_reflections.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 19,
+                resource: weather_field.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 6,

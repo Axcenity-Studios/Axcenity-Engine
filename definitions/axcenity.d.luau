@@ -434,6 +434,10 @@ declare extern type DataTable with
 	function GetAll(self): { [string]: DataRow }
 	--- Every row's key, in the table's order. A new list each call.
 	function Keys(self): { string }
+	--- How many rows the table has.
+	function Count(self): number
+	--- Every row in the table's order as a 1-indexed list. A new list each call.
+	function GetRows(self): { DataRow }
 end
 
 --- One row of a data table, read by column name: `row.Damage`. Numbers, strings, booleans, Vector3s and Color3s are what they say; an enum is its option's name, an asset its path, and a reference the row it names (nil for none). `for column, value in row do` goes through its columns. Changing it is an error: tables are read-only in scripts.
@@ -481,6 +485,8 @@ declare extern type SaveService with
 	function LoadSlot(self, slot: number): ()
 	--- True if slot `slot` has been saved.
 	function HasSlot(self, slot: number): boolean
+	--- Deletes save slot `slot` if it exists. Returns true if a saved file was removed, false otherwise.
+	function DeleteSlot(self, slot: number): boolean
 	--- Keeps `value` for the player under `name`, such as `SaveService:SetPlayerData("Coins", 10)`: a boolean, number, string, Vector3, Vector2, Color3, UDim2 or EnumItem. nil removes it. Saved in slots and captured at checkpoints.
 	function SetPlayerData(self, name: string, value: any): ()
 	--- The player data kept under `name`, or nil.
@@ -513,6 +519,10 @@ end
 
 --- Hosting and joining games, from `game:GetService("NetworkService")`, so a menu can do them. Players who join appear in `Players` on every device (the worlds aren't shared yet). Both sides have it; in the editor's Play, Host and Join fail and FindLanGames finds nothing.
 declare extern type NetworkService with
+	--- True while this device is hosting a multiplayer game. Read-only.
+	IsHost: boolean
+	--- True while this device is hosting or joined to a multiplayer game. Read-only.
+	IsConnected: boolean
 	--- Fires with why when hosting or joining fails, a join is refused (such as a version mismatch, a wrong password or a full game) or the connection is lost: `function(reason) ... end`.
 	ConnectionFailed: Signal
 	--- Hosts the game on this device on UDP `port` (47800 if left out), for at most `Players.MaxPlayers` players; with a `password`, only players who give it can join. ConnectionFailed fires if the port is taken.
@@ -1521,6 +1531,8 @@ declare extern type Instance with
 	Destroying: Signal
 	--- Fires on a device when world streaming brings this Instance back, or a Model's contents arrive. Connect to it on a Model that's still away, or a part kept from before it went.
 	StreamedIn: Signal
+	--- Fires on a device when world streaming takes this Instance away, or a Model's contents leave.
+	StreamedOut: Signal
 	--- Fires when an attribute gets a different value or is removed. The handler gets the attribute's name.
 	AttributeChanged: Signal
 	[string]: any
@@ -1661,6 +1673,8 @@ declare extern type Workspace extends Instance with
 	StreamingTargetRadius: number
 	--- The camera the player sees through. LocalScripts only.
 	CurrentCamera: Camera
+	--- Seconds of game time elapsed since the session started. Read-only.
+	DistributedGameTime: number
 	[string]: any
 	--- The first collider along `direction` from `origin`, or nil. The direction's length is how far the ray reaches. Hits sensors (`CanCollide` off) as well as solid parts and terrain, but not parts with `CanQuery` off. `params` (a `RaycastParams`) can pass by or keep to some parts, a collision group, or sensors. The result has Instance, Position, Normal and Distance.
 	function Raycast(self, origin: Vector3, direction: Vector3, params: RaycastParams?): RaycastResult?
@@ -1703,6 +1717,8 @@ declare extern type Players extends Instance with
 	[string]: any
 	--- Every Player in the game.
 	function GetPlayers(self): {Player}
+	--- The Player whose Character is `character`, or nil if none matches.
+	function GetPlayerFromCharacter(self, character: Instance?): Player?
 	--- A new character that looks like `description`, for an NPC or a preview: a copy of the game's StarterCharacter with the description applied. Its Parent is nil: name it, place it and put it in the Workspace. An error if the game has no StarterCharacter (StarterPlayer's StarterCharacter names no prefab) or the description can't be applied.
 	function CreateHumanoidModelFromDescription(self, description: HumanoidDescription): Model
 end
@@ -1793,6 +1809,7 @@ declare extern type Part extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -1906,6 +1923,7 @@ declare extern type MeshPart extends Instance with
 	Orientation: Vector3
 	--- The size of the model's box in studs along X, Y and Z. The model stretches to fill it.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- If false, the part casts no sun shadow. It's still shaded by other parts' shadows.
 	CastShadow: boolean
 	--- From 0 (as solid as its model) to 1 (invisible).
@@ -2001,6 +2019,7 @@ declare extern type UnionOperation extends Instance with
 	Orientation: Vector3
 	--- The size of the model's box in studs along X, Y and Z. The model stretches to fill it.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- If true, the whole solid is drawn in Color. If false (the default), each face keeps the color and material of the part it came from.
 	UsePartColor: boolean
 	--- The color the whole solid is drawn in while UsePartColor is on. Union sets it to the first part's.
@@ -2100,6 +2119,7 @@ declare extern type NegateOperation extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2220,6 +2240,7 @@ declare extern type Seat extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2339,6 +2360,7 @@ declare extern type VehicleSeat extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2472,6 +2494,7 @@ declare extern type DamageZone extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2585,6 +2608,7 @@ declare extern type ReverbZone extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2700,6 +2724,7 @@ declare extern type SpawnLocation extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -2905,6 +2930,7 @@ end
 declare extern type Model extends Instance with
 	--- How the Model streams. Default: a Model with no Models inside loads and unloads whole, and one with Models inside streams each piece on its own. Atomic: always whole, with the Models inside. Persistent: always on every device.
 	ModelStreamingMode: EnumModelStreamingMode | "Default" | "Atomic" | "Persistent"
+	PivotOffset: CFrame
 	--- If true, the editor's viewport can't select or change it, and the building tools leave it alone. It has no effect in a running game.
 	Locked: boolean
 	[string]: any
@@ -3652,6 +3678,10 @@ declare extern type Sound extends Instance with
 	PlaybackSpeed: number
 	--- True while the sound plays. Set it to false to pause and true to carry on. Saved as true, the sound plays as soon as the game starts, with no script needed.
 	Playing: boolean
+	--- Playback position in seconds. Setting it seeks the sound to that time.
+	TimePosition: number
+	--- Total length of the sound clip in seconds. Read-only in scripts.
+	TimeLength: number
 	--- If true, the sound is placed in the world and panned as the camera moves. If false, it plays the same in both ears.
 	Spatial: boolean
 	--- Where a spatial sound plays from, in studs, when it is not inside a Part, MeshPart or Terrain. Inside one of those, that ancestor's Position is used instead.
@@ -3931,6 +3961,8 @@ end
 
 --- Inside Lighting: rain or snow falling around the camera, and how wet and snow-covered surfaces are (parts, models and terrain). Wet surfaces are darker and glossier; snow covers the tops of things but not walls. workspace.GlobalWind blows the rain and snow. Every change eases in over TransitionTime. With Precipitation None and no Wetness or SnowCover it costs nothing.
 declare extern type Weather extends Instance with
+	--- Turns the weather system on or off (true by default). When false, precipitation stops and surfaces dry and clear over TransitionTime.
+	Enabled: boolean
 	--- What falls around the camera (`Enum.Precipitation`): None, Rain (the default) or Snow. Rain wets surfaces as it falls, up to its Intensity; snow covers the ones facing up.
 	Precipitation: EnumPrecipitation | "None" | "Rain" | "Snow"
 	--- How hard the rain or snow falls, from 0 to 1 (0.5 by default): more drops, and wetter or deeper on the ground.
@@ -3939,8 +3971,18 @@ declare extern type Weather extends Instance with
 	Wetness: number
 	--- How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: more cover whitens flat tops fully and reaches further down slopes. Walls stay bare. Falling snow covers them at least as much as its Intensity.
 	SnowCover: number
+	--- Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.
+	SnowThickness: number
 	--- Seconds a change takes to ease in (10 by default): rain starting and stopping, surfaces wetting and drying, snow settling and melting. 0 changes at once.
 	TransitionTime: number
+	--- When true (the default), rain and snow are occluded by solid roofs and geometry, and sheltered interior surfaces stay dry and bare.
+	OcclusionEnabled: boolean
+	--- When true (the default), moving characters and objects press dynamic footprints and trails into snow-covered ground.
+	FootprintsEnabled: boolean
+	--- Seconds a snow footprint or trail takes to fill back in (30 by default).
+	FootprintFadeTime: number
+	--- Manual interior/exterior surface mask cells painted in the editor (format: "x,z:I;x,z:E"). Overrides automatic sky-visibility detection.
+	SurfaceMask: string
 	[string]: any
 end
 
@@ -4065,6 +4107,7 @@ declare extern type GraphicsVolume extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
 	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
@@ -4771,6 +4814,10 @@ declare extern type NavigationAgent extends Instance with
 	PatrolSpline: Instance?
 	--- Fires when the agent starts seeing or hearing the player character. The handler gets the sense: "Sight" or "Hearing".
 	PlayerSensed: Signal
+	--- Fires when the agent stops seeing or hearing the player character. The handler gets the sense: "Sight" or "Hearing".
+	PlayerLost: Signal
+	--- Fires when the agent reaches its Destination. The handler gets no arguments.
+	DestinationReached: Signal
 	[string]: any
 	--- Sets PatrolSpline: the agent walks `spline`'s points in order from now on (nil stops).
 	function Patrol(self, spline: Spline?): ()

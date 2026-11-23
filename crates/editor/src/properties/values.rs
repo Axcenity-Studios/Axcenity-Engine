@@ -73,6 +73,14 @@ pub(super) fn value_edit(ui: &mut egui::Ui, name: &str, value: Value) -> Option<
                 .changed()
                 .then_some(Value::Number(number))
         }
+        Value::Number(mut number) if name == "SnowThickness" => ui
+            .add(
+                egui::Slider::new(&mut number, 0.0..=2.0)
+                    .clamping(egui::SliderClamping::Always)
+                    .suffix(" studs"),
+            )
+            .changed()
+            .then_some(Value::Number(number)),
         Value::Number(mut number) if matches!(name, "Glare" | "Haze") => ui
             .add(egui::Slider::new(&mut number, 0.0..=10.0).clamping(egui::SliderClamping::Always))
             .changed()

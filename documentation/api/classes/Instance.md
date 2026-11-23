@@ -130,6 +130,14 @@ Instance.StreamedIn: Signal
 
 Fires on a device when world streaming brings this Instance back, or a Model's contents arrive. Connect to it on a Model that's still away, or a part kept from before it went.
 
+#### StreamedOut
+
+```luau
+Instance.StreamedOut: Signal
+```
+
+Fires on a device when world streaming takes this Instance away, or a Model's contents leave.
+
 #### AttributeChanged
 
 ```luau

@@ -143,6 +143,7 @@ pub fn build_draw_list_posed(
         fog: look.fog,
         clouds: settings.clouds,
         weather: crate::weather::settled(world),
+        weather_field: None,
         wind: crate::particles::global_wind(world),
         camera,
         sun: look.sun,

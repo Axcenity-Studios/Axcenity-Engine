@@ -50,7 +50,18 @@ fn statement_index(kind: &BlockKind) -> Option<usize> {
     Some(match kind {
         BlockKind::WhenStarted { .. }
         | BlockKind::WhenTouched { .. }
+        | BlockKind::WhenTouchEnds { .. }
         | BlockKind::WhenKeyPressed { .. }
+        | BlockKind::WhenKeyReleased { .. }
+        | BlockKind::WhenPlayerJoins { .. }
+        | BlockKind::WhenPlayerLeaves { .. }
+        | BlockKind::WhenCharacterSpawns { .. }
+        | BlockKind::WhenPlayerDies { .. }
+        | BlockKind::WhenChildAdded { .. }
+        | BlockKind::WhenChildRemoved { .. }
+        | BlockKind::WhenTagAdded { .. }
+        | BlockKind::WhenTagRemoved { .. }
+        | BlockKind::WhenRemoteFires { .. }
         | BlockKind::WhenClicked { .. }
         | BlockKind::WhenMouseEnters { .. }
         | BlockKind::WhenMouseLeaves { .. }
@@ -66,9 +77,15 @@ fn statement_index(kind: &BlockKind) -> Option<usize> {
         | BlockKind::WhenStreamedIn { .. }
         | BlockKind::WhenStateChanged { .. }
         | BlockKind::WhenAnimationEvent { .. }
+        | BlockKind::WhenAnimationFinished { .. }
         | BlockKind::WhenAgentSenses { .. }
+        | BlockKind::WhenAgentLosesPlayer { .. }
+        | BlockKind::WhenAgentArrives { .. }
         | BlockKind::WhenSeatOccupied { .. }
+        | BlockKind::WhenSeatVacated { .. }
         | BlockKind::WhenLayerChanged { .. }
+        | BlockKind::WhenStreamedOut { .. }
+        | BlockKind::WhenChatMessageReceived { .. }
         | BlockKind::WhenPropertyChanged { .. }
         | BlockKind::WhenAttributeChanged { .. }
         | BlockKind::WhenPromptTriggered { .. }
@@ -184,13 +201,64 @@ fn statement_index(kind: &BlockKind) -> Option<usize> {
         BlockKind::Return { .. } => 102,
         BlockKind::SetAttribute { .. } => 103,
         BlockKind::WaitForEvent { .. } => 104,
+        BlockKind::ListCreate { .. } => 106,
+        BlockKind::ListAdd { .. } => 107,
+        BlockKind::ListInsert { .. } => 108,
+        BlockKind::ListRemoveIndex { .. } => 109,
+        BlockKind::ListRemoveValue { .. } => 110,
+        BlockKind::ListClear { .. } => 111,
+        BlockKind::Disconnect { .. } => 112,
+        BlockKind::DestroyScript => 113,
+        BlockKind::ForRange { .. } => 114,
+        BlockKind::ForEachInList { .. } => 115,
+        BlockKind::ForEachTagged { .. } => 116,
+        BlockKind::Sequence { .. } => 117,
+        BlockKind::CooldownGate { .. } => 118,
+        BlockKind::SpawnAsync { .. } => 119,
+        BlockKind::SlideTo { .. } => 120,
+        BlockKind::RotateTo { .. } => 121,
+        BlockKind::SetGravity { .. } => 122,
+        BlockKind::SetAngularVelocity { .. } => 123,
+        BlockKind::LaunchPart { .. } => 124,
+        BlockKind::FollowTarget { .. } => 125,
+        BlockKind::StopAgent { .. } => 126,
+        BlockKind::SitInSeat { .. } => 127,
+        BlockKind::ControlSpline { .. } => 128,
+        BlockKind::SetSplineSpeed { .. } => 129,
+        BlockKind::ToggleVisibility { .. } => 130,
+        BlockKind::SetTransparency { .. } => 131,
+        BlockKind::SetMaterial { .. } => 132,
+        BlockKind::EmitParticles { .. } => 133,
+        BlockKind::SetEffectEnabled { .. } => 134,
+        BlockKind::SetLightingProperty { .. } => 135,
+        BlockKind::SetPostProcessing { .. } => 136,
+        BlockKind::TweenProperty { .. } => 137,
+        BlockKind::SetImage { .. } => 138,
+        BlockKind::PlaySoundAtPosition { .. } => 139,
+        BlockKind::FadeVolume { .. } => 140,
+        BlockKind::SetSoundPitch { .. } => 141,
+        BlockKind::SetSoundLooping { .. } => 142,
+        BlockKind::SetSoundTime { .. } => 143,
+        BlockKind::StopAnimation { .. } => 144,
+        BlockKind::SetAnimatorSpeed { .. } => 145,
+        BlockKind::SetIkTarget { .. } => 146,
+        BlockKind::SetRagdollEnabled { .. } => 147,
+        BlockKind::PauseCutscene { .. } => 148,
+        BlockKind::ResumeCutscene { .. } => 149,
+        BlockKind::StopCutscene { .. } => 150,
+        BlockKind::SlideOut { .. } => 151,
+        BlockKind::TweenPivot { .. } => 152,
+        BlockKind::PulseScale { .. } => 153,
+        BlockKind::CancelTween { .. } => 154,
+        BlockKind::DeleteSlot { .. } => 155,
+        BlockKind::ForEachRow { .. } => 156,
     })
 }
-const STATEMENT_COUNT: usize = 106;
+const STATEMENT_COUNT: usize = 157;
 
 /// One of each statement block, with the Lua it must produce.
 fn every_statement() -> Vec<(BlockKind, &'static str)> {
-    let pad = || "Pad".to_owned();
+    let pad = || ObjectRef::path("Pad");
     let truth = || Expression::Boolean { value: true };
     vec![
         (
@@ -216,7 +284,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                 condition: truth(),
                 body: Vec::new(),
             },
-            "while not (true) do",
+            "until true",
         ),
         (
             BlockKind::If {
@@ -243,7 +311,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                     z: 3.0,
                 },
             },
-            "workspace.Pad.Position = Vector3.new(1, 2, 3)",
+            "workspace.Pad:PivotTo(CFrame.new(Vector3.new(1, 2, 3)) * workspace.Pad:GetPivot().Rotation)",
         ),
         (
             BlockKind::MoveBy {
@@ -254,7 +322,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                     z: 0.0,
                 },
             },
-            "workspace.Pad.Position = workspace.Pad.Position + Vector3.new(0, 1, 0)",
+            "workspace.Pad:PivotTo(workspace.Pad:GetPivot() + Vector3.new(0, 1, 0))",
         ),
         (
             BlockKind::TurnTo {
@@ -275,14 +343,15 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                     y: 5.0,
                     z: 0.0,
                 },
+                space: "Local".to_owned(),
             },
-            "workspace.Pad.Orientation = workspace.Pad.Orientation + Vector3.new(0, 5, 0)",
+            "workspace.Pad:PivotTo(workspace.Pad:GetPivot() * CFrame.Angles(math.rad(0), math.rad(5), math.rad(0)))",
         ),
         (
             BlockKind::LookAt {
                 target: pad(),
                 position: Expression::Property {
-                    target: "Goal".to_owned(),
+                    target: "Goal".to_owned().into(),
                     property: "Position".to_owned(),
                 },
             },
@@ -401,11 +470,11 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                     b: 0.0,
                 },
             },
-            "workspace.Pad.Color = Color3.new(1, 0, 0)",
+            "local _t, _c = workspace.Pad, Color3.new(1, 0, 0)",
         ),
         (
             BlockKind::SetText {
-                target: "Hud.Score".to_owned(),
+                target: "Hud.Score".to_owned().into(),
                 text: variable("score"),
             },
             "workspace.Hud.Score.Text = tostring(score)",
@@ -428,31 +497,33 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::PlaySound {
-                target: "Pad.Chime".to_owned(),
+                target: "Pad.Chime".to_owned().into(),
+                pitch: None,
+                wait_until_done: false,
             },
             "workspace.Pad.Chime:Play()",
         ),
         (
             BlockKind::StopSound {
-                target: "Music".to_owned(),
+                target: "Music".to_owned().into(),
             },
             "workspace.Music:Stop()",
         ),
         (
             BlockKind::PauseSound {
-                target: "Music".to_owned(),
+                target: "Music".to_owned().into(),
             },
             "workspace.Music:Pause()",
         ),
         (
             BlockKind::ResumeSound {
-                target: "Music".to_owned(),
+                target: "Music".to_owned().into(),
             },
             "workspace.Music:Resume()",
         ),
         (
             BlockKind::SetVolume {
-                target: "Music".to_owned(),
+                target: "Music".to_owned().into(),
                 volume: number(0.5),
             },
             "workspace.Music.Volume = 0.5",
@@ -469,7 +540,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                 name: "score".to_owned(),
                 by: number(1.0),
             },
-            "score = score + 1",
+            "score = (tonumber(score) or 0) + 1",
         ),
         (
             BlockKind::Print {
@@ -481,13 +552,13 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::Destroy {
-                target: "Red Ball".to_owned(),
+                target: "Red Ball".to_owned().into(),
             },
             "workspace[\"Red Ball\"]:Destroy()",
         ),
         (
             BlockKind::ForEachChild {
-                target: "Coins".to_owned(),
+                target: "Coins".to_owned().into(),
                 variable: "coin".to_owned(),
                 body: Vec::new(),
             },
@@ -502,35 +573,96 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                 },
                 radius: number(12.0),
                 variable: "nearby".to_owned(),
+                players_only: false,
+                ignore: None,
                 body: Vec::new(),
             },
             "for _, nearby in workspace:GetPartBoundsInRadius(Vector3.new(0, 5, 0), 12) do",
         ),
         (
             BlockKind::ForEachPartTouching {
-                target: "Zone".to_owned(),
+                target: "Zone".to_owned().into(),
                 variable: "inside".to_owned(),
+                players_only: false,
+                ignore: None,
                 body: Vec::new(),
             },
             "for _, inside in workspace:GetPartsInPart(workspace.Zone) do",
         ),
         (
             BlockKind::WaitForChild {
-                target: String::new(),
+                target: String::new().into(),
                 name: "Door".to_owned(),
+                timeout: None,
             },
             "workspace:WaitForChild(\"Door\")",
         ),
         (
             BlockKind::CloneInto {
-                target: "Coin".to_owned(),
-                parent: "Coins".to_owned(),
+                target: "Coin".into(),
+                parent: "Coins".into(),
+                count: None,
+                position: None,
+                offset_per_clone: None,
+                per_clone_positions: None,
             },
             "workspace.Coin:Clone().Parent = workspace.Coins",
         ),
         (
+            BlockKind::ListCreate {
+                name: "bag".to_owned(),
+                items: vec![number(1.0), number(2.0)],
+            },
+            "bag = { 1, 2 }",
+        ),
+        (
+            BlockKind::ListAdd {
+                list: Expression::Variable {
+                    name: "bag".to_owned(),
+                },
+                value: number(3.0),
+            },
+            "table.insert(bag, 3)",
+        ),
+        (
+            BlockKind::ListInsert {
+                list: Expression::Variable {
+                    name: "bag".to_owned(),
+                },
+                index: number(1.0),
+                value: number(0.0),
+            },
+            "table.insert(bag, 1, 0)",
+        ),
+        (
+            BlockKind::ListRemoveIndex {
+                list: Expression::Variable {
+                    name: "bag".to_owned(),
+                },
+                index: number(1.0),
+            },
+            "table.remove(bag, 1)",
+        ),
+        (
+            BlockKind::ListRemoveValue {
+                list: Expression::Variable {
+                    name: "bag".to_owned(),
+                },
+                value: number(2.0),
+            },
+            "local _i = table.find(bag, 2)",
+        ),
+        (
+            BlockKind::ListClear {
+                list: Expression::Variable {
+                    name: "bag".to_owned(),
+                },
+            },
+            "table.clear(bag)",
+        ),
+        (
             BlockKind::ShowPage {
-                layout: "Menu".to_owned(),
+                layout: "Menu".to_owned().into(),
                 page: Expression::Text {
                     value: "Home".to_owned(),
                 },
@@ -539,7 +671,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::ScrollTo {
-                target: "List".to_owned(),
+                target: "List".to_owned().into(),
                 x: number(0.0),
                 y: number(120.0),
             },
@@ -547,14 +679,14 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetValue {
-                target: "Settings.Volume".to_owned(),
+                target: "Settings.Volume".to_owned().into(),
                 value: number(75.0),
             },
             "workspace.Settings.Volume.Value = 75",
         ),
         (
             BlockKind::SetDestination {
-                agent: "Guard.NavigationAgent".to_owned(),
+                agent: "Guard.NavigationAgent".to_owned().into(),
                 position: Expression::Vector3 {
                     x: 20.0,
                     y: 0.0,
@@ -565,13 +697,13 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::LeaveSeat {
-                controller: "Character.ThirdPersonController".to_owned(),
+                controller: "Character.ThirdPersonController".to_owned().into(),
             },
             "workspace.Character.ThirdPersonController.Sit = false",
         ),
         (
             BlockKind::SetVelocity {
-                agent: "Guard.NavigationAgent".to_owned(),
+                agent: "Guard.NavigationAgent".to_owned().into(),
                 velocity: Expression::Vector3 {
                     x: 0.0,
                     y: 0.0,
@@ -590,7 +722,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetCheckpoint {
-                checkpoint: "Checkpoints.Cave".to_owned(),
+                checkpoint: "Checkpoints.Cave".to_owned().into(),
             },
             "SaveService:SetCheckpoint(workspace.Checkpoints.Cave)",
         ),
@@ -632,22 +764,22 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         (BlockKind::LeaveGame, "NetworkService:Disconnect()"),
         (
             BlockKind::PlayCutscene {
-                sequence: "Intro".to_owned(),
+                sequence: "Intro".to_owned().into(),
             },
             "workspace.Intro:Play()",
         ),
         (
             BlockKind::PlaceOnSpline {
-                target: "Cart".to_owned(),
-                spline: "Track".to_owned(),
+                target: "Cart".to_owned().into(),
+                spline: "Track".to_owned().into(),
                 distance: number(12.5),
             },
             "workspace.Cart:PivotTo(workspace.Track:GetCFrameAt(12.5))",
         ),
         (
             BlockKind::Patrol {
-                agent: "Guard.NavigationAgent".to_owned(),
-                spline: "Route".to_owned(),
+                agent: "Guard.NavigationAgent".to_owned().into(),
+                spline: "Route".to_owned().into(),
             },
             "workspace.Guard.NavigationAgent:Patrol(workspace.Route)",
         ),
@@ -658,13 +790,17 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
             "Lighting.ToneMapping = Enum.ToneMapping.Filmic",
         ),
         (
-            BlockKind::SetClockTime { time: number(18.5) },
+            BlockKind::SetClockTime {
+                time: number(18.5),
+                duration: None,
+            },
             "Lighting.ClockTime = 18.5",
         ),
         (
             BlockKind::SetAtmosphere {
                 property: "Haze".to_owned(),
                 value: number(2.0),
+                duration: None,
             },
             "Lighting.Atmosphere.Haze = 2",
         ),
@@ -686,6 +822,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
             BlockKind::SetGraphicsOption {
                 setting: "AntiAliasing".to_owned(),
                 choice: "FXAA".to_owned(),
+                value: None,
             },
             "UserGameSettings.AntiAliasing = Enum.AntiAliasing.FXAA",
         ),
@@ -704,7 +841,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetAnimatorBool {
-                animator: animator(),
+                animator: animator().into(),
                 parameter: "IsGrounded".to_owned(),
                 value: truth(),
             },
@@ -712,7 +849,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetAnimatorNumber {
-                animator: animator(),
+                animator: animator().into(),
                 parameter: "Speed".to_owned(),
                 value: number(4.0),
             },
@@ -720,7 +857,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetAnimatorLayerWeight {
-                animator: animator(),
+                animator: animator().into(),
                 layer: "UpperBody".to_owned(),
                 weight: number(1.0),
                 seconds: number(0.25),
@@ -729,29 +866,33 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::SetAnimatorTrigger {
-                animator: animator(),
+                animator: animator().into(),
                 parameter: "Jump".to_owned(),
             },
             "workspace.Hero.Animator:SetTrigger(\"Jump\")",
         ),
         (
             BlockKind::ResetAnimatorTrigger {
-                animator: animator(),
+                animator: animator().into(),
                 parameter: "Jump".to_owned(),
             },
             "workspace.Hero.Animator:ResetTrigger(\"Jump\")",
         ),
         (
             BlockKind::PlayAnimatorState {
-                animator: animator(),
+                animator: animator().into(),
                 state: "Jump".to_owned(),
             },
             "workspace.Hero.Animator:Play(\"Jump\")",
         ),
         (
             BlockKind::PlayAnimation {
-                animator: animator(),
-                animation: "Hero.Wave".to_owned(),
+                animator: animator().into(),
+                animation: "Hero.Wave".to_owned().into(),
+                fade_time: None,
+                speed: None,
+                weight: None,
+                wait_until_done: false,
             },
             "workspace.Hero.Animator:LoadAnimation(workspace.Hero.Wave):Play()",
         ),
@@ -767,33 +908,41 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                 seconds: number(1.0),
                 style: "Quad".to_owned(),
                 direction: "Out".to_owned(),
+                repeat_count: None,
+                reverses: false,
+                wait_until_done: false,
+                completed: Vec::new(),
             },
             "TweenService:Create(workspace.Pad, TweenInfo.new(1, Enum.EasingStyle.Quad, \
              Enum.EasingDirection.Out), {Position = Vector3.new(0, 5, 0)}):Play()",
         ),
         (
             BlockKind::SlideIn {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 from: "Left".to_owned(),
                 seconds: number(0.5),
+                wait_until_done: false,
+                completed: Vec::new(),
             },
             "workspace.Hud.Menu.Position = goal - UDim2.fromScale(1, 0)",
         ),
         (
             BlockKind::FadeIn {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 seconds: number(0.5),
+                wait_until_done: false,
+                completed: Vec::new(),
             },
-            "TweenService:Create(workspace.Hud.Menu, TweenInfo.new(0.5), \
-             {BackgroundTransparency = 0}):Play()",
+            "_goals.BackgroundTransparency = 0",
         ),
         (
             BlockKind::FadeOut {
-                target: "Hud.Menu".to_owned(),
+                target: "Hud.Menu".to_owned().into(),
                 seconds: number(0.5),
+                wait_until_done: false,
+                completed: Vec::new(),
             },
-            "TweenService:Create(workspace.Hud.Menu, TweenInfo.new(0.5), \
-             {BackgroundTransparency = 1}):Play()",
+            "_goals.BackgroundTransparency = 1",
         ),
         (
             BlockKind::SetCameraType {
@@ -821,7 +970,7 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
         ),
         (
             BlockKind::DestroyAfter {
-                target: "Spark".to_owned(),
+                target: "Spark".to_owned().into(),
                 seconds: number(2.0),
             },
             "Debris:AddItem(workspace.Spark, 2)",
@@ -846,13 +995,71 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
                 size: number(0.5),
                 seconds: number(20.0),
             },
-            "workspace:SpawnDecal(\"assets/textures/hole.png\", CFrame.lookAt(Vector3.new(), Vector3.new(0, 1, 0)) + (hit + Vector3.new(0, 1, 0)), 0.5, 20)",
+            "workspace:SpawnDecal(\"assets/textures/hole.png\", CFrame.lookAt(_dpos, _dpos + _dfacing, _dup), 0.5, 20)",
         ),
         (
             BlockKind::FireEvent {
                 event: "Events.Scored".to_owned(),
+                data: None,
             },
             "game.ReplicatedStorage.Events.Scored:Fire()",
+        ),
+        (
+            BlockKind::Disconnect {
+                connection: Expression::Name {
+                    name: "conn".to_owned(),
+                },
+            },
+            "conn:Disconnect()",
+        ),
+        (BlockKind::DestroyScript, "script:Destroy()"),
+        (
+            BlockKind::ForRange {
+                start: number(1.0),
+                end: number(5.0),
+                step: number(1.0),
+                body: Vec::new(),
+            },
+            "= 1, 5, 1 do",
+        ),
+        (
+            BlockKind::ForEachInList {
+                list: Expression::Variable {
+                    name: "items".to_owned(),
+                },
+                body: Vec::new(),
+            },
+            "in ipairs(items) do",
+        ),
+        (
+            BlockKind::ForEachTagged {
+                tag: text("Enemy"),
+                body: Vec::new(),
+            },
+            "CollectionService:GetTagged(\"Enemy\") do",
+        ),
+        (
+            BlockKind::Sequence {
+                branches: vec![
+                    vec![block(950, BlockKind::Print { value: text("a") })],
+                    Vec::new(),
+                ],
+            },
+            "print(\"a\")",
+        ),
+        (
+            BlockKind::CooldownGate {
+                cooldown: number(2.0),
+                body: Vec::new(),
+            },
+            "os.clock() - _gate_",
+        ),
+        (
+            BlockKind::SpawnAsync {
+                delay: number(0.0),
+                body: Vec::new(),
+            },
+            "task.spawn(function()",
         ),
         (
             BlockKind::Connect {
@@ -977,6 +1184,316 @@ fn every_statement() -> Vec<(BlockKind, &'static str)> {
             },
             "workspace.Pad.Touched:Wait()",
         ),
+        (
+            BlockKind::SlideTo {
+                target: pad(),
+                position: Expression::Vector3 {
+                    x: 0.0,
+                    y: 10.0,
+                    z: 0.0,
+                },
+                duration: number(1.0),
+                easing: "Quad".to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            },
+            "TweenService:Create(workspace.Pad, TweenInfo.new(1, Enum.EasingStyle.Quad), { CFrame = CFrame.new(Vector3.new(0, 10, 0)) * workspace.Pad:GetPivot().Rotation }):Play()",
+        ),
+        (
+            BlockKind::RotateTo {
+                target: pad(),
+                rotation: Expression::Vector3 {
+                    x: 0.0,
+                    y: 90.0,
+                    z: 0.0,
+                },
+                duration: number(0.5),
+                easing: "Linear".to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            },
+            "TweenService:Create(workspace.Pad, TweenInfo.new(0.5, Enum.EasingStyle.Linear), { CFrame = CFrame.new(workspace.Pad:GetPivot().Position) * CFrame.Angles(math.rad(0), math.rad(90), math.rad(0)) }):Play()",
+        ),
+        (
+            BlockKind::SetGravity {
+                target: pad(),
+                multiplier: number(0.0),
+            },
+            "_vf.Force = Vector3.new(0, workspace.Pad.AssemblyMass * workspace.Gravity * (1 - 0), 0)",
+        ),
+        (
+            BlockKind::SetAngularVelocity {
+                target: pad(),
+                velocity: Expression::Vector3 {
+                    x: 0.0,
+                    y: 10.0,
+                    z: 0.0,
+                },
+            },
+            "workspace.Pad.AssemblyAngularVelocity = Vector3.new(0, 10, 0)",
+        ),
+        (
+            BlockKind::LaunchPart {
+                target: pad(),
+                direction: Expression::Vector3 {
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
+                speed: number(50.0),
+            },
+            "workspace.Pad.AssemblyLinearVelocity = _dir.Unit * 50",
+        ),
+        (
+            BlockKind::FollowTarget {
+                agent: ObjectRef::path("Guard.Agent"),
+                target: pad(),
+            },
+            "workspace.Guard.Agent.Destination = workspace.Pad:GetPivot().Position",
+        ),
+        (
+            BlockKind::StopAgent {
+                agent: ObjectRef::path("Guard.Agent"),
+            },
+            "workspace.Guard.Agent.Velocity = Vector3.new(0, 0, 0)",
+        ),
+        (
+            BlockKind::SitInSeat {
+                seat: ObjectRef::path("Car.DriverSeat"),
+                controller: ObjectRef::path("Hero.Controller"),
+            },
+            "workspace.Car.DriverSeat:Sit(workspace.Hero.Controller)",
+        ),
+        (
+            BlockKind::ControlSpline {
+                follower: ObjectRef::path("Train.Follower"),
+                action: "Reverse".to_owned(),
+            },
+            "workspace.Train.Follower.Speed = -workspace.Train.Follower.Speed",
+        ),
+        (
+            BlockKind::SetSplineSpeed {
+                follower: ObjectRef::path("Train.Follower"),
+                speed: number(20.0),
+            },
+            "workspace.Train.Follower.Speed = 20",
+        ),
+        (
+            BlockKind::ToggleVisibility { target: pad() },
+            "if _t:IsA(\"GuiObject\") then",
+        ),
+        (
+            BlockKind::SetTransparency {
+                target: pad(),
+                transparency: number(0.5),
+            },
+            "local _t, _v = workspace.Pad, 0.5",
+        ),
+        (
+            BlockKind::SetMaterial {
+                target: pad(),
+                material: "Neon".to_owned(),
+            },
+            "workspace.Pad.Material = Enum.Material.Neon",
+        ),
+        (
+            BlockKind::EmitParticles {
+                target: ObjectRef::path("Pad.Sparks"),
+                count: number(20.0),
+            },
+            "workspace.Pad.Sparks:Emit(20)",
+        ),
+        (
+            BlockKind::SetEffectEnabled {
+                target: ObjectRef::path("Pad.Sparks"),
+                enabled: truth(),
+            },
+            "workspace.Pad.Sparks.Enabled = true",
+        ),
+        (
+            BlockKind::SetLightingProperty {
+                property: "Exposure".to_owned(),
+                value: number(1.5),
+            },
+            "Lighting.Exposure = 1.5",
+        ),
+        (
+            BlockKind::SetPostProcessing {
+                effect: "BloomEffect".to_owned(),
+                property: "Intensity".to_owned(),
+                value: number(0.8),
+            },
+            "Lighting:FindFirstChildOfClass(\"BloomEffect\")",
+        ),
+        (
+            BlockKind::TweenProperty {
+                target: pad(),
+                property: "Transparency".to_owned(),
+                value: number(1.0),
+                duration: number(0.5),
+                easing: "Sine".to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            },
+            "TweenService:Create(workspace.Pad, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { Transparency = 1 }):Play()",
+        ),
+        (
+            BlockKind::SetImage {
+                target: ObjectRef::path("Hud.Icon"),
+                image: text("assets/textures/coin.png"),
+            },
+            "_t.Image = _img",
+        ),
+        (
+            BlockKind::PlaySoundAtPosition {
+                target: ObjectRef::path("Boom"),
+                position: Expression::Vector3 {
+                    x: 1.0,
+                    y: 2.0,
+                    z: 3.0,
+                },
+                volume: None,
+                pitch: None,
+            },
+            "local _s = workspace.Boom:Clone()",
+        ),
+        (
+            BlockKind::FadeVolume {
+                target: ObjectRef::path("Music"),
+                volume: number(0.0),
+                duration: number(1.5),
+                wait_until_done: false,
+            },
+            "TweenService:Create(workspace.Music, TweenInfo.new(1.5), { Volume = 0 }):Play()",
+        ),
+        (
+            BlockKind::SetSoundPitch {
+                target: ObjectRef::path("Music"),
+                pitch: number(1.25),
+            },
+            "workspace.Music.PlaybackSpeed = 1.25",
+        ),
+        (
+            BlockKind::SetSoundLooping {
+                target: ObjectRef::path("Music"),
+                looped: truth(),
+            },
+            "workspace.Music.Looped = true",
+        ),
+        (
+            BlockKind::SetSoundTime {
+                target: ObjectRef::path("Music"),
+                time: number(12.5),
+            },
+            "workspace.Music.TimePosition = 12.5",
+        ),
+        (
+            BlockKind::StopAnimation {
+                animator: animator().into(),
+                animation: None,
+                fade_time: None,
+            },
+            "GetPlayingAnimationTracks()",
+        ),
+        (
+            BlockKind::SetAnimatorSpeed {
+                animator: animator().into(),
+                speed: number(1.5),
+            },
+            "workspace.Hero.Animator.Speed = 1.5",
+        ),
+        (
+            BlockKind::SetIkTarget {
+                ik_control: ObjectRef::path("Hero.RightArmIK"),
+                target: ObjectRef::path("Lever"),
+                weight: None,
+            },
+            "workspace.Hero.RightArmIK.Target = workspace.Lever",
+        ),
+        (
+            BlockKind::SetRagdollEnabled {
+                ragdoll: ObjectRef::path("Hero.Ragdoll"),
+                enabled: truth(),
+            },
+            "workspace.Hero.Ragdoll.Enabled = true",
+        ),
+        (
+            BlockKind::PauseCutscene {
+                sequence: ObjectRef::path("Intro"),
+            },
+            "workspace.Intro:Pause()",
+        ),
+        (
+            BlockKind::ResumeCutscene {
+                sequence: ObjectRef::path("Intro"),
+            },
+            "workspace.Intro:Play()",
+        ),
+        (
+            BlockKind::StopCutscene {
+                sequence: ObjectRef::path("Intro"),
+            },
+            "workspace.Intro:Stop()",
+        ),
+        (
+            BlockKind::SlideOut {
+                target: "Hud.Menu".to_owned().into(),
+                to: "Left".to_owned(),
+                seconds: number(0.4),
+                wait_until_done: false,
+                completed: Vec::new(),
+            },
+            "workspace.Hud.Menu.Visible = false",
+        ),
+        (
+            BlockKind::TweenPivot {
+                target: ObjectRef::path("DoorModel"),
+                position: Expression::Vector3 {
+                    x: 0.0,
+                    y: 5.0,
+                    z: 0.0,
+                },
+                duration: number(1.0),
+                easing: "Quad".to_owned(),
+                direction: "Out".to_owned(),
+                wait_until_done: false,
+                completed: Vec::new(),
+            },
+            "Instance.new(\"CFrameValue\")",
+        ),
+        (
+            BlockKind::PulseScale {
+                target: pad(),
+                scale: number(1.2),
+                duration: number(0.3),
+                wait_until_done: false,
+            },
+            "Enum.EasingDirection.Out, 0, true)",
+        ),
+        (
+            BlockKind::CancelTween {
+                tween: ObjectRef::path("ActiveTween"),
+            },
+            "workspace.ActiveTween:Cancel()",
+        ),
+        (
+            BlockKind::DeleteSlot { slot: number(2.0) },
+            "SaveService:DeleteSlot(2)",
+        ),
+        (
+            BlockKind::ForEachRow {
+                table: "weapons".to_owned(),
+                body: vec![block(
+                    9999,
+                    BlockKind::Print {
+                        value: Expression::Variable {
+                            name: "row".to_owned(),
+                        },
+                    },
+                )],
+            },
+            "for _, row in DataService:GetTable(\"weapons\"):GetRows() do",
+        ),
     ]
 }
 
@@ -1024,7 +1541,10 @@ fn translation_covers_every_event_block() {
         block(
             2,
             BlockKind::WhenTouched {
-                part: "Pad".to_owned(),
+                part: "Pad".to_owned().into(),
+                filter: String::new(),
+                filter_value: None,
+                cooldown: None,
                 body: say(12),
             },
         ),
@@ -1038,7 +1558,7 @@ fn translation_covers_every_event_block() {
         block(
             4,
             BlockKind::WhenClicked {
-                button: "Menu.Start".to_owned(),
+                button: "Menu.Start".to_owned().into(),
                 body: quiet(14),
             },
         ),
@@ -1046,7 +1566,7 @@ fn translation_covers_every_event_block() {
         block(
             6,
             BlockKind::WhenSoundEnded {
-                sound: "Music".to_owned(),
+                sound: "Music".to_owned().into(),
                 body: quiet(16),
             },
         ),
@@ -1054,14 +1574,14 @@ fn translation_covers_every_event_block() {
         block(
             8,
             BlockKind::WhenStateChanged {
-                animator: animator(),
+                animator: animator().into(),
                 body: quiet(18),
             },
         ),
         block(
             9,
             BlockKind::WhenAnimationEvent {
-                animator: animator(),
+                animator: animator().into(),
                 event: "Footstep".to_owned(),
                 body: quiet(19),
             },
@@ -1069,28 +1589,28 @@ fn translation_covers_every_event_block() {
         block(
             30,
             BlockKind::WhenMouseEnters {
-                element: "Menu.Start".to_owned(),
+                element: "Menu.Start".to_owned().into(),
                 body: quiet(31),
             },
         ),
         block(
             32,
             BlockKind::WhenMouseLeaves {
-                element: "Menu.Start".to_owned(),
+                element: "Menu.Start".to_owned().into(),
                 body: quiet(33),
             },
         ),
         block(
             34,
             BlockKind::WhenValueChanged {
-                widget: "Settings.Volume".to_owned(),
+                widget: "Settings.Volume".to_owned().into(),
                 body: quiet(35),
             },
         ),
         block(
             36,
             BlockKind::WhenAgentSenses {
-                agent: "Guard.NavigationAgent".to_owned(),
+                agent: "Guard.NavigationAgent".to_owned().into(),
                 sense: "Sight".to_owned(),
                 body: quiet(37),
             },
@@ -1098,21 +1618,23 @@ fn translation_covers_every_event_block() {
         block(
             44,
             BlockKind::WhenSeatOccupied {
-                seat: "Chair".to_owned(),
+                seat: "Chair".to_owned().into(),
                 body: quiet(45),
             },
         ),
         block(
             46,
             BlockKind::WhenPromptTriggered {
-                prompt: "Door.ProximityPrompt".to_owned(),
+                prompt: "Door.ProximityPrompt".to_owned().into(),
+                cooldown: None,
                 body: quiet(47),
             },
         ),
         block(
             48,
             BlockKind::WhenPartClicked {
-                detector: "Button.ClickDetector".to_owned(),
+                detector: "Button.ClickDetector".to_owned().into(),
+                cooldown: None,
                 body: quiet(49),
             },
         ),
@@ -1121,6 +1643,7 @@ fn translation_covers_every_event_block() {
             BlockKind::WhenCommandRun {
                 command: text("heal"),
                 help: text("Heals the player"),
+                admin_only: None,
                 body: quiet(95),
             },
         ),
@@ -1136,7 +1659,7 @@ fn translation_covers_every_event_block() {
         block(
             90,
             BlockKind::WhenCutsceneFinished {
-                sequence: "Intro".to_owned(),
+                sequence: "Intro".to_owned().into(),
                 body: quiet(91),
             },
         ),
@@ -1144,7 +1667,7 @@ fn translation_covers_every_event_block() {
         block(
             98,
             BlockKind::WhenPropertyChanged {
-                target: "Door".to_owned(),
+                target: "Door".to_owned().into(),
                 property: "Transparency".to_owned(),
                 body: quiet(99),
             },
@@ -1152,7 +1675,7 @@ fn translation_covers_every_event_block() {
         block(
             100,
             BlockKind::WhenAttributeChanged {
-                target: "Player1".to_owned(),
+                target: "Player1".to_owned().into(),
                 attribute: "Health".to_owned(),
                 body: quiet(101),
             },
@@ -1160,7 +1683,7 @@ fn translation_covers_every_event_block() {
         block(
             96,
             BlockKind::WhenSplineReached {
-                follower: "Lift.SplineFollower".to_owned(),
+                follower: "Lift.SplineFollower".to_owned().into(),
                 which: "End".to_owned(),
                 body: quiet(97),
             },
@@ -1210,7 +1733,7 @@ fn translation_covers_every_event_block() {
         "workspace.Door:GetPropertyChangedSignal(\"Transparency\"):Connect(function()",
         "workspace.Player1:GetAttributeChangedSignal(\"Health\"):Connect(function()",
         "local DataLayerService = game:GetService(\"DataLayerService\")",
-        "DataLayerService.LayerChanged:Connect(function(layerName)",
+        "DataLayerService.LayerChanged:Connect(function(layerName, active)",
         "    if layerName == \"Night\" then",
     ] {
         assert!(source.contains(lua), "missing `{lua}`:\n{source}");
@@ -1307,7 +1830,7 @@ fn reporters_translate_with_brackets_where_the_blocks_nest() {
         ),
         (
             Expression::Property {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 property: "Position".to_owned(),
             },
             "workspace.Pad.Position",
@@ -1358,7 +1881,7 @@ fn variables_belong_to_the_whole_script_and_start_at_zero() {
     let translated = translate(&script(blocks)).unwrap();
     assert_eq!(
         translated.source,
-        "local lives = 0\nlocal score = 0\n\ntask.spawn(function()\n    score = score + 1\n    print(lives)\nend)\n"
+        "local lives = 0\nlocal score = 0\n\ntask.spawn(function()\n    score = (tonumber(score) or 0) + 1\n    print(lives)\nend)\n"
     );
     // Lines count from 1: the event is on 4, its blocks on 5 and 6.
     assert_eq!(translated.block_lines, [(4, 1), (5, 2), (6, 3)]);
@@ -1381,7 +1904,7 @@ fn translated_blocks_run_in_the_scheduler_like_typed_lua() {
                 block(
                     2,
                     BlockKind::SetColor {
-                        target: "Pad".to_owned(),
+                        target: "Pad".to_owned().into(),
                         color: Expression::Color3 {
                             r: 1.0,
                             g: 0.0,
@@ -1397,7 +1920,7 @@ fn translated_blocks_run_in_the_scheduler_like_typed_lua() {
                             block(
                                 4,
                                 BlockKind::MoveBy {
-                                    target: "Pad".to_owned(),
+                                    target: "Pad".to_owned().into(),
                                     offset: Expression::Vector3 {
                                         x: 0.0,
                                         y: 1.0,
@@ -1476,6 +1999,7 @@ fn a_when_command_run_block_runs_its_blocks_when_the_command_is_typed() {
         BlockKind::WhenCommandRun {
             command: text("heal"),
             help: text("Heals the player"),
+            admin_only: None,
             body: vec![block(
                 2,
                 BlockKind::Print {
@@ -1515,12 +2039,19 @@ fn the_time_of_day_and_atmosphere_blocks_set_lighting_and_come_back_from_lua() {
         1,
         BlockKind::WhenStarted {
             body: vec![
-                block(2, BlockKind::SetClockTime { time: number(18.5) }),
+                block(
+                    2,
+                    BlockKind::SetClockTime {
+                        time: number(18.5),
+                        duration: None,
+                    },
+                ),
                 block(
                     3,
                     BlockKind::SetAtmosphere {
                         property: "Haze".to_owned(),
                         value: number(2.0),
+                        duration: None,
                     },
                 ),
             ],
@@ -1557,10 +2088,14 @@ fn the_time_of_day_and_atmosphere_blocks_set_lighting_and_come_back_from_lua() {
     assert_eq!(translate(&back).unwrap().source, source);
     let mut kinds = Vec::new();
     back.for_each_block(&mut |b| kinds.push(b.kind.clone()));
-    assert!(kinds.contains(&BlockKind::SetClockTime { time: number(18.5) }));
+    assert!(kinds.contains(&BlockKind::SetClockTime {
+        time: number(18.5),
+        duration: None,
+    }));
     assert!(kinds.contains(&BlockKind::SetAtmosphere {
         property: "Haze".to_owned(),
         value: number(2.0),
+        duration: None,
     }));
 
     let wrong = script(vec![block(
@@ -1571,6 +2106,7 @@ fn the_time_of_day_and_atmosphere_blocks_set_lighting_and_come_back_from_lua() {
                 BlockKind::SetAtmosphere {
                     property: "Color".to_owned(),
                     value: number(1.0),
+                    duration: None,
                 },
             )],
         },
@@ -1720,6 +2256,7 @@ fn graphics_blocks_change_user_game_settings_and_come_back_from_lua() {
             every.push(BlockKind::SetGraphicsOption {
                 setting: setting.to_owned(),
                 choice: (*choice).to_owned(),
+                value: None,
             });
         }
     }
@@ -1744,6 +2281,7 @@ fn graphics_blocks_change_user_game_settings_and_come_back_from_lua() {
     let option = |setting: &str, choice: &str| BlockKind::SetGraphicsOption {
         setting: setting.to_owned(),
         choice: choice.to_owned(),
+        value: None,
     };
     let blocks = script(vec![block(
         1,
@@ -2008,7 +2546,10 @@ fn every_block_script() -> BlockScript {
         block(
             2,
             BlockKind::WhenTouched {
-                part: "Pad".to_owned(),
+                part: "Pad".to_owned().into(),
+                filter: String::new(),
+                filter_value: None,
+                cooldown: None,
                 body: touched_body,
             },
         ),
@@ -2022,7 +2563,7 @@ fn every_block_script() -> BlockScript {
         block(
             4,
             BlockKind::WhenClicked {
-                button: "Menu.Start".to_owned(),
+                button: "Menu.Start".to_owned().into(),
                 body: body(),
             },
         ),
@@ -2030,21 +2571,21 @@ fn every_block_script() -> BlockScript {
         block(
             6,
             BlockKind::WhenSoundEnded {
-                sound: "Music".to_owned(),
+                sound: "Music".to_owned().into(),
                 body: body(),
             },
         ),
         block(
             7,
             BlockKind::WhenStateChanged {
-                animator: animator(),
+                animator: animator().into(),
                 body: body(),
             },
         ),
         block(
             8,
             BlockKind::WhenAnimationEvent {
-                animator: animator(),
+                animator: animator().into(),
                 event: "Footstep".to_owned(),
                 body: body(),
             },
@@ -2052,28 +2593,28 @@ fn every_block_script() -> BlockScript {
         block(
             9,
             BlockKind::WhenMouseEnters {
-                element: "Menu.Start".to_owned(),
+                element: "Menu.Start".to_owned().into(),
                 body: body(),
             },
         ),
         block(
             10,
             BlockKind::WhenMouseLeaves {
-                element: "Menu.Start".to_owned(),
+                element: "Menu.Start".to_owned().into(),
                 body: body(),
             },
         ),
         block(
             11,
             BlockKind::WhenValueChanged {
-                widget: "Settings.Volume".to_owned(),
+                widget: "Settings.Volume".to_owned().into(),
                 body: body(),
             },
         ),
         block(
             12,
             BlockKind::WhenAgentSenses {
-                agent: "Guard.NavigationAgent".to_owned(),
+                agent: "Guard.NavigationAgent".to_owned().into(),
                 sense: "Hearing".to_owned(),
                 body: body(),
             },
@@ -2081,21 +2622,23 @@ fn every_block_script() -> BlockScript {
         block(
             16,
             BlockKind::WhenSeatOccupied {
-                seat: "Cart.Seat".to_owned(),
+                seat: "Cart.Seat".to_owned().into(),
                 body: body(),
             },
         ),
         block(
             17,
             BlockKind::WhenPromptTriggered {
-                prompt: "Door.ProximityPrompt".to_owned(),
+                prompt: "Door.ProximityPrompt".to_owned().into(),
+                cooldown: None,
                 body: body(),
             },
         ),
         block(
             18,
             BlockKind::WhenPartClicked {
-                detector: "Button.ClickDetector".to_owned(),
+                detector: "Button.ClickDetector".to_owned().into(),
+                cooldown: None,
                 body: body(),
             },
         ),
@@ -2104,6 +2647,7 @@ fn every_block_script() -> BlockScript {
             BlockKind::WhenCommandRun {
                 command: text("heal"),
                 help: text("Heals the player"),
+                admin_only: None,
                 body: body(),
             },
         ),
@@ -2119,7 +2663,7 @@ fn every_block_script() -> BlockScript {
         block(
             19,
             BlockKind::WhenCutsceneFinished {
-                sequence: "Intro".to_owned(),
+                sequence: "Intro".to_owned().into(),
                 body: body(),
             },
         ),
@@ -2127,7 +2671,7 @@ fn every_block_script() -> BlockScript {
         block(
             21,
             BlockKind::WhenSplineReached {
-                follower: "Lift.SplineFollower".to_owned(),
+                follower: "Lift.SplineFollower".to_owned().into(),
                 which: "Start".to_owned(),
                 body: body(),
             },
@@ -2135,7 +2679,7 @@ fn every_block_script() -> BlockScript {
         block(
             22,
             BlockKind::WhenPropertyChanged {
-                target: "Door".to_owned(),
+                target: "Door".to_owned().into(),
                 property: "Transparency".to_owned(),
                 body: body(),
             },
@@ -2143,7 +2687,7 @@ fn every_block_script() -> BlockScript {
         block(
             23,
             BlockKind::WhenAttributeChanged {
-                target: "Coin".to_owned(),
+                target: "Coin".to_owned().into(),
                 attribute: "Value".to_owned(),
                 body: body(),
             },
@@ -2211,7 +2755,7 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
         },
         Expression::Lerp {
             from: boxed(Expression::Property {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 property: "Position".to_owned(),
             }),
             to: boxed(Expression::Vector3 {
@@ -2235,7 +2779,7 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
             right: boxed(Expression::Compare {
                 op: Comparison::GreaterOrEqual,
                 left: boxed(Expression::Property {
-                    target: "Pad".to_owned(),
+                    target: "Pad".to_owned().into(),
                     property: "Transparency".to_owned(),
                 }),
                 right: boxed(number(0.5)),
@@ -2253,23 +2797,23 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
             b: 1.0,
         },
         Expression::AnimatorBool {
-            animator: animator(),
+            animator: animator().into(),
             parameter: "IsGrounded".to_owned(),
         },
         Expression::AnimatorNumber {
-            animator: animator(),
+            animator: animator().into(),
             parameter: "Speed".to_owned(),
         },
         Expression::AnimatorLayerWeight {
-            animator: animator(),
+            animator: animator().into(),
             layer: "UpperBody".to_owned(),
         },
         Expression::Attribute {
-            target: "Coin".to_owned(),
+            target: "Coin".to_owned().into(),
             attribute: "Value".to_owned(),
         },
         Expression::Property {
-            target: animator(),
+            target: animator().into(),
             property: "CurrentState".to_owned(),
         },
         Expression::IsA {
@@ -2287,6 +2831,8 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
                 y: -20.0,
                 z: 0.0,
             }),
+            output: String::new(),
+            ignore: None,
         },
         Expression::RaycastIgnoring {
             origin: boxed(variable("a")),
@@ -2295,7 +2841,7 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
                 y: 0.0,
                 z: -50.0,
             }),
-            ignore: "Shooter".to_owned(),
+            ignore: "Shooter".to_owned().into(),
         },
         Expression::PartUnderMouse,
         Expression::DataRow {
@@ -2312,11 +2858,11 @@ fn reporters_switched_to_code_and_back_are_the_same_reporters() {
             }),
         },
         Expression::SplinePosition {
-            spline: "Track".to_owned(),
+            spline: "Track".to_owned().into(),
             t: boxed(number(0.5)),
         },
         Expression::SplineClosestDistance {
-            spline: "Track".to_owned(),
+            spline: "Track".to_owned().into(),
             position: boxed(variable("a")),
         },
         Expression::DataValue {
@@ -2398,14 +2944,18 @@ end)
                 block(
                     2,
                     BlockKind::CloneInto {
-                        target: "Coin".to_owned(),
-                        parent: "Bank".to_owned(),
+                        target: "Coin".into(),
+                        parent: "Bank".into(),
+                        count: None,
+                        position: None,
+                        offset_per_clone: None,
+                        per_clone_positions: None,
                     },
                 ),
                 block(
                     3,
                     BlockKind::ForEachChild {
-                        target: "Bank".to_owned(),
+                        target: "Bank".to_owned().into(),
                         variable: "child".to_owned(),
                         body: vec![block(
                             4,
@@ -2418,8 +2968,9 @@ end)
                 block(
                     5,
                     BlockKind::WaitForChild {
-                        target: "Bank".to_owned(),
+                        target: "Bank".to_owned().into(),
                         name: "Coin".to_owned(),
+                        timeout: None,
                     },
                 ),
             ],
@@ -2477,7 +3028,7 @@ local function double(x)
 end
 
 workspace.Pad.Touched:Connect(function(hit)
-    count = count + 1
+    count = (tonumber(count) or 0) + 1
     for i = 1, 2 do
         print(i)
     end
@@ -2758,7 +3309,7 @@ fn set_property_blocks_turn_a_frame_and_fade_a_labels_text() {
         block(
             id,
             BlockKind::SetProperty {
-                target: target.to_owned(),
+                target: target.to_owned().into(),
                 property: property.to_owned(),
                 value: number(value),
             },
@@ -2797,21 +3348,21 @@ fn set_property_blocks_turn_a_frame_and_fade_a_labels_text() {
 #[test]
 fn look_at_move_forward_lerp_and_random_number_blocks_run_and_come_back_from_lua() {
     let goal = || Expression::Property {
-        target: "Goal".to_owned(),
+        target: "Goal".to_owned().into(),
         property: "Position".to_owned(),
     };
     let body = vec![
         block(
             2,
             BlockKind::LookAt {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 position: goal(),
             },
         ),
         block(
             3,
             BlockKind::MoveForward {
-                target: "Pad".to_owned(),
+                target: "Pad".to_owned().into(),
                 distance: number(5.0),
             },
         ),
@@ -3017,7 +3568,7 @@ fn event_and_frame_blocks_fire_bindables_destroy_later_and_run_before_physics_an
                     block(
                         3,
                         BlockKind::DestroyAfter {
-                            target: "Spark".to_owned(),
+                            target: "Spark".to_owned().into(),
                             seconds: number(0.5),
                         },
                     ),
@@ -3043,6 +3594,7 @@ fn event_and_frame_blocks_fire_bindables_destroy_later_and_run_before_physics_an
                     7,
                     BlockKind::FireEvent {
                         event: "Scored".to_owned(),
+                        data: None,
                     },
                 )],
             },
@@ -3175,8 +3727,10 @@ fn query_blocks_list_the_parts_in_a_zone_and_raycast_past_the_shooter() {
                 block(
                     2,
                     BlockKind::ForEachPartTouching {
-                        target: "Zone".to_owned(),
+                        target: "Zone".to_owned().into(),
                         variable: "inside".to_owned(),
+                        players_only: false,
+                        ignore: None,
                         body: vec![print_name(3, "inside")],
                     },
                 ),
@@ -3190,6 +3744,8 @@ fn query_blocks_list_the_parts_in_a_zone_and_raycast_past_the_shooter() {
                         },
                         radius: number(0.5),
                         variable: "near".to_owned(),
+                        players_only: false,
+                        ignore: None,
                         body: vec![print_name(5, "near")],
                     },
                 ),
@@ -3200,7 +3756,7 @@ fn query_blocks_list_the_parts_in_a_zone_and_raycast_past_the_shooter() {
                         value: Expression::RaycastIgnoring {
                             origin: boxed(from()),
                             direction: boxed(along(-30.0)),
-                            ignore: "Shooter".to_owned(),
+                            ignore: "Shooter".to_owned().into(),
                         },
                     },
                 ),
@@ -3212,6 +3768,8 @@ fn query_blocks_list_the_parts_in_a_zone_and_raycast_past_the_shooter() {
                         value: Expression::Raycast {
                             origin: boxed(from()),
                             direction: boxed(along(-30.0)),
+                            output: String::new(),
+                            ignore: None,
                         },
                     },
                 ),

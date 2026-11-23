@@ -140,11 +140,34 @@ impl EditorApp {
         } else {
             Default::default()
         };
+        let project_root = self.project.as_ref().map(|project| project.folder.clone());
         let mut picked = None;
+        let mut weather_action = None;
         let edit = properties::show(ui, world, &self.assets, selected, !editing, &kept, |ui| {
             if nothing {
                 picked = properties::nothing_selected(ui, &place, &recent);
+                if editing {
+                    weather_action = crate::weather_inspector::show(
+                        ui,
+                        world,
+                        &mut self.weather_ui,
+                        project_root.as_deref(),
+                        true,
+                    );
+                }
                 return;
+            }
+            if editing
+                && let Some(instance) = selected.and_then(|id| world.get(id))
+                && matches!(instance.class(), ClassName::Lighting | ClassName::Weather)
+            {
+                weather_action = crate::weather_inspector::show(
+                    ui,
+                    world,
+                    &mut self.weather_ui,
+                    project_root.as_deref(),
+                    instance.class() == ClassName::Lighting,
+                );
             }
             // Stylesheets are edited, not the game, so not during Play.
             if editing {
@@ -155,6 +178,23 @@ impl EditorApp {
             }
         });
         drop(plugin_rows);
+        if let Some(action) = weather_action {
+            if matches!(
+                action,
+                crate::weather_inspector::WeatherInspectorAction::SelectWeather
+            ) {
+                if let Some(id) = crate::weather_inspector::find_weather(&self.world) {
+                    self.select_from_viewport(Some(id));
+                }
+            } else {
+                let before = self.world.clone();
+                if crate::weather_inspector::apply_action(&mut self.world, action).is_some() {
+                    self.history
+                        .record_world(&mut self.world, "Change Weather".to_owned(), before);
+                }
+            }
+            ui.ctx().request_repaint();
+        }
         match picked {
             Some(properties::NothingSelectedPick::Select(id)) => {
                 self.select_from_viewport(Some(id));
@@ -896,16 +936,71 @@ impl EditorApp {
             .project
             .as_ref()
             .map_or(&[][..], |project| &project.stylesheets[..]);
-        let actions = self.animation.show(
-            ui,
-            folder.as_deref(),
-            &self.assets,
-            render_state,
-            self.selected,
-            &mut self.world,
-            stylesheets,
-            &mut self.output,
-        );
+        // Prepare sequencer inputs so the unified Animation window's Sequencer
+        // tab can render the multi-track timeline without losing the Outliner.
+        let entries = self.asset_browser.entries();
+        let of_kind = |kind| -> Vec<String> {
+            let mut paths: Vec<String> = entries
+                .iter()
+                .filter(|entry| entry.kind == kind)
+                .map(|entry| entry.path.clone())
+                .collect();
+            paths.sort();
+            paths
+        };
+        let seq_files = of_kind(crate::asset_browser::AssetKind::Sequence);
+        let seq_clips = of_kind(crate::asset_browser::AssetKind::Animation);
+        let seq_levels = folder
+            .as_deref()
+            .map(axcenity_project::level_names)
+            .unwrap_or_default();
+        let seq_picked = self.selected.and_then(|id| {
+            let instance = self.world.get(id)?;
+            Some(crate::sequencer::Picked {
+                id,
+                path: axcenity_anim::sequence::binding_path(&self.world, id)?,
+                tags: instance.tags().to_vec(),
+                name: instance.name().to_owned(),
+            })
+        });
+        let camera = self.viewport.camera_view();
+        let editable = folder.is_some() && !self.playing();
+        let mut seq_actions = Vec::new();
+        let sequencer = &mut self.sequencer;
+        let world_ref = &mut self.world;
+        let actions = {
+            let mut draw_sequencer = |ui: &mut egui::Ui, world: &World| {
+                let scene = crate::sequencer::SequencerScene {
+                    files: &seq_files,
+                    clips: &seq_clips,
+                    levels: &seq_levels,
+                    picked: seq_picked.clone(),
+                    world,
+                    camera,
+                    editable,
+                };
+                seq_actions.extend(sequencer.show(ui, &scene));
+            };
+            self.animation.show_with_sequencer(
+                ui,
+                folder.as_deref(),
+                &self.assets,
+                render_state,
+                self.selected,
+                world_ref,
+                stylesheets,
+                &mut self.output,
+                Some(&mut draw_sequencer),
+            )
+        };
+        for action in seq_actions {
+            match action {
+                crate::sequencer::SequencerAction::Open(path) => self.open_sequence(&path),
+                crate::sequencer::SequencerAction::New(name) => self.new_sequence(&name),
+                crate::sequencer::SequencerAction::Insert(path) => self.insert_sequence(&path),
+            }
+        }
+        self.flush_sequence(ui.ctx());
         self.studio_actions(actions);
     }
 
@@ -920,6 +1015,7 @@ impl EditorApp {
                 }
                 StudioAction::Animate(object) => self.animate(object),
                 StudioAction::Show => self.layout.open(Pane::Animation),
+                StudioAction::ShowScene => self.layout.open(Pane::Scene),
                 StudioAction::SetPivot { id, offset } => self.set_pivot_offset(id, offset),
                 StudioAction::SetController {
                     part,
@@ -1138,8 +1234,9 @@ impl EditorApp {
             .project
             .as_ref()
             .map_or(&[][..], |project| project.stylesheets.as_slice());
-        // No tool during Play or the preview, so nothing can be dragged.
-        let tool = (!self.playing() && sequence.is_none()).then_some(self.tool);
+        // No tool during Play, the preview, or while painting the weather surface mask.
+        let tool = (!self.playing() && sequence.is_none() && !self.weather_ui.brush.is_active())
+            .then_some(self.tool);
         let preview = self.angular_preview();
         let terrain_brush = self
             .terrain_brush_view(&ctx)
@@ -1191,6 +1288,7 @@ impl EditorApp {
         };
         let spline_editing = self.spline_editing();
         let others = self.team_selections();
+        let has_sequence = sequence.is_some();
         let mut output = egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ui, |ui| match render_state {
@@ -1321,6 +1419,31 @@ impl EditorApp {
             .inner;
         self.swap_play_effects();
         if let Some(rect) = self.viewport_rect {
+            if !self.playing() && !has_sequence {
+                if let Some(new_mask) = crate::weather_inspector::viewport_paint_and_overlay(
+                    &ctx,
+                    rect,
+                    self.viewport.render_camera(),
+                    &self.world,
+                    &self.weather_ui.brush,
+                ) {
+                    let weather_id =
+                        crate::weather_inspector::find_weather(&self.world).or_else(|| {
+                            let id = self.world.create(ClassName::Weather).ok()?;
+                            self.world
+                                .set_parent(id, Some(self.world.lighting()))
+                                .ok()?;
+                            Some(id)
+                        });
+                    if let Some(id) = weather_id {
+                        self.apply(
+                            id,
+                            properties::Edit::Property("SurfaceMask", Value::String(new_mask)),
+                        );
+                        ctx.request_repaint();
+                    }
+                }
+            }
             let play_cpu = self
                 .play
                 .as_ref()

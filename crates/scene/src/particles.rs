@@ -436,9 +436,11 @@ impl Particles {
     /// `list`'s camera. Before the first [`update`](Self::update) the
     /// list keeps the world's settled weather.
     pub fn add_weather(&self, list: &mut DrawList) {
+        self.weather.note_camera(list.camera.position);
         if let Some(look) = self.weather.look() {
             list.weather = look;
         }
+        list.weather_field = self.weather.field();
         list.sprites
             .extend(self.weather.sprites(list.camera.position));
     }
@@ -545,7 +547,8 @@ impl Particles {
         } else {
             0.0
         };
-        self.weather.update(world, seconds, &mut self.random);
+        self.weather
+            .update(world, seconds, &mut self.random, surfaces);
         let live: Vec<Live> = emitters(world)
             .map(|(id, instance)| {
                 let subs = subs_of(world, instance);

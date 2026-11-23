@@ -845,11 +845,16 @@ pub fn mode_bar(ui: &mut egui::Ui, view: ScriptView, enabled: bool) -> Option<Sc
                 .on_disabled_hover_text("Press Stop to switch.");
             switch = (picked != view).then_some(picked);
         });
-        ui.label(
-            egui::RichText::new("Switch any time: the script runs the same either way.")
-                .size(theme::type_scale::SMALL)
-                .color(palette.text_weak),
-        );
+        const SWITCH_HINT: &str = "Switch any time: the script runs the same either way.";
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(SWITCH_HINT)
+                    .size(theme::type_scale::SMALL)
+                    .color(palette.text_weak),
+            )
+            .truncate(),
+        )
+        .on_hover_text(SWITCH_HINT);
     });
     switch
 }

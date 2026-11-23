@@ -54,6 +54,12 @@ ReverbZone.Size: Vector3
 
 The part's size in studs along X, Y and Z.
 
+#### PivotOffset
+
+```luau
+ReverbZone.PivotOffset: CFrame
+```
+
 #### Color
 
 ```luau

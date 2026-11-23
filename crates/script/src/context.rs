@@ -794,8 +794,9 @@ impl Context {
     }
 
     /// Streaming (Phase 80): `gone` left this device (or was never sent
-    /// and is `StreamingState` StreamedOut), and `arrived` came back, which
-    /// fires `StreamedIn` on each that had gone.
+    /// and is `StreamingState` StreamedOut), firing `StreamedOut` on each
+    /// that just left, and `arrived` came back, firing `StreamedIn` on each
+    /// that had gone.
     pub fn note_streaming(&self, world: &mut World, gone: &[InstanceId], arrived: &[InstanceId]) {
         if self
             .lua
@@ -805,9 +806,14 @@ impl Context {
             self.lua
                 .set_app_data(crate::network::StreamedOut::default());
         }
+        let mut left = Vec::new();
         let mut back = Vec::new();
         if let Some(mut out) = self.lua.app_data_mut::<crate::network::StreamedOut>() {
-            out.0.extend(gone.iter().copied());
+            for &id in gone {
+                if out.0.insert(id) {
+                    left.push(id);
+                }
+            }
             for &id in arrived {
                 if out.0.remove(&id) {
                     back.push(id);
@@ -815,10 +821,18 @@ impl Context {
             }
         }
         with_world(&self.lua, world, || {
+            for id in left {
+                events::fire(&self.lua, events::Owner::Instance(id), "StreamedOut", ());
+            }
             for id in back {
                 events::fire(&self.lua, events::Owner::Instance(id), "StreamedIn", ());
             }
         });
+    }
+
+    /// Updates `NetworkService.IsHost` and `NetworkService.IsConnected`.
+    pub fn set_network_status(&self, is_host: bool, is_connected: bool) {
+        crate::network::set_status(&self.lua, is_host, is_connected);
     }
 
     /// Resumes the script waiting on a `RequestStreamAroundAsync`.

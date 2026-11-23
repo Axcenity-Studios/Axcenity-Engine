@@ -295,6 +295,20 @@ impl Saves {
         self.slot_path(slot).is_ok_and(|path| path.is_file())
     }
 
+    /// Removes save slot `slot` if it exists. Returns `true` if a file was
+    /// removed, or `false` if the slot wasn't saved.
+    pub fn delete_slot(&self, slot: u32) -> Result<bool, SaveError> {
+        let path = self.slot_path(slot)?;
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(true),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(err) => Err(SaveError::Write {
+                slot,
+                message: err.to_string(),
+            }),
+        }
+    }
+
     /// Makes `checkpoint` the active one, and captures the player data and
     /// world state now, for [`restore_checkpoint`](Self::restore_checkpoint).
     pub fn set_checkpoint(

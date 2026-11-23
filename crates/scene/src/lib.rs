@@ -82,3 +82,4 @@ pub use surface_pick::{
 };
 pub use terrain::{DEFAULT_DETAIL_DISTANCE, TerrainCache, terrain_hit};
 pub use time_of_day::sun_direction;
+pub use weather::{SurfaceMaskKind, format_surface_mask, paint_surface_mask, parse_surface_mask};

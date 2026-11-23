@@ -39,10 +39,10 @@ impl AnimationStudio {
             && super::transport::keys_free(ctx)
     }
 
-    /// Draws the Animation tab. `selected` is the Explorer's primary
-    /// selection, which the tab follows (see [`AnimationStudio::follow`]).
-    #[allow(clippy::too_many_arguments)] // Each is a different input to the tab.
-    pub fn show(
+    /// Draws the unified Animation workspace (`Logic`, `Clips & Rigging`, and
+    /// optionally embedded `Sequencer`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn show_with_sequencer(
         &mut self,
         ui: &mut egui::Ui,
         project: Option<&Path>,
@@ -52,6 +52,7 @@ impl AnimationStudio {
         world: &mut World,
         stylesheets: &[axcenity_ui::Stylesheet],
         output: &mut Output,
+        mut sequencer_ui: Option<&mut dyn FnMut(&mut egui::Ui, &World)>,
     ) -> Vec<StudioAction> {
         let mut actions = Vec::new();
         let Some(project) = project else {
@@ -64,15 +65,17 @@ impl AnimationStudio {
         if let Some(subject) = &subject {
             self.read_outline(project, subject);
         }
-        // Show what's open if the view's own document isn't.
+        // Show what's open if the view's own document isn't (Sequencer stays open).
         self.view = match self.view {
             View::Clip if self.clip.doc.is_none() && self.machine.doc.is_some() => {
                 View::StateMachine
             }
-            View::StateMachine if self.machine.doc.is_none() => View::Clip,
+            View::StateMachine if self.machine.doc.is_none() && self.clip.doc.is_some() => {
+                View::Clip
+            }
             view => view,
         };
-        if self.view == View::StateMachine {
+        if self.view != View::Clip {
             self.clip.drawn = None;
         }
 
@@ -124,6 +127,7 @@ impl AnimationStudio {
                 let open = match self.view {
                     View::Clip => self.clip.doc.is_some(),
                     View::StateMachine => self.machine.doc.is_some(),
+                    View::Sequencer => true,
                 };
                 if !open {
                     egui::ScrollArea::vertical()
@@ -167,6 +171,32 @@ impl AnimationStudio {
                             go = Some(asked);
                         }
                     }
+                    View::Sequencer => {
+                        egui::Panel::top("animation sequencer bar").show(ui, |ui| {
+                            responsive::toolbar(ui, |ui| {
+                                ui.strong(format!("{} Sequencer", icons::FILM_SLATE));
+                                ui.separator();
+                                if ui
+                                    .button(format!("{} Focus Scene View", icons::CUBE))
+                                    .on_hover_text(
+                                        "Focus the Scene View to watch cinematics alongside this timeline",
+                                    )
+                                    .clicked()
+                                {
+                                    actions.push(StudioAction::ShowScene);
+                                }
+                            });
+                        });
+                        egui::CentralPanel::default()
+                            .frame(egui::Frame::NONE)
+                            .show(ui, |ui| {
+                                if let Some(draw_seq) = sequencer_ui.as_mut() {
+                                    draw_seq(ui, world);
+                                } else {
+                                    ui.weak("Open a sequence in the Sequencer tab.");
+                                }
+                            });
+                    }
                 }
             });
         if let Some(go) = go {
@@ -207,6 +237,44 @@ impl AnimationStudio {
         let mut go = None;
         let mut new = None;
         let pick = responsive::toolbar(ui, |ui| {
+            // Unified workspace mode sub-tabs: Logic | Clips & Rigging | Sequencer
+            if ui
+                .selectable_label(
+                    self.view == View::StateMachine,
+                    format!("{} Logic", icons::GRAPH),
+                )
+                .on_hover_text("State Machine node graph, live parameters, and corner 3D preview")
+                .clicked()
+            {
+                if subject.is_some_and(|s| !s.state_machine.is_empty())
+                    && self.machine.doc.is_none()
+                {
+                    go = Some(Go::StateMachine);
+                } else {
+                    self.view = View::StateMachine;
+                }
+            }
+            if ui
+                .selectable_label(
+                    self.view == View::Clip,
+                    format!("{} Clips & Rigging", icons::FILM_STRIP),
+                )
+                .on_hover_text("3D character viewport, keyframe timeline, and retargeting")
+                .clicked()
+            {
+                self.view = View::Clip;
+            }
+            if ui
+                .selectable_label(
+                    self.view == View::Sequencer,
+                    format!("{} Sequencer", icons::FILM_SLATE),
+                )
+                .on_hover_text("Multi-track cinematic timeline synced to the Scene View")
+                .clicked()
+            {
+                self.view = View::Sequencer;
+            }
+            ui.separator();
             let visuals = ui.visuals().clone();
             let palette = theme::palette(ui.ctx());
             for (index, crumb) in crumbs.iter().enumerate() {
@@ -263,6 +331,7 @@ impl AnimationStudio {
             let open = match self.view {
                 View::Clip => self.clip_path(),
                 View::StateMachine => self.controller_path(),
+                View::Sequencer => None,
             };
             let mut paths = self.files.controllers.clone();
             paths.extend(self.files.clips.iter().cloned());
@@ -334,6 +403,27 @@ impl AnimationStudio {
             ui.label(AnimKind::Animator.rich_icon(&visuals));
             ui.weak(AnimKind::Animator.label());
         });
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.outline_search)
+                    .hint_text(format!("{} Filter…", icons::MAGNIFYING_GLASS))
+                    .desired_width(ui.available_width() - 22.0),
+            );
+            if !self.outline_search.is_empty()
+                && ui
+                    .small_button(icons::X)
+                    .on_hover_text("Clear filter")
+                    .clicked()
+            {
+                self.outline_search.clear();
+            }
+        });
+        ui.add_space(4.0);
+        let needle = self.outline_search.trim().to_lowercase();
+        let matches_filter =
+            |name: &str| needle.is_empty() || name.to_lowercase().contains(&needle);
+
         let clip = self.clip_path();
         let showing_clip = self.view == View::Clip;
         if !subject.state_machine.is_empty() {
@@ -343,14 +433,9 @@ impl AnimationStudio {
                 if posing::fold_toggle(ui, Some(self.outline_folds.states)) {
                     self.outline_folds.states = !self.outline_folds.states;
                 }
-                if row(
-                    ui,
-                    AnimKind::StateMachine,
-                    AnimKind::StateMachine.label(),
-                    open,
-                )
-                .on_hover_text(&subject.state_machine)
-                .clicked()
+                if row(ui, AnimKind::StateMachine, "States", open)
+                    .on_hover_text(&subject.state_machine)
+                    .clicked()
                 {
                     go = Some(Go::StateMachine);
                 }
@@ -361,6 +446,9 @@ impl AnimationStudio {
                     return;
                 }
                 for (state, clips) in self.states_of(&subject.state_machine) {
+                    if !matches_filter(&state) {
+                        continue;
+                    }
                     let first = clips.first().cloned();
                     let open = showing_clip
                         && first.is_some()
@@ -369,8 +457,7 @@ impl AnimationStudio {
                     let response = row(ui, AnimKind::Clip, &state, open);
                     match &first {
                         Some(path) => {
-                            let response = response.on_hover_text(path);
-                            self.badge(path).show_short(ui);
+                            let response = response.on_hover_text(format!("{state}\nClip: {path}"));
                             if response.clicked() {
                                 go = Some(Go::State(state.clone(), path.clone()));
                             }
@@ -383,11 +470,12 @@ impl AnimationStudio {
             });
         }
         ui.add_space(4.0);
+        ui.separator();
         ui.horizontal(|ui| {
             if posing::fold_toggle(ui, Some(self.outline_folds.animations)) {
                 self.outline_folds.animations = !self.outline_folds.animations;
             }
-            ui.weak("Animations");
+            ui.weak("Clips & Animations");
         });
         let shown = if self.outline_folds.animations {
             &[][..]
@@ -395,6 +483,9 @@ impl AnimationStudio {
             &subject.animations[..]
         };
         for animation in shown {
+            if !matches_filter(&animation.name) {
+                continue;
+            }
             let open = showing_clip
                 && !animation.clip.is_empty()
                 && clip.as_deref() == Some(animation.clip.as_str())
@@ -405,9 +496,6 @@ impl AnimationStudio {
                 continue;
             }
             let response = response.on_hover_text(&animation.clip);
-            ui.indent(("outline animation", animation.id), |ui| {
-                self.badge(&animation.clip).show_short(ui);
-            });
             if response.clicked() {
                 go = Some(Go::Animation(animation.clip.clone()));
             }

@@ -1197,6 +1197,7 @@ impl Network {
         for event in events {
             self.apply(world, scripts, event);
         }
+        scripts.set_network_status(self.is_hosting(), self.is_hosting() || self.is_joined());
         self.chat_and_kicks(world, scripts);
         if scripts.is_client_only() && matches!(self.session, Session::Joined(_)) {
             self.smoother.step(world, self.seconds);

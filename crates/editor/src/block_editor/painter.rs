@@ -129,6 +129,13 @@ impl<'a> BlockPainter<'a> {
                 vec2(width + self.s(6.0), height)
             }
             Expression::Color3 { .. } => vec2(self.s(40.0), height),
+            Expression::ObjectPath { path } => {
+                let filter = match kind {
+                    SlotKind::Object(filter) => filter,
+                    _ => Filter::Any,
+                };
+                self.dropdown_size(ui, shown_path(path, filter))
+            }
             Expression::Name { name } => self.typed_size(ui, name),
             Expression::Nil => vec2(self.text_width(ui, "nil") + self.s(14.0), height),
             Expression::Vararg => vec2(self.text_width(ui, "...") + self.s(14.0), height),
@@ -167,7 +174,6 @@ impl<'a> BlockPainter<'a> {
                     self.reporter_size(ui, expression)
                 }
             }
-            Part::Object(text, filter) => self.dropdown_size(ui, shown_path(text, *filter)),
             Part::Property(text, _) | Part::Key(text) => self.dropdown_size(ui, text),
             Part::Variable(name) => self.dropdown_size(ui, name),
             Part::Name(name, _, _) => self.dropdown_size(ui, name),
@@ -288,13 +294,17 @@ impl<'a> BlockPainter<'a> {
     }
 
     /// The row of an event block: a flat top with rounder corners, a
-    /// lighter band across it, and its category's icon first.
+    /// lighter band across it, gold Event styling across all categories,
+    /// and its semantic icon first.
     pub(super) fn hat(&mut self, ui: &mut egui::Ui, block: &mut Block, at: Pos2) -> Drawn {
-        let category = block_category(&block.kind);
         let (fill, edge) = {
             let palette = theme::palette(ui.ctx());
-            (category.fill(&palette), category.edge(&palette))
+            (
+                Category::Events.fill(&palette),
+                Category::Events.edge(&palette),
+            )
         };
+        let icon = block_icon(&block.kind);
         let id = self.id.with(block.id);
         let block_id = block.id;
         let highlighted = self.highlighted == Some(block_id);
@@ -308,7 +318,7 @@ impl<'a> BlockPainter<'a> {
             };
         };
         if !matches!(parts.first(), Some(Part::Icon(_))) {
-            parts.insert(0, Part::Icon(category.icon()));
+            parts.insert(0, Part::Icon(icon));
         }
         let size = self.row_size(ui, parts);
         let width = size.x.max(self.s(MIN_WIDTH + 40.0));
@@ -390,8 +400,14 @@ impl<'a> BlockPainter<'a> {
         let cap = block.kind.is_cap();
         let grows = block.kind.input_list_mut().is_some();
         let highlighted = self.highlighted == Some(block_id);
+        let icon = block_icon(&block.kind);
         let objects = self.objects;
         let mut sections = sections(&mut block.kind, objects);
+        if let Some(Section::Row(parts)) = sections.first_mut()
+            && !matches!(parts.first(), Some(Part::Icon(_)))
+        {
+            parts.insert(0, Part::Icon(icon));
+        }
 
         let mut width = self.s(MIN_WIDTH);
         let mut row_heights = Vec::new();
@@ -709,16 +725,6 @@ impl<'a> BlockPainter<'a> {
             }
             // Value slots are drawn by `slot`.
             Part::Slot(..) => {}
-            Part::Object(path, filter) => {
-                let filter = *filter;
-                let shown = shown_path(path, filter).to_owned();
-                if let Some(response) = self.dropdown(ui, rect, part_id, &shown) {
-                    let objects = self.objects;
-                    egui::Popup::menu(&response).show(|ui| {
-                        object_menu(ui, path, filter, objects);
-                    });
-                }
-            }
             Part::Property(name, class) => {
                 let class = *class;
                 if let Some(response) = self.dropdown(ui, rect, part_id, name) {
@@ -1121,6 +1127,21 @@ impl<'a> BlockPainter<'a> {
                         "Drop a pointed block here, or click to switch true and false",
                     )
                 })
+            }
+            Expression::ObjectPath { path } => {
+                let filter = match kind {
+                    SlotKind::Object(filter) => filter,
+                    _ => Filter::Any,
+                };
+                let shown = shown_path(path, filter).to_owned();
+                let response = self.dropdown(ui, rect, id, &shown);
+                if let Some(response) = &response {
+                    let objects = self.objects;
+                    egui::Popup::menu(response).show(|ui| {
+                        object_menu(ui, path, filter, objects);
+                    });
+                }
+                response
             }
             Expression::Boolean { value } => {
                 let text = truth_name(*value);

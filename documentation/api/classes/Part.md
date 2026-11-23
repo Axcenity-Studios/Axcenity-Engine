@@ -77,6 +77,12 @@ for _ = 1, 20 do
 end
 ```
 
+#### PivotOffset
+
+```luau
+Part.PivotOffset: CFrame
+```
+
 #### Color
 
 ```luau

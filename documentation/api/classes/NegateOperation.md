@@ -54,6 +54,12 @@ NegateOperation.Size: Vector3
 
 The part's size in studs along X, Y and Z.
 
+#### PivotOffset
+
+```luau
+NegateOperation.PivotOffset: CFrame
+```
+
 #### Color
 
 ```luau

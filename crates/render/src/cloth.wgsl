@@ -116,7 +116,7 @@ fn cloth_surface(
     dielectric: vec3<f32>,
     solid: bool,
 ) -> vec3<f32> {
-    let weather = weathered(geometric, shaded.normal, shaded.base_color, metalness, roughness);
+    let weather = weathered(in.world_position, geometric, shaded.normal, shaded.base_color, metalness, roughness);
     let n = weather.normal;
     let base_color = weather.base_color;
     let metal = weather.metalness;

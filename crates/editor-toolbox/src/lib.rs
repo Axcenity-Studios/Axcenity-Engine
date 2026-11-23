@@ -574,6 +574,18 @@ impl ToolboxPanel {
         self.search_on_show = true;
     }
 
+    /// Polls any in-flight background downloads or searches even when the
+    /// Toolbox tab is not currently visible (e.g. after dragging a card onto
+    /// the Scene View and switching tabs).
+    pub fn poll_background(&mut self, ctx: &egui::Context) -> Vec<ToolboxAction> {
+        if self.search.is_some() || self.download.is_some() {
+            ctx.request_repaint_after(Duration::from_millis(100));
+        }
+        let mut actions = Vec::new();
+        self.poll(ctx, &mut actions);
+        actions
+    }
+
     /// Stops a running download; the project is left as it was.
     pub fn cancel(&mut self) {
         self.queue.clear();
@@ -1036,6 +1048,20 @@ impl ToolboxPanel {
                     name: card.name.clone(),
                 },
             );
+        }
+        if gettable && response.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+            if let Some(pos) = ui.ctx().pointer_interact_pos() {
+                egui::Area::new(egui::Id::new("toolbox_drag_ghost"))
+                    .order(egui::Order::Tooltip)
+                    .interactable(false)
+                    .fixed_pos(pos + egui::vec2(12.0, 12.0))
+                    .show(ui.ctx(), |ui| {
+                        egui::Frame::popup(ui.style()).show(ui, |ui| {
+                            ui.label(format!("{} {}", icons::CLOUD_ARROW_DOWN, card.name));
+                        });
+                    });
+            }
         }
         let preview = self.previews.get(&card.key);
         let selected = self

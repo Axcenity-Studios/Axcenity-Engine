@@ -167,6 +167,7 @@ pub(super) fn frame_uniform(
         // And the clouds, which drift with the wind.
         clouds: Default::default(),
         weather: weather_uniform(&list.weather),
+        weather_bounds: [0.0; 4],
         // Filled in while ray traced shadows are drawn.
         ray_shadows: [0.0; 4],
         // And while ray traced reflections are.
@@ -176,11 +177,21 @@ pub(super) fn frame_uniform(
     }
 }
 
-/// The weather as `Frame::weather` holds it: wetness and snow cover, each
-/// held to 0 to 1 (a NaN is none).
+/// The weather as `Frame::weather` holds it: wetness and snow cover (each
+/// held to 0 to 1), snow layer thickness in studs (0 to 2, defaulting to
+/// [`crate::DEFAULT_SNOW_THICKNESS`] when snow > 0 and thickness <= 0), and
+/// `w` filled in by `ScenePipeline` when a valid `weather_field` is bound.
 fn weather_uniform(weather: &crate::Weather) -> [f32; 4] {
     let share = |value: f32| if value > 0.0 { value.min(1.0) } else { 0.0 };
-    [share(weather.wetness), share(weather.snow), 0.0, 0.0]
+    let snow = share(weather.snow);
+    let thickness = if weather.snow_thickness > 0.0 && weather.snow_thickness.is_finite() {
+        weather.snow_thickness.min(2.0)
+    } else if snow > 0.0 {
+        crate::DEFAULT_SNOW_THICKNESS
+    } else {
+        0.0
+    };
+    [share(weather.wetness), snow, thickness, 0.0]
 }
 
 /// The lights to draw, and which of them reach each tile of the screen.

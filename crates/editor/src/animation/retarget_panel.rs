@@ -318,7 +318,8 @@ impl RetargetPanel {
         self.summary.as_ref().expect("just made")
     }
 
-    /// Draws the section under the clip's settings.
+    /// Draws the section under the clip's settings as a collapsible accordion
+    /// (collapsed by default once the rig has no errors).
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -328,118 +329,129 @@ impl RetargetPanel {
         output: &mut Output,
     ) {
         ui.separator();
-        ui.strong("Retargeting");
         let profile = self.profile(doc, assets);
         let summary = self.summary(doc, assets);
-        ui.label(&summary.status);
-        let palette = theme::palette(ui.ctx());
-        for (who, problem) in &summary.problems {
-            let (icon, color) = match problem.severity {
-                Severity::Error => (icons::X_CIRCLE, palette.error),
-                Severity::Warning => (icons::WARNING, palette.warning),
-                Severity::Note => (icons::INFO, ui.visuals().weak_text_color()),
-            };
-            ui.horizontal_wrapped(|ui| {
-                ui.colored_label(color, icon);
-                ui.weak(format!("{who}:"));
-                ui.label(&problem.message);
-            });
-        }
+        let has_errors = summary
+            .problems
+            .iter()
+            .any(|(_, p)| matches!(p.severity, Severity::Error));
+        let status = summary.status.clone();
+        let problems = summary.problems.clone();
+        let default_open = has_errors || doc.file.retarget.is_none();
+        let header = egui::CollapsingHeader::new(format!("{} Retargeting", icons::PERSON_SIMPLE))
+            .id_salt(("retarget accordion", &doc.path, doc.file.retarget.is_some()))
+            .default_open(default_open)
+            .icon(crate::widgets::chevron)
+            .show(ui, |ui| {
+                ui.label(&status);
+                let palette = theme::palette(ui.ctx());
+                for (who, problem) in &problems {
+                    let (icon, color) = match problem.severity {
+                        Severity::Error => (icons::X_CIRCLE, palette.error),
+                        Severity::Warning => (icons::WARNING, palette.warning),
+                        Severity::Note => (icons::INFO, ui.visuals().weak_text_color()),
+                    };
+                    ui.horizontal_wrapped(|ui| {
+                        ui.colored_label(color, icon);
+                        ui.weak(format!("{who}:"));
+                        ui.label(&problem.message);
+                    });
+                }
 
-        ui.horizontal_wrapped(|ui| {
-            let model = doc
-                .preview_model
-                .clone()
-                .and_then(|mesh_id| Some((assets.model_blocking(&mesh_id)?, mesh_id)));
-            if let Some((model, mesh_id)) = &model
-                && let Some(rig) = &model.rig
-                && ui
-                    .button(format!("{} Model's bone map…", icons::PERSON_SIMPLE))
-                    .on_hover_text("Which of the model's bones plays each humanoid role")
-                    .clicked()
-            {
-                self.bone_map = Some(BoneMap::open(
-                    Which::Model,
-                    mesh_id,
-                    rig.bones.clone(),
-                    &assets.rig_definitions(),
-                ));
-            }
-            let skeleton = doc.take_skeleton();
-            if !skeleton.is_empty()
-                && ui
-                    .button(format!("{} Take's bone map…", icons::PERSON_SIMPLE))
-                    .on_hover_text("Which bone of the take's own skeleton plays each humanoid role")
-                    .clicked()
-            {
-                self.bone_map = Some(BoneMap::open(
-                    Which::Take,
-                    &doc.file.source,
-                    skeleton,
-                    &assets.rig_definitions(),
-                ));
-            }
-        });
-
-        // The profile: picked, made, and its settings.
-        let paths = profile_paths(project);
-        let current = doc.file.retarget.clone();
-        let mut pick: Option<Option<String>> = None;
-        crate::responsive::form(ui, "retarget profile", |ui| {
-            ui.label("Profile");
-            egui::ComboBox::from_id_salt("retarget profile pick")
-                .selected_text(current.as_deref().map_or("None (defaults)", |path| {
-                    path.rsplit('/').next().unwrap_or(path)
-                }))
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_label(current.is_none(), "None (defaults)")
-                        .clicked()
-                    {
-                        pick = Some(None);
-                    }
-                    for path in &paths {
-                        let name = path.rsplit('/').next().unwrap_or(path);
-                        if ui
-                            .selectable_label(current.as_deref() == Some(path), name)
-                            .on_hover_text(path)
+                ui.horizontal_wrapped(|ui| {
+                    let model = doc
+                        .preview_model
+                        .clone()
+                        .and_then(|mesh_id| Some((assets.model_blocking(&mesh_id)?, mesh_id)));
+                    if let Some((model, mesh_id)) = &model
+                        && let Some(rig) = &model.rig
+                        && ui
+                            .button(format!("{} Model's bone map…", icons::PERSON_SIMPLE))
+                            .on_hover_text("Which of the model's bones plays each humanoid role")
                             .clicked()
-                        {
-                            pick = Some(Some(path.clone()));
-                        }
+                    {
+                        self.bone_map = Some(BoneMap::open(
+                            Which::Model,
+                            mesh_id,
+                            rig.bones.clone(),
+                            &assets.rig_definitions(),
+                        ));
                     }
-                    ui.separator();
-                    if ui.button(format!("{} New profile", icons::PLUS)).clicked() {
-                        pick = Some(Some(new_profile_path(project, &doc.path)));
+                    let skeleton = doc.take_skeleton();
+                    if !skeleton.is_empty()
+                        && ui
+                            .button(format!("{} Take's bone map…", icons::PERSON_SIMPLE))
+                            .on_hover_text(
+                                "Which bone of the take's own skeleton plays each humanoid role",
+                            )
+                            .clicked()
+                    {
+                        self.bone_map = Some(BoneMap::open(
+                            Which::Take,
+                            &doc.file.source,
+                            skeleton,
+                            &assets.rig_definitions(),
+                        ));
                     }
                 });
-            ui.end_row();
-        });
-        if let Some(path) = pick
-            && let Err(err) = self.use_profile(doc, project, path)
-        {
-            output.error(format!("Could not make the retarget profile: {err}"));
-        }
 
-        match profile {
-            Some(Err(why)) => {
-                ui.colored_label(palette.error, why);
-            }
-            Some(Ok(profile)) => {
-                if let Some(changed) = profile_settings(ui, &profile)
-                    && let Err(err) = self.change_profile(doc, project, changed)
+                // The profile: picked, made, and its settings.
+                let paths = profile_paths(project);
+                let current = doc.file.retarget.clone();
+                let mut pick: Option<Option<String>> = None;
+                crate::responsive::form(ui, "retarget profile", |ui| {
+                    ui.label("Profile");
+                    egui::ComboBox::from_id_salt("retarget profile pick")
+                        .selected_text(current.as_deref().map_or("None (defaults)", |path| {
+                            path.rsplit('/').next().unwrap_or(path)
+                        }))
+                        .show_ui(ui, |ui| {
+                            if ui
+                                .selectable_label(current.is_none(), "None (defaults)")
+                                .clicked()
+                            {
+                                pick = Some(None);
+                            }
+                            for path in &paths {
+                                let name = path.rsplit('/').next().unwrap_or(path);
+                                if ui
+                                    .selectable_label(current.as_deref() == Some(path), name)
+                                    .on_hover_text(path)
+                                    .clicked()
+                                {
+                                    pick = Some(Some(path.clone()));
+                                }
+                            }
+                            ui.separator();
+                            if ui.button(format!("{} New profile", icons::PLUS)).clicked() {
+                                pick = Some(Some(new_profile_path(project, &doc.path)));
+                            }
+                        });
+                    ui.end_row();
+                });
+                if let Some(path) = pick
+                    && let Err(err) = self.use_profile(doc, project, path)
                 {
-                    output.error(format!("Could not save the retarget profile: {err}"));
+                    output.error(format!("Could not make the retarget profile: {err}"));
                 }
-            }
-            None => {
-                ui.weak(
-                    "Without a profile, rest poses are matched, the hips travel scaled to the \
-                     legs, and every bone plays fully. Make one to plant feet, place hands, \
-                     play in place or tune single bones; clips can share it.",
-                );
-            }
-        }
+
+                match profile {
+                    Some(Err(why)) => {
+                        ui.colored_label(palette.error, why);
+                    }
+                    Some(Ok(profile)) => {
+                        if let Some(changed) = profile_settings(ui, &profile)
+                            && let Err(err) = self.change_profile(doc, project, changed)
+                        {
+                            output.error(format!("Could not save the retarget profile: {err}"));
+                        }
+                    }
+                    None => {}
+                }
+            });
+        header.header_response.on_hover_text(
+            "Without a profile, rest poses are matched, hips travel scaled to the legs, and every bone plays fully. Create a profile to plant feet, match hands, play in place, or tune single bones.",
+        );
 
         if let Some(saved) = self.bone_map_window(ui.ctx(), project, assets, output) {
             output.info(format!("Saved the bone map as `{saved}`."));

@@ -54,6 +54,12 @@ Seat.Size: Vector3
 
 The part's size in studs along X, Y and Z.
 
+#### PivotOffset
+
+```luau
+Seat.PivotOffset: CFrame
+```
+
 #### Color
 
 ```luau

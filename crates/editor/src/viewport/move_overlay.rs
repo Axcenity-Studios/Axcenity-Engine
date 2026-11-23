@@ -216,13 +216,21 @@ fn paint_turn(
 }
 
 /// While parts change: leaves each solid as it started and draws it
-/// see-through as it is now. `moves` is each part's place now and what
-/// turns its transform now into the one it started with.
-pub(super) fn ghost_moving(list: &mut DrawList, moves: &[(Vec3, Mat4)]) {
+/// see-through as it is now. `moves` is each moving piece's `(item_id,
+/// current_position, transform_back_to_start)`. Matching by `item_id` when
+/// non-zero (MeshParts) and by piece position otherwise (Parts and all three
+/// pieces of a Capsule) keeps multi-piece parts unified.
+pub(super) fn ghost_moving(list: &mut DrawList, moves: &[(u64, Vec3, Mat4)]) {
     let mut starts = Vec::new();
     for item in &mut list.items {
         let at = item.transform.w_axis.truncate();
-        let Some((_, back)) = moves.iter().find(|(now, _)| now.distance(at) < 0.001) else {
+        let Some((_, _, back)) = moves.iter().find(|(id, now, _)| {
+            if item.id != 0 {
+                *id == item.id
+            } else {
+                now.distance(at) < 0.002
+            }
+        }) else {
             continue;
         };
         let mut start = item.clone();
@@ -389,7 +397,11 @@ mod tests {
 
         ghost_moving(
             &mut list,
-            &[(now, Mat4::from_translation(Vec3::new(-4.0, 0.0, 0.0)))],
+            &[(
+                axcenity_scene::item_id(part),
+                now,
+                Mat4::from_translation(Vec3::new(-4.0, 0.0, 0.0)),
+            )],
         );
 
         assert_eq!(list.items.len(), 2);
@@ -398,5 +410,53 @@ mod tests {
         assert!(list.items[0].material.opacity < 0.5);
         assert_eq!(at(1), Vec3::new(2.0, 1.0, 0.0));
         assert_eq!(list.items[1].material.opacity, 1.0);
+    }
+
+    #[test]
+    fn a_moving_capsule_ghosts_all_three_pieces_together() {
+        let mut world = World::new();
+        let part = world.create(ClassName::Part).unwrap();
+        let workspace = world.workspace();
+        world.set_parent(part, Some(workspace)).unwrap();
+        world
+            .set_property(
+                part,
+                "Shape",
+                Value::PartType(axcenity_core::PartType::Capsule),
+            )
+            .unwrap();
+        world
+            .set_property(part, "Size", Value::Vector3(Vector3::new(4.0, 2.0, 2.0)))
+            .unwrap();
+        let center = Vec3::new(6.0, 1.0, 0.0);
+        world
+            .set_property(
+                part,
+                "Position",
+                Value::Vector3(Vector3::new(center.x, center.y, center.z)),
+            )
+            .unwrap();
+        let assets = axcenity_assets::Assets::new(std::env::temp_dir().join("axcenity-no-ghosts"));
+        let mut list = axcenity_scene::build_draw_list(&world, &assets, camera());
+        assert_eq!(list.items.len(), 3, "cylinder + two end spheres");
+
+        let back = Mat4::from_translation(Vec3::new(-4.0, 0.0, 0.0));
+        let id = axcenity_scene::item_id(part);
+        ghost_moving(
+            &mut list,
+            &[
+                (id, center, back),
+                (id, center - Vec3::X, back),
+                (id, center + Vec3::X, back),
+            ],
+        );
+
+        assert_eq!(list.items.len(), 6, "all three pieces ghosted + cloned");
+        for item in &list.items[0..3] {
+            assert!(item.material.opacity < 0.5, "moved capsule pieces ghosted");
+        }
+        for item in &list.items[3..6] {
+            assert_eq!(item.material.opacity, 1.0, "start capsule pieces solid");
+        }
     }
 }

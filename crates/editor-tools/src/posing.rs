@@ -69,6 +69,10 @@ pub struct PoseSettings {
     pub axes: Axes,
     /// How many bones above a moved joint turn to move it (1 to 4).
     pub chain: usize,
+    /// Draw the skeleton bones & joints overlay in the preview (off by default).
+    pub show_bones: bool,
+    /// Draw bone name labels next to joints when `show_bones` is on.
+    pub show_bone_names: bool,
 }
 
 impl Default for PoseSettings {
@@ -85,6 +89,8 @@ impl Default for PoseSettings {
             },
             axes: Axes::World,
             chain: 2,
+            show_bones: false,
+            show_bone_names: false,
         }
     }
 }
@@ -462,6 +468,8 @@ pub struct Interaction {
     shapes: Vec<gizmo::Shape>,
     highlighted: Option<Handle>,
     hovered: Option<usize>,
+    show_bones: bool,
+    show_bone_names: bool,
 }
 
 /// How a drag holds on.
@@ -669,13 +677,18 @@ impl Poser {
             }
             _ => None,
         };
+        out.show_bones = settings.show_bones;
+        out.show_bone_names = settings.show_bone_names;
         out.hovered = over
             .filter(|_| handle.is_none() && self.drag.is_none())
             .and_then(|pointer| {
                 joints
                     .iter()
                     .enumerate()
-                    .filter(|(bone, _)| skeleton.posable(*bone))
+                    .filter(|(bone, _)| {
+                        skeleton.posable(*bone)
+                            && (settings.show_bones || self.selected == Some(*bone))
+                    })
                     .filter_map(|(bone, &joint)| {
                         Some((bone, screen.point(joint)?.distance(pointer)))
                     })
@@ -858,53 +871,64 @@ impl Poser {
         interaction: &Interaction,
     ) {
         let palette = theme::palette(painter.ctx());
-        let joints = skeleton.joints();
-        let bone_line = egui::Stroke::new(1.5_f32, egui::Color32::from_white_alpha(140));
-        for (bone, info) in skeleton.rig.bones.iter().enumerate() {
-            if let Some(parent) = info.parent.filter(|&p| skeleton.posable(p))
-                && skeleton.posable(bone)
-                && let Some(line) = screen.line(joints[parent], joints[bone])
-            {
-                painter.line_segment(line, bone_line);
+        if interaction.show_bones {
+            let joints = skeleton.joints();
+            let bone_line = egui::Stroke::new(1.5_f32, egui::Color32::from_white_alpha(140));
+            for (bone, info) in skeleton.rig.bones.iter().enumerate() {
+                if let Some(parent) = info.parent.filter(|&p| skeleton.posable(p))
+                    && skeleton.posable(bone)
+                    && let Some(line) = screen.line(joints[parent], joints[bone])
+                {
+                    painter.line_segment(line, bone_line);
+                }
             }
-        }
-        for (bone, &joint) in joints.iter().enumerate() {
-            if !skeleton.posable(bone) {
-                continue;
-            }
-            let Some(at) = screen.point(joint) else {
-                continue;
-            };
-            let fill = if self.selected == Some(bone) {
-                palette.accent
-            } else if skeleton.locked(bone) {
-                egui::Color32::from_gray(110)
-            } else {
-                egui::Color32::WHITE
-            };
-            let radius = if interaction.hovered == Some(bone) {
-                JOINT + 1.5
-            } else {
-                JOINT
-            };
-            painter.circle(
-                at,
-                radius,
-                fill,
-                egui::Stroke::new(1.0_f32, egui::Color32::from_black_alpha(180)),
-            );
-        }
-        // A pin where each pinned joint is held.
-        let to_world = skeleton.to_world();
-        for &at in self.pins().values() {
-            if let Some(at) = screen.point(to_world.transform_point3(at)) {
-                painter.text(
-                    at + egui::vec2(0.0, -JOINT - 1.0),
-                    egui::Align2::CENTER_BOTTOM,
-                    icons::PUSH_PIN,
-                    egui::FontId::proportional(14.0),
-                    palette.warning,
+            for (bone, &joint) in joints.iter().enumerate() {
+                if !skeleton.posable(bone) {
+                    continue;
+                }
+                let Some(at) = screen.point(joint) else {
+                    continue;
+                };
+                let fill = if self.selected == Some(bone) {
+                    palette.accent
+                } else if skeleton.locked(bone) {
+                    egui::Color32::from_gray(110)
+                } else {
+                    egui::Color32::WHITE
+                };
+                let radius = if interaction.hovered == Some(bone) {
+                    JOINT + 1.5
+                } else {
+                    JOINT
+                };
+                painter.circle(
+                    at,
+                    radius,
+                    fill,
+                    egui::Stroke::new(1.0_f32, egui::Color32::from_black_alpha(180)),
                 );
+                if interaction.show_bone_names {
+                    painter.text(
+                        at + egui::vec2(6.0, -4.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        &skeleton.rig.bones[bone].name,
+                        egui::FontId::proportional(10.0),
+                        egui::Color32::from_white_alpha(200),
+                    );
+                }
+            }
+            // A pin where each pinned joint is held.
+            let to_world = skeleton.to_world();
+            for &at in self.pins().values() {
+                if let Some(at) = screen.point(to_world.transform_point3(at)) {
+                    painter.text(
+                        at + egui::vec2(0.0, -JOINT - 1.0),
+                        egui::Align2::CENTER_BOTTOM,
+                        icons::PUSH_PIN,
+                        egui::FontId::proportional(14.0),
+                        palette.warning,
+                    );
+                }
             }
         }
         gizmo::paint(painter, &interaction.shapes, interaction.highlighted);

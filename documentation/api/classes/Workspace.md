@@ -88,6 +88,14 @@ local camera = workspace.CurrentCamera
 camera.FieldOfView = 90
 ```
 
+#### DistributedGameTime
+
+```luau
+Workspace.DistributedGameTime: number
+```
+
+Seconds of game time elapsed since the session started. Read-only.
+
 ### Functions
 
 #### Raycast

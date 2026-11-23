@@ -82,8 +82,12 @@ struct Frame {
     // The layer of cloud in the sky (clouds.wgsl).
     clouds: Clouds,
     // x: how wet surfaces are, y: how much snow covers them, each from 0
-    // to 1 (`weathered`).
+    // to 1, z: snow layer thickness in studs, w: 1 while `weather_field` is
+    // populated for this frame (`weathered`).
     weather: vec4<f32>,
+    // xy: world X and Z of `weather_field` cell (0, 0), z: cell size in studs,
+    // w: grid side length in cells.
+    weather_bounds: vec4<f32>,
     // x: 1 while ray traced sun shadows are drawn, y: the scene's width in
     // pixels, z: how far they reach in studs (`ray_traced_sun`), w: where
     // the lamps' half of `ray_shadow_mask` starts, or 0 while lamps aren't
@@ -211,6 +215,10 @@ const LIGHTS_PER_TILE: u32 = 64u;
 // rg, then b and how much it counts, as half floats. One blank entry while
 // they're off.
 @group(0) @binding(18) var<storage, read> ray_reflections: array<vec2<u32>>;
+// World-space 2D weather field around the camera: per cell (z * size + x),
+// x = highest sky-occluding roof Y (-1e9 if open sky), y = manual surface
+// mask (-1 interior, 0 auto, +1 exterior), z = snow footprint depth (0..1).
+@group(0) @binding(19) var<storage, read> weather_field: array<vec4<f32>>;
 
 // The most lamps a pixel has ray traced shadows for. Must match
 // `TRACED_LAMPS` in ray_shadows.wgsl.
@@ -946,7 +954,7 @@ fn light_surface(
     solid: bool,
     bumped: bool,
 ) -> vec3<f32> {
-    let weather = weathered(geometric, n, base_color, metalness, roughness);
+    let weather = weathered(world_position, geometric, n, base_color, metalness, roughness);
     return shade_surface(world_position, geometric, weather.normal, pixel, weather.base_color,
         weather.metalness, weather.roughness, occlusion, dielectric, solid, bumped);
 }
@@ -958,6 +966,7 @@ const WET_DARKENING: f32 = 0.5;
 const WET_ROUGHNESS: f32 = 0.08;
 // Snow's color (linear) and roughness.
 const SNOW_COLOR: vec3<f32> = vec3<f32>(0.85, 0.87, 0.9);
+const SNOW_COMPACTED_COLOR: vec3<f32> = vec3<f32>(0.62, 0.68, 0.78);
 const SNOW_ROUGHNESS: f32 = 0.8;
 
 // A surface as the weather leaves it.
@@ -968,13 +977,87 @@ struct Weathered {
     normal: vec3<f32>,
 }
 
+// Samples one cell of `weather_field`, clamped to the grid.
+fn weather_cell(ix: i32, iz: i32, size: i32) -> vec4<f32> {
+    let cx = clamp(ix, 0, size - 1);
+    let cz = clamp(iz, 0, size - 1);
+    return weather_field[u32(cz * size + cx)];
+}
+
+// Exterior exposure (0 = sheltered interior, 1 = exposed to sky) for one
+// `weather_field` cell at `world_y`.
+fn weather_cell_exposure(cell: vec4<f32>, world_y: f32) -> f32 {
+    if cell.y < -0.5 {
+        return 0.0;
+    }
+    if cell.y > 0.5 {
+        return 1.0;
+    }
+    if cell.x <= -1.0e8 {
+        return 1.0;
+    }
+    return smoothstep(cell.x - 0.6, cell.x - 0.1, world_y);
+}
+
+// Returns (exposure, footprint_depth) at `world_position` from Interior
+// GraphicsVolumes and `weather_field` (sky-visibility + manual paint + snow
+// footprints).
+fn weather_sample(world_position: vec3<f32>) -> vec2<f32> {
+    var exposure = 1.0;
+    let dust_count = min(frame.fog.dust_count.x, MAX_DUST);
+    for (var i = 0u; i < dust_count; i++) {
+        let b = frame.fog.dust[i];
+        if b.color.w > 0.5 {
+            exposure *= 1.0 - dust_inside(b, world_position);
+        }
+    }
+    var footprint = 0.0;
+    if frame.weather.w > 0.5 && frame.weather_bounds.w > 0.0 && frame.weather_bounds.z > 0.0 {
+        let size = i32(frame.weather_bounds.w);
+        let grid = (world_position.xz - frame.weather_bounds.xy) / frame.weather_bounds.z - 0.5;
+        if grid.x >= -0.5 && grid.y >= -0.5 && grid.x <= f32(size) - 0.5 && grid.y <= f32(size) - 0.5 {
+            let x0 = i32(floor(grid.x));
+            let z0 = i32(floor(grid.y));
+            let f = fract(grid);
+            let c00 = weather_cell(x0, z0, size);
+            let c10 = weather_cell(x0 + 1, z0, size);
+            let c01 = weather_cell(x0, z0 + 1, size);
+            let c11 = weather_cell(x0 + 1, z0 + 1, size);
+            let e00 = weather_cell_exposure(c00, world_position.y);
+            let e10 = weather_cell_exposure(c10, world_position.y);
+            let e01 = weather_cell_exposure(c01, world_position.y);
+            let e11 = weather_cell_exposure(c11, world_position.y);
+            let field_exp = mix(mix(e00, e10, f.x), mix(e01, e11, f.x), f.y);
+            exposure *= field_exp;
+            footprint = mix(mix(c00.z, c10.z, f.x), mix(c01.z, c11.z, f.x), f.y);
+        }
+    }
+    return vec2<f32>(exposure, clamp(footprint, 0.0, 1.0));
+}
+
+// Finite-difference XZ gradient of snow footprint depth at `world_position`
+// for normal-mapped 3D depression rims.
+fn weather_footprint_gradient(world_position: vec3<f32>) -> vec2<f32> {
+    if frame.weather.w <= 0.5 || frame.weather_bounds.w <= 0.0 || frame.weather_bounds.z <= 0.0 {
+        return vec2<f32>(0.0);
+    }
+    let size = i32(frame.weather_bounds.w);
+    let grid = (world_position.xz - frame.weather_bounds.xy) / frame.weather_bounds.z - 0.5;
+    let ix = i32(round(grid.x));
+    let iz = i32(round(grid.y));
+    let dx = weather_cell(ix + 1, iz, size).z - weather_cell(ix - 1, iz, size).z;
+    let dz = weather_cell(ix, iz + 1, size).z - weather_cell(ix, iz - 1, size).z;
+    return vec2<f32>(dx, dz) * 0.5;
+}
+
 // The weather on a surface (`frame.weather`): wet surfaces are darker and
 // glossier, undersides less so; snow covers surfaces facing up, the
-// deeper it is the further down their slopes, and never walls. Snow is
-// judged by the surface's own normal (`geometric`), so a normal map's
-// bumps don't shed it, and it smooths the shading normal over. Dry and
-// bare, the surface is left as it is.
+// deeper it is the further down their slopes, and never walls. Sheltered
+// surfaces under roofs, inside Interior volumes, or painted Interior stay
+// dry and bare. Snow footprints indent and compact the snow surface.
+// Dry and bare, the surface is left as it is.
 fn weathered(
+    world_position: vec3<f32>,
     geometric: vec3<f32>,
     n: vec3<f32>,
     base_color: vec3<f32>,
@@ -987,17 +1070,36 @@ fn weathered(
     if wetness <= 0.0 && cover <= 0.0 {
         return out;
     }
+    let sample = weather_sample(world_position);
+    let exposure = sample.x;
+    let footprint = sample.y;
+    if exposure <= 0.001 {
+        return out;
+    }
+    let thickness = select(0.35, frame.weather.z, frame.weather.z > 0.0);
     let up = geometric.y;
-    let wet = wetness * smoothstep(-1.0, -0.2, up);
+    let wet = wetness * exposure * smoothstep(-1.0, -0.2, up);
     out.base_color *= mix(1.0, WET_DARKENING, wet * (1.0 - metalness));
     out.roughness = mix(roughness, min(roughness, WET_ROUGHNESS), wet);
     // Full on a flat top from two thirds cover, and at full cover down to
     // about 37 degrees of slope; nothing steeper than about 66 degrees.
-    let snow = clamp(1.5 * cover - 2.5 * (1.0 - up), 0.0, 1.0);
-    out.base_color = mix(out.base_color, SNOW_COLOR, snow);
+    let base_snow = clamp(1.5 * cover - 2.5 * (1.0 - up), 0.0, 1.0) * exposure;
+    // Deep footprints thin the snow slightly on thin layers so ground peeks through.
+    let snow_thin = footprint * clamp(0.45 - 0.15 * thickness, 0.1, 0.45);
+    let snow = clamp(base_snow * (1.0 - snow_thin), 0.0, 1.0);
+    let snow_albedo = mix(SNOW_COLOR, SNOW_COMPACTED_COLOR, footprint * 0.55);
+    let snow_rough = mix(SNOW_ROUGHNESS, 0.45, footprint * 0.6);
+    out.base_color = mix(out.base_color, snow_albedo, snow);
     out.metalness = mix(metalness, 0.0, snow);
-    out.roughness = mix(out.roughness, SNOW_ROUGHNESS, snow);
-    out.normal = normalize(mix(n, geometric, snow));
+    out.roughness = mix(out.roughness, snow_rough, snow);
+    let flatten = clamp(snow * (0.75 + 0.25 * clamp(thickness, 0.0, 1.5)), 0.0, 1.0);
+    var snow_normal = normalize(mix(n, geometric, flatten));
+    if footprint > 0.001 && snow > 0.01 {
+        let grad = weather_footprint_gradient(world_position);
+        let indent = vec3<f32>(grad.x, 0.0, grad.y) * (1.6 * clamp(thickness, 0.15, 2.0) * snow);
+        snow_normal = normalize(snow_normal + indent);
+    }
+    out.normal = snow_normal;
     return out;
 }
 

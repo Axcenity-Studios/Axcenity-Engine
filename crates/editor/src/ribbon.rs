@@ -203,17 +203,18 @@ impl egui::Widget for PinnedButton<'_> {
         );
         let label = ui.painter().layout_no_wrap(
             self.label.to_owned(),
-            FontId::new(type_scale::SMALL + 0.5, theme::medium_family()),
+            FontId::new(type_scale::BODY, theme::medium_family()),
             Color32::PLACEHOLDER,
         );
-        // Compact, the name is only in the tooltip.
+        // Match the primary ribbon navigation tabs (26pt tall, BODY medium
+        // label, 8pt horizontal padding). Compact shows the icon only.
         let width = if compact {
             26.0
         } else {
-            icon.size().x + 5.0 + label.size().x + 18.0
+            icon.size().x + 5.0 + label.size().x + 16.0
         };
         let (rect, response) =
-            ui.allocate_exact_size(egui::vec2(width, 22.0), egui::Sense::click());
+            ui.allocate_exact_size(egui::vec2(width, 26.0), egui::Sense::click());
         response.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), self.label)
         });
@@ -240,11 +241,7 @@ impl egui::Widget for PinnedButton<'_> {
                 );
             }
             let (icon_color, text_color) = if enabled {
-                let text = theme::mix(
-                    ink(&palette, palette.text_secondary),
-                    palette.text_strong,
-                    hover,
-                );
+                let text = theme::mix(palette.text_weak, palette.text_strong, hover);
                 (ink(&palette, self.color), text)
             } else {
                 (self.color.gamma_multiply(0.35), palette.text_muted)
@@ -252,8 +249,8 @@ impl egui::Widget for PinnedButton<'_> {
             if compact {
                 painter.galley(rect.center() - icon.size() / 2.0, icon, icon_color);
             } else {
-                let left = rect.left() + 9.0;
-                let middle = rect.center().y;
+                let left = rect.left() + 8.0;
+                let middle = rect.center().y - 1.0;
                 let icon_width = icon.size().x;
                 painter.galley(
                     egui::pos2(left, middle - icon.size().y / 2.0),

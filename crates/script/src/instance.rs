@@ -197,6 +197,9 @@ pub(crate) fn get(lua: &Lua, id: InstanceId, key: &str) -> mlua::Result<mlua::Va
     if key == "StreamedIn" {
         return LuaSignal::named(Owner::Instance(id), "StreamedIn").into_lua(lua);
     }
+    if key == "StreamedOut" {
+        return LuaSignal::named(Owner::Instance(id), "StreamedOut").into_lua(lua);
+    }
     let instance = world.get(id).ok_or_else(destroyed)?;
     match key {
         "Name" => return instance.name().into_lua(lua),
@@ -238,6 +241,9 @@ pub(crate) fn get(lua: &Lua, id: InstanceId, key: &str) -> mlua::Result<mlua::Va
         return value.into_lua(lua);
     }
     let class = instance.class();
+    if class == ClassName::Workspace && key == "DistributedGameTime" {
+        return crate::scheduler::now(lua).into_lua(lua);
+    }
     // Live animator state, not a saved property (see `core::AnimatorState`).
     if class == ClassName::Animator && key == "CurrentState" {
         let state = world.animator(id).map(|s| s.current_state.clone());
@@ -393,6 +399,12 @@ pub(crate) fn set(lua: &Lua, id: InstanceId, key: &str, value: mlua::Value) -> m
         "UserId" | "DisplayName" if class == Some(ClassName::Player) => Err(mlua::Error::runtime(
             format!("Player.{key} is read-only: it's who joined, as they joined"),
         )),
+        "DistributedGameTime" if class == Some(ClassName::Workspace) => Err(mlua::Error::runtime(
+            "Workspace.DistributedGameTime is read-only",
+        )),
+        "TimeLength" if class == Some(ClassName::Sound) => {
+            Err(mlua::Error::runtime("Sound.TimeLength is read-only"))
+        }
         "Active" if class == Some(ClassName::DataLayer) => {
             Err(mlua::Error::runtime(crate::data_layers::ACTIVE_READ_ONLY))
         }

@@ -42,6 +42,16 @@ impl EditorApp {
         }
     }
 
+    /// Polls any in-flight Toolbox downloads even when the Toolbox pane is not
+    /// currently visible, so dragged assets always complete and open the Import
+    /// dialog.
+    pub(in crate::app) fn poll_toolbox_background(&mut self, ctx: &egui::Context) {
+        let actions = self.toolbox.poll_background(ctx);
+        for action in actions {
+            self.toolbox_action(action);
+        }
+    }
+
     /// Shows the Toolbox tab; with a target, the next texture got fills it.
     pub(in crate::app) fn open_toolbox(&mut self, target: Option<Target>) {
         self.layout.open(Pane::Toolbox);
@@ -73,10 +83,12 @@ impl EditorApp {
             part: target.part,
             ui: target.ui,
         };
-        if !self
+        if self
             .toolbox
             .get_dropped(ctx, &folder, card, Target::Drop(spot))
         {
+            self.output.info(format!("Downloading {}…", card.name));
+        } else {
             self.output
                 .error(format!("Could not get {} from the Toolbox now.", card.name));
         }

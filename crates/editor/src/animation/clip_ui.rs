@@ -280,6 +280,24 @@ impl AnimationStudio {
                         &mut self.clip.record,
                         "On, turning a bone in the preview sets a key at the playhead",
                     );
+                    if ui
+                        .selectable_label(
+                            self.clip.pose.show_bones,
+                            format!("{} Show Bones", icons::BONE),
+                        )
+                        .on_hover_text("Toggle the skeleton overlay over the character mesh")
+                        .clicked()
+                    {
+                        self.clip.pose.show_bones = !self.clip.pose.show_bones;
+                    }
+                    if self.clip.pose.show_bones
+                        && ui
+                            .selectable_label(self.clip.pose.show_bone_names, "Show Bone Names")
+                            .on_hover_text("Show bone names beside joints in the preview")
+                            .clicked()
+                    {
+                        self.clip.pose.show_bone_names = !self.clip.pose.show_bone_names;
+                    }
                 }
                 Clip::Property(doc) => {
                     doc.controls(ui);
@@ -313,6 +331,24 @@ impl AnimationStudio {
                         &mut self.clip.record,
                         "On, moving something in the preview sets a key at the playhead",
                     );
+                    if ui
+                        .selectable_label(
+                            self.clip.pose.show_bones,
+                            format!("{} Show Bones", icons::BONE),
+                        )
+                        .on_hover_text("Toggle the skeleton overlay over a rigged mesh")
+                        .clicked()
+                    {
+                        self.clip.pose.show_bones = !self.clip.pose.show_bones;
+                    }
+                    if self.clip.pose.show_bones
+                        && ui
+                            .selectable_label(self.clip.pose.show_bone_names, "Show Bone Names")
+                            .on_hover_text("Show bone names beside joints in the preview")
+                            .clicked()
+                    {
+                        self.clip.pose.show_bone_names = !self.clip.pose.show_bone_names;
+                    }
                 }
             }
             ui.separator();

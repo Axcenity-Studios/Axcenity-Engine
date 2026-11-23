@@ -74,9 +74,122 @@ pub struct BlockScript {
     /// shown as one, so other block scripts don't change.
     #[serde(default, skip_serializing_if = "Graph::is_empty")]
     pub graph: Graph,
+    /// Declared variables with their optional initial value, scope and live
+    /// debug watcher flag.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<VariableDef>,
     /// Indent the Lua with tabs, as the typed script it came from was.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tabs: bool,
+}
+
+fn default_variable_initial() -> Expression {
+    Expression::Number { value: 0.0 }
+}
+
+/// Metadata for a script variable declared in the Variables palette.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VariableDef {
+    pub name: String,
+    #[serde(default = "default_variable_initial")]
+    pub initial: Expression,
+    /// When false, declared as a script-local `local <name>`. When true,
+    /// stored in `_G.<name>` so other scripts can share it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub global: bool,
+    /// When true, the editor/Play HUD watches this variable's live value.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub watched: bool,
+}
+
+impl VariableDef {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            initial: default_variable_initial(),
+            global: false,
+            watched: false,
+        }
+    }
+}
+
+/// A reference to a scene Instance: either a static dotted path picked from
+/// the scene dropdown (serializes as a plain JSON string for backwards
+/// compatibility) or a dynamic [`Expression`] wired in from another node or
+/// dropped as a reporter pill.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ObjectRef(pub Box<Expression>);
+
+impl ObjectRef {
+    pub fn path(path: impl Into<String>) -> Self {
+        Self(Box::new(Expression::ObjectPath { path: path.into() }))
+    }
+
+    pub fn expr(expression: Expression) -> Self {
+        Self(Box::new(expression))
+    }
+
+    pub fn as_path(&self) -> Option<&str> {
+        match self.0.as_ref() {
+            Expression::ObjectPath { path } => Some(path.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn as_expr(&self) -> &Expression {
+        &self.0
+    }
+
+    pub fn as_expr_mut(&mut self) -> &mut Expression {
+        &mut self.0
+    }
+
+    pub fn is_empty_path(&self) -> bool {
+        matches!(self.0.as_ref(), Expression::ObjectPath { path } if path.is_empty())
+    }
+}
+
+impl Default for ObjectRef {
+    fn default() -> Self {
+        Self::path(String::new())
+    }
+}
+
+impl From<String> for ObjectRef {
+    fn from(path: String) -> Self {
+        Self::path(path)
+    }
+}
+
+impl From<&str> for ObjectRef {
+    fn from(path: &str) -> Self {
+        Self::path(path)
+    }
+}
+
+impl Serialize for ObjectRef {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0.as_ref() {
+            Expression::ObjectPath { path } => serializer.serialize_str(path),
+            other => other.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ObjectRef {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Path(String),
+            Expr(Expression),
+        }
+        match Repr::deserialize(deserializer)? {
+            Repr::Path(path) => Ok(Self::path(path)),
+            Repr::Expr(expr) => Ok(Self::expr(expr)),
+        }
+    }
 }
 
 /// The node-graph view of a block script (see `docs/scripting/graphs.md`).
@@ -237,13 +350,34 @@ pub enum BlockKind {
         body: Vec<Block>,
     },
     WhenTouched {
-        part: String,
+        part: ObjectRef,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        filter: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filter_value: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cooldown: Option<Expression>,
+        body: Vec<Block>,
+    },
+    /// When a part stops touching `part` (`TouchEnded`).
+    WhenTouchEnds {
+        part: ObjectRef,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        filter: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filter_value: Option<Expression>,
         body: Vec<Block>,
     },
     /// World streaming brought `target` (or a Model's contents) back
     /// (Phase 80).
     WhenStreamedIn {
-        target: String,
+        target: ObjectRef,
+        body: Vec<Block>,
+    },
+    /// World streaming removed `target` (or a Model's contents) from this
+    /// device (`target.StreamedOut`).
+    WhenStreamedOut {
+        target: ObjectRef,
         body: Vec<Block>,
     },
     /// Client only.
@@ -251,26 +385,74 @@ pub enum BlockKind {
         key: String,
         body: Vec<Block>,
     },
+    /// When a key is released (`UserInputService.InputEnded`). Client only.
+    WhenKeyReleased {
+        key: String,
+        body: Vec<Block>,
+    },
+    /// When a player joins the game (`Players.PlayerAdded`).
+    WhenPlayerJoins {
+        body: Vec<Block>,
+    },
+    /// When a player leaves the game (`Players.PlayerRemoving`).
+    WhenPlayerLeaves {
+        body: Vec<Block>,
+    },
+    /// When any player's character spawns (`player.CharacterAdded`).
+    WhenCharacterSpawns {
+        body: Vec<Block>,
+    },
+    /// When any player's character dies (`Humanoid.Died` / `Health.Died`).
+    WhenPlayerDies {
+        body: Vec<Block>,
+    },
+    /// When a child is added to `target` (the Workspace when empty).
+    WhenChildAdded {
+        target: ObjectRef,
+        body: Vec<Block>,
+    },
+    /// When a child is removed from `target` (the Workspace when empty).
+    WhenChildRemoved {
+        target: ObjectRef,
+        body: Vec<Block>,
+    },
+    /// When `tag` is added to any Instance (`CollectionService:GetInstanceAddedSignal`).
+    WhenTagAdded {
+        tag: Expression,
+        body: Vec<Block>,
+    },
+    /// When `tag` is removed from any Instance (`CollectionService:GetInstanceRemovedSignal`).
+    WhenTagRemoved {
+        tag: Expression,
+        body: Vec<Block>,
+    },
+    /// When a RemoteEvent fires (`OnServerEvent` or `OnClientEvent`).
+    WhenRemoteFires {
+        remote: ObjectRef,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        side: String,
+        body: Vec<Block>,
+    },
     /// When a TextButton is clicked or tapped. Client only.
     WhenClicked {
-        button: String,
+        button: ObjectRef,
         body: Vec<Block>,
     },
     /// When the pointer comes onto a UI element (`MouseEnter`). Client only.
     WhenMouseEnters {
-        element: String,
+        element: ObjectRef,
         body: Vec<Block>,
     },
     /// When the pointer goes off a UI element (`MouseLeave`). Client only.
     WhenMouseLeaves {
-        element: String,
+        element: ObjectRef,
         body: Vec<Block>,
     },
     /// When a Slider, Toggle, Dropdown or ProgressBar's `Value` changes
     /// (`ValueChanged`): dragged, clicked, picked or set by a script. The
     /// body reads the new value as the widget's `Value` property.
     WhenValueChanged {
-        widget: String,
+        widget: ObjectRef,
         body: Vec<Block>,
     },
     /// Runs every frame (`RunService.Heartbeat`).
@@ -293,12 +475,12 @@ pub enum BlockKind {
         body: Vec<Block>,
     },
     WhenSoundEnded {
-        sound: String,
+        sound: ObjectRef,
         body: Vec<Block>,
     },
     /// When a Sequence reaches its end, or is skipped there (`Completed`).
     WhenCutsceneFinished {
-        sequence: String,
+        sequence: ObjectRef,
         body: Vec<Block>,
     },
     /// When hosting or joining fails, a join is refused or the connection
@@ -306,36 +488,65 @@ pub enum BlockKind {
     WhenConnectionFails {
         body: Vec<Block>,
     },
+    /// When a chat message arrives on this device
+    /// (`TextChatService.MessageReceived`, Phase 67).
+    WhenChatMessageReceived {
+        body: Vec<Block>,
+    },
     /// When an Animator moves to another state (`StateChanged`).
     WhenStateChanged {
-        animator: String,
+        animator: ObjectRef,
         body: Vec<Block>,
     },
     /// When an Animator's clip passes the event named `event`
-    /// (`AnimationEvent`).
+    /// (`AnimationEvent`). Empty or `"Any"` fires for every event.
     WhenAnimationEvent {
-        animator: String,
+        animator: ObjectRef,
         event: String,
+        body: Vec<Block>,
+    },
+    /// When a loaded Animation finishes playing on an Animator (`track.Stopped`).
+    WhenAnimationFinished {
+        animator: ObjectRef,
+        animation: ObjectRef,
         body: Vec<Block>,
     },
     /// When a NavigationAgent starts seeing or hearing the player character
     /// (`PlayerSensed`), `sense` being one of [`SENSES`].
     WhenAgentSenses {
-        agent: String,
+        agent: ObjectRef,
         sense: String,
+        body: Vec<Block>,
+    },
+    /// When a NavigationAgent stops seeing or hearing the player character
+    /// (`PlayerLost`), `sense` being one of [`SENSES`].
+    WhenAgentLosesPlayer {
+        agent: ObjectRef,
+        sense: String,
+        body: Vec<Block>,
+    },
+    /// When a NavigationAgent reaches its `Destination` (`DestinationReached`).
+    WhenAgentArrives {
+        agent: ObjectRef,
         body: Vec<Block>,
     },
     /// When a SplineFollower gets to an end of its spline (`Reached`),
     /// `which` being one of [`SPLINE_ENDS`] (Phase 73).
     WhenSplineReached {
-        follower: String,
+        follower: ObjectRef,
         which: String,
         body: Vec<Block>,
     },
     /// When a character sits on a Seat: its `Occupant` changes to a
     /// controller (not to nil).
     WhenSeatOccupied {
-        seat: String,
+        seat: ObjectRef,
+        body: Vec<Block>,
+    },
+    /// When a character leaves a Seat: its `Occupant` changes from a
+    /// controller to nil.
+    WhenSeatVacated {
+        seat: ObjectRef,
         body: Vec<Block>,
     },
     /// When the data layer `layer` is switched on or off
@@ -347,26 +558,30 @@ pub enum BlockKind {
     /// When one property of an object changes
     /// (`GetPropertyChangedSignal`), whoever changed it.
     WhenPropertyChanged {
-        target: String,
+        target: ObjectRef,
         property: String,
         body: Vec<Block>,
     },
     /// When one attribute of an object changes, is added or removed
     /// (`GetAttributeChangedSignal`).
     WhenAttributeChanged {
-        target: String,
+        target: ObjectRef,
         attribute: String,
         body: Vec<Block>,
     },
     /// When a ProximityPrompt is triggered: its action pressed, or held
     /// for its `HoldDuration` (Phase 44).
     WhenPromptTriggered {
-        prompt: String,
+        prompt: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cooldown: Option<Expression>,
         body: Vec<Block>,
     },
     /// When a ClickDetector's part is clicked (`MouseClick`).
     WhenPartClicked {
-        detector: String,
+        detector: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cooldown: Option<Expression>,
         body: Vec<Block>,
     },
     /// When `command` is typed in the Developer Console (Phase 71):
@@ -375,7 +590,13 @@ pub enum BlockKind {
     WhenCommandRun {
         command: Expression,
         help: Expression,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        admin_only: Option<Expression>,
         body: Vec<Block>,
+    },
+    /// Disconnects a signal connection (`connection:Disconnect()`).
+    Disconnect {
+        connection: Expression,
     },
     /// Loose blocks on the canvas, under no event. They don't run.
     Unattached {
@@ -397,7 +618,7 @@ pub enum BlockKind {
     /// Waits until an object's event next fires (`signal:Wait()`), such as
     /// a part's `Touched`.
     WaitForEvent {
-        target: String,
+        target: ObjectRef,
         event: String,
     },
     Repeat {
@@ -422,10 +643,43 @@ pub enum BlockKind {
     },
     /// Ends the event's handler early.
     StopScript,
+    /// Disconnects all script-tracked connections and destroys this script (`script:Destroy()`).
+    DestroyScript,
+    /// Numeric range loop (`for i = start, end, step do ... end`).
+    ForRange {
+        start: Expression,
+        end: Expression,
+        step: Expression,
+        body: Vec<Block>,
+    },
+    /// Iterates over every element of a list (`for i, item in ipairs(list) do ... end`).
+    ForEachInList {
+        list: Expression,
+        body: Vec<Block>,
+    },
+    /// Iterates over every Instance with `tag` (`CollectionService:GetTagged(tag)`).
+    ForEachTagged {
+        tag: Expression,
+        body: Vec<Block>,
+    },
+    /// Runs multiple execution branches in sequence (`Then 0`, `Then 1`, ...).
+    Sequence {
+        branches: Vec<Vec<Block>>,
+    },
+    /// Rate-limiting execution gate (`Cooldown (s) = 0` runs once; `> 0` debounces via `os.clock()`).
+    CooldownGate {
+        cooldown: Expression,
+        body: Vec<Block>,
+    },
+    /// Runs `body` asynchronously without blocking (`task.spawn` or `task.delay`).
+    SpawnAsync {
+        delay: Expression,
+        body: Vec<Block>,
+    },
     /// Runs `body` once for each child of `target` (the Workspace when
     /// empty), with the child in the variable `variable`.
     ForEachChild {
-        target: String,
+        target: ObjectRef,
         variable: String,
         body: Vec<Block>,
     },
@@ -436,138 +690,218 @@ pub enum BlockKind {
         center: Expression,
         radius: Expression,
         variable: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        players_only: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ignore: Option<Expression>,
         body: Vec<Block>,
     },
     /// Runs `body` once for each part overlapping `target`, such as the
     /// parts inside a trigger zone (`workspace:GetPartsInPart`), with the
     /// part in the variable `variable`.
     ForEachPartTouching {
-        target: String,
+        target: ObjectRef,
         variable: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        players_only: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ignore: Option<Expression>,
         body: Vec<Block>,
     },
-    /// Waits until `target` (the Workspace when empty) has a child `name`.
+    /// Waits until `target` (the Workspace when empty) has a child `name`,
+    /// with an optional `timeout` in seconds.
     WaitForChild {
-        target: String,
+        target: ObjectRef,
         name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Expression>,
     },
     /// Destroys `target` after `seconds`, without waiting
     /// (`Debris:AddItem`).
     DestroyAfter {
-        target: String,
+        target: ObjectRef,
         seconds: Expression,
     },
 
     // Motion.
     MoveTo {
-        target: String,
+        target: ObjectRef,
         position: Expression,
     },
     MoveBy {
-        target: String,
+        target: ObjectRef,
         offset: Expression,
     },
     /// Turns `target` to face `position`: `CFrame.lookAt`.
     LookAt {
-        target: String,
+        target: ObjectRef,
         position: Expression,
     },
     /// Moves `target` along the way it faces (its `CFrame.LookVector`).
     MoveForward {
-        target: String,
+        target: ObjectRef,
         distance: Expression,
     },
     TurnTo {
-        target: String,
+        target: ObjectRef,
         orientation: Expression,
     },
     TurnBy {
-        target: String,
+        target: ObjectRef,
         rotation: Expression,
+        #[serde(default = "default_space")]
+        space: String,
+    },
+    /// Smoothly slides/glides `target` to `position` over `duration` seconds
+    /// using `TweenService` (`CFrame`).
+    SlideTo {
+        target: ObjectRef,
+        position: Expression,
+        duration: Expression,
+        #[serde(default = "default_easing_style")]
+        easing: String,
+        #[serde(default)]
+        wait_until_done: bool,
+        #[serde(default)]
+        completed: Vec<Block>,
+    },
+    /// Smoothly rotates `target` to `rotation` (degrees) over `duration`
+    /// seconds using `TweenService` (`CFrame`).
+    RotateTo {
+        target: ObjectRef,
+        rotation: Expression,
+        duration: Expression,
+        #[serde(default = "default_easing_style")]
+        easing: String,
+        #[serde(default)]
+        wait_until_done: bool,
+        #[serde(default)]
+        completed: Vec<Block>,
+    },
+    /// Sets a gravity multiplier on `target` via a `VectorForce` (`0` = zero
+    /// gravity / anti-gravity, `1` = normal gravity).
+    SetGravity {
+        target: ObjectRef,
+        multiplier: Expression,
+    },
+    /// Sets `target`'s `AssemblyAngularVelocity` in radians per second.
+    SetAngularVelocity {
+        target: ObjectRef,
+        velocity: Expression,
+    },
+    /// Launches or bounces `target` along `direction` at `speed` studs/sec.
+    LaunchPart {
+        target: ObjectRef,
+        direction: Expression,
+        speed: Expression,
     },
     SetAnchored {
-        target: String,
+        target: ObjectRef,
         anchored: Expression,
     },
     /// Pushes `target` with an impulse: `ApplyImpulse`, which changes its
     /// velocity by `force` over its mass.
     PushWithForce {
-        target: String,
+        target: ObjectRef,
         force: Expression,
     },
     /// Throws `target`: sets its `AssemblyLinearVelocity`.
     SetPartVelocity {
-        target: String,
+        target: ObjectRef,
         velocity: Expression,
     },
     /// Sets `target`'s friction, keeping its other physical properties:
     /// its `CustomPhysicalProperties` from its `CurrentPhysicalProperties`.
     SetFriction {
-        target: String,
+        target: ObjectRef,
         friction: Expression,
     },
 
     // Looks.
     SetColor {
-        target: String,
+        target: ObjectRef,
         color: Expression,
     },
     SetText {
-        target: String,
+        target: ObjectRef,
         text: Expression,
     },
     Show {
-        target: String,
+        target: ObjectRef,
     },
     Hide {
-        target: String,
+        target: ObjectRef,
     },
     /// Sets a PageLayout's current page to a Frame's name.
     ShowPage {
-        layout: String,
+        layout: ObjectRef,
         page: Expression,
     },
     /// Scrolls a ScrollingFrame: sets its `CanvasPosition` to `x`, `y` pixels.
     ScrollTo {
-        target: String,
+        target: ObjectRef,
         x: Expression,
         y: Expression,
     },
     /// Sets a Slider, Toggle, Dropdown or ProgressBar's `Value`, which
     /// moves it and fires its `ValueChanged`.
     SetValue {
-        target: String,
+        target: ObjectRef,
         value: Expression,
     },
     SetProperty {
-        target: String,
+        target: ObjectRef,
         property: String,
         value: Expression,
     },
     /// Sets one of an object's attributes (`SetAttribute`); nil removes it.
     SetAttribute {
-        target: String,
+        target: ObjectRef,
         attribute: String,
         value: Expression,
     },
 
-    // Navigation.
+    // Navigation & Seats & Splines.
     /// Walks a NavigationAgent along the navigation mesh to `position`: sets
     /// its `Destination`.
     SetDestination {
-        agent: String,
+        agent: ObjectRef,
         position: Expression,
+    },
+    /// Directs a NavigationAgent to chase/follow `target`'s current position.
+    FollowTarget {
+        agent: ObjectRef,
+        target: ObjectRef,
+    },
+    /// Stops a NavigationAgent immediately (`Velocity = Vector3.new(0, 0, 0)`).
+    StopAgent {
+        agent: ObjectRef,
+    },
+    /// Sits a character controller in a `Seat`: `seat:Sit(controller)`.
+    SitInSeat {
+        seat: ObjectRef,
+        controller: ObjectRef,
     },
     /// Stands a character controller's character up from its seat: sets
     /// its `Sit` to false.
     LeaveSeat {
-        controller: String,
+        controller: ObjectRef,
     },
     /// Moves a NavigationAgent straight at `velocity` studs a second, with
     /// no path: sets its `Velocity`. Zero stops it where it is.
     SetVelocity {
-        agent: String,
+        agent: ObjectRef,
         velocity: Expression,
+    },
+    /// Starts, stops, or reverses a `SplineFollower` (`action` in [`SPLINE_ACTIONS`]).
+    ControlSpline {
+        follower: ObjectRef,
+        action: String,
+    },
+    /// Sets a `SplineFollower`'s `Speed` in studs a second.
+    SetSplineSpeed {
+        follower: ObjectRef,
+        speed: Expression,
     },
 
     // Saving: `SaveService`.
@@ -580,9 +914,18 @@ pub enum BlockKind {
     LoadSlot {
         slot: Expression,
     },
+    /// Deletes save slot `slot` (`SaveService:DeleteSlot`).
+    DeleteSlot {
+        slot: Expression,
+    },
+    /// Iterates every row in a data table (`DataService:GetTable(t):GetRows()`).
+    ForEachRow {
+        table: String,
+        body: Vec<Block>,
+    },
     /// Makes a Checkpoint the active one, capturing the game there.
     SetCheckpoint {
-        checkpoint: String,
+        checkpoint: ObjectRef,
     },
     /// Returns to the active checkpoint: what was captured there, with the
     /// player character standing on it.
@@ -618,13 +961,13 @@ pub enum BlockKind {
     /// Gives `target`'s assembly to `owner` (a Player, or nil for the
     /// server) to simulate: `SetNetworkOwner` (Phase 66).
     SetNetworkOwner {
-        target: String,
+        target: ObjectRef,
         owner: Expression,
     },
     /// Lets the engine choose who simulates `target`'s assembly: the
     /// nearest player: `SetNetworkOwnershipAuto` (Phase 66).
     SetNetworkOwnershipAuto {
-        target: String,
+        target: ObjectRef,
     },
     /// Takes `player` out of the game, telling them `reason`:
     /// `Player:Kick` (Phase 67).
@@ -693,14 +1036,73 @@ pub enum BlockKind {
         curve: String,
     },
     /// Sets `Lighting.ClockTime`: the time of day, in hours.
+    /// When `duration` is set, tweens `ClockTime` smoothly over that many seconds.
     SetClockTime {
         time: Expression,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration: Option<Expression>,
     },
     /// Sets one of [`ATMOSPHERE_NUMBERS`] on Lighting's Atmosphere (the
-    /// child named Atmosphere).
+    /// child named Atmosphere). When `duration` is set, tweens it smoothly.
     SetAtmosphere {
         property: String,
         value: Expression,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration: Option<Expression>,
+    },
+    /// Toggles visibility of a GUI element (`Visible`) or Part (`Transparency`).
+    ToggleVisibility {
+        target: ObjectRef,
+    },
+    /// Sets transparency (`Transparency`, `TextTransparency`, `ImageTransparency`,
+    /// or `BackgroundTransparency` depending on class).
+    SetTransparency {
+        target: ObjectRef,
+        transparency: Expression,
+    },
+    /// Sets a BasePart's `Material` to one of [`MATERIALS`].
+    SetMaterial {
+        target: ObjectRef,
+        material: String,
+    },
+    /// Emits `count` particles immediately from a `ParticleEmitter`.
+    EmitParticles {
+        target: ObjectRef,
+        count: Expression,
+    },
+    /// Sets `.Enabled` on a `ParticleEmitter`, Light, or post-processing effect.
+    SetEffectEnabled {
+        target: ObjectRef,
+        enabled: Expression,
+    },
+    /// Sets one of [`LIGHTING_PROPERTIES`] on `Lighting`.
+    SetLightingProperty {
+        property: String,
+        value: Expression,
+    },
+    /// Sets a property on a post-processing effect inside `Lighting`.
+    SetPostProcessing {
+        effect: String,
+        property: String,
+        value: Expression,
+    },
+    /// Tweens any property of an object over `duration` seconds with `easing`.
+    TweenProperty {
+        target: ObjectRef,
+        property: String,
+        value: Expression,
+        duration: Expression,
+        #[serde(default = "default_easing_style")]
+        easing: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
+    },
+    /// Sets `.Image` (on `ImageLabel`/`ImageButton`) or `.Texture` (on `Decal`/`ProjectedDecal`/`ParticleEmitter`).
+    SetImage {
+        target: ObjectRef,
+        image: Expression,
     },
 
     // Graphics: the player's computer's settings (LocalScripts only).
@@ -709,13 +1111,18 @@ pub enum BlockKind {
     SetGraphicsQuality {
         quality: String,
     },
-    /// Sets one of [`GRAPHICS_OPTIONS`] in `UserGameSettings` to one of its
-    /// [`graphics_choices`]; [`PRESET`] goes back to the preset's.
+    /// Sets one of [`GRAPHICS_OPTIONS`] or [`GRAPHICS_NUMBERS`] in
+    /// `UserGameSettings`. For choice/switch settings uses `choice` ([`PRESET`]
+    /// clears the override); for numeric settings uses `value`.
     SetGraphicsOption {
         setting: String,
         choice: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        value: Option<Expression>,
     },
     /// Sets one of [`GRAPHICS_NUMBERS`] in `UserGameSettings`.
+    /// Kept for backwards-compatible deserialization; unified into
+    /// `SetGraphicsOption` in the palette.
     SetGraphicsNumber {
         setting: String,
         value: Expression,
@@ -723,75 +1130,153 @@ pub enum BlockKind {
 
     // Sound.
     PlaySound {
-        target: String,
+        target: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pitch: Option<Expression>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+    },
+    PlaySoundAtPosition {
+        target: ObjectRef,
+        position: Expression,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        volume: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pitch: Option<Expression>,
     },
     StopSound {
-        target: String,
+        target: ObjectRef,
     },
     PauseSound {
-        target: String,
+        target: ObjectRef,
     },
     ResumeSound {
-        target: String,
+        target: ObjectRef,
     },
     SetVolume {
-        target: String,
+        target: ObjectRef,
         volume: Expression,
+    },
+    FadeVolume {
+        target: ObjectRef,
+        volume: Expression,
+        duration: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+    },
+    SetSoundPitch {
+        target: ObjectRef,
+        pitch: Expression,
+    },
+    SetSoundLooping {
+        target: ObjectRef,
+        looped: Expression,
+    },
+    SetSoundTime {
+        target: ObjectRef,
+        time: Expression,
     },
 
     // Animation: an Animator's parameters and states.
     SetAnimatorBool {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
         value: Expression,
     },
     SetAnimatorNumber {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
         value: Expression,
     },
     SetAnimatorTrigger {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
     },
     ResetAnimatorTrigger {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
     },
     PlayAnimatorState {
-        animator: String,
+        animator: ObjectRef,
         state: String,
     },
     /// How much a state machine layer counts, faded over `seconds`
     /// (`animator:SetLayerWeight(layer, weight, seconds)`, Phase 78).
     SetAnimatorLayerWeight {
-        animator: String,
+        animator: ObjectRef,
         layer: String,
         weight: Expression,
         seconds: Expression,
     },
     /// Loads an Animation on an Animator and plays the track
-    /// (`animator:LoadAnimation(animation):Play()`).
+    /// (`animator:LoadAnimation(animation):Play(fadeTime, weight, speed)`).
     PlayAnimation {
-        animator: String,
-        animation: String,
+        animator: ObjectRef,
+        animation: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fade_time: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speed: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        weight: Option<Expression>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+    },
+    /// Stops one Animation (or all playing tracks when `animation` is `None`)
+    /// on an Animator, optionally fading out over `fade_time` seconds.
+    StopAnimation {
+        animator: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        animation: Option<ObjectRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fade_time: Option<Expression>,
+    },
+    /// Sets an Animator's playback speed (`animator.Speed = speed`).
+    SetAnimatorSpeed {
+        animator: ObjectRef,
+        speed: Expression,
+    },
+    /// Sets an IKControl's target instance (`ikControl.Target = target`) and
+    /// optional blend weight (`ikControl.Weight = weight`).
+    SetIkTarget {
+        ik_control: ObjectRef,
+        target: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        weight: Option<Expression>,
+    },
+    /// Enables or disables a Ragdoll (`ragdoll.Enabled = enabled`).
+    SetRagdollEnabled {
+        ragdoll: ObjectRef,
+        enabled: Expression,
     },
     /// Plays a Sequence (`sequence:Play()`, Phase 51).
     PlayCutscene {
-        sequence: String,
+        sequence: ObjectRef,
+    },
+    /// Pauses a playing Sequence (`sequence:Pause()`).
+    PauseCutscene {
+        sequence: ObjectRef,
+    },
+    /// Resumes a paused Sequence (`sequence:Play()`).
+    ResumeCutscene {
+        sequence: ObjectRef,
+    },
+    /// Stops a Sequence and resets it (`sequence:Stop()`).
+    StopCutscene {
+        sequence: ObjectRef,
     },
     /// Puts an object `distance` studs along a Spline, facing along it
     /// (`target:PivotTo(spline:GetCFrameAt(distance))`, Phase 73).
     PlaceOnSpline {
-        target: String,
-        spline: String,
+        target: ObjectRef,
+        spline: ObjectRef,
         distance: Expression,
     },
     /// Has a NavigationAgent walk a Spline's points in order
     /// (`agent:Patrol(spline)`).
     Patrol {
-        agent: String,
-        spline: String,
+        agent: ObjectRef,
+        spline: ObjectRef,
     },
 
     // Tweens: a property moving smoothly (`TweenService`).
@@ -799,32 +1284,89 @@ pub enum BlockKind {
     /// `style` (one of [`EASING_STYLES`]) and `direction` (one of
     /// [`EASING_DIRECTIONS`]).
     Tween {
-        target: String,
+        target: ObjectRef,
         property: String,
         value: Expression,
         seconds: Expression,
         style: String,
         direction: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        repeat_count: Option<Expression>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        reverses: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
     },
-    /// Slides a UI element in to where it is from one parent's width or
-    /// height past an edge, `from` being one of [`SLIDE_EDGES`].
+    /// Slides a UI element in to its cached rest position (`_RestPos`) from one
+    /// parent's width or height past an edge, `from` being one of [`SLIDE_EDGES`].
     SlideIn {
-        target: String,
+        target: ObjectRef,
         from: String,
         seconds: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
     },
-    /// Fades a UI element's background in (`BackgroundTransparency` to 0).
+    /// Slides a UI element out to one parent's width or height past an edge,
+    /// `to` being one of [`SLIDE_EDGES`], then hides it (`Visible = false`).
+    SlideOut {
+        target: ObjectRef,
+        to: String,
+        seconds: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
+    },
+    /// Fades a UI element or BasePart in (sets `Visible = true` for UI).
     FadeIn {
-        target: String,
+        target: ObjectRef,
         seconds: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
     },
-    /// Fades a UI element's background out (`BackgroundTransparency` to 1).
+    /// Fades a UI element or BasePart out (sets `Visible = false` after UI fade).
     FadeOut {
-        target: String,
+        target: ObjectRef,
         seconds: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
+    },
+    /// Smoothly moves a Model or BasePart's pivot to `position` (Vector3 or
+    /// CFrame) over `duration` seconds using a `CFrameValue` proxy.
+    TweenPivot {
+        target: ObjectRef,
+        position: Expression,
+        duration: Expression,
+        easing: String,
+        direction: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        completed: Vec<Block>,
+    },
+    /// Briefly scales a BasePart or GuiObject up by `scale` and reverses back
+    /// over `duration` seconds.
+    PulseScale {
+        target: ObjectRef,
+        scale: Expression,
+        duration: Expression,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        wait_until_done: bool,
+    },
+    /// Cancels a running Tween (`tween:Cancel()`).
+    CancelTween {
+        tween: ObjectRef,
     },
 
-    // Variables.
+    // Variables & Lists.
     SetVariable {
         name: String,
         value: Expression,
@@ -833,22 +1375,66 @@ pub enum BlockKind {
         name: String,
         by: Expression,
     },
+    /// Creates or resets a list variable (`name = { ... }`).
+    ListCreate {
+        name: String,
+        #[serde(default)]
+        items: Vec<Expression>,
+    },
+    /// Appends `value` to `list` (`table.insert(list, value)`).
+    ListAdd {
+        list: Expression,
+        value: Expression,
+    },
+    /// Inserts `value` at 1-based `index` in `list` (`table.insert(list, index, value)`).
+    ListInsert {
+        list: Expression,
+        index: Expression,
+        value: Expression,
+    },
+    /// Removes item at 1-based `index` from `list` (`table.remove(list, index)`).
+    ListRemoveIndex {
+        list: Expression,
+        index: Expression,
+    },
+    /// Removes the first occurrence of `value` from `list`.
+    ListRemoveValue {
+        list: Expression,
+        value: Expression,
+    },
+    /// Removes all items from `list` (`table.clear(list)`).
+    ListClear {
+        list: Expression,
+    },
 
     // Other.
     Print {
         value: Expression,
     },
     Destroy {
-        target: String,
+        target: ObjectRef,
     },
     /// Copies `target` and puts the copy in `parent` (the Workspace when empty).
+    /// Supports optional batch `count`, `position`, `offset_per_clone` and
+    /// `per_clone_positions`, binding `<Object>_cloned` (and `<Object>_clones`
+    /// when batching).
     CloneInto {
-        target: String,
-        parent: String,
+        target: ObjectRef,
+        parent: ObjectRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        count: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        position: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        offset_per_clone: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        per_clone_positions: Option<Expression>,
     },
-    /// Fires a BindableEvent (`event:Fire()`), by its path in ReplicatedStorage.
+    /// Fires a BindableEvent (`event:Fire(data?)`), by its path in ReplicatedStorage.
     FireEvent {
         event: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        data: Option<Expression>,
     },
 
     // Luau itself, which any typed script is made of (see
@@ -1030,6 +1616,124 @@ pub const GRAPHICS_SWITCHES: [&str; 9] = [
 ];
 /// The `UserGameSettings` overrides the graphics number block sets.
 pub const GRAPHICS_NUMBERS: [&str; 2] = ["ShadowDistance", "RenderScale"];
+/// Every graphics setting offered by the unified `SetGraphicsOption` block
+/// (choice/switch settings plus numeric settings).
+pub const ALL_GRAPHICS_SETTINGS: [&str; 23] = [
+    "ShadowQuality",
+    "AntiAliasing",
+    "TextureQuality",
+    "AmbientOcclusion",
+    "ReflectionQuality",
+    "CloudQuality",
+    "DepthOfField",
+    "MotionBlur",
+    "RayTracedShadows",
+    "RayTracedAmbientOcclusion",
+    "RayTracedGlobalIllumination",
+    "RayTracedReflections",
+    "PostProcessing",
+    "ContactShadows",
+    "RealtimeGI",
+    "VolumetricFog",
+    "Vignette",
+    "FilmGrain",
+    "ChromaticAberration",
+    "Sharpen",
+    "SunRays",
+    "ShadowDistance",
+    "RenderScale",
+];
+/// `Enum.Material`'s items, offered by `SetMaterial`.
+pub const MATERIALS: [&str; 16] = [
+    "Plastic",
+    "SmoothPlastic",
+    "Wood",
+    "WoodPlanks",
+    "Marble",
+    "Granite",
+    "Concrete",
+    "Slate",
+    "Brick",
+    "Fabric",
+    "Sand",
+    "Metal",
+    "Glass",
+    "Neon",
+    "Ice",
+    "Rubber",
+];
+/// Properties of `Lighting` offered by `SetLightingProperty`.
+pub const LIGHTING_PROPERTIES: [&str; 17] = [
+    "Exposure",
+    "EnvironmentIntensity",
+    "FogStart",
+    "FogEnd",
+    "FogColor",
+    "BloomIntensity",
+    "BloomThreshold",
+    "BloomEnabled",
+    "ShadowsEnabled",
+    "ShadowDistance",
+    "ShadowSoftness",
+    "AmbientOcclusionIntensity",
+    "GeographicLatitude",
+    "SkyTopColor",
+    "SkyHorizonColor",
+    "GroundColor",
+    "PostProcessingEnabled",
+];
+/// Post-processing effect classes inside `Lighting` offered by `SetPostProcessing`.
+pub const POST_PROCESSING_EFFECTS: [&str; 9] = [
+    "BloomEffect",
+    "ColorCorrectionEffect",
+    "DepthOfFieldEffect",
+    "VignetteEffect",
+    "SunRaysEffect",
+    "FilmGrainEffect",
+    "ChromaticAberrationEffect",
+    "SharpenEffect",
+    "MotionBlurEffect",
+];
+/// Properties available on each post-processing effect class.
+pub fn post_processing_properties(effect: &str) -> &'static [&'static str] {
+    match effect {
+        "BloomEffect" => &["Enabled", "Intensity", "Threshold"],
+        "ColorCorrectionEffect" => &[
+            "Enabled",
+            "Brightness",
+            "Contrast",
+            "Saturation",
+            "TintColor",
+        ],
+        "DepthOfFieldEffect" => &[
+            "Enabled",
+            "FocusDistance",
+            "InFocusRadius",
+            "NearIntensity",
+            "FarIntensity",
+        ],
+        "VignetteEffect" => &["Enabled", "Intensity", "Size", "Color"],
+        "SunRaysEffect" => &["Enabled", "Intensity", "Spread"],
+        "FilmGrainEffect" => &["Enabled", "Intensity", "Size"],
+        "ChromaticAberrationEffect" | "SharpenEffect" | "MotionBlurEffect" => {
+            &["Enabled", "Intensity"]
+        }
+        _ => &[],
+    }
+}
+/// Properties readable by `Expression::SoundProperty`.
+pub const SOUND_PROPERTIES: [&str; 6] = [
+    "Playing",
+    "TimePosition",
+    "TimeLength",
+    "Volume",
+    "PlaybackSpeed",
+    "Looped",
+];
+/// Axes selectable in `Expression::VectorAxis`.
+pub const VECTOR_AXES: [&str; 3] = ["X", "Y", "Z"];
+/// Operations selectable in `Expression::MinMax`.
+pub const MIN_MAX_OPS: [&str; 2] = ["min", "max"];
 /// The graphics option block's choice that removes the override (nil).
 pub const PRESET: &str = "Preset";
 
@@ -1080,11 +1784,40 @@ pub const IS_A_CLASSES: [&str; 16] = [
     "ModuleScript",
 ];
 
-/// The senses a NavigationAgent's `PlayerSensed` names.
-pub const SENSES: [&str; 2] = ["Sight", "Hearing"];
+/// The senses a NavigationAgent's `PlayerSensed` / `PlayerLost` names.
+pub const SENSES: [&str; 3] = ["Sight", "Hearing", "Any"];
 
 /// The ends a SplineFollower's `Reached` names.
-pub const SPLINE_ENDS: [&str; 2] = ["End", "Start"];
+pub const SPLINE_ENDS: [&str; 3] = ["End", "Start", "Any"];
+
+/// Coordinate space choices for `Turn By`.
+pub const SPACE_MODES: [&str; 2] = ["Local", "World"];
+
+/// Actions for `Start / Stop / Reverse Spline`.
+pub const SPLINE_ACTIONS: [&str; 3] = ["Start", "Stop", "Reverse"];
+
+/// Output field choices for the unified `Raycast` reporter.
+pub const RAYCAST_OUTPUTS: [&str; 5] = [
+    "Hit Part",
+    "Hit Position",
+    "Hit Normal",
+    "Distance",
+    "Result",
+];
+
+fn default_space() -> String {
+    "Local".to_owned()
+}
+
+fn default_easing_style() -> String {
+    "Quad".to_owned()
+}
+
+/// Filter modes for `When Touched` and `When Touch Ends`.
+pub const TOUCH_FILTERS: [&str; 3] = ["Any Part", "Players Only", "Tagged / Named..."];
+
+/// Listening side for `When Remote Fires`.
+pub const REMOTE_SIDES: [&str; 2] = ["Server (OnServerEvent)", "Client (OnClientEvent)"];
 
 impl BlockKind {
     pub fn shape(&self) -> BlockShape {
@@ -1101,8 +1834,20 @@ impl BlockKind {
             self,
             BlockKind::WhenStarted { .. }
                 | BlockKind::WhenTouched { .. }
+                | BlockKind::WhenTouchEnds { .. }
                 | BlockKind::WhenStreamedIn { .. }
+                | BlockKind::WhenStreamedOut { .. }
                 | BlockKind::WhenKeyPressed { .. }
+                | BlockKind::WhenKeyReleased { .. }
+                | BlockKind::WhenPlayerJoins { .. }
+                | BlockKind::WhenPlayerLeaves { .. }
+                | BlockKind::WhenCharacterSpawns { .. }
+                | BlockKind::WhenPlayerDies { .. }
+                | BlockKind::WhenChildAdded { .. }
+                | BlockKind::WhenChildRemoved { .. }
+                | BlockKind::WhenTagAdded { .. }
+                | BlockKind::WhenTagRemoved { .. }
+                | BlockKind::WhenRemoteFires { .. }
                 | BlockKind::WhenClicked { .. }
                 | BlockKind::WhenMouseEnters { .. }
                 | BlockKind::WhenMouseLeaves { .. }
@@ -1114,11 +1859,16 @@ impl BlockKind {
                 | BlockKind::WhenSoundEnded { .. }
                 | BlockKind::WhenCutsceneFinished { .. }
                 | BlockKind::WhenConnectionFails { .. }
+                | BlockKind::WhenChatMessageReceived { .. }
                 | BlockKind::WhenStateChanged { .. }
                 | BlockKind::WhenAnimationEvent { .. }
+                | BlockKind::WhenAnimationFinished { .. }
                 | BlockKind::WhenAgentSenses { .. }
+                | BlockKind::WhenAgentLosesPlayer { .. }
+                | BlockKind::WhenAgentArrives { .. }
                 | BlockKind::WhenSplineReached { .. }
                 | BlockKind::WhenSeatOccupied { .. }
+                | BlockKind::WhenSeatVacated { .. }
                 | BlockKind::WhenLayerChanged { .. }
                 | BlockKind::WhenPropertyChanged { .. }
                 | BlockKind::WhenAttributeChanged { .. }
@@ -1137,6 +1887,7 @@ impl BlockKind {
         matches!(
             self,
             BlockKind::WhenKeyPressed { .. }
+                | BlockKind::WhenKeyReleased { .. }
                 | BlockKind::WhenClicked { .. }
                 | BlockKind::WhenMouseEnters { .. }
                 | BlockKind::WhenMouseLeaves { .. }
@@ -1154,8 +1905,20 @@ impl BlockKind {
         let mut bodies = match self {
             BlockKind::WhenStarted { body }
             | BlockKind::WhenTouched { body, .. }
+            | BlockKind::WhenTouchEnds { body, .. }
             | BlockKind::WhenStreamedIn { body, .. }
+            | BlockKind::WhenStreamedOut { body, .. }
             | BlockKind::WhenKeyPressed { body, .. }
+            | BlockKind::WhenKeyReleased { body, .. }
+            | BlockKind::WhenPlayerJoins { body }
+            | BlockKind::WhenPlayerLeaves { body }
+            | BlockKind::WhenCharacterSpawns { body }
+            | BlockKind::WhenPlayerDies { body }
+            | BlockKind::WhenChildAdded { body, .. }
+            | BlockKind::WhenChildRemoved { body, .. }
+            | BlockKind::WhenTagAdded { body, .. }
+            | BlockKind::WhenTagRemoved { body, .. }
+            | BlockKind::WhenRemoteFires { body, .. }
             | BlockKind::WhenClicked { body, .. }
             | BlockKind::WhenMouseEnters { body, .. }
             | BlockKind::WhenMouseLeaves { body, .. }
@@ -1167,22 +1930,60 @@ impl BlockKind {
             | BlockKind::WhenSoundEnded { body, .. }
             | BlockKind::WhenCutsceneFinished { body, .. }
             | BlockKind::WhenConnectionFails { body }
+            | BlockKind::WhenChatMessageReceived { body }
             | BlockKind::WhenStateChanged { body, .. }
             | BlockKind::WhenAnimationEvent { body, .. }
+            | BlockKind::WhenAnimationFinished { body, .. }
             | BlockKind::WhenAgentSenses { body, .. }
+            | BlockKind::WhenAgentLosesPlayer { body, .. }
+            | BlockKind::WhenAgentArrives { body, .. }
             | BlockKind::WhenSplineReached { body, .. }
             | BlockKind::WhenSeatOccupied { body, .. }
+            | BlockKind::WhenSeatVacated { body, .. }
             | BlockKind::WhenLayerChanged { body, .. }
             | BlockKind::WhenPropertyChanged { body, .. }
             | BlockKind::WhenAttributeChanged { body, .. }
             | BlockKind::WhenPromptTriggered { body, .. }
             | BlockKind::WhenPartClicked { body, .. }
             | BlockKind::WhenCommandRun { body, .. }
+            | BlockKind::SlideTo {
+                completed: body, ..
+            }
+            | BlockKind::RotateTo {
+                completed: body, ..
+            }
+            | BlockKind::TweenProperty {
+                completed: body, ..
+            }
+            | BlockKind::Tween {
+                completed: body, ..
+            }
+            | BlockKind::SlideIn {
+                completed: body, ..
+            }
+            | BlockKind::SlideOut {
+                completed: body, ..
+            }
+            | BlockKind::FadeIn {
+                completed: body, ..
+            }
+            | BlockKind::FadeOut {
+                completed: body, ..
+            }
+            | BlockKind::TweenPivot {
+                completed: body, ..
+            }
             | BlockKind::Unattached { body }
             | BlockKind::Repeat { body, .. }
             | BlockKind::Forever { body }
             | BlockKind::RepeatUntil { body, .. }
+            | BlockKind::ForRange { body, .. }
+            | BlockKind::ForEachInList { body, .. }
+            | BlockKind::ForEachTagged { body, .. }
+            | BlockKind::CooldownGate { body, .. }
+            | BlockKind::SpawnAsync { body, .. }
             | BlockKind::ForEachChild { body, .. }
+            | BlockKind::ForEachRow { body, .. }
             | BlockKind::ForEachPartInRadius { body, .. }
             | BlockKind::ForEachPartTouching { body, .. }
             | BlockKind::If { body, .. }
@@ -1200,6 +2001,7 @@ impl BlockKind {
                 else_body,
                 ..
             } => vec![then_body, else_body],
+            BlockKind::Sequence { branches } => branches.iter().collect(),
             _ => Vec::new(),
         };
         let slots = self.expressions();
@@ -1222,6 +2024,12 @@ impl BlockKind {
         let (mut bodies, slots): (Vec<&mut Vec<Block>>, Vec<&mut Expression>) = match self {
             BlockKind::Repeat { count: e, body }
             | BlockKind::RepeatUntil { condition: e, body }
+            | BlockKind::ForEachInList { list: e, body }
+            | BlockKind::ForEachTagged { tag: e, body }
+            | BlockKind::CooldownGate { cooldown: e, body }
+            | BlockKind::SpawnAsync { delay: e, body }
+            | BlockKind::WhenTagAdded { tag: e, body }
+            | BlockKind::WhenTagRemoved { tag: e, body }
             | BlockKind::If { condition: e, body }
             | BlockKind::OnSignal {
                 signal: e, body, ..
@@ -1231,22 +2039,162 @@ impl BlockKind {
             }
             | BlockKind::While { condition: e, body }
             | BlockKind::RepeatLoop { condition: e, body } => (vec![body], vec![e]),
+            BlockKind::SlideTo {
+                target,
+                position,
+                duration,
+                completed,
+                ..
+            } => (
+                vec![completed],
+                vec![target.as_expr_mut(), position, duration],
+            ),
+            BlockKind::RotateTo {
+                target,
+                rotation,
+                duration,
+                completed,
+                ..
+            } => (
+                vec![completed],
+                vec![target.as_expr_mut(), rotation, duration],
+            ),
+            BlockKind::TweenProperty {
+                target,
+                value,
+                duration,
+                completed,
+                ..
+            } => (vec![completed], vec![target.as_expr_mut(), value, duration]),
+            BlockKind::Tween {
+                target,
+                value,
+                seconds,
+                repeat_count,
+                completed,
+                ..
+            } => {
+                let mut slots = vec![target.as_expr_mut(), value, seconds];
+                slots.extend(repeat_count.as_mut());
+                (vec![completed], slots)
+            }
+            BlockKind::SlideIn {
+                target,
+                seconds,
+                completed,
+                ..
+            }
+            | BlockKind::SlideOut {
+                target,
+                seconds,
+                completed,
+                ..
+            }
+            | BlockKind::FadeIn {
+                target,
+                seconds,
+                completed,
+                ..
+            }
+            | BlockKind::FadeOut {
+                target,
+                seconds,
+                completed,
+                ..
+            } => (vec![completed], vec![target.as_expr_mut(), seconds]),
+            BlockKind::TweenPivot {
+                target,
+                position,
+                duration,
+                completed,
+                ..
+            } => (
+                vec![completed],
+                vec![target.as_expr_mut(), position, duration],
+            ),
+            BlockKind::ForRange {
+                start,
+                end,
+                step,
+                body,
+            } => (vec![body], vec![start, end, step]),
             BlockKind::IfElse {
                 condition,
                 then_body,
                 else_body,
             } => (vec![then_body, else_body], vec![condition]),
+            BlockKind::Sequence { branches } => (branches.iter_mut().collect(), Vec::new()),
             BlockKind::ForEachPartInRadius {
                 center,
                 radius,
+                ignore,
                 body,
                 ..
-            } => (vec![body], vec![center, radius]),
+            } => {
+                let mut slots = vec![radius, center];
+                slots.extend(ignore.as_mut());
+                (vec![body], slots)
+            }
+            BlockKind::ForEachPartTouching {
+                target,
+                ignore,
+                body,
+                ..
+            } => {
+                let mut slots = vec![target.as_expr_mut()];
+                slots.extend(ignore.as_mut());
+                (vec![body], slots)
+            }
+            BlockKind::WhenTouched {
+                part,
+                filter_value,
+                cooldown,
+                body,
+                ..
+            } => {
+                let mut slots = vec![part.as_expr_mut()];
+                slots.extend(filter_value.as_mut());
+                slots.extend(cooldown.as_mut());
+                (vec![body], slots)
+            }
+            BlockKind::WhenTouchEnds {
+                part,
+                filter_value,
+                body,
+                ..
+            } => {
+                let mut slots = vec![part.as_expr_mut()];
+                slots.extend(filter_value.as_mut());
+                (vec![body], slots)
+            }
+            BlockKind::WhenPromptTriggered {
+                prompt,
+                cooldown,
+                body,
+            } => {
+                let mut slots = vec![prompt.as_expr_mut()];
+                slots.extend(cooldown.as_mut());
+                (vec![body], slots)
+            }
+            BlockKind::WhenPartClicked {
+                detector,
+                cooldown,
+                body,
+            } => {
+                let mut slots = vec![detector.as_expr_mut()];
+                slots.extend(cooldown.as_mut());
+                (vec![body], slots)
+            }
             BlockKind::WhenCommandRun {
                 command,
                 help,
+                admin_only,
                 body,
-            } => (vec![body], vec![command, help]),
+            } => {
+                let mut slots = vec![command, help];
+                slots.extend(admin_only.as_mut());
+                (vec![body], slots)
+            }
             BlockKind::NumericFor {
                 start,
                 stop,
@@ -1261,8 +2209,16 @@ impl BlockKind {
             BlockKind::GenericFor { values, body, .. } => (vec![body], values.iter_mut().collect()),
             BlockKind::WhenStarted { body }
             | BlockKind::WhenStreamedIn { body, .. }
-            | BlockKind::WhenTouched { body, .. }
+            | BlockKind::WhenStreamedOut { body, .. }
             | BlockKind::WhenKeyPressed { body, .. }
+            | BlockKind::WhenKeyReleased { body, .. }
+            | BlockKind::WhenPlayerJoins { body }
+            | BlockKind::WhenPlayerLeaves { body }
+            | BlockKind::WhenCharacterSpawns { body }
+            | BlockKind::WhenPlayerDies { body }
+            | BlockKind::WhenChildAdded { body, .. }
+            | BlockKind::WhenChildRemoved { body, .. }
+            | BlockKind::WhenRemoteFires { body, .. }
             | BlockKind::WhenClicked { body, .. }
             | BlockKind::WhenMouseEnters { body, .. }
             | BlockKind::WhenMouseLeaves { body, .. }
@@ -1274,20 +2230,23 @@ impl BlockKind {
             | BlockKind::WhenSoundEnded { body, .. }
             | BlockKind::WhenCutsceneFinished { body, .. }
             | BlockKind::WhenConnectionFails { body }
+            | BlockKind::WhenChatMessageReceived { body }
             | BlockKind::WhenStateChanged { body, .. }
             | BlockKind::WhenAnimationEvent { body, .. }
+            | BlockKind::WhenAnimationFinished { body, .. }
             | BlockKind::WhenAgentSenses { body, .. }
+            | BlockKind::WhenAgentLosesPlayer { body, .. }
+            | BlockKind::WhenAgentArrives { body, .. }
             | BlockKind::WhenSplineReached { body, .. }
             | BlockKind::WhenSeatOccupied { body, .. }
+            | BlockKind::WhenSeatVacated { body, .. }
             | BlockKind::WhenLayerChanged { body, .. }
             | BlockKind::WhenPropertyChanged { body, .. }
             | BlockKind::WhenAttributeChanged { body, .. }
-            | BlockKind::WhenPromptTriggered { body, .. }
-            | BlockKind::WhenPartClicked { body, .. }
             | BlockKind::Unattached { body }
             | BlockKind::Forever { body }
             | BlockKind::ForEachChild { body, .. }
-            | BlockKind::ForEachPartTouching { body, .. }
+            | BlockKind::ForEachRow { body, .. }
             | BlockKind::RunScript { body }
             | BlockKind::DefineFunction { body, .. }
             | BlockKind::DoBlock { body } => (vec![body], Vec::new()),
@@ -1310,66 +2269,441 @@ impl BlockKind {
     /// Like [`BlockKind::expressions`], for changing them.
     pub fn expressions_mut(&mut self) -> Vec<&mut Expression> {
         match self {
+            BlockKind::WhenStreamedIn { target: o, .. }
+            | BlockKind::WhenStreamedOut { target: o, .. }
+            | BlockKind::WhenChildAdded { target: o, .. }
+            | BlockKind::WhenChildRemoved { target: o, .. }
+            | BlockKind::WhenRemoteFires { remote: o, .. }
+            | BlockKind::WhenClicked { button: o, .. }
+            | BlockKind::WhenMouseEnters { element: o, .. }
+            | BlockKind::WhenMouseLeaves { element: o, .. }
+            | BlockKind::WhenValueChanged { widget: o, .. }
+            | BlockKind::WhenSoundEnded { sound: o, .. }
+            | BlockKind::WhenCutsceneFinished { sequence: o, .. }
+            | BlockKind::WhenStateChanged { animator: o, .. }
+            | BlockKind::WhenAnimationEvent { animator: o, .. }
+            | BlockKind::WhenAgentSenses { agent: o, .. }
+            | BlockKind::WhenAgentLosesPlayer { agent: o, .. }
+            | BlockKind::WhenAgentArrives { agent: o, .. }
+            | BlockKind::WhenSplineReached { follower: o, .. }
+            | BlockKind::WhenSeatOccupied { seat: o, .. }
+            | BlockKind::WhenSeatVacated { seat: o, .. }
+            | BlockKind::WhenPropertyChanged { target: o, .. }
+            | BlockKind::WhenAttributeChanged { target: o, .. }
+            | BlockKind::WaitForEvent { target: o, .. }
+            | BlockKind::ForEachChild { target: o, .. }
+            | BlockKind::Show { target: o }
+            | BlockKind::Hide { target: o }
+            | BlockKind::ToggleVisibility { target: o }
+            | BlockKind::SetMaterial { target: o, .. }
+            | BlockKind::StopAgent { agent: o }
+            | BlockKind::LeaveSeat { controller: o }
+            | BlockKind::ControlSpline { follower: o, .. }
+            | BlockKind::SetCheckpoint { checkpoint: o }
+            | BlockKind::SetNetworkOwnershipAuto { target: o }
+            | BlockKind::StopSound { target: o }
+            | BlockKind::PauseSound { target: o }
+            | BlockKind::ResumeSound { target: o }
+            | BlockKind::SetAnimatorTrigger { animator: o, .. }
+            | BlockKind::ResetAnimatorTrigger { animator: o, .. }
+            | BlockKind::PlayAnimatorState { animator: o, .. }
+            | BlockKind::PlayCutscene { sequence: o }
+            | BlockKind::PauseCutscene { sequence: o }
+            | BlockKind::ResumeCutscene { sequence: o }
+            | BlockKind::StopCutscene { sequence: o }
+            | BlockKind::CancelTween { tween: o }
+            | BlockKind::Destroy { target: o } => vec![o.as_expr_mut()],
+            BlockKind::PlaySound {
+                target: o,
+                pitch: opt,
+                ..
+            } => {
+                let mut slots = vec![o.as_expr_mut()];
+                slots.extend(opt.as_mut());
+                slots
+            }
+            BlockKind::PlaySoundAtPosition {
+                target: o,
+                position: p,
+                volume,
+                pitch,
+            } => {
+                let mut slots = vec![o.as_expr_mut(), p];
+                slots.extend(volume.as_mut());
+                slots.extend(pitch.as_mut());
+                slots
+            }
+            BlockKind::WhenTouched {
+                part,
+                filter_value,
+                cooldown,
+                ..
+            } => {
+                let mut slots = vec![part.as_expr_mut()];
+                slots.extend(filter_value.as_mut());
+                slots.extend(cooldown.as_mut());
+                slots
+            }
+            BlockKind::WhenTouchEnds {
+                part, filter_value, ..
+            } => {
+                let mut slots = vec![part.as_expr_mut()];
+                slots.extend(filter_value.as_mut());
+                slots
+            }
+            BlockKind::WhenPromptTriggered {
+                prompt: o,
+                cooldown: opt,
+                ..
+            }
+            | BlockKind::WhenPartClicked {
+                detector: o,
+                cooldown: opt,
+                ..
+            }
+            | BlockKind::WaitForChild {
+                target: o,
+                timeout: opt,
+                ..
+            }
+            | BlockKind::ForEachPartTouching {
+                target: o,
+                ignore: opt,
+                ..
+            } => {
+                let mut slots = vec![o.as_expr_mut()];
+                slots.extend(opt.as_mut());
+                slots
+            }
+            BlockKind::FireEvent { data, .. } => data.iter_mut().collect(),
             BlockKind::Wait { seconds: e }
             | BlockKind::WaitUntil { condition: e }
             | BlockKind::Repeat { count: e, .. }
             | BlockKind::RepeatUntil { condition: e, .. }
+            | BlockKind::ForEachInList { list: e, .. }
+            | BlockKind::ForEachTagged { tag: e, .. }
+            | BlockKind::CooldownGate { cooldown: e, .. }
+            | BlockKind::SpawnAsync { delay: e, .. }
+            | BlockKind::WhenTagAdded { tag: e, .. }
+            | BlockKind::WhenTagRemoved { tag: e, .. }
+            | BlockKind::Disconnect { connection: e }
             | BlockKind::If { condition: e, .. }
             | BlockKind::IfElse { condition: e, .. }
-            | BlockKind::MoveTo { position: e, .. }
-            | BlockKind::MoveBy { offset: e, .. }
-            | BlockKind::LookAt { position: e, .. }
-            | BlockKind::MoveForward { distance: e, .. }
-            | BlockKind::TurnTo { orientation: e, .. }
-            | BlockKind::TurnBy { rotation: e, .. }
-            | BlockKind::SetAnchored { anchored: e, .. }
-            | BlockKind::PushWithForce { force: e, .. }
-            | BlockKind::SetPartVelocity { velocity: e, .. }
-            | BlockKind::SetFriction { friction: e, .. }
-            | BlockKind::SetColor { color: e, .. }
-            | BlockKind::SetText { text: e, .. }
-            | BlockKind::ShowPage { page: e, .. }
-            | BlockKind::SetProperty { value: e, .. }
-            | BlockKind::SetAttribute { value: e, .. }
-            | BlockKind::SetValue { value: e, .. }
-            | BlockKind::SetDestination { position: e, .. }
-            | BlockKind::SetVelocity { velocity: e, .. }
             | BlockKind::SaveSlot { slot: e }
             | BlockKind::LoadSlot { slot: e }
+            | BlockKind::DeleteSlot { slot: e }
             | BlockKind::AddLevel { level: e }
             | BlockKind::RemoveLevel { level: e }
             | BlockKind::HostGame { port: e }
             | BlockKind::JoinGame { address: e }
-            | BlockKind::SetNetworkOwner { owner: e, .. }
             | BlockKind::SendChatMessage { text: e }
             | BlockKind::ShowSystemMessage { text: e }
             | BlockKind::SetLayerActive { active: e, .. }
             | BlockKind::SetLanguage { language: e }
-            | BlockKind::SetVolume { volume: e, .. }
-            | BlockKind::PlaceOnSpline { distance: e, .. }
-            | BlockKind::SetAnimatorBool { value: e, .. }
-            | BlockKind::SetAnimatorNumber { value: e, .. }
             | BlockKind::SetVariable { value: e, .. }
             | BlockKind::ChangeVariable { by: e, .. }
-            | BlockKind::SlideIn { seconds: e, .. }
-            | BlockKind::FadeIn { seconds: e, .. }
-            | BlockKind::FadeOut { seconds: e, .. }
+            | BlockKind::ListClear { list: e }
             | BlockKind::SetGraphicsNumber { value: e, .. }
-            | BlockKind::SetClockTime { time: e }
-            | BlockKind::SetAtmosphere { value: e, .. }
+            | BlockKind::SetLightingProperty { value: e, .. }
+            | BlockKind::SetPostProcessing { value: e, .. }
             | BlockKind::PointCameraAt { position: e }
-            | BlockKind::DestroyAfter { seconds: e, .. }
             | BlockKind::Print { value: e } => vec![e],
-            BlockKind::Tween { value, seconds, .. } => vec![value, seconds],
+            BlockKind::SetGraphicsOption { value, .. } => value.iter_mut().collect(),
+            BlockKind::SetClockTime { time: e, duration }
+            | BlockKind::SetAtmosphere {
+                value: e, duration, ..
+            } => {
+                let mut slots = vec![e];
+                slots.extend(duration.as_mut());
+                slots
+            }
+            BlockKind::SlideTo {
+                target: o,
+                position: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::RotateTo {
+                target: o,
+                rotation: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::TweenProperty {
+                target: o,
+                value: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::FadeVolume {
+                target: o,
+                volume: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::LaunchPart {
+                target: o,
+                direction: a,
+                speed: b,
+            } => vec![o.as_expr_mut(), a, b],
+            BlockKind::FollowTarget {
+                agent: a,
+                target: b,
+            }
+            | BlockKind::SitInSeat {
+                seat: a,
+                controller: b,
+            } => vec![a.as_expr_mut(), b.as_expr_mut()],
+            BlockKind::MoveTo {
+                target: o,
+                position: e,
+            }
+            | BlockKind::MoveBy {
+                target: o,
+                offset: e,
+            }
+            | BlockKind::LookAt {
+                target: o,
+                position: e,
+            }
+            | BlockKind::MoveForward {
+                target: o,
+                distance: e,
+            }
+            | BlockKind::TurnTo {
+                target: o,
+                orientation: e,
+            }
+            | BlockKind::TurnBy {
+                target: o,
+                rotation: e,
+                ..
+            }
+            | BlockKind::SetGravity {
+                target: o,
+                multiplier: e,
+            }
+            | BlockKind::SetAngularVelocity {
+                target: o,
+                velocity: e,
+            }
+            | BlockKind::SetSplineSpeed {
+                follower: o,
+                speed: e,
+            }
+            | BlockKind::SetAnchored {
+                target: o,
+                anchored: e,
+            }
+            | BlockKind::PushWithForce {
+                target: o,
+                force: e,
+            }
+            | BlockKind::SetPartVelocity {
+                target: o,
+                velocity: e,
+            }
+            | BlockKind::SetFriction {
+                target: o,
+                friction: e,
+            }
+            | BlockKind::SetColor {
+                target: o,
+                color: e,
+            }
+            | BlockKind::SetTransparency {
+                target: o,
+                transparency: e,
+            }
+            | BlockKind::EmitParticles {
+                target: o,
+                count: e,
+            }
+            | BlockKind::SetEffectEnabled {
+                target: o,
+                enabled: e,
+            }
+            | BlockKind::SetImage {
+                target: o,
+                image: e,
+            }
+            | BlockKind::SetSoundPitch {
+                target: o,
+                pitch: e,
+            }
+            | BlockKind::SetSoundLooping {
+                target: o,
+                looped: e,
+            }
+            | BlockKind::SetSoundTime { target: o, time: e }
+            | BlockKind::SetText { target: o, text: e }
+            | BlockKind::SetProperty {
+                target: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAttribute {
+                target: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetValue {
+                target: o,
+                value: e,
+            }
+            | BlockKind::SetDestination {
+                agent: o,
+                position: e,
+            }
+            | BlockKind::SetVelocity {
+                agent: o,
+                velocity: e,
+            }
+            | BlockKind::SetVolume {
+                target: o,
+                volume: e,
+            }
+            | BlockKind::SetAnimatorBool {
+                animator: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAnimatorNumber {
+                animator: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAnimatorSpeed {
+                animator: o,
+                speed: e,
+            }
+            | BlockKind::SetRagdollEnabled {
+                ragdoll: o,
+                enabled: e,
+            }
+            | BlockKind::SlideIn {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::SlideOut {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::FadeIn {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::FadeOut {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::DestroyAfter {
+                target: o,
+                seconds: e,
+            } => vec![o.as_expr_mut(), e],
+            BlockKind::ShowPage { layout: o, page: e }
+            | BlockKind::SetNetworkOwner {
+                target: o,
+                owner: e,
+            } => vec![e, o.as_expr_mut()],
+            BlockKind::WhenAnimationFinished {
+                animator,
+                animation,
+                ..
+            } => vec![animation.as_expr_mut(), animator.as_expr_mut()],
+            BlockKind::PlayAnimation {
+                animator,
+                animation,
+                fade_time,
+                speed,
+                weight,
+                ..
+            } => {
+                let mut slots = vec![animation.as_expr_mut(), animator.as_expr_mut()];
+                slots.extend(fade_time.as_mut());
+                slots.extend(speed.as_mut());
+                slots.extend(weight.as_mut());
+                slots
+            }
+            BlockKind::StopAnimation {
+                animator,
+                animation,
+                fade_time,
+            } => {
+                let mut slots = Vec::new();
+                if let Some(anim) = animation {
+                    slots.push(anim.as_expr_mut());
+                }
+                slots.push(animator.as_expr_mut());
+                slots.extend(fade_time.as_mut());
+                slots
+            }
+            BlockKind::SetIkTarget {
+                ik_control,
+                target,
+                weight,
+            } => {
+                let mut slots = vec![ik_control.as_expr_mut(), target.as_expr_mut()];
+                slots.extend(weight.as_mut());
+                slots
+            }
+            BlockKind::Patrol { agent, spline } => vec![agent.as_expr_mut(), spline.as_expr_mut()],
+            BlockKind::PlaceOnSpline {
+                target,
+                spline,
+                distance,
+            } => vec![target.as_expr_mut(), spline.as_expr_mut(), distance],
+            BlockKind::Tween {
+                target,
+                value,
+                seconds,
+                repeat_count,
+                ..
+            } => {
+                let mut slots = vec![target.as_expr_mut(), value, seconds];
+                slots.extend(repeat_count.as_mut());
+                slots
+            }
+            BlockKind::TweenPivot {
+                target,
+                position,
+                duration,
+                ..
+            } => vec![target.as_expr_mut(), position, duration],
+            BlockKind::PulseScale {
+                target,
+                scale,
+                duration,
+                ..
+            } => vec![target.as_expr_mut(), scale, duration],
             BlockKind::LoadLevel { level, spawn } => vec![level, spawn],
-            BlockKind::WhenCommandRun { command, help, .. } => vec![command, help],
+            BlockKind::WhenCommandRun {
+                command,
+                help,
+                admin_only,
+                ..
+            } => {
+                let mut slots = vec![command, help];
+                slots.extend(admin_only.as_mut());
+                slots
+            }
+            BlockKind::ForRange {
+                start, end, step, ..
+            } => vec![start, end, step],
             BlockKind::KickPlayer { player, reason } => vec![player, reason],
             BlockKind::RequestStreamAround { player, position } => vec![player, position],
-            BlockKind::ScrollTo { x, y, .. } => vec![x, y],
+            BlockKind::ScrollTo { target, x, y } => vec![target.as_expr_mut(), x, y],
             BlockKind::ShakeCamera { intensity, seconds } => vec![intensity, seconds],
             BlockKind::SetAnimatorLayerWeight {
-                weight, seconds, ..
-            } => vec![weight, seconds],
+                animator,
+                weight,
+                seconds,
+                ..
+            } => vec![animator.as_expr_mut(), weight, seconds],
             BlockKind::SpawnDecal {
                 texture,
                 position,
@@ -1377,6 +2711,27 @@ impl BlockKind {
                 size,
                 seconds,
             } => vec![texture, position, facing, size, seconds],
+            BlockKind::CloneInto {
+                target,
+                parent,
+                count,
+                position,
+                offset_per_clone,
+                per_clone_positions,
+            } => {
+                let mut slots = vec![target.as_expr_mut(), parent.as_expr_mut()];
+                slots.extend(count.as_mut());
+                slots.extend(position.as_mut());
+                slots.extend(offset_per_clone.as_mut());
+                slots.extend(per_clone_positions.as_mut());
+                slots
+            }
+            BlockKind::ListCreate { items, .. } => items.iter_mut().collect(),
+            BlockKind::ListAdd { list, value } | BlockKind::ListRemoveValue { list, value } => {
+                vec![value, list]
+            }
+            BlockKind::ListInsert { list, index, value } => vec![value, index, list],
+            BlockKind::ListRemoveIndex { list, index } => vec![index, list],
             BlockKind::Local { values, .. } | BlockKind::Return { values } => {
                 values.iter_mut().collect()
             }
@@ -1405,7 +2760,16 @@ impl BlockKind {
                 slots.extend(step.as_mut());
                 slots
             }
-            BlockKind::ForEachPartInRadius { center, radius, .. } => vec![center, radius],
+            BlockKind::ForEachPartInRadius {
+                center,
+                radius,
+                ignore,
+                ..
+            } => {
+                let mut slots = vec![radius, center];
+                slots.extend(ignore.as_mut());
+                slots
+            }
             _ => Vec::new(),
         }
     }
@@ -1417,6 +2781,8 @@ impl BlockKind {
             BlockKind::SetToneMapping { .. }
                 | BlockKind::SetClockTime { .. }
                 | BlockKind::SetAtmosphere { .. }
+                | BlockKind::SetLightingProperty { .. }
+                | BlockKind::SetPostProcessing { .. }
         )
     }
 
@@ -1436,8 +2802,23 @@ impl BlockKind {
             self,
             BlockKind::Tween { .. }
                 | BlockKind::SlideIn { .. }
+                | BlockKind::SlideOut { .. }
                 | BlockKind::FadeIn { .. }
                 | BlockKind::FadeOut { .. }
+                | BlockKind::TweenPivot { .. }
+                | BlockKind::PulseScale { .. }
+                | BlockKind::SlideTo { .. }
+                | BlockKind::RotateTo { .. }
+                | BlockKind::TweenProperty { .. }
+                | BlockKind::FadeVolume { .. }
+                | BlockKind::SetClockTime {
+                    duration: Some(_),
+                    ..
+                }
+                | BlockKind::SetAtmosphere {
+                    duration: Some(_),
+                    ..
+                }
         )
     }
 
@@ -1447,6 +2828,7 @@ impl BlockKind {
             self,
             BlockKind::SaveSlot { .. }
                 | BlockKind::LoadSlot { .. }
+                | BlockKind::DeleteSlot { .. }
                 | BlockKind::SetCheckpoint { .. }
                 | BlockKind::RestoreCheckpoint
         )
@@ -1480,6 +2862,7 @@ impl BlockKind {
             self,
             BlockKind::Forever { .. }
                 | BlockKind::StopScript
+                | BlockKind::DestroyScript
                 | BlockKind::Break
                 | BlockKind::Continue
                 | BlockKind::Return { .. }
@@ -1495,7 +2878,8 @@ impl BlockKind {
             | BlockKind::Local { values: list, .. }
             | BlockKind::Assign { values: list, .. }
             | BlockKind::Return { values: list }
-            | BlockKind::GenericFor { values: list, .. } => Some(list),
+            | BlockKind::GenericFor { values: list, .. }
+            | BlockKind::ListCreate { items: list, .. } => Some(list),
             _ => None,
         }
     }
@@ -1503,66 +2887,441 @@ impl BlockKind {
     /// The value slots this block has, in the order they're shown.
     pub fn expressions(&self) -> Vec<&Expression> {
         match self {
+            BlockKind::WhenStreamedIn { target: o, .. }
+            | BlockKind::WhenStreamedOut { target: o, .. }
+            | BlockKind::WhenChildAdded { target: o, .. }
+            | BlockKind::WhenChildRemoved { target: o, .. }
+            | BlockKind::WhenRemoteFires { remote: o, .. }
+            | BlockKind::WhenClicked { button: o, .. }
+            | BlockKind::WhenMouseEnters { element: o, .. }
+            | BlockKind::WhenMouseLeaves { element: o, .. }
+            | BlockKind::WhenValueChanged { widget: o, .. }
+            | BlockKind::WhenSoundEnded { sound: o, .. }
+            | BlockKind::WhenCutsceneFinished { sequence: o, .. }
+            | BlockKind::WhenStateChanged { animator: o, .. }
+            | BlockKind::WhenAnimationEvent { animator: o, .. }
+            | BlockKind::WhenAgentSenses { agent: o, .. }
+            | BlockKind::WhenAgentLosesPlayer { agent: o, .. }
+            | BlockKind::WhenAgentArrives { agent: o, .. }
+            | BlockKind::WhenSplineReached { follower: o, .. }
+            | BlockKind::WhenSeatOccupied { seat: o, .. }
+            | BlockKind::WhenSeatVacated { seat: o, .. }
+            | BlockKind::WhenPropertyChanged { target: o, .. }
+            | BlockKind::WhenAttributeChanged { target: o, .. }
+            | BlockKind::WaitForEvent { target: o, .. }
+            | BlockKind::ForEachChild { target: o, .. }
+            | BlockKind::Show { target: o }
+            | BlockKind::Hide { target: o }
+            | BlockKind::ToggleVisibility { target: o }
+            | BlockKind::SetMaterial { target: o, .. }
+            | BlockKind::StopAgent { agent: o }
+            | BlockKind::LeaveSeat { controller: o }
+            | BlockKind::ControlSpline { follower: o, .. }
+            | BlockKind::SetCheckpoint { checkpoint: o }
+            | BlockKind::SetNetworkOwnershipAuto { target: o }
+            | BlockKind::StopSound { target: o }
+            | BlockKind::PauseSound { target: o }
+            | BlockKind::ResumeSound { target: o }
+            | BlockKind::SetAnimatorTrigger { animator: o, .. }
+            | BlockKind::ResetAnimatorTrigger { animator: o, .. }
+            | BlockKind::PlayAnimatorState { animator: o, .. }
+            | BlockKind::PlayCutscene { sequence: o }
+            | BlockKind::PauseCutscene { sequence: o }
+            | BlockKind::ResumeCutscene { sequence: o }
+            | BlockKind::StopCutscene { sequence: o }
+            | BlockKind::CancelTween { tween: o }
+            | BlockKind::Destroy { target: o } => vec![o.as_expr()],
+            BlockKind::PlaySound {
+                target: o,
+                pitch: opt,
+                ..
+            } => {
+                let mut slots = vec![o.as_expr()];
+                slots.extend(opt.as_ref());
+                slots
+            }
+            BlockKind::PlaySoundAtPosition {
+                target: o,
+                position: p,
+                volume,
+                pitch,
+            } => {
+                let mut slots = vec![o.as_expr(), p];
+                slots.extend(volume.as_ref());
+                slots.extend(pitch.as_ref());
+                slots
+            }
+            BlockKind::WhenTouched {
+                part,
+                filter_value,
+                cooldown,
+                ..
+            } => {
+                let mut slots = vec![part.as_expr()];
+                slots.extend(filter_value.as_ref());
+                slots.extend(cooldown.as_ref());
+                slots
+            }
+            BlockKind::WhenTouchEnds {
+                part, filter_value, ..
+            } => {
+                let mut slots = vec![part.as_expr()];
+                slots.extend(filter_value.as_ref());
+                slots
+            }
+            BlockKind::WhenPromptTriggered {
+                prompt: o,
+                cooldown: opt,
+                ..
+            }
+            | BlockKind::WhenPartClicked {
+                detector: o,
+                cooldown: opt,
+                ..
+            }
+            | BlockKind::WaitForChild {
+                target: o,
+                timeout: opt,
+                ..
+            }
+            | BlockKind::ForEachPartTouching {
+                target: o,
+                ignore: opt,
+                ..
+            } => {
+                let mut slots = vec![o.as_expr()];
+                slots.extend(opt.as_ref());
+                slots
+            }
+            BlockKind::FireEvent { data, .. } => data.iter().collect(),
             BlockKind::Wait { seconds: e }
             | BlockKind::WaitUntil { condition: e }
             | BlockKind::Repeat { count: e, .. }
             | BlockKind::RepeatUntil { condition: e, .. }
+            | BlockKind::ForEachInList { list: e, .. }
+            | BlockKind::ForEachTagged { tag: e, .. }
+            | BlockKind::CooldownGate { cooldown: e, .. }
+            | BlockKind::SpawnAsync { delay: e, .. }
+            | BlockKind::WhenTagAdded { tag: e, .. }
+            | BlockKind::WhenTagRemoved { tag: e, .. }
+            | BlockKind::Disconnect { connection: e }
             | BlockKind::If { condition: e, .. }
             | BlockKind::IfElse { condition: e, .. }
-            | BlockKind::MoveTo { position: e, .. }
-            | BlockKind::MoveBy { offset: e, .. }
-            | BlockKind::LookAt { position: e, .. }
-            | BlockKind::MoveForward { distance: e, .. }
-            | BlockKind::TurnTo { orientation: e, .. }
-            | BlockKind::TurnBy { rotation: e, .. }
-            | BlockKind::SetAnchored { anchored: e, .. }
-            | BlockKind::PushWithForce { force: e, .. }
-            | BlockKind::SetPartVelocity { velocity: e, .. }
-            | BlockKind::SetFriction { friction: e, .. }
-            | BlockKind::SetColor { color: e, .. }
-            | BlockKind::SetText { text: e, .. }
-            | BlockKind::ShowPage { page: e, .. }
-            | BlockKind::SetProperty { value: e, .. }
-            | BlockKind::SetAttribute { value: e, .. }
-            | BlockKind::SetValue { value: e, .. }
-            | BlockKind::SetDestination { position: e, .. }
-            | BlockKind::SetVelocity { velocity: e, .. }
             | BlockKind::SaveSlot { slot: e }
             | BlockKind::LoadSlot { slot: e }
+            | BlockKind::DeleteSlot { slot: e }
             | BlockKind::AddLevel { level: e }
             | BlockKind::RemoveLevel { level: e }
             | BlockKind::HostGame { port: e }
             | BlockKind::JoinGame { address: e }
-            | BlockKind::SetNetworkOwner { owner: e, .. }
             | BlockKind::SendChatMessage { text: e }
             | BlockKind::ShowSystemMessage { text: e }
             | BlockKind::SetLayerActive { active: e, .. }
             | BlockKind::SetLanguage { language: e }
-            | BlockKind::SetVolume { volume: e, .. }
-            | BlockKind::PlaceOnSpline { distance: e, .. }
-            | BlockKind::SetAnimatorBool { value: e, .. }
-            | BlockKind::SetAnimatorNumber { value: e, .. }
             | BlockKind::SetVariable { value: e, .. }
             | BlockKind::ChangeVariable { by: e, .. }
-            | BlockKind::SlideIn { seconds: e, .. }
-            | BlockKind::FadeIn { seconds: e, .. }
-            | BlockKind::FadeOut { seconds: e, .. }
+            | BlockKind::ListClear { list: e }
             | BlockKind::SetGraphicsNumber { value: e, .. }
-            | BlockKind::SetClockTime { time: e }
-            | BlockKind::SetAtmosphere { value: e, .. }
+            | BlockKind::SetLightingProperty { value: e, .. }
+            | BlockKind::SetPostProcessing { value: e, .. }
             | BlockKind::PointCameraAt { position: e }
-            | BlockKind::DestroyAfter { seconds: e, .. }
             | BlockKind::Print { value: e } => vec![e],
-            BlockKind::Tween { value, seconds, .. } => vec![value, seconds],
+            BlockKind::SetGraphicsOption { value, .. } => value.iter().collect(),
+            BlockKind::SetClockTime { time: e, duration }
+            | BlockKind::SetAtmosphere {
+                value: e, duration, ..
+            } => {
+                let mut slots = vec![e];
+                slots.extend(duration.as_ref());
+                slots
+            }
+            BlockKind::SlideTo {
+                target: o,
+                position: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::RotateTo {
+                target: o,
+                rotation: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::TweenProperty {
+                target: o,
+                value: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::FadeVolume {
+                target: o,
+                volume: a,
+                duration: b,
+                ..
+            }
+            | BlockKind::LaunchPart {
+                target: o,
+                direction: a,
+                speed: b,
+            } => vec![o.as_expr(), a, b],
+            BlockKind::FollowTarget {
+                agent: a,
+                target: b,
+            }
+            | BlockKind::SitInSeat {
+                seat: a,
+                controller: b,
+            } => vec![a.as_expr(), b.as_expr()],
+            BlockKind::MoveTo {
+                target: o,
+                position: e,
+            }
+            | BlockKind::MoveBy {
+                target: o,
+                offset: e,
+            }
+            | BlockKind::LookAt {
+                target: o,
+                position: e,
+            }
+            | BlockKind::MoveForward {
+                target: o,
+                distance: e,
+            }
+            | BlockKind::TurnTo {
+                target: o,
+                orientation: e,
+            }
+            | BlockKind::TurnBy {
+                target: o,
+                rotation: e,
+                ..
+            }
+            | BlockKind::SetGravity {
+                target: o,
+                multiplier: e,
+            }
+            | BlockKind::SetAngularVelocity {
+                target: o,
+                velocity: e,
+            }
+            | BlockKind::SetSplineSpeed {
+                follower: o,
+                speed: e,
+            }
+            | BlockKind::SetAnchored {
+                target: o,
+                anchored: e,
+            }
+            | BlockKind::PushWithForce {
+                target: o,
+                force: e,
+            }
+            | BlockKind::SetPartVelocity {
+                target: o,
+                velocity: e,
+            }
+            | BlockKind::SetFriction {
+                target: o,
+                friction: e,
+            }
+            | BlockKind::SetColor {
+                target: o,
+                color: e,
+            }
+            | BlockKind::SetTransparency {
+                target: o,
+                transparency: e,
+            }
+            | BlockKind::EmitParticles {
+                target: o,
+                count: e,
+            }
+            | BlockKind::SetEffectEnabled {
+                target: o,
+                enabled: e,
+            }
+            | BlockKind::SetImage {
+                target: o,
+                image: e,
+            }
+            | BlockKind::SetSoundPitch {
+                target: o,
+                pitch: e,
+            }
+            | BlockKind::SetSoundLooping {
+                target: o,
+                looped: e,
+            }
+            | BlockKind::SetSoundTime { target: o, time: e }
+            | BlockKind::SetText { target: o, text: e }
+            | BlockKind::SetProperty {
+                target: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAttribute {
+                target: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetValue {
+                target: o,
+                value: e,
+            }
+            | BlockKind::SetDestination {
+                agent: o,
+                position: e,
+            }
+            | BlockKind::SetVelocity {
+                agent: o,
+                velocity: e,
+            }
+            | BlockKind::SetVolume {
+                target: o,
+                volume: e,
+            }
+            | BlockKind::SetAnimatorBool {
+                animator: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAnimatorNumber {
+                animator: o,
+                value: e,
+                ..
+            }
+            | BlockKind::SetAnimatorSpeed {
+                animator: o,
+                speed: e,
+            }
+            | BlockKind::SetRagdollEnabled {
+                ragdoll: o,
+                enabled: e,
+            }
+            | BlockKind::SlideIn {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::SlideOut {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::FadeIn {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::FadeOut {
+                target: o,
+                seconds: e,
+                ..
+            }
+            | BlockKind::DestroyAfter {
+                target: o,
+                seconds: e,
+            } => vec![o.as_expr(), e],
+            BlockKind::ShowPage { layout: o, page: e }
+            | BlockKind::SetNetworkOwner {
+                target: o,
+                owner: e,
+            } => vec![e, o.as_expr()],
+            BlockKind::WhenAnimationFinished {
+                animator,
+                animation,
+                ..
+            } => vec![animation.as_expr(), animator.as_expr()],
+            BlockKind::PlayAnimation {
+                animator,
+                animation,
+                fade_time,
+                speed,
+                weight,
+                ..
+            } => {
+                let mut slots = vec![animation.as_expr(), animator.as_expr()];
+                slots.extend(fade_time.as_ref());
+                slots.extend(speed.as_ref());
+                slots.extend(weight.as_ref());
+                slots
+            }
+            BlockKind::StopAnimation {
+                animator,
+                animation,
+                fade_time,
+            } => {
+                let mut slots = Vec::new();
+                if let Some(anim) = animation {
+                    slots.push(anim.as_expr());
+                }
+                slots.push(animator.as_expr());
+                slots.extend(fade_time.as_ref());
+                slots
+            }
+            BlockKind::SetIkTarget {
+                ik_control,
+                target,
+                weight,
+            } => {
+                let mut slots = vec![ik_control.as_expr(), target.as_expr()];
+                slots.extend(weight.as_ref());
+                slots
+            }
+            BlockKind::Patrol { agent, spline } => vec![agent.as_expr(), spline.as_expr()],
+            BlockKind::PlaceOnSpline {
+                target,
+                spline,
+                distance,
+            } => vec![target.as_expr(), spline.as_expr(), distance],
+            BlockKind::Tween {
+                target,
+                value,
+                seconds,
+                repeat_count,
+                ..
+            } => {
+                let mut slots = vec![target.as_expr(), value, seconds];
+                slots.extend(repeat_count.as_ref());
+                slots
+            }
+            BlockKind::TweenPivot {
+                target,
+                position,
+                duration,
+                ..
+            } => vec![target.as_expr(), position, duration],
+            BlockKind::PulseScale {
+                target,
+                scale,
+                duration,
+                ..
+            } => vec![target.as_expr(), scale, duration],
             BlockKind::LoadLevel { level, spawn } => vec![level, spawn],
-            BlockKind::WhenCommandRun { command, help, .. } => vec![command, help],
+            BlockKind::WhenCommandRun {
+                command,
+                help,
+                admin_only,
+                ..
+            } => {
+                let mut slots = vec![command, help];
+                slots.extend(admin_only.as_ref());
+                slots
+            }
+            BlockKind::ForRange {
+                start, end, step, ..
+            } => vec![start, end, step],
             BlockKind::RequestStreamAround { player, position } => vec![player, position],
             BlockKind::KickPlayer { player, reason } => vec![player, reason],
-            BlockKind::ScrollTo { x, y, .. } => vec![x, y],
+            BlockKind::ScrollTo { target, x, y } => vec![target.as_expr(), x, y],
             BlockKind::ShakeCamera { intensity, seconds } => vec![intensity, seconds],
             BlockKind::SetAnimatorLayerWeight {
-                weight, seconds, ..
-            } => vec![weight, seconds],
+                animator,
+                weight,
+                seconds,
+                ..
+            } => vec![animator.as_expr(), weight, seconds],
             BlockKind::SpawnDecal {
                 texture,
                 position,
@@ -1570,6 +3329,27 @@ impl BlockKind {
                 size,
                 seconds,
             } => vec![texture, position, facing, size, seconds],
+            BlockKind::CloneInto {
+                target,
+                parent,
+                count,
+                position,
+                offset_per_clone,
+                per_clone_positions,
+            } => {
+                let mut slots = vec![target.as_expr(), parent.as_expr()];
+                slots.extend(count.as_ref());
+                slots.extend(position.as_ref());
+                slots.extend(offset_per_clone.as_ref());
+                slots.extend(per_clone_positions.as_ref());
+                slots
+            }
+            BlockKind::ListCreate { items, .. } => items.iter().collect(),
+            BlockKind::ListAdd { list, value } | BlockKind::ListRemoveValue { list, value } => {
+                vec![value, list]
+            }
+            BlockKind::ListInsert { list, index, value } => vec![value, index, list],
+            BlockKind::ListRemoveIndex { list, index } => vec![index, list],
             BlockKind::Local { values, .. } | BlockKind::Return { values } => {
                 values.iter().collect()
             }
@@ -1596,7 +3376,16 @@ impl BlockKind {
                 slots.extend(step.as_ref());
                 slots
             }
-            BlockKind::ForEachPartInRadius { center, radius, .. } => vec![center, radius],
+            BlockKind::ForEachPartInRadius {
+                center,
+                radius,
+                ignore,
+                ..
+            } => {
+                let mut slots = vec![radius, center];
+                slots.extend(ignore.as_ref());
+                slots
+            }
             _ => Vec::new(),
         }
     }
@@ -1625,10 +3414,38 @@ pub enum Expression {
         g: f64,
         b: f64,
     },
+    /// A static dotted scene path picked from an instance dropdown (inside an
+    /// [`ObjectRef`] slot). Treated as a literal so the dropdown renders inline
+    /// when unwired and disappears when a reporter or wire is connected.
+    ObjectPath {
+        path: String,
+    },
+    /// Reference to a right-side output data pin of block `block` (output index
+    /// `output`), bound to Luau identifier `name` (e.g. `Baseplate_cloned`,
+    /// `otherPart`, or a `Local` variable).
+    BlockOutput {
+        block: u64,
+        output: usize,
+        name: String,
+    },
 
     // Reporters.
     Variable {
         name: String,
+    },
+    /// 1-based item lookup in a list: `list[index]`.
+    ListItem {
+        list: Box<Expression>,
+        index: Box<Expression>,
+    },
+    /// Number of items in a list: `#list`.
+    ListLength {
+        list: Box<Expression>,
+    },
+    /// Whether `list` contains `value`: `table.find(list, value) ~= nil`.
+    ListContains {
+        list: Box<Expression>,
+        value: Box<Expression>,
     },
     Math {
         op: MathOp,
@@ -1676,32 +3493,79 @@ pub enum Expression {
     },
     /// An object's property, such as a part's `Position`.
     Property {
-        target: String,
+        target: ObjectRef,
         property: String,
     },
     /// One of an object's attributes (`GetAttribute`), nil when it has none
     /// by that name.
     Attribute {
-        target: String,
+        target: ObjectRef,
         attribute: String,
     },
-    /// `workspace:Raycast(origin, direction)`.
+    /// `workspace:Raycast(origin, direction[, params])`, optionally extracting
+    /// one field from the result (`output` in [`RAYCAST_OUTPUTS`]).
     Raycast {
         origin: Box<Expression>,
         direction: Box<Expression>,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        output: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ignore: Option<ObjectRef>,
     },
-    /// `workspace:Raycast(origin, direction, params)`, passing by `ignore`
+    /// Legacy: `workspace:Raycast(origin, direction, params)`, passing by `ignore`
     /// and everything inside it, such as the shooter's own character.
     RaycastIgnoring {
         origin: Box<Expression>,
         direction: Box<Expression>,
-        ignore: String,
+        ignore: ObjectRef,
     },
     /// The part that touched, inside "when touched".
     TouchingPart,
+    /// The triggering player inside a player-bearing event (e.g. When Touched,
+    /// When Prompt Triggered, When Part Clicked, When Command Run, When Player Joins).
+    TriggeringPlayer,
+    /// The command arguments list inside `When Command Run`.
+    CommandArgs,
+    /// The frame delta time (`dt`) inside `Every Frame`, `Before Render`, or
+    /// `Before Physics`.
+    DeltaTime,
     /// The part under the mouse: `LocalPlayer:GetMouse().Target`, the
     /// camera's ray through the mouse cast into the world. Client only.
     PartUnderMouse,
+    /// The 3D world position under the mouse: `LocalPlayer:GetMouse().Hit.Position`.
+    MouseHitPosition,
+    /// The current camera's world position: `workspace.CurrentCamera.CFrame.Position`.
+    CameraPosition,
+    /// The current camera's unit look direction: `workspace.CurrentCamera.CFrame.LookVector`.
+    CameraLookDirection,
+    /// The player whose character is nearest `position`, or nil.
+    NearestPlayerTo {
+        position: Box<Expression>,
+    },
+    /// The `Player` owning `part`'s character (`Players:GetPlayerFromCharacter`).
+    PlayerOfPart {
+        part: ObjectRef,
+    },
+    /// Whether `player`'s character has Health > 0.
+    PlayerIsAlive {
+        player: ObjectRef,
+    },
+    /// `target.Parent`.
+    ParentOf {
+        target: ObjectRef,
+    },
+    /// `target:FindFirstChild(name)`.
+    ChildOf {
+        name: Box<Expression>,
+        target: ObjectRef,
+    },
+    /// `CollectionService:HasTag(target, tag)`.
+    HasTag {
+        target: ObjectRef,
+        tag: Box<Expression>,
+    },
+    /// Elapsed game time in seconds (`workspace.DistributedGameTime`).
+    GameTime,
     /// Whether a key is held down. Client only.
     KeyDown {
         key: String,
@@ -1713,18 +3577,18 @@ pub enum Expression {
     },
     /// An Animator's Bool parameter (`animator:GetBool`).
     AnimatorBool {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
     },
     /// An Animator's Number parameter (`animator:GetNumber`).
     AnimatorNumber {
-        animator: String,
+        animator: ObjectRef,
         parameter: String,
     },
     /// How much an Animator's layer counts now
     /// (`animator:GetLayerWeight`, Phase 78).
     AnimatorLayerWeight {
-        animator: String,
+        animator: ObjectRef,
         layer: String,
     },
     /// Whether `value` (an Instance) is of class `class` or inherits from
@@ -1747,19 +3611,118 @@ pub enum Expression {
     /// The point `t` of the way along a Spline (`spline:GetPositionAt(t)`,
     /// Phase 73).
     SplinePosition {
-        spline: String,
+        spline: ObjectRef,
         t: Box<Expression>,
     },
     /// How far along a Spline its point nearest `position` is
     /// (`spline:GetClosestDistance(position)`).
     SplineClosestDistance {
-        spline: String,
+        spline: ObjectRef,
         position: Box<Expression>,
     },
     /// A row's value in one column: `row.Damage`.
     DataValue {
         column: String,
         row: Box<Expression>,
+    },
+    /// A property of a `Sound` instance (`Playing`, `TimePosition`, `TimeLength`,
+    /// `Volume`, `PlaybackSpeed`, `Looped`).
+    SoundProperty {
+        target: ObjectRef,
+        property: String,
+    },
+    /// Constructs a Vector3 from three expressions: `Vector3.new(x, y, z)`.
+    MakeVector3 {
+        x: Box<Expression>,
+        y: Box<Expression>,
+        z: Box<Expression>,
+    },
+    /// Extracts `"X"`, `"Y"`, or `"Z"` from a Vector3: `vector.X`.
+    VectorAxis {
+        axis: String,
+        vector: Box<Expression>,
+    },
+    /// Distance between two Vector3 points: `(from - to).Magnitude`.
+    Distance {
+        from: Box<Expression>,
+        to: Box<Expression>,
+    },
+    /// Unit direction vector from `from` toward `to`: `(to - from).Unit`.
+    Direction {
+        from: Box<Expression>,
+        to: Box<Expression>,
+    },
+    /// Length of a Vector3: `vector.Magnitude`.
+    Magnitude {
+        vector: Box<Expression>,
+    },
+    /// Clamps `value` between `min` and `max`: `math.clamp(value, min, max)`.
+    Clamp {
+        value: Box<Expression>,
+        min: Box<Expression>,
+        max: Box<Expression>,
+    },
+    /// Minimum or maximum of two numbers: `math.min(a, b)` / `math.max(a, b)`.
+    MinMax {
+        op: String,
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    /// Character count of a string: `#tostring(text)`.
+    StringLength {
+        text: Box<Expression>,
+    },
+    /// Whether `text` contains `substring` (plain match):
+    /// `string.find(tostring(text), tostring(substring), 1, true) ~= nil`.
+    StringContains {
+        text: Box<Expression>,
+        substring: Box<Expression>,
+    },
+    /// Formats a number to `decimals` decimal places:
+    /// `string.format("%.2f", value)`.
+    FormatNumber {
+        value: Box<Expression>,
+        decimals: Box<Expression>,
+    },
+    /// Constructs a Color3 from 0–255 RGB components: `Color3.fromRGB(r, g, b)`.
+    MakeColorRgb {
+        r: Box<Expression>,
+        g: Box<Expression>,
+        b: Box<Expression>,
+    },
+    /// Constructs a Color3 from 0–1 HSV components: `Color3.fromHSV(h, s, v)`.
+    MakeColorHsv {
+        h: Box<Expression>,
+        s: Box<Expression>,
+        v: Box<Expression>,
+    },
+    /// The new state name (`state`) inside `WhenStateChanged`.
+    AnimatorNewState,
+    /// The previous state name (`previous`) inside `WhenStateChanged`.
+    AnimatorPreviousState,
+    /// The animation event name (`name`) inside `WhenAnimationEvent`.
+    AnimationEventName,
+    /// The failure reason (`reason`) inside `WhenConnectionFails`.
+    ConnectionFailureReason,
+    /// The changed data layer name (`layerName`) inside `WhenLayerChanged`.
+    ChangedLayerName,
+    /// Whether the changed data layer is active (`active`) inside `WhenLayerChanged`.
+    ChangedLayerActive,
+    /// The chat message text (`message.Text`) inside `WhenChatMessageReceived`.
+    ChatMessageText,
+    /// The player who sent the chat message (`message.Player`) inside `WhenChatMessageReceived`.
+    ChatMessageSender,
+    /// Whether this device is hosting the multiplayer game (`NetworkService.IsHost`).
+    IsHost,
+    /// Whether this device is connected to a multiplayer game (`NetworkService.IsConnected`).
+    IsConnected,
+    /// Whether save slot `slot` exists (`SaveService:HasSlot(slot)`).
+    SlotExists {
+        slot: Box<Expression>,
+    },
+    /// Number of rows in a data table (`DataService:GetTable(t):Count()`).
+    DataTableRowCount {
+        table: String,
     },
 
     // Luau's own values (see `BlockKind::RunScript`).
@@ -1871,7 +3834,18 @@ impl Expression {
             | Expression::AnimatorBool { .. }
             | Expression::IsA { .. }
             | Expression::IsStreamedIn { .. }
+            | Expression::ListContains { .. }
+            | Expression::StringContains { .. }
+            | Expression::ChangedLayerActive
+            | Expression::IsHost
+            | Expression::IsConnected
+            | Expression::SlotExists { .. }
             | Expression::Code { .. } => BlockShape::Boolean,
+            Expression::SoundProperty { property, .. }
+                if matches!(property.as_str(), "Playing" | "Looped") =>
+            {
+                BlockShape::Boolean
+            }
             // Any value can be a condition in Luau, so what can't be told
             // apart from one fits a condition.
             expression if expression.is_untyped() => BlockShape::Boolean,
@@ -1886,6 +3860,7 @@ impl Expression {
             Expression::Nil
                 | Expression::Vararg
                 | Expression::Name { .. }
+                | Expression::BlockOutput { .. }
                 | Expression::Field { .. }
                 | Expression::Index { .. }
                 | Expression::Call { .. }
@@ -1936,6 +3911,7 @@ impl Expression {
                 | Expression::Boolean { .. }
                 | Expression::Vector3 { .. }
                 | Expression::Color3 { .. }
+                | Expression::ObjectPath { .. }
                 | Expression::Nil
                 | Expression::Vararg
                 | Expression::Name { .. }
@@ -1962,20 +3938,62 @@ impl Expression {
                 vec![min, max]
             }
             Expression::Lerp { from, to, alpha } => vec![from, to, alpha],
-            Expression::Raycast { origin, direction }
-            | Expression::RaycastIgnoring {
-                origin, direction, ..
-            } => vec![origin, direction],
+            Expression::MakeVector3 { x, y, z } => vec![x, y, z],
+            Expression::MakeColorRgb { r, g, b } => vec![r, g, b],
+            Expression::MakeColorHsv { h, s, v } => vec![h, s, v],
+            Expression::Clamp { value, min, max } => vec![value, min, max],
+            Expression::Distance { from, to } | Expression::Direction { from, to } => {
+                vec![from, to]
+            }
+            Expression::MinMax { left, right, .. } => vec![left, right],
+            Expression::StringContains { text, substring } => vec![text, substring],
+            Expression::FormatNumber { value, decimals } => vec![value, decimals],
+            Expression::VectorAxis { vector: v, .. }
+            | Expression::Magnitude { vector: v }
+            | Expression::StringLength { text: v } => vec![v],
+            Expression::Raycast {
+                origin,
+                direction,
+                ignore,
+                ..
+            } => {
+                let mut slots = vec![origin.as_mut(), direction.as_mut()];
+                if let Some(ig) = ignore {
+                    slots.push(ig.as_expr_mut());
+                }
+                slots
+            }
+            Expression::RaycastIgnoring {
+                origin,
+                direction,
+                ignore,
+            } => vec![origin, direction, ignore.as_expr_mut()],
+            Expression::Property { target: o, .. }
+            | Expression::Attribute { target: o, .. }
+            | Expression::SoundProperty { target: o, .. }
+            | Expression::PlayerOfPart { part: o }
+            | Expression::PlayerIsAlive { player: o }
+            | Expression::ParentOf { target: o }
+            | Expression::AnimatorBool { animator: o, .. }
+            | Expression::AnimatorNumber { animator: o, .. }
+            | Expression::AnimatorLayerWeight { animator: o, .. } => vec![o.as_expr_mut()],
+            Expression::NearestPlayerTo { position } => vec![position],
+            Expression::ChildOf { name, target } => vec![name, target.as_expr_mut()],
+            Expression::HasTag { target, tag } => vec![target.as_expr_mut(), tag],
+            Expression::SplinePosition { spline, t } => vec![t, spline.as_expr_mut()],
+            Expression::SplineClosestDistance { spline, position } => {
+                vec![spline.as_expr_mut(), position]
+            }
+            Expression::ListItem { list, index } => vec![index, list],
+            Expression::ListLength { list } => vec![list],
+            Expression::ListContains { list, value } => vec![list, value],
             Expression::Function { value, .. }
             | Expression::Not { value }
             | Expression::IsA { value, .. }
             | Expression::IsStreamedIn { value }
             | Expression::DataRow { key: value, .. }
-            | Expression::SplinePosition { t: value, .. }
-            | Expression::SplineClosestDistance {
-                position: value, ..
-            }
             | Expression::DataValue { row: value, .. }
+            | Expression::SlotExists { slot: value }
             | Expression::Field { object: value, .. }
             | Expression::Unary { value, .. }
             | Expression::Paren { value }
@@ -2026,20 +4044,62 @@ impl Expression {
                 vec![min, max]
             }
             Expression::Lerp { from, to, alpha } => vec![from, to, alpha],
-            Expression::Raycast { origin, direction }
-            | Expression::RaycastIgnoring {
-                origin, direction, ..
-            } => vec![origin, direction],
+            Expression::MakeVector3 { x, y, z } => vec![x, y, z],
+            Expression::MakeColorRgb { r, g, b } => vec![r, g, b],
+            Expression::MakeColorHsv { h, s, v } => vec![h, s, v],
+            Expression::Clamp { value, min, max } => vec![value, min, max],
+            Expression::Distance { from, to } | Expression::Direction { from, to } => {
+                vec![from, to]
+            }
+            Expression::MinMax { left, right, .. } => vec![left, right],
+            Expression::StringContains { text, substring } => vec![text, substring],
+            Expression::FormatNumber { value, decimals } => vec![value, decimals],
+            Expression::VectorAxis { vector: v, .. }
+            | Expression::Magnitude { vector: v }
+            | Expression::StringLength { text: v } => vec![v],
+            Expression::Raycast {
+                origin,
+                direction,
+                ignore,
+                ..
+            } => {
+                let mut slots = vec![origin.as_ref(), direction.as_ref()];
+                if let Some(ig) = ignore {
+                    slots.push(ig.as_expr());
+                }
+                slots
+            }
+            Expression::RaycastIgnoring {
+                origin,
+                direction,
+                ignore,
+            } => vec![origin, direction, ignore.as_expr()],
+            Expression::Property { target: o, .. }
+            | Expression::Attribute { target: o, .. }
+            | Expression::SoundProperty { target: o, .. }
+            | Expression::PlayerOfPart { part: o }
+            | Expression::PlayerIsAlive { player: o }
+            | Expression::ParentOf { target: o }
+            | Expression::AnimatorBool { animator: o, .. }
+            | Expression::AnimatorNumber { animator: o, .. }
+            | Expression::AnimatorLayerWeight { animator: o, .. } => vec![o.as_expr()],
+            Expression::NearestPlayerTo { position } => vec![position],
+            Expression::ChildOf { name, target } => vec![name, target.as_expr()],
+            Expression::HasTag { target, tag } => vec![target.as_expr(), tag],
+            Expression::SplinePosition { spline, t } => vec![t, spline.as_expr()],
+            Expression::SplineClosestDistance { spline, position } => {
+                vec![spline.as_expr(), position]
+            }
+            Expression::ListItem { list, index } => vec![index, list],
+            Expression::ListLength { list } => vec![list],
+            Expression::ListContains { list, value } => vec![list, value],
             Expression::Function { value, .. }
             | Expression::Not { value }
             | Expression::IsStreamedIn { value }
             | Expression::IsA { value, .. }
             | Expression::DataRow { key: value, .. }
-            | Expression::SplinePosition { t: value, .. }
-            | Expression::SplineClosestDistance {
-                position: value, ..
-            }
             | Expression::DataValue { row: value, .. }
+            | Expression::SlotExists { slot: value }
             | Expression::Field { object: value, .. }
             | Expression::Unary { value, .. }
             | Expression::Paren { value }
@@ -2191,15 +4251,33 @@ pub enum MathFunction {
     Ceil,
     Round,
     Sqrt,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Log,
+    Exp,
+    Sign,
 }
 
 impl MathFunction {
-    pub const ALL: [MathFunction; 5] = [
-        MathFunction::Abs,
+    pub const ALL: [MathFunction; 14] = [
+        MathFunction::Round,
         MathFunction::Floor,
         MathFunction::Ceil,
-        MathFunction::Round,
+        MathFunction::Abs,
         MathFunction::Sqrt,
+        MathFunction::Sin,
+        MathFunction::Cos,
+        MathFunction::Tan,
+        MathFunction::Asin,
+        MathFunction::Acos,
+        MathFunction::Atan,
+        MathFunction::Log,
+        MathFunction::Exp,
+        MathFunction::Sign,
     ];
 
     /// The name a block shows.
@@ -2210,6 +4288,15 @@ impl MathFunction {
             Self::Ceil => "ceiling",
             Self::Round => "round",
             Self::Sqrt => "sqrt",
+            Self::Sin => "sin",
+            Self::Cos => "cos",
+            Self::Tan => "tan",
+            Self::Asin => "asin",
+            Self::Acos => "acos",
+            Self::Atan => "atan",
+            Self::Log => "log",
+            Self::Exp => "exp",
+            Self::Sign => "sign",
         }
     }
 }

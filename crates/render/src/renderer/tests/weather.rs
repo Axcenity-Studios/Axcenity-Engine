@@ -81,6 +81,7 @@ fn wet_surfaces_are_darker_and_glossier() {
     list.weather = Weather {
         wetness: 1.0,
         snow: 0.0,
+        ..Weather::default()
     };
     let wet_wall = brightness(pixel_at(&mut renderer, &list, WALL));
     let wet_floor = floor_pixels(&renderer.read_pixels());
@@ -114,6 +115,7 @@ fn snow_whitens_the_tops_of_things_but_not_their_walls() {
         list.weather = Weather {
             wetness: 0.0,
             snow: cover,
+            ..Weather::default()
         };
         tops.push(pixel_at(&mut renderer, &list, TOP));
         assert_eq!(
@@ -147,6 +149,7 @@ fn clear_weather_draws_the_same_frame_and_weather_adds_no_cost() {
     list.weather = Weather {
         wetness: 0.8,
         snow: 0.6,
+        ..Weather::default()
     };
     renderer.render(&list).unwrap();
     assert!(renderer.read_pixels() != clear, "the weather shows");
@@ -157,4 +160,105 @@ fn clear_weather_draws_the_same_frame_and_weather_adds_no_cost() {
     list.weather = Weather::default();
     renderer.render(&list).unwrap();
     assert!(renderer.read_pixels() == clear, "dry again, as before");
+}
+
+#[test]
+fn weather_field_shelters_roof_and_manual_interior_from_snow() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let mut list = block_on_floor();
+    let bare_top = pixel_at(&mut renderer, &list, TOP);
+
+    // Snow with no weather field whitens the block top.
+    list.weather = Weather {
+        wetness: 0.0,
+        snow: 1.0,
+        snow_thickness: 0.5,
+    };
+    let snowy_top = pixel_at(&mut renderer, &list, TOP);
+    assert!(brightness(snowy_top) > brightness(bare_top) + 150);
+
+    // A roof at y = 12 above the block top (y = 4) shelters it back to bare.
+    let size = 16u32;
+    let roof_cells = vec![[12.0, 0.0, 0.0, 0.0]; (size * size) as usize];
+    list.weather_field = Some(std::sync::Arc::new(crate::WeatherField {
+        origin: [-8.0, -8.0],
+        cell_size: 1.0,
+        size,
+        cells: roof_cells,
+    }));
+    let sheltered_top = pixel_at(&mut renderer, &list, TOP);
+    assert_eq!(
+        sheltered_top, bare_top,
+        "a roof above the block keeps its top completely bare"
+    );
+
+    // Manual exterior override (+1.0) forces snow even under the roof.
+    let forced_exterior = vec![[12.0, 1.0, 0.0, 0.0]; (size * size) as usize];
+    list.weather_field = Some(std::sync::Arc::new(crate::WeatherField {
+        origin: [-8.0, -8.0],
+        cell_size: 1.0,
+        size,
+        cells: forced_exterior,
+    }));
+    let forced_top = pixel_at(&mut renderer, &list, TOP);
+    assert!(
+        brightness(forced_top) > brightness(bare_top) + 150,
+        "manual exterior override restores snow: {forced_top:?}"
+    );
+
+    // Manual interior override (-1.0) shelters even with open sky (-1e9).
+    let forced_interior = vec![[-1.0e9, -1.0, 0.0, 0.0]; (size * size) as usize];
+    list.weather_field = Some(std::sync::Arc::new(crate::WeatherField {
+        origin: [-8.0, -8.0],
+        cell_size: 1.0,
+        size,
+        cells: forced_interior,
+    }));
+    let interior_top = pixel_at(&mut renderer, &list, TOP);
+    assert_eq!(
+        interior_top, bare_top,
+        "manual interior paint keeps the surface bare"
+    );
+}
+
+#[test]
+fn snow_footprints_visibly_compact_snow() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let mut list = block_on_floor();
+    list.weather = Weather {
+        wetness: 0.0,
+        snow: 1.0,
+        snow_thickness: 0.6,
+    };
+    let size = 16u32;
+    let open = vec![[-1.0e9, 0.0, 0.0, 0.0]; (size * size) as usize];
+    list.weather_field = Some(std::sync::Arc::new(crate::WeatherField {
+        origin: [-8.0, -8.0],
+        cell_size: 1.0,
+        size,
+        cells: open,
+    }));
+    let untouched = pixel_at(&mut renderer, &list, TOP);
+
+    // Stamp a deep footprint across the top of the block.
+    let stamped = vec![[-1.0e9, 0.0, 1.0, 0.0]; (size * size) as usize];
+    list.weather_field = Some(std::sync::Arc::new(crate::WeatherField {
+        origin: [-8.0, -8.0],
+        cell_size: 1.0,
+        size,
+        cells: stamped,
+    }));
+    let compressed = pixel_at(&mut renderer, &list, TOP);
+    assert!(
+        brightness(compressed) < brightness(untouched),
+        "footprints compact and darken snow: untouched {untouched:?}, compressed {compressed:?}"
+    );
 }

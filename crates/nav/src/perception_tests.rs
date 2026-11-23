@@ -320,3 +320,41 @@ fn with_no_player_character_an_agent_senses_nothing() {
     assert_eq!(step(&mut agents, &mut world), vec![]);
     assert!(!flag(&world, agent, "SeesPlayer"));
 }
+
+#[test]
+fn agent_reports_player_lost_and_destination_reached_once() {
+    let Scene {
+        mut world,
+        agent,
+        player,
+        ..
+    } = guard_and_player();
+    let mut agents = Agents::default();
+    // Place player in view so the agent senses them.
+    put(&mut world, player, at(-15.0, 0.0, -20.0));
+    assert_eq!(step(&mut agents, &mut world), vec![Sense::Sight]);
+    assert!(agents.take_lost().is_empty());
+
+    // Move player behind the wall: Sight is lost once.
+    put(&mut world, player, at(0.0, 0.0, -20.0));
+    step(&mut agents, &mut world);
+    let lost: Vec<Sense> = agents.take_lost().into_iter().map(|s| s.sense).collect();
+    assert_eq!(lost, vec![Sense::Sight]);
+    step(&mut agents, &mut world);
+    assert!(agents.take_lost().is_empty());
+
+    // Drain any initial arrival at default destination, then walk to a new one.
+    agents.take_arrived();
+    set(
+        &mut world,
+        agent,
+        "Destination",
+        Value::Vector3(at(0.0, 0.0, -2.0)),
+    );
+    let mut arrivals = Vec::new();
+    for _ in 0..60 {
+        agents.step(&mut world, &Assets::default(), 1.0 / 30.0);
+        arrivals.extend(agents.take_arrived());
+    }
+    assert_eq!(arrivals, vec![agent]);
+}

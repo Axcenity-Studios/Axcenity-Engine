@@ -323,13 +323,16 @@ impl Side {
 pub enum Handle {
     Move(Axis),
     Scale(Axis, Side),
+    /// Uniform (all-axis) scale handle at the center of the selection.
+    ScaleUniform,
     Rotate(Axis),
 }
 
 impl Handle {
-    fn axis(self) -> Axis {
+    fn color(self) -> egui::Color32 {
         match self {
-            Handle::Move(axis) | Handle::Scale(axis, _) | Handle::Rotate(axis) => axis,
+            Handle::Move(axis) | Handle::Scale(axis, _) | Handle::Rotate(axis) => axis.color(),
+            Handle::ScaleUniform => egui::Color32::from_rgb(235, 240, 248),
         }
     }
 }
@@ -391,6 +394,8 @@ enum End {
         toward: egui::Vec2,
     },
     Ball(egui::Pos2),
+    /// Centered square handle for uniform all-axis scaling.
+    Cube(egui::Pos2),
     None,
 }
 
@@ -765,6 +770,14 @@ fn handles_of(tool: Tool, pose: Pose, screen: &Screen) -> Vec<Shape> {
                     });
                 }
             }
+            if let Some(mid) = screen.point(center) {
+                shapes.push(Shape {
+                    handle: Handle::ScaleUniform,
+                    frame: pose,
+                    lines: Vec::new(),
+                    end: End::Cube(mid),
+                });
+            }
         }
         Tool::Rotate => {
             for axis in Axis::ALL {
@@ -812,6 +825,7 @@ fn distance_to_shape(shape: &Shape, pointer: egui::Pos2) -> f32 {
             distance_to_segment(pointer, tip, tip + toward * ARROW_LENGTH)
         }
         End::Ball(center) => (pointer.distance(center) - BALL_RADIUS).max(0.0),
+        End::Cube(center) => (pointer.distance(center) - (BALL_RADIUS + 1.0)).max(0.0),
         End::None => f32::INFINITY,
     };
     to_lines.fold(to_end, f32::min)
@@ -834,7 +848,7 @@ pub fn paint(painter: &egui::Painter, shapes: &[Shape], highlighted: Option<Hand
         let color = if highlighted == Some(shape.handle) {
             HIGHLIGHT
         } else {
-            shape.handle.axis().color()
+            shape.handle.color()
         };
         let stroke = egui::Stroke::new(LINE_WIDTH, color);
         for &line in &shape.lines {
@@ -852,6 +866,19 @@ pub fn paint(painter: &egui::Painter, shapes: &[Shape], highlighted: Option<Hand
             }
             End::Ball(center) => {
                 painter.circle_filled(center, BALL_RADIUS, color);
+            }
+            End::Cube(center) => {
+                let rect = egui::Rect::from_center_size(
+                    center,
+                    egui::vec2((BALL_RADIUS + 1.0) * 2.0, (BALL_RADIUS + 1.0) * 2.0),
+                );
+                painter.rect(
+                    rect,
+                    2.0,
+                    color,
+                    egui::Stroke::new(1.5, egui::Color32::from_rgba_unmultiplied(15, 18, 24, 220)),
+                    egui::StrokeKind::Outside,
+                );
             }
             End::None => {}
         }
@@ -1011,6 +1038,7 @@ impl Drag {
     ) -> Option<Drag> {
         let spin = match handle {
             Handle::Rotate(axis) => Some((ring_spin(frame, axis, screen, at), at)),
+            Handle::ScaleUniform => Some((egui::Vec2::ZERO, at)),
             _ => None,
         };
         let mut drag = Self::begin(handle, frame, parts, modes, screen.ray(at), spin)?;
@@ -1034,7 +1062,7 @@ impl Drag {
                 let (origin, direction) = handle_line(handle, frame);
                 along_line(origin, direction, ray)?
             }
-            Handle::Rotate(_) => 0.0,
+            Handle::ScaleUniform | Handle::Rotate(_) => 0.0,
         };
         let (spin, last_at) = spin.unwrap_or((egui::Vec2::ZERO, egui::Pos2::ZERO));
         Some(Drag {
@@ -1314,7 +1342,8 @@ impl Drag {
             Handle::Scale(axis, side) => {
                 let (origin, direction) = handle_line(self.handle, frame);
                 let raw = along_line(origin, direction, ray)? - self.grabbed;
-                let mut pulled = snap.studs(raw);
+                // Holding Shift disables stud snapping for smooth fine-grained scaling.
+                let mut pulled = if pointer.fine { raw } else { snap.studs(raw) };
                 let mut link = None;
                 if snap.surfaces
                     && modes.directions == ResizeDirections::Normal
@@ -1383,6 +1412,28 @@ impl Drag {
                     })
                     .collect();
                 self.note_resize((axis, side), pulled, link, snap);
+                Some(values)
+            }
+            Handle::ScaleUniform => {
+                let speed = if pointer.fine { FINE_TURN } else { 1.0 };
+                let delta = (pointer.at.x - self.last_at.x) - (pointer.at.y - self.last_at.y);
+                self.last_at = pointer.at;
+                self.turned += delta * speed;
+                // Smooth exponential uniform scaling: 160 points doubles/halves size.
+                let factor = 2.0_f32.powf(self.turned / 160.0);
+                let pivot = frame.position;
+                let values: PartValues = self
+                    .parts
+                    .iter()
+                    .map(|&(id, start)| {
+                        let size = (start.size * factor).max(Vec3::splat(MIN_SIZE));
+                        let position = pivot + (start.position - pivot) * factor;
+                        (
+                            id,
+                            vec![("Size", to_value(size)), ("Position", to_value(position))],
+                        )
+                    })
+                    .collect();
                 Some(values)
             }
             Handle::Rotate(axis) => {
@@ -1607,6 +1658,7 @@ fn handle_line(handle: Handle, pose: Pose) -> (Vec3, Vec3) {
         Handle::Move(axis) | Handle::Rotate(axis) => pose.rotation * axis.vector(),
         // Scale handles use the part's own (turned) axes, like `Size` does.
         Handle::Scale(axis, side) => pose.rotation * axis.vector() * side.sign(),
+        Handle::ScaleUniform => Vec3::X,
     };
     (pose.position, direction)
 }

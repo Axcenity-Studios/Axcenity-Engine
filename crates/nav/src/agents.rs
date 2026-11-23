@@ -109,6 +109,8 @@ pub struct Agents {
     trees: BTreeMap<String, Option<Arc<BehaviorTree>>>,
     warnings: Vec<String>,
     sensed: Vec<Sensed>,
+    lost: Vec<Sensed>,
+    arrived: Vec<InstanceId>,
     /// Each patrolling agent's place on its `PatrolSpline` (Phase 73).
     patrols: BTreeMap<InstanceId, Patrol>,
 }
@@ -168,19 +170,35 @@ impl Agents {
         for id in agents {
             let parts = parts_of(world, id);
             let before = feet_of(world, &parts);
+            let was_reached = world
+                .get(id)
+                .and_then(|agent| agent.property("Status"))
+                .and_then(Value::as_str)
+                == Some(AgentStatus::Reached.as_str());
             let walk = self.walks.entry(id).or_default();
             if let Some(warning) = step_agent(world, built, id, walk, dt) {
                 self.warnings.push(warning);
+            }
+            let now_reached = world
+                .get(id)
+                .and_then(|agent| agent.property("Status"))
+                .and_then(Value::as_str)
+                == Some(AgentStatus::Reached.as_str());
+            if now_reached && !was_reached {
+                self.arrived.push(id);
             }
             let moved = match (before, feet_of(world, &parts)) {
                 (Some(a), Some(b)) => (b.x - a.x, b.z - a.z),
                 _ => (0.0, 0.0),
             };
             let senses = self.senses.entry(id).or_default();
-            for sense in
-                perception::perceive(world, assets, id, &parts, senses, player.as_ref(), moved)
-            {
+            let (started, lost) =
+                perception::perceive(world, assets, id, &parts, senses, player.as_ref(), moved);
+            for sense in started {
                 self.sensed.push(Sensed { agent: id, sense });
+            }
+            for sense in lost {
+                self.lost.push(Sensed { agent: id, sense });
             }
         }
     }
@@ -316,6 +334,18 @@ impl Agents {
     /// the last call. Hosts fire each one's `PlayerSensed` with the sense.
     pub fn take_sensed(&mut self) -> Vec<Sensed> {
         std::mem::take(&mut self.sensed)
+    }
+
+    /// The agents that stopped seeing or hearing the player character since
+    /// the last call. Hosts fire each one's `PlayerLost` with the sense.
+    pub fn take_lost(&mut self) -> Vec<Sensed> {
+        std::mem::take(&mut self.lost)
+    }
+
+    /// The agents that reached their `Destination` since the last call.
+    /// Hosts fire each one's `DestinationReached`.
+    pub fn take_arrived(&mut self) -> Vec<InstanceId> {
+        std::mem::take(&mut self.arrived)
     }
 
     /// Brings the mesh up to date ([`SharedNavMesh::refresh`]). Agents

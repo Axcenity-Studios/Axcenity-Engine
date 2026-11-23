@@ -102,7 +102,9 @@ fn inputs_of(value: Option<serde_json::Value>) -> Vec<(String, String)> {
     };
     fields
         .keys()
-        .filter(|name| !matches!(name.as_str(), "type" | "multiline") && !name.ends_with("body"))
+        .filter(|name| {
+            !matches!(name.as_str(), "type" | "multiline" | "completed") && !name.ends_with("body")
+        })
         .map(|name| {
             let help = field_help(name).unwrap_or("what goes in this slot");
             (name.replace('_', " "), help.to_owned())
@@ -182,6 +184,13 @@ pub fn field_help(name: &str) -> Option<&'static str> {
         "setting" => "the graphics setting",
         "choice" => "the setting's choice",
         "volume" => "how loud, 0 to 10 (1 is as recorded)",
+        "pitch" => "playback speed multiplier (1 is normal, 2 is double speed/higher pitch)",
+        "looped" => "true repeats the sound until stopped; false plays once",
+        "transparency" => "0 is solid/visible, 1 is completely invisible",
+        "material" => "the surface material (Plastic, Metal, Neon, Glass, etc.)",
+        "enabled" => "true turns the effect on, false turns it off",
+        "effect" => "the post-processing effect class inside Lighting",
+        "image" => "the project-relative image path, such as assets/textures/icon.png",
         "parameter" => "the state machine parameter's name",
         "state" => "the state's name",
         "layer" => "the state machine layer's name",
@@ -228,6 +237,49 @@ pub fn field_help(name: &str) -> Option<&'static str> {
         "fields" => "the table's entries",
         "parts" => "the text around the values",
         "annotation" => "the type, as written",
+        "items" => "the starting items in the list, in order",
+        "list" => "the list variable to read or change",
+        "index" => "the 1-based position in the list",
+        "offset_per_clone" => "offset added for each additional clone (Vector3)",
+        "per_clone_positions" => "optional list of positions (Vector3 or CFrame), one per clone",
+        "filter" => {
+            "which touching parts trigger this event (Any Part, Players Only, or Tagged / Named)"
+        }
+        "filter_value" => "the part Name or CollectionService tag to match",
+        "cooldown" => "minimum seconds between triggers (0 runs once for a gate)",
+        "admin_only" => "when true, only players with the IsAdmin attribute can run this command",
+        "data" => "optional payload passed to listeners",
+        "connection" => "the RBXScriptConnection to disconnect",
+        "tag" => "the CollectionService tag name",
+        "remote" => "the RemoteEvent, picked from the tree",
+        "side" => "whether to listen on the server (OnServerEvent) or client (OnClientEvent)",
+        "timeout" => "optional maximum seconds to wait before returning nil",
+        "players_only" => "when true, skip parts that don't belong to a player character",
+        "end" => "the last number (inclusive)",
+        "delay" => "seconds to wait before starting (0 runs immediately on a new thread)",
+        "branches" => "the ordered execution branches (Then 0, Then 1, ...)",
+        "space" => "whether to rotate in Local (object) or World space",
+        "duration" => "how long the transition takes, in seconds",
+        "easing" => "the easing curve (Linear, Quad, Cubic, Sine, Back, Bounce, Elastic)",
+        "wait_until_done" => "when true, pause the script until the motion finishes",
+        "multiplier" => "gravity scale: 0 is anti-gravity, 0.5 is half gravity, 1 is normal",
+        "speed" => "speed in studs per second",
+        "action" => "whether to Start, Stop, or Reverse the spline follower",
+        "output" => {
+            "which field of the raycast result to return (Hit Part, Hit Position, Hit Normal, Distance, or Result)"
+        }
+        "fade_time" => "seconds to blend in or out",
+        "ik_control" => "the IKControl, picked from the tree",
+        "ragdoll" => "the Ragdoll, picked from the tree",
+        "repeat_count" => "how many extra times to repeat (-1 repeats forever)",
+        "reverses" => "whether the tween plays backward after reaching the goal",
+        "scale" => "how much to multiply the size (e.g. 1.2 for +20%)",
+        "tween" => "a running Tween from a Tween block's output",
+        "axis" => "X, Y, or Z",
+        "vector" => "a Vector3",
+        "substring" => "the text to search for",
+        "decimals" => "number of digits after the decimal point",
+        "h" | "s" | "v" => "hue, saturation, or value, 0 to 1",
         _ => return None,
     })
 }
@@ -240,24 +292,89 @@ fn block_words(kind: &BlockKind) -> Words {
     match kind {
         // Events.
         B::WhenStarted { .. } => (
-            "When the game starts",
-            "Runs the blocks inside once, as soon as the game starts.",
+            "When script starts",
+            "Runs the blocks inside once, as soon as the script starts.",
             "Set the score to 0 and print a welcome.",
         ),
         B::WhenTouched { .. } => (
             "When touched",
-            "Runs the blocks inside each time something touches the part. The touching part is the \"touching part\" reporter.",
+            "Runs each time something touches the part. Outputs Other Part and Player, with optional filter and cooldown.",
             "Hurt whoever steps on a lava floor.",
+        ),
+        B::WhenTouchEnds { .. } => (
+            "When touch ends",
+            "Runs when a part stops touching this part (TouchEnded). Outputs Other Part and Player.",
+            "Turn off a pressure plate when the player steps off.",
         ),
         B::WhenStreamedIn { .. } => (
             "When streamed in",
             "Runs when world streaming brings the object (or a Model's contents) back onto this device.",
             "Start a far-away windmill turning once it's near.",
         ),
+        B::WhenStreamedOut { .. } => (
+            "When streamed out",
+            "Runs when world streaming removes the object (or a Model's contents) from this device.",
+            "Pause a far-away ambient effect once it streams out.",
+        ),
         B::WhenKeyPressed { .. } => (
             "When key pressed",
-            "Runs each time the player presses the key. LocalScripts only.",
+            "Runs each time the player presses the key. Outputs KeyCode and GameProcessed. LocalScripts only.",
             "Open the map when M is pressed.",
+        ),
+        B::WhenKeyReleased { .. } => (
+            "When key released",
+            "Runs each time the player releases the key. Outputs KeyCode and GameProcessed. LocalScripts only.",
+            "Stop sprinting when LeftShift is released.",
+        ),
+        B::WhenPlayerJoins { .. } => (
+            "When player joins",
+            "Runs whenever a player joins the game (Players.PlayerAdded). Outputs Player.",
+            "Give each joining player a starting inventory.",
+        ),
+        B::WhenPlayerLeaves { .. } => (
+            "When player leaves",
+            "Runs whenever a player leaves the game (Players.PlayerRemoving). Outputs Player.",
+            "Save a player's progress when they disconnect.",
+        ),
+        B::WhenCharacterSpawns { .. } => (
+            "When character spawns",
+            "Runs whenever any player's character spawns (CharacterAdded). Outputs Character and Player.",
+            "Equip a starter tool whenever a character spawns.",
+        ),
+        B::WhenPlayerDies { .. } => (
+            "When player dies",
+            "Runs whenever any player's character dies (Humanoid.Died). Outputs Player and Character.",
+            "Increment the death counter and play a sound.",
+        ),
+        B::WhenChildAdded { .. } => (
+            "When child added",
+            "Runs when a new child is parented to the object (ChildAdded). Outputs Child.",
+            "React when a new enemy spawns in an Enemies folder.",
+        ),
+        B::WhenChildRemoved { .. } => (
+            "When child removed",
+            "Runs when a child is removed from the object (ChildRemoved). Outputs Child.",
+            "Check if the last coin in a folder was collected.",
+        ),
+        B::WhenTagAdded { .. } => (
+            "When tag added",
+            "Runs when CollectionService adds the tag to any Instance. Outputs Instance.",
+            "Start a burning effect when \"OnFire\" is added.",
+        ),
+        B::WhenTagRemoved { .. } => (
+            "When tag removed",
+            "Runs when CollectionService removes the tag from any Instance. Outputs Instance.",
+            "Clean up a burning effect when \"OnFire\" is removed.",
+        ),
+        B::WhenRemoteFires { .. } => (
+            "When remote fires",
+            "Runs when a RemoteEvent fires on the server (OnServerEvent) or client (OnClientEvent). Outputs Player (server) and Data.",
+            "Handle a client's \"BuyItem\" request on the server.",
+        ),
+        B::Disconnect { .. } => (
+            "Disconnect",
+            "Stops an RBXScriptConnection from firing again (connection:Disconnect()).",
+            "Disconnect a temporary touch listener once triggered.",
         ),
         B::WhenClicked { .. } => (
             "When button clicked",
@@ -311,8 +428,13 @@ fn block_words(kind: &BlockKind) -> Words {
         ),
         B::WhenConnectionFails { .. } => (
             "When connection fails",
-            "Runs when hosting or joining fails, a join is refused, or the connection is lost.",
-            "Show a \"Connection lost\" message.",
+            "Runs when hosting or joining fails, a join is refused, or the connection is lost. Outputs Reason.",
+            "Show a \"Connection lost\" message with the Reason.",
+        ),
+        B::WhenChatMessageReceived { .. } => (
+            "When chat message received",
+            "Runs on every device when a chat message arrives. Outputs Message and Sender.",
+            "Trigger a secret command when a player says \"open sesame\".",
         ),
         B::WhenStateChanged { .. } => (
             "When animation state changes",
@@ -325,9 +447,19 @@ fn block_words(kind: &BlockKind) -> Words {
             "Play a swoosh at the \"swing\" event of an attack.",
         ),
         B::WhenAgentSenses { .. } => (
-            "When agent senses",
+            "When agent senses player",
             "Runs when the NavigationAgent starts seeing or hearing the player character.",
             "Make a guard chase the player it sees.",
+        ),
+        B::WhenAgentLosesPlayer { .. } => (
+            "When agent loses player",
+            "Runs when the NavigationAgent stops seeing or hearing the player character.",
+            "Return a guard to its patrol when the player hides.",
+        ),
+        B::WhenAgentArrives { .. } => (
+            "When agent arrives",
+            "Runs when the NavigationAgent reaches its Destination.",
+            "Play an idle animation when an NPC reaches its waypoint.",
         ),
         B::WhenSplineReached { .. } => (
             "When spline end reached",
@@ -335,13 +467,18 @@ fn block_words(kind: &BlockKind) -> Words {
             "Turn a train round at the end of the line.",
         ),
         B::WhenSeatOccupied { .. } => (
-            "When seat taken",
+            "When someone sits",
             "Runs when a character sits on the Seat.",
             "Start a ride when someone sits down.",
         ),
+        B::WhenSeatVacated { .. } => (
+            "When someone leaves seat",
+            "Runs when a character stands up from the Seat.",
+            "Stop the engine when the driver exits.",
+        ),
         B::WhenLayerChanged { .. } => (
             "When layer changes",
-            "Runs when a data layer is switched on or off, on the server and on every player's device.",
+            "Runs when a data layer (or Any layer) is switched on or off, on the server and on every player's device. Outputs Layer Name and Is Active.",
             "Play the night music when the Night layer comes on.",
         ),
         B::WhenPropertyChanged { .. } => (
@@ -440,6 +577,41 @@ fn block_words(kind: &BlockKind) -> Words {
             "Ends the event's blocks here; nothing after it runs this time.",
             "Stop when the game is already over.",
         ),
+        B::DestroyScript => (
+            "Destroy / stop script",
+            "Disconnects all script-tracked event connections and destroys this script (script:Destroy()).",
+            "Shut down a one-time intro script permanently.",
+        ),
+        B::ForRange { .. } => (
+            "For loop (range)",
+            "Counts from Start to End by Step, running Loop Body each time and exposing Index.",
+            "Spawn 5 pillars spaced along a bridge.",
+        ),
+        B::ForEachInList { .. } => (
+            "For each in list",
+            "Runs Loop Body once for each item in a list (ipairs), exposing Item and Index.",
+            "Print every name in a players list.",
+        ),
+        B::ForEachTagged { .. } => (
+            "For each tagged",
+            "Runs Loop Body once for each Instance with the CollectionService tag, exposing Instance and Index.",
+            "Turn off every light tagged \"HallwayLight\".",
+        ),
+        B::Sequence { .. } => (
+            "Sequence",
+            "Runs each output branch (Then 0, Then 1, ...) in order.",
+            "Split setup steps into neat parallel-looking branches.",
+        ),
+        B::CooldownGate { .. } => (
+            "Do once / cooldown gate",
+            "Only lets execution pass once (Cooldown = 0) or at most once every Cooldown seconds.",
+            "Limit a dash ability to once every 2 seconds.",
+        ),
+        B::SpawnAsync { .. } => (
+            "Spawn / delay (async)",
+            "Starts Async Body on a new thread (immediately or after Delay seconds) without pausing the blocks after it.",
+            "Fade a notification out after 3 seconds while gameplay continues.",
+        ),
         B::ForEachChild { .. } => (
             "For each child",
             "Runs the blocks inside once for each child of the object, with it in the variable.",
@@ -493,8 +665,33 @@ fn block_words(kind: &BlockKind) -> Words {
         ),
         B::TurnBy { .. } => (
             "Turn by",
-            "Turns the object by some degrees from how it faces now.",
+            "Turns the object by some degrees in Local or World space using CFrame rotation.",
             "Spin a coin a few degrees each frame.",
+        ),
+        B::SlideTo { .. } => (
+            "Slide to",
+            "Smoothly glides the object to a position over a duration using TweenService.",
+            "Slide a door open over 1 second.",
+        ),
+        B::RotateTo { .. } => (
+            "Rotate to",
+            "Smoothly rotates the object to a target orientation over a duration using TweenService.",
+            "Swing a gate open 90 degrees over 0.8 seconds.",
+        ),
+        B::SetGravity { .. } => (
+            "Set gravity",
+            "Scales gravity on a part with a VectorForce (0 = zero-G anti-gravity, 1 = normal).",
+            "Make a crate float in zero gravity.",
+        ),
+        B::SetAngularVelocity { .. } => (
+            "Set angular velocity",
+            "Sets how fast the part spins around each axis in radians per second.",
+            "Spin a propeller at 10 rad/s around Y.",
+        ),
+        B::LaunchPart { .. } => (
+            "Launch part",
+            "Sets a part's velocity along a direction at the given speed.",
+            "Launch a ball forward along LookVector at 60 studs/s.",
         ),
         B::SetAnchored { .. } => (
             "Set anchored",
@@ -568,15 +765,40 @@ fn block_words(kind: &BlockKind) -> Words {
             "Walks a NavigationAgent to a position, finding its way around walls.",
             "Send a guard to the alarm.",
         ),
+        B::FollowTarget { .. } => (
+            "Follow target",
+            "Directs a NavigationAgent to chase a target object's current position.",
+            "Chase the player's character.",
+        ),
+        B::StopAgent { .. } => (
+            "Stop agent",
+            "Stops a NavigationAgent where it stands.",
+            "Freeze a guard when a cutscene begins.",
+        ),
+        B::SitInSeat { .. } => (
+            "Sit in seat",
+            "Sits a character controller in the Seat (`seat:Sit(controller)`).",
+            "Put the player into the driver's seat.",
+        ),
         B::LeaveSeat { .. } => (
             "Leave seat",
             "Stands the character up from its seat.",
             "Throw the driver out of a crashed car.",
         ),
         B::SetVelocity { .. } => (
-            "Move agent at",
-            "Moves a NavigationAgent straight at a speed, with no path. Zero stops it.",
+            "Set agent velocity",
+            "Moves a NavigationAgent straight at a velocity, with no path. Zero stops it.",
             "Make a pet dash ahead.",
+        ),
+        B::ControlSpline { .. } => (
+            "Control spline",
+            "Starts, stops, or reverses a SplineFollower.",
+            "Reverse a moving platform when a switch is flipped.",
+        ),
+        B::SetSplineSpeed { .. } => (
+            "Set spline speed",
+            "Sets how fast a SplineFollower moves along its curve, in studs per second.",
+            "Speed up a train to 25 studs/s.",
         ),
         // Saving and levels.
         B::SaveSlot { .. } => (
@@ -588,6 +810,16 @@ fn block_words(kind: &BlockKind) -> Words {
             "Load game",
             "Puts the game back as the save slot was saved.",
             "A Continue button.",
+        ),
+        B::DeleteSlot { .. } => (
+            "Delete save slot",
+            "Removes the saved data stored in a save slot.",
+            "Reset slot 1 from a New Game button.",
+        ),
+        B::ForEachRow { .. } => (
+            "For each row",
+            "Runs the blocks inside once for every row in a DataTable. Outputs Row and Index.",
+            "Spawn a shop item for every row in the Items table.",
         ),
         B::SetCheckpoint { .. } => (
             "Set checkpoint",
@@ -703,8 +935,53 @@ fn block_words(kind: &BlockKind) -> Words {
         ),
         B::SetAtmosphere { .. } => (
             "Set atmosphere",
-            "Sets one of the Atmosphere's numbers, such as its density (fog).",
+            "Sets one of the Atmosphere's numbers, such as its density (fog), optionally smoothly over a duration.",
             "Thicken the fog in a swamp.",
+        ),
+        B::ToggleVisibility { .. } => (
+            "Toggle visibility",
+            "Flips a UI element's Visible flag or switches a Part between solid and invisible.",
+            "Toggle a pause menu or hidden bridge.",
+        ),
+        B::SetTransparency { .. } => (
+            "Set transparency",
+            "Sets transparency (0 = solid, 1 = invisible), auto-detecting Parts, Text, Images, and Frames.",
+            "Make a forcefield half see-through (0.5).",
+        ),
+        B::SetMaterial { .. } => (
+            "Set material",
+            "Changes a Part's surface material (Plastic, Metal, Neon, Glass, Ice, etc.).",
+            "Turn a block Neon when activated.",
+        ),
+        B::EmitParticles { .. } => (
+            "Emit particles",
+            "Triggers an immediate burst of particles from a ParticleEmitter, even when Enabled is false.",
+            "Emit 30 sparks on impact.",
+        ),
+        B::SetEffectEnabled { .. } => (
+            "Set effect enabled",
+            "Turns a ParticleEmitter, Light, or post-processing effect on or off.",
+            "Switch a torch's PointLight and fire emitter on.",
+        ),
+        B::SetLightingProperty { .. } => (
+            "Set lighting property",
+            "Sets a property on Lighting such as Exposure, FogStart, FogEnd, or ShadowsEnabled.",
+            "Increase Exposure when stepping outdoors.",
+        ),
+        B::SetPostProcessing { .. } => (
+            "Set post-processing",
+            "Sets a property on a post-processing effect (Bloom, ColorCorrection, DepthOfField, Vignette, etc.) inside Lighting.",
+            "Boost VignetteEffect Intensity when health is low.",
+        ),
+        B::TweenProperty { .. } => (
+            "Tween property",
+            "Smoothly animates any property of an object over a duration with an easing style.",
+            "Smoothly tween a Light's Brightness to 4 over 1 second.",
+        ),
+        B::SetImage { .. } => (
+            "Set image",
+            "Sets the image/texture path of an ImageLabel, Decal, ProjectedDecal, or ParticleEmitter.",
+            "Swap an inventory icon's Image.",
         ),
         B::SetGraphicsQuality { .. } => (
             "Set graphics quality",
@@ -724,8 +1001,13 @@ fn block_words(kind: &BlockKind) -> Words {
         // Sound.
         B::PlaySound { .. } => (
             "Play sound",
-            "Plays the Sound from the start.",
+            "Plays the Sound from the start, with optional pitch and wait-until-done.",
             "A coin pickup sound.",
+        ),
+        B::PlaySoundAtPosition { .. } => (
+            "Play sound at position",
+            "Clones a Sound to play a one-shot spatial sound at a 3D world position and destroys it when done.",
+            "Play an explosion sound at the blast center.",
         ),
         B::StopSound { .. } => ("Stop sound", "Stops the Sound.", "Stop the alarm."),
         B::PauseSound { .. } => (
@@ -742,6 +1024,26 @@ fn block_words(kind: &BlockKind) -> Words {
             "Set volume",
             "Sets how loud the Sound plays.",
             "Turn the music down during dialogue.",
+        ),
+        B::FadeVolume { .. } => (
+            "Fade volume",
+            "Smoothly tweens a Sound's Volume to a target level over a duration.",
+            "Fade background music out over 2 seconds.",
+        ),
+        B::SetSoundPitch { .. } => (
+            "Set sound pitch / speed",
+            "Sets a Sound's PlaybackSpeed (1 is normal, 2 is twice as fast / higher pitch).",
+            "Pitch up a combo sound on each hit.",
+        ),
+        B::SetSoundLooping { .. } => (
+            "Set sound looping",
+            "Sets whether a Sound repeats automatically until stopped.",
+            "Loop ambient wind while outdoors.",
+        ),
+        B::SetSoundTime { .. } => (
+            "Set sound time / seek",
+            "Seeks a Sound's playback position to a time in seconds.",
+            "Jump to 30 seconds into a music track.",
         ),
         // Animation.
         B::SetAnimatorBool { .. } => (
@@ -824,6 +1126,36 @@ fn block_words(kind: &BlockKind) -> Words {
             "Change variable",
             "Adds to a number variable (a negative number takes away).",
             "Add 1 to score for each coin.",
+        ),
+        B::ListCreate { .. } => (
+            "Create list",
+            "Creates or resets a list variable with optional starting items.",
+            "Keep an inventory list of collected items.",
+        ),
+        B::ListAdd { .. } => (
+            "Add to list",
+            "Appends a value to the end of a list.",
+            "Add a new enemy to the active enemies list.",
+        ),
+        B::ListInsert { .. } => (
+            "Insert in list",
+            "Inserts a value into a list at a 1-based position.",
+            "Insert a priority target at position 1.",
+        ),
+        B::ListRemoveIndex { .. } => (
+            "Remove index from list",
+            "Removes the item at a 1-based position from a list.",
+            "Remove the first item from a queue.",
+        ),
+        B::ListRemoveValue { .. } => (
+            "Remove value from list",
+            "Removes the first matching value found in a list.",
+            "Remove a key from the player's inventory.",
+        ),
+        B::ListClear { .. } => (
+            "Clear list",
+            "Removes every item from a list.",
+            "Reset the round's active targets.",
         ),
         B::Print { .. } => (
             "Print",
@@ -921,6 +1253,66 @@ fn block_words(kind: &BlockKind) -> Words {
             "Ends the function, giving back values.",
             "return total",
         ),
+        B::WhenAnimationFinished { .. } => (
+            "When animation finishes",
+            "Runs when a loaded animation finishes playing on the Animator.",
+            "Re-enable attacks after a swing animation ends.",
+        ),
+        B::StopAnimation { .. } => (
+            "Stop animation",
+            "Stops one playing animation (or all animations) on an Animator, with an optional fade-out.",
+            "Stop an emote when the player starts walking.",
+        ),
+        B::SetAnimatorSpeed { .. } => (
+            "Set animator speed",
+            "Scales how fast an Animator plays (1 is normal, 0 pauses, 2 is double speed).",
+            "Slow down a boss's animations during slow motion.",
+        ),
+        B::SetIkTarget { .. } => (
+            "Set IK target",
+            "Points an IKControl at a target instance (and optionally sets its blend weight).",
+            "Make a character's hand reach for a lever.",
+        ),
+        B::SetRagdollEnabled { .. } => (
+            "Set ragdoll enabled",
+            "Turns physics ragdoll on or off for a Ragdoll instance.",
+            "Enable ragdoll when an enemy is knocked out.",
+        ),
+        B::PauseCutscene { .. } => (
+            "Pause cutscene",
+            "Pauses a playing Sequence where it is; Resume Cutscene continues from there.",
+            "Pause the intro cutscene when the pause menu opens.",
+        ),
+        B::ResumeCutscene { .. } => (
+            "Resume cutscene",
+            "Resumes a paused Sequence from where it left off.",
+            "Resume the intro cutscene when the player closes the menu.",
+        ),
+        B::StopCutscene { .. } => (
+            "Stop cutscene",
+            "Stops a Sequence and resets it to the start.",
+            "Skip a cutscene when the player presses Space.",
+        ),
+        B::SlideOut { .. } => (
+            "Slide out",
+            "Slides a UI element off-screen toward an edge and hides it (Visible = false).",
+            "Slide the pause menu out to the Left over 0.3 seconds.",
+        ),
+        B::TweenPivot { .. } => (
+            "Tween model / pivot",
+            "Smoothly moves a Model or BasePart's pivot to a target position or CFrame.",
+            "Slide a multi-part door Model open over 1 second.",
+        ),
+        B::PulseScale { .. } => (
+            "Pulse / pop scale",
+            "Briefly scales a BasePart or UI element up and reverses back to its original size.",
+            "Pop a coin or button by 1.2x when clicked.",
+        ),
+        B::CancelTween { .. } => (
+            "Cancel tween",
+            "Cancels a running Tween where it is.",
+            "Cancel a door tween if the player steps off the pad.",
+        ),
     }
 }
 
@@ -1017,11 +1409,17 @@ fn expression_words(
             "The coin's Value.",
             "the attribute's value, or nil",
         ),
+        E::SoundProperty { .. } => (
+            "Sound property",
+            "Reads a property of a Sound (Playing, TimePosition, TimeLength, Volume, PlaybackSpeed, or Looped).",
+            "Check if Music is Playing before starting it.",
+            "boolean or number",
+        ),
         E::Raycast { .. } => (
             "Raycast",
-            "Casts a ray and gives what it hits first (nil if nothing): where, which part and its surface.",
-            "Is there ground under the player?",
-            "a RaycastResult, or nil",
+            "Casts a ray and returns the chosen hit property (Hit Part, Hit Position, Hit Normal, Distance, or full Result), or nil if nothing was hit.",
+            "Find the ground position under the player.",
+            "hit part, Vector3, number, or nil",
         ),
         E::RaycastIgnoring { .. } => (
             "Raycast ignoring",
@@ -1035,11 +1433,89 @@ fn expression_words(
             "Check if it belongs to a player.",
             "a part",
         ),
+        E::TriggeringPlayer => (
+            "Triggering player",
+            "The Player who triggered the enclosing event (touched, prompt, click, command, seat, etc.).",
+            "Give coins to the triggering player.",
+            "a Player, or nil",
+        ),
+        E::CommandArgs => (
+            "Command args",
+            "The list of arguments passed to the enclosing \"when command run\" event.",
+            "Read item 1 of command args.",
+            "a list of values",
+        ),
+        E::DeltaTime => (
+            "Delta time",
+            "Seconds since the last frame or physics step, inside Every Frame / Before Physics.",
+            "Move smoothly by speed * delta time.",
+            "a number (seconds)",
+        ),
         E::PartUnderMouse => (
             "Part under mouse",
             "The part under the mouse pointer. LocalScripts only.",
             "Pick a unit to select.",
             "a part, or nil",
+        ),
+        E::MouseHitPosition => (
+            "Mouse hit position",
+            "The 3D world position where the mouse ray hits. LocalScripts only.",
+            "Place a turret where the player clicks.",
+            "a Vector3",
+        ),
+        E::CameraPosition => (
+            "Camera position",
+            "The world position of the current camera. LocalScripts only.",
+            "Cast a ray from the camera position.",
+            "a Vector3",
+        ),
+        E::CameraLookDirection => (
+            "Camera look direction",
+            "The unit direction vector the current camera is facing. LocalScripts only.",
+            "Shoot in the camera's look direction.",
+            "a Vector3",
+        ),
+        E::NearestPlayerTo { .. } => (
+            "Nearest player to",
+            "Finds the Player whose character is closest to a position, or nil if none.",
+            "Have a turret target the nearest player.",
+            "a Player, or nil",
+        ),
+        E::PlayerOfPart { .. } => (
+            "Player of part",
+            "Returns the Player whose character owns the part, or nil if it is not a character part.",
+            "Check if the touching part belongs to a player.",
+            "a Player, or nil",
+        ),
+        E::PlayerIsAlive { .. } => (
+            "Player is alive",
+            "True when the player's character exists and its Health is above 0.",
+            "Only deal damage while the player is alive.",
+            "true or false",
+        ),
+        E::ParentOf { .. } => (
+            "Parent of",
+            "Returns the parent Instance of an object, or nil.",
+            "Get the character model containing a touched part.",
+            "an Instance, or nil",
+        ),
+        E::ChildOf { .. } => (
+            "Child of",
+            "Finds a direct child with the given name (`FindFirstChild`), or nil.",
+            "Find \"Humanoid\" inside a character.",
+            "an Instance, or nil",
+        ),
+        E::HasTag { .. } => (
+            "Has tag",
+            "Returns true if the object has the given CollectionService tag.",
+            "Check if a touched part has tag \"Hazard\".",
+            "true or false",
+        ),
+        E::GameTime => (
+            "Game time",
+            "Seconds elapsed since the game started (`workspace.DistributedGameTime`).",
+            "Measure how long a race took.",
+            "a number (seconds)",
         ),
         E::KeyDown { .. } => (
             "Key down",
@@ -1192,6 +1668,180 @@ fn expression_words(
             "Lua that has no block of its own, kept word for word.",
             "",
             "its value",
+        ),
+        E::ObjectPath { .. } => (
+            "Object",
+            "An instance in the scene, picked by path.",
+            "",
+            "the object",
+        ),
+        E::BlockOutput { .. } => (
+            "Block output",
+            "A value produced by an earlier event or block (such as a clone or local).",
+            "",
+            "the output value",
+        ),
+        E::ListItem { .. } => (
+            "Item of list",
+            "Reads the item at a 1-based index in a list (list[index]).",
+            "Get item 1 of inventory.",
+            "the item",
+        ),
+        E::ListLength { .. } => (
+            "Length of list",
+            "Counts how many items are in a list (#list).",
+            "Check how many enemies are left.",
+            "a number",
+        ),
+        E::ListContains { .. } => (
+            "List contains",
+            "Checks whether a list contains a given value.",
+            "Check if inventory contains \"Key\".",
+            "true or false",
+        ),
+        E::MakeVector3 { .. } => (
+            "Vector (x, y, z)",
+            "Builds a 3D Vector3 from X, Y, and Z numbers or reporters.",
+            "Vector (0, height, 0).",
+            "a Vector3",
+        ),
+        E::VectorAxis { .. } => (
+            "X / Y / Z of vector",
+            "Reads the X, Y, or Z component of a Vector3.",
+            "Y of Player's Position.",
+            "a number",
+        ),
+        E::Distance { .. } => (
+            "Distance between",
+            "Distance in studs between two 3D positions.",
+            "Distance from Enemy to Player.",
+            "a number",
+        ),
+        E::Direction { .. } => (
+            "Direction from A to B",
+            "Unit direction Vector3 pointing from A toward B.",
+            "Direction from Turret to Target.",
+            "a unit Vector3",
+        ),
+        E::Magnitude { .. } => (
+            "Magnitude of vector",
+            "Length of a Vector3 (e.g. speed from velocity).",
+            "Magnitude of Ball's Velocity.",
+            "a number",
+        ),
+        E::Clamp { .. } => (
+            "Clamp",
+            "Keeps a number between a minimum and maximum.",
+            "Clamp health between 0 and 100.",
+            "a number",
+        ),
+        E::MinMax { .. } => (
+            "Min / max",
+            "Returns the smaller (min) or larger (max) of two numbers.",
+            "max of score and highScore.",
+            "a number",
+        ),
+        E::StringLength { .. } => (
+            "Length of text",
+            "Number of characters in a string.",
+            "Check if a player's name is at least 3 characters.",
+            "a number",
+        ),
+        E::StringContains { .. } => (
+            "Text contains",
+            "True when the first text contains the second text.",
+            "Check if chat message contains \"!help\".",
+            "true or false",
+        ),
+        E::FormatNumber { .. } => (
+            "Format number",
+            "Formats a number to a fixed number of decimal places as text.",
+            "Format timer to 1 decimal place: \"12.5\".",
+            "text",
+        ),
+        E::MakeColorRgb { .. } => (
+            "Color from RGB",
+            "Builds a Color3 from red, green, and blue values (0–255).",
+            "rgb(255, 128, 0) for orange.",
+            "a Color3",
+        ),
+        E::MakeColorHsv { .. } => (
+            "Color from HSV",
+            "Builds a Color3 from hue, saturation, and value (0–1).",
+            "Cycle hue over time for a rainbow glow.",
+            "a Color3",
+        ),
+        E::AnimatorNewState => (
+            "New state",
+            "The state the Animator just entered, inside When State Changes.",
+            "Play a sound when New State is \"Jump\".",
+            "text",
+        ),
+        E::AnimatorPreviousState => (
+            "Previous state",
+            "The state the Animator just left, inside When State Changes.",
+            "Check if Previous State was \"Fall\".",
+            "text",
+        ),
+        E::AnimationEventName => (
+            "Event name",
+            "The animation event marker name, inside When Reaches Event.",
+            "Match Event Name when listening for Any Event.",
+            "text",
+        ),
+        E::ConnectionFailureReason => (
+            "Failure reason",
+            "The reason text explaining why a connection failed, inside When Connection Fails.",
+            "Display Failure Reason on an error banner.",
+            "text",
+        ),
+        E::ChangedLayerName => (
+            "Layer name",
+            "The name of the data layer that changed, inside When Layer Changes.",
+            "Log which layer toggled when listening for Any layer.",
+            "text",
+        ),
+        E::ChangedLayerActive => (
+            "Layer is active",
+            "True if the changed data layer is now active, inside When Layer Changes.",
+            "Switch music on or off based on Layer is active.",
+            "true or false",
+        ),
+        E::ChatMessageText => (
+            "Chat message",
+            "The text of the incoming chat message, inside When Chat Message Received.",
+            "Check if Chat message contains \"!help\".",
+            "text",
+        ),
+        E::ChatMessageSender => (
+            "Chat sender",
+            "The Player who sent the incoming chat message (or nil for system messages), inside When Chat Message Received.",
+            "Reward the Chat sender when they solve a riddle.",
+            "a Player",
+        ),
+        E::IsHost => (
+            "Is host",
+            "True when this device is hosting the multiplayer game.",
+            "Show host-only controls when Is host is true.",
+            "true or false",
+        ),
+        E::IsConnected => (
+            "Is connected",
+            "True when this device is connected to a multiplayer game.",
+            "Show a Disconnect button while Is connected is true.",
+            "true or false",
+        ),
+        E::SlotExists { .. } => (
+            "Save slot exists",
+            "True when the given save slot has saved data on disk.",
+            "Enable the Continue button only if save slot 1 exists.",
+            "true or false",
+        ),
+        E::DataTableRowCount { .. } => (
+            "Row count of table",
+            "The number of rows in a DataTable.",
+            "Show how many quests are in the Quests table.",
+            "a number",
         ),
     }
 }

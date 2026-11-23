@@ -5,7 +5,9 @@ use axcenity_anim::files::{Motion, TransitionDef};
 use axcenity_anim::{ANY_STATE, StateMachineFile};
 use eframe::egui::{self, Color32, CornerRadius, FontId, Pos2, Rect, Shape, Stroke, vec2};
 
-use super::{Node, ParameterKind, STATE, words};
+#[cfg(test)]
+use super::ParameterKind;
+use super::{Node, STATE, words};
 use crate::theme::{self, icons};
 
 /// A node's title band, at zoom 1.
@@ -103,6 +105,9 @@ pub(super) struct NodeLook<'a> {
     pub playing: Option<f32>,
     pub wired_in: bool,
     pub wired_out: bool,
+    pub out_count: usize,
+    pub in_count: usize,
+    pub wiring_active: bool,
 }
 
 /// What a state plays, in a few words: its clip's name, or "blend tree ·
@@ -173,26 +178,49 @@ pub(super) fn draw_node(painter: &egui::Painter, look: NodeLook) {
                 },
                 header,
             );
+            let state = &file.states[index];
+            let title_display = if state.returns.is_some() {
+                format!("{title}  {}", icons::ARROW_U_UP_LEFT)
+            } else {
+                title.clone()
+            };
             clipped.text(
                 Pos2::new(band.left() + 10.0 * z, band.center().y),
                 egui::Align2::LEFT_CENTER,
-                &title,
+                &title_display,
                 title_font,
                 colors.header_text,
             );
             let body_y = band.bottom() + (rect.bottom() - band.bottom()) * 0.5;
-            let icon = match &file.states[index].motion {
-                Motion::Clip(_) => icons::FILM_STRIP,
-                Motion::BlendTree(_) => icons::SLIDERS_HORIZONTAL,
-                Motion::BlendSpace(_) => icons::GRID_FOUR,
-            };
-            clipped.text(
-                Pos2::new(rect.left() + 22.0 * z, body_y),
-                egui::Align2::LEFT_CENTER,
-                format!("{icon} {}", plays(&file.states[index].motion)),
-                body_font,
-                colors.node_text,
-            );
+            let is_special_motion = !matches!(state.motion, Motion::Clip(_));
+            let show_details = look.selected || look.hovered || is_special_motion;
+            if show_details {
+                let icon = match &state.motion {
+                    Motion::Clip(_) => icons::FILM_STRIP,
+                    Motion::BlendTree(_) => icons::SLIDERS_HORIZONTAL,
+                    Motion::BlendSpace(_) => icons::GRID_FOUR,
+                };
+                clipped.text(
+                    Pos2::new(rect.left() + 14.0 * z, body_y),
+                    egui::Align2::LEFT_CENTER,
+                    format!("{icon} {}", plays(&state.motion)),
+                    body_font,
+                    colors.node_text,
+                );
+            } else if look.out_count > 0 || look.in_count > 0 {
+                let badge = match (look.out_count, look.in_count) {
+                    (o, i) if o > 0 && i > 0 => format!("→ {o} | ← {i}"),
+                    (o, 0) => format!("→ {o}"),
+                    (_, i) => format!("← {i}"),
+                };
+                clipped.text(
+                    Pos2::new(rect.left() + 12.0 * z, body_y),
+                    egui::Align2::LEFT_CENTER,
+                    badge,
+                    FontId::proportional(10.5 * z.clamp(0.7, 1.4)),
+                    colors.node_text_weak,
+                );
+            }
             if let Some(progress) = look.playing {
                 let bar = Rect::from_min_size(
                     Pos2::new(rect.left(), rect.bottom() - 3.0 * z),
@@ -200,34 +228,47 @@ pub(super) fn draw_node(painter: &egui::Painter, look: NodeLook) {
                 );
                 painter.rect_filled(bar, 0.0, colors.live);
             }
-            pin(
-                painter,
-                Pos2::new(rect.left() + super::PIN_INSET * z, body_y),
-                z,
-                look.wired_in,
-            );
-            pin(
-                painter,
-                Pos2::new(rect.right() - super::PIN_INSET * z, body_y),
-                z,
-                look.wired_out,
-            );
+            // Only show the hover-ring output pin on hover/selection/wiring,
+            // and the input pin while actively wiring, keeping cards clean.
+            if look.wiring_active {
+                pin(
+                    painter,
+                    Pos2::new(rect.left() + super::PIN_INSET * z, body_y),
+                    z,
+                    look.wired_in,
+                );
+            }
+            if look.hovered || look.selected || look.wiring_active {
+                pin(
+                    painter,
+                    Pos2::new(rect.right() - super::PIN_INSET * z, body_y),
+                    z,
+                    look.wired_out,
+                );
+            }
         }
         Node::Any | Node::Entry => {
             painter.rect_filled(rect, corner, header);
+            let title_display = if !look.selected && node == Node::Any && look.out_count > 0 {
+                format!("{title}  → {}", look.out_count)
+            } else {
+                title.clone()
+            };
             clipped.text(
                 Pos2::new(rect.left() + 10.0 * z, rect.center().y),
                 egui::Align2::LEFT_CENTER,
-                &title,
+                &title_display,
                 body_font,
                 colors.header_text,
             );
-            pin(
-                painter,
-                Pos2::new(rect.right() - super::PIN_INSET * z, rect.center().y),
-                z,
-                look.wired_out,
-            );
+            if look.hovered || look.selected || look.wiring_active {
+                pin(
+                    painter,
+                    Pos2::new(rect.right() - super::PIN_INSET * z, rect.center().y),
+                    z,
+                    look.wired_out,
+                );
+            }
         }
     }
     let outline = if look.selected {
@@ -240,6 +281,131 @@ pub(super) fn draw_node(painter: &egui::Painter, look: NodeLook) {
         Stroke::new(1.0_f32, colors.node_edge)
     };
     painter.rect_stroke(rect, corner, outline, egui::StrokeKind::Outside);
+}
+
+/// Draws an expanded collapsible group container behind its member states.
+/// Returns the header rect (for dragging) and collapse button rect.
+pub(super) fn draw_group_expanded(
+    painter: &egui::Painter,
+    rect: Rect,
+    name: &str,
+    member_count: usize,
+    z: f32,
+) -> (Rect, Rect) {
+    let colors = theme::canvas(painter.ctx());
+    let corner = 8.0 * z;
+    let header_h = HEADER * z;
+    let fill = colors.node_body.gamma_multiply(0.55);
+    painter.rect_filled(rect, corner, fill);
+    let header_rect = Rect::from_min_size(rect.min, vec2(rect.width(), header_h));
+    let r = corner.round().clamp(0.0, 255.0) as u8;
+    painter.rect_filled(
+        header_rect,
+        CornerRadius {
+            nw: r,
+            ne: r,
+            sw: 0,
+            se: 0,
+        },
+        colors.node_edge.gamma_multiply(0.45),
+    );
+    painter.rect_stroke(
+        rect,
+        corner,
+        Stroke::new(1.2 * z.max(0.7), colors.node_edge),
+        egui::StrokeKind::Outside,
+    );
+    let toggle_rect = Rect::from_min_size(header_rect.min, vec2(24.0 * z, header_h));
+    let font = FontId::proportional(12.0 * z.clamp(0.7, 1.4));
+    painter.text(
+        toggle_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        icons::CARET_DOWN,
+        font.clone(),
+        colors.node_text,
+    );
+    let clipped = painter.with_clip_rect(painter.clip_rect().intersect(header_rect));
+    clipped.text(
+        Pos2::new(toggle_rect.right() + 2.0 * z, header_rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        format!("{name}  ({member_count})"),
+        font,
+        colors.node_text_strong,
+    );
+    (header_rect, toggle_rect)
+}
+
+/// Draws a collapsed group node card. Returns the expand button rect.
+pub(super) fn draw_group_collapsed(
+    painter: &egui::Painter,
+    rect: Rect,
+    name: &str,
+    member_count: usize,
+    playing: bool,
+    hovered: bool,
+    z: f32,
+) -> Rect {
+    let colors = theme::canvas(painter.ctx());
+    let corner = 7.0 * z;
+    let header_h = HEADER * z;
+    painter.rect_filled(
+        rect.translate(vec2(0.0, 3.0 * z)),
+        corner,
+        Color32::from_black_alpha(70),
+    );
+    painter.rect_filled(rect, corner, colors.node_body);
+    let band = Rect::from_min_size(rect.min, vec2(rect.width(), header_h));
+    let r = corner.round().clamp(0.0, 255.0) as u8;
+    let group_header = colors.header(Color32::from_rgb(96, 76, 148));
+    painter.rect_filled(
+        band,
+        CornerRadius {
+            nw: r,
+            ne: r,
+            sw: 0,
+            se: 0,
+        },
+        group_header,
+    );
+    let toggle_rect = Rect::from_min_size(band.min, vec2(24.0 * z, header_h));
+    let title_font = FontId::proportional(13.0 * z.clamp(0.7, 1.5));
+    let body_font = FontId::proportional(11.0 * z.clamp(0.7, 1.4));
+    painter.text(
+        toggle_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        icons::CARET_RIGHT,
+        body_font.clone(),
+        colors.header_text,
+    );
+    let clipped = painter.with_clip_rect(painter.clip_rect().intersect(rect.expand(2.0)));
+    clipped.text(
+        Pos2::new(toggle_rect.right() + 2.0 * z, band.center().y),
+        egui::Align2::LEFT_CENTER,
+        name,
+        title_font,
+        colors.header_text,
+    );
+    let body_y = band.bottom() + (rect.bottom() - band.bottom()) * 0.5;
+    clipped.text(
+        Pos2::new(rect.left() + 12.0 * z, body_y),
+        egui::Align2::LEFT_CENTER,
+        format!(
+            "{} {member_count} {}",
+            icons::STACK,
+            if member_count == 1 { "state" } else { "states" }
+        ),
+        body_font,
+        colors.node_text_weak,
+    );
+    let outline = if playing {
+        Stroke::new(2.0 * z.max(0.8), colors.live)
+    } else if hovered {
+        Stroke::new(1.5_f32, colors.node_text.gamma_multiply(0.6))
+    } else {
+        Stroke::new(1.2_f32, group_header)
+    };
+    painter.rect_stroke(rect, corner, outline, egui::StrokeKind::Outside);
+    toggle_rect
 }
 
 /// Where a state's pins sit up and down: the middle of its body, under
@@ -303,8 +469,10 @@ pub(super) fn draw_label(
 
 /// A parameter chip: its type's icon and its name in a pill.
 /// A parameter chip's room left and right of its name.
+#[cfg(test)]
 pub(super) const CHIP_MARGIN_X: f32 = 8.0;
 
+#[cfg(test)]
 pub(super) fn draw_chip(ui: &mut egui::Ui, kind: ParameterKind, name: &str) {
     let color = kind.color();
     egui::Frame::new()

@@ -237,7 +237,7 @@ fn skin_surface(
     solid: bool,
     footprint: SkinFootprint,
 ) -> vec3<f32> {
-    let weather = weathered(geometric, shaded.normal, shaded.base_color, 0.0, roughness);
+    let weather = weathered(in.world_position, geometric, shaded.normal, shaded.base_color, 0.0, roughness);
     let n = weather.normal;
     let base_color = weather.base_color;
     let world_position = in.world_position;

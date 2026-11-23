@@ -407,6 +407,30 @@ pub struct StateMachineFile {
     /// states (Phase 78). Left out when there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<LayerDef>,
+    /// Collapsible visual groups (sub-state containers) in the editor graph.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<StateGroupDef>,
+}
+
+/// A collapsible group container for organizing states in the editor graph.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateGroupDef {
+    pub name: String,
+    #[serde(default)]
+    pub position: [f32; 2],
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub collapsed: bool,
+}
+
+impl StateGroupDef {
+    pub fn new(name: &str, position: [f32; 2]) -> Self {
+        Self {
+            name: name.to_owned(),
+            position,
+            collapsed: false,
+        }
+    }
 }
 
 impl Default for StateMachineFile {
@@ -420,6 +444,7 @@ impl Default for StateMachineFile {
             any_state_position: None,
             entry_position: None,
             layers: Vec::new(),
+            groups: Vec::new(),
         }
     }
 }
@@ -517,6 +542,8 @@ pub struct LayerDef {
     pub any_state_position: Option<[f32; 2]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry_position: Option<[f32; 2]>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<StateGroupDef>,
 }
 
 impl LayerDef {
@@ -532,6 +559,7 @@ impl LayerDef {
             transitions: Vec::new(),
             any_state_position: None,
             entry_position: None,
+            groups: Vec::new(),
         }
     }
 
@@ -545,6 +573,7 @@ impl LayerDef {
             transitions: self.transitions.clone(),
             any_state_position: self.any_state_position,
             entry_position: self.entry_position,
+            groups: self.groups.clone(),
             ..StateMachineFile::default()
         }
     }
@@ -557,6 +586,7 @@ impl LayerDef {
         self.transitions.clone_from(&machine.transitions);
         self.any_state_position = machine.any_state_position;
         self.entry_position = machine.entry_position;
+        self.groups.clone_from(&machine.groups);
     }
 }
 
@@ -626,6 +656,9 @@ pub struct StateDef {
     /// for it (see [`with_returns`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub returns: Option<ReturnDef>,
+    /// Optional visual group name this state belongs to in the editor graph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 impl StateDef {
@@ -636,6 +669,7 @@ impl StateDef {
             speed: 1.0,
             position,
             returns: None,
+            group: None,
         }
     }
 }
@@ -1045,7 +1079,22 @@ mod tests {
             any_state_position: Some([-200.0, 40.0]),
             entry_position: Some([-260.0, -40.0]),
             layers: Vec::new(),
+            groups: Vec::new(),
         }
+    }
+
+    #[test]
+    fn state_groups_round_trip_through_json() {
+        let mut machine = sample_controller();
+        machine.groups.push(StateGroupDef {
+            name: "Locomotion".into(),
+            position: [100.0, 50.0],
+            collapsed: true,
+        });
+        machine.states[0].group = Some("Locomotion".into());
+        let json = machine.to_json();
+        let parsed = StateMachineFile::from_json(&json).expect("valid json");
+        assert_eq!(parsed, machine);
     }
 
     #[test]

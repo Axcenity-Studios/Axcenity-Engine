@@ -820,7 +820,7 @@ fn toon_surface(
     occlusion: f32,
     solid: bool,
 ) -> vec3<f32> {
-    let weather = weathered(geometric, normal, base_color, 0.0, 1.0);
+    let weather = weathered(world_position, geometric, normal, base_color, 0.0, 1.0);
     let n = weather.normal;
     let color = weather.base_color;
     let v = normalize(frame.camera_position.xyz - world_position);
