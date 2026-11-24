@@ -16,7 +16,9 @@
 //! state, the preview shown in the character's place), `EndPreview`,
 //! item favourites, and the worn item's own controls (`SetItemVariant`,
 //! `SetItemMaterial`, `SetItemParameter`), which are edits. `Wear` stays
-//! the one way an item goes on: one undo step.
+//! the one way an item goes on: one undo step. The Clothing page's online
+//! wardrobe adds `Wardrobe` (`wardrobe.rs`): its list and its downloads
+//! into the library, which are editor state.
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
@@ -31,6 +33,7 @@ use super::random::RandomScope;
 use super::selection::Level;
 use super::sides::{SideTool, SidesOf};
 use super::stage::{Backdrop, Lighting, ViewPreset};
+use super::wardrobe::Ask;
 use super::{Category, Start};
 
 /// Where a change is in its gesture.
@@ -109,6 +112,10 @@ pub enum Intent {
     /// Takes a tile's preview off: the character as it is (Esc, leaving
     /// the page).
     EndPreview,
+    /// The online wardrobe (`wardrobe.rs`): asks for its list, downloads
+    /// an item into the library or takes one out again (editor state and
+    /// the library's files: never the character, never an undo step).
+    Wardrobe(Ask),
     /// Picks variant `variant` of the worn item `item` (`None`: as made),
     /// as one undo step. The colours and parameters the variant sets are
     /// the variant's again.

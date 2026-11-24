@@ -9,11 +9,14 @@
 //! downloads ([`guard`]), swapping a finished folder into a project
 //! ([`files`]), licence codes ([`license`]) and errors that are safe to show
 //! ([`SourceError`]). The design and what comes next:
-//! `docs/research/asset-sources/provider-interface.md`.
+//! `docs/research/asset-sources/provider-interface.md`. Beside the
+//! sources, [`character_pack`] reads a character pack's index (the Axcenity
+//! Wardrobe's `pack.json`) and fetches its items for Character Studio.
 //!
 //! Editor only: the player, server and test runner must never depend on it.
 
 pub mod ambientcg;
+pub mod character_pack;
 pub mod cli;
 pub mod db;
 pub mod directory;

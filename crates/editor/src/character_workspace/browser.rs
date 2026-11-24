@@ -15,6 +15,9 @@
 //!   the listed items' tags), "Recolourable" (a colour role or variants),
 //!   "Fits this body" (no `limitations` range the character is outside)
 //!   and "Favourites".
+//! - **The online wardrobe** (`wardrobe.rs`, `Browser::online`): the
+//!   Clothing page shows the library's clothes or, in their place, the
+//!   Axcenity Wardrobe's garments to download into the library.
 //! - **Favourites and recently used** are editor state, kept beside the
 //!   preset favourites (`presets.rs`, `favourites.json`).
 //! - **Preview without committing.** Hovering a tile, or picking one,
@@ -126,6 +129,9 @@ pub enum Browse {
     Filters(Shelf, Filters),
     /// Lists drafts (both pages), marked "Draft".
     ShowDrafts(bool),
+    /// The Clothing page shows the online wardrobe (`wardrobe.rs`) in
+    /// place of the library's clothes, or the library's again.
+    Online(bool),
     /// The tile under the pointer (`None`: none): previewed while it is.
     Hover(Option<Pick>),
     /// The tile picked to try on, waiting for "Wear" (`None`: none).
@@ -138,6 +144,8 @@ pub struct Browser {
     pub hair: Filters,
     pub clothing: Filters,
     pub show_drafts: bool,
+    /// The Clothing page shows the online wardrobe, not the library.
+    pub online: bool,
     pub hovered: Option<Pick>,
     pub selected: Option<Pick>,
     /// What the preview shows in the character's place while a tile is
@@ -607,6 +615,12 @@ impl CharacterWorkspace {
                         self.browser.hovered = None;
                     }
                 }
+            }
+            Browse::Online(on) => {
+                self.browser.online = on;
+                // A tile tried on was one of the library's.
+                self.browser.hovered = None;
+                self.browser.selected = None;
             }
             Browse::Hover(pick) => {
                 if !self.browser.hover(pick) {

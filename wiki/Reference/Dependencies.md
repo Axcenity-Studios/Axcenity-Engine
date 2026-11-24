@@ -37,7 +37,7 @@ Third-party crates pinned in the root `Cargo.toml` `[workspace.dependencies]` (v
 | Parallelism, hashing | `rayon` 1.10, `rustc-hash` 2 | render, editor cooking; core and caches | MIT/Apache | |
 | Profiling | `profiling` 1 (no default features) | hosts, hot functions | MIT/Apache | Tracy only with `profile-tracy`; excluded from hakari |
 | Serialization | `serde` 1, `serde_json` 1 | everywhere | MIT/Apache | |
-| Downloads | `ureq` 3 (rustls) | toolbox, editor | MIT/Apache | Not in the player |
+| Downloads | `ureq` 3 (rustls); `sha2` 0.11 for a character pack's checksums (already in the tree for releases) | toolbox, editor | MIT/Apache | Not in the player |
 | Team Create transport | `tungstenite` 0.28, `rustls` 0.23 (ring, TLS 1.3), `rcgen` 0.14, `ring` 0.17 (Ed25519 keys) | collab | MIT/Apache; rustls also ISC; ring Apache-2.0 AND ISC | Synchronous, one thread per connection |
 | Collaborate live scripts | `yrs` 0.28 (with `sync`; brings `arc-swap`, `dashmap`, `smallstr`) | collab | MIT (`yrs`); MIT or Apache-2.0 | A text CRDT for scripts and stylesheets typed in together (C7, ADR-0021) |
 | Utilities | `anyhow`, `thiserror` 2, `bytemuck`, `log`, `env_logger`, `pollster`, `regex`, `memory-stats` 1.2 | various | MIT/Apache | |

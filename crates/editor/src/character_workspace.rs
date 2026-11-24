@@ -67,6 +67,7 @@ pub mod sides;
 mod stage;
 pub mod thumbnails;
 mod toolbar;
+pub mod wardrobe;
 
 #[cfg(test)]
 mod browser_tests;
@@ -94,6 +95,8 @@ mod tests;
 mod timing_tests;
 #[cfg(test)]
 mod walkthrough_tests;
+#[cfg(test)]
+mod wardrobe_tests;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -332,6 +335,9 @@ pub struct CharacterWorkspace {
     /// The Hair and Clothing browsers' search, filters and preview
     /// (editor state, `browser.rs`).
     pub browser: browser::Browser,
+    /// The online wardrobe: its list, downloads and pictures (editor
+    /// state, `wardrobe.rs`).
+    pub wardrobe: wardrobe::Wardrobe,
     /// Parameters Randomize leaves alone (editor state).
     pub locks: BTreeSet<String>,
     /// How many times Randomize was pressed: part of its seed.
@@ -446,6 +452,7 @@ impl CharacterWorkspace {
             item_favourites,
             recent_items,
             browser: browser::Browser::default(),
+            wardrobe: wardrobe::Wardrobe::default(),
             locks: random::default_locks(),
             rolls: 0,
             comparison: Comparison::default(),

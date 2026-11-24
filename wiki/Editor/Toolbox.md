@@ -4,8 +4,8 @@ type: system
 status: current
 implementation: implemented
 crates: [toolbox, editor-toolbox, editor]
-source: [crates/toolbox/src/lib.rs, crates/toolbox/src/source.rs, crates/toolbox/src/record.rs, crates/toolbox/src/download.rs, crates/toolbox/src/db.rs, crates/toolbox/src/provenance.rs, crates/editor-toolbox/src/lib.rs, crates/editor-toolbox/src/packs.rs]
-docs: [docs/research/asset-sources/README.md, docs/research/asset-sources/provider-interface.md, docs/editor/assets.md, docs/editor/plugins.md, crates/toolbox/CLAUDE.md]
+source: [crates/toolbox/src/lib.rs, crates/toolbox/src/source.rs, crates/toolbox/src/record.rs, crates/toolbox/src/download.rs, crates/toolbox/src/db.rs, crates/toolbox/src/provenance.rs, crates/editor-toolbox/src/lib.rs, crates/editor-toolbox/src/packs.rs, crates/toolbox/src/character_pack.rs, crates/editor/src/character_workspace/wardrobe.rs]
+docs: [docs/research/asset-sources/README.md, docs/research/asset-sources/provider-interface.md, docs/editor/assets.md, docs/editor/plugins.md, docs/editor/character-studio.md, crates/toolbox/CLAUDE.md]
 verified: 2026-11-11
 verified_commit: 19c7179d
 tags: [system/editor, assets, toolbox]
@@ -46,6 +46,27 @@ flowchart LR
   F --> DIR["central asset directory<br/>+ metadata.db (SQLite)"]
   DIR --> P["copy into project assets/<br/>+ provenance, CREDITS.txt"]
 ```
+
+## Character packs (the online wardrobe)
+
+Clothing doesn't come through `AssetSource` or the central asset directory: it is a **character pack**, a repository with a `pack.json` index (format `axcenity-character-pack` 1) that lists each item with its library path, its picture and each file's size and SHA-256. The one pack read today is the [Axcenity Wardrobe](https://github.com/Axcenity-Studios/Axcenity-Wardrobe), at a fixed address. `crates/toolbox/src/character_pack.rs` reads the index and fetches an item's files, knowing nothing of character libraries; Character Studio's Clothing page (`crates/editor/src/character_workspace/wardrobe.rs`, drawn by `panel/wardrobe.rs`) lists it under its **Online wardrobe** switch and installs a downloaded garment into the studio's character library, where the Clothing browser offers it like any item. The Toolbox tab itself has no clothing kind: a garment belongs to a character library, not to a project's `assets/` folders, and the record's `Kind` is shared with the metadata database and the Python package.
+
+```mermaid
+flowchart LR
+  P["Clothing page:<br/>Online wardrobe"] -->|"Ask::List"| I["character_pack::fetch_index<br/>(pack.json, rules checked)"]
+  I --> K["kept: wardrobe/pack.json,<br/>previews/"]
+  P -->|"Ask::Get"| F["character_pack::fetch_item<br/>(.part, size, SHA-256)"]
+  F --> S["wardrobe/staging/&lt;item&gt;/"]
+  S -->|"wardrobe::install"| L["assets/characters/<br/>realistic/imports/&lt;name&gt;/<br/>+ catalogue.json"]
+  L --> B["Clothing browser<br/>(Your library)"]
+```
+
+- Nothing is fetched until the list is asked for; the answer is kept, and the kept list fetches nothing.
+- The index is untrusted: files come only from under the pack's own address; an item is kept only when its ID and paths are plain names, all its files sit in its own folder and are `.glb`, `.json` or `.png`, and its manifest is among them (others are left out and counted).
+- A file is put in place only when its size and SHA-256 match; an item reaches the library only whole. The install refuses an ID the library has at another path and a folder that holds anything else the catalogue lists, so a pack never writes over the engine's items or a person's own.
+- Downloads run one at a time on a thread of their own (`Progress`: bytes done and a cancel flag); the World and the workspace are only touched on the editor's thread, when a message arrives.
+
+Behaviour: `docs/editor/character-studio.md` (The online wardrobe).
 
 ## Rules (from `crates/toolbox/CLAUDE.md`)
 

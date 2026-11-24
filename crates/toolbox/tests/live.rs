@@ -108,3 +108,28 @@ fn a_polyhaven_texture_has_loose_maps_with_md5s() {
 fn openverse_sounds() {
     search_then_record("openverse", Kind::Sound, "door");
 }
+
+/// The Axcenity Wardrobe's index reads whole (no item left out), and one
+/// of its small files downloads and matches its checksum.
+#[test]
+#[ignore = "reaches the network"]
+fn the_axcenity_wardrobe_lists_its_garments() {
+    use axcenity_toolbox::character_pack::{self, Progress, WARDROBE, WARDROBE_FILES};
+    let http = Client::new(Duration::from_secs(60));
+    let (pack, _) = character_pack::fetch_index(&http, WARDROBE, WARDROBE_FILES).unwrap();
+    assert!(!pack.items.is_empty());
+    assert_eq!(pack.refused, 0, "an item of the wardrobe was left out");
+    assert!(!pack.credit.is_empty());
+    let mut item = pack.items[0].clone();
+    assert!(item.preview.is_some());
+    // Only its manifest: the model is tens of megabytes.
+    item.files.retain(|file| file.path.ends_with(".item.json"));
+    let folder =
+        std::env::temp_dir().join(format!("axcenity-wardrobe-live-{}", std::process::id()));
+    character_pack::fetch_item(&http, &pack, &item, &folder, &Progress::default()).unwrap();
+    assert!(folder.join(item.manifest_name()).is_file());
+    let picture = folder.join("preview.png");
+    character_pack::fetch_preview(&http, &pack, &item, &picture).unwrap();
+    assert!(picture.is_file());
+    let _ = std::fs::remove_dir_all(&folder);
+}

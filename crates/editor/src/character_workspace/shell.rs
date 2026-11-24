@@ -72,6 +72,8 @@ impl CharacterWorkspace {
         );
         let view = Rect::from_min_max(centre.min, egui::pos2(centre.right(), bar.top()));
 
+        // Before the library is read: a download that just ended is in it.
+        self.wardrobe_step(Some(ui.ctx()));
         // One library for the frame: each call stats the catalogue.
         let library = self.library();
         self.autosave_step(Instant::now());
@@ -176,6 +178,7 @@ impl CharacterWorkspace {
             Intent::ToggleItemFavourite(id) => self.toggle_item_favourite(&id),
             Intent::Browse(change) => self.browse(change),
             Intent::EndPreview => self.end_preview(),
+            Intent::Wardrobe(ask) => self.ask_wardrobe(ask),
             Intent::SetItemVariant { item, variant } => {
                 self.set_item_variant(&item, variant.as_deref())
             }

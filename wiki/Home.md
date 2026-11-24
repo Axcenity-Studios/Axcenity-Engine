@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-24 | Toolbox, specialized editors, file formats | Character Studio's online wardrobe: garments listed from the Axcenity Wardrobe and downloaded into the library, each file checked by size and SHA-256 |
 | 2026-11-23 | Repository structure, System inventory | The examples became the engine's own samples in `crates/samples/projects/` (the `samples` crate) |
 | 2026-11-23 | Lighting and atmosphere | Lightning that throws the sun's shadows and glows in the clouds; grey sky light under an overcast; snow driven by the wind, uneven on things, and spindrift |
 | 2026-11-23 | Lighting and atmosphere | Prints in the snow from real contact: each thing presses its own shape as deep as it has sunk, feet where they are down, trails as wide as what touches, in a fine map an eighth of a stud a cell |
 | 2026-11-23 | Lighting and atmosphere | Snow as a slab on solid items with drifts at their foot; rain blown under eaves, a coarser wet film and fewer puddles; weather particles that take the scene's light; wispy clouds with real cover and overcast bellies |
-| 2026-11-23 | Lighting and atmosphere, animation, specialized editors, scripting, file formats | Environment presets: the sky and weather under one name, blended on a sequence's Environment track, by `Lighting:TransitionToPreset` and from the Properties panel |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

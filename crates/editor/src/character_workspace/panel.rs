@@ -10,6 +10,7 @@ mod parameters;
 mod row;
 #[cfg(test)]
 mod tests;
+mod wardrobe;
 mod worn;
 
 pub(super) use browser::none_picture;

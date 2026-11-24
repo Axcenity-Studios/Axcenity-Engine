@@ -13,7 +13,7 @@ use eframe::egui::{self, Sense, vec2};
 use super::super::browser::{self, Browse, Entry, Filters, Pick, Shelf};
 use super::super::intent::Intent;
 use super::super::{CharacterWorkspace, nav};
-use super::worn;
+use super::{wardrobe, worn};
 use crate::theme::{self, icons};
 use crate::widgets;
 
@@ -85,7 +85,30 @@ pub(super) fn page(
     if !listing.body_type_wears.is_empty() {
         ui.add_space(6.0);
     }
-    if listing.slots.is_empty() || (listing.offered == 0 && listing.entries.is_empty()) {
+    if listing.slots.is_empty() {
+        nothing_offered(ui, shelf);
+        return intents;
+    }
+    // The Clothing page shows the library's clothes, or the online
+    // wardrobe's to download (`wardrobe.rs`): one or the other, so the
+    // wardrobe is never under a long list of tiles.
+    let online = shelf == Shelf::Clothing && state.online;
+    if shelf == Shelf::Clothing {
+        let mut shown = online;
+        let options = [
+            (false, Some(icons::T_SHIRT), "Your library"),
+            (true, Some(icons::CLOUD_ARROW_DOWN), "Online wardrobe"),
+        ];
+        let tips = [
+            "The clothes in your library",
+            "More clothes to download, from the Axcenity Wardrobe",
+        ];
+        if widgets::segmented_tips(ui, &mut shown, &options, &tips).0 {
+            intents.push(Intent::Browse(Browse::Online(shown)));
+        }
+        ui.add_space(6.0);
+    }
+    if !online && listing.offered == 0 && listing.entries.is_empty() {
         nothing_offered(ui, shelf);
         return intents;
     }
@@ -95,6 +118,7 @@ pub(super) fn page(
     let width = (ui.available_width() - widgets::SEARCH_FIELD_MARGINS).max(60.0);
     let hint = match shelf {
         Shelf::Hair => "Search hairstyles",
+        Shelf::Clothing if online => "Search the wardrobe",
         Shelf::Clothing => "Search clothes",
     };
     widgets::search_field(ui, &mut search, hint, width);
@@ -123,6 +147,11 @@ pub(super) fn page(
             }
         });
         ui.add_space(2.0);
+    }
+    if online {
+        // The search and the category above narrow the wardrobe too.
+        intents.extend(wardrobe::section(ui, workspace, base, &filters));
+        return intents;
     }
 
     // Filters.
