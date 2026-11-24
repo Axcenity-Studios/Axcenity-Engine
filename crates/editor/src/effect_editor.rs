@@ -90,6 +90,7 @@ pub const MODULES: [(&str, &str, &[&str]); 6] = [
             "FlipbookFramerate",
             "FlipbookStartRandom",
             "LightEmission",
+            "LightInfluence",
             "Brightness",
         ],
     ),

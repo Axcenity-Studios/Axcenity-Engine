@@ -5,10 +5,10 @@
 use super::tests::example;
 use super::*;
 
-/// hello-part with three new Parts in the Workspace, selected: Anchored on
+/// part with three new Parts in the Workspace, selected: Anchored on
 /// the first only, and each a different Transparency.
 fn three_parts() -> (EditorApp, [InstanceId; 3]) {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let workspace = app.world.workspace();
     let parts = [0.1, 0.2, 0.3].map(|transparency| {
         let part = app.world.create(ClassName::Part).unwrap();

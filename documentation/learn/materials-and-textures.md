@@ -1,7 +1,7 @@
 ---
 description: Give parts a look with colours, built-in materials, PBR texture maps, material files, the Material tab and material graphs.
 icon: palette
-samples: [hello-pbr, hello-graphics, hello-material-graph]
+samples: [pbr, graphics, material-graph]
 ---
 
 # Materials and textures
@@ -34,12 +34,12 @@ Maps are recognised by their file names too (`_BaseColor`, `_Normal`, `_Roughnes
 
 ## Shading models and special materials
 
-A material file can choose its shading: **Standard**, **Unlit** (flat colour, no lighting) or **Toon** (banded light), add an **outline**, be **translucent** like leaves, or be **water**. The **hello-toon**, **hello-outlines** and **hello-water** samples show each.
+A material file can choose its shading: **Standard**, **Unlit** (flat colour, no lighting) or **Toon** (banded light), add an **outline**, be **translucent** like leaves, or be **water**. The **toon**, **outlines** and **water** samples show each.
 
 ## Shaders and material graphs
 
-> **For advanced users.** In the Material tab, **Add shader** gives a material a surface shader written in WGSL, checked as you type with errors shown on their line. The tab's **Graph** view builds the same thing from nodes instead, with no code, and the editor turns the graph into a shader. Both run in built games. The **hello-shader** and **hello-material-graph** samples each have one.
+> **For advanced users.** In the Material tab, **Add shader** gives a material a surface shader written in WGSL, checked as you type with errors shown on their line. The tab's **Graph** view builds the same thing from nodes instead, with no code, and the editor turns the graph into a shader. Both run in built games. The **shader** and **material-graph** samples each have one.
 
 ## Decals
 
-A **Decal** inside a part projects an image onto whatever surfaces its box covers, such as a sign or a stain, without changing those surfaces' materials. See the **hello-decals** sample.
+A **Decal** inside a part projects an image onto whatever surfaces its box covers, such as a sign or a stain, without changing those surfaces' materials. See the **decals** sample. To brush many stains or tracks onto the ground at once, use the Scatter pane's **Paint decals** ([Terrain](terrain.md#ground-clutter-and-stains)).

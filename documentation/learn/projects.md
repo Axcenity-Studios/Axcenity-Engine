@@ -1,7 +1,7 @@
 ---
 description: Make, open, organize and safeguard projects: templates, the project folder, levels, version history, backups and Collaborate (editing together).
 icon: folder
-samples: [hello-levels]
+samples: [levels]
 ---
 
 # Projects
@@ -38,7 +38,7 @@ On the start screen, a project card's **Settings** changes its name, description
 
 ## Levels
 
-A game can have several levels. `world.json` is the start level; every other level is a file in `levels/`. The **Levels** panel adds, opens and renames them. A level is its Workspace: Lighting, ReplicatedStorage, StarterPlayer and the other services belong to the project and stay the same from level to level. Scripts switch levels with `LevelService:LoadLevel("Castle")`. The **hello-levels** sample has three levels (Meadow, Castle and Dungeon) joined by portals.
+A game can have several levels. `world.json` is the start level; every other level is a file in `levels/`. The **Levels** panel adds, opens and renames them. A level is its Workspace: Lighting, ReplicatedStorage, StarterPlayer and the other services belong to the project and stay the same from level to level. Scripts switch levels with `LevelService:LoadLevel("Castle")`. The **levels** sample has three levels (Meadow, Castle and Dungeon) joined by portals.
 
 ## Version history, checkpoints and backups
 

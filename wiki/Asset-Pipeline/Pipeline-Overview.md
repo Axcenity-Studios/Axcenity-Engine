@@ -74,7 +74,7 @@ All **Measured**; see the [Optimization log](../Performance/Optimization-Log.md)
 
 | Stage | Before → after |
 |---|---|
-| Player first frame (I11 preload), hello-roads | 2,069–5,431 → 341–398 ms |
+| Player first frame (I11 preload), the `roads` sample | 2,069–5,431 → 341–398 ms |
 | Arid Dry Patch launch to assets in (M5 off-lock) | 5,056 → 3,204 ms |
 | 4096² texture upload on first frame (L2 BC7) | 55–61 → 0.9–1.1 ms; GPU 85 → 21 MiB |
 | CityPropsCollection.fbx load (L2 cooked model) | 143 → 1.7–1.9 ms |

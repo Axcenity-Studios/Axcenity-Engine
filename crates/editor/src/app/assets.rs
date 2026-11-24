@@ -836,7 +836,7 @@ mod tests {
 
     #[test]
     fn dropping_a_prop_places_it_where_it_lands_as_one_undo_step() {
-        let mut app = EditorApp::new(Some(&crate::app::tests::example("hello-touched")));
+        let mut app = EditorApp::new(Some(&crate::app::tests::example("touched")));
         let workspace = app.world.workspace();
         let before = app.world.get(workspace).unwrap().children().len();
         let entry = AssetEntry {

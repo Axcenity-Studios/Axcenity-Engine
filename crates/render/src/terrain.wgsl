@@ -65,15 +65,24 @@ struct TerrainOut {
 fn vs_terrain(vertex: TerrainIn, chunk: ChunkIn) -> TerrainOut {
     let model = mat4x4<f32>(chunk.model_0, chunk.model_1, chunk.model_2, chunk.model_3);
     var world_position = model * vec4<f32>(vertex.position, 1.0);
-    // Deformable snow accumulation lift on exposed upward-facing terrain,
-    // depressed where footprints/trails are stamped in `weather_field`.
+    // Snow lies on exposed ground as deep as its thickness (`SnowThickness`,
+    // heaped into drifts by `snow_drift`), so what stands on the ground is
+    // buried to that depth; it thins to nothing where shelter begins and is
+    // pressed down by the average of what's printed in each of
+    // `weather_field`'s cells (the corners are a stud apart, so the prints'
+    // shapes are the shading's to show: lighting.wgsl's `weather_print`).
     let cover = frame.weather.y;
     let thickness = frame.weather.z;
     if cover > 0.0 && thickness > 0.0 {
         let snow = clamp(1.5 * cover - 2.5 * (1.0 - vertex.normal.y), 0.0, 1.0);
         if snow > 0.0 {
-            let sample = weather_sample(world_position.xyz);
-            let lift = snow * thickness * 0.35 * sample.x * (1.0 - sample.y * 0.85);
+            // z: the share of the world's snow here (none under shelter,
+            // up to 2 in a weather box), y: how deep prints are on average.
+            // w: how high it banks against what stands in it, in studs.
+            let sample = weather_sample_as(world_position.xyz, true);
+            // Thin cover is a dusting; it has its whole depth by full cover.
+            let lift = snow * smoothstep(0.2, 0.9, cover) * (thickness
+                * snow_drift(world_position.xz) * sample.z * (1.0 - sample.y * 0.85) + sample.w);
             world_position.y += lift;
         }
     }
@@ -291,10 +300,9 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
         metalness = 0.0;
     }
 
-    var color = light_surface(in.world_position, n, shading_normal, in.clip_position.xy,
+    var color = light_ground(in.world_position, n, shading_normal, in.clip_position.xy,
         base_color, clamp(metalness, 0.0, 1.0), clamp(roughness, 0.04, 1.0),
-        clamp(occlusion, 0.0, 1.0) * screen_occlusion(in.clip_position.xy), vec3<f32>(0.04), true,
-        false);
+        clamp(occlusion, 0.0, 1.0) * screen_occlusion(in.clip_position.xy), vec3<f32>(0.04));
     if view == 4u {
         // Lines along the grid of samples, the same width on screen.
         let to_line = abs(fract(grid - 0.5) - 0.5) / max(grid_width, vec2<f32>(0.0001));
@@ -304,12 +312,19 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
     return vec4<f32>(fogged(frame.fog, frame.camera_position.xyz, in.world_position, color), 1.0);
 }
 
+// How smooth the water on the ground must be for ray traced reflections to
+// trace it: about half of it under a puddle.
+const TERRAIN_MIRRORS: f32 = 0.35;
+
 // The depth and normal prepass, for ambient occlusion.
 @fragment
 fn fs_terrain_prepass(in: TerrainOut) -> @location(0) vec4<f32> {
     // Marked rough (1 plus the roughness, as `fs_prepass` does), so ray
-    // traced reflections (ray_reflections.wgsl) leave terrain to the probes.
-    var normal = prepass_normal(normalize(in.normal));
-    normal.w = 1.999;
+    // traced reflections (ray_reflections.wgsl) leave terrain to the probes,
+    // but for its puddles, which mirror what stands over them.
+    let weather = weathered_prepass(in.world_position, normalize(in.normal), 0.999);
+    var normal = prepass_normal(weather.normal);
+    // A film of water leaves the ground too rough to trace; a puddle doesn't.
+    normal.w = 1.0 + select(0.999, weather.roughness, weather.roughness < TERRAIN_MIRRORS);
     return normal;
 }

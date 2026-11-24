@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn an_older_project_plays_the_same_once_migrated_as_one_made_in_the_new_format() {
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation");
         let fbx = example.join("assets/models/noodle.fbx");
         let door_keys = r#"[ { "id": "a", "time": 0, "value": [0, 2, 0] },
                              { "id": "b", "time": 1, "value": [4, 2, 0] } ]"#;

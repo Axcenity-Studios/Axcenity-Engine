@@ -1,10 +1,10 @@
 //! The crowd scene, for the multithreaded frame (unified Phase 93): the
-//! graphics reference scene (`examples/hello-graphics`) with
+//! graphics reference scene (`crates/samples/projects/graphics`) with
 //! [`CHARACTERS`] animated characters and [`BODIES`] physics bodies added.
 //! `axcenity-test --make-crowd <folder>` writes it; every host's `--bench`
 //! measures it like S10k.
 //!
-//! - The characters are hello-animation's Noodle, each with an Animator
+//! - The characters are animation's Noodle, each with an Animator
 //!   playing its state machine, in a 20 × 10 grid behind the reference
 //!   objects. `crowd.server.lua` gives each a different Speed, so their
 //!   poses differ.
@@ -26,81 +26,81 @@ pub const CHARACTERS: usize = 200;
 pub const BODIES: usize = 2_000;
 
 /// The reference scene's world and files, and the Noodle's.
-const WORLD: &str = include_str!("../../../examples/hello-graphics/world.json");
+const WORLD: &str = include_str!("../../samples/projects/graphics/world.json");
 const ASSETS: &[(&str, &[u8])] = &[
     (
         "scripts/quality.client.lua",
-        include_bytes!("../../../examples/hello-graphics/scripts/quality.client.lua"),
+        include_bytes!("../../samples/projects/graphics/scripts/quality.client.lua"),
     ),
     (
         "assets/models/pbr_panel.fbx",
-        include_bytes!("../../../examples/hello-graphics/assets/models/pbr_panel.fbx"),
+        include_bytes!("../../samples/projects/graphics/assets/models/pbr_panel.fbx"),
     ),
     (
         "assets/models/maps/ao.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/ao.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/ao.png"),
     ),
     (
         "assets/models/maps/color.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/color.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/color.png"),
     ),
     (
         "assets/models/maps/emissive.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/emissive.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/emissive.png"),
     ),
     (
         "assets/models/maps/gloss.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/gloss.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/gloss.png"),
     ),
     (
         "assets/models/maps/metalness.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/metalness.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/metalness.png"),
     ),
     (
         "assets/models/maps/normal.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/normal.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/normal.png"),
     ),
     (
         "assets/models/maps/opacity.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/opacity.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/opacity.png"),
     ),
     (
         "assets/models/maps/roughness.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/roughness.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/roughness.png"),
     ),
     (
         "assets/models/maps/specular.png",
-        include_bytes!("../../../examples/hello-graphics/assets/models/maps/specular.png"),
+        include_bytes!("../../samples/projects/graphics/assets/models/maps/specular.png"),
     ),
     (
         "assets/models/noodle.fbx",
-        include_bytes!("../../../examples/hello-animation/assets/models/noodle.fbx"),
+        include_bytes!("../../samples/projects/animation/assets/models/noodle.fbx"),
     ),
     (
         "assets/animations/noodle/noodle.statemachine.json",
         include_bytes!(
-            "../../../examples/hello-animation/assets/animations/noodle/noodle.statemachine.json"
+            "../../samples/projects/animation/assets/animations/noodle/noodle.statemachine.json"
         ),
     ),
     (
         "assets/animations/noodle/Idle.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Idle.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Idle.anim.json"),
     ),
     (
         "assets/animations/noodle/Walk.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Walk.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Walk.anim.json"),
     ),
     (
         "assets/animations/noodle/Run.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Run.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Run.anim.json"),
     ),
     (
         "assets/animations/noodle/Hop.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Hop.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Hop.anim.json"),
     ),
     (
         "assets/animations/noodle/Wave.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Wave.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Wave.anim.json"),
     ),
 ];
 
@@ -150,7 +150,7 @@ pub fn write(folder: &Path) -> io::Result<()> {
 
 /// The scene's world: the reference scene's, with the crowd and bodies.
 pub fn world() -> World {
-    let mut world = axcenity_project::parse_world(WORLD).expect("hello-graphics' world reads");
+    let mut world = axcenity_project::parse_world(WORLD).expect("graphics' world reads");
     let workspace = world.workspace();
 
     let crowd = add(&mut world, ClassName::Folder, workspace, "Crowd", &[]);

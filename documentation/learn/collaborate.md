@@ -1,7 +1,7 @@
 ---
 description: Set up Collaborate in about five minutes, start a session, invite people from anywhere over Tailscale, keep the project in a Git repository when everyone leaves, and fix what usually goes wrong.
 icon: users
-samples: [hello-touched]
+samples: [touched]
 ---
 
 # Collaborate: set up and work together

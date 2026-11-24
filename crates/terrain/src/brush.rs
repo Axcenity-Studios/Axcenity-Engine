@@ -23,7 +23,12 @@ use crate::Placement;
 use crate::noise::{Noise, smoothstep};
 
 mod scatter;
+mod scatter_mask;
 pub use scatter::{MAX_ITEM_SCALE, MIN_ITEM_SCALE, Scatter, ScatterErase, ScatterItem, shares};
+pub use scatter_mask::{
+    HEIGHT_FADE, MOISTURE_REACH, NOISE_SCALE, OPEN_HEIGHT, SLOPE_FADE, ScatterMask, WET_RELIEF,
+    wetness,
+};
 
 /// How much Raise, Lower and Sculpt move the ground in one stamp at full
 /// strength, as a fraction of the brush's radius.

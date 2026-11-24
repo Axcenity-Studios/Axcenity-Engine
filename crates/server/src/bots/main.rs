@@ -44,7 +44,7 @@ const USAGE: &str = "usage: axcenity-bots <project-folder> --join <address:port>
                      [--threads <n>] [--stagger <ms>] [--password <text>] [--no-scripts] [--idle] [--roam <studs>] \
                      [--report <s>] [--report-file <path>] [--user-id <first>] [--churn <s>] [--flood tokenless|silent|junk|spam|deep] [--cheat speed|noclip|fly] [--relay <address:port>] [--no-punch]\n\
                      --join takes an address, a join link, or a join code with --relay; --no-punch always goes through the relay\n\
-                     example: cargo run -p axcenity-server --bin axcenity-bots -- examples/hello-character --join 127.0.0.1:47800 --count 16";
+                     example: cargo run -p axcenity-server --bin axcenity-bots -- crates/samples/projects/character --join 127.0.0.1:47800 --count 16";
 
 /// Each frame is this long.
 const FRAME: Duration = Duration::from_micros(16_667);

@@ -23,6 +23,7 @@ Map only. Luau and block scripts (shown as blocks or as a graph) share one runti
 - SaveService, save slots and Checkpoints: [architecture/saves.md](architecture/saves.md)
 - LevelService (levels, `LoadLevel`, `AddLevel`): [project/levels.md](project/levels.md)
 - Sequence (cutscenes: `Play`, `Completed`, `EventReached`, skipping, locked input): [project/sequences.md](project/sequences.md)
+- Environment presets (`Lighting:TransitionToPreset`, `StopPresetTransition`): [project/sequences.md](project/sequences.md#environment-presets-and-the-environment-track)
 - DataService and data tables: [project/data-tables.md](project/data-tables.md)
 - ConsoleService (Developer Console commands): [developer-console.md](developer-console.md)
 - LocalizationService, the string table and `TextKey`: [ui.md](ui.md)

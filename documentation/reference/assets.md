@@ -1,7 +1,7 @@
 ---
 description: Supported formats, what happens when a file is imported, asset IDs, cooking textures and models for the GPU, loading in the background, texture budgets, the Toolbox and licences.
 icon: download
-samples: [hello-mesh, hello-pbr]
+samples: [mesh, pbr]
 ---
 
 # Assets and importing

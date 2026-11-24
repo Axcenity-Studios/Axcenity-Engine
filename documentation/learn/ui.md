@@ -1,7 +1,7 @@
 ---
 description: Screen UI with ScreenGuis, frames, text, buttons and widgets, the UI Designer, styling with CSS, event graphs, and UI in the 3D world.
 icon: cursor
-samples: [hello-ui, hello-buttons, hello-css, hello-ui-graph, hello-settings]
+samples: [ui, buttons, css, ui-graph, settings]
 ---
 
 # UI for your game
@@ -26,11 +26,13 @@ Game UI is made of Instances, like the rest of the world: a **ScreenGui** is a l
 
 ## The UI Designer
 
+![Diagram of responsive ScreenGui layout using UDim2 (Scale fraction plus pixel Offset) and AnchorPoint presets for top-left HUDs, centered modals, and bottom-right buttons.](../images/ui-layout-udim2.png)
+
 The **UI Designer** tab (beside the Scene) shows the selected ScreenGui on an artboard the size of a screen; with none it offers **New ScreenGui**. Drag elements from the palette, move and resize them with handles, and set **anchors** so they stay in a corner or stretch as the screen changes size. **Preview** shows the layout on other screens, from 4:3 desktops to phones. Drag guides out of the rulers to line things up, and select several elements to move or align them together. The inspector shows the selected element's position, its anchor and its style, and the **States** editor sets how a button looks when hovered, pressed or disabled.
 
 ## Styling with CSS
 
-Give elements a **Class** or an **Id**, then style them from `.css` files in the project folder: colours, fonts, padding, borders, rounded corners, flex layout, transitions and `:hover` states. One stylesheet styles every screen, so changing a colour changes it everywhere. Properties also has a **Style (CSS)** section that shows and edits the rules that apply to the selected element. The **hello-css** sample shows the supported rules.
+Give elements a **Class** or an **Id**, then style them from `.css` files in the project folder: colours, fonts, padding, borders, rounded corners, flex layout, transitions and `:hover` states. One stylesheet styles every screen, so changing a colour changes it everywhere. Properties also has a **Style (CSS)** section that shows and edits the rules that apply to the selected element. The **css** sample shows the supported rules.
 
 ```css
 .primary {
@@ -56,11 +58,11 @@ start.Activated:Connect(function()
 end)
 ```
 
-Or, without code, switch the UI Designer to **Event Graph**: wire a button's click to nodes that switch pages, change text or set values. The graph compiles to an ordinary LocalScript. The **hello-ui-graph** sample has one.
+Or, without code, switch the UI Designer to **Event Graph**: wire a button's click to nodes that switch pages, change text or set values. The graph compiles to an ordinary LocalScript. The **ui-graph** sample has one.
 
 ## Text for every language
 
-Write text through the **string table** so the game can be translated: the UI Designer's **Strings** tab lists the languages and keys (such as `menu.play`) with a text for each language, and an element's **TextKey** picks a key. The **hello-strings** sample shows how.
+Write text through the **string table** so the game can be translated: the UI Designer's **Strings** tab lists the languages and keys (such as `menu.play`) with a text for each language, and an element's **TextKey** picks a key. The **strings** sample shows how.
 
 ## Built-in game UI
 

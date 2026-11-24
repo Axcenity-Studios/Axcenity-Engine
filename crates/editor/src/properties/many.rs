@@ -256,7 +256,7 @@ pub fn show_many(
                                         Edit::Property(name, Value::PhysicalProperties(custom))
                                     })
                                 }
-                                value => value_control(ui, name, value, assets),
+                                value => value_control(ui, primary.class(), name, value, assets),
                             })
                             .inner;
                         if made.is_some() {

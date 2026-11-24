@@ -162,9 +162,10 @@ pub use packed::{
 };
 pub use prefabs::{PrefabError, Prefabs, applied_text, prefab_references, variant_text};
 pub use scatter_palettes::{
-    DEFAULT_SCATTER_DENSITY, DEFAULT_SCATTER_SPACING, SCATTER_PALETTE_EXTENSION,
-    SCATTER_PALETTE_FORMAT, ScatterPalette, ScatterPaletteError, list_scatter_palettes,
-    save_scatter_palette, scatter_palette_file_name,
+    DECAL_SIZE_RANGE, DEFAULT_DECAL_DENSITY, DEFAULT_DECAL_SPACING, DEFAULT_SCATTER_DENSITY,
+    DEFAULT_SCATTER_SPACING, GROUND_CLUTTER_PALETTE, SCATTER_PALETTE_EXTENSION,
+    SCATTER_PALETTE_FORMAT, ScatterDecal, ScatterPalette, ScatterPaletteError,
+    list_scatter_palettes, save_scatter_palette, scatter_palette_file_name,
 };
 pub use starter_character::load_starter_character;
 pub use terrain_files::{

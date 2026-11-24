@@ -21,15 +21,15 @@ fn copy_folder(from: &Path, to: &Path) {
     }
 }
 
-/// A copy of `examples/<name>`, so the server can't change the original.
+/// A copy of the engine sample `<name>`, so the server can't change the original.
 fn copy_of_example(name: &str) -> PathBuf {
     copy_of_example_for(name, "stdio")
 }
 
-/// A copy of `examples/<name>` of this test's own.
+/// A copy of the engine sample `<name>` of this test's own.
 fn copy_of_example_for(name: &str, test: &str) -> PathBuf {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name);
     let folder =
         std::env::temp_dir().join(format!("axcenity-mcp-{test}-{name}-{}", std::process::id()));
@@ -40,7 +40,7 @@ fn copy_of_example_for(name: &str, test: &str) -> PathBuf {
 
 #[test]
 fn a_client_lists_and_calls_tools_over_stdio() {
-    let folder = copy_of_example("hello-part");
+    let folder = copy_of_example("part");
     let mut child = Command::new(env!("CARGO_BIN_EXE_axcenity-editor"))
         .arg("--mcp")
         .arg(&folder)
@@ -163,7 +163,7 @@ fn a_folder_that_isnt_a_project_fails_without_touching_stdout() {
 
 #[test]
 fn check_prints_a_report_and_client_lines_for_this_binary() {
-    let folder = copy_of_example("hello-touched");
+    let folder = copy_of_example("touched");
     let output = Command::new(env!("CARGO_BIN_EXE_axcenity-editor"))
         .args(["--mcp", "--check"])
         .arg(&folder)
@@ -236,7 +236,7 @@ fn fake_editor(
 
 #[test]
 fn the_server_relays_to_an_open_editor_with_its_options() {
-    let folder = copy_of_example_for("hello-part", "relay");
+    let folder = copy_of_example_for("part", "relay");
     let hellos = fake_editor(&folder, |_| "ok");
     let mut child = Command::new(env!("CARGO_BIN_EXE_axcenity-editor"))
         .args([
@@ -280,7 +280,7 @@ fn the_server_relays_to_an_open_editor_with_its_options() {
 
 #[test]
 fn without_the_editor_the_server_refuses_writes_while_an_editor_listens() {
-    let folder = copy_of_example_for("hello-part", "guard");
+    let folder = copy_of_example_for("part", "guard");
     // The editor refuses this client but says it's there to a probe.
     let hellos = fake_editor(&folder, |hello| {
         if hello["probe"] == true {
@@ -348,7 +348,7 @@ fn without_the_editor_the_server_refuses_writes_while_an_editor_listens() {
 #[cfg(unix)]
 #[test]
 fn the_server_starts_with_a_one_megabyte_main_thread_stack() {
-    let folder = copy_of_example_for("hello-part", "small-stack");
+    let folder = copy_of_example_for("part", "small-stack");
     let output = Command::new("sh")
         .arg("-c")
         .arg("ulimit -s 1024 && exec \"$0\" --mcp --check \"$1\"")

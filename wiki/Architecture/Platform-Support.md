@@ -50,4 +50,4 @@ There is no platform abstraction layer of the engine's own. Each concern goes th
 
 ## Checking a platform
 
-`scripts/check-platform.sh` / `check-platform.ps1` run build, the "player has no editor code" check, clippy, every test, doc tests, `axcenity-test examples/hello-character` and the dedicated server with no display, and save a summary to `target/platform-check-<os>.txt`. Packages and Build Game per OS: `python3 scripts/check-packages.py`. See [Build and run](../Getting-Started/Build-and-Run.md).
+`scripts/check-platform.sh` / `check-platform.ps1` run build, the "player has no editor code" check, clippy, every test, doc tests, `axcenity-test crates/samples/projects/character` and the dedicated server with no display, and save a summary to `target/platform-check-<os>.txt`. Packages and Build Game per OS: `python3 scripts/check-packages.py`. See [Build and run](../Getting-Started/Build-and-Run.md).

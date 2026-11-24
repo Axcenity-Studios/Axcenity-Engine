@@ -1,7 +1,7 @@
 ---
 description: Sounds, music, spatial (3D) sound, rolloff and occlusion, sound groups, the Mixer and effects such as reverb and echo.
 icon: speaker
-samples: [hello-audio, hello-spatial, hello-mixer]
+samples: [audio, spatial, mixer]
 ---
 
 # Audio and spatial sound
@@ -47,6 +47,6 @@ The **Mixer** panel (View > Panels) shows each group's level during Play, with m
 
 ## Effects
 
-Put effect Instances inside a Sound or a SoundGroup: **ReverbSoundEffect**, **EqualizerSoundEffect**, **CompressorSoundEffect**, **EchoSoundEffect**, **DistortionSoundEffect**, **PitchShiftSoundEffect**, **LowPassSoundEffect** and **HighPassSoundEffect**. Effects on a group apply to every sound in it. The **hello-mixer** sample has groups with effects.
+Put effect Instances inside a Sound or a SoundGroup: **ReverbSoundEffect**, **EqualizerSoundEffect**, **CompressorSoundEffect**, **EchoSoundEffect**, **DistortionSoundEffect**, **PitchShiftSoundEffect**, **LowPassSoundEffect** and **HighPassSoundEffect**. Effects on a group apply to every sound in it. The **mixer** sample has groups with effects.
 
 > **Known limits.** Spatial sound pans in stereo; there's no HRTF (sound from above or behind) yet. Occlusion counts walls, it doesn't trace how sound travels around them.

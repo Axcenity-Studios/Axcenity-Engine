@@ -25,14 +25,14 @@ type Open = fn(&mut EditorApp);
 #[test]
 fn every_graph_editor_opens_its_example_at_a_readable_zoom() {
     let cases: [(&str, &str, Open); 3] = [
-        ("hello-material-graph", "zoom-material", |app| {
+        ("material-graph", "zoom-material", |app| {
             app.open_material("assets/materials/MossyStone.material.json");
             app.materials.view = crate::material_editor::MaterialView::Graph;
         }),
-        ("hello-behavior", "zoom-behavior", |app| {
+        ("behavior", "zoom-behavior", |app| {
             app.open_behavior_tree("assets/ai/Guard.behaviortree.json");
         }),
-        ("hello-dialogue", "zoom-dialogue", |app| {
+        ("dialogue", "zoom-dialogue", |app| {
             app.open_dialogue("assets/dialogue/Farmer.dialogue.json");
         }),
     ];
@@ -42,8 +42,8 @@ fn every_graph_editor_opens_its_example_at_a_readable_zoom() {
         open(&mut app);
         draw(&mut app);
         let zooms = match example {
-            "hello-material-graph" => app.materials.view_zooms(),
-            "hello-behavior" => app.behavior.view_zooms(),
+            "material-graph" => app.materials.view_zooms(),
+            "behavior" => app.behavior.view_zooms(),
             _ => app.dialogues.view_zooms(),
         };
         assert!(!zooms.is_empty(), "{example}: no graph drawn");

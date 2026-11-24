@@ -11,7 +11,7 @@ use common::{Running, example, json_lines, scratch, server};
 #[test]
 fn twelve_bots_in_two_processes_join_over_udp_walk_about_and_leave() {
     let folder = scratch("join");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let stats = folder.join("server.jsonl");
     let (_server, port, _lines) = server(
         &game,
@@ -88,7 +88,7 @@ fn twelve_bots_in_two_processes_join_over_udp_walk_about_and_leave() {
 #[test]
 fn bots_past_max_players_are_refused_with_the_reason() {
     let folder = scratch("full");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let (_server, port, _lines) = server(&game, &["--max-players", "2"]);
     let report = folder.join("bots.jsonl");
     let status = Command::new(env!("CARGO_BIN_EXE_axcenity-bots"))

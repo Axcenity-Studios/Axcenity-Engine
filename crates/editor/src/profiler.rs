@@ -46,8 +46,9 @@ const MEMORY_CLASSES: usize = 12;
 /// The width the four tabs need side by side.
 const TABS_WIDTH: f32 = 290.0;
 /// The narrowest a column of sections is: wider panels lay their sections
-/// side by side, up to [`MAX_COLUMNS`] of them.
-const COLUMN_MIN: f32 = 280.0;
+/// side by side, up to [`MAX_COLUMNS`] of them. Wide enough for a name and
+/// the longest reading beside it ("12.34 ms (peak 56.78 ms)").
+const COLUMN_MIN: f32 = 300.0;
 const MAX_COLUMNS: usize = 3;
 /// The frame-time graph's height.
 const GRAPH_HEIGHT: f32 = 72.0;
@@ -976,8 +977,11 @@ fn gpu_color(ui: &egui::Ui) -> egui::Color32 {
 /// another in a narrow column.
 #[derive(Default)]
 struct Grid<'a> {
-    sections: Vec<(&'static str, Box<dyn FnOnce(&mut egui::Ui) + 'a>)>,
+    sections: Vec<(&'static str, SectionRows<'a>)>,
 }
+
+/// What draws a section's rows, once.
+type SectionRows<'a> = Box<dyn FnOnce(&mut egui::Ui) + 'a>;
 
 impl<'a> Grid<'a> {
     fn section(&mut self, title: &'static str, rows: impl FnOnce(&mut egui::Ui) + 'a) {
@@ -1138,19 +1142,33 @@ fn frame_graph(ui: &mut egui::Ui, frames: &[FrameTimes]) {
     });
 }
 
-/// A dot of `color` and its name, in the frame-time graph's legend.
+/// A dot of `color` and its name, in the frame-time graph's legend: one
+/// widget, so a wrapping row moves the whole key to the next line (a
+/// nested row would run past a narrow panel's edge).
 fn legend_key(ui: &mut egui::Ui, name: &str, color: egui::Color32) {
+    const DOT: f32 = 8.0;
+    const GAP: f32 = 4.0;
     let palette = theme::palette(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 4.0;
-        let (dot, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
-        ui.painter().rect_filled(dot, 2.0, color);
-        ui.label(
-            RichText::new(name)
-                .size(type_scale::CAPTION)
-                .color(palette.text_secondary),
-        );
-    });
+    let text = ui.painter().layout_no_wrap(
+        name.to_owned(),
+        egui::FontId::proportional(type_scale::CAPTION),
+        palette.text_secondary,
+    );
+    let size = egui::vec2(DOT + GAP + text.size().x, text.size().y.max(DOT));
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let dot = egui::Rect::from_center_size(
+        egui::pos2(rect.left() + DOT / 2.0, rect.center().y),
+        egui::Vec2::splat(DOT),
+    );
+    ui.painter().rect_filled(dot, 2.0, color);
+    ui.painter().galley(
+        egui::pos2(
+            rect.left() + DOT + GAP,
+            rect.center().y - text.size().y / 2.0,
+        ),
+        text,
+        palette.text_secondary,
+    );
 }
 
 /// `values` as bars, the newest at the right, room for `slots` of them,

@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://axcenity.com">Website</a> ·
-  <a href="https://axcenity.com/docs">Documentation</a> ·
+  <a href="documentation/README.md">Documentation</a> ·
+  <a href="https://axcenity.com/docs">Web Docs</a> ·
   <a href="https://axcenity.com/discussions">Forums</a> ·
   <a href="https://github.com/MrBearson321/Axcenity-Engine/releases">Releases</a>
 </p>
@@ -20,7 +21,33 @@
 
 Axcenity™ Engine is a cross-platform 3D game engine and editor inspired by Roblox Studio. Build worlds, script them in **Luau** or with **visual blocks**, test directly in the editor, and export standalone games for **Windows, macOS, and Linux**.
 
-> **Status:** Early development (alpha). Expect bugs and breaking changes between releases. For full feature overviews, guides, and API documentation, visit [axcenity.com](https://axcenity.com) and [axcenity.com/docs](https://axcenity.com/docs). Join the community on the [forums](https://axcenity.com/discussions).
+> **Status:** Early development (`0.3.0-alpha.1`). Expect bugs and breaking changes between releases. Browse the [Documentation Home](documentation/README.md) right here in the repository (also built into the editor for offline use and published at [axcenity.com/docs](https://axcenity.com/docs)), or join the community on the [forums](https://axcenity.com/discussions).
+
+<p align="center">
+  <img alt="Axcenity Engine overview showing the four-stage workflow from building 3D worlds and scripting logic to live testing and exporting standalone games, alongside the four documentation pillars." src="documentation/images/home-overview.png" width="900"><br>
+  <em>Overview of the Axcenity workflow: build 3D worlds, script with Luau or visual blocks, test live with F5 Play mode, and export standalone games for desktop platforms.</em>
+</p>
+
+## Documentation and learning
+
+The user documentation lives in [`documentation/`](documentation/README.md) and ships inside the editor so it works completely offline:
+
+| Guide | What it covers |
+|---|---|
+| **[Documentation Home](documentation/README.md)** | Starting points by role, status badges, and how to navigate the docs |
+| **[Getting Started](documentation/learn/getting-started.md)** | Installing Axcenity and building + playing your first project in five minutes |
+| **[Editor Interface](documentation/learn/editor-interface.md)** | Menus, ribbon tabs, 3D viewport, Explorer, Properties, and universal search (`Ctrl+K`) |
+| **[Scripting & the API](documentation/learn/scripting.md)** | Luau scripts, client/server separation, `RemoteEvent`, and visual blocks |
+| **[Engine Architecture](documentation/reference/architecture.md)** | Frame loop, arena World, wgpu rendering, and editor/player/server isolation |
+| **[API Reference](documentation/api/README.md)** | Auto-generated reference for every class, property, method, event, type, and enum |
+| **[AI Disclosure & Security](documentation/reference/ai-disclosure.md)** | How AI is used in development, scope, and security/verification safeguards |
+
+<p align="center">
+  <img alt="Annotated Axcenity Editor workspace layout showing header menus and search, task ribbon, 3D Scene viewport, Explorer tree, Properties inspector, and Console/Assets dock." src="documentation/images/editor-layout.png" width="900"><br>
+  <em>Annotated Axcenity Editor workspace showing the menus, universal search, ribbon tabs, 3D Scene viewport, Explorer, Properties, and docked Console/Assets panels.</em>
+</p>
+
+Looking for engine internals, architecture decision records (ADRs), and performance logs? See the [Engineering Wiki](wiki/Home.md).
 
 ## Supported hardware
 
@@ -86,10 +113,10 @@ cd Axcenity-Engine
 
 # Run the editor (opens the start screen, or pass a project folder)
 cargo run -p axcenity-editor
-cargo run -p axcenity-editor -- examples/hello-touched
+cargo run -p axcenity-editor -- crates/samples/projects/touched
 
 # Run the standalone player with an example project
-cargo run -p axcenity-player -- examples/hello-part
+cargo run -p axcenity-player -- crates/samples/projects/part
 ```
 
 Common workspace commands:
@@ -104,6 +131,19 @@ Common workspace commands:
 | Update workspace-hack after dependency changes | `cargo hakari generate` |
 
 See [docs/development.md](docs/development.md) for development setup details and tips for faster local builds.
+
+## AI disclosure and security
+
+Axcenity Engine is developed and maintained by Paul Janota with assistance from AI coding tools (such as Claude Code, Codex, and Antigravity) under human direction and review.
+
+- **Scope:** AI assists with subsystem implementation, editor UI, refactoring, tests, and documentation. Architectural decisions (ADRs), crate boundaries, release sign-off, and licensing remain human-directed. Exported games (`axcenity-player`) and dedicated servers (`axcenity-server`) contain **zero AI models, AI SDKs, or editor/MCP code**.
+- **Security & quality safeguards:**
+  - Workspace-wide `unsafe_code = "deny"` in `Cargo.toml` (with a single narrowly scoped exemption in `crates/script/src/debugger.rs`).
+  - Sandboxed Luau scripting runtime (`crates/script`) preventing arbitrary filesystem, OS process, or raw socket access from game scripts.
+  - Strict binary and crate isolation (`axcenity-player` and `axcenity-server` never depend on `axcenity-editor`, `egui`, or `axcenity-mcp`).
+  - Local verification gates (`cargo clippy --workspace --all-targets -- -D warnings`, workspace tests, doc tests, automated documentation integrity checks, and UI snapshots) plus pinned, Apache-2.0-compatible dependencies.
+
+Read the full [AI disclosure and security practices](documentation/reference/ai-disclosure.md) page for details, or see [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License and trademark
 

@@ -1,7 +1,7 @@
 //! The Learn page: a learning path of chapters, one for each part of the
 //! engine (Markdown pages in `documentation/learn/`, drawn by
 //! `super::docs`), and short step-by-step tutorials, each one task in a
-//! sample project from `examples/` (the words and pictures are in
+//! sample project from `crates/samples/projects/` (the words and pictures are in
 //! `learn/tutorials.rs` and `learn/pictures.rs`). The same page shows on the
 //! start screen and in Help > Learn over an open project, so a tutorial
 //! stays in view after its sample opens.
@@ -124,7 +124,7 @@ impl Learn {
         action
     }
 
-    /// Where the sample `examples/<name>` is, looked for once.
+    /// Where the sample the engine sample `<name>` is, looked for once.
     fn sample_folder(&mut self, name: &str) -> Option<PathBuf> {
         self.samples
             .entry(name.to_owned())
@@ -281,7 +281,7 @@ fn chapter_sample(
                         .color(palette.text_strong),
                 );
                 ui.label(
-                    RichText::new(format!("examples/{sample}"))
+                    RichText::new(format!("{}/{sample}", axcenity_samples::SOURCE_FOLDER))
                         .monospace()
                         .size(type_scale::SMALL)
                         .color(palette.text_weak),
@@ -297,7 +297,7 @@ fn chapter_sample(
                     Some(SampleState::Playing) => ("Open sample", Some("Press Stop first.")),
                     None => (
                         "Open sample",
-                        Some("The examples folder wasn't found near the editor."),
+                        Some("The engine's samples weren't found near the editor."),
                     ),
                 };
                 let open = ui.add_enabled(
@@ -335,11 +335,13 @@ fn find_sample_name(folder: Option<&Path>) -> Option<String> {
     axcenity_project::read_manifest(folder?).map(|manifest| manifest.name)
 }
 
-/// The sample project `examples/<name>`. It's looked for in the folder the
-/// editor was started from, then in each folder above the editor's own
-/// program (a build from source keeps it in `target/`, under the engine's
-/// folder), then in the source tree a debug build came from (when the
-/// build folder is elsewhere, as with `CARGO_TARGET_DIR`).
+/// The engine's sample project `name` (`axcenity_samples::SOURCE_FOLDER`
+/// in its source). It's looked for under the folder the editor was started
+/// from, then under each folder above the editor's own program (a build from
+/// source keeps it in `target/`, under the engine's folder), then in the
+/// source tree a debug build came from (when the build folder is elsewhere,
+/// as with `CARGO_TARGET_DIR`), then in the one this editor was built from.
+/// A packaged editor has no samples beside it.
 pub(super) fn find_sample(name: &str) -> Option<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(folder) = std::env::current_dir() {
@@ -351,8 +353,9 @@ pub(super) fn find_sample(name: &str) -> Option<PathBuf> {
     roots.extend(crate::rebuild::EngineSource::find().map(|source| source.workspace));
     roots
         .into_iter()
-        .map(|root| root.join("examples").join(name))
+        .map(|root| root.join(axcenity_samples::SOURCE_FOLDER).join(name))
         .find(|folder| folder.join(axcenity_project::MANIFEST_FILE).is_file())
+        .or_else(|| axcenity_samples::folder(name))
 }
 
 /// The heading, the learning path's chapters as cards by group, and the
@@ -722,7 +725,7 @@ fn sample_box(
     palette: &Palette,
 ) -> bool {
     let mut clicked = false;
-    let relative = format!("examples/{}", tutorial.sample);
+    let relative = format!("{}/{}", axcenity_samples::SOURCE_FOLDER, tutorial.sample);
     super::cards::soft_panel(palette)
         .inner_margin(egui::Margin::symmetric(14, 12))
         .show(ui, |ui| {
@@ -736,7 +739,7 @@ fn sample_box(
                 None => (
                     "Open sample",
                     Some(
-                        "The examples folder wasn't found near the editor. Press Open \
+                        "The engine's samples weren't found near the editor. Press Open \
                          Project and pick the sample's folder instead.",
                     ),
                 ),

@@ -22,6 +22,7 @@ mod bend;
 pub mod building;
 #[cfg(test)]
 mod building_tests;
+pub mod decal_scatter;
 mod flatten;
 mod footprint;
 #[cfg(test)]
@@ -54,7 +55,7 @@ pub use bend::{MAX_PIECES, Piece, bend, frame, piece_count};
 pub use building::{Block, BuildingSettings, Footprint, Look, Roof, plan};
 pub use flatten::flatten_along;
 pub use footprint::blend_footprint;
-pub use paths::{KeepOff, PathSettings, apply_path, keep_offs};
+pub use paths::{Applied, KeepOff, PathSettings, apply_path, keep_offs};
 pub use route::route;
 pub use scatter::{MAX_MODELS, Placed, Settings, layout};
 pub use surface::Surfaces;

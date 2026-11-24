@@ -42,12 +42,12 @@ fn switch(app: &mut EditorApp, path: &str) {
 }
 
 pub(super) fn example_model() -> std::path::PathBuf {
-    super::super::tests::example("hello-mesh").join("assets/models/pyramid.gltf")
+    super::super::tests::example("mesh").join("assets/models/pyramid.gltf")
 }
 
 #[test]
 fn scripts_switch_to_blocks_and_can_be_edited_saved_and_reloaded() {
-    let folder = copy_of_example("hello-part", "block-script-editor");
+    let folder = copy_of_example("part", "block-script-editor");
     let mut app = EditorApp::new(Some(&folder));
     app.insert_script(ClassName::Script);
     let code_path = app.tabs.active_path().unwrap().to_owned();
@@ -161,7 +161,7 @@ end
 
 #[test]
 fn importing_a_model_copies_it_and_inserts_a_mesh_part_in_one_undo_step() {
-    let folder = copy_of_example("hello-part", "import-model");
+    let folder = copy_of_example("part", "import-model");
     let mut app = EditorApp::new(Some(&folder));
     app.import_model(&example_model());
     // It has a texture, so its maps are shown first.
@@ -240,14 +240,14 @@ fn files_and_bytes(folder: &Path) -> std::collections::BTreeMap<String, Vec<u8>>
 
 #[test]
 fn undoing_an_animated_fbx_import_removes_only_its_files_and_redo_brings_them_back() {
-    // hello-part already has a Walking model, clip and state machine, so
-    // the import's copies are Walking2.
-    let folder = copy_of_example("hello-part", "undo-import");
+    // The events sample already has a Walking model, clip and state
+    // machine, so the import's copies are Walking2.
+    let folder = copy_of_example("events", "undo-import");
     let mut app = EditorApp::new(Some(&folder));
     let before = files_and_bytes(&folder);
     assert!(before.contains_key("assets/models/Walking/Walking.fbx"));
     app.import_model(
-        &super::super::tests::example("hello-events").join("assets/models/Walking/Walking.fbx"),
+        &super::super::tests::example("events").join("assets/models/Walking/Walking.fbx"),
     );
     let dialog = app.importing.take().expect("an animated file asks first");
     app.import_chosen(&dialog);
@@ -321,10 +321,10 @@ pub(super) fn write_props(folder: &Path) -> std::path::PathBuf {
 
 #[test]
 fn an_animated_fbx_comes_in_with_an_animator_a_state_machine_and_an_animation_per_clip() {
-    let folder = copy_of_example("hello-part", "import-animated");
+    let folder = copy_of_example("part", "import-animated");
     let mut app = EditorApp::new(Some(&folder));
     let file = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-animation/assets/models/noodle.fbx");
+        .join("../samples/projects/animation/assets/models/noodle.fbx");
     app.import_model(&file);
     let dialog = app.importing.take().expect("an animated file asks first");
     let clips = dialog
@@ -446,12 +446,12 @@ fn import_and_count(app: &mut EditorApp, file: &Path) -> (Creates, Creates) {
 
 #[test]
 fn the_import_summary_matches_what_import_creates() {
-    let folder = copy_of_example("hello-part", "import-summary");
+    let folder = copy_of_example("part", "import-summary");
     let mut app = EditorApp::new(Some(&folder));
 
     // An animated FBX: one MeshPart with an Animator, its clips and state machine.
     let noodle = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-animation/assets/models/noodle.fbx");
+        .join("../samples/projects/animation/assets/models/noodle.fbx");
     let (said, made) = import_and_count(&mut app, &noodle);
     assert_eq!(said, made);
     assert_eq!(
@@ -492,7 +492,7 @@ fn the_import_summary_matches_what_import_creates() {
 /// second waits its turn, and an image goes straight in.
 #[test]
 fn every_way_in_opens_the_same_dialog_for_a_model() {
-    let folder = copy_of_example("hello-part", "import-ways-in");
+    let folder = copy_of_example("part", "import-ways-in");
     let props = write_props(&folder);
     let mut app = EditorApp::new(Some(&folder));
     let names = |app: &EditorApp| -> Vec<String> {
@@ -542,7 +542,7 @@ fn every_way_in_opens_the_same_dialog_for_a_model() {
 
 #[test]
 fn a_sky_dropped_on_the_window_is_copied_in_and_asked_about() {
-    let folder = copy_of_example("hello-part", "drop-sky");
+    let folder = copy_of_example("part", "drop-sky");
     let mut app = EditorApp::new(Some(&folder));
     let sky = folder.join("..").join("drop-sky-noon.hdr");
     fs::write(&sky, b"#?RADIANCE").unwrap();
@@ -607,7 +607,7 @@ fn mesh_id(app: &EditorApp, id: InstanceId) -> String {
 
 #[test]
 fn each_material_gets_a_surface_appearance_with_its_maps_as_changed_in_the_dialog() {
-    let folder = copy_of_example("hello-part", "import-surface");
+    let folder = copy_of_example("part", "import-surface");
     let mut app = EditorApp::new(Some(&folder));
     app.import_model(&example_model());
     let mut dialog = app.importing.take().expect("the dialog is open");
@@ -682,7 +682,7 @@ fn part_named(app: &EditorApp, name: &str) -> InstanceId {
 
 #[test]
 fn a_file_with_several_objects_asks_first_and_copies_nothing_yet() {
-    let folder = copy_of_example("hello-part", "import-ask");
+    let folder = copy_of_example("part", "import-ask");
     let file = write_props(&folder);
     let mut app = EditorApp::new(Some(&folder));
     app.import_model(&file);
@@ -700,7 +700,7 @@ fn a_file_with_several_objects_asks_first_and_copies_nothing_yet() {
 
 #[test]
 fn chosen_objects_import_as_a_model_laid_out_as_in_the_file() {
-    let folder = copy_of_example("hello-part", "import-grouped");
+    let folder = copy_of_example("part", "import-grouped");
     let file = write_props(&folder);
     let mut app = EditorApp::new(Some(&folder));
     import_without_small(&mut app, &file, Placement::Grouped);
@@ -750,7 +750,7 @@ fn chosen_objects_import_as_a_model_laid_out_as_in_the_file() {
 
 #[test]
 fn chosen_objects_can_import_as_separate_parts_or_one_merged_part() {
-    let folder = copy_of_example("hello-part", "import-separate");
+    let folder = copy_of_example("part", "import-separate");
     let file = write_props(&folder);
     let mut app = EditorApp::new(Some(&folder));
     let workspace = app.world.workspace();
@@ -784,7 +784,7 @@ fn chosen_objects_can_import_as_separate_parts_or_one_merged_part() {
 
 #[test]
 fn a_broken_model_is_reported_and_nothing_is_inserted_or_copied() {
-    let folder = copy_of_example("hello-part", "import-broken");
+    let folder = copy_of_example("part", "import-broken");
     let broken = folder.join("broken.glb");
     fs::write(&broken, "glTF, but not really").unwrap();
     let mut app = EditorApp::new(Some(&folder));
@@ -811,7 +811,7 @@ fn a_broken_model_is_reported_and_nothing_is_inserted_or_copied() {
 
 #[test]
 fn a_mesh_part_whose_file_is_missing_is_reported_in_output() {
-    let folder = copy_of_example("hello-mesh", "missing-model");
+    let folder = copy_of_example("mesh", "missing-model");
     fs::remove_file(folder.join("assets/models/CityPropsCollection2.fbx")).unwrap();
     let app = EditorApp::new(Some(&folder));
     // Drawing asks for the model, which reports it once.
@@ -829,7 +829,7 @@ fn a_mesh_part_whose_file_is_missing_is_reported_in_output() {
 
 #[test]
 fn insert_script_makes_the_file_and_the_script_together_and_opens_it() {
-    let folder = copy_of_example("hello-touched", "insert-script");
+    let folder = copy_of_example("touched", "insert-script");
     let mut app = EditorApp::new(Some(&folder));
     app.act(Action::InsertScript(ClassName::Script));
     app.act(Action::InsertScript(ClassName::Script));
@@ -849,7 +849,7 @@ fn insert_script_makes_the_file_and_the_script_together_and_opens_it() {
 
 #[test]
 fn editing_and_saving_a_script_writes_its_file() {
-    let folder = copy_of_example("hello-touched", "edit-script");
+    let folder = copy_of_example("touched", "edit-script");
     let mut app = EditorApp::new(Some(&folder));
     app.act(Action::InsertScript(ClassName::Script));
     let path = "scripts/Script.server.lua";
@@ -881,7 +881,7 @@ fn editing_and_saving_a_script_writes_its_file() {
 
 #[test]
 fn play_saves_script_tabs_first() {
-    let folder = copy_of_example("hello-touched", "play-saves-scripts");
+    let folder = copy_of_example("touched", "play-saves-scripts");
     let mut app = EditorApp::new(Some(&folder));
     app.open_script_instance(script(&app, "pad"));
     app.tabs.get_mut("scripts/pad.server.lua").unwrap().text = "print('unsaved edit')".to_string();
@@ -897,7 +897,7 @@ fn play_saves_script_tabs_first() {
 
 #[test]
 fn closing_a_tab_with_unsaved_changes_asks_first() {
-    let folder = copy_of_example("hello-touched", "close-tab");
+    let folder = copy_of_example("touched", "close-tab");
     let mut app = EditorApp::new(Some(&folder));
     let path = "scripts/pad.server.lua".to_string();
     app.open_script(&path, None);
@@ -920,7 +920,7 @@ fn closing_a_tab_with_unsaved_changes_asks_first() {
 
 #[test]
 fn renaming_a_script_renames_its_file_and_bad_names_are_refused() {
-    let folder = copy_of_example("hello-touched", "rename-script");
+    let folder = copy_of_example("touched", "rename-script");
     let mut app = EditorApp::new(Some(&folder));
     let pad = script(&app, "pad");
     app.open_script_instance(pad);
@@ -946,7 +946,7 @@ fn renaming_a_script_renames_its_file_and_bad_names_are_refused() {
 
 #[test]
 fn deleting_a_script_asks_then_deletes_its_file_and_closes_its_tab() {
-    let folder = copy_of_example("hello-touched", "delete-script");
+    let folder = copy_of_example("touched", "delete-script");
     let mut app = EditorApp::new(Some(&folder));
     let pad = script(&app, "pad");
     app.open_script_instance(pad);
@@ -966,7 +966,7 @@ fn deleting_a_script_asks_then_deletes_its_file_and_closes_its_tab() {
 
 #[test]
 fn outside_edits_update_a_tab_or_keep_unsaved_changes() {
-    let folder = copy_of_example("hello-touched", "outside-edit");
+    let folder = copy_of_example("touched", "outside-edit");
     let mut app = EditorApp::new(Some(&folder));
     let path = "scripts/pad.server.lua";
     app.open_script(path, None);
@@ -992,7 +992,7 @@ fn outside_edits_update_a_tab_or_keep_unsaved_changes() {
 
 #[test]
 fn new_and_deleted_script_files_add_and_remove_scripts() {
-    let folder = copy_of_example("hello-touched", "outside-files");
+    let folder = copy_of_example("touched", "outside-files");
     let mut app = EditorApp::new(Some(&folder));
     fs::write(folder.join("scripts/door.server.lua"), "print('door')").unwrap();
     app.disk_changed(&["scripts/door.server.lua".to_string()]);
@@ -1008,7 +1008,7 @@ fn new_and_deleted_script_files_add_and_remove_scripts() {
 
 #[test]
 fn an_outside_change_to_the_world_file_reloads_it_unless_there_are_unsaved_changes() {
-    let folder = copy_of_example("hello-touched", "outside-world");
+    let folder = copy_of_example("touched", "outside-world");
     let mut app = EditorApp::new(Some(&folder));
     let mut other = axcenity_project::load(&folder).unwrap().world;
     let floor = other.find_first_child(other.workspace(), "Floor").unwrap();
@@ -1042,7 +1042,7 @@ fn an_outside_change_to_the_world_file_reloads_it_unless_there_are_unsaved_chang
 
 #[test]
 fn a_corrupted_script_is_reported_and_the_rest_of_the_project_still_loads() {
-    let folder = copy_of_example("hello-touched", "broken-script");
+    let folder = copy_of_example("touched", "broken-script");
     fs::write(folder.join("scripts/broken.server.lua"), b"print('\xFF')").unwrap();
     let mut app = EditorApp::new(Some(&folder));
 
@@ -1071,7 +1071,7 @@ fn a_corrupted_script_is_reported_and_the_rest_of_the_project_still_loads() {
 
 #[test]
 fn saving_over_a_damaged_world_file_keeps_it() {
-    let folder = copy_of_example("hello-touched", "damaged-world");
+    let folder = copy_of_example("touched", "damaged-world");
     fs::write(folder.join("world.json"), "{ damaged").unwrap();
     let mut app = EditorApp::new(Some(&folder));
     assert_eq!(app.title(), "Hello Touched - Axcenity Editor");
@@ -1093,7 +1093,7 @@ fn saving_over_a_damaged_world_file_keeps_it() {
 
 #[test]
 fn clicking_a_script_error_opens_the_script_at_that_line() {
-    let folder = copy_of_example("hello-touched", "error-link");
+    let folder = copy_of_example("touched", "error-link");
     fs::write(
         folder.join("scripts/pad.server.lua"),
         "print('one')\nprint('two')\nerror('three')\n",
@@ -1122,7 +1122,7 @@ fn clicking_a_script_error_opens_the_script_at_that_line() {
 
 #[test]
 fn a_script_edited_in_another_program_updates_its_tab_within_a_second() {
-    let folder = copy_of_example("hello-touched", "watch-live");
+    let folder = copy_of_example("touched", "watch-live");
     let mut app = EditorApp::new(Some(&folder));
     let path = "scripts/pad.server.lua";
     app.open_script(path, None);
@@ -1148,7 +1148,7 @@ fn a_script_edited_in_another_program_updates_its_tab_within_a_second() {
 
 #[test]
 fn script_changes_wait_while_playing() {
-    let folder = copy_of_example("hello-touched", "watch-play");
+    let folder = copy_of_example("touched", "watch-play");
     let mut app = EditorApp::new(Some(&folder));
     std::thread::sleep(Duration::from_millis(100));
     app.play();
@@ -1185,7 +1185,7 @@ fn names_in(app: &EditorApp, service: InstanceId) -> Vec<String> {
 
 #[test]
 fn insert_local_script_makes_a_client_file_in_starter_player_scripts() {
-    let folder = copy_of_example("hello-touched", "insert-local-script");
+    let folder = copy_of_example("touched", "insert-local-script");
     let mut app = EditorApp::new(Some(&folder));
     app.act(Action::InsertScript(ClassName::LocalScript));
 
@@ -1222,7 +1222,7 @@ fn insert_local_script_makes_a_client_file_in_starter_player_scripts() {
 
 #[test]
 fn insert_module_script_makes_a_module_file_in_replicated_storage() {
-    let folder = copy_of_example("hello-touched", "insert-module-script");
+    let folder = copy_of_example("touched", "insert-module-script");
     let mut app = EditorApp::new(Some(&folder));
     let what = crate::tree::Insertable::RemoteEvent;
     app.act(Action::Insert { what, near: None });
@@ -1265,7 +1265,7 @@ fn insert_module_script_makes_a_module_file_in_replicated_storage() {
 
 #[test]
 fn remote_events_are_inserted_into_replicated_storage_and_saved() {
-    let folder = copy_of_example("hello-touched", "insert-remote");
+    let folder = copy_of_example("touched", "insert-remote");
     let mut app = EditorApp::new(Some(&folder));
     let what = crate::tree::Insertable::RemoteEvent;
     app.act(Action::Insert { what, near: None });
@@ -1286,7 +1286,7 @@ fn remote_events_are_inserted_into_replicated_storage_and_saved() {
 
 #[test]
 fn a_script_using_input_gets_a_warning_badge_until_it_is_fixed() {
-    let folder = copy_of_example("hello-touched", "side-warning");
+    let folder = copy_of_example("touched", "side-warning");
     let mut app = EditorApp::new(Some(&folder));
     let pad = script(&app, "pad");
     app.update_warnings();
@@ -1313,7 +1313,7 @@ fn a_script_using_input_gets_a_warning_badge_until_it_is_fixed() {
 
 #[test]
 fn play_runs_hello_remote_and_held_arrow_keys_move_the_block() {
-    let folder = copy_of_example("hello-remote", "play-remote");
+    let folder = copy_of_example("remote", "play-remote");
     let mut app = EditorApp::new(Some(&folder));
     let mover = part(&app, "Mover");
     let start = app.world.get(mover).unwrap().property("Position").cloned();
@@ -1350,7 +1350,7 @@ fn play_runs_hello_remote_and_held_arrow_keys_move_the_block() {
 
 #[test]
 fn scripts_switch_between_code_graph_and_blocks_and_run_the_same() {
-    let folder = copy_of_example("hello-part", "graph-script-editor");
+    let folder = copy_of_example("part", "graph-script-editor");
     let mut app = EditorApp::new(Some(&folder));
     app.insert_script(ClassName::Script);
     let code_path = app.tabs.active_path().unwrap().to_owned();
@@ -1398,7 +1398,7 @@ fn scripts_switch_between_code_graph_and_blocks_and_run_the_same() {
 
 #[test]
 fn a_model_imported_with_weld_parts_ticked_is_welded_to_its_largest_part() {
-    let folder = copy_of_example("hello-part", "import-weld");
+    let folder = copy_of_example("part", "import-weld");
     let mut app = EditorApp::new(Some(&folder));
     let file = write_props(&folder);
     app.import_model(&file);
@@ -1434,7 +1434,7 @@ fn a_model_imported_with_weld_parts_ticked_is_welded_to_its_largest_part() {
 
 #[test]
 fn deleting_a_model_deletes_its_asset_id_and_undo_brings_both_back() {
-    let folder = copy_of_example("hello-part", "delete-asset-id");
+    let folder = copy_of_example("mesh", "delete-asset-id");
     let mut app = EditorApp::new(Some(&folder));
     let model = "assets/models/CityPropsCollection.fbx";
     axcenity_assets::give_asset_ids(&folder).unwrap();

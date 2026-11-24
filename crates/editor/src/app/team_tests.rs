@@ -12,12 +12,12 @@ use super::tests::{copy_of_example, example, with_big_stack};
 use super::*;
 use crate::properties::Edit;
 
-/// Two editors on hello-part: the first hosts, the second joins as an
+/// Two editors on part: the first hosts, the second joins as an
 /// Editor.
 fn two_editors() -> (EditorApp, EditorApp, SharedHub) {
-    let mut a = EditorApp::new(Some(&example("hello-part")));
+    let mut a = EditorApp::new(Some(&example("part")));
     let hub = a.host_team_session();
-    let mut b = EditorApp::new(Some(&example("hello-part")));
+    let mut b = EditorApp::new(Some(&example("part")));
     let member = hub.lock().unwrap().add_member(Role::Editor);
     b.join_team_session(hub.clone(), member);
     (a, b, hub)
@@ -231,9 +231,9 @@ fn undo_leaves_alone_what_someone_else_changed_since() {
 
 #[test]
 fn a_viewer_cannot_change_the_world() {
-    let mut a = EditorApp::new(Some(&example("hello-part")));
+    let mut a = EditorApp::new(Some(&example("part")));
     let hub = a.host_team_session();
-    let mut b = EditorApp::new(Some(&example("hello-part")));
+    let mut b = EditorApp::new(Some(&example("part")));
     let member = hub.lock().unwrap().add_member(Role::Viewer);
     b.join_team_session(hub.clone(), member);
     let part = b.world.descendants(b.world.workspace())[0];
@@ -342,7 +342,7 @@ fn team_client(app: &EditorApp) -> Option<&axcenity_collab::Client> {
 
 #[test]
 fn two_editors_share_a_session_over_the_network() {
-    let project = copy_of_example("hello-touched", "team-net-host");
+    let project = copy_of_example("touched", "team-net-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
         .host_network_session(Some(&team_folder("host")), 0)
@@ -359,7 +359,7 @@ fn two_editors_share_a_session_over_the_network() {
         host: format!("127.0.0.1:{port}"),
         ..invite
     };
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "team-net-joiner")));
+    let mut b = EditorApp::new(Some(&copy_of_example("touched", "team-net-joiner")));
     b.join_network_session(&invite, Some(&team_folder("joiner")))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
@@ -494,7 +494,7 @@ fn draw_panel(app: &mut EditorApp, name: &str) {
 
 #[test]
 fn the_panel_offers_share_and_join_then_shows_the_session() {
-    let mut a = EditorApp::new(Some(&copy_of_example("hello-touched", "team-panel-host")));
+    let mut a = EditorApp::new(Some(&copy_of_example("touched", "team-panel-host")));
     draw_panel(&mut a, "team-create-start");
     assert!(!a.in_team_session());
 
@@ -515,7 +515,7 @@ fn the_panel_offers_share_and_join_then_shows_the_session() {
         host: format!("127.0.0.1:{port}"),
         ..invite
     };
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "team-panel-joiner")));
+    let mut b = EditorApp::new(Some(&copy_of_example("touched", "team-panel-joiner")));
     b.join_network_session(&invite, Some(&team_folder("panel-joiner")))
         .expect("joining");
     settle_net(&mut a, &mut b, |a, b| {
@@ -598,7 +598,7 @@ fn scripts(app: &EditorApp) -> Vec<(String, InstanceId, String)> {
 #[test]
 fn the_start_screen_joins_a_session_and_opens_its_files() {
     use crate::start::JoinProgress;
-    let project = copy_of_example("hello-touched", "team-start-host");
+    let project = copy_of_example("touched", "team-start-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
         a.host_network_session(Some(&team_folder("start-host")), 0)
@@ -646,7 +646,7 @@ fn the_start_screen_joins_a_session_and_opens_its_files() {
 
 #[test]
 fn document_tabs_lock_while_edited_and_reload_what_a_teammate_saves() {
-    let project = copy_of_example("hello-touched", "team-docs-host");
+    let project = copy_of_example("touched", "team-docs-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
         a.host_network_session(Some(&team_folder("docs-host")), 0)
@@ -705,7 +705,7 @@ fn document_tabs_lock_while_edited_and_reload_what_a_teammate_saves() {
 
 #[test]
 fn a_ui_graph_a_teammate_saves_runs_its_new_version_here() {
-    let project = copy_of_example("hello-ui-graph", "team-graph-host");
+    let project = copy_of_example("ui-graph", "team-graph-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
         a.host_network_session(Some(&team_folder("graph-host")), 0)
@@ -758,7 +758,7 @@ fn a_ui_graph_a_teammate_saves_runs_its_new_version_here() {
 
 #[test]
 fn a_joining_editor_gets_the_files_and_types_in_scripts_with_the_host() {
-    let project = copy_of_example("hello-touched", "team-files-host");
+    let project = copy_of_example("touched", "team-files-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
         .host_network_session(Some(&team_folder("files-host")), 0)
@@ -868,7 +868,7 @@ fn a_joining_editor_gets_the_files_and_types_in_scripts_with_the_host() {
 
 #[test]
 fn an_import_reaches_everyone_as_one_step_with_its_files() {
-    let project = copy_of_example("hello-touched", "team-import-host");
+    let project = copy_of_example("touched", "team-import-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
         .host_network_session(Some(&team_folder("import-host")), 0)
@@ -882,7 +882,7 @@ fn an_import_reaches_everyone_as_one_step_with_its_files() {
         caught_up(a, seq) && caught_up(b, seq) && b.project.is_some()
     });
 
-    a.import_model(&super::tests::example("hello-mesh").join("assets/models/pyramid.gltf"));
+    a.import_model(&super::tests::example("mesh").join("assets/models/pyramid.gltf"));
     let dialog = a.importing.take().expect("the dialog is open");
     a.import_chosen(&dialog);
     let part = a.selected.expect("the new MeshPart is selected");
@@ -964,7 +964,7 @@ fn a_hosting_editor_that_stops_without_ending_gets_the_session_back() {
 }
 
 fn recover_after_a_crash() {
-    let project = copy_of_example("hello-touched", "team-recover");
+    let project = copy_of_example("touched", "team-recover");
     let scripts_before = crash_a_session(&project);
     assert!(axcenity_collab::journal::has_recovery(&project));
 
@@ -991,7 +991,7 @@ fn a_session_ended_with_its_changes_saved_leaves_nothing_to_recover() {
 }
 
 fn end_after_a_save() {
-    let project = copy_of_example("hello-touched", "team-quit-saved");
+    let project = copy_of_example("touched", "team-quit-saved");
     let (mut a, b) = session_with_a_crate(&project, "quit-saved");
     drop(b);
     assert!(a.save());
@@ -1005,7 +1005,7 @@ fn a_session_ended_with_changes_to_save_keeps_them_until_a_save() {
 }
 
 fn keep_until_a_save() {
-    let project = copy_of_example("hello-touched", "team-end-unsaved");
+    let project = copy_of_example("touched", "team-end-unsaved");
     end_unsaved_then_save(&project);
     let reopened = EditorApp::new(Some(&project));
     assert!(has_named(&reopened.world, "Crate"), "it was saved");
@@ -1027,7 +1027,7 @@ fn when_the_host_ends_the_session_the_joiner_stays_open_read_only() {
 }
 
 fn host_ends_the_session() {
-    let project = copy_of_example("hello-part", "team-host-leaves");
+    let project = copy_of_example("part", "team-host-leaves");
     let (mut a, mut b) = session_with_a_crate(&project, "host-leaves");
     a.end_team_session();
     let start = std::time::Instant::now();
@@ -1063,7 +1063,7 @@ fn a_joiner_that_stops_while_offline_sends_its_edits_when_it_joins_again() {
 }
 
 fn stop_offline_then_join_again() {
-    let project = copy_of_example("hello-part", "team-unsent");
+    let project = copy_of_example("part", "team-unsent");
     let mut a = EditorApp::new(Some(&project));
     let invite = over_loopback(
         a.host_network_session(Some(&team_folder("unsent-host")), 0)
@@ -1250,7 +1250,7 @@ fn only_paths_of_instances_become_links() {
 #[test]
 fn the_owner_restores_a_checkpoint_for_everyone_from_the_panel() {
     use super::team_history::HistoryAction;
-    let project = copy_of_example("hello-touched", "team-history-host");
+    let project = copy_of_example("touched", "team-history-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a
         .host_network_session(Some(&team_folder("history-host")), 0)
@@ -1348,7 +1348,7 @@ fn idle_session_cost_on_s10k() {
         .host_network_session(Some(&team_folder("s10k-host")), 0)
         .expect("hosting");
     let hosted = started.elapsed();
-    let mut b = EditorApp::new(Some(&copy_of_example("hello-touched", "s10k-joiner")));
+    let mut b = EditorApp::new(Some(&copy_of_example("touched", "s10k-joiner")));
     let started = Instant::now();
     b.join_network_session(&over_loopback(invite), Some(&team_folder("s10k-joiner")))
         .expect("joining");

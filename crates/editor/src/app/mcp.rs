@@ -69,6 +69,8 @@ mod toolbox_get;
 mod toolbox_search;
 mod values;
 mod view_capture;
+// Shared with `--render-movie`, which opens a device the same way.
+pub(crate) use view_capture::block_on;
 
 #[cfg(test)]
 mod benchmarks;

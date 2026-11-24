@@ -339,6 +339,9 @@ fn conflict_copies_keep_the_script_from_loading() {
         "world.json",
         "plugins/p.lua",
         "a/.DS_Store",
+        // Rendered movies stay on the machine that made them.
+        "movies/Intro.mp4",
+        "movies/Intro/Intro_0001.png",
     ] {
         assert!(!files::is_synced(not), "{not}");
     }

@@ -218,7 +218,7 @@ The architecture is a single god-object `EditorApp`, with behaviour spread over 
 
 ## 3. Serialization and asset formats
 
-### 3.1 Project folder on disk [V] (`project/src/lib.rs:1-20`, `examples/hello-part/`)
+### 3.1 Project folder on disk [V] (`project/src/lib.rs:1-20`, `crates/samples/projects/part/`)
 
 ```
 axcenity.json           manifest {name, format_version: 4, ...}          (FORMAT_VERSION lib.rs:143)
@@ -354,7 +354,7 @@ assets/animations/*.anim.json, materials, data tables, prefabs...
   - Benchmarks (`player/src/bench_tests.rs:235, 288`; `editor/src/play/tests.rs:614`) are `#[ignore]`, so there is no performance regression tracking.
   - GPU tests print "skipped: no graphics adapter" and pass (e.g. `render/src/renderer/tests/ambient_occlusion.rs:14`). CI installs no software Vulkan (lavapipe) on Linux, so **[I]** render and player GPU tests probably do not run there.
   - Editor snapshots are written only when `AXCENITY_SNAPSHOTS` is set. They are not compared against golden images (`editor/src/snapshot.rs:1`).
-  - No `axcenity-test examples/...` game-test run and no server headless check in CI. Those are only in `scripts/check-platform.sh`.
+  - No `axcenity-test crates/samples/projects/...` game-test run and no server headless check in CI. Those are only in `scripts/check-platform.sh`.
 - **[V]** `docs/development.md` says "CI is off, so check Windows, macOS and Linux on those computers". This contradicts `ci.yml` (push/PR triggers). Either the workflow is disabled in the repo settings or the doc is stale.
 - **[V]** There is no `[profile.release]` (no LTO, no `codegen-units = 1`, no `panic`, no `strip`). Only dev-profile per-package `opt-level = 3` for render, scene, physics, terrain, nav and mesh-edit, plus `"*"`.
 - **[V]** `release.yml` builds only `axcenity-editor` and `axcenity-player` (with macOS universal binaries through `lipo`). `axcenity-server` and `axcenity-test` are not shipped, and grep found no code signing or notarization steps.

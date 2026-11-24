@@ -269,3 +269,47 @@ fn a_lookup_tables_texture_lives_only_while_one_is_used() {
     near(shown(&mut renderer, [0.2; 3], broken), [51; 3], "broken");
     assert!(!renderer.scene.post.grading.has_lookup());
 }
+
+#[test]
+fn a_shade_between_two_is_drawn_as_a_mix_of_them_and_black_stays_black() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = renderer(&device, &queue, AntiAliasing::Off);
+    // Nothing but sky, one flat color all over.
+    let shades = |renderer: &mut TextureRenderer, grey: f32, post: bool| {
+        let mut list = list_of(Vec::new());
+        list.sky.top_color = [grey; 3];
+        list.sky.horizon_color = [grey; 3];
+        list.sky.ground_color = [grey; 3];
+        list.post.enabled = post;
+        renderer.render(&list).unwrap();
+        let pixels = renderer.read_pixels();
+        let distinct: HashSet<u8> = pixels.as_chunks::<4>().0.iter().map(|p| p[0]).collect();
+        let mut distinct: Vec<u8> = distinct.into_iter().collect();
+        distinct.sort_unstable();
+        distinct
+    };
+    // Somewhere in a run of greys closer together than 8 bits can tell
+    // apart, one falls between two shades: tone mapped, it's drawn in both
+    // (which average to it), where the plain frame rounds it to one.
+    let mut mixed = 0;
+    for step in 0..12 {
+        let grey = 0.3 + step as f32 * 0.0005;
+        let plain = shades(&mut renderer, grey, false);
+        assert_eq!(
+            plain.len(),
+            1,
+            "post-processing off adds nothing: {plain:?}"
+        );
+        let dithered = shades(&mut renderer, grey, true);
+        assert!(
+            dithered.len() <= 3 && dithered[dithered.len() - 1] - dithered[0] <= 2,
+            "under a shade of noise: {dithered:?}"
+        );
+        mixed += usize::from(dithered.len() >= 2);
+    }
+    assert!(mixed >= 6, "{mixed} of 12 greys were drawn in two shades");
+    assert_eq!(shades(&mut renderer, 0.0, true), [0], "black stays black");
+}

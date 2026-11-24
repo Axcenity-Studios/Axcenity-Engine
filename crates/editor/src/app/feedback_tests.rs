@@ -24,7 +24,7 @@ fn count_drawn(app: &mut EditorApp, ctx: &egui::Context, count: usize) -> bool {
 
 #[test]
 fn the_console_tab_counts_errors_until_the_console_shows() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     // Assets in front of the Console.
     app.layout.open(Pane::Assets);

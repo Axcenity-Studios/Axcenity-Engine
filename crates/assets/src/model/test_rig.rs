@@ -1,5 +1,5 @@
 //! A small rigged and animated FBX file, for tests and for the
-//! `hello-animation` example (`examples/hello-animation/assets/models/noodle.fbx`
+//! `animation` example (`crates/samples/projects/animation/assets/models/noodle.fbx`
 //! is this file, checked by a test).
 //!
 //! "Noodle" is a 1×3×1 column (Y up, in meters) skinned to a chain of three
@@ -512,7 +512,7 @@ mod tests {
     #[test]
     fn the_example_project_has_this_noodle() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/hello-animation/assets/models/noodle.fbx");
+            .join("../samples/projects/animation/assets/models/noodle.fbx");
         let on_disk = std::fs::read_to_string(&path)
             .unwrap_or_default()
             .replace("\r\n", "\n");

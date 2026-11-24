@@ -10,7 +10,7 @@ const ARROW: &str = "assets/textures/arrow.png";
 
 #[test]
 fn picking_a_preset_cooks_the_texture_that_way_and_undo_puts_it_back() {
-    let folder = copy_of_example("hello-decals", "import-preset");
+    let folder = copy_of_example("decals", "import-preset");
     let mut app = EditorApp::new(Some(&folder));
     // Cooked as it is when the project opened (the editor's own cooker
     // isn't running in tests).

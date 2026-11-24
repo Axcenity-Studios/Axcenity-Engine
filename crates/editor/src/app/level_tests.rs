@@ -1,5 +1,5 @@
 //! Phase 48: the Levels panel, editing a level other than the start level,
-//! and Play in levels, on copies of the hello-levels example.
+//! and Play in levels, on copies of the levels example.
 
 use super::tests::{copy_of_example, play_for, printed};
 use super::*;
@@ -34,7 +34,7 @@ fn played(app: &mut EditorApp, command: &str) {
 
 #[test]
 fn a_level_opens_with_the_projects_services_and_saves_to_its_own_file() {
-    let folder = copy_of_example("hello-levels", "level-open");
+    let folder = copy_of_example("levels", "level-open");
     let mut app = EditorApp::new(None);
     app.open_in_level(&folder, Some("Castle".to_owned()));
     assert_eq!(open_level(&app), Some("Castle"));
@@ -71,7 +71,7 @@ fn a_level_opens_with_the_projects_services_and_saves_to_its_own_file() {
 
 #[test]
 fn opening_a_level_asks_about_unsaved_changes_first() {
-    let folder = copy_of_example("hello-levels", "level-ask");
+    let folder = copy_of_example("levels", "level-ask");
     let mut app = EditorApp::new(Some(&folder));
     let open = Discard::OpenLevel(Some("Castle".to_owned()));
     assert_eq!(app.request(open.clone()), Some(open.clone()));
@@ -90,7 +90,7 @@ fn opening_a_level_asks_about_unsaved_changes_first() {
 
 #[test]
 fn new_duplicate_rename_and_delete_change_level_files_and_undo() {
-    let folder = copy_of_example("hello-levels", "level-files");
+    let folder = copy_of_example("levels", "level-files");
     let mut app = EditorApp::new(Some(&folder));
     assert_eq!(names(&app), ["Castle", "Dungeon"]);
 
@@ -158,7 +158,7 @@ fn new_duplicate_rename_and_delete_change_level_files_and_undo() {
 
 #[test]
 fn set_as_start_swaps_the_files_and_the_open_level_follows_through_undo() {
-    let folder = copy_of_example("hello-levels", "level-start");
+    let folder = copy_of_example("levels", "level-start");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, LevelAction::SetStart("Castle".to_owned()));
     let project = app.project.as_ref().unwrap();
@@ -206,7 +206,7 @@ fn set_as_start_swaps_the_files_and_the_open_level_follows_through_undo() {
 
 #[test]
 fn play_starts_in_the_open_level_or_the_start_level_and_adds_the_dungeon() {
-    let folder = copy_of_example("hello-levels", "level-play");
+    let folder = copy_of_example("levels", "level-play");
     let mut app = EditorApp::new(None);
     app.open_in_level(&folder, Some("Castle".to_owned()));
     app.play();
@@ -242,7 +242,7 @@ fn play_starts_in_the_open_level_or_the_start_level_and_adds_the_dungeon() {
 
 #[test]
 fn asset_check_checks_the_levels_that_are_not_open() {
-    let folder = copy_of_example("hello-levels", "level-check");
+    let folder = copy_of_example("levels", "level-check");
     let castle = folder.join("levels/Castle.world.json");
     let text = std::fs::read_to_string(&castle).unwrap().replace(
         "\"name\": \"Tower\",",
@@ -279,7 +279,7 @@ fn asset_check_checks_the_levels_that_are_not_open() {
 
 #[test]
 fn the_levels_panel_lists_the_start_level_and_the_others_in_a_narrow_column() {
-    let folder = copy_of_example("hello-levels", "level-panel");
+    let folder = copy_of_example("levels", "level-panel");
     let mut app = EditorApp::new(None);
     app.open_in_level(&folder, Some("Castle".to_owned()));
     let size = egui::vec2(260.0, 220.0);

@@ -1,7 +1,7 @@
 ---
 description: How a game is one tree of objects, what the services are for, and how to organize, find and lock things.
 icon: tree
-samples: [hello-part, hello-object-scripts]
+samples: [part, object-scripts]
 ---
 
 # Explorer and hierarchy
@@ -11,6 +11,8 @@ Everything in an Axcenity game is an **Instance**: a part, a light, a script, a 
 ## The services
 
 The top of the tree is a fixed set of **services**, each with its own job:
+
+![Diagram of the Axcenity DataModel game tree rooted at game, showing each top-level service, its server/client scope, and an example SlidingDoor Model branch inside Workspace.](../images/instance-hierarchy.png)
 
 | Service | Holds |
 |---|---|
@@ -50,4 +52,4 @@ A **prefab** is a saved object (with everything inside it) you can place many ti
 
 ## Scripts inside objects
 
-A Script, LocalScript or ModuleScript can live inside the object it controls, such as a door's script inside the door. Its code is a file in `objects/`, shared by every copy, so each copy of a prefab runs the same file with its own `script.Parent`. The **hello-object-scripts** sample has two doors from one prefab.
+A Script, LocalScript or ModuleScript can live inside the object it controls, such as a door's script inside the door. Its code is a file in `objects/`, shared by every copy, so each copy of a prefab runs the same file with its own `script.Parent`. The **object-scripts** sample has two doors from one prefab.

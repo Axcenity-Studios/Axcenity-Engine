@@ -1,7 +1,7 @@
 ---
 description: The UI Instances, layout with UDim2 and anchors, layering, widgets, the CSS subset, text and rich text, keyboard and controller navigation, localisation and accessibility.
 icon: cursor
-samples: [hello-ui, hello-css, hello-buttons, hello-rich-text, hello-accessibility, hello-strings]
+samples: [ui, css, buttons, rich-text, accessibility, strings]
 ---
 
 # UI

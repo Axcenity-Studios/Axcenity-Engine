@@ -63,4 +63,4 @@ The streaming world (`axcenity-test --make-streaming <folder>`, `docs/benchmarks
 
 ## Testing it by hand
 
-`examples/hello-streaming` builds a town of about 8,000 parts across 4 km and teleports the player across it after a few seconds. Raise `PARTS` in its script to 50,000 to measure the frame budget: `cargo run --release -p axcenity-player -- examples/hello-streaming`, and F9 for frame times.
+`crates/samples/projects/streaming` builds a town of about 8,000 parts across 4 km and teleports the player across it after a few seconds. Raise `PARTS` in its script to 50,000 to measure the frame budget: `cargo run --release -p axcenity-player -- crates/samples/projects/streaming`, and F9 for frame times.

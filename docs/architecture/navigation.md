@@ -95,7 +95,7 @@ After each agent's step, it looks and listens for the **player character**: the 
 
 Sight casts at most two rays (plus one per sensor in the way) for each agent with the player in range and in front, every frame.
 
-Example: `examples/hello-perception`. Tests: `crates/nav/src/perception_tests.rs`, the player's `hello_perception_guard_sees_and_hears_the_player_from_lua_and_blocks`, the editor's `sight_range_set_in_properties_changes_what_the_guard_sees_in_play_and_saves`, and `a_navigation_agents_senses_save_and_load_and_an_older_agent_gets_the_defaults` in `crates/project/src/world_file/tests.rs`.
+Example: `crates/samples/projects/perception`. Tests: `crates/nav/src/perception_tests.rs`, the player's `hello_perception_guard_sees_and_hears_the_player_from_lua_and_blocks`, the editor's `sight_range_set_in_properties_changes_what_the_guard_sees_in_play_and_saves`, and `a_navigation_agents_senses_save_and_load_and_an_older_agent_gets_the_defaults` in `crates/project/src/world_file/tests.rs`.
 
 ### Behavior trees
 
@@ -118,13 +118,13 @@ A node stopped (not reached in a frame after it ran) forgets its state: a Wait s
 
 `BehaviorTree::from_json` checks a file and gives every problem with its node: no Root (or a second one), nothing wired to Root, a Selector or Sequence with no children, a field that isn't a number (or Seconds below zero), an unknown kind, two wires out of one pin, a wire into a Root or out of a pin a node doesn't have, a loop, or more than 4096 nodes once a node wired under several parents is copied under each. `BehaviorTree::load` also refuses a path that isn't a `.behaviortree.json` (a state machine says it plays animation on an Animator). A tree that can't run leaves the agent to its scripts, and warns once: `<full name> doesn't run the behavior tree `<path>`: <why>.` Files are read the first time an agent names them and kept for the rest of Play.
 
-Example: `examples/hello-behavior` (a Guard whose tree patrols and chases, and a Courier with no tree walked by a script). Tests: `crates/nav/src/behavior_tests.rs`, the player's `hello_behavior_guard_runs_its_tree_and_the_courier_walks_where_its_script_sends_it`, and `crates/editor/src/app/behavior_tree_tests.rs`.
+Example: `crates/samples/projects/behavior` (a Guard whose tree patrols and chases, and a Courier with no tree walked by a script). Tests: `crates/nav/src/behavior_tests.rs`, the player's `hello_behavior_guard_runs_its_tree_and_the_courier_walks_where_its_script_sends_it`, and `crates/editor/src/app/behavior_tree_tests.rs`.
 
 ### Scripts and blocks
 
 Phase 73: an agent with a `PatrolSpline` walks to its points in order with no script, round a Closed spline or back and forth along an open one, setting its own `Destination` before trees decide (`Agents::patrol`); `agent:Patrol(spline)` and the block **patrol *agent* along *spline*** set it. See [splines.md](splines.md).
 
-Scripts set `Destination` and `Velocity` and read `Status`, `SeesPlayer` and `HearsPlayer`, and connect to `PlayerSensed`; blocks have **walk *agent* to (x, y, z)**, **set velocity of *agent* to (x, y, z)** and **when *agent* senses the player by *Sight/Hearing*** (`docs/scripting/blocks.md`). Example: `examples/hello-agent`. Tests: `crates/nav/src/agent_tests.rs`, the player's `hello_agent_walks_to_destinations_from_properties_lua_and_blocks`, and `crates/editor/src/app/agent_tests.rs`.
+Scripts set `Destination` and `Velocity` and read `Status`, `SeesPlayer` and `HearsPlayer`, and connect to `PlayerSensed`; blocks have **walk *agent* to (x, y, z)**, **set velocity of *agent* to (x, y, z)** and **when *agent* senses the player by *Sight/Hearing*** (`docs/scripting/blocks.md`). Example: `crates/samples/projects/agent`. Tests: `crates/nav/src/agent_tests.rs`, the player's `hello_agent_walks_to_destinations_from_properties_lua_and_blocks`, and `crates/editor/src/app/agent_tests.rs`.
 
 ## In the editor
 

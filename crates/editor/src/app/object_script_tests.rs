@@ -24,7 +24,7 @@ fn source_file(app: &EditorApp, id: InstanceId) -> Option<String> {
 
 #[test]
 fn opening_a_copys_script_opens_the_file_every_copy_shares() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-open");
+    let folder = copy_of_example("object-scripts", "object-script-open");
     let mut app = EditorApp::new(Some(&folder));
     let project = app.project.as_ref().unwrap();
     // Only the `scripts` folder's script stands for a file of its own.
@@ -40,7 +40,7 @@ fn opening_a_copys_script_opens_the_file_every_copy_shares() {
 
 #[test]
 fn insert_script_on_an_object_makes_its_file_in_objects_as_one_undo_step() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-insert");
+    let folder = copy_of_example("object-scripts", "object-script-insert");
     let mut app = EditorApp::new(Some(&folder));
     let door = app
         .world
@@ -68,7 +68,7 @@ fn insert_script_on_an_object_makes_its_file_in_objects_as_one_undo_step() {
 
 #[test]
 fn make_unique_gives_one_copy_its_own_file_and_leaves_the_others() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-unique");
+    let folder = copy_of_example("object-scripts", "object-script-unique");
     let mut app = EditorApp::new(Some(&folder));
     let back = script_in(&app, "BackDoor", "Open");
     let front = script_in(&app, "FrontDoor", "Open");
@@ -89,7 +89,7 @@ fn make_unique_gives_one_copy_its_own_file_and_leaves_the_others() {
 
 #[test]
 fn renaming_or_deleting_a_copys_script_keeps_the_shared_file() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-delete");
+    let folder = copy_of_example("object-scripts", "object-script-delete");
     let mut app = EditorApp::new(Some(&folder));
     let back = script_in(&app, "BackDoor", "Open");
     app.act(Action::Rename(back, "Slide".into()));
@@ -108,7 +108,7 @@ fn renaming_or_deleting_a_copys_script_keeps_the_shared_file() {
 
 #[test]
 fn saving_a_shared_file_during_play_reloads_every_copy() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-reload");
+    let folder = copy_of_example("object-scripts", "object-script-reload");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     play_for(&mut app, 0.5);
@@ -134,7 +134,7 @@ fn saving_a_shared_file_during_play_reloads_every_copy() {
 
 #[test]
 fn rename_or_move_a_shared_file_points_every_copy_at_it_as_one_undo_step() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-move");
+    let folder = copy_of_example("object-scripts", "object-script-move");
     let mut app = EditorApp::new(Some(&folder));
     let back = script_in(&app, "BackDoor", "Open");
     let front = script_in(&app, "FrontDoor", "Open");
@@ -166,7 +166,7 @@ fn find_in_scripts_and_quick_open_include_the_code_of_scripts_inside_objects() {
     use super::search::SearchTarget;
     use crate::command_palette::Category;
 
-    let folder = copy_of_example("hello-object-scripts", "object-script-find");
+    let folder = copy_of_example("object-scripts", "object-script-find");
     let mut app = EditorApp::new(Some(&folder));
     app.find.query = "slides up".to_owned();
     app.search_scripts();
@@ -203,7 +203,7 @@ fn find_in_scripts_and_quick_open_include_the_code_of_scripts_inside_objects() {
 /// at it, its tab follows, and each switch is one undo step.
 #[test]
 fn switching_a_shared_file_to_blocks_and_back_points_every_copy_at_it() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-switch");
+    let folder = copy_of_example("object-scripts", "object-script-switch");
     let mut app = EditorApp::new(Some(&folder));
     let back = script_in(&app, "BackDoor", "Open");
     let front = script_in(&app, "FrontDoor", "Open");
@@ -259,7 +259,7 @@ fn switching_a_shared_file_to_blocks_and_back_points_every_copy_at_it() {
 /// and saving it rewrites the shared file, not a new script.
 #[test]
 fn a_block_script_inside_an_object_opens_and_saves_its_shared_file() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-blocks");
+    let folder = copy_of_example("object-scripts", "object-script-blocks");
     let mut app = EditorApp::new(Some(&folder));
     let back = script_in(&app, "BackDoor", "Open");
     let front = script_in(&app, "FrontDoor", "Open");
@@ -293,7 +293,7 @@ fn a_block_script_inside_an_object_opens_and_saves_its_shared_file() {
 
 #[test]
 fn dragging_a_script_onto_an_object_attaches_it_and_undo_moves_it_back() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-attach");
+    let folder = copy_of_example("object-scripts", "object-script-attach");
     let mut app = EditorApp::new(Some(&folder));
     let coins = app
         .world
@@ -352,7 +352,7 @@ fn dragging_a_script_onto_an_object_attaches_it_and_undo_moves_it_back() {
 
 #[test]
 fn only_scripts_and_local_scripts_attach_and_only_to_saved_objects() {
-    let folder = copy_of_example("hello-object-scripts", "object-script-attach-refused");
+    let folder = copy_of_example("object-scripts", "object-script-attach-refused");
     let mut app = EditorApp::new(Some(&folder));
     let world = &mut app.world;
     let coins = world

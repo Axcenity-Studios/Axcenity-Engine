@@ -90,7 +90,9 @@ fn load(world: &World, assets: &Assets, id: InstanceId) -> Result<SequenceRun, S
         ));
     }
     let file = load_sequence(assets, path).map_err(|why| format!("can't read {path}: {why}"))?;
-    SequenceRun::new(file).map_err(|why| format!("can't play {path}: {}", why.0))
+    SequenceRun::new(file)
+        .map(|run| run.with_presets(assets))
+        .map_err(|why| format!("can't play {path}: {}", why.0))
 }
 
 impl Sequences {

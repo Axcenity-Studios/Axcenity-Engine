@@ -1,7 +1,7 @@
 ---
 description: The classes you'll use most, grouped by what they're for, with the properties and events that matter. The API Reference lists every member.
 icon: cube
-samples: [hello-part, hello-character, hello-agent, hello-splines]
+samples: [part, character, agent, splines]
 ---
 
 # Common classes
@@ -32,6 +32,7 @@ Click a class name to open its API Reference entry, with every property, method 
 | `Atmosphere`, `Clouds`, `Weather` | Haze, clouds, rain and snow. |
 | `BloomEffect`, `ColorCorrectionEffect`, `DepthOfFieldEffect`, `VignetteEffect`, `ExposureEffect`, `FogEffect` and others | Post-processing. |
 | `GraphicsVolume` | Changes lighting and effects inside a box. |
+| `WeatherVolume` | Sets the rain, snow and wetness inside a box: a shelter for a room or porch. |
 | `ReflectionProbe`, `LightProbeVolume` | Baked reflections and indirect light. |
 | `ParticleEmitter` | Smoke, fire, sparks and dust. |
 | `OutlineEffect` | An outline around an object. |

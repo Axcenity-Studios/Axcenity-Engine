@@ -507,7 +507,7 @@ fn easing_sets_every_selected_key_and_leaves_the_rest_and_saved_clips_be() {
     // A clip saved before opens with its keys as they were, and isn't
     // written again.
     let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-door/assets/animations/Door/Door.anim.json");
+        .join("../samples/projects/door/assets/animations/Door/Door.anim.json");
     let text = std::fs::read_to_string(example).unwrap();
     let saved = ClipFile::from_json(&text).unwrap();
     let mut door = PropertyDoc::open("assets/animations/Door/Door.anim.json".into(), saved);

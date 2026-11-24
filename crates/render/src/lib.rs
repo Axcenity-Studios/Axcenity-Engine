@@ -26,15 +26,19 @@ pub use draw_list::{
     ColorLookup, Cone, DEFAULT_SNOW_THICKNESS, DepthOfField, DrawItem, DrawList, Dust, DustBoxes,
     Edges, FilmGrain, Flipbook, FlipbookFrame, FlipbookMode, Fog, GridPlane, GridTint, HairShading,
     ItemChunk, LensEffects, Light, LightProbeGrid, LightProbeVolume, MAX_DUST_BOXES,
-    MAX_PALETTE_COLORS, Makeup, Material, MeshSource, MorphView, NormalMap, Outline,
-    ParticleCollision, ParticleCurves, ParticleEmitter, ParticleLook, PointShadows, PostProcessing,
-    ProbeImage, ProbeSky, RectArea, ReflectionProbe, SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS,
-    Shading, Shadows, Shape, ShapeInOut, Skin, SkinLayers, SkinShading, Sky, SkyImage, SpawnKind,
-    SpawnShape, SpotShadows, Spots, Sprite, Sun, SunRays, Sway, TerrainLayer, TerrainLayers,
-    TerrainSurface, TerrainView, TextAlign, TextShadow, TextSpan, TextStroke, TextureMaps,
-    TextureSource, Toon, UiBorderSide, UiClip, UiDrawItem, UiImage, UiRectangle, UiShadow, UiSlice,
-    UiText, VerticalAlign, Vignette, WEATHER_FIELD_SIZE, Weather, WeatherField, curve_at,
-    is_turned, turn_point, turned_bounds,
+    MAX_PALETTE_COLORS, MAX_WEATHER_BOXES, Makeup, Material, MeshSource, MorphView, NormalMap,
+    Outline, ParticleCollision, ParticleCurves, ParticleEmitter, ParticleLook, PointShadows,
+    PostProcessing, ProbeImage, ProbeSky, RectArea, ReflectionProbe, SKIN_MAKEUP_LAYERS,
+    SURFACE_PARAMETERS, Shading, Shadows, Shape, ShapeInOut, Skin, SkinLayers, SkinShading, Sky,
+    SkyImage, SpawnKind, SpawnShape, SpotShadows, Spots, Sprite, Sun, SunRays, Sway, TerrainLayer,
+    TerrainLayers, TerrainSurface, TerrainView, TextAlign, TextShadow, TextSpan, TextStroke,
+    TextureMaps, TextureSource, Toon, UiBorderSide, UiClip, UiDrawItem, UiImage, UiRectangle,
+    UiShadow, UiSlice, UiText, VerticalAlign, Vignette, WEATHER_FIELD_SIZE, Weather, WeatherBox,
+    WeatherField, curve_at, is_turned, turn_point, turned_bounds,
+};
+pub use draw_list::{
+    WEATHER_PRINT_CELLS_PER_STUD, WEATHER_PRINT_LEVELS, WEATHER_PRINT_MOST, WEATHER_PRINT_SIZE,
+    WeatherPrintCells, WeatherPrints,
 };
 pub use fonts::{BUILT_IN_FONTS, BuiltInFont, UiFont, font_families};
 pub use graphics::{

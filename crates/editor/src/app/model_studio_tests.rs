@@ -36,7 +36,7 @@ fn drawn_size(app: &EditorApp, part: InstanceId) -> [f32; 3] {
 
 #[test]
 fn a_cube_made_in_the_studio_with_a_face_scaled_up_is_saved_and_used_by_a_meshpart_at_once() {
-    let folder = copy_of_example("hello-touched", "studio-cube");
+    let folder = copy_of_example("touched", "studio-cube");
     let mut app = EditorApp::new(Some(&folder));
     let doc = StudioDoc::new(
         String::new(),
@@ -101,7 +101,7 @@ fn a_cube_made_in_the_studio_with_a_face_scaled_up_is_saved_and_used_by_a_meshpa
 
 #[test]
 fn an_fbx_opened_from_a_meshpart_lists_its_objects_and_saves_as_a_glb_beside_it() {
-    let folder = copy_of_example("hello-graphics", "studio-fbx");
+    let folder = copy_of_example("graphics", "studio-fbx");
     let mut app = EditorApp::new(Some(&folder));
     let fbx = "assets/models/pbr_panel.fbx";
     let part = mesh_part(&mut app, fbx);
@@ -126,7 +126,7 @@ fn an_fbx_opened_from_a_meshpart_lists_its_objects_and_saves_as_a_glb_beside_it(
 
 #[test]
 fn studio_undo_is_its_own_while_the_mouse_is_over_it() {
-    let folder = copy_of_example("hello-touched", "studio-undo");
+    let folder = copy_of_example("touched", "studio-undo");
     let mut app = EditorApp::new(Some(&folder));
     app.model_studio.open(StudioDoc::new(
         String::new(),
@@ -155,7 +155,7 @@ fn studio_undo_is_its_own_while_the_mouse_is_over_it() {
 
 #[test]
 fn a_chair_modeled_from_one_cube_is_saved_and_drawn_by_a_meshpart_in_the_world() {
-    let folder = copy_of_example("hello-touched", "studio-chair");
+    let folder = copy_of_example("touched", "studio-chair");
     let mut app = EditorApp::new(Some(&folder));
     let doc = StudioDoc::new(
         String::new(),
@@ -208,7 +208,7 @@ fn a_chair_modeled_from_one_cube_is_saved_and_drawn_by_a_meshpart_in_the_world()
 #[test]
 fn a_half_head_with_mirror_and_subdivision_saves_whole_and_reopens_as_the_half_with_its_stack() {
     use crate::model_studio::modifiers_tests::{half_head_doc, mirror, subdivision};
-    let folder = copy_of_example("hello-touched", "studio-head");
+    let folder = copy_of_example("touched", "studio-head");
     let mut app = EditorApp::new(Some(&folder));
     let mut doc = half_head_doc();
     let half = doc.mesh().unwrap().clone();
@@ -263,7 +263,7 @@ fn a_half_head_with_mirror_and_subdivision_saves_whole_and_reopens_as_the_half_w
 
 #[test]
 fn generated_lods_are_drawn_far_away_by_a_meshpart_without_another_step() {
-    let folder = copy_of_example("hello-touched", "studio-lods");
+    let folder = copy_of_example("touched", "studio-lods");
     let mut app = EditorApp::new(Some(&folder));
     let mut settings = PrimitiveSettings::of(axcenity_mesh_edit::PrimitiveShape::UvSphere);
     settings.segments = 32;
@@ -330,7 +330,7 @@ fn corner_uvs(model: &axcenity_assets::Model) -> Vec<([i64; 3], [i64; 2])> {
 #[test]
 fn unwrapped_uvs_save_in_the_glb_and_draw_the_same_texture_in_the_game_as_in_the_studio() {
     use crate::model_studio::uv_editor::UvAction;
-    let folder = copy_of_example("hello-touched", "studio-uvs");
+    let folder = copy_of_example("touched", "studio-uvs");
     let mut app = EditorApp::new(Some(&folder));
     // A texture beside the model, which the cube's material draws.
     let models = folder.join("assets/models");
@@ -436,7 +436,7 @@ fn paint_seat(app: &mut EditorApp, kind: axcenity_mesh_edit::MapKind, color: [u8
 #[test]
 fn rust_painted_on_the_chair_saves_maps_the_scene_view_draws_with_the_material_set_up() {
     use axcenity_mesh_edit::MapKind;
-    let folder = copy_of_example("hello-touched", "studio-paint");
+    let folder = copy_of_example("touched", "studio-paint");
     let mut app = EditorApp::new(Some(&folder));
     painting_chair(&mut app);
     paint_seat(&mut app, MapKind::BaseColor, [150, 70, 30], 0.0);
@@ -514,7 +514,7 @@ fn rust_painted_on_the_chair_saves_maps_the_scene_view_draws_with_the_material_s
 #[test]
 fn a_hidden_layer_stays_out_of_the_saved_maps_and_is_still_there_after_reopening() {
     use axcenity_mesh_edit::MapKind;
-    let folder = copy_of_example("hello-touched", "studio-paint-layers");
+    let folder = copy_of_example("touched", "studio-paint-layers");
     let mut app = EditorApp::new(Some(&folder));
     painting_chair(&mut app);
     paint_seat(&mut app, MapKind::BaseColor, [150, 70, 30], 0.0);
@@ -574,7 +574,7 @@ fn a_hidden_layer_stays_out_of_the_saved_maps_and_is_still_there_after_reopening
 
 #[test]
 fn a_sculpted_face_made_low_poly_and_baked_writes_maps_a_meshpart_draws_once_saved() {
-    let folder = copy_of_example("hello-touched", "studio-bake");
+    let folder = copy_of_example("touched", "studio-bake");
     let mut app = EditorApp::new(Some(&folder));
     app.model_studio = crate::model_studio::bake_tests::sculpted_face_studio();
     app.model_studio.bake.target = 4000;
@@ -630,7 +630,7 @@ fn a_sculpted_face_made_low_poly_and_baked_writes_maps_a_meshpart_draws_once_sav
 #[test]
 fn a_model_saved_in_blender_is_offered_again_but_the_editors_own_save_isnt() {
     use axcenity_mesh_edit::PrimitiveShape;
-    let folder = copy_of_example("hello-touched", "studio-blender");
+    let folder = copy_of_example("touched", "studio-blender");
     let mut app = EditorApp::new(Some(&folder));
     app.model_studio.open(StudioDoc::new(
         String::new(),
@@ -672,7 +672,7 @@ fn a_model_saved_in_blender_is_offered_again_but_the_editors_own_save_isnt() {
 /// where to set Blender when it isn't found; only a `.glb` goes.
 #[test]
 fn edit_in_blender_saves_first_and_names_the_setting_when_blender_is_missing() {
-    let folder = copy_of_example("hello-touched", "studio-blender-missing");
+    let folder = copy_of_example("touched", "studio-blender-missing");
     let mut app = EditorApp::new(Some(&folder));
     app.blender_path = folder
         .join("no-blender-here")

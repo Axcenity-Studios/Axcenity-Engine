@@ -1,7 +1,7 @@
 ---
 description: How physics steps, assemblies and welds, collision shapes, materials and physical properties, touches, joints and movers, spatial queries and network ownership.
 icon: atom
-samples: [hello-physics, hello-joints, hello-movers, hello-vehicle, hello-destruction]
+samples: [physics, joints, movers, vehicle, destruction]
 ---
 
 # Physics

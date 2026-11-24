@@ -391,12 +391,12 @@ fn a_search_from_the_network_lists_the_game_at_its_network_address_and_joins_it(
 }
 
 /// The check by hand for a game on the LAN showing on another computer.
-/// Host `examples/hello-part` on one computer (`cargo run -p
-/// axcenity-player -- --host examples/hello-part`), then on another on the
+/// Host `crates/samples/projects/part` on one computer (`cargo run -p
+/// axcenity-player -- --host crates/samples/projects/part`), then on another on the
 /// same network run `cargo test -p axcenity-net -- --ignored --nocapture
 /// a_game_hosted_on_another_computer`.
 #[test]
-#[ignore = "needs examples/hello-part hosted on another computer on the LAN"]
+#[ignore = "needs crates/samples/projects/part hosted on another computer on the LAN"]
 fn a_game_hosted_on_another_computer_shows_in_a_lan_search() {
     let mut search = LanSearch::start(DISCOVERY_PORT, "Hello Part").unwrap();
     let found = loop {

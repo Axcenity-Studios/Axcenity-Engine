@@ -1,4 +1,4 @@
-//! Phase 73: the hello-splines example in the player's frame order. The
+//! Phase 73: the splines example in the player's frame order. The
 //! lift on its PingPong SplineFollower carries the character standing on
 //! it, the guard patrols its closed spline with no script, and the Flyby
 //! Sequence's camera rides its rail.
@@ -26,7 +26,7 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
-        let (world, mut scripts, folder) = start_example_in("hello-splines");
+        let (world, mut scripts, folder) = start_example_in("splines");
         let assets = Assets::new(&folder);
         scripts.set_assets(assets.clone());
         let mut game = Self {

@@ -184,6 +184,12 @@ struct VertexOut {
     // The middle of the item and half its size, for leaves (`leaf_canopy`).
     @location(9) @interpolate(flat) item_middle: vec3<f32>,
     @location(10) @interpolate(flat) item_half_size: vec3<f32>,
+    // How far the snow lying on the item lifted this point, in studs
+    // (lighting.wgsl's `snow_cap`): above 0 it's the slab of snow itself.
+    @location(11) rise: f32,
+    // 1 for something that hangs (`Sway::hanging`: drapes, washing), which
+    // lets light through as cloth does, not as a leaf.
+    @location(12) @interpolate(flat) hangs: f32,
 }
 
 @vertex
@@ -202,13 +208,27 @@ fn item_vertex(vertex: VertexIn, instance: InstanceIn) -> VertexOut {
     let normal_matrix = mat3x3<f32>(instance.normal_0, instance.normal_1, instance.normal_2);
     let posed = pose_corner(vertex.index, instance.skin, vertex.position, vertex.normal,
         vertex.tangent.xyz);
-    let world_position = vec4<f32>(swayed((model * vec4<f32>(posed.position, 1.0)).xyz,
+    var world_position = vec4<f32>(swayed((model * vec4<f32>(posed.position, 1.0)).xyz,
         instance.sway), 1.0);
+    let world_normal = normal_matrix * posed.normal;
 
     var out: VertexOut;
+    // Snow with a thickness lies on a solid thing as a slab: the corners
+    // that face up rise by its depth. Not on what's see-through or cut out
+    // (leaves take snow by their crown, `lit_leaf`), on what sways or is
+    // posed, or on a decal.
+    out.hangs = select(0.0, 1.0, instance.sway.y < 0.0 && instance.sway.z > 0.0);
+    out.rise = 0.0;
+    if frame.weather.y > 0.0 && frame.weather.z > 0.0 && instance.base_color.a >= 1.0
+        && instance.surface.z <= 0.0 && instance.sway.z <= 0.0 && instance.skin.y == 0u
+        && floor(instance.sway.w) != ROLE_DECAL {
+        let facing = world_normal / max(length(world_normal), 1e-6);
+        out.rise = snow_cap(world_position.xyz, facing.y);
+        world_position.y += out.rise;
+    }
     out.clip_position = frame.view_proj * world_position;
     out.world_position = world_position.xyz;
-    out.normal = normal_matrix * posed.normal;
+    out.normal = world_normal;
     out.base_color = instance.base_color;
     out.emissive = instance.emissive_fade.xyz;
     out.fade = instance.emissive_fade.w;
@@ -511,7 +531,18 @@ fn pixel_surface(in: VertexOut, facing: f32) -> Surface {
     input.metalness = in.surface.x;
     input.roughness = in.surface.y;
     input.emissive = in.emissive;
-    return surface(input);
+    var shaded = surface(input);
+    // What the snow lifted is the snow: the top of the slab, and its sides
+    // (the mesh's skirt), whichever way they face.
+    if in.rise > 0.0 {
+        let snow = snow_cap_cover(in.world_position, in.rise);
+        shaded.base_color = mix(shaded.base_color, SNOW_COLOR, snow);
+        shaded.metalness = mix(shaded.metalness, 0.0, snow);
+        shaded.roughness = mix(shaded.roughness, SNOW_ROUGHNESS, snow);
+        shaded.emissive = shaded.emissive * (1.0 - snow);
+        shaded.opacity = max(shaded.opacity, snow);
+    }
+    return shaded;
 }
 
 @fragment
@@ -631,6 +662,9 @@ fn lit_pixel(
     } else if maps.shading.x == SHADING_CLOTH {
         color = cloth_surface(in, facing, geometric, shaded, metalness, roughness, occlusion,
             dielectric, solid);
+    } else if maps.shading.y > 0.0 && in.hangs > 0.5 {
+        color = lit_thin_cloth(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
+            solid, maps.shading.y);
     } else if maps.shading.y > 0.0 {
         color = lit_leaf(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
             solid, maps.shading.y);
@@ -670,6 +704,25 @@ const CANOPY_LIFT: f32 = 0.3;
 // Rough enough, a leaf seen edge-on doesn't mirror a white sky as grey.
 const LEAF_ROUGHNESS_OUTSIDE: f32 = 0.72;
 const LEAF_ROUGHNESS_INSIDE: f32 = 0.9;
+// How far what lies on a leaf (rain, snow) follows its crown's shape and
+// not its own card's, and how much further up the outside of a crown faces
+// for it: snow caps a bush.
+const LEAF_SNOW_CROWN: f32 = 0.65;
+const LEAF_SNOW_LIFT: f32 = 0.45;
+// How far a low plant's leaves face up for the light, whichever way their
+// cards face (added to the bent normal before it's made unit length), and
+// the heights in studs between which that fades out: grass and low brush
+// are ground cover, lit like the ground they stand on. An upright card
+// lit by the way it faces takes little of a high sun and most of the
+// horizon's light, so pale grass looked dull at noon and glowed at dusk
+// while the ground around it went dark. A tree's crown keeps its own shape.
+const LEAF_GROUND_LIFT: f32 = 0.8;
+const LEAF_GROUND_HEIGHTS: vec2<f32> = vec2<f32>(3.0, 9.0);
+// How much of the surrounding light reaches the foot of a plant, and how far
+// up it (of its height) the shade lasts: its own leaves and stems stand in
+// the way, so it's darker toward the ground and sits on it.
+const LEAF_FOOT_SHADE: f32 = 0.55;
+const LEAF_FOOT_REACH: f32 = 0.5;
 // How much individual leaves differ in brightness and in hue.
 const LEAF_TONE_VARIATION: f32 = 0.2;
 const LEAF_HUE_VARIATION: f32 = 0.18;
@@ -721,18 +774,60 @@ fn lit_leaf(
     amount: f32,
 ) -> vec3<f32> {
     let canopy = leaf_canopy(in.world_position, in.item_middle, in.item_half_size, shaded.normal);
-    let bent = normalize(mix(shaded.normal, canopy.normal, CANOPY_BEND));
+    let low = 1.0 - smoothstep(LEAF_GROUND_HEIGHTS.x, LEAF_GROUND_HEIGHTS.y,
+        2.0 * in.item_half_size.y);
+    let bent = normalize(mix(shaded.normal, canopy.normal, CANOPY_BEND)
+        + vec3<f32>(0.0, LEAF_GROUND_LIFT * low, 0.0));
     let base_color = leaf_tone(normalize(in.normal), in.world_position, shaded.base_color);
-    let open = mix(CANOPY_DEPTH_SHADE, 1.0, canopy.openness);
+    // Darker toward its foot, where the plant shades itself.
+    let foot = in.item_middle.y - in.item_half_size.y;
+    let up_it = (in.world_position.y - foot) / max(2.0 * in.item_half_size.y, 0.001);
+    let open = mix(CANOPY_DEPTH_SHADE, 1.0, canopy.openness)
+        * mix(LEAF_FOOT_SHADE, 1.0, smoothstep(0.0, LEAF_FOOT_REACH, up_it));
     let rough = max(roughness,
         mix(LEAF_ROUGHNESS_INSIDE, LEAF_ROUGHNESS_OUTSIDE, canopy.openness));
+    // Rain and snow lie on the plant, not on each card of it: on the top of
+    // its crown, the way the crown faces there, and more on the cards that
+    // face up themselves. No water stands on leaves.
+    let lie = normalize(mix(shaded.normal, canopy.normal, LEAF_SNOW_CROWN)
+        + vec3<f32>(0.0, LEAF_SNOW_LIFT * canopy.openness, 0.0));
+    let weather = weathered_lying(in.world_position, lie, false, false, bent, base_color, metalness, rough);
     // `bent` leans by the crown, not by bumps: no bump shadowing.
-    let reflected_light = light_surface(in.world_position, geometric, bent, in.clip_position.xy,
-        base_color, metalness, rough, occlusion * open, dielectric, solid, false);
-    // What passes through isn't also reflected.
-    return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * amount)
-        + through_leaf(in.world_position, geometric, shaded.normal, bent, in.clip_position.xy,
-            base_color, occlusion, open, amount);
+    let reflected_light = shade_surface(in.world_position, geometric, weather.normal,
+        in.clip_position.xy, weather.base_color, weather.metalness, weather.roughness,
+        occlusion * mix(open, 1.0, weather.snow), dielectric, solid, false);
+    // What passes through isn't also reflected, and nothing passes snow.
+    let through = amount * (1.0 - weather.snow);
+    return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * through)
+        + through_thin(in.world_position, geometric, shaded.normal, bent, in.clip_position.xy,
+            weather.base_color, THROUGH_LEAF_TINT, occlusion, open, through);
+}
+
+// Thin cloth that hangs (a drape, washing on a line) with light coming
+// through it: lit by the way it faces and in its own colors, with none of
+// what makes a leaf a leaf (the crown's shape, the tones from leaf to leaf,
+// the green of the light that comes through). Before 2026-11-23 a drape
+// with a translucency was lit as a leaf, and glowed yellow-green in the sun.
+fn lit_thin_cloth(
+    in: VertexOut,
+    shaded: Surface,
+    geometric: vec3<f32>,
+    metalness: f32,
+    roughness: f32,
+    occlusion: f32,
+    dielectric: vec3<f32>,
+    solid: bool,
+    amount: f32,
+) -> vec3<f32> {
+    let weather = weathered(in.world_position, geometric, shaded.normal, shaded.base_color,
+        metalness, roughness);
+    let reflected_light = shade_surface(in.world_position, geometric, weather.normal,
+        in.clip_position.xy, weather.base_color, weather.metalness, weather.roughness,
+        occlusion, dielectric, solid, false);
+    let through = amount * (1.0 - weather.snow);
+    return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * through)
+        + through_thin(in.world_position, geometric, shaded.normal, shaded.normal,
+            in.clip_position.xy, weather.base_color, vec3<f32>(1.0), occlusion, 1.0, through);
 }
 
 // The light that comes through a thin surface from its far side, from the
@@ -740,13 +835,14 @@ fn lit_leaf(
 // sun lights each leaf by its own card (`n`), a sharp thing; the sky by the
 // crown around it (`bent`, `open`), a soft one. Occlusion counts by half:
 // what's close in front of a leaf doesn't block what reaches it from behind.
-fn through_leaf(
+fn through_thin(
     world_position: vec3<f32>,
     geometric: vec3<f32>,
     n: vec3<f32>,
     bent: vec3<f32>,
     pixel: vec2<f32>,
     base_color: vec3<f32>,
+    tint: vec3<f32>,
     occlusion: f32,
     open: f32,
     amount: f32,
@@ -756,7 +852,7 @@ fn through_leaf(
     let from_sun = frame.sun_radiance.rgb * sun_visible
         * max(dot(-n, frame.sun_direction.xyz), 0.0) / PI;
     let from_sky = surrounding_diffuse(world_position, -bent, frame.sky_top.w) * open;
-    return amount * base_color * THROUGH_LEAF_TINT * mix(1.0, occlusion, 0.5) * (from_sun + from_sky);
+    return amount * base_color * tint * mix(1.0, occlusion, 0.5) * (from_sun + from_sky);
 }
 
 // `Maps::shading`'s models. Must match `SHADING_*` in renderer/types.rs.
@@ -825,8 +921,13 @@ fn toon_surface(
     let color = weather.base_color;
     let v = normalize(frame.camera_position.xyz - world_position);
 
-    let sun = sun_arrival(world_position, geometric, pixel, solid);
+    let sun_parts = sun_arrival_parts(world_position, geometric, pixel, solid);
+    let sun = sun_parts.arrival;
     var lit = toon_light(n, v, sun, color);
+    let flash = lightning_arrival(world_position, sun.l, sun_parts.shadow);
+    if flash.radiance.b > 0.0 {
+        lit += toon_light(n, v, flash, color) + lightning_fill(world_position, n, color, flash);
+    }
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {
@@ -870,11 +971,14 @@ fn fs_prepass(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0)
     if shaded.opacity < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
-    var normal = prepass_normal(normalize(in.normal) * facing);
+    // As the weather leaves it: wet, it's smoother, and rain rings it.
+    let weather = weathered_prepass(in.world_position, normalize(in.normal) * facing,
+        shaded.roughness);
+    var normal = prepass_normal(weather.normal);
     // A plain solid pixel keeps its roughness, 1 plus it, for ray traced
     // reflections (ray_reflections.wgsl); anything reading the flags below
     // sees it as solid (1 or more).
-    normal.w = 1.0 + clamp(shaded.roughness, 0.0, 0.999);
+    normal.w = 1.0 + clamp(weather.roughness, 0.0, 0.999);
     // A character's pixels are marked for projected decals (decal.wgsl).
     if in.role == ROLE_CHARACTER {
         normal.w = 0.5;
@@ -1001,6 +1105,7 @@ fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
         sky = clouded_sky(frame.clouds, frame.camera_position.xyz, dir, sky, frame.sun_direction.xyz,
             frame.sun_radiance.rgb, frame.sky_top.rgb, frame.sky_horizon.rgb,
             pixel_noise(in.clip_position.xy));
+        sky += lightning_sky(frame.camera_position.xyz, dir);
     }
     return vec4<f32>(fogged_along(frame.fog, frame.camera_position.xyz, dir, FOG_SKY_DISTANCE, sky), 1.0);
 }

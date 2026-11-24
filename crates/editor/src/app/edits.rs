@@ -1435,6 +1435,13 @@ impl EditorApp {
             self.follow_start_level();
         }
         self.sync_sequence(&files);
+        // An environment preset saved, or its save undone.
+        if files
+            .iter()
+            .any(|file| axcenity_anim::environment::preset_name(&file.path).is_some())
+        {
+            self.environment_presets_changed();
+        }
         self.animation.sync_after_history(
             &project,
             &self.assets,

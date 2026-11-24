@@ -369,7 +369,14 @@ pub fn bar_with(
 /// The Sequencer's second row (AP5): play backwards, loop, In and Out
 /// marks and clearing them, and the previous and next edit point, then
 /// the range, if any.
-pub fn sequence_bar(ui: &mut egui::Ui, clip: &dyn Playback, mode: &PlayMode) -> Option<Command> {
+/// `more` draws what else belongs at the end of the row (the Sequencer's
+/// Render Movie button).
+pub fn sequence_bar(
+    ui: &mut egui::Ui,
+    clip: &dyn Playback,
+    mode: &PlayMode,
+    more: impl FnOnce(&mut egui::Ui),
+) -> Option<Command> {
     let key = |ui: &egui::Ui, action: Action| action.menu_text(ui.ctx());
     let mut command = None;
     ui.horizontal_wrapped(|ui| {
@@ -465,6 +472,7 @@ pub fn sequence_bar(ui: &mut egui::Ui, clip: &dyn Playback, mode: &PlayMode) -> 
                 command = Some(Command::ClearRange);
             }
         }
+        more(ui);
     });
     command
 }

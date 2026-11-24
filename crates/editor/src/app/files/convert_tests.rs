@@ -32,7 +32,7 @@ def Xform "World"
 
 #[test]
 fn a_usd_file_is_converted_and_imported_as_a_glb_that_remembers_it() {
-    let folder = copy_of_example("hello-part", "import-usd");
+    let folder = copy_of_example("part", "import-usd");
     let mut app = EditorApp::new(Some(&folder));
     let usd = folder.join("..").join("import-usd-Crate.usda");
     fs::write(&usd, CRATE_USDA).unwrap();
@@ -77,7 +77,7 @@ fn a_usd_file_is_converted_and_imported_as_a_glb_that_remembers_it() {
 
 #[test]
 fn a_usd_file_that_cant_be_read_is_reported_not_imported() {
-    let folder = copy_of_example("hello-part", "import-usd-bad");
+    let folder = copy_of_example("part", "import-usd-bad");
     let mut app = EditorApp::new(Some(&folder));
     let usd = folder.join("..").join("import-usd-bad.usda");
     fs::write(&usd, "#usda 1.0\ndef Xform \"World\" {\n").unwrap();

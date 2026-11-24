@@ -12,8 +12,8 @@ Measured directly from the repository tree at `8f4c2420`:
 | WGSL Shader Files | **47** | Wiki says 24 (stale) |
 | WGSL Lines of Code | **10,410** | Wiki says ~5.1k (stale) |
 | `#[test]` / `#[tokio::test]` Functions | **5,579** | Wiki says ~3,150 (stale) |
-| Lua / Luau Files (examples/templates/runner) | **120** | Wiki says ~108 |
-| Example Projects (`examples/`) | **71** | Wiki says 67 |
+| Lua / Luau Files (crates/samples/projects/templates/runner) | **120** | Wiki says ~108 |
+| Example Projects (`crates/samples/projects/`) | **71** | Wiki says 67 |
 | Genre Templates (`templates/`) | **6** | Matches |
 | Compiled Binaries | **10** | Across 8 binary crates |
 | Version (`[workspace.package]`) | `0.3.0-alpha.1` | Wiki says `0.2.0-alpha.1` (stale) |

@@ -2172,6 +2172,7 @@ pub fn class_icon(class: ClassName) -> &'static str {
         ClassName::LowPassSoundEffect | ClassName::HighPassSoundEffect => icons::FUNNEL,
         ClassName::ReverbZone => icons::EAR,
         ClassName::GraphicsVolume => icons::BOUNDING_BOX,
+        ClassName::WeatherVolume => icons::UMBRELLA,
         ClassName::ExposureEffect => icons::APERTURE,
         ClassName::FogEffect => icons::CLOUD_FOG,
         ClassName::BloomEffect => icons::STAR_FOUR,
@@ -2320,6 +2321,7 @@ pub fn class_color(class: ClassName, visuals: &egui::Visuals) -> Color32 {
         | ClassName::DamageZone
         | ClassName::ReverbZone
         | ClassName::GraphicsVolume
+        | ClassName::WeatherVolume
         | ClassName::Model => pick((120, 160, 240), (40, 90, 190)),
         ClassName::Folder => pick((222, 182, 92), (160, 115, 10)),
         ClassName::SurfaceAppearance => pick((214, 130, 204), (150, 50, 140)),

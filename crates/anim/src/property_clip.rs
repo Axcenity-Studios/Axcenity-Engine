@@ -188,10 +188,16 @@ pub struct EvaluatedProperty {
 }
 
 /// A property value as the numbers a key stores, or `None` for a value
-/// that can't be keyed (text, enums).
+/// that can't be keyed (text, most enums). A switch is `[0]` or `[1]`, and
+/// a keyed choice ([`crate::files::KEYED_CHOICES`]) its item's place.
 pub fn numbers_of(value: &Value) -> Option<Vec<f32>> {
     Some(match value {
         Value::Number(n) => vec![*n as f32],
+        Value::Bool(on) => vec![f32::from(u8::from(*on))],
+        Value::EnumItem(item) => {
+            let items = crate::files::keyed_choices(&item.enum_name)?;
+            vec![items.iter().position(|name| *name == item.item)? as f32]
+        }
         Value::Vector3(v) => vec![v.x, v.y, v.z],
         Value::Color3(c) => vec![c.r, c.g, c.b],
         Value::UDim2(u) => vec![u.x.scale, u.x.offset, u.y.scale, u.y.offset],
@@ -204,6 +210,15 @@ pub fn numbers_of(value: &Value) -> Option<Vec<f32>> {
 pub fn value_from_numbers(like: &Value, numbers: &[f32]) -> Option<Value> {
     Some(match (like, numbers) {
         (Value::Number(_), [n]) => Value::Number(f64::from(*n)),
+        (Value::Bool(_), [n]) => Value::Bool(*n >= 0.5),
+        (Value::EnumItem(item), [n]) => {
+            let items = crate::files::keyed_choices(&item.enum_name)?;
+            let place = (n.round().max(0.0) as usize).min(items.len().saturating_sub(1));
+            Value::EnumItem(axcenity_core::EnumItem {
+                enum_name: item.enum_name.clone(),
+                item: (*items.get(place)?).to_owned(),
+            })
+        }
         (Value::Vector3(_), [x, y, z]) => Value::Vector3(Vector3::new(*x, *y, *z)),
         (Value::Color3(_), [r, g, b]) => Value::Color3(Color3::new(*r, *g, *b)),
         (Value::UDim2(_), [xs, xo, ys, yo]) => Value::UDim2(UDim2::new(*xs, *xo, *ys, *yo)),
@@ -254,7 +269,8 @@ pub fn sample_track(track: &PropertyTrack, time: f64) -> Option<Vec<f32>> {
     }
     let a = &keys[i];
     let b = &keys[i + 1];
-    if a.interp == Interp::Step {
+    // A switch or a choice has nothing between its values.
+    if a.interp == Interp::Step || track.property.is_stepped() {
         return Some(a.value.clone());
     }
     let span = (b.time - a.time).max(1e-12);
@@ -270,6 +286,9 @@ pub fn sample_track(track: &PropertyTrack, time: f64) -> Option<Vec<f32>> {
 /// `t` of the way from `a` to `b`: Orientation turns by slerp, and a bone's
 /// rotation (its numbers 3 to 6) too; everything else goes straight.
 pub(crate) fn lerp_property(property: PropertyName, a: &[f32], b: &[f32], t: f32) -> Vec<f32> {
+    if property.is_stepped() {
+        return if t >= 1.0 { b.to_vec() } else { a.to_vec() };
+    }
     if let (PropertyName::Orientation, [ax, ay, az], [bx, by, bz]) = (property, a, b) {
         let qa = quat_from_orientation(Vector3::new(*ax, *ay, *az));
         let qb = quat_from_orientation(Vector3::new(*bx, *by, *bz));

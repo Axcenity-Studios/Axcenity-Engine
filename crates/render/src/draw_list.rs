@@ -31,6 +31,11 @@ pub struct DrawList {
     /// sky-visibility ceiling heights, manual interior/exterior masks, and
     /// dynamic snow footprint depression depths.
     pub weather_field: Option<Arc<WeatherField>>,
+    /// Boxes that set the weather inside them by hand (the world's
+    /// WeatherVolumes), in the order they apply: lowest priority first, so
+    /// where two overlap the later one wins. At most [`MAX_WEATHER_BOXES`]
+    /// are drawn: the nearest to the camera.
+    pub weather_boxes: Vec<WeatherBox>,
     /// The wind (the Workspace's `GlobalWind`), in studs a second. Items
     /// with a [`DrawItem::sway`] bend along its level part.
     pub wind: Vec3,
@@ -257,6 +262,12 @@ pub struct Sprite {
     /// 0 blends it over what's behind, like paint; 1 adds its light, like
     /// fire. In between mixes the two.
     pub light_emission: f32,
+    /// How far the scene's light shows on it, 0 to 1: at 0 it's its color
+    /// whatever the hour, and at 1 it's lit as a pale matte thing in the
+    /// open is, by the sun through the clouds, the sky and the ambient
+    /// light (one light for the whole scene: it isn't shadowed, and lamps
+    /// don't light it). Dust and smoke go dark at night with it.
+    pub light_influence: f32,
     /// Its picture, whose alpha is its shape. `None` is a plain square.
     pub texture: Option<Arc<dyn TextureSource>>,
     /// Shows one frame of the picture cut into a grid (a flipbook, roadmap
@@ -566,6 +577,8 @@ pub struct ParticleLook {
     pub brightness: f32,
     /// As [`Sprite::light_emission`].
     pub light_emission: f32,
+    /// As [`Sprite::light_influence`].
+    pub light_influence: f32,
     /// As [`Sprite::texture`].
     pub texture: Option<Arc<dyn TextureSource>>,
     /// Size, transparency and color over life (roadmap R17.1), in place of
@@ -681,6 +694,7 @@ impl Default for ParticleLook {
             spin_degrees: 0.0,
             brightness: 1.0,
             light_emission: 0.0,
+            light_influence: 0.0,
             texture: None,
             curves: None,
             flipbook: None,
@@ -1461,8 +1475,21 @@ pub struct Weather {
     /// stay bare.
     pub snow: f32,
     /// Snow layer thickness in studs (0 to 2; 0 uses [`DEFAULT_SNOW_THICKNESS`]
-    /// when `snow > 0`). Controls terrain snow lift and footprint depth.
+    /// when `snow > 0`). Snow on terrain rises that far, and footprints
+    /// press that deep into it.
     pub snow_thickness: f32,
+    /// How hard rain falls now, from 0 to 1: drops ring the puddles and
+    /// dimple the film of water on surfaces facing up. Surfaces stay wet
+    /// (`wetness`) after it stops.
+    pub rain: f32,
+    /// How hard snow falls now, from 0 to 1. Lying snow (`snow`) is fresher,
+    /// brighter and softer while it does.
+    pub snowfall: f32,
+    /// How often lightning flashes, from 0 (never) to 1: the chance of a
+    /// flash in each 2.6 seconds (`lightning` in lighting.wgsl). A flash
+    /// lights what's open to the sky and glows inside the clouds; it's
+    /// worked out from [`DrawList::time`], so every pass sees the same one.
+    pub lightning: f32,
 }
 
 impl Weather {
@@ -1477,10 +1504,16 @@ impl Weather {
 /// depression depths.
 ///
 /// Cell `(x, z)` covers world coordinates `[origin[0] + x * cell_size, ...)`
-/// and is stored at index `z * size + x` as `[roof_y, manual_mask, footprint_depth, 0.0]`:
+/// and is stored at index `z * size + x` as `[roof_y, manual_mask, footprint_depth, bank]`:
 /// - `roof_y`: highest solid blocker Y seen from above (`-1e9` if open sky).
 /// - `manual_mask`: `0.0` = auto, `-1.0` = painted Interior, `+1.0` = painted Exterior.
 /// - `footprint_depth`: `0.0` = untouched snow, `1.0` = deeply compressed footprint/trail.
+/// - `bank`: how far what stands here rises over the ground round it, in studs (spread a
+///   couple of cells outward), for the snow that drifts against it; `0.0` on open ground.
+///
+/// `footprint_depth` is the average over the cell, which is what the terrain's
+/// corners (a stud apart) are pressed down by; the shapes of the prints are in
+/// [`WeatherField::prints`], which the shading reads.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WeatherField {
     /// World X and Z of cell `(0, 0)`'s corner.
@@ -1491,6 +1524,8 @@ pub struct WeatherField {
     pub size: u32,
     /// `size * size` cells, row-major (`z * size + x`).
     pub cells: Vec<[f32; 4]>,
+    /// The fine map of what's pressed into the snow, while anything is.
+    pub prints: Option<WeatherPrints>,
 }
 
 impl WeatherField {
@@ -1502,6 +1537,136 @@ impl WeatherField {
             && self.origin[0].is_finite()
             && self.origin[1].is_finite()
             && self.cells.len() == (self.size as usize) * (self.size as usize)
+    }
+}
+
+/// Side of the snow print map in cells, and its cells to a stud: 64 studs
+/// around the camera at an eighth of a stud a cell.
+pub const WEATHER_PRINT_SIZE: u32 = 512;
+pub const WEATHER_PRINT_CELLS_PER_STUD: f32 = 8.0;
+/// How many levels a print cell's two numbers have to one whole depth, and
+/// the most a level can be: each is 12 bits. Must match `PRINT_LEVELS` in
+/// lighting.wgsl.
+pub const WEATHER_PRINT_LEVELS: f32 = 1024.0;
+pub const WEATHER_PRINT_MOST: u32 = 4095;
+
+/// The snow's prints as the shaders read them: [`WeatherPrintCells`], which
+/// change only when something presses the snow or the map moves, and how far
+/// the snow has filled them in since, which changes every frame.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WeatherPrints {
+    /// How much every print has filled in, in whole depths, on the clock the
+    /// cells were stamped by: a cell pressed to `press` shows as deep as
+    /// `press - fill`, and not at all from 0 down.
+    pub fill: f32,
+    pub cells: Arc<WeatherPrintCells>,
+}
+
+/// A fine world-space grid of what's pressed into the snow, around the
+/// camera (footprints, ruts, the hollow a thing lies in).
+///
+/// Cell `(x, z)` covers `1 / cells_per_stud` studs from
+/// `origin + (x, z) / cells_per_stud` and is at `z * size + x`, as one
+/// `f32` holding two whole numbers from 0 to [`WEATHER_PRINT_MOST`]:
+/// `press + 4096 * rim` ([`pack`](Self::pack)). Both are in
+/// [`WEATHER_PRINT_LEVELS`] to a whole depth and are stamped as their value
+/// plus [`WeatherPrints::fill`] at the time, so they needn't change as the
+/// snow fills the print in. `press` is how far the snow is pressed down, as
+/// a share of its depth; `rim` is how high the snow pushed out round a deep
+/// print stands, as a share of the most it can. 0 is untouched snow.
+#[derive(Clone, Debug)]
+pub struct WeatherPrintCells {
+    /// Which map this is: a new number for each one made, so a renderer
+    /// that has another's cells uploads these whole.
+    pub key: u64,
+    /// Goes up each time `cells` change.
+    pub version: u64,
+    /// World X and Z of cell `(0, 0)`'s corner.
+    pub origin: [f32; 2],
+    /// Cells to a stud (typically [`WEATHER_PRINT_CELLS_PER_STUD`]).
+    pub cells_per_stud: f32,
+    /// Cells along X and Z (typically [`WEATHER_PRINT_SIZE`]).
+    pub size: u32,
+    /// `size * size` cells, row-major.
+    pub cells: Vec<f32>,
+    /// For each row, the `version` at which it last changed, so a renderer
+    /// uploads only the rows that changed since the version it has.
+    pub row_versions: Vec<u64>,
+}
+
+impl WeatherPrintCells {
+    /// A cell's two numbers as the one `f32` it's kept as. An `f32` holds
+    /// whole numbers up to 2^24 exactly.
+    pub fn pack(press: u32, rim: u32) -> f32 {
+        (press.min(WEATHER_PRINT_MOST) + rim.min(WEATHER_PRINT_MOST) * 4096) as f32
+    }
+
+    /// A cell's `(press, rim)`.
+    pub fn unpack(cell: f32) -> (u32, u32) {
+        let packed = cell as u32;
+        (packed & 0xFFF, packed >> 12)
+    }
+
+    /// True when the map has valid dimensions and matching cell data.
+    pub fn is_valid(&self) -> bool {
+        let cells = (self.size as usize) * (self.size as usize);
+        self.size > 0
+            && self.size.is_multiple_of(4)
+            && self.cells_per_stud > 0.0
+            && self.cells_per_stud.is_finite()
+            && self.origin[0].is_finite()
+            && self.origin[1].is_finite()
+            && self.cells.len() == cells
+            && self.row_versions.len() == self.size as usize
+    }
+}
+
+/// The same map with the same cells: its `key` and `version` say so, so the
+/// megabyte of cells isn't compared.
+impl PartialEq for WeatherPrintCells {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key && self.version == other.version
+    }
+}
+
+/// The most [`WeatherBox`]es drawn at once. Must match `MAX_WEATHER_BOXES`
+/// in lighting.wgsl.
+pub const MAX_WEATHER_BOXES: usize = 8;
+
+/// A box that sets the weather inside it by hand, in place of the shelter
+/// found from roofs, interiors and painted cells ([`WeatherField`]): how
+/// much of the world's wetness and snow ([`Weather`]) surfaces inside it
+/// have. A porch that stays dry under open sky, or a shed the snow blows
+/// into under its roof.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WeatherBox {
+    /// Turns world space to the box's own: studs from its middle, along
+    /// its sides.
+    pub to_box: Mat4,
+    /// Half its size, in studs.
+    pub half_size: Vec3,
+    /// Studs over which it fades across its faces, half outside them and
+    /// half inside. 0 switches at the faces.
+    pub blend: f32,
+    /// How much of the world's wetness is inside, from 0 (dry) through 1
+    /// (as wet as under open sky) to 2 (the result is held to fully wet).
+    pub wetness: f32,
+    /// How much of the world's snow lies inside, from 0 (none) through 1
+    /// (as under open sky) to 2 (twice as deep; the cover is no whiter
+    /// than whole).
+    pub snow: f32,
+}
+
+impl Default for WeatherBox {
+    /// A shelter 20 × 12 × 20 studs around the origin: dry and bare inside.
+    fn default() -> Self {
+        Self {
+            to_box: Mat4::IDENTITY,
+            half_size: Vec3::new(10.0, 6.0, 10.0),
+            blend: 1.0,
+            wetness: 0.0,
+            snow: 0.0,
+        }
     }
 }
 
@@ -1802,11 +1967,17 @@ pub struct DrawItem {
 /// How a plant bends in the wind. Its corners move by their height above
 /// `base`: not at all at the ground, most at `base + height`. A plant drawn
 /// as several items gives each the same values, so its pieces bend as one.
+///
+/// What hangs (drapes, washing on a line) sways the other way up: a
+/// negative `height`, with `base` where it hangs from, keeps its top still
+/// and moves its foot most ([`Sway::hanging`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Sway {
-    /// The world height of the ground the plant stands on, in studs.
+    /// The world height of the ground the plant stands on, in studs (or of
+    /// what a hanging thing hangs from).
     pub base: f32,
-    /// How tall the plant is, in studs.
+    /// How tall the plant is, in studs. Negative for something that hangs
+    /// that far down from `base`.
     pub height: f32,
     /// How far it gives: 1 is grass, which leans about a quarter of its
     /// height in a strong wind. 0 keeps it still.
@@ -1817,19 +1988,30 @@ pub struct Sway {
 }
 
 impl Sway {
+    /// The sway of something hanging `length` studs down from `top` (a
+    /// world height): its top stays put and its foot swings.
+    pub fn hanging(top: f32, length: f32, strength: f32, flutter: f32) -> Self {
+        Self {
+            base: top,
+            height: -length.abs(),
+            strength,
+            flutter,
+        }
+    }
+
     /// The farthest a corner can move from where it rests, in studs, in a
     /// wind of any speed (see `swayed` in shader.wgsl).
     pub fn reach(&self) -> f32 {
         if self.is_still() {
             0.0
         } else {
-            self.height * self.strength * SWAY_REACH + self.flutter.max(0.0) * FLUTTER_REACH
+            self.height.abs() * self.strength * SWAY_REACH + self.flutter.max(0.0) * FLUTTER_REACH
         }
     }
 
     /// Whether the item doesn't move at all.
     pub fn is_still(&self) -> bool {
-        !(self.strength > 0.0 && self.height > 0.0 && self.base.is_finite())
+        !(self.strength > 0.0 && self.height.abs() > 0.0 && self.base.is_finite())
     }
 }
 

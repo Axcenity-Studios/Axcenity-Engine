@@ -288,6 +288,14 @@ impl Environment {
         }
     }
 
+    /// The sky's diffuse light on what faces straight up (lighting.wgsl's
+    /// `sky_irradiance` there), for the light sprites take (`sprites.rs`).
+    pub(super) fn light_from_above(&self) -> Vec3 {
+        let light = &self.harmonics;
+        (light[0] * 0.282095 + light[1] * 0.488603 - light[6] * 0.315392 - light[8] * 0.546274)
+            .max(Vec3::ZERO)
+    }
+
     /// The frame uniform's `environment` and `sky_light` (see lighting.wgsl).
     pub(super) fn uniform(&self) -> ([f32; 4], [[f32; 4]; 9]) {
         let Some(maps) = &self.maps else {

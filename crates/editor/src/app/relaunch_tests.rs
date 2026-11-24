@@ -50,7 +50,7 @@ fn position(world: &World, id: InstanceId) -> Vector3 {
 
 #[test]
 fn a_relaunch_carries_the_project_camera_selection_and_unsaved_edits() {
-    let folder = copy_of_example("hello-touched", "relaunch-edits");
+    let folder = copy_of_example("touched", "relaunch-edits");
     let world_file = std::fs::read_to_string(folder.join("world.json")).unwrap();
     let mut app = EditorApp::new(Some(&folder));
     let pad = edit_the_pad(&mut app);
@@ -149,7 +149,7 @@ fn a_relaunch_carries_the_project_camera_selection_and_unsaved_edits() {
 
 #[test]
 fn relaunching_during_play_continues_play_with_positions_and_properties_as_they_were() {
-    let folder = copy_of_example("hello-touched", "relaunch-play");
+    let folder = copy_of_example("touched", "relaunch-play");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     play_for(&mut app, 0.4);
@@ -203,7 +203,7 @@ fn relaunching_during_play_continues_play_with_positions_and_properties_as_they_
 
 #[test]
 fn relaunch_needs_a_rebuilt_editor_first() {
-    let folder = copy_of_example("hello-touched", "relaunch-refused");
+    let folder = copy_of_example("touched", "relaunch-refused");
     let mut app = EditorApp::new(Some(&folder));
     app.relaunch();
     assert!(app.launching.is_none(), "nothing was rebuilt yet");
@@ -211,7 +211,7 @@ fn relaunch_needs_a_rebuilt_editor_first() {
 
 #[test]
 fn restart_now_hands_off_to_this_editor_without_a_rebuild() {
-    let folder = copy_of_example("hello-touched", "restart-now");
+    let folder = copy_of_example("touched", "restart-now");
     let mut app = EditorApp::new(Some(&folder));
     edit_the_pad(&mut app);
     app.restart_editor();
@@ -267,7 +267,7 @@ fn a_compile_error_is_listed_with_links_and_fixing_it_rebuilds_and_offers_relaun
         "fn main() {\n    let x: u32 = \"not a number\";\n}\n",
     );
     let ctx = theme::test_context();
-    let mut app = EditorApp::new(Some(&copy_of_example("hello-touched", "rebuild-errors")));
+    let mut app = EditorApp::new(Some(&copy_of_example("touched", "rebuild-errors")));
     app.rebuilds = Rebuilds {
         source: EngineSource::at(&workspace),
         on_change: true,

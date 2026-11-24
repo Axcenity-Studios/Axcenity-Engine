@@ -1,4 +1,4 @@
-//! Phase 43: the hello-health example's lava, regeneration, fall damage
+//! Phase 43: the health example's lava, regeneration, fall damage
 //! and health bars, in the player's frame order.
 
 use axcenity_core::{InstanceId, Value, Vector3};
@@ -23,7 +23,7 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
-        let (world, scripts) = start_example("hello-health");
+        let (world, scripts) = start_example("health");
         Self {
             world,
             scripts,

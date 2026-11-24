@@ -8,12 +8,12 @@ S10k is the standard measurement scene. `axcenity-test --make-s10k <folder>` wri
 
 - **10,000 parts**: 9,000 anchored (a 440-stud floor, 8,899 grid blocks of three shapes and five heights, and 100 spinners) and 1,000 unanchored drops (balls and blocks) falling onto the middle of the grid. A script lifts 100 drops back up every second, so about the same number are always moving.
 - **200 Scripts**: 100 turn a spinner every `Heartbeat`; 97 loop on `task.wait` (0.1 to 0.5 s), read a block's position and recolor it; `drops`, `sounds` and `agents` drive the rest.
-- **50 looping Sounds** (hello-audio's chime), **20 animated characters** (hello-animation's Noodle, each with an Animator) along one edge, and **10 navigation agents** walking across the grid and back every 8 seconds.
+- **50 looping Sounds** (the `audio` sample's chime), **20 animated characters** (the `animation` sample's Noodle, each with an Animator) along one edge, and **10 navigation agents** walking across the grid and back every 8 seconds.
 - A SpawnLocation in a corner, so the player's and test runner's character stands clear of the grid.
 
 ## The crowd scene
 
-The crowd scene measures the multithreaded frame (unified Phase 93). `axcenity-test --make-crowd <folder>` writes it (`testing/src/crowd.rs`): the graphics reference scene (`examples/hello-graphics`, its world and files) with **200 animated characters** (hello-animation's Noodle, each with an Animator, in a 20 × 10 grid behind the reference objects; `crowd.server.lua` gives each a Speed from 0 to 4, so their poses differ) and **2,000 physics bodies** (a 20 × 10 × 10 block of balls and blocks over the floor's far half; the same script lifts 100 back up every second). Run it like S10k (`--bench 600` on any host). To compare thread counts, run it with `AXCENITY_ANIM_THREADS=1 AXCENITY_PHYSICS_THREADS=1 AXCENITY_RENDER_THREADS=1` and then without them (or with 8): the Animation step is where posing across threads shows, and the editor's Profiler lists posing time per thread under **Posing by thread**.
+The crowd scene measures the multithreaded frame (unified Phase 93). `axcenity-test --make-crowd <folder>` writes it (`testing/src/crowd.rs`): the graphics reference scene (`crates/samples/projects/graphics`, its world and files) with **200 animated characters** (the `animation` sample's Noodle, each with an Animator, in a 20 × 10 grid behind the reference objects; `crowd.server.lua` gives each a Speed from 0 to 4, so their poses differ) and **2,000 physics bodies** (a 20 × 10 × 10 block of balls and blocks over the floor's far half; the same script lifts 100 back up every second). Run it like S10k (`--bench 600` on any host). To compare thread counts, run it with `AXCENITY_ANIM_THREADS=1 AXCENITY_PHYSICS_THREADS=1 AXCENITY_RENDER_THREADS=1` and then without them (or with 8): the Animation step is where posing across threads shows, and the editor's Profiler lists posing time per thread under **Posing by thread**.
 
 ## The streaming world
 
@@ -90,7 +90,7 @@ Each kind of load has a scene that isolates it, measured the same way every time
 | Scenario | Where | How it's run |
 |---|---|---|
 | The owner's baseline: Temperate Dry Patch at Ultra 2560 × 1440 | `dry-patch-ultra-1440p` (check) | player `--bench`, demo camera |
-| Lightweight, minimal geometry | `bench_20_animated_characters` (41 small items), hello-part | render bench, player `--bench` |
+| Lightweight, minimal geometry | `bench_20_animated_characters` (41 small items), the `part` sample | render bench, player `--bench` |
 | Dense vegetation | Temperate Wet and Dry Patch (check), `bench_terrain_with_foliage` (20,000 plants) | player `--bench`, render bench |
 | Several large trees | Abandoned Farmhouse (check), the patches' two 0.7–1 M triangle oaks | player `--bench`; `profile_project`'s `no-large-meshes` isolates them |
 | High wind | any patch: `GlobalWind` is set; `profile_project`'s `no-wind` and `no-sway` measure it | `profile_project` |
@@ -180,13 +180,13 @@ The server had no clients connected, so its Network send is the replication diff
 
 Same container, release build, 120 frames, three runs each. Milliseconds; ranges are the three runs.
 
-| | hello-roads before | hello-roads after | hello-mesh before | hello-mesh after |
+| | the `roads` sample before | the `roads` sample after | the `mesh` sample before | the `mesh` sample after |
 |---|---|---|---|---|
 | First frame (= worst warm-up frame) | 2,069–5,431 | 341–398 | 1,226–1,500 | 139–166 |
 | Launch to first frame | 10,989–14,532 | 8,934–9,541 | 9,502–10,054 | 8,812–9,165 |
 | Frame, median | 14.2–15.1 | 15.2–16.4 | 41.2–41.6 | 40.9–42.5 |
 
-hello-roads draws four 4K JPEG maps and a model; hello-mesh two FBX prop sets with their textures. Before I11 the first frame decoded every texture on the main thread. Now the preload thread starts right after the project is read, so the decodes overlap the window and GPU start-up (about 8.5 s here, mostly lavapipe) and are done before the first frame; the splash hides nothing half-drawn. What's left of the first frame is mostly the CPU mipmaps and upload of the 4K textures (roadmap L2 moves those to import time). Steady-state frames are unchanged within run-to-run noise.
+the `roads` sample draws four 4K JPEG maps and a model; the `mesh` sample two FBX prop sets with their textures. Before I11 the first frame decoded every texture on the main thread. Now the preload thread starts right after the project is read, so the decodes overlap the window and GPU start-up (about 8.5 s here, mostly lavapipe) and are done before the first frame; the splash hides nothing half-drawn. What's left of the first frame is mostly the CPU mipmaps and upload of the 4K textures (roadmap L2 moves those to import time). Steady-state frames are unchanged within run-to-run noise.
 
 ### Loading off the lock (M5)
 
@@ -340,7 +340,7 @@ Physics fell by about 22% on the test runner and 18% on the server (29% and 28% 
 
 - **Sync** reads only what changed: physics no longer reads back what it wrote itself, and reparents read just the parts they touched. What's left is the 100 spinners a script turns every frame and the walk comparing each part's revision.
 - **Write-back** is once per frame and looks only at awake bodies. It saves little on S10k because none of its 1,000 drops ever sleeps: they rest in one pile (one rapier island), and the drops script lifts 100 of them every second, which keeps the whole island awake. The ~1,100 parts written each frame cost about 0.8 µs each in `World::set_property` (string-keyed properties and the change log; roadmap L1 and M6). A world whose bodies come to rest now writes nothing. The benchmarks run one 60 Hz step per frame, so writing once per frame instead of once per step only pays when frames are slower than 60 Hz.
-- **rapier's `parallel`** took about 1 ms (17%) off rapier's step on 4 cores, more in the 95th percentile, and should gain more on a desktop with more cores. In tiny scenes it costs a little: `hello-physics` 0.008 → 0.011 ms and `hello-vehicle` 0.05–0.07 → 0.19 ms a frame. A pile of 150 parts lands exactly the same way with and without it, with any number of threads.
+- **rapier's `parallel`** took about 1 ms (17%) off rapier's step on 4 cores, more in the 95th percentile, and should gain more on a desktop with more cores. In tiny scenes it costs a little: `physics` 0.008 → 0.011 ms and `vehicle` 0.05–0.07 → 0.19 ms a frame. A pile of 150 parts lands exactly the same way with and without it, with any number of threads.
 
 The real projects (General Store Roadside, Abandoned Farmhouse, The Dimming, the biome patches) weren't run for M3: they're on the Windows desktop, not in the container.
 
@@ -428,7 +428,7 @@ What's left is about evenly split between painting (text and boxes from CSS valu
 
 ### Cooked textures (L2, first part)
 
-Taken on 2026-11-10 in the Linux cloud container (4 vCPUs, lavapipe), release build, hello-roads (four 4096² JPEG maps on a SurfaceAppearance), after `axcenity-editor --cook examples/hello-roads` ([rendering/textures.md](rendering/textures.md)). Upload times are from temporary timers around `upload_texture`, on the player's first frame.
+Taken on 2026-11-10 in the Linux cloud container (4 vCPUs, lavapipe), release build, the `roads` sample (four 4096² JPEG maps on a SurfaceAppearance), after `axcenity-editor --cook crates/samples/projects/roads` ([rendering/textures.md](rendering/textures.md)). Upload times are from temporary timers around `upload_texture`, on the player's first frame.
 
 | | Before (decode, CPU mips, RGBA8) | Cooked (BC7) |
 |---|---|---|
@@ -439,7 +439,7 @@ Taken on 2026-11-10 in the Linux cloud container (4 vCPUs, lavapipe), release bu
 
 - **The CPU's part of the first frame drops by about 230 ms** here (four maps), and by the same per map on any machine: no mipmaps to make and a quarter of the bytes to copy. Abandoned Farmhouse, whose 2.7–3 s first frame was this work for many embedded 4K maps (above), is the project to measure it on with a real GPU.
 - **The first frame on lavapipe didn't change**, because lavapipe does the GPU's work on the CPU too: it decodes BC7 in software on every sample, which costs what the upload saved. The steady frame stayed within noise (Render median 17.8–21.5 ms both ways). On a real GPU BC7 sampling is free, so this needs the Windows desktop to show.
-- **Cooking** took 32 s for hello-roads' 28 images (20 of them 4096²) on the container's 4 cores, once; 418 MB of cooked copies. Image quality with the "very fast" settings, PSNR against the source: 35.8 dB for the color map, 47.4 dB for roughness, 28.1 dB for the normal map ("basic" settings: 36.3, 47.7, 30.4). Normal maps would do better as BC5, which needs the shader to rebuild z; not done yet.
+- **Cooking** took 32 s for the `roads` sample' 28 images (20 of them 4096²) on the container's 4 cores, once; 418 MB of cooked copies. Image quality with the "very fast" settings, PSNR against the source: 35.8 dB for the color map, 47.4 dB for roughness, 28.1 dB for the normal map ("basic" settings: 36.3, 47.7, 30.4). Normal maps would do better as BC5, which needs the shader to rebuild z; not done yet.
 
 ### Cached simpler copies (L2, offline LODs)
 
@@ -521,7 +521,7 @@ The player's first frame was 130 to 152 ms, and launch to first frame 3.3 s (7.0
   - The regression check at 15965da recorded first frame 212 ms and launch to assets in 1,579 ms, against 1,054 and 4,692 ms at 300bbb5 (`benchmarks/baselines.json`). General Store Roadside and Temperate Wet Patch also start faster: first frame 1,230 to 446 ms and 820 to 268 ms.
   - **Still open:** its steady frame is 5.4 ms, about 0.6 ms above 300bbb5's 4.77, not yet explained. The check's `known` note says so.
 - **Editor Play and M1** (the possible 5.9% slowdown measured on the cloud container): `bench_project_play` on S10k, `4da1528` (before M1) against `1832da8` (M1's merge), seven alternating pinned rounds of 600 frames. The frame's median is 5.99 ms before and 5.09 ms after (ranges 5.05–6.48 and 4.57–5.22), Physics 3.34 → 2.29 ms, and the worst frame 13.8–17.2 → 5.9–6.9 ms. M1 made editor Play faster, not slower.
-- **`bench_project` and `shoot_project` drew cooked textures uncooked** until their device asked for BC compression (`bench_gpu` in `player/src/bench_tests.rs`); a cooked hello-character now takes 0.2 s for its first 24 frames instead of 1.2 s. Numbers from those tools on cooked projects before that fix are the uncooked path's.
+- **`bench_project` and `shoot_project` drew cooked textures uncooked** until their device asked for BC compression (`bench_gpu` in `player/src/bench_tests.rs`); a cooked the `character` sample now takes 0.2 s for its first 24 frames instead of 1.2 s. Numbers from those tools on cooked projects before that fix are the uncooked path's.
 
 ### The mouse's ray and mesh hulls (Input)
 
@@ -616,16 +616,16 @@ The roadmap said to measure the ratio before compressing `.axgame` files. Each e
 
 | Game | Version 1 (main) | Version 2 (zstd per entry) | Unpack, main | Unpack, version 2 |
 |---|---|---|---|---|
-| hello-roads (four 4K maps) | 830 | 745 | 210 | 166 |
-| hello-character | 454 | 387 | 135 | 98 |
-| hello-events | 207 | 163 | 66 | 63 |
-| hello-part | 109 | 87 | 34 | 31 |
-| hello-mesh | 17 | 13 | 10 | 11 |
+| the `roads` sample (four 4K maps) | 830 | 745 | 210 | 166 |
+| the `character` sample | 454 | 387 | 135 | 98 |
+| the `events` sample | 207 | 163 | 66 | 63 |
+| the `part` sample | 109 | 87 | 34 | 31 |
+| the `mesh` sample | 17 | 13 | 10 | 11 |
 | S10k (no textures) | 10 | 0.2 | 30 | 41 |
 
-- **Compressing is worth little for textures, a lot for worlds.** zstd over the whole file found 0.72–0.90 for cooked games (BC7 data) and 0.98–1.0 for uncooked ones (PNG and JPEG are compressed already), but `world.json` shrinks about 50×. Level 9 gave 0.81 where level 3 gave 0.83, at twice the time, so entries use level 3. Building takes longer: hello-roads packs in 3.3 s instead of 1.0 s.
-- **Unpacking on several threads** makes up for the decompression; on one thread hello-roads took 520 ms.
-- **The bigger size cost is shipping each texture twice**: a cooked game carried both the source image and its cooked copy (hello-roads: 393 MB before cooking, 830 MB after). Build Game now leaves out sources that have a current cooked copy (roadmap G12, [rendering/textures.md](rendering/textures.md)): hello-character 369 → 212 MB, hello-roads 711 → 337 MB (version 2 packs, `build_game::tests::cooked_only_sizes`).
+- **Compressing is worth little for textures, a lot for worlds.** zstd over the whole file found 0.72–0.90 for cooked games (BC7 data) and 0.98–1.0 for uncooked ones (PNG and JPEG are compressed already), but `world.json` shrinks about 50×. Level 9 gave 0.81 where level 3 gave 0.83, at twice the time, so entries use level 3. Building takes longer: the `roads` sample packs in 3.3 s instead of 1.0 s.
+- **Unpacking on several threads** makes up for the decompression; on one thread the `roads` sample took 520 ms.
+- **The bigger size cost is shipping each texture twice**: a cooked game carried both the source image and its cooked copy (the `roads` sample: 393 MB before cooking, 830 MB after). Build Game now leaves out sources that have a current cooked copy (roadmap G12, [rendering/textures.md](rendering/textures.md)): the `character` sample 369 → 212 MB, the `roads` sample 711 → 337 MB (version 2 packs, `build_game::tests::cooked_only_sizes`).
 - **Reading in place** (no temporary copy) would need a file layer under the project loader, `assets`, `scene` and the player (about 600 file calls); with unpacking at 30–170 ms here it isn't the bottleneck.
 
 ### Collaborate on S10k (C11)

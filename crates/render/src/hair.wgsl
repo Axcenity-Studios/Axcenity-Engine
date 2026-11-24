@@ -284,10 +284,18 @@ fn hair_surface(
     let tilt = HAIR_TILT * maps.shading.z * (1.0 + HAIR_SHIFT_SPREAD * (2.0 * data.g - 1.0));
     let secondary = maps.shading.w;
 
-    let sun = sun_arrival(world_position, geometric, pixel, solid);
+    let sun_parts = sun_arrival_parts(world_position, geometric, pixel, solid);
+    let sun = sun_parts.arrival;
     let sun_visible = sun.visible * hair_shell(outward, sun.l);
     var lit = hair_scatter(t, v, sun.l, colour, roughness, tilt, secondary, sun_visible)
         * sun.radiance * sun_visible;
+    let flash = lightning_arrival(world_position, sun.l, sun_parts.shadow);
+    if flash.radiance.b > 0.0 {
+        let flash_visible = flash.visible * hair_shell(outward, flash.l);
+        lit += hair_scatter(t, v, flash.l, colour, roughness, tilt, secondary, flash_visible)
+            * flash.radiance * flash_visible
+            + lightning_fill(world_position, outward, colour, flash);
+    }
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {

@@ -261,7 +261,8 @@ fn a_blender_model_opened_and_saved_unchanged_keeps_its_geometry_uvs_and_materia
     // DamagedHelmet was exported from Blender with its textures embedded;
     // importing copies them out, as the editor does.
     let project = temp_folder("helmet");
-    let source = example("examples/hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
+    let source =
+        example("crates/samples/projects/pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
     let (mesh_id, original) = axcenity_assets::import_model(&project, &source).unwrap();
     let path = project.join(&mesh_id);
     let folder = path.parent().unwrap();

@@ -2,6 +2,8 @@
 
 A `GraphicsVolume` (graphics Phase 33) is a Part that gives a place its own look: while the camera is inside its box, the effects inside it replace that part of the world's look, and over `BlendDistance` studs outside it the look fades in and out. Walking into a cave can raise the exposure, bring in cold fog and cool the colors, then hand them back on the way out. These are look settings, saved with the world; the machine's graphics settings ([settings.md](settings.md)) are separate and untouched.
 
+A `WeatherVolume` is not a GraphicsVolume: it sets the rain, snow and wetness in its box in the world, wherever the camera is, not a look the camera takes on ([weather.md](weather.md#weather-volumes)).
+
 ## The volume
 
 Everything a Part has, with its own defaults: anchored, `CanCollide` and `CanQuery` off, `Transparency` 1 (invisible, so nothing of it is drawn), no shadow, 20 × 12 × 20 studs. Its box is its `Position`, `Orientation` and `Size`, turned with it.
@@ -42,6 +44,6 @@ Environment maps are re-baked when the sky changes ([sky.md](sky.md)), so an Atm
 
 **Fog Volume** and **Interior** on the Lighting ribbon insert a big volume of haze or a room's interior, each with its FogEffect set up ([fog.md](fog.md)). **Graphics Volume** on the Lighting ribbon (and the Explorer's Insert menu) inserts one into the Workspace standing on the ground. **Exposure**, **Fog** and **Bloom** beside it insert their effect into the selected volume, or into a new one with none selected. **Color Correction** and **Atmosphere** go into a selected volume too, and otherwise into Lighting. Properties shows the volume's **Graphics Volume** section and each effect's **Effect** section (a `FogEffect`'s `Color` is under Appearance).
 
-`examples/hello-volumes` has a cave with two volumes: CaveLook (brighter exposure, cold blue fog, a cool tint, stronger bloom) and, at the back, Embers (warm fog and tint at `Priority` 1). Fly in, or press V to glide in and out.
+`crates/samples/projects/volumes` has a cave with two volumes: CaveLook (brighter exposure, cold blue fog, a cool tint, stronger bloom) and, at the back, Embers (warm fog and tint at `Priority` 1). Fly in, or press V to glide in and out.
 
-Tests: `scene` `graphics_volumes::tests` (blending in and out over the distance, priority, a turned box, fog, bloom, color correction and Atmosphere, and a world without volumes). `player` `volume_tests` (hello-volumes drawn: half the look halfway into the blend, and the higher priority winning). `editor` `app::tests::graphics_volumes_hold_the_effects_inserted_into_them`.
+Tests: `scene` `graphics_volumes::tests` (blending in and out over the distance, priority, a turned box, fog, bloom, color correction and Atmosphere, and a world without volumes). `player` `volume_tests` (the `volumes` sample drawn: half the look halfway into the blend, and the higher priority winning). `editor` `app::tests::graphics_volumes_hold_the_effects_inserted_into_them`.

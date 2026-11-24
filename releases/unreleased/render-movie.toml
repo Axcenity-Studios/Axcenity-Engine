@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "editor"
+title = "Render a cutscene as a movie from the Sequencer"
+details = "The Sequencer's Render Movie button draws the open sequence frame by frame into an H.264 or AV1 MP4, a lossless FFV1 MKV (through the ffmpeg on your computer) or a folder of PNGs, up to 4K and at the best graphics your computer can draw, with ray tracing where the graphics card has it. Camera cuts can now dissolve (in rendered movies) or fade through a color (everywhere), and a sequence can key the time of day, the weather, the wind, lights and lens effects such as depth of field. `axcenity-editor --render-movie` renders without the window."
+features = ["editor.render-movie", "editor.sequencer"]

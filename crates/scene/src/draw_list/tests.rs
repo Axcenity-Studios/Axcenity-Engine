@@ -254,7 +254,7 @@ fn parts_outside_workspace_are_not_drawn() {
 }
 
 fn example_assets() -> Assets {
-    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh"))
+    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh"))
 }
 
 fn mesh_part(world: &mut World, mesh_id: &str) -> InstanceId {
@@ -297,7 +297,7 @@ fn a_surface_appearance_replaces_its_materials_maps() {
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(&project).unwrap();
     let pyramid = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-mesh/assets/models/pyramid.gltf");
+        .join("../samples/projects/mesh/assets/models/pyramid.gltf");
     let (mesh_id, model) = axcenity_assets::import_model(&project, &pyramid).unwrap();
     let base = model.primitives[0]
         .material
@@ -569,7 +569,7 @@ fn a_point_lights_shadows_start_past_its_own_part_on_each_side() {
 }
 
 fn examples() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects")
 }
 
 #[test]
@@ -577,7 +577,7 @@ fn a_mesh_part_hands_over_its_models_simpler_copies_with_an_id_of_its_own() {
     let mut world = World::new();
     let helmet = "assets/models/DamagedHelmet/DamagedHelmet.glb";
     let (a, b) = (mesh_part(&mut world, helmet), mesh_part(&mut world, helmet));
-    let assets = Assets::new(examples().join("hello-pbr"));
+    let assets = Assets::new(examples().join("pbr"));
     let list = build_draw_list(&world, &assets, camera());
     assert_eq!(list.items.len(), 2);
     let [first, second] = [&list.items[0], &list.items[1]];
@@ -604,7 +604,7 @@ fn a_mesh_part_hands_over_its_models_simpler_copies_with_an_id_of_its_own() {
 }
 
 fn csg_assets() -> Assets {
-    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-csg"))
+    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/csg"))
 }
 
 #[test]

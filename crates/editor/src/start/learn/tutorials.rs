@@ -1,5 +1,5 @@
 //! What the tutorials say. Each one is a single task that follows a sample
-//! project in `examples/`; a test checks every sample still opens and plays.
+//! project in `crates/samples/projects/`; a test checks every sample still opens and plays.
 //! Text between backticks is shown in the code font.
 
 use super::pictures::Picture;
@@ -11,7 +11,7 @@ pub(in crate::start) struct Tutorial {
     pub(in crate::start) icon: &'static str,
     /// One sentence for its card.
     pub(in crate::start) summary: &'static str,
-    /// The sample's folder in `examples/`.
+    /// The sample's folder in `crates/samples/projects/`.
     pub(in crate::start) sample: &'static str,
     /// The sample's name, as its `axcenity.json` has it.
     pub(in crate::start) sample_name: &'static str,
@@ -60,7 +60,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Place and move a part",
         icon: icons::CUBE,
         summary: "Insert a block, then move, resize and rotate it with the handles.",
-        sample: "hello-part",
+        sample: "part",
         sample_name: "Hello Part",
         steps: &[
             Step {
@@ -118,7 +118,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Run a script",
         icon: icons::CODE,
         summary: "Open a Lua script, write your own, and see what it prints.",
-        sample: "hello-script",
+        sample: "script",
         sample_name: "Hello Script",
         steps: &[
             Step {
@@ -187,7 +187,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Press Play and Stop",
         icon: icons::PLAY,
         summary: "Run the game in the viewport, watch it, and go back to editing.",
-        sample: "hello-touched",
+        sample: "touched",
         sample_name: "Hello Touched",
         steps: &[
             Step {
@@ -258,19 +258,19 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Open a sample",
         icon: icons::FOLDER_OPEN,
         summary: "Open any sample project, look inside it, and run it.",
-        sample: "hello-physics",
+        sample: "physics",
         sample_name: "Hello Physics",
         steps: &[
             Step {
                 title: "Where samples live",
-                text: "Samples are in the engine's `examples` folder. Each one is an ordinary \
+                text: "Samples are in the engine's `crates/samples/projects` folder. Each one is an ordinary \
                        project folder: `axcenity.json` names it, `world.json` holds the \
                        world, and `scripts` holds its scripts.",
                 picture: Some(Picture::Tree {
                     title: "Files",
                     rows: &[
-                        (0, icons::FOLDER, "examples"),
-                        (1, icons::FOLDER_OPEN, "hello-physics"),
+                        (0, icons::FOLDER, "projects"),
+                        (1, icons::FOLDER_OPEN, "physics"),
                         (2, icons::FILE, "axcenity.json"),
                         (2, icons::FILE, "world.json"),
                         (2, icons::FOLDER, "scripts"),
@@ -313,7 +313,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
             Step {
                 title: "Run it without the editor",
                 text: "Every sample also runs in the player. From the engine's folder, run \
-                       `cargo run -p axcenity-player -- examples/hello-physics`.",
+                       `cargo run -p axcenity-player -- crates/samples/projects/physics`.",
                 picture: None,
             },
         ],
@@ -323,7 +323,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Build with blocks",
         icon: icons::PUZZLE_PIECE,
         summary: "Snap a script together from blocks and see the Lua it becomes.",
-        sample: "hello-touched-blocks",
+        sample: "touched-blocks",
         sample_name: "Hello Touched (Blocks)",
         steps: &[
             Step {
@@ -368,7 +368,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Wait and repeat",
         icon: icons::ARROWS_CLOCKWISE,
         summary: "Make things happen over time with task.wait and loops.",
-        sample: "hello-tasks",
+        sample: "tasks",
         sample_name: "Hello Tasks",
         steps: &[
             Step {
@@ -407,7 +407,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Make a menu",
         icon: icons::LAYOUT,
         summary: "Put a menu on the screen and make its button do something.",
-        sample: "hello-ui",
+        sample: "ui",
         sample_name: "Hello UI",
         steps: &[
             Step {
@@ -471,7 +471,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Light a scene",
         icon: icons::LIGHTBULB,
         summary: "Add point, spot and rect lights, in parts or on their own, and tune them.",
-        sample: "hello-lights",
+        sample: "lights",
         sample_name: "Hello Lights",
         steps: &[
             Step {
@@ -541,7 +541,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Play a sound",
         icon: icons::SPEAKER_HIGH,
         summary: "Add sounds, preview them, and play them from a script.",
-        sample: "hello-audio",
+        sample: "audio",
         sample_name: "Hello Audio",
         steps: &[
             Step {
@@ -590,7 +590,7 @@ pub(in crate::start) const TUTORIALS: &[Tutorial] = &[
         title: "Send a message to the server",
         icon: icons::BROADCAST,
         summary: "Read keys on the player's side and move a block on the server.",
-        sample: "hello-remote",
+        sample: "remote",
         sample_name: "Hello Remote",
         steps: &[
             Step {

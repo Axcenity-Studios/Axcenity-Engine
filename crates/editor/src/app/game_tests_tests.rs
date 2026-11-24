@@ -1,4 +1,4 @@
-//! Phase 53: the Tests panel on copies of the hello-character example: its
+//! Phase 53: the Tests panel on copies of the character example: its
 //! runs give what `axcenity-test` gives, a failure opens its spec at the
 //! line, and saving runs the last tests again.
 
@@ -44,7 +44,7 @@ fn panel_results(app: &EditorApp) -> Vec<(String, String, Option<String>)> {
 
 #[test]
 fn the_panel_runs_the_same_tests_as_the_command_line_with_the_same_results() {
-    let folder = copy_of_example("hello-character", "tests-panel");
+    let folder = copy_of_example("character", "tests-panel");
     let world = folder.join("world.json");
     let text = std::fs::read_to_string(&world).unwrap();
     std::fs::write(
@@ -83,7 +83,7 @@ fn the_panel_runs_the_same_tests_as_the_command_line_with_the_same_results() {
 
 #[test]
 fn a_failures_location_opens_the_spec_at_that_line() {
-    let folder = copy_of_example("hello-character", "tests-open");
+    let folder = copy_of_example("character", "tests-open");
     let mut app = EditorApp::new(Some(&folder));
     // What clicking `tests/walk.spec.lua:14` does.
     app.open_spec(SPEC, 14);
@@ -96,7 +96,7 @@ fn a_failures_location_opens_the_spec_at_that_line() {
 
 #[test]
 fn saving_a_spec_reruns_the_last_tests_and_adds_no_script() {
-    let folder = copy_of_example("hello-character", "tests-rerun");
+    let folder = copy_of_example("character", "tests-rerun");
     let mut app = EditorApp::new(Some(&folder));
     let scripts = app.project.as_ref().unwrap().scripts.len();
     app.run_tests(Selection::One {

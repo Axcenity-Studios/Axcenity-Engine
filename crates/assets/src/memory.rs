@@ -107,13 +107,13 @@ mod tests {
 
     fn example(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples")
+            .join("../samples/projects")
             .join(name)
     }
 
     #[test]
     fn a_models_triangles_and_its_images_are_counted_once_each() {
-        let assets = Assets::new(example("hello-pbr"));
+        let assets = Assets::new(example("pbr"));
         assert_eq!(assets.memory(), AssetMemory::default(), "nothing loaded");
         let path = "assets/models/DamagedHelmet/DamagedHelmet.glb";
         let model = assets.model_blocking(path).unwrap();
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_texture_file_counts_its_pixels() {
-        let assets = Assets::new(example("hello-decals"));
+        let assets = Assets::new(example("decals"));
         let image = assets
             .texture_blocking("assets/textures/arrow.png")
             .unwrap();

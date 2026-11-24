@@ -305,11 +305,11 @@ fn a_jump_goes_through_jumping_freefall_and_landed_to_running() {
     );
 }
 
-/// A floor and hello-character's Mixamo character on it, with a Ragdoll
+/// A floor and character's Mixamo character on it, with a Ragdoll
 /// built, a Health and a Humanoid with RagdollOnDeath.
 fn dummy() -> (Game, InstanceId, InstanceId, InstanceId) {
     let assets =
-        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-character"));
+        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/character"));
     let mut world = World::new();
     floor(&mut world);
     let workspace = world.workspace();

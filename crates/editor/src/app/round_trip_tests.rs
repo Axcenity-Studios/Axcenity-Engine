@@ -133,7 +133,7 @@ fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
         std::env::temp_dir().join(format!("axcenity-round-trip-older-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&parent);
     std::fs::create_dir_all(&parent).unwrap();
-    let folder = super::tests::copy_of_example("hello-character", "round-trip-older");
+    let folder = super::tests::copy_of_example("character", "round-trip-older");
     axcenity_project::add_default_humanoid(&folder).unwrap();
     let prefab = folder.join(axcenity_project::DEFAULT_CHARACTER_PREFAB_PATH);
     let old_prefab = std::fs::read_to_string(&prefab).unwrap();

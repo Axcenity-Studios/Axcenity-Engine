@@ -1,4 +1,4 @@
-//! The Animator Inspector's snapshot of the `hello-animation` noodle.
+//! The Animator Inspector's snapshot of the `animation` noodle.
 
 use std::path::Path;
 
@@ -10,7 +10,7 @@ use crate::Animators;
 #[test]
 fn inspecting_shows_the_state_its_fade_what_plays_over_it_and_what_fired() {
     let assets =
-        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation"));
+        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation"));
     let mut world = World::new();
     let workspace = world.workspace();
     let model = world.create(ClassName::Model).unwrap();

@@ -105,7 +105,7 @@ mod tests {
             return;
         };
         let folder =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-graphics");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/graphics");
         let world = axcenity_project::load(&folder).unwrap().world;
         let assets = axcenity_assets::Assets::new(&folder);
         let camera = axcenity_scene::FlyCamera::looking_at(Vec3::new(12.0, 8.0, 16.0), Vec3::ZERO)

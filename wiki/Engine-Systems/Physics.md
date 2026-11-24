@@ -57,7 +57,7 @@ Frame steps (from [Frame schedule](Frame-Schedule.md)): `physics.hold` (network-
 | Drag properties (CP6, container, 7 alternating rounds, step medians) | 1k bodies 1.18 → 1.33 ms, 5k 5.10 → 5.37, 10k 10.56 → 10.99: within this container's ±20% swing; recheck on the PC |
 | What's left on S10k | Mostly rapier itself; ~0.8 µs per `World::set_property` in write-back for ~1,100 moving parts; 58% of S10k frame instructions are physics (PR #59 Callgrind) |
 
-`parallel` costs a little in tiny scenes (`hello-vehicle` 0.05–0.07 → 0.19 ms).
+`parallel` costs a little in tiny scenes (`vehicle` 0.05–0.07 → 0.19 ms).
 
 ## Interpolation (G3)
 

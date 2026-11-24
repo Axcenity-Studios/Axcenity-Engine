@@ -1,4 +1,4 @@
-//! Phase 75 in the editor: hello-decals' decals in Play are the ones the
+//! Phase 75 in the editor: decals' decals in Play are the ones the
 //! exported game draws, the placed ones and those its script spawns.
 
 use axcenity_render::glam::Vec3;
@@ -43,7 +43,7 @@ fn decals_of(list: &DrawList) -> (Vec<String>, Vec<String>) {
 
 #[test]
 fn decals_in_play_are_the_ones_the_exported_game_draws() {
-    let folder = copy_of_example("hello-decals", "decals-play");
+    let folder = copy_of_example("decals", "decals-play");
     let camera = Camera {
         position: Vec3::new(12.0, 8.0, 16.0),
         look_at: Vec3::ZERO,

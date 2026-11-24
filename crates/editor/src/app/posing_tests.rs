@@ -60,7 +60,7 @@ fn played(app: &EditorApp, noodle: InstanceId) -> std::sync::Arc<Posed> {
 
 #[test]
 fn a_three_key_wave_made_on_an_imported_rig_plays_in_the_preview_a_state_and_play() {
-    let folder = copy_of_example("hello-animation", "wave");
+    let folder = copy_of_example("animation", "wave");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     let model = app.assets.model_blocking(NOODLE).unwrap();
@@ -165,7 +165,7 @@ fn a_three_key_wave_made_on_an_imported_rig_plays_in_the_preview_a_state_and_pla
 
 #[test]
 fn a_linked_clips_take_bones_are_locked_until_convert_to_keys_which_looks_the_same() {
-    let folder = copy_of_example("hello-animation", "convert-to-keys");
+    let folder = copy_of_example("animation", "convert-to-keys");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     let rest = app
@@ -359,7 +359,7 @@ pub(super) fn plays_as_previewed(app: &mut EditorApp, noodle: InstanceId, what: 
 
 #[test]
 fn a_bones_first_turn_after_the_start_also_keys_it_at_rest_at_0_so_it_moves() {
-    let folder = copy_of_example("hello-animation", "start-key");
+    let folder = copy_of_example("animation", "start-key");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     let rig = app
@@ -421,7 +421,7 @@ fn a_bones_first_turn_after_the_start_also_keys_it_at_rest_at_0_so_it_moves() {
 
 #[test]
 fn smooth_linear_and_constant_keys_made_by_posing_play_the_same_in_the_preview_and_in_play() {
-    let folder = copy_of_example("hello-animation", "eased-wave");
+    let folder = copy_of_example("animation", "eased-wave");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     let rig = app
@@ -496,7 +496,7 @@ fn smooth_linear_and_constant_keys_made_by_posing_play_the_same_in_the_preview_a
 
 #[test]
 fn a_linked_clips_own_bone_keys_use_new_keys_which_stays_picked_from_clip_to_clip() {
-    let folder = copy_of_example("hello-animation", "linked-new-keys");
+    let folder = copy_of_example("animation", "linked-new-keys");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     app.animation.open_for(
@@ -551,7 +551,7 @@ fn a_linked_clips_own_bone_keys_use_new_keys_which_stays_picked_from_clip_to_cli
 
 #[test]
 fn making_keys_and_changing_their_easing_undo_and_redo_with_their_values_and_easing() {
-    let folder = copy_of_example("hello-animation", "easing-undo");
+    let folder = copy_of_example("animation", "easing-undo");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     app.animate(noodle);
@@ -629,7 +629,7 @@ fn making_keys_and_changing_their_easing_undo_and_redo_with_their_values_and_eas
 /// clip's edits: undo puts the file and the open clip back, redo again.
 #[test]
 fn a_linked_clips_range_change_is_one_undo_step() {
-    let folder = copy_of_example("hello-animation", "linked-clip-undo");
+    let folder = copy_of_example("animation", "linked-clip-undo");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     app.animation.open_for(

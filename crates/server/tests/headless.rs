@@ -21,7 +21,7 @@ impl Drop for Running {
 
 #[test]
 fn the_server_runs_headless_and_a_player_joins_it() {
-    let example = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/hello-part");
+    let example = concat!(env!("CARGO_MANIFEST_DIR"), "/../samples/projects/part");
     let mut command = Command::new(env!("CARGO_BIN_EXE_axcenity-server"));
     command
         .args([example, "--port", "0", "--no-port-map"])

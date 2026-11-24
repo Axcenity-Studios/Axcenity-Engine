@@ -42,10 +42,10 @@ pub(super) fn bare_remote(name: &str) -> String {
     format!("file://{}", dir.to_string_lossy().replace('\\', "/"))
 }
 
-/// A copy of hello-part linked to a new bare remote, as connecting it in
+/// A copy of part linked to a new bare remote, as connecting it in
 /// the panel would leave it.
 pub(super) fn linked_project(name: &str) -> (std::path::PathBuf, String) {
-    let folder = copy_of_example("hello-part", name);
+    let folder = copy_of_example("part", name);
     let url = bare_remote(name);
     let spec = RemoteSpec {
         url: url.clone(),
@@ -143,7 +143,7 @@ fn saves_become_checkpoints_that_reach_the_repository() {
 
 #[test]
 fn a_project_without_a_repository_never_runs_git() {
-    let folder = copy_of_example("hello-part", "repo-none");
+    let folder = copy_of_example("part", "repo-none");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     for _ in 0..3 {
@@ -329,7 +329,7 @@ fn the_project_section_shows_the_repository_and_its_history() {
 
 #[test]
 fn a_project_without_a_repository_offers_to_connect_one_and_the_host_offer_is_kept() {
-    let folder = copy_of_example("hello-part", "repo-panel-none");
+    let folder = copy_of_example("part", "repo-panel-none");
     let mut app = EditorApp::new(Some(&folder));
     app.repo.manager = Some(manager());
     app.repo_frame();

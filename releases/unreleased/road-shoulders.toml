@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "terrain"
+title = "Roads blend into the ground: a shoulder layer with a ragged edge, and foliage that thins out beside them"
+details = "A Terrain Path has a Shoulder Layer: Apply to Terrain paints it (gravel or dust, say) from the road's edge out over the Falloff, and Edge Noise breaks that outer edge up so the road doesn't end in a clean line (Noise Scale sets how long the bulges are; 0 is the even edge as before, and the default is 0.5, so an Apply that painted an even edge before now paints a ragged one). Apply also takes the painted foliage (the Scatter pane's) off the road, and both it and scatter rules thin out over Clear Falloff beside the road instead of stopping at a line. Still one undo step. An existing world's scatter rules thin out over 4 studs beside its Terrain Paths; set Clear Falloff to 0 for the clean edge."
+features = ["terrain.studio"]

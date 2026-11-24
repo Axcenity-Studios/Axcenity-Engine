@@ -54,8 +54,8 @@ step "The player has no editor code" no_editor_code
 step "Clippy" cargo clippy --workspace --all-targets --locked -- -D warnings
 step "Every test" all_tests
 step "Doc tests" cargo test --workspace --doc --locked
-step "axcenity-test examples/hello-character" \
-    cargo run -p axcenity-testing --locked -- examples/hello-character
+step "axcenity-test crates/samples/projects/character" \
+    cargo run -p axcenity-testing --locked -- crates/samples/projects/character
 step "axcenity-server with no display" headless_server
 
 mkdir -p target

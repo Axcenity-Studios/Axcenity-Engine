@@ -1023,7 +1023,7 @@ fn remove_from(dir: &AssetDirectory, db: &Database, item: &Item) -> Result<(), S
 }
 
 /// Opens `folder` in the system's file manager.
-fn open_folder(folder: &Path) -> std::io::Result<()> {
+pub(crate) fn open_folder(folder: &Path) -> std::io::Result<()> {
     let opener = if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {

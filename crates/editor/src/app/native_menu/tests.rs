@@ -36,7 +36,7 @@ fn find(menus: &[TopMenu], title: &str, label: &str) -> MenuItem {
 
 #[test]
 fn the_menus_are_laid_out_the_mac_way() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let menus = app.native_menus();
     let titles: Vec<&str> = menus.iter().map(|menu| menu.title).collect();
     assert_eq!(
@@ -94,7 +94,7 @@ fn items_follow_the_editor_state() {
     assert!(find(&menus, "File", "Open Project…").enabled);
     assert!(!find(&menus, "Help", "Learn").enabled);
 
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let menus = app.native_menus();
     assert!(find(&menus, "File", "Save").enabled);
     assert!(!find(&menus, "Edit", "Undo").enabled, "nothing to undo yet");
@@ -114,7 +114,7 @@ fn items_follow_the_editor_state() {
     );
 
     // While a project loads, nothing but About and Quit.
-    app.start_loading(&ctx, &example("hello-part"), None);
+    app.start_loading(&ctx, &example("part"), None);
     let menus = app.native_menus();
     let on: Vec<String> = menus
         .iter()
@@ -128,7 +128,7 @@ fn items_follow_the_editor_state() {
 #[test]
 fn every_command_item_is_on_when_the_palette_says_it_can_run() {
     let ctx = theme::test_context();
-    for folder in [None, Some(example("hello-touched"))] {
+    for folder in [None, Some(example("touched"))] {
         let mut app = EditorApp::new(folder.as_deref());
         let menus = app.native_menus();
         let commands = app.palette_commands(&ctx);
@@ -154,7 +154,7 @@ fn every_command_item_is_on_when_the_palette_says_it_can_run() {
 #[test]
 fn build_game_has_the_loading_screen_and_its_time() {
     // A copy: choosing writes the project's manifest.
-    let folder = copy_of_example("hello-touched", "native-menu-loading");
+    let folder = copy_of_example("touched", "native-menu-loading");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let splash = find(&app.native_menus(), "File", "Axcenity splash");

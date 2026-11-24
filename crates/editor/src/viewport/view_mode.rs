@@ -131,7 +131,7 @@ mod tests {
         }
     }
 
-    /// hello-graphics (the graphics reference scene) from the player's
+    /// graphics (the graphics reference scene) from the player's
     /// starting camera, in every mode, then lit again. With
     /// `AXCENITY_SNAPSHOTS` naming a folder, each mode's frame is saved
     /// there to look at.
@@ -155,7 +155,7 @@ mod tests {
             return;
         };
         let folder =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-graphics");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/graphics");
         let project = axcenity_project::load(&folder).unwrap();
         let assets = axcenity_assets::Assets::new(&folder);
         let camera = axcenity_scene::FlyCamera::looking_at(Vec3::new(12.0, 8.0, 16.0), Vec3::ZERO);

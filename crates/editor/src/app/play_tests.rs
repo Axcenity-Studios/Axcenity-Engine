@@ -24,7 +24,7 @@ fn everything(app: &EditorApp) -> (Vec<String>, String, usize, Option<String>, b
 
 #[test]
 fn play_runs_the_milestone_1_demo_in_the_editor() {
-    let folder = example("hello-touched");
+    let folder = example("touched");
     let file_before = std::fs::read_to_string(folder.join("world.json")).unwrap();
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
@@ -74,7 +74,7 @@ fn play_runs_the_milestone_1_demo_in_the_editor() {
 
 #[test]
 fn an_endless_loop_during_play_is_stopped_and_the_editor_carries_on() {
-    let folder = copy_of_example("hello-touched", "endless-loop");
+    let folder = copy_of_example("touched", "endless-loop");
     std::fs::write(
         folder.join("scripts/stuck.server.lua"),
         "print('looping')\nwhile true do\nend\n",
@@ -116,7 +116,7 @@ fn an_endless_loop_during_play_is_stopped_and_the_editor_carries_on() {
 
 #[test]
 fn stop_puts_every_instance_and_property_back_as_before_play() {
-    let folder = copy_of_example("hello-touched", "play-stop");
+    let folder = copy_of_example("touched", "play-stop");
     let mut app = EditorApp::new(Some(&folder));
     // Some edits first: a moved pad, a new Model with a part in it, and a
     // deleted Folder that undo still holds outside the tree.
@@ -160,7 +160,7 @@ fn stop_puts_every_instance_and_property_back_as_before_play() {
 
 #[test]
 fn something_the_game_made_is_unselected_at_stop() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     app.play();
     play_for(&mut app, 3.1);
     let game = shown(&app.world, &app.play);
@@ -172,7 +172,7 @@ fn something_the_game_made_is_unselected_at_stop() {
 
 #[test]
 fn play_saves_unsaved_changes_first_and_does_not_start_if_saving_fails() {
-    let folder = copy_of_example("hello-touched", "play-save");
+    let folder = copy_of_example("touched", "play-save");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.apply(pad, Edit::Name("Launch Pad".to_string()));
@@ -195,7 +195,7 @@ fn play_saves_unsaved_changes_first_and_does_not_start_if_saving_fails() {
 
 #[test]
 fn play_runs_the_script_file_as_it_is_now() {
-    let folder = copy_of_example("hello-touched", "play-reread");
+    let folder = copy_of_example("touched", "play-reread");
     let mut app = EditorApp::new(Some(&folder));
     std::fs::write(
         folder.join("scripts/pad.server.lua"),
@@ -222,7 +222,7 @@ fn play_runs_the_script_file_as_it_is_now() {
 
 #[test]
 fn an_engine_panic_during_play_is_reported_and_goes_back_to_editing() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let before = everything(&app);
     app.play();
     play_for(&mut app, 1.0);
@@ -252,7 +252,7 @@ fn an_engine_panic_during_play_is_reported_and_goes_back_to_editing() {
 #[test]
 fn only_properties_can_be_edited_while_playing_and_stop_undoes_them() {
     // A copy, because Play saves the unsaved edit below.
-    let folder = copy_of_example("hello-touched", "play-read-only");
+    let folder = copy_of_example("touched", "play-read-only");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.apply(pad, Edit::Property("Anchored", Value::Bool(false)));
@@ -287,7 +287,7 @@ fn only_properties_can_be_edited_while_playing_and_stop_undoes_them() {
 #[test]
 fn editing_a_property_during_play_fires_changed_in_the_game() {
     // A copy: opening an example from an older format upgrades it.
-    let folder = copy_of_example("hello-events", "edit-during-play");
+    let folder = copy_of_example("events", "edit-during-play");
     let mut app = EditorApp::new(Some(&folder));
     let lamp = part(&app, "Lamp");
     app.play();
@@ -310,7 +310,7 @@ fn editing_a_property_during_play_fires_changed_in_the_game() {
 
 #[test]
 fn f5_plays_and_shift_f5_stops() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     press(&mut app, egui::Modifiers::SHIFT, egui::Key::F5);
     assert!(!app.playing());
     press(&mut app, egui::Modifiers::NONE, egui::Key::F5);
@@ -345,7 +345,7 @@ fn files_in(folder: &std::path::Path) -> std::collections::BTreeMap<std::path::P
 fn saving_during_play_writes_the_players_data_not_the_project_and_stop_restores_the_world() {
     use axcenity_core::KeyCode;
     use axcenity_script::KeyEvent;
-    let folder = copy_of_example("hello-saves", "saves-play");
+    let folder = copy_of_example("saves", "saves-play");
     let saves = super::session::play_save_folder("Hello Saves").unwrap();
     let _ = std::fs::remove_dir_all(&saves);
     let mut app = EditorApp::new(Some(&folder));
@@ -417,7 +417,7 @@ fn saving_during_play_writes_the_players_data_not_the_project_and_stop_restores_
 
 #[test]
 fn a_checkpoint_inserted_on_a_part_stands_on_top_of_it_in_the_workspace() {
-    let mut app = EditorApp::new(Some(&example("hello-saves")));
+    let mut app = EditorApp::new(Some(&example("saves")));
     let pad = part(&app, "Pad");
     let checkpoint = inserted(&mut app, Insertable::Checkpoint, Some(pad));
     let instance = app.world.get(checkpoint).unwrap();
@@ -428,7 +428,7 @@ fn a_checkpoint_inserted_on_a_part_stands_on_top_of_it_in_the_workspace() {
         property(&app, checkpoint, "Position"),
         vector(20.0, 0.1, 10.0)
     );
-    // hello-saves has a Checkpoint already, so this one is numbered.
+    // saves has a Checkpoint already, so this one is numbered.
     assert_eq!(app.history.undo_label(), Some("Insert Checkpoint2"));
 }
 
@@ -440,7 +440,7 @@ fn rebinding_jump_to_e_in_the_input_map_makes_both_controllers_jump_on_e_in_play
     let mut map = InputMap::default();
     map.rebind("Jump", vec![Input::Key(KeyCode::E)]).unwrap();
     for first_person in [false, true] {
-        let folder = copy_of_example("hello-character", &format!("rebind-jump-{first_person}"));
+        let folder = copy_of_example("character", &format!("rebind-jump-{first_person}"));
         axcenity_project::save_input_map(&folder, &map).unwrap();
         let mut app = EditorApp::new(Some(&folder));
         let model = part(&app, "Character");

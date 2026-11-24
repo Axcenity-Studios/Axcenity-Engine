@@ -12,7 +12,7 @@ const SIZE: egui::Vec2 = egui::vec2(1500.0, 950.0);
 /// A project with a new Script switched to Blocks, its tab open, and the
 /// part "Block" selected. Returns the app, the script's path and its tab.
 fn block_script_open(test: &str) -> (EditorApp, String, u64) {
-    let folder = copy_of_example("hello-part", test);
+    let folder = copy_of_example("part", test);
     let mut app = EditorApp::new(Some(&folder));
     app.insert_script(ClassName::Script);
     let code_path = app.tabs.active_path().unwrap().to_owned();

@@ -144,12 +144,12 @@ Nothing else changes; Phase 9 redesigns the dialog.
 - Every path to a moved file is rewritten (state machines, Instances, blend trees).
 - An old Animation stays where it is, so scripts that find it keep working, and gains an Animator beside it on the same parent.
 - `animation:Play()`, `Stop`, `Pause`, `Resume` and `Completed` keep working through that Animator. They report once in Console that `animator:LoadAnimation(animation)` is the new way.
-- `examples/hello-animation` and `examples/hello-door` are rewritten in the new shape, and hello-door's script uses `LoadAnimation`.
+- `crates/samples/projects/animation` and `crates/samples/projects/door` are rewritten in the new shape, and the `door` sample's script uses `LoadAnimation`.
 
 ### Acceptance criteria
 
 - [ ] A project saved before this phase opens, is migrated once, and plays the same in Play.
-- [x] hello-door (using `LoadAnimation`) and hello-animation play as before, and tests check their files are saved as the engine writes them.
+- [x] the `door` sample (using `LoadAnimation`) and the `animation` sample play as before, and tests check their files are saved as the engine writes them.
 - [x] One clip that is linked to a take and also keys a sword Part's Transparency plays both.
 - [ ] A track from `LoadAnimation` plays over a state machine's Walk, and `Stop(0.3)` fades it out.
 

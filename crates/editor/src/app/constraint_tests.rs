@@ -77,7 +77,7 @@ fn select(app: &mut EditorApp, ids: &[InstanceId]) {
 
 #[test]
 fn the_weld_button_welds_the_selection_to_its_largest_part() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let small = inserted(&mut app, Insertable::Part(PartType::Block), None);
     let big = inserted(&mut app, Insertable::Part(PartType::Block), None);
     set(&mut app, big, "Size", v(6.0, 1.0, 6.0));
@@ -124,7 +124,7 @@ fn the_weld_button_welds_the_selection_to_its_largest_part() {
 
 #[test]
 fn attachments_keep_their_offsets_when_the_part_moves_and_save_and_reload() {
-    let folder = copy_of_example("hello-part", "attachment-offsets");
+    let folder = copy_of_example("part", "attachment-offsets");
     let mut app = EditorApp::new(Some(&folder));
     let block = part(&app, "Block");
     select(&mut app, &[block]);
@@ -172,7 +172,7 @@ fn attachments_keep_their_offsets_when_the_part_moves_and_save_and_reload() {
 
 #[test]
 fn moving_a_selected_attachment_moves_it_in_the_world_and_stores_its_offset_on_the_turned_part() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let block = inserted(&mut app, Insertable::Part(PartType::Block), None);
     // Turned a quarter around Y: its own X points along the world's -Z.
     set(&mut app, block, "Orientation", v(0.0, 90.0, 0.0));
@@ -201,7 +201,7 @@ fn moving_a_selected_attachment_moves_it_in_the_world_and_stores_its_offset_on_t
 
 #[test]
 fn the_constraints_overlay_draws_welds_and_attachments() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let a = inserted(&mut app, Insertable::Part(PartType::Block), None);
     let b = inserted(&mut app, Insertable::Part(PartType::Block), None);
     set(&mut app, a, "Position", v(-4.0, 2.0, 0.0));
@@ -250,7 +250,7 @@ fn the_constraints_overlay_draws_welds_and_attachments() {
 
 #[test]
 fn join_surfaces_welds_a_moved_part_to_the_parts_it_is_left_touching_as_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let place = |app: &mut EditorApp, at: Vec3| {
         let id = inserted(app, Insertable::Part(PartType::Block), None);
         for (name, value) in [("Position", at), ("Size", Vec3::splat(2.0))] {

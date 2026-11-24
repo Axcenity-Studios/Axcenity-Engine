@@ -631,8 +631,9 @@ impl ControllerDoc {
             .returns
             .as_ref()
             .is_some_and(|r| matches!(r.when, ReturnWhen::Finished) && r.to == default_target);
-        if !is_default && !default_target.is_empty() {
-            if ui
+        if !is_default
+            && !default_target.is_empty()
+            && ui
                 .checkbox(
                     &mut auto_return,
                     egui::RichText::new("Auto-Return to Default (on finish)").strong(),
@@ -641,13 +642,12 @@ impl ControllerDoc {
                     "Automatically return to the default state when this clip finishes — no manual return wire needed.",
                 )
                 .changed()
-            {
-                state.returns = auto_return.then(|| ReturnDef {
-                    to: default_target.clone(),
-                    when: ReturnWhen::Finished,
-                    blend: DEFAULT_BLEND,
-                });
-            }
+        {
+            state.returns = auto_return.then(|| ReturnDef {
+                to: default_target.clone(),
+                when: ReturnWhen::Finished,
+                blend: DEFAULT_BLEND,
+            });
         }
 
         let is_custom = state.returns.is_some() && !auto_return;

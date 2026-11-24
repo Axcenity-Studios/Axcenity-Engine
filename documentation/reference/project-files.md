@@ -1,7 +1,7 @@
 ---
 description: What's in a project folder, each file format and what it holds, the per-computer .axcenity folder, upgrading older projects, version history, backups and what a built game contains.
 icon: file
-samples: [hello-part, hello-levels]
+samples: [part, levels]
 ---
 
 # Project structure and file formats
@@ -18,7 +18,7 @@ A project is a folder of readable text files plus your assets, so it works well 
 | `scripts/` | Scripts: `.server.lua`, `.client.lua`, `.module.lua`, and block scripts `.server.blocks.json` and `.client.blocks.json`. |
 | `objects/` | The code of scripts that live inside objects, shared by every copy. |
 | `ui/` (or anywhere) | `.css` stylesheets, and UI Event Graphs (`.uigraph.json`). |
-| `assets/` | Models, textures, sounds, fonts, skies, materials (`.material.json`), texture sets (`.texture.json`), prefabs (`.prefab.json`), data tables (`.data.json`), animations, sequences, dialogues and behaviour trees. |
+| `assets/` | Models, textures, sounds, fonts, skies, materials (`.material.json`), texture sets (`.texture.json`), prefabs (`.prefab.json`), data tables (`.data.json`), animations, sequences, environment presets (`.environment.json`), dialogues and behaviour trees. |
 | `strings.json` | The string table: UI text in each language. |
 | `input.json` | The input map: actions and the keys and buttons bound to them. |
 | `collision-groups.json` | Collision groups and which collide. |

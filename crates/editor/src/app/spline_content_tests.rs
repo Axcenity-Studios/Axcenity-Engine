@@ -38,7 +38,7 @@ fn layout(app: &EditorApp, generator: InstanceId) -> Vec<(Vector3, Vector3)> {
 
 #[test]
 fn moving_a_spline_point_makes_its_scatter_again_and_reopening_gives_the_same_layout() {
-    let folder = copy_of_example("hello-roads", "spline-scatter-move");
+    let folder = copy_of_example("roads", "spline-scatter-move");
     let mut app = EditorApp::new(Some(&folder));
     app.generate_frame();
     let trees = find(&app, &["Treeline", "Trees"]);
@@ -78,7 +78,7 @@ fn first_ids(app: &EditorApp, generator: InstanceId) -> Vec<InstanceId> {
 
 #[test]
 fn a_scatter_saves_only_its_settings_until_bake_keeps_what_it_made_as_one_step() {
-    let folder = copy_of_example("hello-roads", "spline-scatter-bake");
+    let folder = copy_of_example("roads", "spline-scatter-bake");
     let mut app = EditorApp::new(Some(&folder));
     app.generate_frame();
     let woods = find(&app, &["Grove", "Woods"]);
@@ -120,7 +120,7 @@ fn a_scatter_saves_only_its_settings_until_bake_keeps_what_it_made_as_one_step()
 
 #[test]
 fn baking_a_road_saves_its_bent_pieces_which_load_as_they_were() {
-    let folder = copy_of_example("hello-roads", "spline-mesh-bake");
+    let folder = copy_of_example("roads", "spline-mesh-bake");
     let mut app = EditorApp::new(Some(&folder));
     app.generate_frame();
     let asphalt = find(&app, &["Road", "Asphalt"]);
@@ -152,7 +152,7 @@ fn baking_a_road_saves_its_bent_pieces_which_load_as_they_were() {
 
 #[test]
 fn insert_puts_a_spline_mesh_in_the_selected_spline_and_assets_clicks_pick_its_models() {
-    let folder = copy_of_example("hello-roads", "spline-insert");
+    let folder = copy_of_example("roads", "spline-insert");
     let mut app = EditorApp::new(Some(&folder));
     let road = find(&app, &["Road"]);
     let mesh = inserted(&mut app, Insertable::SplineMesh, Some(road));
@@ -188,8 +188,8 @@ fn insert_puts_a_spline_mesh_in_the_selected_spline_and_assets_clicks_pick_its_m
 
 #[test]
 fn flatten_terrain_along_levels_a_road_wide_strip_as_one_step() {
-    // hello-part has a 512-stud Terrain from y = -32 to 96.
-    let folder = copy_of_example("hello-part", "spline-flatten");
+    // part has a 512-stud Terrain from y = -32 to 96.
+    let folder = copy_of_example("part", "spline-flatten");
     let mut app = EditorApp::new(Some(&folder));
     let terrain = app
         .world

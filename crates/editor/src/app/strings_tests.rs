@@ -63,7 +63,7 @@ fn count(texts: &[String], text: &str) -> usize {
     texts.iter().filter(|each| *each == text).count()
 }
 
-/// hello-strings' Menu ScreenGui and its Panel.
+/// strings' Menu ScreenGui and its Panel.
 fn menu(app: &EditorApp) -> (InstanceId, InstanceId) {
     let gui = app
         .world
@@ -74,7 +74,7 @@ fn menu(app: &EditorApp) -> (InstanceId, InstanceId) {
 
 #[test]
 fn a_label_bound_in_the_designer_shows_its_entry_in_the_designer_and_in_play() {
-    let folder = copy_of_example("hello-strings", "strings-bound-label");
+    let folder = copy_of_example("strings", "strings-bound-label");
     let mut app = EditorApp::new(Some(&folder));
     let (gui, panel) = menu(&app);
 
@@ -158,7 +158,7 @@ fn a_label_bound_in_the_designer_shows_its_entry_in_the_designer_and_in_play() {
 
 #[test]
 fn the_strings_tab_edits_the_table_as_undo_steps_and_saves_it() {
-    let folder = copy_of_example("hello-strings", "strings-tab");
+    let folder = copy_of_example("strings", "strings-tab");
     let mut app = EditorApp::new(Some(&folder));
     let original = app.world.strings().clone();
     let table = |app: &EditorApp| (**app.world.strings()).clone();
@@ -240,7 +240,7 @@ fn the_strings_tab_edits_the_table_as_undo_steps_and_saves_it() {
 
 #[test]
 fn the_strings_tab_lists_the_keys_and_fits_any_shape() {
-    let folder = copy_of_example("hello-strings", "strings-tab-shapes");
+    let folder = copy_of_example("strings", "strings-tab-shapes");
     let mut app = EditorApp::new(Some(&folder));
     let (gui, _) = menu(&app);
     act(&mut app, DesignerAction::Select(Some(gui)));

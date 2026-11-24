@@ -136,7 +136,7 @@ fn cooking_a_project_writes_copies_that_assets_then_loads() {
 fn a_models_embedded_textures_load_from_their_cooked_copies() {
     let folder = project("embedded");
     let helmet = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
+        .join("../samples/projects/pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
     // Importing copies the .glb's embedded images out as files.
     let (mesh_id, imported) = axcenity_assets::import_model(&folder, &helmet).unwrap();
     let stop = AtomicBool::new(false);
@@ -247,7 +247,7 @@ fn a_models_embedded_textures_are_cooked_in_place_when_it_wasnt_imported() {
     let model = "assets/models/DamagedHelmet.glb";
     std::fs::create_dir_all(folder.join("assets/models")).unwrap();
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
+        .join("../samples/projects/pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
     // Dropped into assets/ by hand: nothing copied out.
     fs::copy(&example, folder.join(model)).unwrap();
     let decoded = Assets::new(&folder).model_blocking(model).expect("loads");
@@ -295,7 +295,7 @@ fn a_models_embedded_textures_are_cooked_in_place_when_it_wasnt_imported() {
     // Replaced by a model with other images: the old copies go once no
     // model uses them.
     let other = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/primitives/assets/models/AWP.glb");
+        .join("../samples/projects/primitives/assets/models/AWP.glb");
     fs::copy(other, folder.join(model)).unwrap();
     let replaced = cook_project(&folder, &stop, |_, _| {});
     assert_eq!(replaced.removed, copies.len(), "{replaced:?}");
@@ -309,7 +309,7 @@ fn a_models_embedded_textures_are_cooked_in_place_when_it_wasnt_imported() {
 fn models_embedding_the_same_image_share_one_cooked_copy() {
     let folder = project("shared-embedded");
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
+        .join("../samples/projects/pbr/assets/models/DamagedHelmet/DamagedHelmet.glb");
     fs::create_dir_all(folder.join("assets/a")).unwrap();
     fs::create_dir_all(folder.join("assets/b")).unwrap();
     let (first, second) = ("assets/a/Helmet.glb", "assets/b/Helmet.glb");
@@ -418,20 +418,17 @@ fn maps_of(model: &axcenity_assets::Model) -> Vec<(String, bool, bool, Vec<u8>)>
 
 #[test]
 fn a_model_with_embedded_maps_loads_the_same_cooked_as_uncooked() {
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     for (example, name) in [
         (
-            "hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb",
+            "pbr/assets/models/DamagedHelmet/DamagedHelmet.glb",
             "Helmet.glb",
         ),
         ("primitives/assets/models/AWP.glb", "AWP.glb"),
         // Its image is a `data:` URI.
-        ("hello-mesh/assets/models/pyramid.gltf", "pyramid.gltf"),
+        ("mesh/assets/models/pyramid.gltf", "pyramid.gltf"),
         // An FBX with its maps inside.
-        (
-            "hello-character/assets/models/Walking/Walking.fbx",
-            "Walking.fbx",
-        ),
+        ("character/assets/models/Walking/Walking.fbx", "Walking.fbx"),
     ] {
         let folder = project(&format!("parity-{name}"));
         let model = format!("assets/models/{name}");

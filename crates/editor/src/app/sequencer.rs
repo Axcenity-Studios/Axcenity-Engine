@@ -28,6 +28,7 @@ impl EditorApp {
             .as_deref()
             .map(axcenity_project::level_names)
             .unwrap_or_default();
+        let presets = self.environment_presets.names(&self.assets).to_vec();
         let picked = self.selected.and_then(|id| {
             let instance = self.world.get(id)?;
             Some(Picked {
@@ -42,6 +43,7 @@ impl EditorApp {
             files: &files,
             clips: &clips,
             levels: &levels,
+            presets: &presets,
             picked,
             world: &self.world,
             camera: (position, orientation),
@@ -53,6 +55,7 @@ impl EditorApp {
                 SequencerAction::Open(path) => self.open_sequence(&path),
                 SequencerAction::New(name) => self.new_sequence(&name),
                 SequencerAction::Insert(path) => self.insert_sequence(&path),
+                SequencerAction::RenderMovie => self.open_render_movie(),
             }
         }
         self.flush_sequence(ui.ctx());

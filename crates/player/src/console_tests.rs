@@ -20,11 +20,11 @@ task.wait(1)
 print("a second of game time")
 "#;
 
-/// `hello-part` with a script that registers `heal`, built into a
+/// `part` with a script that registers `heal`, built into a
 /// `game.axgame` as File > Build Game does, with the Developer Console
 /// setting `on` or off. Returns the built game's path.
 fn built_game(name: &str, on: bool) -> PathBuf {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-part");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/part");
     let root = std::env::temp_dir().join(format!(
         "axcenity-player-console-{name}-{}-{:?}",
         std::process::id(),

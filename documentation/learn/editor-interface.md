@@ -1,12 +1,14 @@
 ---
 description: The window, the ribbon, the panels and how to arrange them, the camera, search, settings and plugins.
 icon: layout
-samples: [hello-part, hello-plugins]
+samples: [part, plugins]
 ---
 
 # Editor interface
 
 The editor is one window: a header with the menus and a **search box**, a **ribbon** of tools under it, and a docking area of **panels** below. Everything you can click is also reachable from the keyboard through search.
+
+![Annotated Axcenity Editor workspace layout showing (1) Header menus and Ctrl+K search, (2) Task ribbon tabs and tools, (3) 3D Scene viewport with transform gizmo and view cube, (4) Explorer hierarchy, (5) Properties inspector, and (6) Console and Assets dock.](../images/editor-layout.png)
 
 ## The header and menus
 
@@ -88,7 +90,7 @@ Plugins are Lua scripts that add tools to the editor: buttons on the ribbon's **
 - **Export** on a plugin saves it as one `.axcenity-plugin` file to send to someone. **Import plugin…**, in the Plugins panel or the Toolbox's **Packs** menu, installs one. A package may only hold `plugin.json`, `.lua` and `.css` files.
 - A plugin can only read and write the project's files if its `plugin.json` asks for the `files` permission.
 
-The [hello-plugins](https://github.com/MrBearson321/Axcenity-Engine/tree/main/examples/hello-plugins) sample has two worked plugins.
+The [plugins](https://github.com/MrBearson321/Axcenity-Engine/tree/main/crates/samples/projects/plugins) sample has two worked plugins.
 
 ## Keyboard shortcuts you'll use most
 

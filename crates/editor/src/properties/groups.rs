@@ -12,7 +12,7 @@ pub struct Section {
 
 /// The groups, in panel order, and which properties go in each. Name and
 /// ClassName come first, under "Data", and aren't in the property map.
-pub(super) const GROUPS: [(&str, &[&str]); 36] = [
+pub(super) const GROUPS: [(&str, &[&str]); 37] = [
     (
         "Appearance",
         &[
@@ -254,6 +254,7 @@ pub(super) const GROUPS: [(&str, &[&str]); 36] = [
             "Wetness",
             "SnowCover",
             "SnowThickness",
+            "Lightning",
             "TransitionTime",
             "OcclusionEnabled",
             "FootprintsEnabled",
@@ -289,6 +290,17 @@ pub(super) const GROUPS: [(&str, &[&str]); 36] = [
         ],
     ),
     ("Graphics Volume", &["Enabled", "BlendDistance", "Priority"]),
+    (
+        "Weather Volume",
+        &[
+            "Enabled",
+            "Precipitation",
+            "Snow",
+            "Wetness",
+            "BlendDistance",
+            "Priority",
+        ],
+    ),
     (
         "Effect",
         &[
@@ -374,6 +386,7 @@ pub(super) const GROUPS: [(&str, &[&str]); 36] = [
             "FlipbookFramerate",
             "FlipbookStartRandom",
             "LightEmission",
+            "LightInfluence",
             "Brightness",
         ],
     ),
@@ -440,6 +453,7 @@ pub fn sections(instance: &Instance) -> Vec<Section> {
             "Color Correction" => instance.class() == ClassName::ColorCorrectionEffect,
             "Lens" => instance.class().is_lens_effect(),
             "Graphics Volume" => instance.class() == ClassName::GraphicsVolume,
+            "Weather Volume" => instance.class() == ClassName::WeatherVolume,
             "Effect" => matches!(
                 instance.class(),
                 ClassName::ExposureEffect | ClassName::FogEffect | ClassName::BloomEffect
@@ -529,9 +543,13 @@ pub fn is_advanced(class: ClassName, name: &str) -> bool {
         ]
     } else {
         match class {
-            ClassName::ParticleEmitter => {
-                &["Drag", "WindAffectsDrag", "LightEmission", "Brightness"]
-            }
+            ClassName::ParticleEmitter => &[
+                "Drag",
+                "WindAffectsDrag",
+                "LightEmission",
+                "LightInfluence",
+                "Brightness",
+            ],
             ClassName::Sound => &["RollOffMinDistance", "RollOffMaxDistance", "SoundGroup"],
             ClassName::Model => &["ModelStreamingMode"],
             _ => &[],

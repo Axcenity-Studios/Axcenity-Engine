@@ -8,7 +8,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use glam::camera::rh;
-use glam::{Mat3, Mat4, Vec2, Vec3};
+use glam::{Mat3, Mat4, Vec2, Vec3, Vec4};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::DecalRole;
@@ -29,7 +29,7 @@ use super::{
     MAX_LIGHTS, MAX_POINT_SHADOWS, MAX_SPOT_SHADOW_DEGREES, MAX_SPOT_SHADOWS, MAX_SUN_SIZE,
     MAX_TILES, MIN_TILE_SIZE, MapsUniform, MaterialKey, MeshKey, NEAR_PLANE, POINT_SHADOW_SPREAD,
     PointShadow, PostUniform, SHADING_CLOTH, SHADING_HAIR, SHADING_SKIN, SHADING_STANDARD,
-    SHADING_TOON, SHADING_UNLIT, SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow,
+    SHADING_TOON, SHADING_UNLIT, SHADOW_CASCADES, SHADOW_CASTER_RANGE, SpotShadow, WeatherBoxRaw,
 };
 use crate::{HairShading, SKIN_MAKEUP_LAYERS, SURFACE_PARAMETERS, SkinLayers};
 
@@ -126,6 +126,9 @@ pub(super) fn frame_uniform(
         0.0
     };
 
+    let [rain, snowfall, ..] = precipitation_uniform(&list.weather);
+    let (weather_boxes, weather_box_count) = weather_boxes_uniform(list, camera.position);
+
     FrameUniform {
         view_proj: view_proj.to_cols_array_2d(),
         camera_position: camera.position.extend(1.0).to_array(),
@@ -168,13 +171,64 @@ pub(super) fn frame_uniform(
         clouds: Default::default(),
         weather: weather_uniform(&list.weather),
         weather_bounds: [0.0; 4],
+        precipitation: [rain, snowfall, weather_box_count as f32, 0.0],
         // Filled in while ray traced shadows are drawn.
         ray_shadows: [0.0; 4],
         // And while ray traced reflections are.
         ray_reflections: [0.0; 4],
-        // And while TAA is on.
-        noise: [0.0; 4],
+        // And while TAA is on (x and y). z: how often lightning flashes
+        // (`lightning` in lighting.wgsl).
+        noise: [0.0, 0.0, lightning_uniform(&list.weather), 0.0],
+        weather_boxes,
+        // Filled in while the snow has prints.
+        weather_prints: [0.0; 4],
     }
+}
+
+/// The weather boxes as `Frame::weather_boxes` holds them, and how many:
+/// none while surfaces are dry and bare (the shaders skip the weather
+/// then), and otherwise the [`crate::MAX_WEATHER_BOXES`] nearest `camera`
+/// (inside one counting as 0 away), in the order the list has them, which
+/// is the order they apply. One that can't be drawn is left out.
+fn weather_boxes_uniform(
+    list: &DrawList,
+    camera: Vec3,
+) -> ([WeatherBoxRaw; crate::MAX_WEATHER_BOXES], usize) {
+    let mut raw = [WeatherBoxRaw::default(); crate::MAX_WEATHER_BOXES];
+    if list.weather.is_clear() || list.weather_boxes.is_empty() {
+        return (raw, 0);
+    }
+    // Each with its place in the list and how far outside it the camera is.
+    let mut found: Vec<(usize, f32, WeatherBoxRaw)> = list
+        .weather_boxes
+        .iter()
+        .filter_map(WeatherBoxRaw::new)
+        .enumerate()
+        .map(|(order, raw)| {
+            let local = if camera.is_finite() {
+                // `rows` is the box's matrix, a row to a vector.
+                Vec3::from_array(
+                    raw.rows
+                        .map(|row| Vec4::from_array(row).dot(camera.extend(1.0))),
+                )
+            } else {
+                Vec3::ZERO
+            };
+            let half_size = Vec3::new(raw.extent[0], raw.extent[1], raw.extent[2]);
+            let outside = (local.abs() - half_size).max(Vec3::ZERO).length();
+            (order, outside, raw)
+        })
+        .collect();
+    if found.len() > crate::MAX_WEATHER_BOXES {
+        // A stable sort: of two as near, the earlier is kept.
+        found.sort_by(|a, b| a.1.total_cmp(&b.1));
+        found.truncate(crate::MAX_WEATHER_BOXES);
+        found.sort_by_key(|&(order, ..)| order);
+    }
+    for (slot, (_, _, weather_box)) in raw.iter_mut().zip(&found) {
+        *slot = *weather_box;
+    }
+    (raw, found.len())
 }
 
 /// The weather as `Frame::weather` holds it: wetness and snow cover (each
@@ -192,6 +246,23 @@ fn weather_uniform(weather: &crate::Weather) -> [f32; 4] {
         0.0
     };
     [share(weather.wetness), snow, thickness, 0.0]
+}
+
+/// What falls now, as `Frame::precipitation` holds it: rain and snowfall,
+/// each held to 0 to 1 (a NaN counts as none).
+fn precipitation_uniform(weather: &crate::Weather) -> [f32; 4] {
+    let share = |value: f32| if value > 0.0 { value.min(1.0) } else { 0.0 };
+    [share(weather.rain), share(weather.snowfall), 0.0, 0.0]
+}
+
+/// How often lightning flashes, as `Frame::noise.z` holds it: 0 to 1 (a NaN
+/// counts as never).
+fn lightning_uniform(weather: &crate::Weather) -> f32 {
+    if weather.lightning > 0.0 {
+        weather.lightning.min(1.0)
+    } else {
+        0.0
+    }
 }
 
 /// The lights to draw, and which of them reach each tile of the screen.

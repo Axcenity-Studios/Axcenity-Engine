@@ -29,7 +29,7 @@ Graphics features have two kinds of knob: how the world should look (the creator
 
 ## Consequences
 
-- `hello-graphics` has a reference image per preset.
+- `graphics` has a reference image per preset.
 - Scripts change the machine's settings only through `UserGameSettings` (LocalScripts).
 - `render-types` holds the settings as plain data so the server and scripts don't link wgpu (M8).
 

@@ -756,10 +756,10 @@ A state's motion can be a **1D blend tree**: a Number parameter and a list of cl
 
 ### What to build
 
-A state's **Return when** setting picks a completion check (its clip finishes, a Bool becomes true or false, or a number of seconds pass), the state to return to and a blend; it generates the matching transition (marked as generated, drawn dashed, updated whenever the setting changes and read-only in the inspector). The block editor gets an **Animation** category: set *bool* of *animator* to *true/false*, set *number* to *n*, set trigger, reset trigger, play state, when *animator* changes state, when *animator* reaches event *e*, and reporters for a parameter's value and the current state, each translating to the Lua API (and listed in `docs/scripting.md`). So "when Space key pressed → set trigger Jump → play state Jump" is built from blocks. `examples/hello-animation` shows a generated rigged FBX driven by blocks.
+A state's **Return when** setting picks a completion check (its clip finishes, a Bool becomes true or false, or a number of seconds pass), the state to return to and a blend; it generates the matching transition (marked as generated, drawn dashed, updated whenever the setting changes and read-only in the inspector). The block editor gets an **Animation** category: set *bool* of *animator* to *true/false*, set *number* to *n*, set trigger, reset trigger, play state, when *animator* changes state, when *animator* reaches event *e*, and reporters for a parameter's value and the current state, each translating to the Lua API (and listed in `docs/scripting.md`). So "when Space key pressed → set trigger Jump → play state Jump" is built from blocks. `crates/samples/projects/animation` shows a generated rigged FBX driven by blocks.
 
 ### Acceptance criteria
 
 - [x] An Attack state set to return to Idle when its clip finishes does so with no hand-made transition, and changing the setting updates its transition.
 - [x] Every animation block translates to the Lua in the docs table and runs.
-- [x] `examples/hello-animation` plays, and pressing its keys drives its animations.
+- [x] `crates/samples/projects/animation` plays, and pressing its keys drives its animations.

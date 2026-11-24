@@ -1,4 +1,4 @@
-//! Phase 48: levels, through the hello-levels example in the player's
+//! Phase 48: levels, through the levels example in the player's
 //! frame order with physics: portals between levels, a level added
 //! beside the current one (in a built game too), and a slot that goes
 //! back to the level it was saved in.
@@ -12,7 +12,7 @@ use super::*;
 
 const FRAME: f32 = 1.0 / 60.0;
 
-/// hello-levels, copied into a folder of its own (or `packed` from a built
+/// levels, copied into a folder of its own (or `packed` from a built
 /// game), its levels handed over and its scripts started as the player
 /// does, saving to `saves`.
 struct Game {
@@ -25,7 +25,7 @@ struct Game {
 }
 
 fn example_copy(test: &str) -> TempCopy {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-levels");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/levels");
     TempCopy::of(
         &example,
         &format!("axcenity-player-levels-{test}-{}", std::process::id()),
@@ -355,7 +355,7 @@ fn a_level_load_shows_the_games_loading_screen_again() {
 
 #[test]
 fn a_project_with_only_world_json_has_one_level_and_plays_as_before() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-spawn");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/spawn");
     let project = axcenity_project::load(&example).unwrap();
     assert_eq!(
         project.manifest.start_level,

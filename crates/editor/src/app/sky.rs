@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn double_clicking_a_sky_asks_first_and_yes_is_one_undo_step() {
-        let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+        let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
         app.drop_asset(&sky_entry("assets/sky/noon.hdr"), None);
         assert_eq!(app.confirm_sky.as_deref(), Some("assets/sky/noon.hdr"));
         assert_eq!(sky_image(&app), "", "nothing changes before the answer");
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn the_time_of_day_sky_clears_the_picture_and_adds_air_once() {
-        let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+        let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
         app.drop_asset(&sky_entry("assets/sky/noon.hdr"), None);
         app.answer_sky(true);
         assert_eq!(sky_image(&app), "assets/sky/noon.hdr");
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn cancelling_leaves_the_sky_as_it_was() {
-        let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+        let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
         app.apply(
             app.world.lighting(),
             Edit::AskSkyImage("assets/sky/dusk.hdr".into()),
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn the_question_box_draws_and_enter_uses_the_sky() {
-        let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+        let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
         app.ask_sky("assets/sky/noon.hdr".into());
         if let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS") {
             // Drawn from a copy of the question, so the app's stays asked.

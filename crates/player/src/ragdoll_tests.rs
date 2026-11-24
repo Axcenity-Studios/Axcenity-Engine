@@ -13,7 +13,7 @@ const FRAME: f32 = 1.0 / 60.0;
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -54,11 +54,11 @@ fn make(
     id
 }
 
-/// A floor, and hello-character's Mixamo character standing on it
+/// A floor, and character's Mixamo character standing on it
 /// (anchored) with a Ragdoll built in it. Returns the world, the
 /// example's assets, the MeshPart and the Ragdoll.
 fn dummy() -> (World, Assets, InstanceId, InstanceId) {
-    let assets = Assets::new(example("hello-character"));
+    let assets = Assets::new(example("character"));
     let mut world = World::new();
     let workspace = world.workspace();
     make(
@@ -372,7 +372,7 @@ fn snapshot(sim: &Sim, at: Vec3, path: &Path) {
         .unwrap();
 }
 
-/// hello-character running in the player's frame order, from its start:
+/// character running in the player's frame order, from its start:
 /// scripts get the assets and Animators start before any script runs.
 pub(super) struct Game {
     pub world: World,
@@ -389,7 +389,7 @@ pub(super) struct Game {
 impl Game {
     pub fn start() -> Self {
         let folder = super::tests::TempCopy::of(
-            &example("hello-character"),
+            &example("character"),
             &format!(
                 "axcenity-player-ragdoll-{}-{:?}",
                 std::process::id(),

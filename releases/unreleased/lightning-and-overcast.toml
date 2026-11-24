@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "renderer"
+title = "Lightning, grey light under an overcast, and snow that follows the wind"
+details = "A Weather's new Lightning (0 to 1) flashes: two or three strokes within half a second that light what's open to the sky with the hard shadows the overcast hid, come in through windows, and glow inside the clouds. Under broken to overcast cloud (Cover from 0.4) the sky's light is now the clouds' grey and not the clear blue sky they hide, on surfaces and in reflections, so a storm's puddles no longer mirror a blue sky. The wind drives lying snow onto slopes and walls that face it and runs spindrift along the ground, and the snow standing on things differs in depth from place to place."
+features = ["renderer.weather"]

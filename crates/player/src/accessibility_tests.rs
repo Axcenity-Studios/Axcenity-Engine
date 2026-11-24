@@ -1,4 +1,4 @@
-//! The game UI settings in a built game: hello-accessibility's menu changes
+//! The game UI settings in a built game: accessibility's menu changes
 //! text scale, contrast and reduced motion through GuiService, the HUD
 //! changes and the 3D world doesn't, and a save slot keeps them.
 
@@ -10,12 +10,12 @@ use axcenity_render::{DrawList, UiDrawItem, UiText};
 use super::tests::TempCopy;
 use super::*;
 
-/// hello-accessibility, opened from a copy, with its slots in `saves`.
+/// accessibility, opened from a copy, with its slots in `saves`.
 fn start(saves: &Path) -> (World, ScriptRuntime, TempCopy) {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-accessibility");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/accessibility");
     let folder = TempCopy::of(
         &example,
-        &format!("axcenity-player-hello-accessibility-{}", std::process::id()),
+        &format!("axcenity-player-accessibility-{}", std::process::id()),
     );
     let project = axcenity_project::load(&folder).unwrap();
     let mut world = project.world;

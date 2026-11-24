@@ -310,7 +310,7 @@ fn eye_turn(rig: &Rig, eye: usize, posed: &axcenity_assets::Posed) -> Quat {
 
 fn remy() -> (Assets, &'static str) {
     let assets =
-        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-character"));
+        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/character"));
     let mesh = "assets/models/Walking/Walking.fbx";
     assets.model_blocking(mesh).unwrap();
     (assets, mesh)
@@ -318,10 +318,10 @@ fn remy() -> (Assets, &'static str) {
 
 #[test]
 fn face_controls_turn_a_skinned_characters_eyes() {
-    // The hello-character example's Remy has mixamorig:LeftEye and
+    // The character example's Remy has mixamorig:LeftEye and
     // RightEye, and faces +Z.
     let assets =
-        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-character"));
+        Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/character"));
     let mesh = "assets/models/Walking/Walking.fbx";
     let model = assets.model_blocking(mesh).unwrap();
     let rig = model.rig.clone().unwrap();

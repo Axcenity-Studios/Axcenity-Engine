@@ -31,7 +31,7 @@ const SIZE: egui::Vec2 = egui::vec2(1200.0, 800.0);
 
 #[test]
 fn delete_on_the_right_click_menu_deletes_as_one_undo_step() {
-    let folder = copy_of_example("hello-touched", "ui-designer-menu-delete");
+    let folder = copy_of_example("touched", "ui-designer-menu-delete");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -77,7 +77,7 @@ fn delete_on_the_right_click_menu_deletes_as_one_undo_step() {
 
 #[test]
 fn rename_on_the_right_click_menu_types_over_the_name_in_the_inspector() {
-    let folder = copy_of_example("hello-touched", "ui-designer-menu-rename");
+    let folder = copy_of_example("touched", "ui-designer-menu-rename");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -116,7 +116,7 @@ fn rename_on_the_right_click_menu_types_over_the_name_in_the_inspector() {
 
 #[test]
 fn the_empty_designer_says_what_a_screen_gui_is_and_makes_one() {
-    let folder = copy_of_example("hello-touched", "ui-designer-empty");
+    let folder = copy_of_example("touched", "ui-designer-empty");
     let mut app = EditorApp::new(Some(&folder));
     assert!(
         crate::ui_designer::screen_gui_of(&app.world, None).is_none()

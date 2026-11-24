@@ -1,7 +1,7 @@
 ---
 description: Script kinds and where they run, how scripts are scheduled, the 3-second watchdog, the sandbox, modules, native code, errors and editor tooling.
 icon: code
-samples: [hello-script, hello-tasks, hello-modules, hello-remote]
+samples: [script, tasks, modules, remote]
 ---
 
 # Scripting reference

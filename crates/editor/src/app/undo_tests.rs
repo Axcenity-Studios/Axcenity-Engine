@@ -71,7 +71,7 @@ fn rays_along_z(points: &[(f32, f32)]) -> Vec<Ray> {
 
 #[test]
 fn each_gizmo_drag_is_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     let start = (
         property(&app, pad, "Position"),
@@ -122,7 +122,7 @@ fn each_gizmo_drag_is_one_undo_step() {
 
 #[test]
 fn dragging_a_part_onto_another_stacks_it_in_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ball = part(&app, "Ball");
     let start = property(&app, ball, "Position");
     // Grab the ball (2 studs across, at (0, 10, 0)) on top, then drag it
@@ -155,7 +155,7 @@ fn dragging_a_part_onto_another_stacks_it_in_one_undo_step() {
 
 #[test]
 fn property_edits_undo_and_redo_and_typing_a_name_is_one_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     let gray = property(&app, pad, "Color");
     let green = Value::Color3(Color3::new(0.1, 0.725, 0.333));
@@ -183,7 +183,7 @@ fn property_edits_undo_and_redo_and_typing_a_name_is_one_step() {
 
 #[test]
 fn undo_history_survives_saving() {
-    let folder = copy_of_example("hello-touched", "undo-save");
+    let folder = copy_of_example("touched", "undo-save");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     let start = property(&app, pad, "Position");
@@ -223,7 +223,7 @@ fn undo_history_survives_saving() {
 
 #[test]
 fn clip_controller_and_prefab_edits_undo_as_one_step_and_survive_saving() {
-    let folder = copy_of_example("hello-touched", "asset-undo");
+    let folder = copy_of_example("touched", "asset-undo");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.selected = Some(pad);
@@ -350,10 +350,10 @@ fn clip_controller_and_prefab_edits_undo_as_one_step_and_survive_saving() {
 
 #[test]
 fn opening_another_project_starts_a_new_history() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     edit_the_pad(&mut app);
     app.tool = Tool::Rotate;
-    app.open(&example("hello-part"));
+    app.open(&example("part"));
     assert_eq!(app.history.undo_label(), None);
     assert!(!app.unsaved());
     assert_eq!(app.tool, Tool::Rotate, "the tool is a preference");

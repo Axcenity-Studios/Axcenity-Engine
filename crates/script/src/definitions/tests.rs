@@ -278,6 +278,7 @@ fn described_fields_and_methods_exist() {
     let instances = [
         (ClassName::DataModel, "game"),
         (ClassName::Workspace, "workspace"),
+        (ClassName::Lighting, "game:GetService('Lighting')"),
         (ClassName::Players, "game.Players"),
         (ClassName::RemoteEvent, "Instance.new('RemoteEvent')"),
         (ClassName::RemoteFunction, "Instance.new('RemoteFunction')"),

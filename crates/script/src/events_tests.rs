@@ -92,7 +92,7 @@ fn a_property_changed_signal_fires_only_for_its_property_with_no_arguments() {
             "Speed is not a property of Part; choose from Name, Parent, Anchored, AngularDrag, \
              AssemblyAngularVelocity, AssemblyLinearVelocity, BlueprintTexture, CanCollide, CanQuery, CanTouch, \
              CastShadow, CollisionGroup, Color, CustomPhysicalProperties, Emission, EmissiveColor, LinearDrag, Locked, Massless, Material, MaterialVariant, \
-             Metalness, Orientation, Position, RollingFriction, Roughness, Shape, Size, TileSize, Transparency, \
+             Metalness, Orientation, PivotOffset, Position, RollingFriction, Roughness, Shape, Size, TileSize, Transparency, \
              WindAffected"
         ),
         "{}",

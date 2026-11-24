@@ -126,7 +126,7 @@ mod tests {
 
     fn noodle() -> (World, Assets, InstanceId) {
         let assets = Assets::new(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation"),
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation"),
         );
         assets.model_blocking("assets/models/noodle.fbx").unwrap();
         let mut world = World::new();

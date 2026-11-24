@@ -268,6 +268,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         double_sided,
         sway,
         flutter,
+        hangs,
         translucency,
         shading,
         defined_normal_texture,
@@ -307,6 +308,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
     out.floats(uv_offset);
     out.u8(u8::from(*double_sided));
     out.floats(&[*sway, *flutter, *translucency]);
+    out.u8(u8::from(*hangs));
     out.u8(match shading {
         ModelShading::Standard => 0,
         ModelShading::Skin => 1,
@@ -768,6 +770,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     let uv_offset = input.floats()?;
     let double_sided = input.bool()?;
     let [sway, flutter, translucency] = input.floats()?;
+    let hangs = input.bool()?;
     let shading = match input.u8()? {
         0 => ModelShading::Standard,
         1 => ModelShading::Skin,
@@ -822,6 +825,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         double_sided,
         sway,
         flutter,
+        hangs,
         translucency,
         shading,
         defined_normal_texture,
@@ -895,17 +899,17 @@ mod tests {
 
     /// A project with some of the examples' models (and their textures).
     fn project(name: &str) -> PathBuf {
-        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
         let project = std::env::temp_dir().join(format!(
             "axcenity-cooked-model-{name}-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&project);
         for (example, folder) in [
-            ("hello-pbr", "assets/models"),
-            ("hello-animation", "assets/models"),
-            ("hello-mesh", "assets"),
-            ("hello-roads", "assets/models"),
+            ("pbr", "assets/models"),
+            ("animation", "assets/models"),
+            ("mesh", "assets"),
+            ("roads", "assets/models"),
         ] {
             copy(&examples.join(example).join(folder), &project.join(folder));
         }
@@ -972,7 +976,7 @@ mod tests {
                 channel(&material.opacity_texture),
                 (material.uv_scale, material.uv_rotation, material.uv_offset),
                 image(&material.specular_texture),
-                (material.double_sided, material.sway),
+                (material.double_sided, material.sway, material.hangs),
                 material.flutter,
                 (material.translucency, material.shading),
                 (
@@ -1219,10 +1223,10 @@ mod tests {
         assert!(!assets.model_blocking(model).unwrap().warnings.is_empty());
         assert!(cooked_models(&project, model).is_empty());
 
-        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
         let helmet = "assets/models/DamagedHelmet/DamagedHelmet.glb";
         copy(
-            &examples.join("hello-pbr/assets/models/DamagedHelmet"),
+            &examples.join("pbr/assets/models/DamagedHelmet"),
             &project.join("assets/models/DamagedHelmet"),
         );
         assets.model_blocking(helmet).unwrap();

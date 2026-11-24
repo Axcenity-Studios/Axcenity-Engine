@@ -44,7 +44,7 @@ use axcenity_sim::{FrameCtx, HostIo, Hosts, Schedule, Sim};
 mod stats;
 
 const USAGE: &str = "usage: axcenity-server <project-folder | game.axgame> [--port <port>] [--password <text>] [--max-players <n>] [--kick-flags <n>] [--insecure] [--data <folder>] [--relay <address:port>] [--no-port-map] [--character-authority client|server] [--stats <seconds> [--stats-file <path>]] [--bench <frames> [--bench-clients <n>]]  (or --version [--json])\n\
-                     example: cargo run -p axcenity-server -- examples/hello-part --port 47800\n\
+                     example: cargo run -p axcenity-server -- crates/samples/projects/part --port 47800\n\
                      The server is secured: players get a connect token from TCP on the same port, \
                      and every packet is encrypted. --insecure turns that off (LAN only); \
                      --data is where its certificate is kept (the engine's data folder unless given). \

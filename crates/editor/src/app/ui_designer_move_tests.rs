@@ -52,7 +52,7 @@ fn near(a: egui::Rect, b: egui::Rect) -> bool {
 
 #[test]
 fn moving_an_element_into_a_frame_keeps_it_where_it_is_on_screen() {
-    let folder = copy_of_example("hello-touched", "ui-designer-move-keeps");
+    let folder = copy_of_example("touched", "ui-designer-move-keeps");
     let mut app = EditorApp::new(Some(&folder));
     let (gui, card, title) = card_and_title(&mut app);
     let ctx = theme::test_context();
@@ -99,7 +99,7 @@ fn moving_an_element_into_a_frame_keeps_it_where_it_is_on_screen() {
 
 #[test]
 fn a_drop_on_an_element_that_isnt_a_frame_goes_into_its_frame_and_a_frame_cant_go_in_itself() {
-    let folder = copy_of_example("hello-touched", "ui-designer-move-targets");
+    let folder = copy_of_example("touched", "ui-designer-move-targets");
     let mut app = EditorApp::new(Some(&folder));
     let (gui, card, title) = card_and_title(&mut app);
     let world = &app.world;
@@ -172,7 +172,7 @@ fn type_number(app: &mut EditorApp, ctx: &egui::Context, clock: &mut f64, name: 
 
 #[test]
 fn x_y_w_and_h_move_and_resize_in_design_pixels_keeping_the_anchor() {
-    let folder = copy_of_example("hello-touched", "ui-designer-xywh");
+    let folder = copy_of_example("touched", "ui-designer-xywh");
     let mut app = EditorApp::new(Some(&folder));
     let (gui, card, _) = card_and_title(&mut app);
     // Pinned to the right: X still means pixels from the parent's left.

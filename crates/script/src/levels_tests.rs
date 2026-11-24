@@ -1,4 +1,4 @@
-//! Phase 48: `LevelService` on worlds made here (the hello-levels example
+//! Phase 48: `LevelService` on worlds made here (the levels example
 //! runs in the player's tests).
 
 use std::collections::BTreeMap;

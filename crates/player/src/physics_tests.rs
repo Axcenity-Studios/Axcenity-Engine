@@ -1,7 +1,7 @@
 //! Phase 34: worlds saved before physical properties simulate the same.
-//! Phase 35: the hello-welds example's welded table and crate.
-//! Phase 36: the hello-joints example's hinges, spring, rope and the rest.
-//! Phase 37: the hello-movers example's balloon, followers and drone.
+//! Phase 35: the welds example's welded table and crate.
+//! Phase 36: the joints example's hinges, spring, rope and the rest.
+//! Phase 37: the movers example's balloon, followers and drone.
 
 use std::path::Path;
 
@@ -84,7 +84,7 @@ fn a_world_saved_before_physical_properties_simulates_the_same() {
 
 #[test]
 fn hello_welds_table_lands_in_one_piece_and_its_script_drops_and_holds_the_crate() {
-    let (mut world, mut scripts) = start_example("hello-welds");
+    let (mut world, mut scripts) = start_example("welds");
     let mut physics = Physics::new();
     let mut clock = 0;
     let mut at = |until| {
@@ -146,7 +146,7 @@ fn spin_of(world: &World, name: &str) -> Vector3 {
 
 #[test]
 fn hello_joints_door_servo_motor_spring_and_winch_work() {
-    let (mut world, mut scripts) = start_example("hello-joints");
+    let (mut world, mut scripts) = start_example("joints");
     let mut physics = Physics::new();
     let mut clock = 0;
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 5.5);
@@ -182,7 +182,7 @@ fn hello_joints_door_servo_motor_spring_and_winch_work() {
 
 #[test]
 fn hello_movers_balloon_hovers_followers_chase_and_the_drone_stays_level() {
-    let (mut world, mut scripts) = start_example("hello-movers");
+    let (mut world, mut scripts) = start_example("movers");
     let mut physics = Physics::new();
     let mut clock = 0;
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 4.5);

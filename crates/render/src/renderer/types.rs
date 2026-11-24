@@ -176,6 +176,11 @@ pub(super) struct FrameUniform {
     /// xy: world X and Z of `weather_field` cell (0, 0), z: cell size in studs,
     /// w: grid side length in cells.
     pub(super) weather_bounds: [f32; 4],
+    /// x: how hard rain falls now, y: how hard snow falls now, each from 0
+    /// to 1 (`Weather::rain`, `Weather::snowfall`), z: how many of
+    /// `weather_boxes` are drawn, w: how far the snow's prints have filled
+    /// in (`WeatherPrints::fill`).
+    pub(super) precipitation: [f32; 4],
     /// x: 1 while ray traced sun shadows are drawn, y: the scene's width in
     /// pixels (to find a pixel in the mask), z: how far they reach in studs
     /// (lighting.wgsl's `ray_traced_sun`).
@@ -189,6 +194,64 @@ pub(super) struct FrameUniform {
     /// averages it away (lighting.wgsl's `shading_noise`); y: 1 while TAA
     /// is on, so hair cards' alpha is hashed (hair.wgsl).
     pub(super) noise: [f32; 4],
+    /// The boxes that set the weather inside them (`DrawList::weather_boxes`),
+    /// in the order they apply; `precipitation.z` of them are drawn
+    /// (lighting.wgsl's `weather_sample`).
+    pub(super) weather_boxes: [WeatherBoxRaw; crate::MAX_WEATHER_BOXES],
+    /// The snow's print map (`WeatherField::prints`), kept in `weather_field`
+    /// after the field's cells: xy: world X and Z of its cell (0, 0), z: its
+    /// cells to a stud (0 while there is none), w: its side in cells. How far
+    /// its prints have filled in is `precipitation.w` (lighting.wgsl's
+    /// `weather_print`).
+    pub(super) weather_prints: [f32; 4],
+}
+
+/// One weather box. Must match `WeatherBox` in lighting.wgsl.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+pub(super) struct WeatherBoxRaw {
+    /// The rows of the world to the box's space.
+    pub(super) rows: [[f32; 4]; 3],
+    /// xyz: half its size, w: the studs over which it fades across its
+    /// faces.
+    pub(super) extent: [f32; 4],
+    /// x: the share of the world's wetness inside it, y: of its snow, each
+    /// from 0 to 2. Then unused.
+    pub(super) values: [f32; 4],
+}
+
+impl WeatherBoxRaw {
+    /// `weather_box` for the shader, or `None` for one that can't be drawn
+    /// (a number that isn't finite in where or how big it is), so none of
+    /// those reach the shader. Its shares are held to 0 to 2 and its fade
+    /// to 0 or more; a share that isn't a number counts as 0.
+    pub(super) fn new(weather_box: &crate::WeatherBox) -> Option<Self> {
+        let half_size = weather_box.half_size.abs();
+        if !weather_box.to_box.is_finite() || !half_size.is_finite() {
+            return None;
+        }
+        let share = |value: f32| if value > 0.0 { value.min(2.0) } else { 0.0 };
+        let blend = if weather_box.blend.is_finite() {
+            weather_box.blend.max(0.0)
+        } else {
+            0.0
+        };
+        let rows = weather_box.to_box.transpose();
+        Some(Self {
+            rows: [
+                rows.x_axis.to_array(),
+                rows.y_axis.to_array(),
+                rows.z_axis.to_array(),
+            ],
+            extent: half_size.extend(blend).to_array(),
+            values: [
+                share(weather_box.wetness),
+                share(weather_box.snow),
+                0.0,
+                0.0,
+            ],
+        })
+    }
 }
 
 /// The most point and spot lights drawn at once.
@@ -476,11 +539,27 @@ impl Drop for Counted {
     }
 }
 
+impl GpuMesh {
+    /// How many of its indices to draw in a pass that lifts corners under
+    /// snow: with its skirt while snow lies (`caps`), without otherwise.
+    pub(super) fn drawn_indices(&self, caps: bool) -> u32 {
+        if caps {
+            self.cap_index_count
+        } else {
+            self.index_count
+        }
+    }
+}
+
 /// A mesh uploaded to the GPU.
 pub(super) struct GpuMesh {
     pub(super) vertices: wgpu::Buffer,
     pub(super) indices: wgpu::Buffer,
     pub(super) index_count: u32,
+    /// Its indices and, after them in the same buffer, its skirt's
+    /// (`snow_caps.rs`): what the passes that lift corners under snow draw
+    /// while snow lies. The same as `index_count` for a mesh without one.
+    pub(super) cap_index_count: u32,
     /// Its corners, for [`RenderStats::vertices`](crate::RenderStats::vertices).
     pub(super) vertex_count: u32,
     /// 16-bit for the built-in shapes, 32-bit for callers' meshes, which
@@ -1123,9 +1202,16 @@ pub(super) struct ScenePipeline {
     /// Storage buffer for `DrawList::weather_field` (sky-visibility roof
     /// heights, manual interior/exterior paint overrides, and snow footprint
     /// depths), bound at frame binding 19. Starts as 1 blank cell and grows
-    /// on demand.
+    /// on demand. The snow's print map (`WeatherField::prints`) follows the
+    /// field's cells in it, four of its cells to an entry.
     pub(super) weather_field: wgpu::Buffer,
     pub(super) weather_field_capacity: usize,
+    /// The print map `weather_field` holds: its key and version and the
+    /// entry it starts at, so only the rows that changed since are written.
+    pub(super) weather_prints_uploaded: Option<(u64, u64, usize)>,
+    /// How many bytes of print map have been written to `weather_field`
+    /// since the renderer was made (tests read it).
+    pub(super) weather_print_bytes: u64,
     /// The scene GI's rays walk in software, while they're traced so
     /// (renderer/ray_soft.rs).
     pub(super) soft_scene: Option<Box<super::ray_soft::SoftScene>>,

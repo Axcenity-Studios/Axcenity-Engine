@@ -345,7 +345,7 @@ fn flex_containers_flow_children_with_gap_and_padding() {
 #[test]
 fn the_health_hud_example_uses_only_supported_css() {
     let (stylesheet, warnings) =
-        parse_stylesheet("ui.css", include_str!("../../../examples/hello-css/ui.css"));
+        parse_stylesheet("ui.css", include_str!("../../samples/projects/css/ui.css"));
     assert!(warnings.is_empty(), "{warnings:#?}");
     let mut world = World::new();
     let gui = world.create(ClassName::ScreenGui).unwrap();

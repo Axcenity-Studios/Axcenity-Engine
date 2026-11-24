@@ -1,7 +1,7 @@
 ---
 description: Anchored and unanchored parts, collisions, touch events, materials' physical properties, welds, joints, movers, vehicles and destruction.
 icon: atom
-samples: [hello-physics, hello-touched, hello-joints, hello-movers, hello-vehicle, hello-destruction]
+samples: [physics, touched, joints, movers, vehicle, destruction]
 ---
 
 # Physics and collisions
@@ -31,7 +31,7 @@ pad.Touched:Connect(function(other)
 end)
 ```
 
-The **hello-touched** sample does this in Lua, and **hello-touched-blocks** with blocks.
+The **touched** sample does this in Lua, and **touched-blocks** with blocks.
 
 ## Collision groups
 

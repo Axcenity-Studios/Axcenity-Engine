@@ -1233,7 +1233,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     fn examples_folder() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects")
     }
 
     fn temp_folder(name: &str) -> PathBuf {
@@ -1300,7 +1300,7 @@ mod tests {
         // Set, the icon's file is there and the banner's isn't.
         fs::create_dir_all(folder.join("assets/branding")).unwrap();
         fs::copy(
-            examples_folder().join("hello-shader/assets/textures/chevrons.png"),
+            examples_folder().join("shader/assets/textures/chevrons.png"),
             folder.join("assets/branding/icon.png"),
         )
         .unwrap();
@@ -1333,7 +1333,7 @@ mod tests {
 
     #[test]
     fn a_clean_example_reports_nothing() {
-        let project = crate::load(&examples_folder().join("hello-part")).unwrap();
+        let project = crate::load(&examples_folder().join("part")).unwrap();
         let report = check_assets(&project.folder, &project.world);
         assert!(
             report.is_ok(),

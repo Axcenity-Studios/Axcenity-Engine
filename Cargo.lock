@@ -798,6 +798,7 @@ dependencies = [
  "axcenity-release",
  "axcenity-render",
  "axcenity-repo",
+ "axcenity-samples",
  "axcenity-save",
  "axcenity-scene",
  "axcenity-script",
@@ -1192,6 +1193,13 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "ureq",
+]
+
+[[package]]
+name = "axcenity-samples"
+version = "0.3.0-alpha.1"
+dependencies = [
+ "axcenity-workspace-hack",
 ]
 
 [[package]]

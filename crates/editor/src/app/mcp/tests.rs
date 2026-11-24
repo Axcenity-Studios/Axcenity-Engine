@@ -57,7 +57,7 @@ fn add(host: &mut Headless, class: ClassName, name: &str, parent: InstanceId) ->
 
 #[test]
 fn project_info_names_the_project_its_levels_and_counts() {
-    let mut opened = open("hello-levels", "mcp-project-info");
+    let mut opened = open("levels", "mcp-project-info");
     let text = ok(&mut opened.app, "project_info", json!({}));
     let first = text.lines().next().unwrap();
     assert!(first.starts_with("project \""), "{text}");
@@ -68,7 +68,7 @@ fn project_info_names_the_project_its_levels_and_counts() {
 
 #[test]
 fn scene_inspect_shows_the_workspace_tree_one_line_per_object() {
-    let mut opened = open("hello-part", "mcp-tree");
+    let mut opened = open("part", "mcp-tree");
     let block = opened
         .app
         .app
@@ -101,7 +101,7 @@ fn scene_inspect_shows_the_workspace_tree_one_line_per_object() {
 
 #[test]
 fn scene_inspect_folds_repeats_and_pages_long_answers() {
-    let mut opened = open("hello-part", "mcp-fold");
+    let mut opened = open("part", "mcp-fold");
     let app = &mut opened.app;
     let workspace = app.app.world.workspace();
     let fence = add(app, ClassName::Model, "Fence", workspace);
@@ -141,7 +141,7 @@ fn scene_inspect_folds_repeats_and_pages_long_answers() {
 
 #[test]
 fn scene_inspect_searches_by_class_name_tag_and_distance() {
-    let mut opened = open("hello-part", "mcp-search");
+    let mut opened = open("part", "mcp-search");
     let app = &mut opened.app;
     let workspace = app.app.world.workspace();
     let far = add(app, ClassName::Part, "FarRock", workspace);
@@ -205,7 +205,7 @@ fn scene_inspect_searches_by_class_name_tag_and_distance() {
 
 #[test]
 fn object_get_shows_only_what_differs_from_the_defaults() {
-    let mut opened = open("hello-part", "mcp-get");
+    let mut opened = open("part", "mcp-get");
     let text = ok(
         &mut opened.app,
         "object_get",
@@ -261,7 +261,7 @@ fn object_get_shows_only_what_differs_from_the_defaults() {
 
 #[test]
 fn docs_describe_classes_properties_and_search_the_api() {
-    let mut opened = open("hello-part", "mcp-docs");
+    let mut opened = open("part", "mcp-docs");
     let app = &mut opened.app;
     let part = ok(app, "docs", json!({"class": "Part"}));
     assert!(part.starts_with("Part (BasePart, PVInstance)"), "{part}");
@@ -387,7 +387,7 @@ fn objects(host: &Headless) -> usize {
 
 #[test]
 fn object_create_inserts_one_undoable_object() {
-    let mut opened = open("hello-part", "mcp-create");
+    let mut opened = open("part", "mcp-create");
     let host = &mut opened.app;
     let text = ok(
         host,
@@ -457,7 +457,7 @@ fn object_create_inserts_one_undoable_object() {
 
 #[test]
 fn a_failed_write_changes_nothing() {
-    let mut opened = open("hello-part", "mcp-rollback");
+    let mut opened = open("part", "mcp-rollback");
     let host = &mut opened.app;
     let before = objects(host);
     let error = call(
@@ -508,7 +508,7 @@ fn a_failed_write_changes_nothing() {
 
 #[test]
 fn object_set_changes_properties_names_parents_attributes_and_tags() {
-    let mut opened = open("hello-part", "mcp-set");
+    let mut opened = open("part", "mcp-set");
     let host = &mut opened.app;
     let workspace = host.app.world.workspace();
     let model = add(host, ClassName::Model, "House", workspace);
@@ -570,7 +570,7 @@ fn object_set_changes_properties_names_parents_attributes_and_tags() {
 
 #[test]
 fn deleting_much_or_a_script_asks_first_with_a_token_for_that_call() {
-    let mut opened = open("hello-part", "mcp-delete");
+    let mut opened = open("part", "mcp-delete");
     let host = &mut opened.app;
     let workspace = host.app.world.workspace();
     // One part goes at once.
@@ -634,7 +634,7 @@ fn deleting_much_or_a_script_asks_first_with_a_token_for_that_call() {
 
 #[test]
 fn modes_decide_what_a_session_may_do() {
-    let mut opened = open("hello-part", "mcp-modes");
+    let mut opened = open("part", "mcp-modes");
     opened.app.session.mode = Mode::Read;
     let error = call(&mut opened.app, "object_create", json!({"kind": "Block"})).unwrap_err();
     assert_eq!(error.code, Code::NotAllowed);
@@ -658,7 +658,7 @@ fn modes_decide_what_a_session_may_do() {
 
 #[test]
 fn project_save_asks_first_then_writes_the_files() {
-    let mut opened = open("hello-part", "mcp-save");
+    let mut opened = open("part", "mcp-save");
     let host = &mut opened.app;
     ok(
         host,
@@ -706,7 +706,7 @@ fn project_save_asks_first_then_writes_the_files() {
 
 #[test]
 fn script_read_lists_scripts_and_shows_numbered_lines() {
-    let mut opened = open("hello-touched", "mcp-script-read");
+    let mut opened = open("touched", "mcp-script-read");
     let host = &mut opened.app;
     let list = ok(host, "script_read", json!({}));
     assert!(
@@ -754,7 +754,7 @@ fn script_read_lists_scripts_and_shows_numbered_lines() {
 
 #[test]
 fn script_write_makes_and_edits_scripts_as_undoable_file_changes() {
-    let mut opened = open("hello-touched", "mcp-script-write");
+    let mut opened = open("touched", "mcp-script-write");
     let host = &mut opened.app;
     let file = opened.folder.join("scripts/Spinner.server.lua");
     let text = ok(
@@ -874,7 +874,7 @@ fn script_write_makes_and_edits_scripts_as_undoable_file_changes() {
 
 #[test]
 fn project_check_lists_script_problems_worst_first() {
-    let mut opened = open("hello-touched", "mcp-check");
+    let mut opened = open("touched", "mcp-check");
     let host = &mut opened.app;
     assert_eq!(
         ok(host, "project_check", json!({"scope": "scripts"})),
@@ -905,7 +905,7 @@ fn project_check_lists_script_problems_worst_first() {
 
 #[test]
 fn object_duplicate_copies_in_place_or_as_a_row() {
-    let mut opened = open("hello-part", "mcp-duplicate");
+    let mut opened = open("part", "mcp-duplicate");
     let host = &mut opened.app;
     ok(
         host,
@@ -980,7 +980,7 @@ fn object_duplicate_copies_in_place_or_as_a_row() {
 
 #[test]
 fn batch_runs_steps_as_one_undo_step_with_names_for_results() {
-    let mut opened = open("hello-part", "mcp-batch");
+    let mut opened = open("part", "mcp-batch");
     let host = &mut opened.app;
     let before = objects(host);
     let text = ok(
@@ -1028,7 +1028,7 @@ fn batch_runs_steps_as_one_undo_step_with_names_for_results() {
 
 #[test]
 fn a_failing_batch_step_changes_nothing_and_says_which() {
-    let mut opened = open("hello-part", "mcp-batch-fail");
+    let mut opened = open("part", "mcp-batch-fail");
     let host = &mut opened.app;
     let before = objects(host);
     let revision = host.app.history.revision();
@@ -1078,7 +1078,7 @@ fn a_failing_batch_step_changes_nothing_and_says_which() {
 
 #[test]
 fn a_batch_with_a_big_delete_asks_first() {
-    let mut opened = open("hello-part", "mcp-batch-ask");
+    let mut opened = open("part", "mcp-batch-ask");
     let host = &mut opened.app;
     let ops = json!([
         {"op": "create", "kind": "Model", "name": "Pile", "as": "pile"},
@@ -1098,7 +1098,7 @@ fn a_batch_with_a_big_delete_asks_first() {
 
 #[test]
 fn material_edit_makes_changes_and_assigns_material_files_undoably() {
-    let mut opened = open("hello-part", "mcp-material");
+    let mut opened = open("part", "mcp-material");
     let folder = opened.folder.clone();
     let host = &mut opened.app;
     let text = ok(
@@ -1198,7 +1198,7 @@ fn material_edit_makes_changes_and_assigns_material_files_undoably() {
 
 #[test]
 fn env_set_changes_the_look_in_one_step_and_makes_sky_objects_when_needed() {
-    let mut opened = open("hello-part", "mcp-env");
+    let mut opened = open("part", "mcp-env");
     let host = &mut opened.app;
     let before = objects(host);
     let text = ok(
@@ -1270,7 +1270,7 @@ fn env_set_changes_the_look_in_one_step_and_makes_sky_objects_when_needed() {
 
 #[test]
 fn game_run_plays_for_a_while_and_reports_errors_and_output() {
-    let mut opened = open("hello-part", "mcp-play");
+    let mut opened = open("part", "mcp-play");
     let host = &mut opened.app;
     ok(
         host,
@@ -1297,7 +1297,7 @@ fn game_run_plays_for_a_while_and_reports_errors_and_output() {
 
 #[test]
 fn game_run_runs_the_game_tests() {
-    let mut opened = open("hello-character", "mcp-game-tests");
+    let mut opened = open("character", "mcp-game-tests");
     let host = &mut opened.app;
     let text = ok(host, "game_run", json!({"mode": "tests"}));
     assert!(text.ends_with(" passed, 0 failed"), "{text}");
@@ -1329,7 +1329,7 @@ fn ground(host: &Headless, x: f32, z: f32) -> f32 {
 
 #[test]
 fn terrain_edit_sculpts_paints_and_scatters_as_undo_steps() {
-    let mut opened = open("hello-part", "mcp-terrain");
+    let mut opened = open("part", "mcp-terrain");
     let host = &mut opened.app;
     assert!(ground(host, 0.0, 0.0).abs() < 0.01);
     // Raise lifts the middle by about `amount`, as one undo step.
@@ -1419,7 +1419,7 @@ fn terrain_edit_sculpts_paints_and_scatters_as_undo_steps() {
 
 #[test]
 fn terrain_edit_generates_asking_before_it_replaces_a_landscape() {
-    let mut opened = open("hello-part", "mcp-terrain-generate");
+    let mut opened = open("part", "mcp-terrain-generate");
     let host = &mut opened.app;
     let args = json!({"action": "generate", "preset": "mountain_range", "seed": 7});
     let asked = call(host, "terrain_edit", args.clone()).unwrap_err();
@@ -1456,7 +1456,7 @@ fn terrain_edit_generates_asking_before_it_replaces_a_landscape() {
 
 #[test]
 fn terrain_edit_generate_makes_a_terrain_when_there_is_none() {
-    let mut opened = open("hello-material-graph", "mcp-terrain-new");
+    let mut opened = open("material-graph", "mcp-terrain-new");
     let host = &mut opened.app;
     let sculpt = call(
         host,
@@ -1483,7 +1483,7 @@ fn terrain_edit_generate_makes_a_terrain_when_there_is_none() {
 
 #[test]
 fn anim_edit_animates_keys_and_lists_a_clip_as_file_undo_steps() {
-    let mut opened = open("hello-part", "mcp-anim");
+    let mut opened = open("part", "mcp-anim");
     let host = &mut opened.app;
     let made = ok(
         host,
@@ -1558,7 +1558,7 @@ fn anim_edit_animates_keys_and_lists_a_clip_as_file_undo_steps() {
 
 #[test]
 fn asset_find_lists_assets_by_kind_name_and_use() {
-    let mut opened = open("hello-material-graph", "mcp-assets");
+    let mut opened = open("material-graph", "mcp-assets");
     let host = &mut opened.app;
     let text = ok(host, "asset_find", json!({}));
     assert!(text.starts_with("4 assets\n"), "{text}");
@@ -1597,7 +1597,7 @@ fn import_folder(test: &str, files: &[&str]) -> std::path::PathBuf {
     let folder = std::env::temp_dir().join(format!("axcenity-mcp-import-{test}"));
     let _ = std::fs::remove_dir_all(&folder);
     std::fs::create_dir_all(&folder).unwrap();
-    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     for file in files {
         let from = examples.join(file);
         std::fs::copy(&from, folder.join(from.file_name().unwrap())).unwrap();
@@ -1607,11 +1607,8 @@ fn import_folder(test: &str, files: &[&str]) -> std::path::PathBuf {
 
 #[test]
 fn asset_import_copies_files_only_from_allowed_folders_as_an_undo_step() {
-    let mut opened = open("hello-part", "mcp-import");
-    let downloads = import_folder(
-        "texture",
-        &["hello-material-graph/assets/textures/moss.png"],
-    );
+    let mut opened = open("part", "mcp-import");
+    let downloads = import_folder("texture", &["material-graph/assets/textures/moss.png"]);
     let host = &mut opened.app;
     let png = downloads.join("moss.png");
     let png_text = png.to_string_lossy().into_owned();
@@ -1671,8 +1668,8 @@ fn asset_import_copies_files_only_from_allowed_folders_as_an_undo_step() {
 
 #[test]
 fn asset_import_places_a_model_where_asked() {
-    let mut opened = open("hello-part", "mcp-import-model");
-    let downloads = import_folder("model", &["hello-roads/assets/models/rock.glb"]);
+    let mut opened = open("part", "mcp-import-model");
+    let downloads = import_folder("model", &["roads/assets/models/rock.glb"]);
     let host = &mut opened.app;
     host.session.import_folders = vec![downloads.clone()];
     let before = objects(host);
@@ -1707,7 +1704,7 @@ fn asset_import_places_a_model_where_asked() {
 
 #[test]
 fn level_lists_makes_renames_deletes_and_opens_levels() {
-    let mut opened = open("hello-levels", "mcp-levels");
+    let mut opened = open("levels", "mcp-levels");
     let host = &mut opened.app;
     let list = ok(host, "level", json!({}));
     assert!(
@@ -1767,7 +1764,7 @@ fn level_lists_makes_renames_deletes_and_opens_levels() {
 
 #[test]
 fn prefab_saves_places_and_applies_copies_as_undo_steps() {
-    let mut opened = open("hello-part", "mcp-prefab");
+    let mut opened = open("part", "mcp-prefab");
     let host = &mut opened.app;
     let made = ok(
         host,
@@ -1835,7 +1832,7 @@ fn prefab_saves_places_and_applies_copies_as_undo_steps() {
 
 #[test]
 fn solid_op_unions_and_separates_parts_as_undo_steps() {
-    let mut opened = open("hello-part", "mcp-solid");
+    let mut opened = open("part", "mcp-solid");
     let host = &mut opened.app;
     let first = ok(
         host,
@@ -1873,7 +1870,7 @@ fn solid_op_unions_and_separates_parts_as_undo_steps() {
 
 #[test]
 fn style_edit_lists_shows_and_changes_rules_by_selector() {
-    let mut opened = open("hello-css", "mcp-style");
+    let mut opened = open("css", "mcp-style");
     let host = &mut opened.app;
     let list = ok(host, "style_edit", json!({}));
     assert!(
@@ -1939,7 +1936,7 @@ fn style_edit_lists_shows_and_changes_rules_by_selector() {
 
 #[test]
 fn project_settings_changes_input_collision_groups_and_strings() {
-    let mut opened = open("hello-part", "mcp-settings");
+    let mut opened = open("part", "mcp-settings");
     let host = &mut opened.app;
     let input = ok(host, "project_settings", json!({"setting": "input"}));
     assert!(input.contains("\nJump: Space | ButtonA"), "{input}");
@@ -1999,7 +1996,7 @@ fn project_settings_changes_input_collision_groups_and_strings() {
 
 #[test]
 fn asset_manage_renames_with_references_and_deletes_after_asking() {
-    let mut opened = open("hello-material-graph", "mcp-asset-manage");
+    let mut opened = open("material-graph", "mcp-asset-manage");
     let host = &mut opened.app;
     let renamed = ok(
         host,
@@ -2043,7 +2040,7 @@ fn asset_manage_renames_with_references_and_deletes_after_asking() {
 
 #[test]
 fn history_changes_says_what_changed_since_last_asked_and_by_whom() {
-    let mut opened = open("hello-part", "mcp-changes");
+    let mut opened = open("part", "mcp-changes");
     let host = &mut opened.app;
     let first = ok(host, "history", json!({"action": "changes"}));
     assert_eq!(first, "mark 0 · nothing changed since 0");
@@ -2179,7 +2176,7 @@ fn prompts_name_only_listed_tools_and_resources_mirror_lite_read_tools() {
 
 #[test]
 fn a_resource_reads_the_same_as_its_tool() {
-    let mut opened = open("hello-part", "mcp-resources");
+    let mut opened = open("part", "mcp-resources");
     let host = &mut opened.app;
     let object = super::prompts::RESOURCES
         .iter()
@@ -2203,7 +2200,7 @@ fn a_resource_reads_the_same_as_its_tool() {
 
 #[test]
 fn check_reports_the_project_and_prints_client_configs_with_full_paths() {
-    let opened = open("hello-part", "mcp-check");
+    let opened = open("part", "mcp-check");
     let folder = opened.folder.clone();
     let options = super::parse_options(
         ["--check", folder.to_str().unwrap(), "--profile", "lite"]
@@ -2344,7 +2341,7 @@ fn the_open_editor_runs_a_clients_calls_between_frames_as_undo_steps() {
     use super::live::{ENDPOINT_FILE, Live, editor_listening};
     use std::sync::mpsc;
 
-    let folder = copy_of_example("hello-part", "mcp-live");
+    let folder = copy_of_example("part", "mcp-live");
     let mut app = EditorApp::new(Some(&folder));
     assert!(app.project.is_some());
     assert!(!editor_listening(&folder));
@@ -2430,7 +2427,7 @@ fn the_open_editor_runs_a_clients_calls_between_frames_as_undo_steps() {
 fn the_ai_connections_setting_starts_and_stops_listening_for_the_open_project() {
     use super::live::{ENDPOINT_FILE, HEADLESS_FILE, editor_listening};
 
-    let folder = copy_of_example("hello-part", "mcp-live-setting");
+    let folder = copy_of_example("part", "mcp-live-setting");
     std::fs::create_dir_all(folder.join(".axcenity")).unwrap();
     std::fs::write(folder.join(HEADLESS_FILE), "{}").unwrap();
     let mut app = EditorApp::new(Some(&folder));
@@ -2460,7 +2457,7 @@ fn the_ai_connections_setting_starts_and_stops_listening_for_the_open_project() 
 
 #[test]
 fn render_stats_reads_the_viewports_last_frame_and_says_why_without_a_window() {
-    let mut opened = open("hello-part", "mcp-render-stats");
+    let mut opened = open("part", "mcp-render-stats");
     let host = &mut opened.app;
     let error = call(host, "render_stats", json!({})).unwrap_err();
     assert_eq!(error.code, Code::Unsupported);
@@ -2497,7 +2494,7 @@ fn render_stats_reads_the_viewports_last_frame_and_says_why_without_a_window() {
 /// message now says where to go next.
 #[test]
 fn errors_a_small_model_tripped_on_point_to_the_right_tool() {
-    let mut opened = open("hello-part", "mcp-small-model");
+    let mut opened = open("part", "mcp-small-model");
     let host = &mut opened.app;
     // Scripts aren't object kinds: object_create says to use script_write.
     let error = call(
@@ -2618,7 +2615,7 @@ fn errors_a_small_model_tripped_on_point_to_the_right_tool() {
 
 #[test]
 fn view_capture_draws_the_scene_as_a_png_from_the_camera_an_object_or_a_point() {
-    let mut opened = open("hello-part", "mcp-view-capture");
+    let mut opened = open("part", "mcp-view-capture");
     let host = &mut opened.app;
     // Wrong combinations are refused before drawing anything.
     let error = call(
@@ -2691,7 +2688,7 @@ fn view_capture_draws_the_scene_as_a_png_from_the_camera_an_object_or_a_point() 
 
 #[test]
 fn toolbox_search_and_get_bring_an_asset_in_as_one_undo_step() {
-    let mut opened = open("hello-part", "mcp-toolbox");
+    let mut opened = open("part", "mcp-toolbox");
     let assets = std::env::temp_dir().join(format!(
         "axcenity-mcp-toolbox-assets-{}",
         std::process::id()
@@ -2795,7 +2792,7 @@ fn the_open_editor_keeps_drawing_while_a_toolbox_download_runs() {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    let folder = copy_of_example("hello-part", "mcp-live-toolbox");
+    let folder = copy_of_example("part", "mcp-live-toolbox");
     let assets = std::env::temp_dir().join(format!(
         "axcenity-mcp-live-toolbox-assets-{}",
         std::process::id()
@@ -2864,7 +2861,7 @@ fn the_open_editor_keeps_drawing_while_a_toolbox_download_runs() {
 
 #[test]
 fn data_edit_lists_shows_creates_and_changes_tables_as_undo_steps() {
-    let mut opened = open("hello-data", "mcp-data");
+    let mut opened = open("data", "mcp-data");
     let project = opened.folder.clone();
     let host = &mut opened.app;
     let list = ok(host, "data_edit", json!({}));

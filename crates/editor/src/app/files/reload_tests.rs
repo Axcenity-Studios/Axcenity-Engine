@@ -90,7 +90,7 @@ fn width(app: &EditorApp) -> f32 {
 
 #[test]
 fn a_model_written_over_its_file_updates_its_mesh_parts_in_edit_mode_and_in_play() {
-    let folder = copy_of_example("hello-touched", "reload-model");
+    let folder = copy_of_example("touched", "reload-model");
     write_triangle(&folder, 1.0);
     let mut app = EditorApp::new(Some(&folder));
     add_triangle_part(&mut app);
@@ -135,7 +135,7 @@ fn a_model_written_over_its_file_updates_its_mesh_parts_in_edit_mode_and_in_play
 
 #[test]
 fn a_broken_model_saved_over_a_good_one_keeps_the_good_one_and_is_reported_once() {
-    let folder = copy_of_example("hello-touched", "reload-broken");
+    let folder = copy_of_example("touched", "reload-broken");
     write_triangle(&folder, 1.0);
     let mut app = EditorApp::new(Some(&folder));
     add_triangle_part(&mut app);
@@ -189,7 +189,7 @@ fn door_y(app: &EditorApp) -> f32 {
 
 #[test]
 fn an_edited_clip_changes_a_playing_animators_motion_and_it_stays_in_its_state() {
-    let folder = copy_of_example("hello-door", "reload-clip");
+    let folder = copy_of_example("door", "reload-clip");
     // Shut plays nothing; Rise plays the door clip (y 2 to 8 over 1.5 s).
     let machine = StateMachineFile {
         default_state: "Shut".into(),

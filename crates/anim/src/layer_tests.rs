@@ -292,7 +292,7 @@ fn a_mask_naming_a_bone_the_skeleton_lacks_is_reported() {
 }
 
 fn example() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation")
 }
 
 const RUN: &str = "assets/animations/noodle/Run.anim.json";
@@ -498,7 +498,7 @@ fn a_weight_for_a_layer_the_state_machine_lacks_is_reported() {
 
 #[test]
 fn a_state_machine_with_only_a_1d_blend_tree_poses_as_its_machine_alone() {
-    // The hello-animation noodle's state machine has no layers: what the
+    // The animation noodle's state machine has no layers: what the
     // Animators pose is exactly what its machine poses by itself.
     let assets = Assets::new(example());
     let path = "assets/animations/noodle/noodle.statemachine.json";

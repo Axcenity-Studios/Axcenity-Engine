@@ -1,7 +1,7 @@
 ---
 description: Block scripts for people new to code, the Blocks and Graph views, switching between blocks and Lua, and what each block category does.
 icon: puzzle
-samples: [hello-touched-blocks]
+samples: [touched-blocks]
 ---
 
 # Blocks: visual programming
@@ -20,7 +20,7 @@ Switching from Code to Blocks turns each line into the friendliest block that wr
 
 ## Building a script
 
-1. Open a block script, such as `pad` in the **hello-touched-blocks** sample.
+1. Open a block script, such as `pad` in the **touched-blocks** sample.
 2. Drag an **event** block (a "hat", such as **when part is touched**) onto the canvas. Only stacks under an event run; a loose stack says so.
 3. Drag action blocks under it. They snap in and run from the top down. C-shaped blocks (**if**, **repeat**, **forever**) hold a stack inside them.
 4. Drop round **value** blocks (numbers, text, maths) and pointed **true/false** blocks into the slots.

@@ -1,4 +1,4 @@
-//! Phase 44: the hello-prompt example's door, chest and button, in the
+//! Phase 44: the prompt example's door, chest and button, in the
 //! player's frame order.
 
 use std::path::{Path, PathBuf};
@@ -25,7 +25,7 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
-        let (world, mut scripts) = start_example("hello-prompt");
+        let (world, mut scripts) = start_example("prompt");
         scripts.set_viewport_size(VIEW.0 as f32, VIEW.1 as f32);
         Self {
             world,
@@ -258,7 +258,7 @@ fn snapshot(game: &Game, path: &Path) {
     else {
         return;
     };
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-prompt");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/prompt");
     let project = axcenity_project::load(&folder).unwrap();
     let stylesheets: Vec<_> = project
         .stylesheets

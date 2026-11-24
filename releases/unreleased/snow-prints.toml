@@ -1,0 +1,5 @@
+category = "improvement"
+subsystem = "renderer"
+title = "Footprints and trails in snow take the shape of what made them"
+details = "What touches the snow now presses its own shape into it, as deep as it has sunk: a character's foot prints a foot where and when it is down, turned the way it points; a plank prints its rectangle, a ball a bowl, a rolling barrel a rut as wide as it is, and a thing dragged leaves an unbroken trail instead of a row of discs. Prints are kept at an eighth of a stud (they were one-stud cells), show as hollows with a lit and a shaded wall on terrain and on snow lying on parts, stay under things that lie still, fill in over FootprintFadeTime (faster while it snows), and are still there when the camera comes back. A MeshPart presses as its box."
+features = ["renderer.weather"]

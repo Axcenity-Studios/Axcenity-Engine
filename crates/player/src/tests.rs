@@ -37,7 +37,7 @@ fn the_wheel_zooms_by_notches_and_a_touchpad_by_pixels() {
 
 #[test]
 fn hello_remote_example_moves_the_block_while_an_arrow_key_is_held() {
-    let (mut world, mut scripts) = start_example("hello-remote");
+    let (mut world, mut scripts) = start_example("remote");
     let mover = world.find_first_child(world.workspace(), "Mover").unwrap();
     let start = position_of(&world, "Mover");
     let mut physics = Physics::new();
@@ -92,7 +92,7 @@ fn hello_remote_example_moves_the_block_while_an_arrow_key_is_held() {
 #[test]
 fn hello_character_walks_runs_and_switches_from_lua_and_blocks() {
     use axcenity_core::KeyCode as K;
-    let (mut world, mut scripts) = start_example("hello-character");
+    let (mut world, mut scripts) = start_example("character");
     let assets = Assets::default();
     let mut characters = Controllers::default();
     let mut physics = Physics::new();
@@ -236,7 +236,7 @@ fn hello_agent_walks_to_destinations_from_properties_lua_and_blocks() {
         }
     }
 
-    let (world, scripts) = start_example("hello-agent");
+    let (world, scripts) = start_example("agent");
     let guard = world.find_first_child(world.workspace(), "Guard").unwrap();
     let agent = world.find_first_child(guard, "NavigationAgent").unwrap();
     let body = world.find_first_child(guard, "Body").unwrap();
@@ -375,7 +375,7 @@ fn hello_behavior_guard_runs_its_tree_and_the_courier_walks_where_its_script_sen
         (a.x - b.x).hypot(a.z - b.z)
     }
 
-    let (world, scripts, folder) = start_example_in("hello-behavior");
+    let (world, scripts, folder) = start_example_in("behavior");
     let find = |model: &str, child: &str| {
         let model = world.find_first_child(world.workspace(), model).unwrap();
         world.find_first_child(model, child).unwrap()
@@ -503,7 +503,7 @@ fn hello_perception_guard_sees_and_hears_the_player_from_lua_and_blocks() {
         }
     }
 
-    let (world, scripts) = start_example("hello-perception");
+    let (world, scripts) = start_example("perception");
     let guard = world.find_first_child(world.workspace(), "Guard").unwrap();
     let agent = world.find_first_child(guard, "NavigationAgent").unwrap();
     let guard_body = world.find_first_child(guard, "Body").unwrap();
@@ -579,7 +579,7 @@ fn hello_perception_guard_sees_and_hears_the_player_from_lua_and_blocks() {
 #[test]
 fn hello_character_hovers_in_a_custom_mode_from_lua_and_blocks() {
     use axcenity_core::KeyCode as K;
-    let (mut world, mut scripts) = start_example("hello-character");
+    let (mut world, mut scripts) = start_example("character");
     let assets = Assets::default();
     let mut characters = Controllers::default();
     let mut physics = Physics::new();
@@ -715,7 +715,7 @@ fn hello_character_hovers_in_a_custom_mode_from_lua_and_blocks() {
 #[test]
 fn hello_character_crouches_from_lua_and_blocks_and_under_the_low_ceiling() {
     use axcenity_core::KeyCode as K;
-    let (mut world, mut scripts) = start_example("hello-character");
+    let (mut world, mut scripts) = start_example("character");
     let assets = Assets::default();
     let mut characters = Controllers::default();
     let mut physics = Physics::new();
@@ -815,7 +815,7 @@ fn hello_character_crosses_the_grey_step_and_ramp_and_is_stopped_by_the_red_ones
     // Walks toward -Z for `frames` 60ths of a second from x, and returns
     // where the body's feet end up.
     let walk_from = |x: f32, frames: usize| {
-        let (mut world, _) = start_example("hello-character");
+        let (mut world, _) = start_example("character");
         let assets = Assets::default();
         let model = world
             .find_first_child(world.workspace(), "Character")
@@ -865,7 +865,7 @@ fn keys_are_recorded_and_released() {
 
 #[test]
 fn hello_script_example_creates_a_part_and_moves_an_existing_one() {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-script");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/script");
     let project = axcenity_project::load(&folder).unwrap();
     let mut world = project.world;
     let parts_before = world.descendants(world.workspace()).len();
@@ -897,7 +897,7 @@ fn hello_script_example_creates_a_part_and_moves_an_existing_one() {
 
 #[test]
 fn hello_modules_example_builds_stairs_through_two_modules() {
-    let (world, _) = start_example("hello-modules");
+    let (world, _) = start_example("modules");
     let workspace = world.workspace();
     let colors: Vec<Option<&Value>> = (1..=8)
         .map(|n| {
@@ -936,7 +936,7 @@ fn every_example_renders() {
         return;
     };
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     let mut names: Vec<String> = fs::read_dir(&examples)
         .unwrap()
         .flatten()
@@ -1025,8 +1025,8 @@ fn check_example_renders(
             .unwrap();
     }
     // An example can have a reference screenshot, which it must still
-    // match: of its top-left corner (where hello-css's HUD is), or of
-    // the whole frame (hello-graphics, the graphics reference scene).
+    // match: of its top-left corner (where css's HUD is), or of
+    // the whole frame (graphics, the graphics reference scene).
     if let Some(average) = difference_from(&folder.join("reference.png"), &pixels, width) {
         assert!(
             average < REFERENCE_TOLERANCE,
@@ -1089,7 +1089,7 @@ pub(super) fn write_png(path: &Path, pixels: &[u8], (width, height): (u32, u32))
         .unwrap();
 }
 
-/// The example project in `examples/<name>`, with its scripts started.
+/// The example project in the engine sample `<name>`, with its scripts started.
 /// A script that sets `Lighting.ToneMapping` changes the frame drawn after it.
 #[test]
 fn a_script_setting_filmic_tone_mapping_changes_the_next_frame() {
@@ -1103,7 +1103,7 @@ fn a_script_setting_filmic_tone_mapping_changes_the_next_frame() {
     else {
         return;
     };
-    let (mut world, mut scripts, folder) = start_example_in("hello-graphics");
+    let (mut world, mut scripts, folder) = start_example_in("graphics");
     let (mut physics, mut clock) = (Physics::new(), 0);
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 0.5);
     let assets = Assets::new(&folder);
@@ -1496,7 +1496,7 @@ pub(super) fn start_example(name: &str) -> (World, ScriptRuntime) {
 /// it's dropped.
 pub(super) fn start_example_in(name: &str) -> (World, ScriptRuntime, TempCopy) {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name);
     // A copy, since opening a project from an older format upgrades it.
     let folder = TempCopy::of(
@@ -1597,7 +1597,7 @@ pub(super) fn run_until(
 
 #[test]
 fn hello_door_opens_through_load_animation_when_something_lands_on_the_pad() {
-    let (mut world, mut scripts, folder) = start_example_in("hello-door");
+    let (mut world, mut scripts, folder) = start_example_in("door");
     let assets = Assets::new(&folder);
     let mut animators = Animators::new();
     let mut physics = Physics::new();
@@ -1659,7 +1659,7 @@ fn hello_door_opens_through_load_animation_when_something_lands_on_the_pad() {
 
 #[test]
 fn hello_events_reacts_to_physics_heartbeat_new_children_and_script_changes() {
-    let (mut world, mut scripts) = start_example("hello-events");
+    let (mut world, mut scripts) = start_example("events");
     let mut physics = Physics::new();
     let mut clock = 0;
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 4.0);
@@ -1697,7 +1697,7 @@ fn hello_events_reacts_to_physics_heartbeat_new_children_and_script_changes() {
 
 #[test]
 fn hello_mesh_drops_parts_onto_an_imported_model_which_reports_touches() {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
     let project = axcenity_project::load(&folder).unwrap();
     let mut world = project.world;
     let workspace = world.workspace();
@@ -1814,7 +1814,7 @@ pub(super) fn position_of(world: &World, name: &str) -> Vector3 {
 
 #[test]
 fn hello_physics_parts_fall_collide_and_come_to_rest_on_the_floor() {
-    let (mut world, mut scripts) = start_example("hello-physics");
+    let (mut world, mut scripts) = start_example("physics");
     let mut physics = Physics::new();
     let mut clock = 0;
     let moving = [
@@ -1856,7 +1856,7 @@ fn hello_physics_parts_fall_collide_and_come_to_rest_on_the_floor() {
 
 #[test]
 fn hello_physics_script_freezes_and_releases_the_dropper() {
-    let (mut world, mut scripts) = start_example("hello-physics");
+    let (mut world, mut scripts) = start_example("physics");
     let mut physics = Physics::new();
     let mut clock = 0;
     let mut at = |until| {
@@ -1876,7 +1876,7 @@ fn hello_physics_script_freezes_and_releases_the_dropper() {
 
 #[test]
 fn hello_physics_script_teleports_the_bouncy_ball_back_to_its_start() {
-    let (mut world, mut scripts) = start_example("hello-physics");
+    let (mut world, mut scripts) = start_example("physics");
     let mut physics = Physics::new();
     let mut clock = 0;
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 4.9);
@@ -1896,7 +1896,7 @@ fn hello_physics_script_teleports_the_bouncy_ball_back_to_its_start() {
 #[test]
 fn hello_object_scripts_runs_one_door_script_per_copy_and_clones_the_coin_template() {
     // `start_scripts` prints and takes what the scripts print as they start.
-    let (mut world, mut scripts, _folder) = start_example_in("hello-object-scripts");
+    let (mut world, mut scripts, _folder) = start_example_in("object-scripts");
     let mut printed = Vec::new();
     // 3.5 seconds at 60 frames per second.
     for _ in 0..210 {
@@ -1935,7 +1935,7 @@ fn hello_object_scripts_runs_one_door_script_per_copy_and_clones_the_coin_templa
 
 #[test]
 fn hello_tasks_example_blinks_spins_and_adds_a_ball_over_time() {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-tasks");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/tasks");
     let project = axcenity_project::load(&folder).unwrap();
     let mut world = project.world;
     let mut scripts = axcenity_sim::script_runtime();
@@ -2004,7 +2004,7 @@ fn run_and_collect(
 
 #[test]
 fn hello_touched_demo_recolors_the_pad_and_prints_what_landed() {
-    let (mut world, mut scripts) = start_example("hello-touched");
+    let (mut world, mut scripts) = start_example("touched");
     let mut physics = Physics::new();
     let mut clock = 0;
     let pad = world.find_first_child(world.workspace(), "Pad").unwrap();
@@ -2041,7 +2041,7 @@ fn hello_touched_demo_recolors_the_pad_and_prints_what_landed() {
 
 #[test]
 fn settled_hello_physics_parts_stop_reporting_touches() {
-    let (mut world, mut scripts) = start_example("hello-physics");
+    let (mut world, mut scripts) = start_example("physics");
     let mut physics = Physics::new();
     let mut clock = 0;
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 9.0);
@@ -2058,7 +2058,7 @@ fn settled_hello_physics_parts_stop_reporting_touches() {
 fn hello_tween_raises_the_block_and_slides_the_menu_in_then_fades_it_out() {
     use axcenity_core::UDim2;
     use axcenity_render::UiDrawItem;
-    let (mut world, mut scripts) = start_example("hello-tween");
+    let (mut world, mut scripts) = start_example("tween");
     let hud = world.find_first_child(world.workspace(), "Hud").unwrap();
     let menu = world.find_first_child(hud, "Menu").unwrap();
     let (width, height) = (1920, 1080);
@@ -2132,7 +2132,7 @@ fn hello_tween_raises_the_block_and_slides_the_menu_in_then_fades_it_out() {
 #[test]
 fn hello_rich_text_styles_tags_from_the_world_lua_and_blocks() {
     use axcenity_render::{UiDrawItem, UiText};
-    let (mut world, mut scripts) = start_example("hello-rich-text");
+    let (mut world, mut scripts) = start_example("rich-text");
     let hud = world.find_first_child(world.workspace(), "Hud").unwrap();
     let text_of = |world: &World, name: &str| -> UiText {
         let layout = axcenity_ui::layout_ui(world, 1280, 720, &[]);
@@ -2277,7 +2277,7 @@ fn hello_buttons_hovers_presses_and_leaves_the_locked_button_alone() {
         ]
     };
 
-    let (world, scripts, folder) = start_example_in("hello-buttons");
+    let (world, scripts, folder) = start_example_in("buttons");
     let css = std::fs::read_to_string(folder.join("ui.css")).unwrap();
     let (sheet, warnings) = axcenity_ui::parse_stylesheet("ui.css", &css);
     assert!(warnings.is_empty(), "{warnings:?}");
@@ -2411,7 +2411,7 @@ fn hello_settings_widgets_change_by_pointer_fire_value_changed_and_move_from_scr
         if name == "Status" { "Text" } else { "Value" }
     }
 
-    let (world, scripts, folder) = start_example_in("hello-settings");
+    let (world, scripts, folder) = start_example_in("settings");
     let css = std::fs::read_to_string(folder.join("ui.css")).unwrap();
     let (sheet, warnings) = axcenity_ui::parse_stylesheet("ui.css", &css);
     assert!(warnings.is_empty(), "{warnings:?}");
@@ -2477,7 +2477,7 @@ fn hello_settings_widgets_change_by_pointer_fire_value_changed_and_move_from_scr
 
 #[test]
 fn hello_ui_graph_runs_its_event_graph_as_an_ordinary_local_script() {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-ui-graph");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/ui-graph");
     let project = axcenity_project::load(&folder).unwrap();
     let problems: Vec<String> = project.problems.iter().map(ToString::to_string).collect();
     assert!(problems.is_empty(), "{problems:?}");
@@ -2548,10 +2548,10 @@ fn files_in(folder: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
     files
 }
 
-/// hello-saves, opened from a copy as the player opens it, with its slots in
+/// saves, opened from a copy as the player opens it, with its slots in
 /// `saves` instead of the player's data folder.
 fn start_hello_saves(copy: &str, saves: &Path) -> (World, ScriptRuntime, TempCopy) {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-saves");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/saves");
     let folder = TempCopy::of(
         &example,
         &format!("axcenity-player-{copy}-{}", std::process::id()),
@@ -2584,7 +2584,7 @@ fn hello_saves_saves_loads_and_restores_its_checkpoint_from_lua_and_blocks_outsi
     use axcenity_core::KeyCode as K;
     let saves = std::env::temp_dir().join(format!("axcenity-player-saves-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&saves);
-    let (mut world, mut scripts, folder) = start_hello_saves("hello-saves", &saves);
+    let (mut world, mut scripts, folder) = start_hello_saves("saves-sample", &saves);
     let project_files = files_in(&folder);
     assert_eq!(
         script_lines(&mut scripts),
@@ -2670,7 +2670,7 @@ fn hello_saves_saves_loads_and_restores_its_checkpoint_from_lua_and_blocks_outsi
     assert_eq!(script_lines(&mut scripts), Vec::<String>::new());
 
     // The next run of the game starts from slot 1, with its checkpoint.
-    let (world, mut scripts, _copy) = start_hello_saves("hello-saves-again", &saves);
+    let (world, mut scripts, _copy) = start_hello_saves("saves-again", &saves);
     assert_eq!(script_lines(&mut scripts), ["Loaded slot 1: 2 coins"]);
     assert_eq!(coin(&world, 1), Some(Value::Number(1.0)));
     assert_eq!(coin(&world, 3), Some(Value::Number(0.0)));
@@ -2685,7 +2685,7 @@ fn hello_saves_loading_a_missing_slot_from_blocks_fails_and_leaves_the_world_alo
     let saves =
         std::env::temp_dir().join(format!("axcenity-player-no-saves-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&saves);
-    let (mut world, mut scripts, _copy) = start_hello_saves("hello-saves-missing", &saves);
+    let (mut world, mut scripts, _copy) = start_hello_saves("saves-missing", &saves);
     script_lines(&mut scripts);
     let before = axcenity_save::snapshot(&world);
     for pressed in [true, false] {
@@ -2770,7 +2770,7 @@ fn hello_menu_moves_focus_the_same_by_keys_and_controller_and_uses_what_is_focus
         }
     }
     let start = || {
-        let (world, scripts, folder) = start_example_in("hello-menu");
+        let (world, scripts, folder) = start_example_in("menu");
         let css = std::fs::read_to_string(folder.join("ui.css")).unwrap();
         let (sheet, warnings) = axcenity_ui::parse_stylesheet("ui.css", &css);
         assert!(warnings.is_empty(), "{warnings:?}");
@@ -2916,7 +2916,7 @@ fn hello_menu_moves_focus_the_same_by_keys_and_controller_and_uses_what_is_focus
 
 #[test]
 fn hello_strings_shows_the_active_language_and_switches_from_lua_and_blocks() {
-    let (mut world, mut scripts, folder) = start_example_in("hello-strings");
+    let (mut world, mut scripts, folder) = start_example_in("strings");
     let project = axcenity_project::load(&folder).unwrap();
     let stylesheets: Vec<_> = project
         .stylesheets
@@ -2985,9 +2985,9 @@ fn hello_strings_shows_the_active_language_and_switches_from_lua_and_blocks() {
 
 #[test]
 fn reading_and_writing_cframes_leaves_a_saved_world_byte_for_byte_the_same() {
-    for name in ["primitives", "hello-character", "hello-mesh", "hello-door"] {
+    for name in ["primitives", "character", "mesh", "door"] {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples")
+            .join("../samples/projects")
             .join(name)
             .join("world.json");
         let mut world =
@@ -3032,7 +3032,7 @@ fn dump_every_example() {
     let Some(out) = std::env::var_os("AXCENITY_DUMP") else {
         return;
     };
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     let mut names: Vec<String> = fs::read_dir(&examples)
         .unwrap()
         .flatten()

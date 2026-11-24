@@ -143,10 +143,18 @@ impl EditorApp {
         let project_root = self.project.as_ref().map(|project| project.folder.clone());
         let mut picked = None;
         let mut weather_action = None;
+        let mut environment_action = None;
+        let preset_names = self.environment_presets.names(&self.assets).to_vec();
         let edit = properties::show(ui, world, &self.assets, selected, !editing, &kept, |ui| {
             if nothing {
                 picked = properties::nothing_selected(ui, &place, &recent);
                 if editing {
+                    environment_action = crate::environment_presets::show(
+                        ui,
+                        &mut self.environment_presets,
+                        &preset_names,
+                        project_root.is_some(),
+                    );
                     weather_action = crate::weather_inspector::show(
                         ui,
                         world,
@@ -156,6 +164,18 @@ impl EditorApp {
                     );
                 }
                 return;
+            }
+            if editing
+                && selected
+                    .and_then(|id| world.get(id))
+                    .is_some_and(|instance| instance.class() == ClassName::Lighting)
+            {
+                environment_action = crate::environment_presets::show(
+                    ui,
+                    &mut self.environment_presets,
+                    &preset_names,
+                    project_root.is_some(),
+                );
             }
             if editing
                 && let Some(instance) = selected.and_then(|id| world.get(id))
@@ -178,6 +198,10 @@ impl EditorApp {
             }
         });
         drop(plugin_rows);
+        if let Some(action) = environment_action {
+            self.environment_action(action);
+            ui.ctx().request_repaint();
+        }
         if let Some(action) = weather_action {
             if matches!(
                 action,
@@ -289,6 +313,8 @@ impl EditorApp {
         let can_save = assets::any_prefab(&self.world, &self.selection_roots());
         // The Scatter pane adds the props and models clicked.
         let picking_scatter = self.scatter_picking();
+        // Or the pictures clicked, as its palette's decals.
+        let picking_decals = self.scatter_decal_picking();
         // A selected SplineMesh or SplineScatter takes the models clicked.
         let spline_models = self.spline_models_picking();
         // A selected ScatterRule takes the props and models clicked (PW1).
@@ -296,6 +322,8 @@ impl EditorApp {
         let action = {
             let picking = if picking_scatter {
                 Some(Picking::Scatter(self.scatter.sources()))
+            } else if picking_decals {
+                Some(Picking::ScatterDecals(self.scatter.decal_textures()))
             } else if let Some((_, entries)) = &scatter_models {
                 Some(Picking::ScatterModels(entries.clone()))
             } else {
@@ -340,6 +368,11 @@ impl EditorApp {
                     && self.use_global_asset(&entry.path)
                 {
                     self.add_scatter_item(source);
+                }
+            }
+            Some(BrowserAction::Pick(entry)) if picking_decals => {
+                if self.use_global_asset(&entry.path) {
+                    self.add_scatter_decal(&entry.path);
                 }
             }
             Some(BrowserAction::Pick(entry)) if scatter_models.is_some() => {
@@ -965,6 +998,7 @@ impl EditorApp {
         });
         let camera = self.viewport.camera_view();
         let editable = folder.is_some() && !self.playing();
+        let seq_presets = self.environment_presets.names(&self.assets).to_vec();
         let mut seq_actions = Vec::new();
         let sequencer = &mut self.sequencer;
         let world_ref = &mut self.world;
@@ -974,6 +1008,7 @@ impl EditorApp {
                     files: &seq_files,
                     clips: &seq_clips,
                     levels: &seq_levels,
+                    presets: &seq_presets,
                     picked: seq_picked.clone(),
                     world,
                     camera,
@@ -998,6 +1033,7 @@ impl EditorApp {
                 crate::sequencer::SequencerAction::Open(path) => self.open_sequence(&path),
                 crate::sequencer::SequencerAction::New(name) => self.new_sequence(&name),
                 crate::sequencer::SequencerAction::Insert(path) => self.insert_sequence(&path),
+                crate::sequencer::SequencerAction::RenderMovie => self.open_render_movie(),
             }
         }
         self.flush_sequence(ui.ctx());
@@ -1419,29 +1455,30 @@ impl EditorApp {
             .inner;
         self.swap_play_effects();
         if let Some(rect) = self.viewport_rect {
-            if !self.playing() && !has_sequence {
-                if let Some(new_mask) = crate::weather_inspector::viewport_paint_and_overlay(
+            if !self.playing()
+                && !has_sequence
+                && let Some(new_mask) = crate::weather_inspector::viewport_paint_and_overlay(
                     &ctx,
                     rect,
                     self.viewport.render_camera(),
                     &self.world,
                     &self.weather_ui.brush,
-                ) {
-                    let weather_id =
-                        crate::weather_inspector::find_weather(&self.world).or_else(|| {
-                            let id = self.world.create(ClassName::Weather).ok()?;
-                            self.world
-                                .set_parent(id, Some(self.world.lighting()))
-                                .ok()?;
-                            Some(id)
-                        });
-                    if let Some(id) = weather_id {
-                        self.apply(
-                            id,
-                            properties::Edit::Property("SurfaceMask", Value::String(new_mask)),
-                        );
-                        ctx.request_repaint();
-                    }
+                )
+            {
+                let weather_id =
+                    crate::weather_inspector::find_weather(&self.world).or_else(|| {
+                        let id = self.world.create(ClassName::Weather).ok()?;
+                        self.world
+                            .set_parent(id, Some(self.world.lighting()))
+                            .ok()?;
+                        Some(id)
+                    });
+                if let Some(id) = weather_id {
+                    self.apply(
+                        id,
+                        properties::Edit::Property("SurfaceMask", Value::String(new_mask)),
+                    );
+                    ctx.request_repaint();
                 }
             }
             let play_cpu = self

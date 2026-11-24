@@ -174,7 +174,9 @@ mod tests {
     #[test]
     fn version_flag_answers_only_when_asked() {
         let args = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert!(version_flag("axcenity-player", &args(&["examples/hello-part"])).is_none());
+        assert!(
+            version_flag("axcenity-player", &args(&["crates/samples/projects/part"])).is_none()
+        );
         let text = version_flag("axcenity-player", &args(&["--version"])).unwrap();
         assert!(text.starts_with(&format!("axcenity-player {}", Version::current())));
         let json = version_flag("axcenity-player", &args(&["--version", "--json"])).unwrap();

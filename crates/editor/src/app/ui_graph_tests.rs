@@ -56,10 +56,10 @@ fn current_page(world: &World, pages: InstanceId) -> String {
         .to_owned()
 }
 
-/// The hello-ui-graph example open in the editor, and its Menu, Pages and
+/// The ui-graph example open in the editor, and its Menu, Pages and
 /// Settings button.
 fn hello_ui_graph(test: &str) -> (PathBuf, EditorApp, InstanceId, InstanceId, InstanceId) {
-    let folder = copy_of_example("hello-ui-graph", test);
+    let folder = copy_of_example("ui-graph", test);
     let app = EditorApp::new(Some(&folder));
     let menu = child(&app.world, app.world.workspace(), "Menu");
     let pages = child(&app.world, menu, "Pages");
@@ -249,7 +249,7 @@ fn saving_writes_the_graph_and_makes_its_read_only_local_script_again() {
 
 #[test]
 fn a_new_screen_guis_first_graph_saves_with_a_new_local_script_that_plays() {
-    let folder = copy_of_example("hello-touched", "ui-graph-new");
+    let folder = copy_of_example("touched", "ui-graph-new");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();

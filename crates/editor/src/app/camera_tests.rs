@@ -1,5 +1,5 @@
 //! `workspace.CurrentCamera` in the editor's Play (unified Phase 31), with
-//! the `hello-camera` example. The player runs it in
+//! the `camera` example. The player runs it in
 //! `player/src/camera_tests.rs` and checks the same numbers, so the
 //! flyover plays the same in both.
 
@@ -47,7 +47,7 @@ fn frame(app: &mut EditorApp, input: &[InputEvent]) {
 }
 
 fn playing(test: &str) -> EditorApp {
-    let folder = copy_of_example("hello-camera", test);
+    let folder = copy_of_example("camera", test);
     let mut app = EditorApp::new(Some(&folder));
     app.viewport.set_pixel_size(SIZE);
     app.play();
@@ -184,7 +184,7 @@ fn part_under_the_mouse_and_the_beacon_tag_line_up_with_what_the_viewport_draws(
 
 #[test]
 fn an_inserted_camera_is_a_viewpoint_where_the_editor_looks_from_and_saves_as_a_camera() {
-    let folder = copy_of_example("hello-camera", "camera-insert");
+    let folder = copy_of_example("camera", "camera-insert");
     let mut app = EditorApp::new(Some(&folder));
     app.viewport
         .look_at(Vec3::new(5.0, 9.0, 12.0), Vec3::new(5.0, 0.0, 0.0));

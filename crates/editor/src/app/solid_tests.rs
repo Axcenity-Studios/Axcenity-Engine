@@ -47,7 +47,7 @@ fn wall_and_negated_block(app: &mut EditorApp) -> (InstanceId, InstanceId) {
 
 #[test]
 fn negate_toggles_a_part_as_one_undo_step() {
-    let folder = copy_of_example("hello-part", "solid-negate");
+    let folder = copy_of_example("part", "solid-negate");
     let mut app = EditorApp::new(Some(&folder));
     let (_, door) = wall_and_negated_block(&mut app);
     let size = app.world.get(door).unwrap().property("Size").cloned();
@@ -64,7 +64,7 @@ fn negate_toggles_a_part_as_one_undo_step() {
 
 #[test]
 fn union_cuts_the_negated_block_out_and_separate_gives_the_parts_back_unchanged() {
-    let folder = copy_of_example("hello-part", "solid-union");
+    let folder = copy_of_example("part", "solid-union");
     let mut app = EditorApp::new(Some(&folder));
     let (wall, door) = wall_and_negated_block(&mut app);
     // A red door, so its cut faces keep a look of their own (parts that
@@ -131,7 +131,7 @@ fn union_cuts_the_negated_block_out_and_separate_gives_the_parts_back_unchanged(
 
 #[test]
 fn intersect_keeps_only_the_overlap() {
-    let folder = copy_of_example("hello-part", "solid-intersect");
+    let folder = copy_of_example("part", "solid-intersect");
     let mut app = EditorApp::new(Some(&folder));
     let a = part(&mut app, "A", [4.0, 4.0, 4.0], [0.0, 2.0, 0.0]);
     let b = part(&mut app, "B", [4.0, 4.0, 4.0], [2.0, 2.0, 0.0]);
@@ -155,7 +155,7 @@ fn intersect_keeps_only_the_overlap() {
 
 #[test]
 fn a_failed_union_says_why_and_leaves_the_parts_unchanged() {
-    let folder = copy_of_example("hello-part", "solid-fails");
+    let folder = copy_of_example("part", "solid-fails");
     let mut app = EditorApp::new(Some(&folder));
     let a = part(&mut app, "Pill", [4.0, 2.0, 2.0], [0.0, 2.0, 0.0]);
     app.world
@@ -185,7 +185,7 @@ fn a_failed_union_says_why_and_leaves_the_parts_unchanged() {
 
 #[test]
 fn the_explorer_hides_the_parts_kept_inside_a_union() {
-    let folder = copy_of_example("hello-csg", "solid-explorer");
+    let folder = copy_of_example("csg", "solid-explorer");
     let mut app = EditorApp::new(Some(&folder));
     let doorway = app
         .world
@@ -207,9 +207,9 @@ fn the_explorer_hides_the_parts_kept_inside_a_union() {
 
 #[test]
 fn to_terrain_raises_the_ground_to_a_part_s_top_and_removes_it_as_one_step() {
-    // hello-part has a 512-stud Terrain from y = -32 to 96, with Grass,
+    // part has a 512-stud Terrain from y = -32 to 96, with Grass,
     // Dirt and Rock layers.
-    let folder = copy_of_example("hello-part", "solid-to-terrain");
+    let folder = copy_of_example("part", "solid-to-terrain");
     let mut app = EditorApp::new(Some(&folder));
     let terrain = app
         .world

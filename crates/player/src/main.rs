@@ -101,7 +101,7 @@ const USAGE: &str = "usage: axcenity-player [--watch] [--dev] [--host [port] [--
                      [--password text] [--bench frames] [--size WxH] [--quality preset] [--graphics file.json] \
                      [--replay file] \
                      [project-folder | game.axgame]  (or --version [--json])\n\
-                     example: cargo run -p axcenity-player -- examples/hello-part\n\
+                     example: cargo run -p axcenity-player -- crates/samples/projects/part\n\
                      --watch reloads a project folder's changed assets while it plays\n\
                      --dev turns on the F9 Developer Console in a built game\n\
                      --host hosts the game (port 47800 unless given), secured with connect \

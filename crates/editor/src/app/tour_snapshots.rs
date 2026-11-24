@@ -12,14 +12,14 @@
 //! `-light` or `-compact`. `TOUR_CONTRAST=high` turns Increase contrast on
 //! (`-contrast`).
 //! The examples are copied to a temporary folder first, so nothing in
-//! `examples/` changes.
+//! `crates/samples/projects/` changes.
 
 use super::*;
 use crate::layout::Pane;
 
 fn copy_example(name: &str) -> PathBuf {
     let from = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name);
     let to = std::env::temp_dir().join(format!("axcenity-tour-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&to);
@@ -119,8 +119,8 @@ fn editor_tour_snapshots() {
         shoot(&mut app, name, setup);
     };
     run("00-start", None, &|_| {});
-    run("01-open", Some("hello-part"), &|_| {});
-    run("02-part-selected", Some("hello-part"), &|app| {
+    run("01-open", Some("part"), &|_| {});
+    run("02-part-selected", Some("part"), &|app| {
         let part = first_child(app);
         select(app, part)
     });
@@ -133,68 +133,66 @@ fn editor_tour_snapshots() {
     ] {
         run(
             &format!("03-ribbon-{}", tab.label()),
-            Some("hello-part"),
+            Some("part"),
             &|app| app.ribbon_tabs.set_active_for_tour(tab),
         );
     }
-    run("04-assets", Some("hello-part"), &|app| {
+    run("04-assets", Some("part"), &|app| {
         app.layout.open(Pane::Assets)
     });
     // The systems the audit only reviewed (A8-A17), for their own pass.
-    run("60-script-editor", Some("hello-script"), &|app| {
+    run("60-script-editor", Some("script"), &|app| {
         app.open_script("scripts/greet.server.lua", Some(1))
     });
-    run("61-lighting", Some("hello-lights"), &|app| {
+    run("61-lighting", Some("lights"), &|app| {
         let lighting = service(app, ClassName::Lighting);
         select(app, lighting)
     });
-    run("62-sound", Some("hello-audio"), &|app| {
+    run("62-sound", Some("audio"), &|app| {
         let id = find(app, "Music");
         select(app, id)
     });
-    run("63-mixer", Some("hello-mixer"), &|app| {
+    run("63-mixer", Some("mixer"), &|app| {
         app.layout.open(Pane::Mixer)
     });
-    run("64-collision-groups", Some("hello-physics"), &|app| {
+    run("64-collision-groups", Some("physics"), &|app| {
         app.collision_groups.open = true
     });
-    run("65-physics-part", Some("hello-physics"), &|app| {
+    run("65-physics-part", Some("physics"), &|app| {
         let part = first_child(app);
         select(app, part)
     });
-    run("66-settings", Some("hello-part"), &|app| {
-        app.settings.open = true
-    });
-    run("67-version-history", Some("hello-part"), &|app| {
+    run("66-settings", Some("part"), &|app| app.settings.open = true);
+    run("67-version-history", Some("part"), &|app| {
         app.version_history.open = true
     });
-    run("68-input", Some("hello-part"), &|app| {
+    run("68-input", Some("part"), &|app| {
         app.input_settings.open = true
     });
-    run("69-tests", Some("hello-part"), &|app| {
+    run("69-tests", Some("part"), &|app| {
         app.layout.open(Pane::Tests)
     });
-    run("70-profiler", Some("hello-part"), &|app| {
+    run("70-profiler", Some("part"), &|app| {
         app.layout.open(Pane::Profiler)
     });
     // The design-system audit: the graph editors and other canvases that
     // draw with their own colours.
-    run("80-material-graph", Some("hello-material-graph"), &|app| {
+    run("80-material-graph", Some("material-graph"), &|app| {
         app.open_material("assets/materials/MossyStone.material.json")
     });
-    run("81-behavior-tree", Some("hello-behavior"), &|app| {
+    run("81-behavior-tree", Some("behavior"), &|app| {
         app.open_behavior_tree("assets/ai/Guard.behaviortree.json")
     });
-    run("82-dialogue", Some("hello-dialogue"), &|app| {
+    run("82-dialogue", Some("dialogue"), &|app| {
         app.open_dialogue("assets/dialogue/Farmer.dialogue.json")
     });
-    run("83-sequencer", Some("hello-cutscene"), &|app| {
+    run("83-sequencer", Some("cutscene"), &|app| {
         app.open_sequence("assets/sequences/Intro.sequence.json")
     });
-    run("84-terrain", Some("hello-part"), &|app| {
+    run("84-terrain", Some("part"), &|app| {
         app.layout.open(Pane::Terrain)
     });
-    run("85-blocks", Some("hello-touched-blocks"), &|app| {
+    run("85-blocks", Some("touched-blocks"), &|app| {
         app.open_script("scripts/pad.server.blocks.json", None)
     });
     // Design system Phase 5: the layout presets and the shortcut table.
@@ -203,31 +201,31 @@ fn editor_tour_snapshots() {
             "90-layout-{}",
             preset.label().to_lowercase().replace([' ', '&'], "")
         );
-        run(&name, Some("hello-script"), &|app| {
+        run(&name, Some("script"), &|app| {
             app.open_script("scripts/greet.server.lua", Some(1));
             // Opened before switching, not just now.
             let _ = app.tabs.take_focus();
             app.layout.use_preset(preset);
         });
     }
-    run("91-shortcuts", Some("hello-part"), &|app| {
+    run("91-shortcuts", Some("part"), &|app| {
         app.settings.open = true;
         app.settings.page = settings::SettingsPage::Shortcuts;
     });
-    run("10-anim-empty", Some("hello-animation"), &|app| {
+    run("10-anim-empty", Some("animation"), &|app| {
         app.layout.open(Pane::Animation)
     });
-    run("11-anim-noodle", Some("hello-animation"), &|app| {
+    run("11-anim-noodle", Some("animation"), &|app| {
         app.layout.open(Pane::Animation);
         let id = find(app, "Noodle");
         select(app, id)
     });
-    run("12-anim-door", Some("hello-door"), &|app| {
+    run("12-anim-door", Some("door"), &|app| {
         app.layout.open(Pane::Animation);
         let id = find(app, "Door");
         select(app, id)
     });
-    run("13-anim-floor", Some("hello-door"), &|app| {
+    run("13-anim-floor", Some("door"), &|app| {
         app.layout.open(Pane::Animation);
         let id = find(app, "Floor");
         select(app, id)
@@ -236,34 +234,34 @@ fn editor_tour_snapshots() {
         app.layout.open(Pane::UiDesigner);
         app.ui_designer.set_tab(tab);
     };
-    run("40-ui-empty", Some("hello-part"), &|app| {
+    run("40-ui-empty", Some("part"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Design)
     });
-    run("41-ui-menu", Some("hello-menu"), &|app| {
+    run("41-ui-menu", Some("menu"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Design);
         let id = find(app, "Menu");
         select(app, id)
     });
-    run("42-ui-button", Some("hello-menu"), &|app| {
+    run("42-ui-button", Some("menu"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Design);
         let id = find(app, "Play");
         select(app, id)
     });
-    run("43-ui-label", Some("hello-menu"), &|app| {
+    run("43-ui-label", Some("menu"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Design);
         let id = find(app, "Title");
         select(app, id)
     });
-    run("44-ui-graph", Some("hello-ui-graph"), &|app| {
+    run("44-ui-graph", Some("ui-graph"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::EventGraph)
     });
-    run("45-ui-strings", Some("hello-menu"), &|app| {
+    run("45-ui-strings", Some("menu"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Strings)
     });
-    run("46-ui-pages", Some("hello-menu"), &|app| {
+    run("46-ui-pages", Some("menu"), &|app| {
         designer(app, crate::ui_designer::DesignerTab::Pages)
     });
-    run("14-animate-floor", Some("hello-door"), &|app| {
+    run("14-animate-floor", Some("door"), &|app| {
         app.layout.open(Pane::Animation);
         let id = find(app, "Floor");
         select(app, id);
@@ -279,11 +277,11 @@ fn editor_tour_snapshots() {
         doc.select(|selection, _| selection.clear());
         doc.set_mode(crate::model_studio::Mode::Object);
     };
-    run("20-studio-empty", Some("hello-part"), &|app| {
+    run("20-studio-empty", Some("part"), &|app| {
         app.layout.open(Pane::ModelStudio)
     });
-    run("21-studio-object", Some("hello-part"), &|app| chair(app));
-    run("22-studio-edit", Some("hello-part"), &|app| {
+    run("21-studio-object", Some("part"), &|app| chair(app));
+    run("22-studio-edit", Some("part"), &|app| {
         chair(app);
         let doc = app.model_studio.doc.as_mut().unwrap();
         doc.set_mode(crate::model_studio::Mode::Edit);
@@ -294,7 +292,7 @@ fn editor_tour_snapshots() {
         ("24-studio-sculpt", crate::model_studio::Mode::Sculpt),
         ("25-studio-rig", crate::model_studio::Mode::Armature),
     ] {
-        run(name, Some("hello-part"), &|app| {
+        run(name, Some("part"), &|app| {
             app.layout.open(Pane::ModelStudio);
             let model = crate::model_studio::rig_tests::humanoid_doc();
             app.model_studio.open(crate::model_studio::StudioDoc::new(
@@ -306,7 +304,7 @@ fn editor_tour_snapshots() {
             doc.set_mode(mode);
         });
     }
-    run("26-studio-weights", Some("hello-part"), &|app| {
+    run("26-studio-weights", Some("part"), &|app| {
         app.layout.open(Pane::ModelStudio);
         let model = crate::model_studio::rig_tests::humanoid_doc();
         app.model_studio.open(crate::model_studio::StudioDoc::new(
@@ -318,7 +316,7 @@ fn editor_tour_snapshots() {
         let doc = app.model_studio.doc.as_mut().unwrap();
         doc.set_mode(crate::model_studio::Mode::Weights);
     });
-    run("27-studio-paint-new-cube", Some("hello-part"), &|app| {
+    run("27-studio-paint-new-cube", Some("part"), &|app| {
         app.layout.open(Pane::ModelStudio);
         app.model_studio
             .open(crate::model_studio::tests::cube_doc());
@@ -338,7 +336,7 @@ fn editor_tour_snapshots() {
         let Ok(folder) = std::env::var("AXCENITY_SNAPSHOTS") else {
             return;
         };
-        let mut app = fresh(Some("hello-menu"));
+        let mut app = fresh(Some("menu"));
         let id = find(&app, element);
         select(&mut app, id);
         crate::snapshot::snapshot_rendered(

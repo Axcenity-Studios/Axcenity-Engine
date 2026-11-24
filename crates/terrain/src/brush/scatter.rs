@@ -7,6 +7,12 @@
 //! same items. A minimum spacing keeps a new item that many studs from any
 //! painted foliage already there (and from the others the stamp adds), so
 //! going over the same ground again fills gaps instead of piling items up.
+//!
+//! An item's masks (`scatter_mask.rs`: noise patches, slope, height and
+//! moisture) thin it out where they say: a spot picked for a masked item
+//! is kept with the chance its masks give, rolled against a number of the
+//! spot's own, so the stroke's random numbers (and so every unmasked
+//! item) are the same with or without masks.
 
 use std::collections::HashMap;
 
@@ -15,6 +21,7 @@ use axcenity_core::{
 };
 use glam::Vec2;
 
+use super::scatter_mask::{ScatterMask, roll as mask_roll};
 use super::{Brush, MAX_FOLIAGE_PER_STAMP};
 use crate::Placement;
 use crate::noise::{Rng, mix};
@@ -45,6 +52,9 @@ pub struct ScatterItem {
     /// Studs it's lowered into the ground, whatever its scale:
     /// [`FoliageInstance::sink`].
     pub sink: f32,
+    /// Where it's placed more or less densely: noise patches, slope,
+    /// height and moisture. Open (the default), it's placed everywhere.
+    pub mask: ScatterMask,
 }
 
 impl ScatterItem {
@@ -61,6 +71,7 @@ impl ScatterItem {
             rotation: 360.0,
             align_to_slope: 0.0,
             sink: 0.0,
+            mask: ScatterMask::default(),
         }
     }
 
@@ -288,16 +299,23 @@ pub(super) fn apply_scatter(
                 if brush.weight(at - center) <= 0.0 || data.hole_at(gx, gz) {
                     continue;
                 }
+                let item = picks
+                    .iter()
+                    .find(|(_, upto)| roll < *upto)
+                    .map_or(picks[picks.len() - 1].0, |(item, _)| item);
+                // A masked item is thinned before it takes up room, so the
+                // ground its masks leave bare stays free for other items.
+                if !item.mask.is_open()
+                    && mask_roll(scatter.seed, gx, gz) >= item.mask.density(data, placement, gx, gz)
+                {
+                    continue;
+                }
                 if let Some(neighbours) = &mut neighbours {
                     if neighbours.near(at, spacing) {
                         continue;
                     }
                     neighbours.add(at);
                 }
-                let item = picks
-                    .iter()
-                    .find(|(_, upto)| roll < *upto)
-                    .map_or(picks[picks.len() - 1].0, |(item, _)| item);
                 let (low, high) = item.scale_range();
                 let rotation = if item.rotation.is_finite() {
                     item.rotation.clamp(0.0, 360.0)

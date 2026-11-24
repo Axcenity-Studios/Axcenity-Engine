@@ -230,10 +230,10 @@ mod tests {
     /// The dialog draws, with its notes, and Escape closes it.
     #[test]
     fn the_save_as_template_dialog_draws_and_closes() {
-        let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+        let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
         app.open_save_template();
         if let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS") {
-            let mut shown = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+            let mut shown = EditorApp::new(Some(&super::super::tests::example("graphics")));
             shown.open_save_template();
             crate::snapshot::snapshot(
                 &std::path::PathBuf::from(folder).join("save-as-template.png"),

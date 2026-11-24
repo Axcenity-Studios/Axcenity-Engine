@@ -20,6 +20,7 @@
 use std::path::Path;
 
 use axcenity_core::face::FACE_CONTROLS;
+use axcenity_core::{ClassName, Value, Vector3};
 use serde::{Deserialize, Serialize};
 
 use crate::easing::{DEFAULT_BEZIER, Easing, cubic_bezier};
@@ -197,7 +198,9 @@ pub enum Interp {
 /// are UDim2s. `Bone` is a bone's transform, for a track whose target
 /// names a bone. `Face` is one of a FaceControls' standard controls (by
 /// its index in `core::face::FACE_CONTROLS`), written by its name
-/// (`"Jaw_Open"`), facial animation F4b.
+/// (`"Jaw_Open"`), facial animation F4b. `Scene` is one of the properties
+/// of the sky, the weather, lights and lens effects that a sequence keys
+/// ([`PropertyName::scene`]), written by its name (`"ClockTime"`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PropertyName {
     Position,
@@ -214,6 +217,105 @@ pub enum PropertyName {
     FieldOfView,
     Bone,
     Face(u8),
+    /// By its place in [`scene_properties`].
+    Scene(u16),
+}
+
+/// A property of the scene around the actors that a sequence can key: its
+/// name, how many numbers its keys may hold, and whether it's held from
+/// one key to the next (a switch or a choice, which has nothing between).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SceneProperty {
+    pub name: &'static str,
+    pub widths: &'static [usize],
+    pub stepped: bool,
+}
+
+/// What a choice property (an `Enum`) can be, in the order its keys count
+/// them: a key of `[1]` on `Precipitation` is `Rain`.
+pub const KEYED_CHOICES: [(&str, &[&str]); 1] = [("Precipitation", &["None", "Rain", "Snow"])];
+
+/// The items of the choice property (or `Enum`) called `name`, if keys
+/// can hold it.
+pub fn keyed_choices(name: &str) -> Option<&'static [&'static str]> {
+    KEYED_CHOICES
+        .iter()
+        .find(|(choice, _)| *choice == name)
+        .map(|(_, items)| *items)
+}
+
+/// Whether a sequence keys the properties of `class`: the sky and the
+/// weather (Lighting, Atmosphere, Clouds, Weather), lights, lens and
+/// screen effects, and ParticleEmitters.
+fn keys_scene_properties(class: ClassName) -> bool {
+    class.is_light()
+        || class.is_lens_effect()
+        || matches!(
+            class,
+            ClassName::Lighting
+                | ClassName::Atmosphere
+                | ClassName::Clouds
+                | ClassName::Weather
+                | ClassName::OutlineEffect
+                | ClassName::ColorCorrectionEffect
+                | ClassName::ExposureEffect
+                | ClassName::FogEffect
+                | ClassName::BloomEffect
+                | ClassName::ParticleEmitter
+        )
+}
+
+/// Every [`PropertyName::Scene`] property, sorted by name: each number,
+/// Vector3, Color3, switch (`true` or `false`) and keyed choice
+/// ([`KEYED_CHOICES`]) of the classes above, and the Workspace's
+/// `GlobalWind`, except the ones [`PropertyName::ALL`] already names. Read
+/// from the classes' own properties, so a new property of theirs can be
+/// keyed without a change here.
+pub fn scene_properties() -> &'static [SceneProperty] {
+    static TABLE: std::sync::OnceLock<Vec<SceneProperty>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        // Name -> (takes one number, takes three, is held between keys).
+        let mut found: std::collections::BTreeMap<&'static str, (bool, bool, bool)> =
+            Default::default();
+        let mut add = |name: &'static str, value: &Value| {
+            let (one, three, stepped) = match value {
+                Value::Number(_) => (true, false, false),
+                Value::Bool(_) => (true, false, true),
+                Value::EnumItem(item) if keyed_choices(&item.enum_name).is_some() => {
+                    (true, false, true)
+                }
+                Value::Vector3(_) | Value::Color3(_) => (false, true, false),
+                _ => return,
+            };
+            if PropertyName::ALL.iter().any(|p| p.as_str() == name) {
+                return;
+            }
+            let entry = found.entry(name).or_default();
+            entry.0 |= one;
+            entry.1 |= three;
+            entry.2 |= stepped;
+        };
+        for class in ClassName::ALL {
+            if keys_scene_properties(class) {
+                for (name, value) in class.default_properties() {
+                    add(name, &value);
+                }
+            }
+        }
+        add("GlobalWind", &Value::Vector3(Vector3::new(0.0, 0.0, 0.0)));
+        found
+            .into_iter()
+            .map(|(name, (one, three, stepped))| SceneProperty {
+                name,
+                widths: match (one, three) {
+                    (true, true) => &[1, 3],
+                    (_, true) => &[3],
+                    _ => &[1],
+                },
+                stepped,
+            })
+            .collect()
+    })
 }
 
 impl Serialize for PropertyName {
@@ -227,7 +329,7 @@ impl<'de> Deserialize<'de> for PropertyName {
         let name = String::deserialize(deserializer)?;
         PropertyName::from_name(&name).ok_or_else(|| {
             serde::de::Error::custom(format!(
-                "`{name}` isn't a property a track can key (Position, Orientation, Size, Color, Transparency, BackgroundColor3, BackgroundTransparency, TextColor3, TextSize, ImageTransparency, FieldOfView, Bone, or a face control such as Jaw_Open)"
+                "`{name}` isn't a property a track can key (Position, Orientation, Size, Color, Transparency, BackgroundColor3, BackgroundTransparency, TextColor3, TextSize, ImageTransparency, FieldOfView, Bone, a face control such as Jaw_Open, or a property of the sky, the weather, a light or a lens effect such as ClockTime)"
             ))
         })
     }
@@ -267,6 +369,9 @@ impl PropertyName {
             PropertyName::Face(control) => FACE_CONTROLS
                 .get(control as usize)
                 .map_or("Face", |control| control.name),
+            PropertyName::Scene(index) => scene_properties()
+                .get(index as usize)
+                .map_or("Scene", |property| property.name),
         }
     }
 
@@ -275,6 +380,34 @@ impl PropertyName {
             .into_iter()
             .find(|p| p.as_str() == name)
             .or_else(|| Self::face(name))
+            .or_else(|| Self::scene(name))
+    }
+
+    /// The scene property `name` (`"ClockTime"`, `"Wetness"`,
+    /// `"FocusDistance"`): see [`scene_properties`].
+    pub fn scene(name: &str) -> Option<Self> {
+        let index = scene_properties()
+            .binary_search_by(|property| property.name.cmp(name))
+            .ok()?;
+        Some(PropertyName::Scene(index as u16))
+    }
+
+    /// Every property a sequence's track can key: [`PropertyName::keyable`],
+    /// then the scene's ([`scene_properties`]). A clip keys only the first.
+    pub fn sequence_keyable() -> impl Iterator<Item = PropertyName> {
+        Self::keyable()
+            .chain((0..scene_properties().len()).map(|index| PropertyName::Scene(index as u16)))
+    }
+
+    /// Whether the value is held from each key to the next whatever the
+    /// key's interpolation says: a switch or a choice.
+    pub fn is_stepped(self) -> bool {
+        match self {
+            PropertyName::Scene(index) => scene_properties()
+                .get(index as usize)
+                .is_some_and(|property| property.stepped),
+            _ => false,
+        }
     }
 
     /// The standard face control `name` (`"Jaw_Open"`), keyed on a
@@ -302,11 +435,17 @@ impl PropertyName {
 
     /// How many numbers a key of this property may hold: 3 for a Vector3 or
     /// Color3, 4 for a UDim2 (`Position` and `Size` of UI elements), 1 for
-    /// a number, and 10 for a bone (translation, rotation as a quaternion
-    /// `x, y, z, w`, and scale, relative to its parent bone).
+    /// a number (a VignetteEffect's or a FilmGrainEffect's `Size` too), and
+    /// 10 for a bone (translation, rotation as a quaternion `x, y, z, w`,
+    /// and scale, relative to its parent bone). A switch's key is `[0]` or
+    /// `[1]`, and a choice's its item's place ([`KEYED_CHOICES`]).
     pub fn widths(self) -> &'static [usize] {
         match self {
-            PropertyName::Position | PropertyName::Size => &[3, 4],
+            PropertyName::Position => &[3, 4],
+            PropertyName::Size => &[1, 3, 4],
+            PropertyName::Scene(index) => scene_properties()
+                .get(index as usize)
+                .map_or(&[], |property| property.widths),
             PropertyName::Orientation
             | PropertyName::Color
             | PropertyName::BackgroundColor3

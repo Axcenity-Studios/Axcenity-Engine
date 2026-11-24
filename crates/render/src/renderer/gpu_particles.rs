@@ -528,7 +528,7 @@ fn uniform_of(
         look: [
             look.spin_degrees.to_radians(),
             look.brightness,
-            look.light_emission,
+            super::sprites::packed_light(look.light_emission, look.light_influence),
             if look.curves.is_some() { 1.0 } else { 0.0 },
         ],
         spawn_shape: [

@@ -551,7 +551,7 @@ fn a_local_script_in_play_reads_keys_and_moves_the_camera() {
 /// (roadmap M1).
 #[test]
 fn render_stepped_sees_this_frames_animated_pose() {
-    let folder = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-door");
+    let folder = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/door");
     let mut world = axcenity_project::load(&folder).unwrap().world;
     no_character(&mut world);
     let instance = world.create(ClassName::LocalScript).unwrap();

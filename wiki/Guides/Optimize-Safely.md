@@ -39,5 +39,5 @@ tags: [guide, perf]
 - Container numbers aren't GPU numbers (lavapipe).
 - Debug builds hide or invent hotspots.
 - An unpinned A/B on the Desktop measures other agents' builds.
-- A small scene can get slower from parallelism (rapier `parallel` on `hello-vehicle`; rayon below 4,096 items).
+- A small scene can get slower from parallelism (rapier `parallel` on `vehicle`; rayon below 4,096 items).
 - `#[inline]` mattered for cross-crate iterators (I9 got 40% slower without it).

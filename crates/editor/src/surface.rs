@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn a_materials_maps_become_surface_appearance_properties() {
         let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/hello-mesh/assets/models");
+            .join("../samples/projects/mesh/assets/models");
         let bytes = std::fs::read(folder.join("pyramid.gltf")).unwrap();
         let model =
             axcenity_assets::load_model(&bytes, &folder, axcenity_assets::ModelFormat::Gltf)

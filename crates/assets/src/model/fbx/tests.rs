@@ -618,7 +618,7 @@ fn broken_fbx_files_give_errors_not_crashes() {
 
 #[test]
 fn hello_pbr_examples_load_their_maps() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-pbr");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/pbr");
     let models = root.join("assets/models");
     let helmet = std::fs::read(models.join("DamagedHelmet/DamagedHelmet.glb")).unwrap();
     let helmet = load_model(&helmet, &models.join("DamagedHelmet"), ModelFormat::Gltf).unwrap();

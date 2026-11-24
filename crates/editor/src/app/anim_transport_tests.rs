@@ -22,9 +22,9 @@ struct Tab {
 }
 
 impl Tab {
-    /// A part in hello-touched, animated, so its new keyed clip is open.
+    /// A part in touched, animated, so its new keyed clip is open.
     fn new(test: &str) -> Tab {
-        let folder = copy_of_example("hello-touched", test);
+        let folder = copy_of_example("touched", test);
         let mut app = EditorApp::new(Some(&folder));
         let pad = app
             .world

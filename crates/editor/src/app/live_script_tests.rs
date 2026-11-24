@@ -11,10 +11,10 @@ use crate::output::OutputKind;
 
 const GREETER: &str = "scripts/Greeter.server.lua";
 
-/// hello-touched, with a script that prints Hello twice a second and one
+/// touched, with a script that prints Hello twice a second and one
 /// that slides an anchored `Mover` part along X every frame.
 fn project_with_greeter(test: &str) -> PathBuf {
-    let folder = copy_of_example("hello-touched", test);
+    let folder = copy_of_example("touched", test);
     std::fs::write(
         folder.join(GREETER),
         "while true do\n    print('Hello')\n    task.wait(0.5)\nend\n",
@@ -99,7 +99,7 @@ fn saving_a_changed_script_during_play_prints_the_new_text_and_a_moving_part_kee
 
 #[test]
 fn a_script_changed_in_another_editor_during_play_drops_its_old_touched_handler_and_wait() {
-    let folder = copy_of_example("hello-touched", "live-script-disk");
+    let folder = copy_of_example("touched", "live-script-disk");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     play_for(&mut app, 0.1);
@@ -230,7 +230,7 @@ fn saving_a_syntax_error_during_play_keeps_the_old_version_and_shows_the_line() 
 
 #[test]
 fn a_kept_play_edit_is_in_the_edit_world_after_stop_as_one_undo_step() {
-    let folder = copy_of_example("hello-touched", "keep-play-edit");
+    let folder = copy_of_example("touched", "keep-play-edit");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     let color_before = property(&app, pad, "Color");
@@ -277,7 +277,7 @@ fn a_kept_play_edit_is_in_the_edit_world_after_stop_as_one_undo_step() {
 
 #[test]
 fn values_that_were_not_kept_are_discarded_at_stop() {
-    let folder = copy_of_example("hello-touched", "discard-play-edit");
+    let folder = copy_of_example("touched", "discard-play-edit");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     let color_before = property(&app, pad, "Color");
@@ -300,7 +300,7 @@ fn values_that_were_not_kept_are_discarded_at_stop() {
 
 #[test]
 fn keep_changes_to_an_object_keeps_what_the_game_did_to_it_and_nothing_else() {
-    let folder = copy_of_example("hello-touched", "keep-object");
+    let folder = copy_of_example("touched", "keep-object");
     let mut app = EditorApp::new(Some(&folder));
     let ball = part(&app, "Ball");
     let pad = part(&app, "Pad");
@@ -333,7 +333,7 @@ fn keep_changes_to_an_object_keeps_what_the_game_did_to_it_and_nothing_else() {
 
 #[test]
 fn properties_show_a_keep_pin_beside_each_value_edited_in_play_and_fit_a_narrow_panel() {
-    let folder = copy_of_example("hello-touched", "keep-pins-drawn");
+    let folder = copy_of_example("touched", "keep-pins-drawn");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.play();

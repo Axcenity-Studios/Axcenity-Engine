@@ -8,10 +8,10 @@ Claims about third-party crates are from their documentation as of late 2026 and
 
 | Target | Verdict | Biggest blockers | First step when allowed |
 |---|---|---|---|
-| **Android** (8.1, first mobile target) | Feasible later; the most practical non-desktop target | Texture formats (BC7 only), touch UI and input, a mobile render profile, Luau JIT on ARM, packaging and signing | A player-only APK that opens `hello-part` with ASTC textures and the Low preset |
+| **Android** (8.1, first mobile target) | Feasible later; the most practical non-desktop target | Texture formats (BC7 only), touch UI and input, a mobile render profile, Luau JIT on ARM, packaging and signing | A player-only APK that opens `part` with ASTC textures and the Low preset |
 | **iOS** | After Android | The same as Android, plus no JIT (App Store rules), Metal only, and Apple signing and review | Only once Android ships |
 | **Web** (8.2) | Not yet; would duplicate too much today | No compute fallback for several passes on WebGL 2, Luau on wasm, UDP networking, threads, asset size | A WebGPU-only player spike, after the runtime can run single-threaded |
-| **VR** (8.3) | Feasible as a desktop add-on (PC VR through OpenXR) | Stereo rendering, frame pacing at 90 Hz, controller input, comfort tools | An OpenXR spike: the player renders `hello-part` to a headset at 90 Hz |
+| **VR** (8.3) | Feasible as a desktop add-on (PC VR through OpenXR) | Stereo rendering, frame pacing at 90 Hz, controller input, comfort tools | An OpenXR spike: the player renders `part` to a headset at 90 Hz |
 | **AR** | Not planned | Needs mobile first | — |
 | **Consoles** (8.4) | Not possible without platform programs | NDAs, dev kits, certification; no public toolchains | None until a platform program accepts Axcenity |
 | **Advanced simulation** (8.5) | Per feature, when a game needs it | — | See section 7 |
@@ -86,7 +86,7 @@ These are per feature, and only when a real game needs them (policy: fix correct
 ## 8. Order, if Paul says go
 
 1. **Android spike (P1):** the player with Vulkan, ASTC cooking, touch input and the `Mobile` preset, on one reference phone. Measure frame time and memory.
-2. **OpenXR spike (P2):** stereo `hello-part` at 90 Hz on PC VR. It needs no mobile work, and it uses the 9070 XT.
+2. **OpenXR spike (P2):** stereo `part` at 90 Hz on PC VR. It needs no mobile work, and it uses the 9070 XT.
 3. **Android productization:** packaging, signing, lifecycle, on-screen controls, and a build profile.
 4. **Web spike:** a WebGPU player, single-threaded, after the runtime work in section 4.
 5. **iOS**, after Android ships.

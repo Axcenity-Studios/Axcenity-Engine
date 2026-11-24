@@ -18,6 +18,8 @@ Axcenity is written in Rust and scripted in Luau. One engine runs in four progra
 
 ## How a frame runs
 
+![Axcenity architecture diagram illustrating the single-threaded frame loop (Input, Scripts, Physics, World Arena, wgpu Render) and strict binary isolation between axcenity-editor, axcenity-player, and axcenity-server.](../images/engine-architecture.png)
+
 Each frame takes the same steps, in the same order, in every program: receive network messages, move characters and navigation agents, read input, resume scripts, step physics (60 times a second, whatever the frame rate), fire `RunService.Heartbeat`, pose animations, build the list of things to draw, lay out the UI, draw, and send network messages. Programs leave out the steps they don't have: the server never draws. Sound plays on its own thread.
 
 ## The main parts

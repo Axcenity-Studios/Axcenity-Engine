@@ -13,10 +13,10 @@ use super::tests::{copy_of_example, example, part};
 use super::*;
 use crate::animation::{StudioAction, Subject};
 
-/// Imports the Mixamo walk from `hello-events` with the dialog's choices
+/// Imports the Mixamo walk from `events` with the dialog's choices
 /// as they start. Returns the new MeshPart and its Animations' clips.
 fn import_walking(app: &mut EditorApp) -> (InstanceId, Vec<String>) {
-    app.import_model(&example("hello-events").join("assets/models/Walking/Walking.fbx"));
+    app.import_model(&example("events").join("assets/models/Walking/Walking.fbx"));
     let dialog = app.importing.take().expect("an animated file asks first");
     app.import_chosen(&dialog);
     let part = app.selected.expect("the new MeshPart is selected");
@@ -90,7 +90,7 @@ fn assert_same_poses(a: &[BoneTransform], b: &[BoneTransform], what: &str) {
 
 #[test]
 fn an_imported_fbx_clip_shows_its_take_as_the_keys_convert_to_keys_makes_and_they_cant_change() {
-    let folder = copy_of_example("hello-part", "imported-keys");
+    let folder = copy_of_example("part", "imported-keys");
     let mut app = EditorApp::new(Some(&folder));
     let (walker, clips) = import_walking(&mut app);
     let mesh_id = app
@@ -213,7 +213,7 @@ fn an_imported_fbx_clip_shows_its_take_as_the_keys_convert_to_keys_makes_and_the
 
 #[test]
 fn a_bone_tree_stays_folded_as_it_was_when_switching_clips() {
-    let folder = copy_of_example("hello-part", "folds-between-clips");
+    let folder = copy_of_example("part", "folds-between-clips");
     let mut app = EditorApp::new(Some(&folder));
     let (walker, clips) = import_walking(&mut app);
     let other = "assets/animations/Walking/Walking.anim.json";
@@ -249,7 +249,7 @@ fn a_bone_tree_stays_folded_as_it_was_when_switching_clips() {
 fn open_marks_clips_and_state_machines_nothing_uses_and_follows_changes() {
     const MACHINE: &str = "assets/animations/noodle/noodle.statemachine.json";
     const SPARE: &str = "assets/animations/noodle/Spare.anim.json";
-    let folder = copy_of_example("hello-animation", "not-used");
+    let folder = copy_of_example("animation", "not-used");
     let mut app = EditorApp::new(Some(&folder));
     let noodle = part(&app, "Noodle");
     let animator = crate::animation::animator_of(&app.world, noodle).unwrap();

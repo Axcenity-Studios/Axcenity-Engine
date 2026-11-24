@@ -1,6 +1,6 @@
 # UI Event Graphs
 
-A ScreenGui's **Event Graph**: Unreal Blueprint-style nodes and wires that say what its buttons and text boxes do. It compiles to an ordinary LocalScript, so there is still one Lua runtime, and the player needs nothing new. `examples/hello-ui-graph` is a worked example (Settings and Back switch a PageLayout's pages).
+A ScreenGui's **Event Graph**: Unreal Blueprint-style nodes and wires that say what its buttons and text boxes do. It compiles to an ordinary LocalScript, so there is still one Lua runtime, and the player needs nothing new. `crates/samples/projects/ui-graph` is a worked example (Settings and Back switch a PageLayout's pages).
 
 ## File and LocalScript
 

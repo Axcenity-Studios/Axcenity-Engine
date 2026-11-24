@@ -1,7 +1,7 @@
 ---
 description: The Instance tree, services, properties, attributes, tags, events and connections, and how to find and change objects from scripts.
 icon: tree
-samples: [hello-events, hello-object-scripts]
+samples: [events, object-scripts]
 ---
 
 # Instances, properties and events

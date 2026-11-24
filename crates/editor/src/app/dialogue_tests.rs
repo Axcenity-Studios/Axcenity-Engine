@@ -20,7 +20,7 @@ fn frame(app: &mut EditorApp, ctx: &egui::Context) {
 
 #[test]
 fn the_tab_follows_the_farmers_prompt_and_a_new_dialogue_saves_and_goes_on_it() {
-    let folder = copy_of_example("hello-dialogue", "dialogue-tab");
+    let folder = copy_of_example("dialogue", "dialogue-tab");
     let mut app = EditorApp::new(Some(&folder));
     let farmer = app
         .world

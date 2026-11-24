@@ -9,7 +9,7 @@ use super::ui_designer_tests::{act, click_named, designer_frame, stylesheets};
 use super::*;
 use crate::theme::icons;
 
-/// The title's text as the artboard draws hello-accessibility's menu.
+/// The title's text as the artboard draws accessibility's menu.
 fn title(app: &EditorApp, world: &World) -> axcenity_render::UiText {
     let gui = world
         .find_first_child(world.workspace(), "Settings")
@@ -28,7 +28,7 @@ fn title(app: &EditorApp, world: &World) -> axcenity_render::UiText {
 
 #[test]
 fn the_designer_previews_game_ui_settings_play_starts_with_them_and_the_editor_theme_stays() {
-    let folder = copy_of_example("hello-accessibility", "accessibility-preview");
+    let folder = copy_of_example("accessibility", "accessibility-preview");
     let mut app = EditorApp::new(Some(&folder));
     let appearance = app.appearance.clone();
     let undo = app.history.undo_label().map(str::to_owned);

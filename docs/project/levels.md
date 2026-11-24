@@ -1,6 +1,6 @@
 # Levels
 
-A game's levels (unified Phase 48). Code: `crates/project/src/levels.rs` (files), `crates/script/src/levels.rs` (`LevelService`), `crates/editor/src/levels.rs` and `app/levels.rs` (the Levels panel). Example: `examples/hello-levels`.
+A game's levels (unified Phase 48). Code: `crates/project/src/levels.rs` (files), `crates/script/src/levels.rs` (`LevelService`), `crates/editor/src/levels.rs` and `app/levels.rs` (the Levels panel). Example: `crates/samples/projects/levels`.
 
 ## Files
 

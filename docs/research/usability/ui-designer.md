@@ -4,7 +4,7 @@ The dedicated pass on the UI Designer that the [audit](usability-audit.md) plann
 
 ## How it was looked at
 
-- **Pictures.** `editor_tour_snapshots` (`app/tour_snapshots.rs`) now also draws the UI Designer: empty (no ScreenGui), `hello-menu` with the ScreenGui, a button and a label selected, the Event Graph (`hello-ui-graph`), Strings and Pages, plus the designer alone 2,400 points tall with a button, a label and a slider selected, so the whole inspector shows (at 1,100 and 1,600 points wide: a stacked and a two-column inspector). Run it with `TOUR_ONLY=ui-`:
+- **Pictures.** `editor_tour_snapshots` (`app/tour_snapshots.rs`) now also draws the UI Designer: empty (no ScreenGui), `menu` with the ScreenGui, a button and a label selected, the Event Graph (`ui-graph`), Strings and Pages, plus the designer alone 2,400 points tall with a button, a label and a slider selected, so the whole inspector shows (at 1,100 and 1,600 points wide: a stacked and a two-column inspector). Run it with `TOUR_ONLY=ui-`:
   `AXCENITY_SNAPSHOTS=<folder> TOUR_ONLY=ui- xvfb-run -a cargo test -p axcenity-editor editor_tour -- --ignored`
 - **Code.** Every inspector section, the toolbar, the arrange bar, the right-click menus and the empty state (`ui_designer.rs`, `ui_designer/`).
 

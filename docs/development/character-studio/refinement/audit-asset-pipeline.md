@@ -252,7 +252,7 @@ From `humanoid/README.md:33-47`, `realistic/README.md:15-31`, `humanoid/qa/READM
 python -m venv .bpy && .bpy/bin/pip install bpy pillow numpy     # Windows: .bpy\Scripts\pip
 
 # Stylized package (about 15 seconds). Then copy Humanoid.glb and HumanoidAnimations.glb
-# into examples/hello-humanoid/assets/models/Humanoid/.
+# into crates/samples/projects/humanoid/assets/models/Humanoid/.
 python -I assets/characters/humanoid/build.py --out assets/characters/humanoid
 # or: blender -b --factory-startup --python assets/characters/humanoid/build.py -- --out assets/characters/humanoid
 

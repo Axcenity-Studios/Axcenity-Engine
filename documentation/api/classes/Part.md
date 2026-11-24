@@ -83,6 +83,8 @@ end
 Part.PivotOffset: CFrame
 ```
 
+Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
+
 #### Color
 
 ```luau

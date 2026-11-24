@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn a_material_made_edited_saved_reopened_and_assigned_looks_the_same_in_the_preview_the_viewport_and_play()
      {
-        let folder = copy_of_example("hello-touched", "material-tab");
+        let folder = copy_of_example("touched", "material-tab");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Brick");
         let path = "assets/materials/Brick.material.json";
@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn editing_a_base_updates_its_instances_previews_and_parts_except_their_overrides() {
-        let folder = copy_of_example("hello-touched", "material-base");
+        let folder = copy_of_example("touched", "material-base");
         let mut app = EditorApp::new(Some(&folder));
         let (stone, mossy) = (
             "assets/materials/Stone.material.json",
@@ -389,7 +389,7 @@ mod tests {
         else {
             return;
         };
-        let folder = copy_of_example("hello-touched", "material-preview");
+        let folder = copy_of_example("touched", "material-preview");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Red");
         let path = "assets/materials/Red.material.json";
@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn a_shader_written_in_the_tab_draws_in_the_viewport_and_play_and_shows_its_error_line() {
         use crate::material_editor::STARTER_SHADER;
-        let folder = copy_of_example("hello-touched", "material-shader");
+        let folder = copy_of_example("touched", "material-shader");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Belt");
         let path = "assets/materials/Belt.material.json";
@@ -541,7 +541,7 @@ mod tests {
     #[test]
     fn toon_shading_set_in_the_tab_draws_in_the_viewport_and_play_and_saves() {
         use axcenity_render::Shading;
-        let folder = copy_of_example("hello-touched", "material-toon");
+        let folder = copy_of_example("touched", "material-toon");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Cel");
         let path = "assets/materials/Cel.material.json";
@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn an_outline_set_in_the_tab_draws_in_the_viewport_and_play_and_saves() {
-        let folder = copy_of_example("hello-touched", "material-outline");
+        let folder = copy_of_example("touched", "material-outline");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Inked");
         let path = "assets/materials/Inked.material.json";
@@ -628,7 +628,7 @@ mod tests {
         use crate::material_editor::MaterialView;
         use crate::material_graph::{graph_of, graph_value, set_parameter, tests::mossy_stone};
         use axcenity_assets::ParamValue;
-        let folder = copy_of_example("hello-material-graph", "material-graph-tab");
+        let folder = copy_of_example("material-graph", "material-graph-tab");
         let mut app = EditorApp::new(Some(&folder));
         app.new_material("Lichen");
         let path = "assets/materials/Lichen.material.json";
@@ -720,7 +720,7 @@ mod tests {
         use crate::material_editor::MaterialView;
         use crate::material_graph::{graph_of, graph_value, set_parameter};
         use axcenity_assets::ParamValue;
-        let folder = copy_of_example("hello-material-graph", "material-graph-instance");
+        let folder = copy_of_example("material-graph", "material-graph-instance");
         let mut app = EditorApp::new(Some(&folder));
         let (mossy, autumn) = (
             "assets/materials/MossyStone.material.json",
@@ -803,7 +803,7 @@ mod tests {
         use crate::material_editor::MaterialView;
         use crate::material_graph::{MaterialLibrary, OUTPUT, graph_of, graph_value};
         use axcenity_blocks::node_graph::{NodeLibrary, PinRef};
-        let folder = copy_of_example("hello-material-graph", "material-graph-errors");
+        let folder = copy_of_example("material-graph", "material-graph-errors");
         let mut app = EditorApp::new(Some(&folder));
         let mossy = "assets/materials/MossyStone.material.json";
         app.open_material(mossy);

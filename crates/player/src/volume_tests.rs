@@ -1,4 +1,4 @@
-//! Graphics volumes (graphics Phase 33), drawn: hello-volumes' cave looks
+//! Graphics volumes (graphics Phase 33), drawn: volumes' cave looks
 //! change as the camera flies in, blended over each volume's
 //! `BlendDistance`, and where they overlap the higher `Priority` wins.
 
@@ -44,7 +44,7 @@ fn hello_volumes_blends_the_caves_look_in_and_the_higher_priority_wins() {
     let Some((device, queue)) = test_gpu() else {
         return;
     };
-    let (mut world, _scripts, folder) = start_example_in("hello-volumes");
+    let (mut world, _scripts, folder) = start_example_in("volumes");
     let assets = Assets::new(&folder);
     let mut renderer = TextureRenderer::new(&device, &queue, SIZE.0, SIZE.1);
     let cave = world
@@ -58,11 +58,7 @@ fn hello_volumes_blends_the_caves_look_in_and_the_higher_priority_wins() {
         std::fs::create_dir_all(&snapshots).unwrap();
         for x in [0.0, 14.0, 17.0, 20.0, 26.0, 32.0, 34.0, 36.0] {
             let pixels = seen_from(&mut renderer, &world, &assets, x);
-            write_png(
-                &snapshots.join(format!("hello-volumes-{x}.png")),
-                &pixels,
-                SIZE,
-            );
+            write_png(&snapshots.join(format!("volumes-{x}.png")), &pixels, SIZE);
         }
     }
 

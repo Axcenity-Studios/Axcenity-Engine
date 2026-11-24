@@ -45,7 +45,43 @@ struct SpriteUniform {
     right: [f32; 4],
     up: [f32; 4],
     eye: [f32; 4],
+    /// The scene's light on sprites (see [`scene_light`]).
+    light: [f32; 4],
     fog: super::fog::FogRaw,
+}
+
+/// A sprite's light emission and light influence in one number, as
+/// sprite.wgsl's `vs_main` takes them apart: the emission (0 to 1) plus
+/// twice the influence in 127 steps.
+pub(super) fn packed_light(light_emission: f32, light_influence: f32) -> f32 {
+    light_emission.clamp(0.0, 1.0) + 2.0 * (light_influence.clamp(0.0, 1.0) * 127.0).round()
+}
+
+/// The light `list`'s scene gives a sprite its light influence shows: what
+/// a white matte thing in the open gives back, lit by the sun (a low one
+/// still lights a cloud of dust from the side, so it counts from 0.3 at
+/// the horizon), dimmed by the cloud cover, by the sky from above
+/// (`sky_above`, the environment's `light_from_above`) and by the ambient
+/// light.
+pub(super) fn scene_light(list: &DrawList, sky_above: Vec3) -> Vec3 {
+    let toward_sun = list.sun.direction.normalize_or(Vec3::Y);
+    let facing = (0.3 + 0.7 * toward_sun.y).clamp(0.0, 1.0);
+    let cover = if list.clouds.is_drawn() {
+        list.clouds.cover.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let sun =
+        linear_color(list.sun.color) * list.sun.intensity.max(0.0) * facing * (1.0 - 0.85 * cover)
+            / std::f32::consts::PI;
+    let environment = if list.sky.environment_intensity.is_finite() {
+        list.sky.environment_intensity.max(0.0)
+    } else {
+        0.0
+    };
+    let ambient = linear_color(list.ambient.color) * list.ambient.intensity.max(0.0);
+    let light = sun + sky_above * environment + ambient;
+    if light.is_finite() { light } else { Vec3::ONE }
 }
 
 /// A run of sprites with the same texture (`None` is plain white).
@@ -168,7 +204,7 @@ impl SpritePass {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         list: &DrawList,
-        (view_proj, fog): (Mat4, super::fog::FogRaw),
+        (view_proj, fog, light): (Mat4, super::fog::FogRaw, Vec3),
         view: &Frustum,
         view_of: impl Fn(u64) -> Option<&'a wgpu::TextureView>,
     ) -> (Vec<SpriteDraw>, u32, Vec<Option<u64>>) {
@@ -184,6 +220,7 @@ impl SpritePass {
             right: right.extend(0.0).to_array(),
             up: up.extend(0.0).to_array(),
             eye: eye.extend(1.0).to_array(),
+            light: light.extend(0.0).to_array(),
             fog,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniform));
@@ -233,7 +270,7 @@ impl SpritePass {
                 color: color.extend(opacity).to_array(),
                 params: [
                     sprite.rotation_degrees.to_radians(),
-                    sprite.light_emission.clamp(0.0, 1.0),
+                    packed_light(sprite.light_emission, sprite.light_influence),
                     sprite.frame.map_or(0.0, |frame| frame.frame as f32),
                     sprite
                         .frame

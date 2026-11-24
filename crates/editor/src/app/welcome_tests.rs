@@ -23,7 +23,7 @@ fn frame(app: &mut EditorApp, ctx: &egui::Context) -> Vec<String> {
 
 #[test]
 fn closing_the_scene_shows_the_welcome_page_with_the_tabs_closed_last() {
-    let folder = copy_of_example("hello-touched", "welcome");
+    let folder = copy_of_example("touched", "welcome");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let path = "scripts/pad.server.lua".to_string();
@@ -94,7 +94,7 @@ fn recent_tabs_are_kept_per_project_newest_first_and_saved() {
 /// (Snapping's two rows of fields used to push its caption lower).
 #[test]
 fn ribbon_captions_share_one_baseline() {
-    let folder = copy_of_example("hello-touched", "ribbon-captions");
+    let folder = copy_of_example("touched", "ribbon-captions");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let input = || egui::RawInput {
@@ -143,7 +143,7 @@ fn ribbon_captions_share_one_baseline() {
 /// moves the icon to the middle of its column, and the label stays put.
 #[test]
 fn ribbon_tick_box_icons_follow_the_menu_icons_setting() {
-    let folder = copy_of_example("hello-touched", "ribbon-menu-icons");
+    let folder = copy_of_example("touched", "ribbon-menu-icons");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let input = || egui::RawInput {
@@ -203,7 +203,7 @@ fn ribbon_tick_box_icons_follow_the_menu_icons_setting() {
 /// Left starts them at the window's left edge.
 #[test]
 fn the_ribbon_centres_its_groups_when_asked() {
-    let folder = copy_of_example("hello-touched", "ribbon-centered");
+    let folder = copy_of_example("touched", "ribbon-centered");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     const WIDTH: f32 = 2400.0;

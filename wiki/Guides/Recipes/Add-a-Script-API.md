@@ -26,7 +26,7 @@ tags: [guide, recipe, scripting]
 3. **Sides**: if it only works on one side, add it to `SIDE_ONLY_APIS` in `sides.rs` with a helpful message.
 4. **Describe it**: add descriptions in `crates/script/src/definitions/docs.rs` (tests fail on an undescribed property, event or global), types in `crates/script/src/definitions/tables.rs`, then run `cargo run -p axcenity-script --bin lua-definitions` to regenerate `definitions/axcenity.d.luau`. A new global also goes in `axcenity.yml` (selene).
 5. **A matching block**: every creator-facing API needs a block that translates to it (`crates/blocks-runtime`), plus a row in `blocks/src/tests.rs`'s exhaustive match and in `docs/scripting/blocks.md`.
-6. **Project files**: if it's a saved property, update `project` parsing and writing; re-save `examples/primitives/world.json` when the expected layout changes.
+6. **Project files**: if it's a saved property, update `project` parsing and writing; re-save `crates/samples/projects/primitives/world.json` when the expected layout changes.
 7. **Network**: a changed class default raises `net::PROTOCOL_VERSION`.
 8. **Docs**: the topic file under `docs/scripting/`; the wiki page if it changes a system's architecture.
 

@@ -46,7 +46,7 @@ All four hosts load through `project::load`. The editor adds save, version histo
 
 ## Performance
 
-**Measured** (M9, cloud container): `.axgame` v2 compresses `world.json` about 50× (S10k 10 MB → 0.2 MB), cooked games 10–21% smaller, unpacking on up to 8 threads (hello-roads 210 → 166 ms). Opening S10k's 10 MB `world.json` took about 5.5 s in release and 30 s in debug (**Measured**, I1 baseline), nearly all in one quadratic step: each Instance looked up its prefab segment among all its siblings. Since C11 that lookup happens only inside prefab copies, and S10k loads in 0.19 s in release, 0.8 s in debug (**Measured**).
+**Measured** (M9, cloud container): `.axgame` v2 compresses `world.json` about 50× (S10k 10 MB → 0.2 MB), cooked games 10–21% smaller, unpacking on up to 8 threads (the `roads` sample 210 → 166 ms). Opening S10k's 10 MB `world.json` took about 5.5 s in release and 30 s in debug (**Measured**, I1 baseline), nearly all in one quadratic step: each Instance looked up its prefab segment among all its siblings. Since C11 that lookup happens only inside prefab copies, and S10k loads in 0.19 s in release, 0.8 s in debug (**Measured**).
 
 ## Testing
 

@@ -1,0 +1,13 @@
+[package]
+name = "axcenity-samples"
+description = "The engine's own sample projects (`projects/`): what its tests, benchmarks and the editor's Learn page open. No code depends on any project outside the engine."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+axcenity-workspace-hack.workspace = true
+
+[lints]
+workspace = true

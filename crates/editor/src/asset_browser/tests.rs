@@ -372,7 +372,7 @@ fn loose_texture_maps_offer_organize_and_each_set_is_one_tile_after() {
     std::fs::create_dir_all(&terrain).unwrap();
     let picture = std::fs::read(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/hello-data/assets/textures/sword.png"),
+            .join("../samples/projects/data/assets/textures/sword.png"),
     )
     .unwrap();
     let names = [

@@ -184,13 +184,10 @@ impl AnimationStudio {
 
         if self.machine.preview_undocked {
             let mut open = true;
-            egui::Window::new(format!("{} 3D Preview — {playing_label}", icons::CUBE))
-                .id(egui::Id::new("state machine preview undocked"))
-                .open(&mut open)
-                .default_size(egui::vec2(280.0, 260.0))
-                .resizable(true)
-                .collapsible(true)
-                .show(ctx, |ui| {
+            crate::widgets::tool_window(icons::CUBE, &format!("3D Preview — {playing_label}"))
+                .id("state machine preview undocked")
+                .size(egui::vec2(280.0, 260.0))
+                .show(ctx, &mut open, |ui| {
                     show_model(preview, controller.preview_model.as_deref(), assets);
                     let posed = match controller.tick(assets, dt) {
                         Ok(posed) => Some(posed),

@@ -49,6 +49,7 @@ mod edit_characters;
 mod edits;
 mod effect_tab;
 mod engine;
+mod environment;
 mod files;
 mod find_in_scripts;
 mod floating;
@@ -66,6 +67,7 @@ mod material_tab;
 pub(crate) mod mcp;
 mod mixer;
 mod model_studio;
+mod movie;
 mod native_menu;
 mod nav_overlay;
 mod open;
@@ -520,6 +522,9 @@ pub struct EditorApp {
     terrain: TerrainStudio,
     /// Environment Weather Inspector state (custom profiles & surface mask brush).
     weather_ui: crate::weather_inspector::WeatherInspectorState,
+    /// The environment presets' names and the Properties panel's
+    /// Environment presets section (`environment_presets.rs`).
+    environment_presets: crate::environment_presets::EnvironmentPresets,
     /// The Scatter pane's palettes, brush and stroke under way.
     scatter: crate::scatter_pane::ScatterPane,
     /// Where the dockable panels are. Saved between runs.
@@ -592,6 +597,8 @@ pub struct EditorApp {
     /// Debug › Graphics Benchmark: its window, a run, and the last report
     /// (saved between runs).
     benchmark: crate::graphics_benchmark::GraphicsBenchmark,
+    /// The Render Movie window and the movie being rendered (`movie.rs`).
+    movie: crate::movie::MovieWindow,
     /// Settings > Engine: rebuilding the editor when engine code changes
     /// (a debug editor run from the source tree only; see `engine.rs`).
     rebuilds: Rebuilds,
@@ -1173,6 +1180,7 @@ impl EditorApp {
             ui_designer: UiDesigner::default(),
             terrain: TerrainStudio::default(),
             weather_ui: crate::weather_inspector::WeatherInspectorState::default(),
+            environment_presets: Default::default(),
             scatter: Default::default(),
             layout: Layout::default(),
             saved_layouts: Default::default(),
@@ -1202,6 +1210,7 @@ impl EditorApp {
             capabilities: None,
             adapter: None,
             benchmark: Default::default(),
+            movie: Default::default(),
             rebuilds: Rebuilds {
                 source: EngineSource::for_rebuilds(),
                 ..Rebuilds::default()
@@ -2113,6 +2122,7 @@ impl EditorApp {
             self.about_open = start::about(ctx, brand, self.adapter.as_deref());
         }
         self.graphics_benchmark_frame(ctx, render_state);
+        self.movie_frame(ctx, render_state);
         self.follow_sound_preview();
         self.updates_frame();
         self.update_install_frame();
@@ -2208,6 +2218,8 @@ mod live_script_tests;
 #[cfg(test)]
 mod mover_tests;
 #[cfg(test)]
+mod movie_tests;
+#[cfg(test)]
 mod multi_edit_tests;
 #[cfg(test)]
 mod navigation_tests;
@@ -2266,6 +2278,8 @@ mod collab_setup_tests;
 mod collab_trust_tests;
 #[cfg(test)]
 mod decal_tests;
+#[cfg(test)]
+mod environment_tests;
 #[cfg(test)]
 mod group_mesh_tests;
 #[cfg(test)]

@@ -19,7 +19,7 @@ Command-line flags, environment variables, Cargo features and settings files. Ga
 |---|---|
 | `axcenity-player [game]` | `--host [port]` (47800), `--join addr:port`, `--password <text>`, `--watch` (live reload from a project folder), `--dev` (F9 console in a built game), `--bench <frames>` |
 | `axcenity-server <game>` | `--port <port>`, `--password <text>`, `--bench <frames>`, `--bench-clients <n>`, `--help` |
-| `axcenity-editor [folder]` | `--cook <folder>` (cook and exit; 1 on failure), `--build-game …`, `--mcp <folder> [--profile lite\|standard\|full] [--mode read\|edit\|full]`, `--version`, `--resume <handoff>` (debug relaunch only) |
+| `axcenity-editor [folder]` | `--cook <folder>` (cook and exit; 1 on failure), `--build-game …`, `--mcp <folder> [--profile lite\|standard\|full] [--mode read\|edit\|full]`, `--render-movie <folder> --sequence <path or name> --out <file or folder> [--size WxH] [--fps N] [--quality …] [--format h264\|av1\|ffv1\|png] [--range FROM:TO] [--warm-up N] [--motion-blur 0..1] [--no-ray-tracing] [--no-letterbox] [--no-ui]` (render a sequence as a movie and exit; `docs/editor/movie.md`), `--version`, `--resume <handoff>` (debug relaunch only) |
 | `axcenity-release` | `check [--tag v…]`, `prepare <version>`, `query compare\|introduced\|search …` |
 | `axcenity-toolbox` | The Toolbox CLI (`crates/toolbox/src/cli.rs`) |
 | `axcenity-test <project>` | `--bench <frames>`, `--make-s10k <folder>`, `--junit <file>`, `--help` |
@@ -34,6 +34,7 @@ Command-line flags, environment variables, Cargo features and settings files. Ga
 | `AXCENITY_BENCH_MACHINE`, `AXCENITY_PROJECTS` | Machine name and projects folder for the regression check |
 | `AXCENITY_SHOT_DIR`, `_VIEWS`, `_SIZE`, `_QUALITY`, `_NOAA`, `_DEBUG` | `shoot_project` screenshots |
 | `AXCENITY_SNAPSHOTS` | Drawing tests save PNGs there |
+| `AXCENITY_FFMPEG` | The `ffmpeg` program Render Movie encodes videos with, in place of the one on `PATH` |
 | `AXCENITY_WRITE_REFERENCES`, `AXCENITY_WRITE_EXAMPLES` | Rewrite reference images / generated example files |
 | `AXCENITY_DUMP` | `dump_every_example` output file |
 | `AXCENITY_RETAINED_DRAW_LIST=off` | Build the draw list from scratch each frame |

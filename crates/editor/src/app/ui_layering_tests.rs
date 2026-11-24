@@ -15,7 +15,7 @@ use crate::ui_handles::Handles;
 #[test]
 fn bring_to_front_swaps_overlapping_buttons_and_the_top_one_takes_the_click_in_the_designer_and_in_play()
  {
-    let folder = copy_of_example("hello-touched", "ui-designer-layers");
+    let folder = copy_of_example("touched", "ui-designer-layers");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -91,7 +91,7 @@ fn bring_to_front_swaps_overlapping_buttons_and_the_top_one_takes_the_click_in_t
 
 #[test]
 fn the_wheel_scrolls_a_scrolling_frame_on_the_artboard_without_changing_its_canvas_position() {
-    let folder = copy_of_example("hello-touched", "ui-designer-scrolling");
+    let folder = copy_of_example("touched", "ui-designer-scrolling");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -206,7 +206,7 @@ fn run_designer_holding(
 
 #[test]
 fn a_frame_turned_with_the_rotate_knob_draws_turned_and_clicks_hit_its_turned_shape() {
-    let folder = copy_of_example("hello-touched", "ui-designer-rotate");
+    let folder = copy_of_example("touched", "ui-designer-rotate");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -384,7 +384,7 @@ fn a_frame_turned_with_the_rotate_knob_draws_turned_and_clicks_hit_its_turned_sh
 
 #[test]
 fn a_top_bar_in_a_device_safe_insets_gui_sits_below_the_notch_on_a_phone_preview() {
-    let folder = copy_of_example("hello-touched", "ui-designer-safe-area");
+    let folder = copy_of_example("touched", "ui-designer-safe-area");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -466,7 +466,7 @@ fn a_top_bar_in_a_device_safe_insets_gui_sits_below_the_notch_on_a_phone_preview
 #[test]
 fn a_settings_page_built_in_the_designer_alone_works_the_same_in_play() {
     use axcenity_ui::{UiInput, UiInteraction};
-    let folder = copy_of_example("hello-touched", "ui-designer-settings");
+    let folder = copy_of_example("touched", "ui-designer-settings");
     let mut app = EditorApp::new(Some(&folder));
     let before = state(&app);
     act(&mut app, DesignerAction::NewScreenGui);

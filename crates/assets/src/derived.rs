@@ -155,7 +155,7 @@ mod tests {
     use crate::model::{BoneChange, IdentityLayer};
 
     fn examples() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-humanoid")
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/humanoid")
     }
 
     const BODY: &str = "assets/models/Humanoid/Humanoid.glb";

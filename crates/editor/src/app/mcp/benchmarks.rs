@@ -64,10 +64,10 @@ fn definitions() {
     println!("| instructions | | {} |", estimate_tokens(INSTRUCTIONS));
 }
 
-/// Each tool once on hello-part, as a model would call it first.
+/// Each tool once on part, as a model would call it first.
 fn tools() {
     println!(
-        "\n## Tools on hello-part\n\n| Tool | Call | Result tokens | Time (ms) |\n|---|---|---|---|"
+        "\n## Tools on part\n\n| Tool | Call | Result tokens | Time (ms) |\n|---|---|---|---|"
     );
     let calls: &[(&str, Value)] = &[
         ("project_info", json!({})),
@@ -120,7 +120,7 @@ fn tools() {
         ("game_run", json!({"seconds": 1})),
         ("history", json!({"action": "undo"})),
     ];
-    let mut opened = open("hello-part", "mcp-bench-tools");
+    let mut opened = open("part", "mcp-bench-tools");
     let host = &mut opened.app;
     for (tool, args) in calls {
         let started = Instant::now();
@@ -247,7 +247,7 @@ fn workflows() {
     ] {
         for (label, calls) in routes {
             // Each route on a fresh copy, so they don't see each other's work.
-            let mut opened = open("hello-part", "mcp-bench-flow");
+            let mut opened = open("part", "mcp-bench-flow");
             let (count, tokens, time) = route(&mut opened.app, &calls);
             println!("| {name} | {label} | {count} | {tokens} | {} |", ms(time));
         }
@@ -260,7 +260,7 @@ fn workflows() {
 fn live() {
     use super::live::Live;
     println!("\n## In the open editor\n\n| Measure | Value |\n|---|---|");
-    let folder = copy_of_example("hello-part", "mcp-bench-live");
+    let folder = copy_of_example("part", "mcp-bench-live");
     let mut app = EditorApp::new(Some(&folder));
     let mut live = Live::start(&folder, axcenity_mcp::Waker(std::sync::Arc::new(|| {}))).unwrap();
     for (label, frame) in [

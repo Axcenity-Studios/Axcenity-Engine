@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn the_window_saves_the_groups_with_the_project_and_play_uses_them() {
-        let folder = super::super::tests::copy_of_example("hello-part", "collision-groups");
+        let folder = super::super::tests::copy_of_example("part", "collision-groups");
         let mut app = EditorApp::new(Some(&folder));
         app.edit_collision_groups(GroupEdit::Add("Players".to_owned()));
         app.edit_collision_groups(GroupEdit::Add("NPCs".to_owned()));

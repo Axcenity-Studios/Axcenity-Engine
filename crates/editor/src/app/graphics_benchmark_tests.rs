@@ -8,7 +8,7 @@ use super::*;
 
 #[test]
 fn a_run_leaves_the_project_and_settings_alone_until_apply() {
-    let folder = super::tests::copy_of_example("hello-touched", "benchmark-run");
+    let folder = super::tests::copy_of_example("touched", "benchmark-run");
     let mut app = EditorApp::new(Some(&folder));
     let parts = app.world.descendants(app.world.workspace()).len();
     let lighting = app.world.descendants(app.world.lighting()).len();
@@ -92,7 +92,7 @@ impl eframe::Storage for MemoryStorage {
 
 #[test]
 fn starting_is_refused_during_play() {
-    let folder = super::tests::copy_of_example("hello-touched", "benchmark-play");
+    let folder = super::tests::copy_of_example("touched", "benchmark-play");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     assert!(app.playing());

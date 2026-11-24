@@ -25,6 +25,7 @@ Map only. Open the one file that matches the change.
 - Build tools: [editor/building.md](editor/building.md)
 - Assets panel: [editor/assets.md](editor/assets.md)
 - Server, client, and modules in the editor: [editor/sides.md](editor/sides.md)
+- Render Movie (a sequence to a video file or PNGs): [editor/movie.md](editor/movie.md)
 - Lua editor plugins: [editor/plugins.md](editor/plugins.md)
 - Character Studio (faces): [editor/character-studio.md](editor/character-studio.md)
 - Team Board (tasks shared with the team): [editor/team-board.md](editor/team-board.md)

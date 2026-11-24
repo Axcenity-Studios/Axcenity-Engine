@@ -44,7 +44,7 @@ Branch `r10-roundtrip` from `main` (waves 1 to 3, PR #427). RA1 with the lead's 
   - a described character keeps its description in its Humanoid.
 - `axcenity-editor` `app::round_trip_tests` (8):
   - Insert > Character is realistic with both families, applied, one undo step;
-  - an older project (hello-character) keeps its character's whole tree and its prefab and gains the realistic family;
+  - an older project (the `character` sample) keeps its character's whole tree and its prefab and gains the realistic family;
   - **insert, edit, return, play**: Edit in Character Studio from the Explorer's test; Done and Cancel drawn and no Game Editor menus; `fat` 0.8 in the studio; Done; one step labelled "Edit Character in Character Studio"; undo and redo; Play: the game's kept description has `fat` 0.8, the body's `Identity` key is the resolved identity's, and its pose is morphed;
   - Cancel changes nothing, adds no step and leaves the studio's recovery file alone;
   - a character without a description opens on the stylized family named after itself, and an imported one isn't offered;
@@ -63,7 +63,7 @@ Branch `r10-roundtrip` from `main` (waves 1 to 3, PR #427). RA1 with the lead's 
   - `cargo clippy -p axcenity-editor -p axcenity-project -p axcenity-avatar -p axcenity-player --all-targets -- -D warnings`: clean. `cargo fmt --all` run. `python3 -I scripts/check-wiki.py`: `114 pages, 0 errors, 58 warnings` (the warnings were there before).
 - The earlier full run had two failures that weren't mine:
   - `axcenity-testing tests::tests_leave_the_project_files_alone_even_when_they_save_and_destroy` failed under load and passes alone (6.5 s).
-  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved` (hello-part, no character) failed twice: "Auto" checkpoint found where "Closing" was expected. It passed in the final run (79 s). It is a timing test on a project my change doesn't touch.
+  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved` (the `part` sample, no character) failed twice: "Auto" checkpoint found where "Closing" was expected. It passed in the final run (79 s). It is a timing test on a project my change doesn't touch.
 
 ### Tests changed deliberately (they depended on the stylized default)
 
@@ -166,7 +166,7 @@ Test runs:
 - GREEN: `cargo nextest run -p axcenity-editor --no-fail-fast -E 'test(/round_trip_tests::/)'` gives `13 tests run: 13 passed`.
 - `cargo nextest run -p axcenity-editor -p axcenity-gameplay -p axcenity-project --no-fail-fast` gives `Summary [106.177s] 1702 tests run: 1700 passed (10 slow), 2 failed, 11 skipped`. There were no ABORT or TIMEOUT lines. The two failures:
   - `app::tests::the_view_mode_changes_the_viewport_at_once_and_lit_comes_back`, GPU timing ("lit comes back");
-  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, the known load-timing test on hello-part, which has no character.
+  - `app::collab_repo_tests::closing_the_editor_uploads_what_was_saved`, the known load-timing test on the `part` sample, which has no character.
   - Rerun alone: `2 tests run: 2 passed`.
 - `cargo clippy -p axcenity-editor -p axcenity-gameplay -p axcenity-project --all-targets -- -D warnings`: clean.
 - `cargo fmt --all`.

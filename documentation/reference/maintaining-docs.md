@@ -28,7 +28,7 @@ Each page starts with a short header, then one `#` title:
 description: One sentence for search results and the contents.
 icon: atom
 status: partial
-samples: [hello-physics, hello-joints]
+samples: [physics, joints]
 ---
 
 # Physics
@@ -36,9 +36,9 @@ samples: [hello-physics, hello-joints]
 
 - `description` is required. `icon` is one of the names the editor knows (the test lists them).
 - `status` is `stable` (the default, no badge), `partial` ("Partly built") or `experimental`. Mark a page when the feature it describes is missing a part, is off by default or is still changing, and say what in a **Known limits** note.
-- `samples` lists example projects under `examples/`; a Learn chapter shows them as "Try it in a sample" with an **Open sample** button.
+- `samples` lists example projects under `crates/samples/projects/`; a Learn chapter shows them as "Try it in a sample" with an **Open sample** button.
 
-Pages use plain Markdown: headings, paragraphs, bold, `code`, links, lists, numbered lists, `>` notes, tables and fenced code blocks with a language (`lua`, `json`, `css`, `text`, `sh`, `powershell` or `toml`). Lists inside lists, HTML and images aren't shown in the editor, so the checks refuse them.
+Pages use plain Markdown: headings, paragraphs, bold, `code`, links, lists, numbered lists, `>` notes, tables, standalone PNG images (`![Descriptive caption](../images/example.png)`), and fenced code blocks with a language (`lua`, `json`, `css`, `text`, `sh`, `powershell` or `toml`). Every image's alt text is shown below the picture as its caption, so describe clearly what the image documents. Lists inside lists, raw HTML, and GitBook `{% %}` blocks aren't shown in the editor, so the checks refuse them.
 
 ## What the checks catch
 
@@ -46,6 +46,7 @@ Pages use plain Markdown: headings, paragraphs, bold, `code`, links, lists, numb
 
 - Every page reads without problems, has a description and is listed in `SUMMARY.md`, and everything listed exists.
 - Every link goes to a page and heading that exist, or to a sample that exists.
+- Every image has descriptive alt text, points to an embedded `.png` under `documentation/`, and decodes cleanly.
 - Every sample a page names opens as a project.
 - Every API name in backticks with a known owner, such as `Part.Touched` or `workspace:Raycast()`, exists in the API. Renaming or removing an API member fails here until the pages say so.
 - Every Lua code block compiles.

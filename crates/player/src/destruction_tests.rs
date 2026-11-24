@@ -1,4 +1,4 @@
-//! Phase 42: hello-destruction's glass pane shatters when the thrown crate
+//! Phase 42: destruction's glass pane shatters when the thrown crate
 //! hits it, and its shelf holds the light crate and breaks under the heavy
 //! one.
 
@@ -9,7 +9,7 @@ use super::*;
 
 const FRAME: f64 = 1.0 / 60.0;
 
-/// hello-destruction running through the frame loop's physics steps:
+/// destruction running through the frame loop's physics steps:
 /// scripts, their shatters, physics, then `Touched`, `Broken` and
 /// `Shattered`, collecting what scripts print.
 struct Game {
@@ -23,7 +23,7 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
-        let (world, mut scripts, folder) = start_example_in("hello-destruction");
+        let (world, mut scripts, folder) = start_example_in("destruction");
         let assets = Assets::new(&folder);
         scripts.set_assets(assets.clone());
         Self {

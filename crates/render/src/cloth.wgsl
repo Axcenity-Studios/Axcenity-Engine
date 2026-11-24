@@ -154,9 +154,16 @@ fn cloth_surface(
     let sheen_strength = max(sheen.r, max(sheen.g, sheen.b));
     let under = 1.0 - sheen_strength * cloth_sheen_albedo(n_dot_v, sheen_roughness);
 
-    let sun = sun_arrival(world_position, geometric, pixel, solid);
+    let sun_parts = sun_arrival_parts(world_position, geometric, pixel, solid);
+    let sun = sun_parts.arrival;
     var lit = cloth_light(n, v, sun.l, t, b, base_color, metal, rough, f0, anisotropy, sheen,
         sheen_roughness, under) * sun.radiance * sun.visible * bumps(bumped, geometric, n, sun.l);
+    let flash = lightning_arrival(world_position, sun.l, sun_parts.shadow);
+    if flash.radiance.b > 0.0 {
+        lit += cloth_light(n, v, flash.l, t, b, base_color, metal, rough, f0, anisotropy, sheen,
+            sheen_roughness, under) * flash.radiance * flash.visible
+            + lightning_fill(world_position, n, base_color * (1.0 - metal), flash);
+    }
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {

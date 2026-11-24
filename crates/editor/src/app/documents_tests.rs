@@ -40,7 +40,7 @@ fn key_the_hinge(app: &mut EditorApp) {
 
 #[test]
 fn an_unwritten_clip_counts_as_unsaved_and_is_listed() {
-    let folder = copy_of_example("hello-touched", "documents-unwritten-clip");
+    let folder = copy_of_example("touched", "documents-unwritten-clip");
     let mut app = EditorApp::new(Some(&folder));
     let (_, clip, _) = animated_door(&mut app, &folder);
     key_the_hinge(&mut app);
@@ -58,7 +58,7 @@ fn an_unwritten_clip_counts_as_unsaved_and_is_listed() {
 
 #[test]
 fn dont_save_on_close_leaves_an_open_clip_as_it_was_saved() {
-    let folder = copy_of_example("hello-touched", "documents-dont-save-clip");
+    let folder = copy_of_example("touched", "documents-dont-save-clip");
     let mut app = EditorApp::new(Some(&folder));
     let (_, clip, saved) = animated_door(&mut app, &folder);
     key_the_hinge(&mut app);
@@ -79,7 +79,7 @@ fn dont_save_on_close_leaves_an_open_clip_as_it_was_saved() {
 
 #[test]
 fn dont_save_puts_back_a_clip_written_when_another_was_opened() {
-    let folder = copy_of_example("hello-touched", "documents-written-clip");
+    let folder = copy_of_example("touched", "documents-written-clip");
     let mut app = EditorApp::new(Some(&folder));
     let (door, clip, saved) = animated_door(&mut app, &folder);
     key_the_hinge(&mut app);
@@ -102,7 +102,7 @@ fn dont_save_puts_back_a_clip_written_when_another_was_opened() {
 
 #[test]
 fn save_in_the_prompt_writes_the_open_clip() {
-    let folder = copy_of_example("hello-touched", "documents-save-clip");
+    let folder = copy_of_example("touched", "documents-save-clip");
     let mut app = EditorApp::new(Some(&folder));
     let (_, clip, saved) = animated_door(&mut app, &folder);
     key_the_hinge(&mut app);
@@ -115,7 +115,7 @@ fn save_in_the_prompt_writes_the_open_clip() {
 
 #[test]
 fn a_changed_model_studio_model_counts_and_saves_with_the_project() {
-    let folder = copy_of_example("hello-touched", "documents-model");
+    let folder = copy_of_example("touched", "documents-model");
     let mut app = EditorApp::new(Some(&folder));
     let doc = crate::model_studio::StudioDoc::new(
         String::new(),
@@ -140,7 +140,7 @@ fn a_changed_model_studio_model_counts_and_saves_with_the_project() {
 
 #[test]
 fn dont_save_drops_a_changed_model_without_writing_it() {
-    let folder = copy_of_example("hello-touched", "documents-model-dont-save");
+    let folder = copy_of_example("touched", "documents-model-dont-save");
     let mut app = EditorApp::new(Some(&folder));
     let doc = crate::model_studio::StudioDoc::new(
         String::new(),
@@ -164,7 +164,7 @@ fn dont_save_drops_a_changed_model_without_writing_it() {
 
 #[test]
 fn the_prompt_lists_every_kind_of_modified_document_once() {
-    let folder = copy_of_example("hello-touched", "documents-list");
+    let folder = copy_of_example("touched", "documents-list");
     let mut app = EditorApp::new(Some(&folder));
     // Six edits, one undo step each: still one document.
     super::tests::edit_the_pad(&mut app);

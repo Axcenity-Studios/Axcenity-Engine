@@ -38,7 +38,7 @@ end)
 "#;
 
 fn opened(test: &str) -> (EditorApp, std::path::PathBuf) {
-    let folder = copy_of_example("hello-plugins", test);
+    let folder = copy_of_example("plugins", test);
     let tidy = folder.join("plugins").join("tidy");
     std::fs::create_dir_all(&tidy).unwrap();
     std::fs::write(
@@ -154,7 +154,7 @@ fn model_imported_changes_are_part_of_the_import_undo_step() {
     let before = app.history.undo_label().map(str::to_owned);
     let count = |app: &EditorApp| app.world.descendants(app.world.workspace()).len();
     let children = count(&app);
-    app.import_model(&example("hello-mesh").join("assets/models/pyramid.gltf"));
+    app.import_model(&example("mesh").join("assets/models/pyramid.gltf"));
     if let Some(dialog) = app.importing.take() {
         app.import_chosen(&dialog);
     }

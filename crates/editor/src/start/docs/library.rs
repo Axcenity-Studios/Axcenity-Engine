@@ -4,9 +4,10 @@
 //!
 //! Only a small part of Markdown is read, so the pages look the same in the
 //! editor, on GitHub and on GitBook: `#` headings, paragraphs, `-` and `1.`
-//! lists (one level), fenced code, `>` notes, pipe tables, `---` rules, and
-//! inside text `**bold**`, `` `code` `` and `[links](target)`. Anything else
-//! is listed in [`Page::problems`], and a test fails on it.
+//! lists (one level), fenced code, `>` notes, pipe tables, standalone
+//! `![description](path.png)` images, `---` rules, and inside text `**bold**`,
+//! `` `code` `` and `[links](target)`. Anything else is listed in
+//! [`Page::problems`], and a test fails on it.
 //!
 //! `SUMMARY.md` (GitBook's table of contents) gives the order: each `## `
 //! heading is a section, each `* [Title](path.md)` under it a page.
@@ -80,6 +81,11 @@ pub(crate) enum Block {
         header: Vec<Vec<Span>>,
         rows: Vec<Vec<Vec<Span>>>,
     },
+    /// A standalone `![description](path.png)` image with its descriptive caption.
+    Image {
+        alt: String,
+        path: String,
+    },
     Rule,
 }
 
@@ -93,7 +99,7 @@ pub(crate) struct Page {
     /// The `description:` line: one sentence for cards and search.
     pub(crate) description: String,
     pub(crate) status: Status,
-    /// The `samples:` list: folders in `examples/` the page follows.
+    /// The `samples:` list: the engine's samples (`crates/samples/projects/`) the page follows.
     pub(crate) samples: Vec<String>,
     /// The `icon:` line: a Phosphor icon name, such as `cube`.
     pub(crate) icon: String,
@@ -130,7 +136,7 @@ pub(crate) enum LinkTarget {
     Page(usize, Option<String>),
     /// A heading on the same page.
     Anchor(String),
-    /// A sample project, `examples/<name>`.
+    /// A sample project, the engine sample `<name>`.
     Sample(String),
     /// A page of the generated API reference, shown in the API Reference: the
     /// entry it names (`Part`, `Part.touched` for `api/classes/Part.md#touched`)
@@ -423,6 +429,18 @@ impl Page {
         code
     }
 
+    /// Every `![alt](path)` image on the page.
+    #[cfg(test)]
+    pub(crate) fn images(&self) -> Vec<(&str, &str)> {
+        self.blocks
+            .iter()
+            .filter_map(|block| match block {
+                Block::Image { alt, path } => Some((alt.as_str(), path.as_str())),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Every run of spans on the page.
     fn span_lists(&self) -> Vec<&[Span]> {
         let mut lists: Vec<&[Span]> = Vec::new();
@@ -501,6 +519,7 @@ fn plain_text(block: &Block) -> String {
             .map(|cell| spans_text(cell))
             .collect::<Vec<_>>()
             .join(" "),
+        Block::Image { alt, .. } => alt.clone(),
         Block::Rule => String::new(),
     }
 }
@@ -529,9 +548,9 @@ fn snippet(text: &str, word: &str) -> String {
     out
 }
 
-/// The sample named by a GitHub link to `.../examples/<name>`.
+/// The sample named by a GitHub link to `.../crates/samples/projects/<name>`.
 fn sample_in_url(url: &str) -> Option<String> {
-    let (_, rest) = url.split_once("/examples/")?;
+    let (_, rest) = url.split_once("/samples/projects/")?;
     let name = rest.split(['/', '#', '?']).next()?;
     (!name.is_empty()).then(|| name.to_owned())
 }
@@ -677,10 +696,20 @@ fn parse_blocks(lines: &[&str], offset: usize, problems: &mut Vec<String>) -> Ve
             });
             continue;
         }
-        if trimmed.starts_with('<') || trimmed.starts_with("![") || trimmed.starts_with("{%") {
-            problems.push(format!(
-                "{number}: HTML, images and GitBook blocks aren't shown"
-            ));
+        if trimmed.starts_with("![") {
+            flush(&mut paragraph, &mut blocks);
+            if let Some((alt, path)) = parse_image(trimmed) {
+                blocks.push(Block::Image { alt, path });
+            } else {
+                problems.push(format!(
+                    "{number}: image syntax must be `![description](path.png)`"
+                ));
+            }
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with('<') || trimmed.starts_with("{%") {
+            problems.push(format!("{number}: HTML and GitBook blocks aren't shown"));
         }
         paragraph.push(trimmed);
         index += 1;
@@ -690,6 +719,19 @@ fn parse_blocks(lines: &[&str], offset: usize, problems: &mut Vec<String>) -> Ve
         check_spans(block, problems);
     }
     blocks
+}
+
+/// A standalone `![alt](path)` image line.
+fn parse_image(line: &str) -> Option<(String, String)> {
+    let after = line.strip_prefix("![")?;
+    let close = after.find("](")?;
+    let alt = after[..close].trim();
+    let rest = &after[close + 2..];
+    let target = rest.strip_suffix(')')?.trim();
+    if target.is_empty() {
+        return None;
+    }
+    Some((alt.to_owned(), target.to_owned()))
 }
 
 /// A `#` heading line.

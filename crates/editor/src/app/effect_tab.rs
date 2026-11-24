@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn saving_an_effect_makes_an_effect_asset_and_the_stack_edits_with_undo() {
-        let folder = super::super::tests::copy_of_example("hello-part", "save-effect");
+        let folder = super::super::tests::copy_of_example("part", "save-effect");
         let mut app = EditorApp::new(None);
         app.open(&folder);
         let workspace = app.world.workspace();

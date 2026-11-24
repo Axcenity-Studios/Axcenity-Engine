@@ -71,6 +71,9 @@ pub enum Insertable {
     LensEffect(ClassName),
     /// An invisible box that changes the look while the camera is in it.
     GraphicsVolume,
+    /// An invisible box that sets the weather inside it: a shelter from
+    /// rain and snow as made.
+    WeatherVolume,
     /// A big GraphicsVolume of haze: a FogEffect with a Density in it, lit
     /// by the sun (shafts) and lamps (LE2).
     FogVolume,
@@ -259,11 +262,12 @@ impl Insertable {
         )
     }
 
-    /// Ribbon ▸ Lighting ▸ Volumes: a GraphicsVolume, and the effects only
-    /// a volume holds.
-    pub const VOLUMES: [Insertable; 6] = [
+    /// Ribbon ▸ Lighting ▸ Volumes: a GraphicsVolume, the effects only a
+    /// volume holds, and a WeatherVolume.
+    pub const VOLUMES: [Insertable; 7] = [
         Insertable::FogVolume,
         Insertable::InteriorVolume,
+        Insertable::WeatherVolume,
         Insertable::GraphicsVolume,
         Insertable::ExposureEffect,
         Insertable::FogEffect,
@@ -419,6 +423,7 @@ impl Insertable {
             Insertable::LensEffect(ClassName::SunRaysEffect) => "Sun Rays",
             Insertable::LensEffect(class) => class.as_str(),
             Insertable::GraphicsVolume => "Graphics Volume",
+            Insertable::WeatherVolume => "Weather Volume",
             Insertable::FogVolume => "Fog Volume",
             Insertable::InteriorVolume => "Interior",
             Insertable::ExposureEffect => "Exposure",
@@ -506,6 +511,7 @@ impl Insertable {
             Insertable::GraphicsVolume | Insertable::FogVolume | Insertable::InteriorVolume => {
                 ClassName::GraphicsVolume
             }
+            Insertable::WeatherVolume => ClassName::WeatherVolume,
             Insertable::ExposureEffect => ClassName::ExposureEffect,
             Insertable::FogEffect => ClassName::FogEffect,
             Insertable::BloomEffect => ClassName::BloomEffect,
@@ -691,7 +697,7 @@ pub fn create(world: &mut World, what: Insertable, position: Vector3) -> Instanc
             ("BlendDistance", Value::Number(1.0)),
             ("Priority", Value::Number(1.0)),
         ],
-        Insertable::ReverbZone | Insertable::GraphicsVolume => vec![(
+        Insertable::ReverbZone | Insertable::GraphicsVolume | Insertable::WeatherVolume => vec![(
             "Position",
             Value::Vector3(Vector3::new(position.x, position.y + 6.0, position.z)),
         )],
@@ -1470,6 +1476,43 @@ mod tests {
         }
         let model = create(&mut world, Insertable::Model, at);
         assert_eq!(world.get(model).unwrap().class(), ClassName::Model);
+    }
+
+    #[test]
+    fn a_weather_volume_is_made_like_a_graphics_volume_and_goes_into_the_workspace() {
+        let mut world = World::new();
+        let ground = Vector3::new(3.0, 1.0, -8.0);
+        let weather = create(&mut world, Insertable::WeatherVolume, ground);
+        let look = create(&mut world, Insertable::GraphicsVolume, ground);
+        let made = world.get(weather).unwrap();
+        assert_eq!(made.class(), ClassName::WeatherVolume);
+        assert_eq!(Insertable::WeatherVolume.class(), ClassName::WeatherVolume);
+        assert_eq!(Insertable::WeatherVolume.label(), "Weather Volume");
+        // Its bottom on the ground: 12 studs high, so its middle 6 up.
+        assert_eq!(
+            made.property("Position"),
+            Some(&Value::Vector3(Vector3::new(3.0, 7.0, -8.0)))
+        );
+        assert_eq!(
+            made.property("Position"),
+            world.get(look).unwrap().property("Position")
+        );
+        assert_eq!(
+            made.property("Size"),
+            world.get(look).unwrap().property("Size")
+        );
+
+        // On the ribbon with the other volumes, and never inside one.
+        assert!(Insertable::VOLUMES.contains(&Insertable::WeatherVolume));
+        assert!(!Insertable::WeatherVolume.goes_in_volume());
+        world.set_parent(look, Some(world.workspace())).unwrap();
+        assert_eq!(
+            insert_parent(&world, Some(look), Insertable::WeatherVolume),
+            world.workspace()
+        );
+        // What changes the look doesn't go into a WeatherVolume.
+        world.set_parent(weather, Some(world.workspace())).unwrap();
+        assert!(!is_graphics_volume(&world, weather));
     }
 
     #[test]

@@ -96,7 +96,7 @@ pub fn classify(ctx: &Ctx, args: &Args) -> Class { … }   // e.g. > 50 objects 
 pub fn call(ctx: &mut Ctx, args: Args) -> ToolResult { … }
 ```
 
-`tools/mod.rs` lists every tool in one array. Shared parameters (`ID_OR_IDS`, `PROPS`, `DETAIL`, …) are constants, so a name and its description are written once. A test walks the array and checks each tool has a summary under 120 characters, an example that parses and runs on `hello-part`, a profile, a docs entry, and that the profile budgets hold.
+`tools/mod.rs` lists every tool in one array. Shared parameters (`ID_OR_IDS`, `PROPS`, `DETAIL`, …) are constants, so a name and its description are written once. A test walks the array and checks each tool has a summary under 120 characters, an example that parses and runs on `part`, a profile, a docs entry, and that the profile budgets hold.
 
 **Extending**: a new engine system adds ops, one tool file and one array line. Plugin-registered tools (Lua plugins exposing their own MCP tools) are possible later through the plugin API, but not in v1 (no infrastructure before it's needed).
 

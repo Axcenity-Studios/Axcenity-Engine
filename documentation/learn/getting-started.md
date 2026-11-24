@@ -1,14 +1,16 @@
 ---
 description: What Axcenity is, how to install it, and your first five minutes from New Project to Play.
 icon: rocket
-samples: [hello-part, hello-touched]
+samples: [part, touched]
 ---
 
 # Getting started
 
 Axcenity is a free, open-source 3D game engine and editor. You build worlds out of parts and models, script them in **Luau** (a fast, typed dialect of Lua) or with **blocks**, press **Play** to test, and build a standalone game for Windows, macOS or Linux. The scripting API will feel familiar if you have used Roblox Studio: objects are Instances in one tree, `workspace` holds the 3D world, and scripts react to events such as `Part.Touched`.
 
-> Axcenity is in **alpha** (version 0.2). Everything described in Learn exists and is tested, but file formats and some APIs can still change between releases. Pages mark anything that is only partly built or experimental.
+> Axcenity is in **alpha** (`0.3.0-alpha.1`). Everything described in Learn exists and is tested, but file formats and some APIs can still change between releases. Pages mark anything that is only partly built or experimental.
+
+![Axcenity Engine workflow overview: build 3D worlds in the Scene, script gameplay in Luau or visual blocks, test live with F5 Play mode, and export standalone games for Windows, macOS, and Linux.](../images/home-overview.png)
 
 ## Install
 
@@ -47,6 +49,6 @@ Hold the **right mouse button** and move the mouse to look around. While it is h
 
 ## Where to go next
 
-- Take the tutorial [Place and move a part](https://github.com/MrBearson321/Axcenity-Engine/tree/main/examples/hello-part) in the **hello-part** sample, then [Editor interface](editor-interface.md).
+- Take the tutorial [Place and move a part](https://github.com/MrBearson321/Axcenity-Engine/tree/main/crates/samples/projects/part) in the **part** sample, then [Editor interface](editor-interface.md).
 - Every sample project in the engine's `examples` folder can be opened from Learn with one click. They run without the editor too.
 - When you want the details behind a feature, the [Documentation](../README.md) has a page for each system.

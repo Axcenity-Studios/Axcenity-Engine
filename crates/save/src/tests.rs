@@ -667,7 +667,7 @@ fn a_current_slot_round_trips_without_a_migration_step() {
 fn project_files_are_never_read_as_save_files() {
     let folder = folder("project-files");
     fs::create_dir_all(&folder).unwrap();
-    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-saves");
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/saves");
     let Level { mut world, .. } = level();
     let before = snapshot(&world);
     let mut saves = Saves::new(Some(folder.clone()));

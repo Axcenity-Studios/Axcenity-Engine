@@ -661,11 +661,11 @@ mod tests {
 
     fn example(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples")
+            .join("../samples/projects")
             .join(name)
     }
 
-    /// A scratch folder with a copy of `hello-part`'s project files (the
+    /// A scratch folder with a copy of `part`'s project files (the
     /// build cooks into the project's `.axcenity`), a pretend player, and
     /// the folder to build into.
     struct Scratch {
@@ -680,7 +680,7 @@ mod tests {
             let project = root.join("project");
             fs::create_dir_all(&project).unwrap();
             for file in ["axcenity.json", "world.json"] {
-                fs::copy(example("hello-part").join(file), project.join(file)).unwrap();
+                fs::copy(example("part").join(file), project.join(file)).unwrap();
             }
             fs::write(root.join("player"), b"pretend player").unwrap();
             Scratch { root }
@@ -716,7 +716,7 @@ mod tests {
         let project = scratch.root.join("project");
         let texture = "assets/textures/stone.png";
         fs::create_dir_all(project.join("assets/textures")).unwrap();
-        let source = example("hello-material-graph").join(texture);
+        let source = example("material-graph").join(texture);
         fs::copy(&source, project.join(texture)).unwrap();
         let built = scratch.build(ExportTarget::Linux, false);
         assert_eq!(built.cooked, 1);
@@ -849,7 +849,7 @@ mod tests {
                 }
             }
         }
-        for name in ["hello-pbr", "hello-character", "hello-roads"] {
+        for name in ["pbr", "character", "roads"] {
             let folder = std::env::temp_dir().join(format!("axcenity-cooked-only-{name}"));
             let _ = fs::remove_dir_all(&folder);
             copy(&example(name), &folder);

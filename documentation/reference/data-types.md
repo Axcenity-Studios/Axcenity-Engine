@@ -1,7 +1,7 @@
 ---
 description: Vector3, Vector2, CFrame, Color3, UDim2, Random, TweenInfo, raycast parameters and results, enums and the other value types scripts use.
 icon: brackets
-samples: [hello-tween, hello-physics]
+samples: [tween, physics]
 ---
 
 # Data types

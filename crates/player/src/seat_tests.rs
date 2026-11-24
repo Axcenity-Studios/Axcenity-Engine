@@ -1,4 +1,4 @@
-//! Phase 39: the hello-seat example's chair, disabled bench and cart.
+//! Phase 39: the seat example's chair, disabled bench and cart.
 
 use axcenity_core::{InstanceId, KeyCode as K, Value, Vector3};
 use axcenity_script::KeyEvent;
@@ -96,7 +96,7 @@ fn walk_toward(game: &mut Game, path: &[&str]) {
 
 #[test]
 fn hello_seat_sits_on_the_chair_bench_and_cart_and_stands_up_beside_them() {
-    let (world, scripts) = start_example("hello-seat");
+    let (world, scripts) = start_example("seat");
     let mut game = Game {
         world,
         scripts,

@@ -1,5 +1,5 @@
 //! Phase 36 in the editor: the Constraint tool, the overlay's joints, and
-//! the hello-joints example saved, reloaded and played.
+//! the joints example saved, reloaded and played.
 
 use std::path::PathBuf;
 
@@ -48,7 +48,7 @@ fn two_blocks(app: &mut EditorApp) -> (SurfacePick, SurfacePick) {
 
 #[test]
 fn the_constraint_tool_joins_two_clicked_surfaces_in_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let (first, second) = two_blocks(&mut app);
     app.pick_constraint_tool(Some(ClassName::RopeConstraint));
     let count = |app: &EditorApp| app.world.descendants(app.world.root()).len();
@@ -107,7 +107,7 @@ fn the_constraint_tool_joins_two_clicked_surfaces_in_one_undo_step() {
 
 #[test]
 fn the_constraints_overlay_draws_joints_with_their_axes_and_limits() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let (first, second) = two_blocks(&mut app);
     let hinge = {
         app.pick_constraint_tool(Some(ClassName::HingeConstraint));
@@ -164,14 +164,14 @@ fn the_constraints_overlay_draws_joints_with_their_axes_and_limits() {
     }
 }
 
-/// The moving parts of hello-joints.
+/// The moving parts of joints.
 const MOVING: [&str; 9] = [
     "Door", "Arm", "Wheel", "Bob", "Crate", "Weight", "Pendulum", "Lift", "Bit",
 ];
 
 #[test]
 fn every_constraint_saves_reloads_and_plays_as_the_player_runs_it() {
-    let folder = copy_of_example("hello-joints", "joints-play");
+    let folder = copy_of_example("joints", "joints-play");
     let app = EditorApp::new(Some(&folder));
     let joints = |world: &World| -> Vec<(String, Vec<(&'static str, Value)>)> {
         world
@@ -275,7 +275,7 @@ fn part_named(world: &World, name: &str) -> InstanceId {
 #[test]
 fn the_constraint_tool_is_off_during_play() {
     // A copy: Play saves the new blocks first.
-    let folder = copy_of_example("hello-touched", "constraint-tool-play");
+    let folder = copy_of_example("touched", "constraint-tool-play");
     let mut app = EditorApp::new(Some(&folder));
     let (first, _) = two_blocks(&mut app);
     app.pick_constraint_tool(Some(ClassName::HingeConstraint));

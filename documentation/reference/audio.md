@@ -1,7 +1,7 @@
 ---
 description: How sound plays, supported files, spatial sound with rolloff curves and occlusion, reverb zones, sound groups as buses, each effect and its settings, and volume settings for players.
 icon: speaker
-samples: [hello-audio, hello-spatial, hello-mixer]
+samples: [audio, spatial, mixer]
 ---
 
 # Audio

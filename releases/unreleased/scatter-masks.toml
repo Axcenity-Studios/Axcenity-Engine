@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "editor"
+title = "Scatter items have masks: noise patches, slope, height and moisture, so a spread isn't uniform"
+details = "Under each item in the Scatter pane, Masks say where the brush places more or less of it: Noise gathers it into patches (Scale, Threshold, Contrast, Seed), Slope and Height keep it between two steepnesses or heights, and Moisture reads the terrain's own shape, so one item gathers in washes and hollows and another on dry rises. Masks save with the palette; palettes without masks are unchanged, and old palettes paint exactly as before."
+features = ["terrain.studio"]

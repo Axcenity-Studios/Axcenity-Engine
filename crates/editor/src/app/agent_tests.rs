@@ -17,11 +17,11 @@ fn near(a: Vector3, x: f32, z: f32) -> bool {
     (a.x - x).hypot(a.z - z) < 1e-3
 }
 
-/// hello-agent with a new Agent inserted from the toolbar with nothing
+/// agent with a new Agent inserted from the toolbar with nothing
 /// selected, its Body moved to (-20, 0, -20) and its Destination set to
 /// (20, 0, -20), behind the wall, both from Properties.
 fn agent_sent_round_the_wall(test: &str) -> (EditorApp, InstanceId, InstanceId) {
-    let folder = copy_of_example("hello-agent", test);
+    let folder = copy_of_example("agent", test);
     let mut app = EditorApp::new(Some(&folder));
     let agent = inserted(&mut app, Insertable::NavigationAgent, None);
     let model = app.world.get(agent).unwrap().parent().unwrap();
@@ -36,7 +36,7 @@ fn agent_sent_round_the_wall(test: &str) -> (EditorApp, InstanceId, InstanceId) 
 
 #[test]
 fn an_inserted_agent_starts_where_it_stands_and_stays_there_in_play() {
-    let folder = copy_of_example("hello-agent", "agent-insert");
+    let folder = copy_of_example("agent", "agent-insert");
     let mut app = EditorApp::new(Some(&folder));
     let agent = inserted(&mut app, Insertable::NavigationAgent, None);
     let model = app.world.get(agent).unwrap().parent().unwrap();
@@ -217,7 +217,7 @@ fn the_path_overlay_draws_a_line_through_each_corner_and_a_ring_at_the_end() {
 
 #[test]
 fn sight_range_set_in_properties_changes_what_the_guard_sees_in_play_and_saves() {
-    let folder = copy_of_example("hello-perception", "agent-senses");
+    let folder = copy_of_example("perception", "agent-senses");
     let mut app = EditorApp::new(Some(&folder));
     let workspace = app.world.workspace();
     let guard = app.world.find_first_child(workspace, "Guard").unwrap();

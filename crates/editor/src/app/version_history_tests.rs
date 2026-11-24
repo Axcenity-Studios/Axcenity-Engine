@@ -11,7 +11,7 @@ use super::*;
 
 const SIZE: egui::Vec2 = egui::vec2(1400.0, 900.0);
 
-/// A copy of `examples/hello-part` in the temp folder.
+/// A copy of `crates/samples/projects/part` in the temp folder.
 fn scratch_project(name: &str) -> PathBuf {
     fn copy(from: &Path, to: &Path) {
         fs::create_dir_all(to).unwrap();
@@ -33,7 +33,7 @@ fn scratch_project(name: &str) -> PathBuf {
         std::process::id()
     ));
     let _ = fs::remove_dir_all(&folder);
-    copy(&example("hello-part"), &folder);
+    copy(&example("part"), &folder);
     folder
 }
 

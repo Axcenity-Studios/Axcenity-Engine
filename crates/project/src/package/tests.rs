@@ -10,7 +10,7 @@ const WALK: &str = "assets/animations/noodle/Walk.anim.json";
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -32,10 +32,10 @@ fn empty_project(name: &str) -> PathBuf {
     folder
 }
 
-/// noodle's state machine from hello-animation, written to a package and
+/// noodle's state machine from animation, written to a package and
 /// read back.
 fn noodle_package(name: &str) -> Package {
-    let source = example("hello-animation");
+    let source = example("animation");
     let contents = package_contents(&source, &[MACHINE.to_owned()], &[]).unwrap();
     let file = std::env::temp_dir().join(format!("axcenity-{name}-{}.axpkg", std::process::id()));
     write_package(&file, "noodle", &[MACHINE.to_owned()], &contents.files).unwrap();
@@ -59,8 +59,7 @@ fn paths(writes: &[(String, Vec<u8>)]) -> Vec<&str> {
 
 #[test]
 fn a_state_machine_brings_its_clips_and_the_model_they_link_to() {
-    let contents =
-        package_contents(&example("hello-animation"), &[MACHINE.to_owned()], &[]).unwrap();
+    let contents = package_contents(&example("animation"), &[MACHINE.to_owned()], &[]).unwrap();
     let files: Vec<&str> = contents.files.keys().map(String::as_str).collect();
     assert_eq!(
         files,
@@ -199,7 +198,7 @@ fn a_package_reads_back_as_written_and_refuses_paths_outside_assets() {
     assert_eq!(package.manifest.name, "noodle");
     assert_eq!(package.manifest.roots, [MACHINE]);
     assert_eq!(package.files.len(), 7);
-    let fbx = fs::read(example("hello-animation").join("assets/models/noodle.fbx")).unwrap();
+    let fbx = fs::read(example("animation").join("assets/models/noodle.fbx")).unwrap();
     assert_eq!(package.files["assets/models/noodle.fbx"], fbx);
 
     let folder = empty_project("unsafe-package");
@@ -224,7 +223,7 @@ fn a_package_reads_back_as_written_and_refuses_paths_outside_assets() {
 /// with it, so the same world poses the same in both.
 #[test]
 fn an_imported_state_machine_plays_the_same_as_in_the_project_it_came_from() {
-    let source = example("hello-animation");
+    let source = example("animation");
     let folder = empty_project("plays-the-same");
     let plan = plan_import(
         &folder,
@@ -407,7 +406,7 @@ fn keep_both_numbers_a_file_and_rewrites_what_names_it() {
 
 #[test]
 fn a_prefabs_scripts_bring_the_tables_they_name_and_list_the_rest_for_a_check() {
-    let source = example("hello-data");
+    let source = example("data");
     let prefab = (
         "assets/prefabs/Rack.prefab.json".to_owned(),
         br#"{"format_version": 1, "instances": []}"#.to_vec(),

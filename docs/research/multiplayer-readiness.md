@@ -148,7 +148,7 @@ Measurement (`prediction_cost`, release build, 8 players walking, running and ju
 | 200 ms ±40, 5% loss | 0 corrections | 0–30 a player (mean 0.7–1.8 studs, largest 10 studs, 10 snaps) |
 | Replay cost | — | at most 0.94 ms in a frame (about 24 moves taken again); 13 ms over a whole run |
 
-Real processes over UDP on one machine (debug builds, `axcenity-server examples/hello-spawn --character-authority server` and `axcenity-bots`, which now print prediction counts):
+Real processes over UDP on one machine (debug builds, `axcenity-server crates/samples/projects/spawn --character-authority server` and `axcenity-bots`, which now print prediction counts):
 
 | Run | Result |
 |---|---|
@@ -187,7 +187,7 @@ MP6b, MP6c and anything hosted wait for Paul.
 
 ### MP1: 32 bots on one machine (cloud container, 2026-11-14)
 
-`python3 scripts/net-scale.py run examples/hello-spawn --bots 32 --bot-processes 2 --seconds 60`, release build, the server and both bot processes on the same 4-vCPU container (about 2.5× slower than Paul's desktop, [benchmarks.md](../benchmarks.md)):
+`python3 scripts/net-scale.py run crates/samples/projects/spawn --bots 32 --bot-processes 2 --seconds 60`, release build, the server and both bot processes on the same 4-vCPU container (about 2.5× slower than Paul's desktop, [benchmarks.md](../benchmarks.md)):
 
 | | |
 |---|---|
@@ -237,7 +237,7 @@ Left: the junk a spammer sends before it's kicked still fills the server's socke
 
 ### MP3b: walls, flight and strikes (cloud container, 2026-11-14)
 
-[networking.md](../architecture/networking.md#validation). Found while building it: **two players spawned with no SpawnLocation stood at the same spot at the origin, and one was pushed into the floor and fell through it forever** (the old character test measured a falling character's walk). With the wall check the server held it back every frame; now characters at the origin spread out on rings as on a SpawnLocation. **Two more ways an honest character fell through the floor on its own device**, both found by the bots once the server refused it: a character pushed into another player's character, and one falling past a ledge and steered into its side below step height, had landing probes that started inside that part, found no ground and never landed. Now a falling foot inside a part lands on its top when that's within a step, and otherwise looks past it (`character::landing_hit`). With both fixed, 24 bots walked hello-spawn for 30 s without a refusal (six runs of seven).
+[networking.md](../architecture/networking.md#validation). Found while building it: **two players spawned with no SpawnLocation stood at the same spot at the origin, and one was pushed into the floor and fell through it forever** (the old character test measured a falling character's walk). With the wall check the server held it back every frame; now characters at the origin spread out on rings as on a SpawnLocation. **Two more ways an honest character fell through the floor on its own device**, both found by the bots once the server refused it: a character pushed into another player's character, and one falling past a ledge and steered into its side below step height, had landing probes that started inside that part, found no ground and never landed. Now a falling foot inside a part lands on its top when that's within a step, and otherwise looks past it (`character::landing_hit`). With both fixed, 24 bots walked the `spawn` sample for 30 s without a refusal (six runs of seven).
 
 | Test | Result |
 |---|---|
@@ -246,7 +246,7 @@ Left: the junk a spammer sends before it's kicked still fills the server's socke
 | Honest player walking into a wall, then jumping along it, 80 ms latency | No corrections, no flags |
 | Owned part at 300 and 1,200 studs a second | 300 placed; 1,200 refused; flinging it on flags the player |
 | `--cheat speed`, `noclip` (through the floor), `fly` bots beside 2 walking players over UDP | Each kicked for its own reason within 20 s; the players had no corrections |
-| 24 honest bots on hello-spawn for 30 s, 7 runs | 6 runs with no refusals or corrections; one with 18 corrections and no flags, not traced (a respawn from the lava counts as a correction too) |
+| 24 honest bots on the `spawn` sample for 30 s, 7 runs | 6 runs with no refusals or corrections; one with 18 corrections and no flags, not traced (a respawn from the lava counts as a correction too) |
 
 The checks cost a ray per update for a moving character (a second only when the first meets a wall), and a ray down plus a ball cast when it's off the ground, each a walk of the Workspace's bounding balls (`physics::query`). At 32 players and S10k's 10,000 parts that's a few thousand walks a second; MP7's run on Paul's PC measures it.
 

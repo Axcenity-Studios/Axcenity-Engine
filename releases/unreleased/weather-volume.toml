@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "renderer"
+title = "Weather Volumes say where rain and snow go, and how deep the snow and how wet the ground is"
+details = "A new Weather Volume (World tab, Post FX, or the Explorer's Insert menu) is an invisible box that sets the weather inside it, for a room, a porch or under an overhang. As inserted it's a shelter: no rain or snow falls in it and what's inside stays dry and bare, even under open sky. Turn on Precipitation to let drops fall inside even under a roof (an open-sided shed), and set Snow and Wetness from 0 (none) through 1 (as outside) to 2 (snow twice as deep, wetter). Where volumes overlap the higher Priority wins; the 8 nearest the camera are drawn."
+features = ["renderer.weather"]

@@ -370,7 +370,7 @@ mod tests {
 
     fn example_model() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/hello-mesh/assets/models/pyramid.gltf")
+            .join("../samples/projects/mesh/assets/models/pyramid.gltf")
     }
 
     #[test]

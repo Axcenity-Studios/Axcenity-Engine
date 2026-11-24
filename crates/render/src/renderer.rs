@@ -87,6 +87,7 @@ mod ray_sway;
 mod ray_tracing;
 mod realtime_gi;
 mod skinning;
+mod snow_caps;
 mod sprites;
 mod sun_rays;
 mod surface_shaders;
@@ -561,6 +562,17 @@ impl TextureRenderer {
     /// What the last frame drawn cost, for the editor's profiler.
     pub fn stats(&self) -> RenderStats {
         self.scene.stats()
+    }
+
+    /// Forgets what's kept from earlier frames to draw the next one: TAA's
+    /// picture, the motion vectors' last view and transforms, and the
+    /// volumetric fog's grid. The next frame starts afresh, as the first
+    /// one did. For a camera cut in a rendered movie (the editor's Render
+    /// Movie), where the frame before shows somewhere else: without it
+    /// that frame ghosts into the first ones after the cut, and motion
+    /// blur streaks the whole picture by the jump.
+    pub fn forget_history(&mut self) {
+        self.scene.forget_history();
     }
 
     /// What the GPU can do, which the graphics settings are lowered to fit.

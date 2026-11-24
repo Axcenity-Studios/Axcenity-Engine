@@ -44,7 +44,7 @@ flowchart LR
 
 ## Testing
 
-106 tests; `cargo test -p axcenity-ui --release --test bench_inventory_ui -- --ignored --nocapture` for the benchmark; `examples/hello-css`, `hello-ui`, `hello-rich-text`, `hello-accessibility` render in `every_example_renders`.
+106 tests; `cargo test -p axcenity-ui --release --test bench_inventory_ui -- --ignored --nocapture` for the benchmark; `crates/samples/projects/css`, `ui`, `rich-text`, `accessibility` render in `every_example_renders`.
 
 ## Development guidance
 

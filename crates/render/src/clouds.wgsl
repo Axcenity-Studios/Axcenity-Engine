@@ -80,43 +80,106 @@ fn cloud_noise3(p: vec3<f32>) -> f32 {
     return mix(x0, x1, u.z);
 }
 
-// How thick the cloud is above the level point `xz`, from 0 (clear sky)
-// to 1 (filling the layer): four octaves of noise, each turned so their
-// grids don't line up, cut at a level set by the cover.
-fn cloud_cover(clouds: Clouds, xz: vec2<f32>) -> f32 {
-    var p = (xz - clouds.offset.xy) / CLOUD_SCALE;
+// How far the clouds' large shapes are pulled about before they're cut
+// (in their own sizes), and how much longer than wide they lie: clouds
+// are drawn out and torn by the air they ride in, not round.
+const CLOUD_PULL: f32 = 0.9;
+const CLOUD_STRETCH: f32 = 1.25;
+// How wide the band of noise is over which a cloud goes from nothing to
+// filling its layer: wide, so a cloud has a long thin veil round a
+// thicker middle, and full cover still has thin places in it.
+const CLOUD_EDGE: f32 = 0.42;
+
+// How much cloud there is above the level point `xz`: nothing at 0 and
+// below, filling the layer at 1, and above 1 more than fills it (the heavy
+// middle of an overcast, `cloud_belly`). Five octaves of noise, each turned
+// so their grids don't line up, the finer ones ridged into strands, cut at
+// a level set by the cover.
+fn cloud_fill(clouds: Clouds, xz: vec2<f32>) -> f32 {
+    let at = (xz - clouds.offset.xy) / CLOUD_SCALE;
+    // Drawn out one way.
+    var p = vec2<f32>(0.8 * at.x + 0.6 * at.y, (0.8 * at.y - 0.6 * at.x) * CLOUD_STRETCH);
+    // Pulled about by a slower noise, so no edge runs straight or round.
+    let pull = vec2<f32>(cloud_noise2(p * 0.7 + vec2<f32>(31.7, 11.3)),
+        cloud_noise2(p * 0.7 + vec2<f32>(5.2, 47.1))) - 0.5;
+    p += pull * CLOUD_PULL;
     let turn = mat2x2<f32>(0.8, 0.6, -0.6, 0.8);
     var sum = 0.0;
     var amplitude = 0.5;
-    for (var octave = 0; octave < 4; octave++) {
-        sum += amplitude * cloud_noise2(p);
-        p = turn * p * 2.03 + vec2<f32>(17.1, 3.7);
+    for (var octave = 0; octave < 5; octave++) {
+        var noise = cloud_noise2(p);
+        if octave >= 2 {
+            // Ridges: the strands and tufts along a cloud's edge.
+            noise = 1.0 - abs(2.0 * noise - 1.0);
+        }
+        sum += amplitude * noise;
+        p = turn * p * 2.13 + vec2<f32>(17.1, 3.7);
         amplitude *= 0.5;
     }
-    // The noise mostly lies between 0.2 and 0.8: no cover cuts above all
-    // of it, full cover below.
-    let cut = 0.85 - 0.75 * clouds.shape.x;
-    return clamp((sum / 0.9375 - cut) / 0.25, 0.0, 1.0);
+    // The noise mostly lies between 0.25 and 0.8: no cover cuts above all
+    // of it, full cover below (and then the thin places are thin cloud,
+    // not holes).
+    let cut = 0.86 - 0.95 * clouds.shape.x;
+    return (sum / 0.96875 - cut) / CLOUD_EDGE;
+}
+
+// How thick the cloud `fill` makes is, from 0 (clear sky) to 1 (filling
+// the layer): mostly veil, thickening late.
+fn cloud_thick(fill: f32) -> f32 {
+    let thick = clamp(fill, 0.0, 1.0);
+    return thick * thick * (1.5 - 0.5 * thick);
+}
+
+// How thick the cloud is above the level point `xz`, from 0 to 1.
+fn cloud_cover(clouds: Clouds, xz: vec2<f32>) -> f32 {
+    return cloud_thick(cloud_fill(clouds, xz));
+}
+
+// How much of the light scattered about inside it a cloud's underside
+// shows where it's `fill` full: all of it up to a full layer, and down to
+// 1 - CLOUD_BELLY where the cloud is heaviest. Without it an overcast is
+// one flat grey from horizon to horizon: every part of it is too deep to
+// see through, so nothing else tells its heavy parts from its thin ones.
+const CLOUD_BELLY: f32 = 0.5;
+fn cloud_belly(fill: f32) -> f32 {
+    return 1.0 - CLOUD_BELLY * smoothstep(1.0, 1.75, fill);
+}
+
+// Where in the layer (x: the middle, y: half the depth, as shares of the
+// layer) a cloud `cover` thick is: a thin one is a veil a third of the way
+// up, and it grows both ways until it fills the layer.
+fn cloud_span(cover: f32) -> vec2<f32> {
+    return vec2<f32>(0.3 + 0.2 * cover, 0.5 * cover);
 }
 
 // How much light the cloud takes away per stud at `p`.
 fn cloud_density(clouds: Clouds, p: vec3<f32>) -> f32 {
+    return cloud_density_filled(clouds, p).x;
+}
+
+// `cloud_density` (x) and the `cloud_fill` it was made from (y).
+fn cloud_density_filled(clouds: Clouds, p: vec3<f32>) -> vec2<f32> {
     let h = (p.y - clouds.shape.z) / (clouds.shape.w - clouds.shape.z);
     if h <= 0.0 || h >= 1.0 {
-        return 0.0;
+        return vec2<f32>(0.0);
     }
-    let cover = cloud_cover(clouds, p.xz);
+    let fill = cloud_fill(clouds, p.xz);
+    let cover = cloud_thick(fill);
     if cover <= 0.0 {
-        return 0.0;
+        return vec2<f32>(0.0);
     }
-    // Up to `cover` of the layer, rounded over the top and softened at the
-    // bottom.
-    var density = clamp((cover - h) * 4.0, 0.0, 1.0) * clamp(h * 12.0, 0.0, 1.0);
+    // Thickest through its middle, thinning to nothing above and below.
+    let span = cloud_span(cover);
+    var density = clamp((span.y - abs(h - span.x)) / (0.5 * span.y + 0.04), 0.0, 1.0);
     if clouds.quality.z > 0.5 && density > 0.0 {
-        let detail = cloud_noise3((p - vec3<f32>(clouds.offset.x, 0.0, clouds.offset.y)) / CLOUD_DETAIL_SCALE);
-        density = clamp(density * 1.4 - 0.5 * detail, 0.0, 1.0);
+        // Fine detail, drawn out the same way, eats the thin parts away to
+        // wisps and leaves the thick middle whole.
+        let q = (p - vec3<f32>(clouds.offset.x, 0.0, clouds.offset.y)) / CLOUD_DETAIL_SCALE;
+        let drawn = vec3<f32>(0.8 * q.x + 0.6 * q.z, q.y * 1.6, (0.8 * q.z - 0.6 * q.x) * CLOUD_STRETCH);
+        let detail = 0.65 * cloud_noise3(drawn) + 0.35 * cloud_noise3(drawn * 2.7 + 13.1);
+        density = clamp(density * 1.7 - detail * (1.45 - 0.75 * density), 0.0, 1.0);
     }
-    return density * clouds.shape.y;
+    return vec2<f32>(density * clouds.shape.y, fill);
 }
 
 // How much of the sun's light gets through `depth` of cloud (optical
@@ -124,6 +187,22 @@ fn cloud_density(clouds: Clouds, p: vec3<f32>) -> f32 {
 // path suggests, so a share fades much more slowly.
 fn cloud_light_through(depth: f32) -> f32 {
     return 0.7 * exp(-depth) + 0.3 * exp(-0.25 * depth);
+}
+
+// The sun's light that reaches a point deep in cloud by scattering many
+// times on the way, coming from every side: what makes the underside of an
+// overcast sky grey and not black, brighter where the cloud is thinner.
+// `direct` is `cloud_light_through` of the cloud between the point and the
+// sun, from which the depth is read back (its slow share, which is all
+// that's left of it by then); a cloud that lets through one part in
+// 1 + 0.075 × its depth is the two-stream answer for cloud droplets.
+const CLOUD_GLOW: f32 = 0.11;
+fn cloud_glow(direct: f32, toward_sun: vec3<f32>) -> f32 {
+    let depth = max(-4.0 * log(max(direct, 1e-6) / 0.3), 0.0);
+    // A sun near the horizon has too far to go through the layer for any
+    // of it to come out underneath: an overcast at sunset is grey, not lit
+    // orange from inside.
+    return CLOUD_GLOW * smoothstep(0.03, 0.4, toward_sun.y) / (1.0 + 0.075 * depth);
 }
 
 // How much of the sun's light the clouds scatter toward a viewer looking
@@ -160,7 +239,8 @@ fn cloud_sunlight(clouds: Clouds, p: vec3<f32>, toward_sun: vec3<f32>, steps: u3
     let up = max(toward_sun.y, 0.25);
     if steps == 0u {
         let h = (p.y - clouds.shape.z) / thickness;
-        let above = max(cloud_cover(clouds, p.xz) - h, 0.0) * thickness;
+        let span = cloud_span(cloud_cover(clouds, p.xz));
+        let above = clamp(span.x + span.y - h, 0.0, 2.0 * span.y) * thickness;
         return cloud_light_through(clouds.shape.y * above / up);
     }
     // To the top of the layer along the sun's way, but no further than
@@ -172,6 +252,16 @@ fn cloud_sunlight(clouds: Clouds, p: vec3<f32>, toward_sun: vec3<f32>, steps: u3
         depth += cloud_density(clouds, p + toward_sun * (f32(i) + 0.5) * step) * step;
     }
     return cloud_light_through(depth);
+}
+
+// The sky's own light on cloud a share `h` of the way up the layer: more
+// from overhead the higher up it is. The horizon's colour reaches the
+// underside only weakly and greyed (it comes a long way through the cloud
+// below), or a storm at sunset is lit orange-brown from underneath by a
+// glow it hides.
+fn cloud_skylight(sky_above: vec3<f32>, sky_around: vec3<f32>, h: f32) -> vec3<f32> {
+    let around = mix(vec3<f32>(dot(sky_around, vec3<f32>(0.2126, 0.7152, 0.0722))), sky_around, 0.35);
+    return mix(around, sky_above, 0.45 + 0.55 * h) * (0.5 + 0.5 * h);
 }
 
 // What's seen looking along `dir` (normalized) from `eye` through the
@@ -208,11 +298,13 @@ fn clouded_sky(
             return sky;
         }
         let p = eye + dir * t;
-        let cover = cloud_cover(clouds, p.xz);
+        let fill = cloud_fill(clouds, p.xz);
+        let cover = cloud_thick(fill);
         let fade = 1.0 - smoothstep(0.25 * CLOUD_FAR, CLOUD_FAR, t);
         let alpha = (1.0 - exp(-clouds.shape.y * cover * thickness * 0.5)) * cover * fade;
         let through_sun = cloud_light_through(clouds.shape.y * cover * cover * thickness / max(toward_sun.y, 0.25));
-        let light = color * (sun * phase * through_sun + mix(sky_around, sky_above, 0.5) * 0.75);
+        let light = color * (sun * phase * through_sun
+            + mix(sky_around, sky_above, 0.5) * 0.75 * cloud_belly(fill));
         return mix(sky, light, alpha);
     }
 
@@ -240,13 +332,15 @@ fn clouded_sky(
     var light = vec3<f32>(0.0);
     for (var i = 0u; i < steps; i++) {
         let p = eye + dir * (near + (f32(i) + jitter) * step);
-        let density = cloud_density(clouds, p);
+        let filled = cloud_density_filled(clouds, p);
+        let density = filled.x;
         if density <= 0.0 {
             continue;
         }
         let h = (p.y - bottom) / thickness;
-        let lit = sun * phase * cloud_sunlight(clouds, p, toward_sun, light_steps)
-            + mix(sky_around, sky_above, h) * (0.5 + 0.5 * h);
+        let direct = cloud_sunlight(clouds, p, toward_sun, light_steps);
+        let lit = sun * phase * direct + (sun * cloud_glow(direct, toward_sun)
+            + cloud_skylight(sky_above, sky_around, h)) * cloud_belly(filled.y);
         // Each step's own light, dimmed by the cloud in front of it
         // (integrated exactly over the step, so it conserves energy).
         let step_through = exp(-density * step);

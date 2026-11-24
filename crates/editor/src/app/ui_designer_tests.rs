@@ -191,7 +191,7 @@ pub(super) fn build_menu(app: &mut EditorApp) -> Menu {
 
 #[test]
 fn a_menu_built_and_styled_in_the_designer_alone_looks_the_same_in_play() {
-    let folder = copy_of_example("hello-touched", "ui-designer-menu");
+    let folder = copy_of_example("touched", "ui-designer-menu");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
 
@@ -276,7 +276,7 @@ fn a_menu_built_and_styled_in_the_designer_alone_looks_the_same_in_play() {
 
 #[test]
 fn every_designer_edit_undoes_and_redoes() {
-    let folder = copy_of_example("hello-touched", "ui-designer-undo");
+    let folder = copy_of_example("touched", "ui-designer-undo");
     let mut app = EditorApp::new(Some(&folder));
     assert!(
         app.stylesheet_text("ui.css").is_none(),
@@ -430,7 +430,7 @@ fn draw_designer(
 #[test]
 fn the_designer_fits_any_shape_and_its_artboard_drags_an_element() {
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let folder = copy_of_example("hello-touched", "ui-designer-draw");
+    let folder = copy_of_example("touched", "ui-designer-draw");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(&mut app, DesignerAction::Select(Some(menu.play)));
@@ -594,7 +594,7 @@ pub(super) fn on_artboard(app: &EditorApp, gui: InstanceId, id: InstanceId) -> e
 
 #[test]
 fn anchored_elements_keep_their_place_on_every_screen() {
-    let folder = copy_of_example("hello-touched", "ui-designer-anchors");
+    let folder = copy_of_example("touched", "ui-designer-anchors");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -666,7 +666,7 @@ fn anchored_elements_keep_their_place_on_every_screen() {
 
 #[test]
 fn fonts_are_picked_from_the_built_in_set_and_the_project() {
-    let folder = copy_of_example("hello-touched", "ui-designer-fonts");
+    let folder = copy_of_example("touched", "ui-designer-fonts");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -744,7 +744,7 @@ fn fonts_are_picked_from_the_built_in_set_and_the_project() {
 
 #[test]
 fn double_clicking_text_on_the_artboard_types_over_it() {
-    let folder = copy_of_example("hello-touched", "ui-designer-typing");
+    let folder = copy_of_example("touched", "ui-designer-typing");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let ctx = theme::test_context();
@@ -811,7 +811,7 @@ fn double_clicking_text_on_the_artboard_types_over_it() {
 
 #[test]
 fn dragging_in_the_box_being_typed_in_selects_text_not_the_element() {
-    let folder = copy_of_example("hello-touched", "ui-designer-typing-drag");
+    let folder = copy_of_example("touched", "ui-designer-typing-drag");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let ctx = theme::test_context();
@@ -857,7 +857,7 @@ fn dragging_in_the_box_being_typed_in_selects_text_not_the_element() {
 
 #[test]
 fn a_guide_dragged_out_of_a_ruler_stays_until_dragged_back() {
-    let folder = copy_of_example("hello-touched", "ui-designer-guides");
+    let folder = copy_of_example("touched", "ui-designer-guides");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let ctx = theme::test_context();
@@ -904,7 +904,7 @@ fn a_guide_dragged_out_of_a_ruler_stays_until_dragged_back() {
 #[test]
 fn the_artboard_previews_the_ui_on_another_screen() {
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let folder = copy_of_example("hello-touched", "ui-designer-preview");
+    let folder = copy_of_example("touched", "ui-designer-preview");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let sheets = stylesheets(&app);
@@ -1026,7 +1026,7 @@ fn near(a: f32, b: f32) -> bool {
 
 #[test]
 fn dragging_the_anchor_to_the_bottom_right_corner_pins_an_element_there() {
-    let folder = copy_of_example("hello-touched", "ui-designer-anchor-corner");
+    let folder = copy_of_example("touched", "ui-designer-anchor-corner");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(&mut app, DesignerAction::Select(Some(menu.frame)));
@@ -1097,7 +1097,7 @@ fn dragging_the_anchor_to_the_bottom_right_corner_pins_an_element_there() {
 
 #[test]
 fn dragging_the_horizontal_diamonds_to_both_edges_stretches_an_element_across() {
-    let folder = copy_of_example("hello-touched", "ui-designer-anchor-stretch");
+    let folder = copy_of_example("touched", "ui-designer-anchor-stretch");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(&mut app, DesignerAction::Select(Some(menu.title)));
@@ -1251,7 +1251,7 @@ pub(super) fn click_named(
 
 #[test]
 fn reset_anchors_an_element_at_the_top_left_without_moving_it() {
-    let folder = copy_of_example("hello-touched", "ui-designer-anchor-reset");
+    let folder = copy_of_example("touched", "ui-designer-anchor-reset");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let ctx = theme::test_context();

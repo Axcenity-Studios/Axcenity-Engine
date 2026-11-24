@@ -25,7 +25,7 @@ tags: [guide, recipe, rendering]
 3. **Render**: add the pass in its place in `ScenePipeline::draw`; create its targets in `FrameTargets` only while the setting uses them; time it as a `FramePass` if it's a pass of its own (tell `stats_time_each_pass_the_frame_draws` which passes a plain frame skips).
 4. **Settings**: a quality enum or switch in `GraphicsSettings` with a value per preset; a `Capabilities` check and a lowering note in `effective` if some GPUs can't do it; expose it in `UserGameSettings` if games should change it.
 5. **Shader**: keep `InstanceRaw`, `FrameUniform`, `MapsUniform` and layouts aligned with `shader.wgsl`. The item shader already uses all 16 sampled textures and 16 vertex attributes: share or replace a binding; pack a new per-item value into an existing attribute.
-6. **Tests**: image tests under `render/src/renderer/tests/`; `hello-graphics` must stay within its references at every preset (update references only for deliberate look changes, after checking by eye); a resource test that targets are freed when off.
+6. **Tests**: image tests under `render/src/renderer/tests/`; `graphics` must stay within its references at every preset (update references only for deliberate look changes, after checking by eye); a resource test that targets are freed when off.
 7. **Docs**: a topic file under `docs/rendering/` and a row in `docs/rendering.md`; the wiki page if the frame's structure changed.
 
 ## Pitfalls

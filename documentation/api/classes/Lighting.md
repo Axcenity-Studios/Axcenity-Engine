@@ -174,3 +174,29 @@ Lighting.GeographicLatitude: number
 
 How far north of the equator the world is, in degrees (negative is south). The noon sun stands this far from straight up, toward +Z north of the equator.
 
+### Functions
+
+#### TransitionToPreset
+
+```luau
+Lighting:TransitionToPreset(name: string, seconds: number?, clock: string?): ()
+```
+
+Eases the sky and the weather from how they are now to the environment preset `name` over `seconds` (0 if left out: at once, before the call returns), slowly at both ends. A preset is a built-in ("Clear", "Evening", "Overcast", "Storm", "SnowDay" or "SnowNight") or one of the project's own, `assets/environments/<name>.environment.json`, saved from the editor's Properties panel. It sets what the preset holds of Lighting (ClockTime, Exposure), its Atmosphere, Clouds, Weather and ColorCorrectionEffect, and the Workspace's GlobalWind, and leaves everything else alone; values for something Lighting hasn't got (no Clouds, say) are skipped with a warning. Numbers, colors and the wind go straight there; rain turning to snow stops falling half way and starts again as snow. `clock` says which way ClockTime turns: "Shortest" (the default; 22 to 2 goes through midnight), "Forward" (as time passes) or "Backward". One transition runs at a time: calling it again takes over from where the world is at that moment, and StopPresetTransition leaves it there. A playing Sequence's keys win over it. The Weather still eases toward its own properties by its TransitionTime, so set that to 0 for rain and snow to follow the transition exactly. Call it from a Script for every player to see it. An unknown preset is an error.
+
+```lua
+local Lighting = game:GetService("Lighting")
+-- A storm rolls in over half a minute, then clears.
+Lighting:TransitionToPreset("Storm", 30)
+task.wait(90)
+Lighting:TransitionToPreset("Clear", 60)
+```
+
+#### StopPresetTransition
+
+```luau
+Lighting:StopPresetTransition(): ()
+```
+
+Stops the transition TransitionToPreset started, leaving the sky and the weather where they've got to. Does nothing when none is under way.
+

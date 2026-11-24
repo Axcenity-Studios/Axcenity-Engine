@@ -44,7 +44,7 @@ How hard the rain or snow falls, from 0 to 1 (0.5 by default): more drops, and w
 Weather.Wetness: number
 ```
 
-How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier. Rain wets them at least as much as its Intensity.
+How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier, with puddles on level ground from 0.35. Rain wets them at least as much as its Intensity, and while it falls its drops ring the puddles and splash on solid surfaces.
 
 #### SnowCover
 
@@ -52,7 +52,7 @@ How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked
 Weather.SnowCover: number
 ```
 
-How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: more cover whitens flat tops fully and reaches further down slopes. Walls stay bare. Falling snow covers them at least as much as its Intensity.
+How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: light cover lies in patches, more whitens flat tops fully and reaches further down slopes. Walls stay bare; plants are capped with it. Falling snow covers them at least as much as its Intensity.
 
 #### SnowThickness
 
@@ -60,7 +60,15 @@ How much snow lies on surfaces facing up whatever is falling, from 0 (none, the 
 Weather.SnowThickness: number
 ```
 
-Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.
+How deep the snow lies, in studs, from 0 to 2 (0.35 by default): snow on terrain rises that far (in drifts a little deeper and shallower), burying the foot of whatever stands on the ground, and footprints press that deep into it.
+
+#### Lightning
+
+```luau
+Weather.Lightning: number
+```
+
+How often lightning flashes, from 0 (never, the default) to 1: the chance of a flash every 2.6 seconds. A flash is two or three strokes within half a second from somewhere in the clouds; it lights what's open to the sky (a tenth as much under a roof or in an interior) and glows inside the cloud round it. It needs no rain, but only shows in the sky where there are Clouds.
 
 #### TransitionTime
 

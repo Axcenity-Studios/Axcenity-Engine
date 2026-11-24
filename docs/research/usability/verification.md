@@ -386,7 +386,7 @@ Paul's brief of 2026-11-11, section 8 (universal search and indexed discovery) a
 | Assets panel (§8C) | Its search matches every word against the asset's path and kind ("sound door", "texture") | `asset_browser.rs` |
 | Index (§8D–E) | Providers with stamps; listed again only when their data changes; ranking cached per query and index generation; a new system registers a `SearchProvider` | `app/search.rs`, `asset_browser.rs` (`generation`) |
 
-**Timings** (`search_cost_at_100_1000_and_10000_objects`, release, cloud container, 4 cores; a Folder of Parts named "Crate N" in hello-touched):
+**Timings** (`search_cost_at_100_1000_and_10000_objects`, release, cloud container, 4 cores; a Folder of Parts named "Crate N" in the `touched` sample):
 
 | Objects | List everything | Check, nothing changed (each frame while open) | Rank "crate 99" (each keystroke) | Ranked again, same query |
 |---|---|---|---|---|

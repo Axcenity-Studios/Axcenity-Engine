@@ -1,7 +1,7 @@
 ---
 description: Light a world with the sun, sky, lights, shadows, fog, clouds, weather and post effects, and choose graphics quality.
 icon: sun
-samples: [hello-lights, hello-graphics, hello-grading, hello-lens]
+samples: [lights, graphics, grading, lens]
 ---
 
 # Lighting and rendering
@@ -16,6 +16,26 @@ Select **Lighting** in the Explorer:
 - Shadows have a softness setting, and the sky can be a colour gradient or an image (an HDR `.exr` or `.hdr` panorama looks best). A sky image keeps its own colours as ClockTime changes (it only darkens toward night); **Follow time of day** under the SkyImage row switches to a sky that changes with the sun.
 - **Atmosphere** (World tab, Lights & Sky) replaces the gradient with a physically based sky that changes colour with the sun, with Density, Offset, Glare and Haze.
 - **Clouds**, **Weather** (rain or snow, with wetness and snow cover) and **Fog** add to it. Lighting's Fog section sets a simple distance fog; volumetric fog with sun shafts is a graphics setting.
+- A **Weather Volume** (World tab, Effects, Post FX) is an invisible box that says where the weather goes. Fit one to a room, a porch or the space under an overhang: no rain or snow falls inside it, and what's in it stays dry and bare. Turn on **Precipitation** to let rain and snow in under a roof (an open-sided shed), and set **Snow** and **Wetness** from 0 (none) to 1 (as outside), or up to 2 for a deeper drift or wetter ground. Where volumes overlap, the higher **Priority** wins.
+
+### Environment presets
+
+An **environment preset** sets the time of day, the air, the clouds, the weather and the wind together. With **Lighting** or nothing selected, the Properties panel has an **Environment presets** section:
+
+- Press **Clear**, **Evening**, **Overcast**, **Storm**, **SnowDay** or **SnowNight** to put the world there. It's one undo step. Clouds and a Weather are added to Lighting if the preset needs them and there are none; add an **Atmosphere** yourself for a preset's haze to show.
+- Type a name and press **Save current as** to keep the world's look as a preset of your own (also one undo step). It appears beside the built-in ones.
+
+A preset changes only what it holds. One saved in a world with no Clouds leaves clouds alone wherever it's used.
+
+In a cutscene, the Sequencer's **Environment** track blends from one preset to the next ([Animation](animation.md#the-environment-track-the-weather-and-the-time-of-day-in-one-key)). In a game, a script changes the weather while it runs:
+
+```lua
+local Lighting = game:GetService("Lighting")
+-- A storm rolls in over half a minute.
+Lighting:TransitionToPreset("Storm", 30)
+```
+
+The second number is how many seconds it takes. Calling it again part way takes over from where the sky has got to, so nothing jumps. Add `"Forward"` as a third value for the clock to turn the way time passes instead of the short way.
 
 ## Lights
 

@@ -22,9 +22,9 @@ The result of the Phase 1 repository audit (2026-11-10, `main` at `f47d5f0`), br
 |---|---|
 | Rust | 33 crates under `crates/` (28 at the first audit), about 466k lines including tests at the first audit |
 | WGSL | 24 shader files in `crates/render`, about 5.1k lines |
-| Luau | about 108 `.lua` files (examples, templates, the test runner's `runner.lua`) |
+| Luau | about 108 `.lua` files (samples, templates, the test runner's `runner.lua`) |
 | Tests | about 3,150 `#[test]` functions (editor 956, script 393, render 277, project 162, player 158, scene 157) |
-| Examples | 67 example projects under `examples/` (55 `hello-*` scenes are rendered by `every_example_renders`) |
+| Samples | 71 sample projects under `crates/samples/projects/`, the engine's own (the `samples` crate; most are rendered by `every_example_renders`) |
 | Templates | 6 genre templates under `templates/` |
 | Toolchain | Rust 1.97.0 pinned in `rust-toolchain.toml`, edition 2024, resolver 3 |
 | Platforms | Windows and Linux primary, macOS secondary, mobile and web deferred |
@@ -36,7 +36,7 @@ The result of the Phase 1 repository audit (2026-11-10, `main` at `f47d5f0`), br
 | Language | Where | Responsibility |
 |---|---|---|
 | Rust | `crates/*` | The whole engine, editor, player, server and tools. `unsafe_code = "deny"` everywhere except `script/src/debugger.rs` |
-| Luau | creator scripts, `crates/testing/src/runner.lua`, examples, templates, editor plugins | Gameplay. One runtime (`mlua` 0.12 with `luau0-src` pinned `=0.22.0`). Replaced Lua 5.4 after v1.5 ([ADR-0004](Architecture-Decisions/ADR-0004-Luau-As-The-Only-Script-Runtime.md)) |
+| Luau | creator scripts, `crates/testing/src/runner.lua`, samples, templates, editor plugins | Gameplay. One runtime (`mlua` 0.12 with `luau0-src` pinned `=0.22.0`). Replaced Lua 5.4 after v1.5 ([ADR-0004](Architecture-Decisions/ADR-0004-Luau-As-The-Only-Script-Runtime.md)) |
 | WGSL | `crates/render/src/**/*.wgsl` | Every GPU shader. Material files can carry a `surface` function in WGSL, checked by `naga` |
 | JSON | project files (`axcenity.json`, `world.json`, `*.anim.json`, `*.material.json`, …) | Saved data. Deterministic, diff-friendly ([File formats](../Reference/File-Formats.md)) |
 | CSS | `ui/*.css` in projects | Game UI styling, parsed by `crates/ui/src/style.rs` and laid out with `taffy` |

@@ -1,5 +1,5 @@
 //! `workspace.CurrentCamera` in the player (unified Phase 31), with the
-//! `hello-camera` example: a Scriptable flyover tweened along a CFrame
+//! `camera` example: a Scriptable flyover tweened along a CFrame
 //! path, the part under the mouse, and a tag kept over a part with
 //! `WorldToScreenPoint`. The editor's Play runs the same example in
 //! `editor/src/app/camera_tests.rs` and checks the same numbers.
@@ -112,7 +112,7 @@ impl App {
 
 #[test]
 fn a_scriptable_flyover_follows_its_cframe_path_and_custom_gives_the_character_the_camera_back() {
-    let (mut app, folder) = open("hello-camera", None);
+    let (mut app, folder) = open("camera", None);
     let size = (960, 540);
     // The first leg: a second of Linear tween, a 60th of the way per frame.
     for frame in 1..=60 {
@@ -166,7 +166,7 @@ fn a_scriptable_flyover_follows_its_cframe_path_and_custom_gives_the_character_t
 
 #[test]
 fn part_under_the_mouse_is_the_part_the_cursor_is_over_at_any_window_size() {
-    let (mut app, folder) = open("hello-camera", None);
+    let (mut app, folder) = open("camera", None);
     app.fly_over((960, 540));
     for size in [(960, 540), (1920, 1080), (640, 900), (300, 200)] {
         app.camera_frame(size);
@@ -192,7 +192,7 @@ fn part_under_the_mouse_is_the_part_the_cursor_is_over_at_any_window_size() {
 
 #[test]
 fn world_to_screen_point_keeps_the_tag_over_the_beacon_as_the_camera_moves() {
-    let (mut app, folder) = open("hello-camera", None);
+    let (mut app, folder) = open("camera", None);
     let stylesheets = app.stylesheets.clone();
     let tag = app
         .sim
@@ -235,14 +235,14 @@ fn world_to_screen_point_keeps_the_tag_over_the_beacon_as_the_camera_moves() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// unified Phase 32 with the `hello-messages` example: functions bound with
+/// unified Phase 32 with the `messages` example: functions bound with
 /// `BindToRenderStep` run in priority order every frame before it's drawn
 /// (the drawn camera is this frame's orbit), Debris clears each spark two
 /// seconds after it appears, and the LocalScript's `InvokeServer` gets the
 /// server's score.
 #[test]
 fn render_step_functions_place_the_drawn_camera_in_priority_order_and_debris_clears_sparks() {
-    let (mut app, folder) = open("hello-messages", None);
+    let (mut app, folder) = open("messages", None);
     let size = (960, 540);
     let sparks = |app: &App| {
         app.sim

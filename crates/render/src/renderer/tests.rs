@@ -131,6 +131,7 @@ fn list_of(items: Vec<DrawItem>) -> DrawList {
         clouds: crate::Clouds::default(),
         weather: crate::Weather::default(),
         weather_field: None,
+        weather_boxes: Vec::new(),
         camera: Camera {
             position: Vec3::ZERO,
             look_at: Vec3::NEG_Z,
@@ -784,6 +785,7 @@ fn red_sprite(z: f32, light_emission: f32) -> crate::Sprite {
         opacity: 1.0,
         brightness: 1.0,
         light_emission,
+        light_influence: 0.0,
         texture: None,
         frame: None,
     }
@@ -814,6 +816,106 @@ fn sprites_show_in_front_and_hide_behind_solid_items() {
         middle_pixel(&device, &queue, &plain)
     };
     assert_eq!(middle_pixel(&device, &queue, &list), block_only);
+}
+
+#[test]
+fn a_sprite_with_light_influence_goes_dark_with_the_scene_and_one_without_keeps_its_color() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut list = list_of(Vec::new());
+    let sprite = |light_influence: f32, light_emission: f32| crate::Sprite {
+        color: [0.6, 0.6, 0.6],
+        light_influence,
+        ..red_sprite(-3.0, light_emission)
+    };
+    // By day: the sun, the sky and the ambient light.
+    list.sprites = vec![sprite(1.0, 0.0)];
+    let day = middle_pixel(&device, &queue, &list);
+    list.sprites = vec![sprite(0.0, 0.0)];
+    let own = middle_pixel(&device, &queue, &list);
+    assert!(own[0] > 120, "{own:?}");
+
+    // By night: no sun, no ambient light and a black sky.
+    list.sun.intensity = 0.0;
+    list.ambient.intensity = 0.0;
+    list.sky.environment_intensity = 0.0;
+    assert_eq!(
+        middle_pixel(&device, &queue, &list),
+        own,
+        "without influence it keeps its color"
+    );
+    list.sprites = vec![sprite(1.0, 0.0)];
+    let night = middle_pixel(&device, &queue, &list);
+    let behind = {
+        let mut empty = list.clone();
+        empty.sprites.clear();
+        middle_pixel(&device, &queue, &empty)
+    };
+    assert!(day[0] > night[0] + 60, "day {day:?}, night {night:?}");
+    assert!(night[0] < 12, "an unlit sprite is black: {night:?}");
+    // It still covers what's behind it: a dark cloud, not a clear one.
+    list.items = vec![big_block()];
+    list.sprites = vec![sprite(1.0, 0.0)];
+    let over_block = middle_pixel(&device, &queue, &list);
+    assert!(
+        over_block[0] < 12,
+        "{over_block:?} (sky behind was {behind:?})"
+    );
+
+    // Half way, it's half its own color; and the packing keeps the two
+    // values apart: an additive sprite with full influence adds nothing
+    // at night, and one without adds its light.
+    list.items.clear();
+    list.sprites = vec![sprite(0.5, 0.0)];
+    let half = middle_pixel(&device, &queue, &list);
+    assert!(
+        half[0] > night[0] + 30 && half[0] + 20 < own[0],
+        "{half:?} of {own:?}"
+    );
+    list.sprites = vec![sprite(1.0, 1.0)];
+    let lit_fire = middle_pixel(&device, &queue, &list);
+    list.sprites = vec![sprite(0.0, 1.0)];
+    let fire = middle_pixel(&device, &queue, &list);
+    assert!(fire[0] > lit_fire[0] + 60, "{fire:?} against {lit_fire:?}");
+}
+
+#[test]
+fn the_light_sprites_take_follows_the_sun_the_clouds_and_the_sky() {
+    use super::sprites::{packed_light, scene_light};
+    let mut list = list_of(Vec::new());
+    list.sun.direction = Vec3::Y;
+    list.sun.intensity = 3.0;
+    list.sun.color = [1.0; 3];
+    list.ambient.intensity = 0.0;
+    let noon = scene_light(&list, Vec3::ZERO);
+    assert!((noon.x - 3.0 / std::f32::consts::PI).abs() < 1e-4, "{noon}");
+    // A sun on the horizon still lights a cloud of dust from the side.
+    list.sun.direction = Vec3::X;
+    let low = scene_light(&list, Vec3::ZERO);
+    assert!((low.x - 0.3 * noon.x).abs() < 1e-4, "{low}");
+    // Well under it, nothing but the sky and the ambient light.
+    list.sun.direction = Vec3::new(0.6, -0.8, 0.0);
+    assert_eq!(scene_light(&list, Vec3::ZERO), Vec3::ZERO);
+    list.sky.environment_intensity = 1.0;
+    assert_eq!(scene_light(&list, Vec3::splat(0.2)), Vec3::splat(0.2));
+    list.sky.environment_intensity = 0.5;
+    assert_eq!(scene_light(&list, Vec3::splat(0.2)), Vec3::splat(0.1));
+    // A broken number never reaches the shader.
+    list.sun.direction = Vec3::Y;
+    list.sun.intensity = f32::NAN;
+    assert!(scene_light(&list, Vec3::ZERO).is_finite());
+    list.sun.intensity = f32::INFINITY;
+    assert_eq!(scene_light(&list, Vec3::ZERO), Vec3::ONE);
+
+    // Both values come back out of the one number as sprite.wgsl reads it.
+    for (emission, influence) in [(0.0, 0.0), (1.0, 1.0), (0.4, 0.5), (1.0, 0.0), (0.0, 1.0)] {
+        let packed = packed_light(emission, influence);
+        let steps = (packed * 0.5).floor();
+        assert!((packed - 2.0 * steps - emission).abs() < 1e-5, "{packed}");
+        assert!((steps / 127.0 - influence).abs() < 0.005, "{packed}");
+    }
 }
 
 #[test]

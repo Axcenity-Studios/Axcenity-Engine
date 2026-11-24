@@ -93,7 +93,7 @@ fn node_of(graph: &NodeGraph, kind: &str) -> u32 {
 
 #[test]
 fn a_tree_built_in_the_tab_saves_and_its_agent_chases_the_player_it_sees_in_play() {
-    let folder = copy_of_example("hello-perception", "behavior-build");
+    let folder = copy_of_example("perception", "behavior-build");
     let mut app = EditorApp::new(Some(&folder));
     let guard = app
         .world
@@ -236,7 +236,7 @@ fn a_tree_built_in_the_tab_saves_and_its_agent_chases_the_player_it_sees_in_play
 
 #[test]
 fn hello_behavior_patrols_by_its_tree_and_the_courier_walks_where_its_script_sends_it() {
-    let folder = copy_of_example("hello-behavior", "behavior-example");
+    let folder = copy_of_example("behavior", "behavior-example");
     let mut app = EditorApp::new(Some(&folder));
     let find = |app: &EditorApp, model: &str| {
         let model = app
@@ -292,7 +292,7 @@ fn hello_behavior_patrols_by_its_tree_and_the_courier_walks_where_its_script_sen
 
 #[test]
 fn a_state_machine_still_opens_as_animation_and_as_an_agents_tree_runs_no_ai() {
-    let folder = copy_of_example("hello-character", "behavior-state-machine");
+    let folder = copy_of_example("character", "behavior-state-machine");
     let mut app = EditorApp::new(Some(&folder));
     let machine = "assets/animations/Walking/Walking.statemachine.json";
     let animator = app

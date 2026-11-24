@@ -65,7 +65,7 @@ fn a_posed_character_looks_the_same_skinned_on_the_gpu_as_on_the_cpu() {
     let Some((device, queue)) = gpu() else {
         return;
     };
-    let (mut world, _scripts, folder) = start_example_in("hello-animation");
+    let (mut world, _scripts, folder) = start_example_in("animation");
     let noodle = world.find_first_child(world.workspace(), "Noodle").unwrap();
     let assets = Assets::new(&folder);
     let mut animators = Animators::new();

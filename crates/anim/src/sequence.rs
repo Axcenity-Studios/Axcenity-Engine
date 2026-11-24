@@ -10,9 +10,15 @@
 //!   per bound Instance and property, with the same easings and curves.
 //!   Tracks whose target is [`CAMERA_TARGET`] are the sequence's own
 //!   camera keys (`Position`, `Orientation`, `FieldOfView`).
+//! - **The Environment track** (`environment`): keys that name environment
+//!   presets (`environment.rs`: the sky and the weather under one name) at
+//!   times; between two keys the world's look is their blend. A property
+//!   track on the same property wins over it.
 //! - **Camera cuts**: from each cut's time to the next, the view is a bound
 //!   Camera's (its `Position`, `Orientation` and `FieldOfView`), or with no
-//!   camera, the sequence's own camera keys.
+//!   camera, the sequence's own camera keys. A cut can take over with a
+//!   [`Transition`]: a dissolve from the shot before it, or a fade through
+//!   a color.
 //! - **Animation sections**: a clip played on a bound Animator (or the
 //!   Animator inside the bound Instance), blending in and out.
 //! - **Audio sections**: a bound Sound plays from its start for the section.
@@ -33,6 +39,7 @@ use axcenity_core::spline::SplineCurve;
 use axcenity_core::{ClassName, Color3, InstanceId, UDim2, Value, Vector3, World};
 use serde::{Deserialize, Serialize};
 
+use crate::environment::{EnvironmentKey, EnvironmentTrack, apply_preset, is_preset_name};
 use crate::files::{ClipEvent, ClipFile, FileError, PropertyName, PropertyTrack};
 use crate::property_clip::{
     Applied as PropertyApplied, EvaluatedProperty, PropertyClip, apply_evaluated, resolve_target,
@@ -65,6 +72,11 @@ pub struct SequenceFile {
     /// Property tracks, and the camera's own keys.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tracks: Vec<PropertyTrack>,
+    /// The Environment track's keys, in time order. Left out of the file
+    /// when there are none, so files from before it read and write as they
+    /// were.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environment: Vec<EnvironmentKey>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub animations: Vec<AnimationSection>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -90,6 +102,54 @@ pub struct CameraCut {
     pub time: f64,
     #[serde(default)]
     pub camera: String,
+    /// How it takes over from the shot before it. Left out of the file
+    /// for a plain cut, so files from before transitions read and write
+    /// as they were.
+    #[serde(default, skip_serializing_if = "Transition::is_cut")]
+    pub transition: Transition,
+}
+
+/// How a camera cut takes over from the shot before it. A transition is
+/// centred on the cut's time: half of it before, half after, never more
+/// than half way to the cut before or after
+/// ([`SequenceFile::transition_span`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum Transition {
+    /// From one frame to the next.
+    #[default]
+    Cut,
+    /// The shot before fades into this one over `duration` seconds while
+    /// both carry on. It takes two views of the world at once, which only
+    /// a rendered movie draws ([`Applied::dissolve`]); the game and the
+    /// editor's preview cut at the cut's time.
+    Dissolve { duration: f64 },
+    /// The screen fades to `color` over the first half of `duration`
+    /// seconds, the cut happens behind it, and it clears over the second
+    /// half: what a fade out and a fade in around the cut would do. Drawn
+    /// by the overlay, so it's the same in the game, the preview and a
+    /// movie.
+    FadeThrough {
+        duration: f64,
+        #[serde(default = "black")]
+        color: [f32; 3],
+    },
+}
+
+impl Transition {
+    pub fn is_cut(&self) -> bool {
+        matches!(self, Transition::Cut)
+    }
+
+    /// Seconds from its start to its end (0 for a cut).
+    pub fn duration(&self) -> f64 {
+        match self {
+            Transition::Cut => 0.0,
+            Transition::Dissolve { duration } | Transition::FadeThrough { duration, .. } => {
+                *duration
+            }
+        }
+    }
 }
 
 /// `clip` (an `*.anim.json` path) played on the Animator bound by
@@ -190,6 +250,7 @@ impl SequenceFile {
             duration,
             camera_cuts: Vec::new(),
             tracks: Vec::new(),
+            environment: Vec::new(),
             animations: Vec::new(),
             audio: Vec::new(),
             events: Vec::new(),
@@ -227,6 +288,29 @@ impl SequenceFile {
         };
         for cut in &file.camera_cuts {
             inside("camera cut", &cut.id, cut.time, cut.time)?;
+            let length = cut.transition.duration();
+            if !length.is_finite() || length < 0.0 {
+                return Err(FileError(format!(
+                    "camera cut `{}`'s transition lasts {length}s; it must be a number 0 or more",
+                    cut.id
+                )));
+            }
+        }
+        file.environment.sort_by(|a, b| a.time.total_cmp(&b.time));
+        for key in &file.environment {
+            inside("environment key", &key.id, key.time, key.time)?;
+            if !is_preset_name(&key.preset) {
+                return Err(FileError(format!(
+                    "environment key `{}` names the preset `{}`; it needs a preset's name, such as Storm",
+                    key.id, key.preset
+                )));
+            }
+            if key.bezier.is_some_and(|h| !h.iter().all(|n| n.is_finite())) {
+                return Err(FileError(format!(
+                    "environment key `{}` has a non-finite Bezier handle",
+                    key.id
+                )));
+            }
         }
         for s in &file.animations {
             inside("animation", &s.id, s.start, s.end)?;
@@ -344,6 +428,11 @@ impl SequenceFile {
         self.camera_cuts.iter().rfind(|cut| cut.time <= time)
     }
 
+    /// The place in `camera_cuts` of the cut in charge at `time`.
+    pub fn cut_index_at(&self, time: f64) -> Option<usize> {
+        self.camera_cuts.iter().rposition(|cut| cut.time <= time)
+    }
+
     /// When the cut in charge at `time` gives way: the next cut's time, or
     /// the end.
     pub fn cut_end(&self, time: f64) -> f64 {
@@ -353,9 +442,93 @@ impl SequenceFile {
             .map_or(self.duration, |cut| cut.time)
     }
 
+    /// The seconds the transition of the cut at `index` runs over, or
+    /// `None` for a plain cut: half its duration either side of the cut,
+    /// stopping at the sequence's ends and half way to the cut before and
+    /// the cut after, so two transitions never overlap.
+    pub fn transition_span(&self, index: usize) -> Option<(f64, f64)> {
+        let cut = self.camera_cuts.get(index)?;
+        let half = cut.transition.duration() / 2.0;
+        if cut.transition.is_cut() || half.is_nan() || half <= 0.0 {
+            return None;
+        }
+        let before = index
+            .checked_sub(1)
+            .and_then(|i| self.camera_cuts.get(i))
+            .map_or(0.0, |previous| (previous.time + cut.time) / 2.0);
+        let after = self
+            .camera_cuts
+            .get(index + 1)
+            .map_or(self.duration, |next| (cut.time + next.time) / 2.0);
+        let span = ((cut.time - half).max(before), (cut.time + half).min(after));
+        (span.1 > span.0).then_some(span)
+    }
+
+    /// The dissolve under way at `time`: the place in `camera_cuts` of the
+    /// cut coming in, and how much of the picture is its shot (from 0 at
+    /// the dissolve's start to 1 at its end).
+    pub fn dissolve_at(&self, time: f64) -> Option<(usize, f32)> {
+        self.camera_cuts
+            .iter()
+            .enumerate()
+            .find_map(|(index, cut)| {
+                if !matches!(cut.transition, Transition::Dissolve { .. }) {
+                    return None;
+                }
+                let (start, end) = self.transition_span(index)?;
+                (start < time && time < end)
+                    .then(|| (index, ((time - start) / (end - start)) as f32))
+            })
+    }
+
+    /// How much of the screen the cuts' fades through a color cover at
+    /// `time` (0 to 1, all of it at the cut itself), and the color.
+    fn fade_through_at(&self, time: f64) -> Option<(f32, [f32; 3])> {
+        self.camera_cuts
+            .iter()
+            .enumerate()
+            .find_map(|(index, cut)| {
+                let Transition::FadeThrough { color, .. } = cut.transition else {
+                    return None;
+                };
+                let (start, end) = self.transition_span(index)?;
+                if !(start <= time && time <= end) {
+                    return None;
+                }
+                let share = |gone: f64, span: f64| {
+                    if span > 0.0 {
+                        (gone / span).clamp(0.0, 1.0) as f32
+                    } else {
+                        1.0
+                    }
+                };
+                let cover = if time < cut.time {
+                    share(time - start, cut.time - start)
+                } else {
+                    share(end - time, end - cut.time)
+                };
+                Some((cover, color))
+            })
+    }
+
+    /// How much of the screen is covered at `time` and in what color: the
+    /// fade sections ([`fade_at`](Self::fade_at)) or a cut's fade through a
+    /// color, whichever covers more.
+    pub fn cover_at(&self, time: f64) -> (f32, [f32; 3]) {
+        let fade = self.fade_at(time);
+        match self.fade_through_at(time) {
+            Some(through) if through.0 > fade.0 => through,
+            _ => fade,
+        }
+    }
+
     /// Whether anything is drawn in the overlay.
     fn has_ui(&self) -> bool {
         !(self.fades.is_empty() && self.letterbox.is_empty() && self.subtitles.is_empty())
+            || self
+                .camera_cuts
+                .iter()
+                .any(|cut| matches!(cut.transition, Transition::FadeThrough { .. }))
     }
 }
 
@@ -417,11 +590,27 @@ pub enum SoundCue {
     Stop(InstanceId),
 }
 
+/// Two shots mixed while a cut dissolves in ([`Transition::Dissolve`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Dissolve {
+    /// The shot going out, carried on past the cut: `None` when no cut
+    /// was in charge before (the host's own camera).
+    pub from: Option<Shot>,
+    /// The shot coming in, started before its cut.
+    pub to: Option<Shot>,
+    /// How much of the picture is `to`, from 0 to 1.
+    pub weight: f32,
+}
+
 /// What a sequence leaves to its host at one time.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Applied {
     /// The view, while a camera cut is in charge.
     pub camera: Option<Shot>,
+    /// While a cut dissolves in: both shots and their mix. A host that
+    /// draws one view shows `camera`, which cuts at the cut's time; one
+    /// that can draw two (a rendered movie) blends them.
+    pub dissolve: Option<Dissolve>,
     /// Sounds to start or stop since the last time applied.
     pub sounds: Vec<SoundCue>,
     /// The levels that should be added now.
@@ -434,6 +623,8 @@ pub struct Applied {
 pub struct SequenceRun {
     pub file: SequenceFile,
     keys: PropertyClip,
+    /// The Environment track, with the presets its keys name.
+    environment: EnvironmentTrack,
     properties: PropertyApplied,
     /// Each animation section's Animator, Animation and AnimationTrack.
     clips: HashMap<String, (InstanceId, InstanceId, InstanceId)>,
@@ -445,17 +636,32 @@ pub struct SequenceRun {
 }
 
 impl SequenceRun {
+    /// A run of `file`. Its Environment track finds only the built-in
+    /// presets until [`with_presets`](Self::with_presets) reads the
+    /// project's.
     pub fn new(file: SequenceFile) -> Result<Self, FileError> {
         let keys = PropertyClip::from_file(file.keyed_clip())?;
+        let environment = EnvironmentTrack::new(&file.environment, crate::environment::built_in);
         Ok(Self {
             file,
             keys,
+            environment,
             properties: PropertyApplied::default(),
             clips: HashMap::new(),
             overlay: None,
             sounding: BTreeSet::new(),
             missing: BTreeSet::new(),
         })
+    }
+
+    /// Finds the Environment track's presets through `assets`: the
+    /// project's own (`assets/environments/`) before the built-ins. Every
+    /// host that plays a sequence calls this once it has the project.
+    pub fn with_presets(mut self, assets: &axcenity_assets::Assets) -> Self {
+        if !self.file.environment.is_empty() {
+            self.environment = EnvironmentTrack::load(&self.file.environment, assets);
+        }
+        self
     }
 
     pub fn duration(&self) -> f64 {
@@ -488,21 +694,38 @@ impl SequenceRun {
                 None => targets.push((&item.target, vec![rooted])),
             }
         }
+        // What the property tracks key, which the Environment track
+        // leaves to them.
+        let mut keyed: Vec<(InstanceId, &'static str)> = Vec::new();
         for (binding, items) in targets {
             let Some(id) = resolve_binding(world, binding) else {
                 self.missing.insert(binding.to_owned());
                 continue;
             };
+            keyed.extend(items.iter().map(|item| (id, item.property.as_str())));
             apply_evaluated(world, id, &items, &mut self.properties);
             for missed in std::mem::take(&mut self.properties.missing) {
                 let property = missed.rsplit(':').next().unwrap_or_default();
                 self.missing.insert(format!("{binding}:{property}"));
             }
         }
+        self.apply_environment(world, time, &keyed);
         self.apply_clips(world, time);
         self.apply_overlay(world, time);
+        let camera = self
+            .file
+            .cut_index_at(time)
+            .and_then(|index| self.shot_of(world, index, time, &own_camera));
+        let dissolve = self.file.dissolve_at(time).map(|(index, weight)| Dissolve {
+            from: index
+                .checked_sub(1)
+                .and_then(|before| self.shot_of(world, before, time, &own_camera)),
+            to: self.shot_of(world, index, time, &own_camera),
+            weight,
+        });
         Applied {
-            camera: self.shot(world, time, &own_camera),
+            camera,
+            dissolve,
             sounds: self.cue_sounds(world, time),
             levels: self.file.levels_at(time),
         }
@@ -534,6 +757,37 @@ impl SequenceRun {
             .into_iter()
             .map(SoundCue::Stop)
             .collect()
+    }
+
+    /// The Environment track: the blend of the presets around `time`, but
+    /// for the properties in `keyed`, which property tracks set.
+    fn apply_environment(
+        &mut self,
+        world: &mut World,
+        time: f64,
+        keyed: &[(InstanceId, &'static str)],
+    ) {
+        for name in &self.environment.missing {
+            self.missing
+                .insert(format!("the environment preset {name}"));
+        }
+        let Some(look) = self.environment.sample(time) else {
+            return;
+        };
+        let missing = apply_preset(world, &look, |id, name| {
+            keyed
+                .iter()
+                .any(|(on, property)| *on == id && *property == name)
+        });
+        for target in missing {
+            // A world with no ColorCorrectionEffect just isn't graded.
+            if target != crate::environment::EnvironmentTarget::ColorCorrection {
+                self.missing.insert(format!(
+                    "Lighting/{} (for the Environment track)",
+                    target.name()
+                ));
+            }
+        }
     }
 
     fn apply_clips(&mut self, world: &mut World, time: f64) {
@@ -621,8 +875,23 @@ impl SequenceRun {
         cues
     }
 
-    fn shot(&mut self, world: &World, time: f64, own: &[&EvaluatedProperty]) -> Option<Shot> {
-        let cut = self.file.cut_at(time)?;
+    /// The shot of the cut at `index` at `time`, which may be outside the
+    /// cut's own stretch (a dissolve shows a shot before its cut and after
+    /// the next): a bound Camera is where its keys have it at `time`, and
+    /// a Spline's camera waits at its start and stays at its end.
+    fn shot_of(
+        &mut self,
+        world: &World,
+        index: usize,
+        time: f64,
+        own: &[&EvaluatedProperty],
+    ) -> Option<Shot> {
+        let cut = self.file.camera_cuts.get(index)?;
+        let cut_end = self
+            .file
+            .camera_cuts
+            .get(index + 1)
+            .map_or(self.file.duration, |next| next.time);
         if cut.camera.is_empty() {
             let numbers = |property| {
                 own.iter()
@@ -651,7 +920,7 @@ impl SequenceRun {
         // cut to its end when the cut gives way, facing along it.
         if camera.class() == ClassName::Spline {
             let curve = SplineCurve::of(world, bound?)?;
-            let span = self.file.cut_end(time) - cut.time;
+            let span = cut_end - cut.time;
             let share = if span > 0.0 {
                 ((time - cut.time) / span).clamp(0.0, 1.0)
             } else {
@@ -688,7 +957,7 @@ impl SequenceRun {
             }
         };
         let child = |world: &World, name| world.find_first_child(overlay, name);
-        let (cover, [r, g, b]) = self.file.fade_at(time);
+        let (cover, [r, g, b]) = self.file.cover_at(time);
         if let Some(fade) = child(world, "Fade") {
             set(
                 world,

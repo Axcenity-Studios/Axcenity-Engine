@@ -5,6 +5,7 @@
 ## Before you start
 
 * [System requirements](reference/system-requirements.md)
+* [AI disclosure and security practices](reference/ai-disclosure.md)
 
 ## Learn: The basics
 
@@ -150,6 +151,7 @@
     * [SunRaysEffect](api/classes/SunRaysEffect.md)
     * [MotionBlurEffect](api/classes/MotionBlurEffect.md)
     * [GraphicsVolume](api/classes/GraphicsVolume.md)
+    * [WeatherVolume](api/classes/WeatherVolume.md)
     * [ExposureEffect](api/classes/ExposureEffect.md)
     * [FogEffect](api/classes/FogEffect.md)
     * [BloomEffect](api/classes/BloomEffect.md)

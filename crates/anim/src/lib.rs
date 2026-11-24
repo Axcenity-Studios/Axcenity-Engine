@@ -38,6 +38,7 @@ mod clip;
 mod controller;
 pub mod correctives;
 mod easing;
+pub mod environment;
 mod face;
 mod face_play;
 mod face_world;

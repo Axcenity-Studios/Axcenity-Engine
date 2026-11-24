@@ -7,7 +7,7 @@ use super::*;
 
 #[test]
 fn the_drawer_lists_what_the_clip_moves_not_its_animator() {
-    let folder = copy_of_example("hello-touched", "anim-drawer-objects");
+    let folder = copy_of_example("touched", "anim-drawer-objects");
     let mut app = EditorApp::new(Some(&folder));
     let pad = app
         .world

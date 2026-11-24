@@ -35,7 +35,7 @@ CODE_SPAN = re.compile(r"`([^`\n]+)`")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 FENCE = re.compile(r"^\s*(```|~~~)")
 REPO_ROOTS = (
-    "crates/", "docs/", "plans/", "prd/", "scripts/", "benchmarks/", "examples/",
+    "crates/", "docs/", "plans/", "prd/", "scripts/", "benchmarks/",
     "templates/", "definitions/", ".config/", ".github/", "packaging/", ".claude/",
 )
 REPO_FILES = {

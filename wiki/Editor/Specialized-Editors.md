@@ -4,10 +4,10 @@ type: system
 status: current
 implementation: implemented
 crates: [editor, mesh_edit, anim, blocks, ui]
-source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/scatter_pane.rs, crates/editor/src/app/scatter_pane.rs, crates/editor/src/effect_editor.rs]
-docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/editor/scatter.md, docs/research/usability/usability-audit.md]
-verified: 2026-11-18
-verified_commit: 0046d549
+source: [crates/editor-model-studio/src/lib.rs, crates/editor/src/animation.rs, crates/editor/src/sequencer.rs, crates/editor/src/movie.rs, crates/editor/src/movie/job.rs, crates/editor/src/movie/encode.rs, crates/editor/src/app/movie.rs, crates/editor-ui-designer/src/lib.rs, crates/editor/src/material_editor.rs, crates/editor/src/material_graph.rs, crates/editor/src/block_editor.rs, crates/editor-node-graph/src/lib.rs, crates/editor/src/behavior_tree.rs, crates/editor/src/dialogue_editor.rs, crates/editor/src/data_table.rs, crates/editor/src/terrain_studio.rs, crates/editor/src/scatter_pane.rs, crates/editor/src/app/scatter_pane.rs, crates/editor/src/effect_editor.rs]
+docs: [docs/editor/model-studio.md, docs/editor/import.md, docs/project/sequences.md, docs/editor/movie.md, docs/ui.md, docs/editor/assets.md, docs/scripting/blocks.md, docs/scripting/graphs.md, docs/terrain.md, docs/editor/scatter.md, docs/research/usability/usability-audit.md]
+verified: 2026-11-23
+verified_commit: 428a3e9f
 tags: [system/editor, tools]
 ---
 
@@ -28,7 +28,7 @@ The editor's tabs beyond the Scene, Explorer and Properties. Each is a module (o
 | Data Table | `data_table.rs` | Data tables | `*.data.json` | `assets::data_table`, `DataService` |
 | Effect | `effect_editor.rs`, `app/effect_tab.rs` (R17.3) | The selected particle effect: a preview of its own (play, loop, slow motion), each emitter's module stack (Properties' rows, the world's undo), counts and costs; R17.5: a Place backdrop with the place's Lighting and wind, and Lighting-aware presets (`scene::EffectPreset`) added as one undo step | `assets/effects/*.prefab.json` (a prefab) | `scene::Particles`, `render` particles |
 | Terrain Studio | `terrain_studio.rs`, `terrain_studio/` | Sculpt, paint, generate, erode, layers, biomes, scatter rules | terrain folders | `terrain` |
-| Scatter | `scatter_pane.rs`, `app/scatter_pane.rs` | A palette of props and models (weight, size, collide, turn, lean, sink) painted onto terrain | `presets/*.axscatter`; painted foliage in the terrain's `foliage.json` | `terrain::brush` (`Operation::Scatter`) |
+| Scatter | `scatter_pane.rs`, `app/scatter_pane.rs`, `app/decal_scatter.rs` | A palette of props and models (weight, size, collide, turn, lean, sink, masks) painted onto terrain, and of pictures brushed on as ProjectedDecals | `presets/*.axscatter`; painted foliage in the terrain's `foliage.json`; decals as Instances in `world.json` | `terrain::brush` (`Operation::Scatter`), `procedural::decal_scatter` |
 
 ## Character Studio
 
@@ -41,7 +41,28 @@ Phase 55–62: a Blender-like mesh editor inside the engine. Its view draws thro
 
 ## Animation tab and sequencer
 
-One Animation tab follows the selected Animator; **Animate** (`EditorApp::animate`) makes an Animator, a clip and an Animation as one undo step. A linked clip's settings end with **Retargeting** (AP3, `animation/retarget_panel.rs`): how the take plays on the preview model, the rig checks, both skeletons' bone maps (saved as reusable rig definitions) and the clip's retarget profile; the preview and Convert to keys bind as Animators do (`ClipDoc::bind_on`). A keyed clip's settings end with **Cleanup** (AP4, `property_editor/cleanup.rs`): Mirror, Smooth, Reduce keys, Fix loop seam and Re-time. Record turns viewport edits into keys. The Sequencer previews in the Scene view through `SequenceRun::apply`, the same code the Sequence Instance runs; its transport adds play backwards, loop, an In/Out play range and edit points (AP5, `transport::sequence_bar`).
+One Animation tab follows the selected Animator; **Animate** (`EditorApp::animate`) makes an Animator, a clip and an Animation as one undo step. A linked clip's settings end with **Retargeting** (AP3, `animation/retarget_panel.rs`): how the take plays on the preview model, the rig checks, both skeletons' bone maps (saved as reusable rig definitions) and the clip's retarget profile; the preview and Convert to keys bind as Animators do (`ClipDoc::bind_on`). A keyed clip's settings end with **Cleanup** (AP4, `property_editor/cleanup.rs`): Mirror, Smooth, Reduce keys, Fix loop seam and Re-time. Record turns viewport edits into keys. The Sequencer previews in the Scene view through `SequenceRun::apply`, the same code the Sequence Instance runs; its transport adds play backwards, loop, an In/Out play range and edit points (AP5, `transport::sequence_bar`). A picked camera cut has a transition (cut, dissolve, fade through a color), and a sequence keys the sky, the weather, lights and lens effects as well as parts and cameras (`PropertyName::Scene`; `docs/project/sequences.md`). The **Environment** row (2026-11-23, `Row::Environment`) holds keys that each name an environment preset: Add section ▸ Environment key adds one at the playhead, the picked key's inspector sets its preset, its blend to the next key and which way the clock turns, and the preview shows the blend as the playhead moves, through the same `SequenceRun::apply`. The Properties panel's **Environment presets** section (`environment_presets.rs`, `app/environment.rs`; nothing or Lighting selected) applies a preset to the edited world or saves its look as a project preset, one undo step each ([Lighting and atmosphere](../Engine-Systems/Lighting-and-Atmosphere.md#environment-presets)).
+
+### Render Movie
+
+The Sequencer's **Render Movie** (`crates/editor/src/movie.rs`, `movie/`, `app/movie.rs`; `docs/editor/movie.md`) draws the open sequence frame by frame into a video file or a folder of PNGs. It replaced one-off tools written for a showcase film.
+
+```mermaid
+flowchart LR
+    W[Edit world copy] --> J[MovieJob::step]
+    S[SequenceFile] --> J
+    J -->|SequenceRun::apply, Animators, Particles by 1/fps| L[DrawList + overlay UI]
+    L --> R[TextureRenderer at the movie's size]
+    R -->|read_pixels| K[Sink thread]
+    K --> P[PNG files]
+    K -->|raw RGBA on stdin| F[ffmpeg process]
+```
+
+- **Offline, on a fixed step.** A `MovieJob` owns a copy of the world, a `SequenceRun`, Animators, Particles and a `TextureRenderer` of its own on the editor's GPU device. Each kept frame moves everything on by `1 / fps` whatever drawing took and reads no clock, so two runs give the same frames. The app steps it for 30 ms of each editor frame, so the editor stays usable.
+- **The same code as the preview and the game.** The frame is `SequenceRun::apply` and `scene::build_draw_list_posed`, so cuts, keys, clips and the overlay (fades, bars, subtitles) are what the Sequencer's preview shows. Only a movie draws a dissolve: two renderers for the overlapping frames, their pictures mixed on the CPU.
+- **History across cuts.** `TextureRenderer::forget_history` (new with this) drops TAA's picture, the motion vectors' last frame and the fog grid at each cut, and a few thrown-away frames follow, as at the movie's start (the warm-up, which also lets ray traced light and uploads settle).
+- **No encoder in the engine.** Video goes through the machine's `ffmpeg` executable (`std::process`, raw frames on its input), found on `PATH` or by `AXCENITY_FFMPEG`, and the formats offered come from its `-encoders` listing. A PNG sequence (the `png` crate) needs nothing. This keeps video codecs and their licences out of the workspace's dependencies.
+- **Headless.** `axcenity-editor --render-movie` runs the same job with a device of its own.
 
 ## UI Designer
 
@@ -54,6 +75,8 @@ Three tabs, Sculpt, Materials and Terrain, each with its tools and the sections 
 ## Scatter
 
 A pane opened from the ribbon's Models group: a per-project palette of props and models picked from the Assets panel (`Picking::Scatter`), each with its share of the mix, size range, collide, turn, lean and sink, and a brush (size, density per 100 square studs, spacing, erase everything). Paint arms the brush through the same viewport plumbing as a terrain brush (`TerrainBrush`, `TerrainPointer`); arming it puts a terrain tool down and the other way round. A stroke is one terrain undo step ("Scatter N Items", "Erase Scatter"). It edits the world's undo, not its own. See `docs/editor/scatter.md`.
+
+Since 2026-11-23: each item has **Masks** (folded; noise patches, slope, height, moisture from the terrain's shape: [Terrain](../Engine-Systems/Terrain.md)); a button makes a **Ground Clutter** palette (small built-in rocks that lie to the slope and sink); and the palette holds **decals**, pictures picked from Assets (`Picking::ScatterDecals`) that **Paint decals** lays with the same brush as ProjectedDecals in a "Scattered Decals" Folder, Shift taking them away. A decal stroke changes Instances, not terrain data, so it keeps the world as it was when it began (`DecalStroke::before`) and records one whole-world step when it ends (`History::record_world`), as a TerrainPath's Apply does. The brush follows the terrain through parts; decals lie on it or, with Land on parts, on the first surface under a point 20 studs up. It has a budget from `Quality::decal_limits` (Medium's 128 within 150 studs by default, else Ultra's), because the renderer draws only the nearest projected decals and none at Low: [Known limitations](../Roadmap/Known-Limitations.md).
 
 ## Shared pieces
 

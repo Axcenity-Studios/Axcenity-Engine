@@ -127,7 +127,7 @@ fn same_ids(mut a: Vec<InstanceId>, mut b: Vec<InstanceId>) -> bool {
 
 #[test]
 fn box_selecting_three_buttons_and_distributing_them_spaces_them_evenly_in_one_step() {
-    let folder = copy_of_example("hello-touched", "ui-designer-distribute");
+    let folder = copy_of_example("touched", "ui-designer-distribute");
     let mut app = EditorApp::new(Some(&folder));
     let gui = new_gui(&mut app);
     let buttons = [
@@ -229,7 +229,7 @@ fn box_selecting_three_buttons_and_distributing_them_spaces_them_evenly_in_one_s
 
 #[test]
 fn resizing_the_box_around_two_buttons_resizes_both_as_one_step() {
-    let folder = copy_of_example("hello-touched", "ui-designer-group-resize");
+    let folder = copy_of_example("touched", "ui-designer-group-resize");
     let mut app = EditorApp::new(Some(&folder));
     let gui = new_gui(&mut app);
     let left = button(&mut app, gui, "Left", [100.0, 100.0]);
@@ -263,7 +263,7 @@ fn resizing_the_box_around_two_buttons_resizes_both_as_one_step() {
 
 #[test]
 fn paste_style_matches_a_button_and_duplicate_copies_its_own_id_and_rule() {
-    let folder = copy_of_example("hello-touched", "ui-designer-paste-style");
+    let folder = copy_of_example("touched", "ui-designer-paste-style");
     let mut app = EditorApp::new(Some(&folder));
     let gui = new_gui(&mut app);
     let play = button(&mut app, gui, "Play", [100.0, 100.0]);
@@ -360,7 +360,7 @@ fn paste_style_matches_a_button_and_duplicate_copies_its_own_id_and_rule() {
 
 #[test]
 fn ctrl_c_and_ctrl_v_copy_a_button_into_another_screen_gui() {
-    let folder = copy_of_example("hello-touched", "ui-designer-clipboard");
+    let folder = copy_of_example("touched", "ui-designer-clipboard");
     let mut app = EditorApp::new(Some(&folder));
     let menu = new_gui(&mut app);
     let play = button(&mut app, menu, "Play", [100.0, 100.0]);
@@ -451,7 +451,7 @@ fn ctrl_c_and_ctrl_v_copy_a_button_into_another_screen_gui() {
 
 #[test]
 fn arrow_keys_nudge_by_one_and_shift_by_ten_but_not_while_typing() {
-    let folder = copy_of_example("hello-touched", "ui-designer-nudge");
+    let folder = copy_of_example("touched", "ui-designer-nudge");
     let mut app = EditorApp::new(Some(&folder));
     let gui = new_gui(&mut app);
     let play = button(&mut app, gui, "Play", [100.0, 100.0]);

@@ -435,7 +435,7 @@ mod tests {
     use axcenity_render::{Camera, glam::Vec3};
 
     fn app_with_part(test: &str) -> (PathBuf, EditorApp, InstanceId) {
-        let folder = copy_of_example("hello-touched", test);
+        let folder = copy_of_example("touched", test);
         let mut app = EditorApp::new(Some(&folder));
         let pad = part(&app, "Pad");
         app.selection = vec![pad];

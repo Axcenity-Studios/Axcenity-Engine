@@ -353,7 +353,7 @@ fn lua_files(folder: &Path, files: &mut Vec<PathBuf>) {
 fn every_script_in_the_repo_becomes_blocks_that_write_the_same_code() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut files = Vec::new();
-    for folder in ["templates", "examples", "plugins"] {
+    for folder in ["templates", "crates/samples/projects", "plugins"] {
         lua_files(&root.join(folder), &mut files);
     }
     assert!(files.len() > 30, "only {} scripts", files.len());

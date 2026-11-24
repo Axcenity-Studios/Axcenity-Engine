@@ -5,7 +5,7 @@ use axcenity_assets::{BoneTransform, RigDefinition};
 
 use super::*;
 
-/// A project with the hello-animation example's noodle and its Walk clip,
+/// A project with the animation example's noodle and its Walk clip,
 /// in a folder of its own.
 fn project(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!(
@@ -13,7 +13,7 @@ fn project(name: &str) -> PathBuf {
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&root);
-    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation");
     std::fs::create_dir_all(root.join("assets/models")).unwrap();
     std::fs::create_dir_all(root.join("assets/animations/noodle")).unwrap();
     for file in [

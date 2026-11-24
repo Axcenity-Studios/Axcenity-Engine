@@ -774,6 +774,7 @@ fn written_world_has_the_hand_written_layout() {
             format!("{indent}    \"MaterialVariant\": \"\","),
             format!("{indent}    \"Metalness\": 0,"),
             format!("{indent}    \"Orientation\": [0, 0, 0],"),
+            format!("{indent}    \"PivotOffset\": [0, 0, 0, 0, 0, 0, 1],"),
             format!("{indent}    \"Position\": {position},"),
             format!("{indent}    \"Roughness\": {roughness},"),
             format!("{indent}    \"Shape\": \"Block\","),

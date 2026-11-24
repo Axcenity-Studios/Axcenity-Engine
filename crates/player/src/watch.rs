@@ -293,16 +293,27 @@ mod tests {
 
     #[test]
     fn replay_takes_a_file_and_isnt_played_online() {
-        let watched = parse(&["--replay", "final.replay", "examples/hello-part"]).unwrap();
+        let watched = parse(&["--replay", "final.replay", "crates/samples/projects/part"]).unwrap();
         assert_eq!(watched.replay, Some(PathBuf::from("final.replay")));
-        assert_eq!(watched.game, Some(PathBuf::from("examples/hello-part")));
+        assert_eq!(
+            watched.game,
+            Some(PathBuf::from("crates/samples/projects/part"))
+        );
         assert!(parse(&["--replay"]).is_err());
-        assert!(parse(&["--replay", "a.replay", "--host", "examples/hello-part"]).is_err());
+        assert!(
+            parse(&[
+                "--replay",
+                "a.replay",
+                "--host",
+                "crates/samples/projects/part"
+            ])
+            .is_err()
+        );
     }
 
     #[test]
     fn watch_comes_before_or_after_the_game_and_only_a_project_folder_is_watched() {
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-door");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/door");
         let folder = example.to_str().unwrap();
         for arguments in [[WATCH_FLAG, folder], [folder, WATCH_FLAG]] {
             let parsed = parse(&arguments).unwrap();
@@ -434,17 +445,21 @@ mod tests {
 
     #[test]
     fn lan_goes_with_host() {
-        let lan = parse(&["--host", "--lan", "examples/hello-part"]).unwrap();
+        let lan = parse(&["--host", "--lan", "crates/samples/projects/part"]).unwrap();
         assert!(lan.lan);
         assert_eq!(lan.network, Some(NetworkStart::Host(None)));
-        assert!(!parse(&["--host", "examples/hello-part"]).unwrap().lan);
-        assert!(parse(&["--lan", "examples/hello-part"]).is_err());
+        assert!(
+            !parse(&["--host", "crates/samples/projects/part"])
+                .unwrap()
+                .lan
+        );
+        assert!(parse(&["--lan", "crates/samples/projects/part"]).is_err());
         assert!(parse(&["--join", "127.0.0.1:4000", "--lan"]).is_err());
         let code = parse(&["--join", "K7Q-M2P", "--relay", "relay.example.com:47810"]).unwrap();
         assert_eq!(code.relay.as_deref(), Some("relay.example.com:47810"));
         assert!(parse(&["--relay"]).is_err());
         assert!(
-            parse(&["--host", "--no-port-map", "examples/hello-part"])
+            parse(&["--host", "--no-port-map", "crates/samples/projects/part"])
                 .unwrap()
                 .no_port_map
         );
@@ -452,15 +467,21 @@ mod tests {
 
     #[test]
     fn host_takes_an_optional_port_and_join_an_address() {
-        let host = parse(&["--host", "4000", "examples/hello-part"]).unwrap();
+        let host = parse(&["--host", "4000", "crates/samples/projects/part"]).unwrap();
         assert_eq!(host.network, Some(NetworkStart::Host(Some(4000))));
-        assert_eq!(host.game, Some(PathBuf::from("examples/hello-part")));
+        assert_eq!(
+            host.game,
+            Some(PathBuf::from("crates/samples/projects/part"))
+        );
         // A game folder after `--host` is the game, not a port.
-        let host = parse(&["--host", "examples/hello-part"]).unwrap();
+        let host = parse(&["--host", "crates/samples/projects/part"]).unwrap();
         assert_eq!(host.network, Some(NetworkStart::Host(None)));
-        assert_eq!(host.game, Some(PathBuf::from("examples/hello-part")));
+        assert_eq!(
+            host.game,
+            Some(PathBuf::from("crates/samples/projects/part"))
+        );
         let join = parse(&[
-            "examples/hello-part",
+            "crates/samples/projects/part",
             "--join",
             "127.0.0.1:4000",
             "--password",
@@ -534,7 +555,7 @@ mod tests {
         let folder =
             std::env::temp_dir().join(format!("axcenity-player-watch-{}", std::process::id()));
         let _ = fs::remove_dir_all(&folder);
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-door");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/door");
         fs::create_dir_all(folder.join("assets/animations/Door")).unwrap();
         fs::copy(example.join(CLIP), folder.join(CLIP)).unwrap();
         let machine = StateMachineFile {

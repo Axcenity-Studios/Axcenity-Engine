@@ -326,6 +326,14 @@ ParticleEmitter.LightEmission: number
 
 From 0 (particles paint over what's behind them, like smoke) to 1 (they add their light, like fire and sparks).
 
+#### LightInfluence
+
+```luau
+ParticleEmitter.LightInfluence: number
+```
+
+From 0 (particles keep their color whatever the hour) to 1 (they are lit by the sun, the sky and the ambient light, so dust and smoke go dark at night). Lamps and shadows don't count.
+
 #### Brightness
 
 ```luau

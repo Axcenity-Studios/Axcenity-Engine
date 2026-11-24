@@ -1,7 +1,7 @@
 ---
 description: Every debugging and profiling tool in one place, the game test API with its matchers and Test helpers, command-line runs, benchmarks, logs, and the AI assistant connection.
 icon: gauge
-samples: [hello-character, hello-script]
+samples: [character, script]
 ---
 
 # Debugging and profiling

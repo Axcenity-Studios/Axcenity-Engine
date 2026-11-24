@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn a_floated_panel_draws_and_keeps_its_place_where_more_windows_are_not_possible() {
-        let folder = copy_of_example("hello-touched", "floating");
+        let folder = copy_of_example("touched", "floating");
         let mut app = EditorApp::new(Some(&folder));
         let id = app.layout.float(Pane::Explorer, None).unwrap();
         let ctx = crate::theme::test_context();
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn a_panel_window_has_no_os_frame_and_its_tab_row_holds_close_and_dock_back() {
-        let folder = copy_of_example("hello-touched", "panel-strip");
+        let folder = copy_of_example("touched", "panel-strip");
         let mut app = EditorApp::new(Some(&folder));
         app.layout.float(Pane::Explorer, None).unwrap();
         if !cfg!(target_os = "macos") {

@@ -151,7 +151,7 @@ fn close(app: &mut EditorApp, ctx: &egui::Context, clock: &mut f64) {
 
 #[test]
 fn every_ribbon_and_menu_command_can_be_run_from_the_palette() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = warm(theme::test_context());
     let mut clock = 0.0;
     let mut drawn = BTreeSet::new();
@@ -269,7 +269,7 @@ fn every_ribbon_and_menu_command_can_be_run_from_the_palette() {
 
 #[test]
 fn test_ribbon_clients_group_renders_cleanly() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     app.ribbon_tabs
         .set_active(ActiveTab::BuiltIn(BuiltInTab::Test));
     let size = egui::vec2(960.0, 140.0);
@@ -315,7 +315,7 @@ fn key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
 
 #[test]
 fn ctrl_shift_p_finds_a_command_by_a_few_letters_and_enter_runs_it() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     let workspace = app.world.workspace();
     let before = app.world.get(workspace).unwrap().children().len();
@@ -353,7 +353,7 @@ fn ctrl_shift_p_finds_a_command_by_a_few_letters_and_enter_runs_it() {
 
 #[test]
 fn the_palette_shows_the_last_commands_run_first() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = warm(theme::test_context());
     for command in [
         Command::Overlay(super::command_palette::Overlay::Bounds),
@@ -377,17 +377,14 @@ fn the_palette_shows_the_last_commands_run_first() {
 
 #[test]
 fn plugin_toolbar_buttons_are_commands_too() {
-    let app = EditorApp::new(Some(&example("hello-plugins")));
+    let app = EditorApp::new(Some(&example("plugins")));
     let ctx = warm(theme::test_context());
     let commands = app.palette_commands(&ctx);
     let plugin: Vec<_> = commands
         .iter()
         .filter(|c| matches!(c.command, Command::PluginButton { .. }))
         .collect();
-    assert!(
-        !plugin.is_empty(),
-        "hello-plugins' toolbar buttons are listed"
-    );
+    assert!(!plugin.is_empty(), "plugins' toolbar buttons are listed");
     assert!(
         plugin
             .iter()
@@ -397,7 +394,7 @@ fn plugin_toolbar_buttons_are_commands_too() {
 
 #[test]
 fn quick_open_finds_scripts_assets_levels_and_instances_and_opens_them() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
     let rows = |app: &EditorApp, category: Category| -> Vec<(String, SearchTarget)> {
@@ -443,7 +440,7 @@ fn quick_open_finds_scripts_assets_levels_and_instances_and_opens_them() {
 /// (with `AXCENITY_SNAPSHOTS`, as PNGs to look at).
 #[test]
 fn the_palette_and_find_windows_draw_on_screen() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let size = egui::vec2(1100.0, 700.0);
     app.palette.toggle_commands();
     app.palette.query = "> light cones".to_owned();
@@ -482,7 +479,7 @@ fn the_palette_and_find_windows_draw_on_screen() {
 /// it and every step after it, and clicking a dimmed one redoes up to it.
 #[test]
 fn undo_history_jumps_back_and_forward_several_steps() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = warm(theme::test_context());
     let mut clock = 0.0;
     let workspace = app.world.workspace();
@@ -526,7 +523,7 @@ fn undo_history_jumps_back_and_forward_several_steps() {
 /// grid), so the layout under it doesn't jump when tabs change.
 #[test]
 fn the_ribbon_keeps_one_height_across_tabs() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = warm(theme::test_context());
     let mut clock = 0.0;
     let mut heights = Vec::new();
@@ -573,7 +570,7 @@ fn native_labels(app: &mut EditorApp) -> BTreeSet<String> {
 
 #[test]
 fn every_header_menu_item_is_in_the_macos_menu_bar() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = warm(theme::test_context());
     let mut clock = 0.0;
     // What's drawn with no menu open: the logo, Settings and the chips.

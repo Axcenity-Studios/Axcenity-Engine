@@ -26,7 +26,7 @@ What a client pays every turn: the `tools/list` JSON for a profile, plus the ins
 
 ## Tools
 
-Each tool is called once on a copy of `examples/hello-part`, the way a model calls it first. Times are in-process, in milliseconds, and leave out the transport.
+Each tool is called once on a copy of `crates/samples/projects/part`, the way a model calls it first. Times are in-process, in milliseconds, and leave out the transport.
 
 | Tool | Call | Result tokens | Time (ms) |
 |---|---|---|---|
@@ -59,7 +59,7 @@ What this shows:
 
 - **Results are short.** A typical answer is 10–60 tokens. The large ones are listings a model asks for once: `docs` with no class (all class names and kinds), a class's properties, and `asset_find` with no filter.
 - **Calls are quick.** Almost every call takes well under a millisecond.
-- **Two calls are slow.** `game_run` takes about 19 ms on top of the seconds it plays. `project_check` on assets takes about 1.1 s because it loads every model file to check it: `hello-part` holds 59 MB of models. This is the Asset Check panel's own scan, shared with the editor, and its cost grows with the model files, not with the scene. S10k's assets check in about 0.1 s.
+- **Two calls are slow.** `game_run` takes about 19 ms on top of the seconds it plays. `project_check` on assets takes about 1.1 s because it loads every model file to check it: `part` holds 59 MB of models. This is the Asset Check panel's own scan, shared with the editor, and its cost grows with the model files, not with the scene. S10k's assets check in about 0.1 s.
 
 ## Reference workflows
 

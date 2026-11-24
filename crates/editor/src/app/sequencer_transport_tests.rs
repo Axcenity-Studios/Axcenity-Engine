@@ -23,9 +23,9 @@ struct Tab {
 }
 
 impl Tab {
-    /// hello-cutscene's Intro (20 s) open in the Sequencer, Preview off.
+    /// cutscene's Intro (20 s) open in the Sequencer, Preview off.
     fn new(test: &str) -> Tab {
-        let folder = copy_of_example("hello-cutscene", test);
+        let folder = copy_of_example("cutscene", test);
         let mut app = EditorApp::new(Some(&folder));
         app.open_sequence(INTRO);
         app.sequencer.preview_on = false;

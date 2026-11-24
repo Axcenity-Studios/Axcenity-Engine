@@ -341,3 +341,35 @@ fn a_swaying_plants_ray_traced_shadow_moves_with_it() {
         "the ray traced shadow moved {shadow_studs} studs with the plant"
     );
 }
+
+#[test]
+fn what_hangs_swings_at_its_foot_and_stays_where_it_hangs_from() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    // The pole as a drape, hung from its top.
+    let hung = |wind: Vec3| {
+        let mut list = plant_seen_side_on(true, wind);
+        list.items[0].sway = Some(Sway::hanging(HEIGHT, HEIGHT, 1.0, 0.0));
+        list
+    };
+    let gale = Vec3::new(40.0, 0.0, 0.0);
+    renderer.render(&plant_seen_side_on(false, gale)).unwrap();
+    let still = renderer.read_pixels();
+    renderer.render(&hung(Vec3::ZERO)).unwrap();
+    assert!(still == renderer.read_pixels(), "no wind moved the drape");
+
+    let foot = |renderer: &mut TextureRenderer, wind| plant_column(renderer, &hung(wind), 0.4, 2.0);
+    let top = |renderer: &mut TextureRenderer, wind| plant_column(renderer, &hung(wind), 7.0, 7.8);
+    let foot_shift = foot(&mut renderer, gale) - foot(&mut renderer, Vec3::ZERO);
+    let top_shift = top(&mut renderer, gale) - top(&mut renderer, Vec3::ZERO);
+    assert!(
+        foot_shift > 2.0,
+        "a wind to +X swings its foot right: {foot_shift} pixels"
+    );
+    assert!(top_shift.abs() < 0.5, "its top moved {top_shift} pixels");
+    let back = foot(&mut renderer, -gale) - foot(&mut renderer, Vec3::ZERO);
+    assert!(back < -2.0, "and a wind to -X left: {back} pixels");
+}

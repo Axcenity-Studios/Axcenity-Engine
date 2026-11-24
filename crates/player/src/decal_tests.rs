@@ -1,4 +1,4 @@
-//! Phase 75: hello-decals' Decals and ProjectedDecals save, reload and
+//! Phase 75: decals' Decals and ProjectedDecals save, reload and
 //! export, and draw the same frame each way.
 
 use std::fs;
@@ -47,7 +47,7 @@ fn decals_save_reload_and_export_and_draw_the_same() {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-decals");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/decals");
     let folder = TempCopy::of(
         &example,
         &format!("axcenity-decals-save-{}", std::process::id()),

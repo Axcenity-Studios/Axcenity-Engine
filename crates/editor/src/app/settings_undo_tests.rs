@@ -12,7 +12,7 @@ use super::*;
 
 #[test]
 fn restore_defaults_in_the_input_window_undoes_and_redoes() {
-    let folder = copy_of_example("hello-character", "input-undo");
+    let folder = copy_of_example("character", "input-undo");
     let mut app = EditorApp::new(Some(&folder));
     let file = folder.join(axcenity_project::INPUT_FILE);
     app.edit_input_map(InputEdit::AddAction {
@@ -62,7 +62,7 @@ fn restore_defaults_in_the_input_window_undoes_and_redoes() {
 
 #[test]
 fn removing_a_collision_group_undoes_with_its_pairs() {
-    let folder = copy_of_example("hello-part", "collision-groups-undo");
+    let folder = copy_of_example("part", "collision-groups-undo");
     let mut app = EditorApp::new(Some(&folder));
     app.edit_collision_groups(GroupEdit::Add("Players".into()));
     app.edit_collision_groups(GroupEdit::Add("Ghosts".into()));

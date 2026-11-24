@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn the_controls_menu_shows_on_menu_and_rebinds_an_action_to_the_next_key() {
-        let folder = copy_of_example("hello-character", "controls-menu");
+        let folder = copy_of_example("character", "controls-menu");
         let mut app = EditorApp::new(Some(&folder));
         app.insert_controls_ui();
         let gui = app

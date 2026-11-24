@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn the_input_window_draws_and_its_edits_are_saved_in_input_json() {
-        let folder = super::super::tests::copy_of_example("hello-character", "input-window");
+        let folder = super::super::tests::copy_of_example("character", "input-window");
         let mut app = EditorApp::new(Some(&folder));
         app.input_settings.open = true;
         let ctx = theme::test_context();

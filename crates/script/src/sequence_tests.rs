@@ -1,4 +1,4 @@
-//! Phase 51: Sequence Instances on worlds made here (the hello-cutscene
+//! Phase 51: Sequence Instances on worlds made here (the cutscene
 //! example runs in the player's and the editor's tests).
 
 use std::collections::BTreeMap;
@@ -40,6 +40,7 @@ fn file() -> SequenceFile {
         id: "shot".into(),
         time: 0.0,
         camera: "Workspace/Shot".into(),
+        transition: Default::default(),
     });
     file.audio.push(AudioSection {
         id: "music".into(),

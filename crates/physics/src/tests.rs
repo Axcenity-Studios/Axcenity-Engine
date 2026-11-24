@@ -407,7 +407,7 @@ fn pyramid(world: &mut World, position: Vector3, size: Value, anchored: bool) ->
 }
 
 fn example_assets() -> Assets {
-    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh"))
+    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh"))
 }
 
 #[test]

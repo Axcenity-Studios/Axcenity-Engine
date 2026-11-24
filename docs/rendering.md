@@ -10,7 +10,7 @@ Map only. `render` draws a draw list. It does not know about Instances. Open the
 - Sky, time of day (sun, moon and stars), Atmosphere, sky images, environment maps, reflection probes, light probe volumes, real-time GI and environment lighting: [rendering/sky.md](rendering/sky.md)
 - Fog (Lighting's distance fog, an Atmosphere's height fog, volumetric fog and sun shafts): [rendering/fog.md](rendering/fog.md)
 - Clouds (a `Clouds` layer, its shadows, the wind, cloud quality): [rendering/clouds.md](rendering/clouds.md)
-- Weather (a `Weather`: rain and snow, wet and snow-covered surfaces, easing): [rendering/weather.md](rendering/weather.md)
+- Weather (a `Weather`: rain and snow, wet and snow-covered surfaces, easing; a `WeatherVolume`: where they go in a box, by hand): [rendering/weather.md](rendering/weather.md)
 - Plants swaying in the wind (`DrawItem::sway`, a material's `sway`, `GlobalWind`): [rendering/wind.md](rendering/wind.md)
 - Water (a material file's `water`: waves, seeing through it, reflections, depth tint, foam, the scene copy): [rendering/water.md](rendering/water.md)
 - Shading models and outlines (a material file's `shading`: Standard, Unlit, Toon bands, ramp, rim and highlight; its `outline`; Lighting's `OutlineEffect`): [rendering/stylized.md](rendering/stylized.md)

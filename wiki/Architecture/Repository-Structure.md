@@ -22,7 +22,7 @@ What each top-level folder holds and who reads it. Crate responsibilities are in
 | `docs/research/` | The 2026-11-10 modernization report and its working notes; the usability and design-system audits; the native-vector check | Evidence for the roadmap, not behavior docs |
 | `plans/` | Phased roadmaps with acceptance checkboxes: `v1`, `v2`, `v3`, `graphics`, `unified` (current) | Open one phase by heading; never read whole |
 | `prd/` | Product stories for v1 and v2 | One story at a time |
-| `examples/` | 67 example projects (`hello-*`, `primitives`) | Rendered and run by player tests; `hello-graphics/reference.png` is the look reference |
+| `crates/samples/projects/` | The engine's own sample projects (71: `part`, `touched`, ... and `primitives`), in the `samples` crate | Loaded, rendered and run by tests; opened by the editor's Learn page; `graphics/reference.png` is the look reference. Until 2026-11-23 they were `examples/hello-*` at the top of the repository (`docs/project/samples.md`) |
 | `templates/` | Genre templates for New Project (`arena`, `first-person`, `third-person`, `top-down`, `vehicle`, `shared`) | Embedded by `crates/project/build.rs` |
 | `definitions/` | Generated luau-lsp definitions: `axcenity.d.luau`, `axcenity-plugin.d.luau` | Regenerate with `cargo run -p axcenity-script --bin lua-definitions` |
 | `benchmarks/` | `baselines.json` (per-machine numbers for `axcenity-bench-check`) and `results/` (raw JSONL runs) | Commit with the change that moved them |
@@ -33,7 +33,7 @@ What each top-level folder holds and who reads it. Crate responsibilities are in
 | `.claude/skills/` | Repo skills for agents: `implement`, `organize`, `research` | See [Contribution workflow](../Development/Contribution-Workflow.md) |
 | `.config/` | `nextest.toml` (timeouts, GPU test group), `hakari.toml` | |
 | `.github/workflows/` | `ci.yml`, `release.yml` | Disabled in repo settings on purpose |
-| `.vscode/` | luau-lsp set-up for `examples/`, separate rust-analyzer target dir | |
+| `.vscode/` | luau-lsp set-up for `crates/samples/projects/`, separate rust-analyzer target dir | |
 | `Cargo.toml` | Workspace, every pinned dependency, build profiles | |
 | `rust-toolchain.toml` | Rust 1.97.0 | Raise with the workflow pins and fix new lints together |
 | `selene.toml`, `axcenity.yml` | selene lint config with the engine's globals | |

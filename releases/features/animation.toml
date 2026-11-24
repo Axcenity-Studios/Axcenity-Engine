@@ -25,6 +25,18 @@ evidence = "reconstructed"
 source = "commit 37c51365 (Cutscene Sequencer), after v0.1.0-alpha.3"
 
 [[feature]]
+id = "animation.environment-presets"
+name = "Environment presets"
+subsystem = "animation"
+description = "The sky and the weather under one name, blended on a sequence's Environment track, by Lighting:TransitionToPreset or applied from the Properties panel."
+status = "active"
+docs = "docs/project/sequences.md"
+[feature.introduced]
+version = "unreleased"
+evidence = "verified"
+source = "crates/anim/src/environment.rs, after v0.3.0-alpha.1"
+
+[[feature]]
 id = "animation.ik"
 name = "Inverse kinematics"
 subsystem = "animation"

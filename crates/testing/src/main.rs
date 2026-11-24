@@ -22,7 +22,7 @@ const USAGE: &str = "usage: axcenity-test <project-folder> [--junit <results.xml
                      \x20      axcenity-test --make-crowd <folder>\n\
                      \x20      axcenity-test --make-streaming <folder>\n\
                      \x20      axcenity-test --make-showcase <folder> --from <project> [--view interior|exterior|pond|tour]\n\
-                     example: cargo run -p axcenity-testing -- examples/hello-character";
+                     example: cargo run -p axcenity-testing -- crates/samples/projects/character";
 
 fn main() -> ExitCode {
     let mut project = None;

@@ -1,7 +1,7 @@
 ---
 description: Build Game for Windows, macOS and Linux, what the build contains, the loading screen, credits and licences, testing a build, and multiplayer hosting.
 icon: package
-samples: [hello-part, hello-loading]
+samples: [part, loading]
 ---
 
 # Publishing your game

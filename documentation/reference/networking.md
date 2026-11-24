@@ -2,7 +2,7 @@
 description: Multiplayer as it is today, server-authoritative with replication, hosting, joining and LAN discovery, testing with several clients in the editor, network ownership, and world streaming.
 icon: globe
 status: partial
-samples: [hello-remote, hello-streaming]
+samples: [remote, streaming]
 ---
 
 # Multiplayer and networking

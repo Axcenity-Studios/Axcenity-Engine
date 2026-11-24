@@ -1,4 +1,4 @@
-//! GPU particles in a world, drawn as a host does: hello-particles looks
+//! GPU particles in a world, drawn as a host does: particles looks
 //! the same with them allowed, and an emitter of a hundred thousand
 //! particles runs on the GPU, or on the CPU where compute shaders can't.
 
@@ -35,7 +35,7 @@ fn hello_particles_looks_the_same_with_gpu_particles_allowed() {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let (world, _scripts, folder) = start_example_in("hello-particles");
+    let (world, _scripts, folder) = start_example_in("particles");
     let assets = Assets::new(&folder);
     let camera = FlyCamera::looking_at(Vec3::new(0.0, 8.0, 24.0), Vec3::new(0.0, 4.0, 0.0));
     let mut frames = Vec::new();

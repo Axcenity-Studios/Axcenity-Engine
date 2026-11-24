@@ -12,7 +12,7 @@ use crate::tags::{TagAction, TagsPanel};
 #[test]
 fn an_attribute_set_in_properties_is_read_in_play_and_its_signal_fires_when_another_script_changes_it()
  {
-    let folder = copy_of_example("hello-touched", "attribute-play");
+    let folder = copy_of_example("touched", "attribute-play");
     std::fs::write(
         folder.join("scripts/reader.server.lua"),
         r#"
@@ -69,7 +69,7 @@ end)
 
 #[test]
 fn tags_added_and_removed_in_properties_are_one_undo_step_each() {
-    let folder = copy_of_example("hello-touched", "tag-properties");
+    let folder = copy_of_example("touched", "tag-properties");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.apply(pad, Edit::AddTag("Lava".into()));
@@ -87,7 +87,7 @@ fn tags_added_and_removed_in_properties_are_one_undo_step_each() {
 
 #[test]
 fn renaming_a_tag_in_the_tags_panel_renames_it_everywhere_as_one_undo_step() {
-    let folder = copy_of_example("hello-touched", "tag-rename");
+    let folder = copy_of_example("touched", "tag-rename");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     let ball = app.world.create(ClassName::Part).unwrap();
@@ -185,7 +185,7 @@ fn renaming_a_tag_in_the_tags_panel_renames_it_everywhere_as_one_undo_step() {
 
 #[test]
 fn attributes_tags_and_value_objects_survive_save_and_reopen() {
-    let folder = copy_of_example("hello-touched", "attribute-save");
+    let folder = copy_of_example("touched", "attribute-save");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.apply(

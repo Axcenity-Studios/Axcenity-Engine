@@ -1,5 +1,5 @@
 //! Phase 37 in the editor: movers from the Constraint tool, the overlay's
-//! movers, and the hello-movers example saved, reloaded and played.
+//! movers, and the movers example saved, reloaded and played.
 
 use std::path::PathBuf;
 
@@ -49,7 +49,7 @@ fn attachment(app: &EditorApp, mover: InstanceId, name: &str) -> Option<Instance
 
 #[test]
 fn the_constraint_tool_puts_a_mover_on_one_clicked_surface_in_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let (first, second) = two_blocks(&mut app);
     let count = |app: &EditorApp| app.world.descendants(app.world.root()).len();
     let before = count(&app);
@@ -94,7 +94,7 @@ fn the_constraint_tool_puts_a_mover_on_one_clicked_surface_in_one_undo_step() {
 
 #[test]
 fn the_constraints_overlay_draws_movers() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let (first, second) = two_blocks(&mut app);
     let made = |app: &mut EditorApp, class, picks: &[SurfacePick]| {
         app.pick_constraint_tool(Some(class));
@@ -156,7 +156,7 @@ fn the_constraints_overlay_draws_movers() {
     }
 }
 
-/// The moving parts of hello-movers.
+/// The moving parts of movers.
 const MOVING: [&str; 6] = [
     "Balloon",
     "SlowFollower",
@@ -168,7 +168,7 @@ const MOVING: [&str; 6] = [
 
 #[test]
 fn every_mover_saves_reloads_and_plays_as_the_player_runs_it() {
-    let folder = copy_of_example("hello-movers", "movers-play");
+    let folder = copy_of_example("movers", "movers-play");
     let app = EditorApp::new(Some(&folder));
     let movers = |world: &World| -> Vec<(String, Vec<(&'static str, Value)>)> {
         world

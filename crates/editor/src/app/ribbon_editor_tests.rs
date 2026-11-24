@@ -26,7 +26,7 @@ fn frame(app: &mut EditorApp, ctx: &egui::Context, clock: &mut f64, events: Vec<
 
 #[test]
 fn the_tab_editor_previews_with_the_ribbons_code_and_its_buttons_do_nothing() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     let mut clock = 0.0;
     let groups = [RibbonGroup::Game, RibbonGroup::Tools, RibbonGroup::Parts];
@@ -69,7 +69,7 @@ fn the_tab_editor_previews_with_the_ribbons_code_and_its_buttons_do_nothing() {
         .world
         .get(app.world.workspace())
         .map(|workspace| workspace.children().len());
-    let before = EditorApp::new(Some(&example("hello-touched")));
+    let before = EditorApp::new(Some(&example("touched")));
     assert_eq!(
         roots,
         before
@@ -110,7 +110,7 @@ fn the_tab_editor_draws_in_both_themes() {
             None,
         ),
     ] {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         app.ribbon_tabs
             .add_custom("Lights", "LIGHTBULB", &[RibbonGroup::Lights]);
         app.ribbon_tabs.edit_for_test(

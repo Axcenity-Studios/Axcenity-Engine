@@ -48,4 +48,4 @@ flowchart LR
 
 ## Related documentation
 
-`docs/architecture/streaming.md`; [Networking](Networking.md), [Scene bridge](Scene-Bridge.md); `examples/hello-streaming`
+`docs/architecture/streaming.md`; [Networking](Networking.md), [Scene bridge](Scene-Bridge.md); `crates/samples/projects/streaming`

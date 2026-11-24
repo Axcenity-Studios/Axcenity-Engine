@@ -1,4 +1,4 @@
-//! Phase 74: the hello-roads example in the player's frame order. Its road
+//! Phase 74: the roads example in the player's frame order. Its road
 //! is one straight 8-stud segment bent along a curving spline by a
 //! SplineMesh, made when the game starts, and the car its script drives
 //! goes the whole way along it on the bent pieces.
@@ -35,7 +35,7 @@ fn find(world: &World, path: &[&str]) -> InstanceId {
 
 #[test]
 fn the_car_drives_the_whole_curving_road_on_its_bent_pieces() {
-    let (mut world, mut scripts, folder) = start_example_in("hello-roads");
+    let (mut world, mut scripts, folder) = start_example_in("roads");
     let assets = Assets::new(&folder);
     scripts.set_assets(assets.clone());
     let mut physics = Physics::with_assets(assets.clone());
@@ -92,7 +92,7 @@ fn the_car_drives_the_whole_curving_road_on_its_bent_pieces() {
 
 #[test]
 fn the_examples_road_and_scatters_save_only_their_settings() {
-    let (mut world, mut scripts, folder) = start_example_in("hello-roads");
+    let (mut world, mut scripts, folder) = start_example_in("roads");
     let assets = Assets::new(&folder);
     scripts.set_assets(assets.clone());
     let mut physics = Physics::with_assets(assets);
@@ -120,7 +120,7 @@ fn the_examples_road_and_scatters_save_only_their_settings() {
 /// Seen from above, the road is drawn all along its curve: every point a
 /// little off its middle (clear of the yellow line) is asphalt, never the
 /// grass under it. With `AXCENITY_SNAPSHOTS` naming a folder, the frame is
-/// saved there as `hello-roads-road.png`. Skipped without a GPU.
+/// saved there as `roads-road.png`. Skipped without a GPU.
 #[test]
 fn the_road_is_drawn_along_its_whole_curve_with_no_gaps() {
     use axcenity_render::TextureRenderer;
@@ -133,7 +133,7 @@ fn the_road_is_drawn_along_its_whole_curve_with_no_gaps() {
     else {
         return;
     };
-    let (mut world, mut scripts, folder) = start_example_in("hello-roads");
+    let (mut world, mut scripts, folder) = start_example_in("roads");
     let assets = Assets::new(&folder);
     scripts.set_assets(assets.clone());
     let mut physics = Physics::with_assets(assets.clone());
@@ -151,8 +151,7 @@ fn the_road_is_drawn_along_its_whole_curve_with_no_gaps() {
     let pixels = renderer.read_pixels();
     if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS") {
         let file =
-            std::fs::File::create(std::path::Path::new(&snapshots).join("hello-roads-road.png"))
-                .unwrap();
+            std::fs::File::create(std::path::Path::new(&snapshots).join("roads-road.png")).unwrap();
         let mut encoder = png::Encoder::new(file, width, height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);

@@ -160,7 +160,7 @@ fn graphics_settings_survive_a_restart() {
 
 #[test]
 fn changing_the_graphics_setting_changes_the_viewport_at_once() {
-    let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+    let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
     let mut frame = 0;
     let mut seen = Vec::new();
     crate::snapshot::snapshot_rendered(
@@ -203,7 +203,7 @@ fn changing_the_graphics_setting_changes_the_viewport_at_once() {
 #[test]
 fn exposure_and_tone_mapping_set_in_properties_change_the_viewport() {
     use axcenity_core::{ToneMapping, Value};
-    let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+    let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
     let lighting = app.world.lighting();
     let mut frame = 0;
     let mut drawn = Vec::new();
@@ -252,13 +252,13 @@ fn exposure_and_tone_mapping_set_in_properties_change_the_viewport() {
     );
 }
 
-/// hello-graphics' LocalScript steps the quality on G. In Play that
+/// graphics' LocalScript steps the quality on G. In Play that
 /// changes the viewport, starting from the editor's own settings, and
 /// Stop puts them back without saving the script's choice.
 #[test]
 fn a_local_scripts_graphics_change_lasts_until_stop() {
     use axcenity_script::KeyEvent;
-    let mut app = EditorApp::new(Some(&super::super::tests::example("hello-graphics")));
+    let mut app = EditorApp::new(Some(&super::super::tests::example("graphics")));
     app.play();
     let press = KeyEvent {
         key: axcenity_core::KeyCode::G,
@@ -308,7 +308,7 @@ fn a_local_scripts_graphics_change_lasts_until_stop() {
 
 #[test]
 fn branding_is_kept_in_the_manifest_used_by_branding_paths_and_previewed() {
-    let folder = crate::app::tests::copy_of_example("hello-part", "branding-settings");
+    let folder = crate::app::tests::copy_of_example("part", "branding-settings");
     let mut app = EditorApp::new(Some(&folder));
     std::fs::create_dir_all(folder.join("assets/branding")).unwrap();
     image::RgbaImage::from_pixel(256, 256, image::Rgba([30, 90, 200, 255]))
@@ -592,7 +592,7 @@ fn settings_window_fits_its_top_bar_on_every_page() {
 /// handling drag-and-drop onto the branding section.
 #[test]
 fn branding_imports_external_files_and_handles_drops() {
-    let folder = crate::app::tests::copy_of_example("hello-part", "branding-drop");
+    let folder = crate::app::tests::copy_of_example("part", "branding-drop");
     let external =
         std::env::temp_dir().join(format!("axcenity-brand-drop-{}.png", std::process::id()));
     image::RgbaImage::from_pixel(256, 256, image::Rgba([40, 140, 220, 255]))

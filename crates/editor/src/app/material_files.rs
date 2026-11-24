@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn a_parts_look_saves_as_a_material_that_drops_onto_another_part_as_one_undo_step() {
-        let folder = copy_of_example("hello-touched", "save-material");
+        let folder = copy_of_example("touched", "save-material");
         let mut app = EditorApp::new(Some(&folder));
         let (pad, ball) = (part(&app, "Pad"), part(&app, "Ball"));
         app.world

@@ -1,4 +1,4 @@
-//! Debug › Animator Inspector… on the `hello-animation` noodle.
+//! Debug › Animator Inspector… on the `animation` noodle.
 
 use super::animator_inspector::Showing;
 use super::command_palette::Command;
@@ -7,7 +7,7 @@ use super::*;
 
 #[test]
 fn the_inspector_follows_the_selected_animator_during_play() {
-    let folder = copy_of_example("hello-animation", "animator-inspector");
+    let folder = copy_of_example("animation", "animator-inspector");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     app.run_command(&ctx, Command::AnimatorInspector);

@@ -23,11 +23,11 @@ Each prints its last frame's counts (items drawn, batches, draw calls, triangles
 | Benchmark | Scene |
 |---|---|
 | `bench_10000_parts` | 100 × 100 grid of blocks, balls, cylinders and wedges on a floor, drawn twice: an overview with all in view, and from one edge with most out of view (culling is measured against both) |
-| `bench_2000_mesh_parts` | 2,000 copies of hello-pbr's textured helmet (about 15,500 triangles each, drawn in five views: three cascades, the prepass and the scene) |
+| `bench_2000_mesh_parts` | 2,000 copies of the `pbr` sample's textured helmet (about 15,500 triangles each, drawn in five views: three cascades, the prepass and the scene) |
 | `bench_terrain_with_foliage` | A 2,048-stud terrain of 1,025² samples with hills, two layers and 20,000 plants (grass, flowers, bushes, trees) |
-| `bench_20_animated_characters` | 20 copies of hello-animation's Noodle (about 200 triangles each), each with an Animator, posed every frame |
-| `bench_20_walking_characters` | 20 copies of hello-character's walking character (about 76,000 triangles and 8 primitives each), each with an Animator, posed every frame (added in graphics Phase 14) |
-| `bench_500_bullet_holes_in_the_graphics_reference_scene` | hello-graphics from (12, 8, 16), drawn without decals, then with 500 bullet holes spawned by `workspace:SpawnDecal` from a grid of raycasts (its cap raised to keep them all); fails if the GPU frame with them is over 16.7 ms (added in Phase 75, see [decals.md](decals.md)) |
+| `bench_20_animated_characters` | 20 copies of the `animation` sample's Noodle (about 200 triangles each), each with an Animator, posed every frame |
+| `bench_20_walking_characters` | 20 copies of the `character` sample's walking character (about 76,000 triangles and 8 primitives each), each with an Animator, posed every frame (added in graphics Phase 14) |
+| `bench_500_bullet_holes_in_the_graphics_reference_scene` | the `graphics` sample from (12, 8, 16), drawn without decals, then with 500 bullet holes spawned by `workspace:SpawnDecal` from a grid of raycasts (its cap raised to keep them all); fails if the GPU frame with them is over 16.7 ms (added in Phase 75, see [decals.md](decals.md)) |
 | `bench_build_2000_mesh_parts` (in `scene/tests/bench_mesh_parts.rs`, no GPU) | The same 2,000 helmets, timing only `build_draw_list_posed` with a `TerrainCache` kept across frames, so it runs on machines with no graphics adapter: `cargo test -p axcenity-scene --release --test bench_mesh_parts -- --ignored --nocapture` (added with I8) |
 | `bench_2000_mesh_parts_behind_a_wall` | The 2,000 helmets in view but hidden behind an 80-stud wall the camera stands 40 studs from, then the same view with no helmets (added in graphics Phase 15, for occlusion culling) |
 | `bench_project` | A project of your own: set `AXCENITY_BENCH_PROJECT` to its folder. Drawn from its SpawnLocation at eye height looking ahead, then from an overview 120 studs up and 250 back. Skipped when the variable isn't set. Use it to find what a slow project costs before changing it or the engine (see Planning draws below) |
@@ -112,7 +112,7 @@ What it says:
 
 ## GPU skinning (graphics Phase 14)
 
-The baseline's Noodle is too small to show what posing costs (0.05 ms). So this phase added `bench_20_walking_characters`, 20 of hello-character's walking characters (about 76,000 triangles each), and measured that first. Posing on the CPU was a real cost there: each frame, `ScenePipeline::draw` skinned every posed primitive (`Posed::primitive` runs when the renderer first reads the corners), checked its 4.5 million indices, rebuilt its corners and wrote 13 MB of them to the GPU, about 5 ms of a CPU frame whose GPU work took 0.8 ms. Every posed part was also its own mesh and batch.
+The baseline's Noodle is too small to show what posing costs (0.05 ms). So this phase added `bench_20_walking_characters`, 20 of the `character` sample's walking characters (about 76,000 triangles each), and measured that first. Posing on the CPU was a real cost there: each frame, `ScenePipeline::draw` skinned every posed primitive (`Posed::primitive` runs when the renderer first reads the corners), checked its 4.5 million indices, rebuilt its corners and wrote 13 MB of them to the GPU, about 5 ms of a CPU frame whose GPU work took 0.8 ms. Every posed part was also its own mesh and batch.
 
 Measured at the commit that skins on the GPU, against the commit before it with the new benchmark, on the same machine as above (AMD Radeon RX 9070 XT, Vulkan), three runs each. Each cell is the range of the three runs. Compare within this table.
 
@@ -225,7 +225,7 @@ The debug views are built only with `render`'s `debug-views` feature, which the 
 
 ## Decals (Phase 75)
 
-`bench_500_bullet_holes_in_the_graphics_reference_scene`, on the machine above (AMD Radeon RX 9070 XT, Vulkan), at 1280 × 720 on High. hello-graphics already keeps the prepass at High (ambient occlusion), so the holes add only their own pass. Times are milliseconds.
+`bench_500_bullet_holes_in_the_graphics_reference_scene`, on the machine above (AMD Radeon RX 9070 XT, Vulkan), at 1280 × 720 on High. the `graphics` sample already keeps the prepass at High (ambient occlusion), so the holes add only their own pass. Times are milliseconds.
 
 | | Without decals | 500 bullet holes |
 |---|---|---|

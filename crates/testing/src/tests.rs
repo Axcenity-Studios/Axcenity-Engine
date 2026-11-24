@@ -6,7 +6,7 @@ use super::*;
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -76,7 +76,7 @@ fn write_spec(folder: &Path, name: &str, source: &str) {
 
 #[test]
 fn hello_character_walks_more_than_five_studs_while_w_is_held_for_a_second() {
-    let results = run_all(&example("hello-character"));
+    let results = run_all(&example("character"));
     let titles: Vec<String> = results.iter().map(TestResult::title).collect();
     assert_eq!(
         titles,
@@ -99,7 +99,7 @@ fn hello_character_walks_more_than_five_studs_while_w_is_held_for_a_second() {
 
 #[test]
 fn a_walk_speed_of_zero_fails_the_walk_with_its_line_and_values() {
-    let folder = copy_of("hello-character", "walk-speed");
+    let folder = copy_of("character", "walk-speed");
     let world = folder.join("world.json");
     let text = fs::read_to_string(&world).unwrap();
     fs::write(
@@ -126,7 +126,7 @@ fn a_walk_speed_of_zero_fails_the_walk_with_its_line_and_values() {
 
 #[test]
 fn tests_leave_the_project_files_alone_even_when_they_save_and_destroy() {
-    let folder = copy_of("hello-character", "files");
+    let folder = copy_of("character", "files");
     write_spec(
         &folder,
         "saves.spec.lua",
@@ -158,7 +158,7 @@ end)
 
 #[test]
 fn a_test_that_errors_or_a_file_that_does_not_compile_does_not_stop_the_others() {
-    let folder = copy_of("hello-character", "errors");
+    let folder = copy_of("character", "errors");
     write_spec(
         &folder,
         "a_broken.spec.lua",
@@ -202,7 +202,7 @@ end)
 
 #[test]
 fn matchers_pass_and_fail_with_what_they_compared() {
-    let folder = copy_of("hello-character", "matchers");
+    let folder = copy_of("character", "matchers");
     write_spec(
         &folder,
         "matchers.spec.lua",
@@ -290,7 +290,7 @@ end)
 
 #[test]
 fn hooks_run_around_each_test_outermost_first_and_names_nest() {
-    let folder = copy_of("hello-character", "hooks");
+    let folder = copy_of("character", "hooks");
     write_spec(
         &folder,
         "hooks.spec.lua",
@@ -328,7 +328,7 @@ end)
 
 #[test]
 fn clicking_a_button_and_typing_reach_local_scripts() {
-    let folder = copy_of("hello-buttons", "click");
+    let folder = copy_of("buttons", "click");
     fs::write(
         folder.join("scripts/typed.client.lua"),
         r#"
@@ -373,7 +373,7 @@ end)
 
 #[test]
 fn test_level_runs_the_tests_after_it_in_that_level() {
-    let folder = copy_of("hello-levels", "levels");
+    let folder = copy_of("levels", "levels");
     write_spec(
         &folder,
         "levels.spec.lua",
@@ -410,7 +410,7 @@ end)
 
 #[test]
 fn run_one_and_run_file_pick_their_tests() {
-    let folder = example("hello-character");
+    let folder = example("character");
     let mut runner = Runner::open(&folder).unwrap();
     let mut found = Vec::new();
     let one = runner.run(
@@ -439,7 +439,7 @@ fn run_one_and_run_file_pick_their_tests() {
 
 #[test]
 fn exported_games_never_include_tests() {
-    let folder = example("hello-character");
+    let folder = example("character");
     assert!(!spec_files(&folder).is_empty());
     let bytes = axcenity_project::pack_game(&folder).unwrap();
     let unpacked = std::env::temp_dir()

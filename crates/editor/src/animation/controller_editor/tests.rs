@@ -302,7 +302,7 @@ fn a_clip_dropped_on_the_graph_makes_a_state_playing_it() {
 #[test]
 fn a_state_machine_saved_before_the_node_graph_opens_the_same() {
     let example =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation");
     let path = "assets/animations/noodle/noodle.statemachine.json";
     let text = std::fs::read_to_string(example.join(path))
         .unwrap()

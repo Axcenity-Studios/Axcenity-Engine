@@ -18,7 +18,7 @@ pub(crate) enum DocAction {
     Open(usize, Option<String>),
     /// Open this entry in the API Reference.
     LookUp(String),
-    /// Open the sample project `examples/<name>`.
+    /// Open the sample project the engine sample `<name>`.
     OpenSample(String),
 }
 
@@ -126,6 +126,7 @@ pub(crate) fn icon(name: &str) -> &'static str {
         "image" => icons::IMAGE,
         "brackets" => icons::BRACKETS_CURLY,
         "users" => icons::USERS_THREE,
+        "shield" => icons::SHIELD_CHECK,
         _ => icons::BOOK_OPEN,
     }
 }
@@ -159,6 +160,7 @@ pub(crate) const ICON_NAMES: &[&str] = &[
     "image",
     "brackets",
     "users",
+    "shield",
 ];
 
 /// A small pill naming a page's status. Stable pages have none.
@@ -325,6 +327,11 @@ fn draw_block(
             ui.add_space(theme::space::S);
             action = table(ui, library, page, header, rows, palette);
         }
+        Block::Image { alt, path } => {
+            ui.add_space(theme::space::M);
+            image_block(ui, page, alt, path, palette);
+            ui.add_space(theme::space::S);
+        }
         Block::Rule => {
             ui.add_space(theme::space::M);
             crate::widgets::divider(ui);
@@ -332,6 +339,75 @@ fn draw_block(
         }
     }
     action
+}
+
+/// Draws a built-in PNG image inside a framed card, with its descriptive alt
+/// text underneath as a caption.
+fn image_block(ui: &mut egui::Ui, page: &Page, alt: &str, path: &str, palette: &Palette) {
+    let resolved = super::library::join(&page.path, path);
+    let Some(bytes) = super::image_bytes(&resolved) else {
+        ui.label(
+            RichText::new(format!("Missing image: {resolved}"))
+                .size(type_scale::CAPTION)
+                .color(palette.warning),
+        );
+        return;
+    };
+    let id = egui::Id::new(("doc_image_texture", resolved.as_str()));
+    let handle = ui
+        .ctx()
+        .data_mut(|data| data.get_temp::<egui::TextureHandle>(id))
+        .unwrap_or_else(|| {
+            let image = match eframe::icon_data::from_png_bytes(bytes) {
+                Ok(icon) => egui::ColorImage::from_rgba_unmultiplied(
+                    [icon.width as usize, icon.height as usize],
+                    &icon.rgba,
+                ),
+                Err(err) => {
+                    log::warn!("could not decode doc image {resolved}: {err}");
+                    egui::ColorImage::new([1, 1], vec![egui::Color32::TRANSPARENT])
+                }
+            };
+            let tex = ui.ctx().load_texture(
+                format!("doc:{resolved}"),
+                image,
+                egui::TextureOptions::LINEAR,
+            );
+            ui.ctx().data_mut(|data| data.insert_temp(id, tex.clone()));
+            tex
+        });
+
+    let natural = handle.size_vec2();
+    let max_width = (ui.available_width() - theme::space::M * 2.0).clamp(120.0, 760.0);
+    let scale = if natural.x > 0.0 {
+        (max_width / natural.x).min(1.0)
+    } else {
+        1.0
+    };
+    let draw_size = vec2(natural.x * scale, natural.y * scale);
+
+    egui::Frame::new()
+        .fill(palette.surface)
+        .stroke(Stroke::new(1.0_f32, palette.border))
+        .corner_radius(theme::radius::CARD)
+        .inner_margin(theme::space::S)
+        .show(ui, |ui| {
+            ui.add(
+                egui::Image::new((handle.id(), draw_size)).corner_radius(theme::radius::CONTROL),
+            )
+            .on_hover_text(alt);
+            if !alt.is_empty() {
+                ui.add_space(theme::space::XS);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(alt)
+                            .size(type_scale::CAPTION)
+                            .color(palette.text_secondary),
+                    )
+                    .wrap(),
+                );
+            }
+        });
 }
 
 /// A run of text, wrapping, with its links. Returns what was clicked.
@@ -383,7 +459,7 @@ fn spans_ui(
                     let hover = match &resolved {
                         LinkTarget::Page(index, _) => library.pages[*index].title.clone(),
                         LinkTarget::Anchor(_) => "Further down this page".to_owned(),
-                        LinkTarget::Sample(name) => format!("Open the sample examples/{name}"),
+                        LinkTarget::Sample(name) => format!("Open the sample {name}"),
                         LinkTarget::Api(_) => "Open the API Reference".to_owned(),
                         LinkTarget::Url(url) => url.clone(),
                         LinkTarget::Missing(path) => format!("{path} isn't built in"),

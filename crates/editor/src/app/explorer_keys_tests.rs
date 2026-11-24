@@ -47,7 +47,7 @@ fn click(app: &mut EditorApp, ctx: &egui::Context, at: egui::Pos2) {
 
 #[test]
 fn a_clicked_explorer_takes_the_arrows_and_enter_and_shortcuts_still_work() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     for _ in 0..3 {
         frame(&mut app, &ctx, Vec::new());

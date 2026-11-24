@@ -71,7 +71,7 @@ fn every_link_goes_somewhere() {
                     broken.push(format!("{}: `{target}` has no such heading", page.path));
                 }
                 LinkTarget::Sample(name) if learn::find_sample(&name).is_none() => {
-                    broken.push(format!("{}: examples/{name} doesn't exist", page.path));
+                    broken.push(format!("{}: the sample {name} doesn't exist", page.path));
                 }
                 _ => {}
             }
@@ -81,13 +81,44 @@ fn every_link_goes_somewhere() {
 }
 
 #[test]
+fn every_image_exists_and_has_a_description() {
+    let mut problems = Vec::new();
+    for page in pages() {
+        for (alt, path) in page.images() {
+            if alt.trim().is_empty() {
+                problems.push(format!(
+                    "{}: image `{path}` needs descriptive alt text",
+                    page.path
+                ));
+            }
+            let resolved = library::join(&page.path, path);
+            match image_bytes(&resolved) {
+                None => problems.push(format!(
+                    "{}: image `{path}` (`{resolved}`) wasn't found under documentation/",
+                    page.path
+                )),
+                Some(bytes) => {
+                    if let Err(err) = eframe::icon_data::from_png_bytes(bytes) {
+                        problems.push(format!(
+                            "{}: image `{resolved}` isn't a valid PNG: {err}",
+                            page.path
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{problems:#?}");
+}
+
+#[test]
 fn every_sample_a_page_follows_opens() {
     for page in pages() {
         for sample in &page.samples {
             let folder = learn::find_sample(sample)
-                .unwrap_or_else(|| panic!("{}: examples/{sample} wasn't found", page.path));
+                .unwrap_or_else(|| panic!("{}: the sample {sample} wasn't found", page.path));
             axcenity_project::load(&folder)
-                .unwrap_or_else(|err| panic!("{}: examples/{sample}: {err}", page.path));
+                .unwrap_or_else(|err| panic!("{}: the sample {sample}: {err}", page.path));
         }
     }
 }
@@ -261,25 +292,33 @@ fn search_finds_titles_before_text() {
 fn markdown_reads_into_blocks() {
     let page = Page::parse(
         "learn/a.md",
-        "---\ndescription: D.\nstatus: experimental\nsamples: [hello-part, hello-ui]\nicon: cube\n---\n\
+        "---\ndescription: D.\nstatus: experimental\nsamples: [part, ui]\nicon: cube\n---\n\
          # Title\n\nSome **bold** and `code` and [a link](../b.md#x).\n\n\
+         ![An example diagram](../images/example.png)\n\n\
          ## Next `step`\n\n- one\n- two\n  wrapped\n\n1. first\n2. second\n\n\
          > A note.\n\n```lua\nprint(1)\n```\n\n| A | B |\n|---|---|\n| `x\\|y` | 2 |\n",
     );
     assert!(page.problems.is_empty(), "{:?}", page.problems);
     assert_eq!(page.title, "Title");
     assert_eq!(page.status, library::Status::Experimental);
-    assert_eq!(page.samples, ["hello-part", "hello-ui"]);
+    assert_eq!(page.samples, ["part", "ui"]);
     assert_eq!(page.links(), ["../b.md#x"]);
+    assert_eq!(
+        page.images(),
+        [("An example diagram", "../images/example.png")]
+    );
     assert_eq!(
         page.headings().collect::<Vec<_>>(),
         [(2, "Next step", "next-step")]
     );
-    assert!(matches!(&page.blocks[2], Block::List { ordered: false, items } if items.len() == 2));
-    assert!(matches!(&page.blocks[3], Block::List { ordered: true, .. }));
-    assert!(matches!(&page.blocks[4], Block::Note(_)));
-    assert!(matches!(&page.blocks[5], Block::Code { lang, .. } if lang == "lua"));
-    assert!(matches!(&page.blocks[6], Block::Table { rows, .. } if rows.len() == 1));
+    assert!(
+        matches!(&page.blocks[1], Block::Image { alt, path } if alt == "An example diagram" && path == "../images/example.png")
+    );
+    assert!(matches!(&page.blocks[3], Block::List { ordered: false, items } if items.len() == 2));
+    assert!(matches!(&page.blocks[4], Block::List { ordered: true, .. }));
+    assert!(matches!(&page.blocks[5], Block::Note(_)));
+    assert!(matches!(&page.blocks[6], Block::Code { lang, .. } if lang == "lua"));
+    assert!(matches!(&page.blocks[7], Block::Table { rows, .. } if rows.len() == 1));
     assert_eq!(page.code_spans(), ["code", "x|y"]);
     assert_eq!(library::join("learn/a.md", "../b.md"), "b.md");
 

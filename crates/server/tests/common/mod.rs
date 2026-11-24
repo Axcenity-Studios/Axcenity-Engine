@@ -20,7 +20,7 @@ impl Drop for Running {
 }
 
 pub fn example(name: &str) -> String {
-    format!("{}/../../examples/{name}", env!("CARGO_MANIFEST_DIR"))
+    format!("{}/../samples/projects/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
 pub fn scratch(name: &str) -> PathBuf {

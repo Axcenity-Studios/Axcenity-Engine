@@ -24,7 +24,7 @@ fn points(app: &EditorApp, spline: InstanceId) -> Vec<Vector3> {
 
 #[test]
 fn insert_spline_makes_two_points_in_one_step_and_selects_it_for_editing() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let spline = inserted(&mut app, Insertable::Spline, None);
     assert_eq!(app.world.get(spline).unwrap().class(), ClassName::Spline);
     assert_eq!(points(&app, spline).len(), 2);
@@ -35,7 +35,7 @@ fn insert_spline_makes_two_points_in_one_step_and_selects_it_for_editing() {
 
 #[test]
 fn dragging_a_point_adding_one_and_deleting_one_are_each_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let spline = inserted(&mut app, Insertable::Spline, None);
     let before = points(&app, spline);
     let ids = crate::splines::points(&app.world, spline);
@@ -78,7 +78,7 @@ fn dragging_a_point_adding_one_and_deleting_one_are_each_one_undo_step() {
 
 #[test]
 fn a_spline_follower_inserted_into_a_part_follows_the_first_spline() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let spline = inserted(&mut app, Insertable::Spline, None);
     let part = inserted(&mut app, Insertable::Part(PartType::Block), None);
     let follower = inserted(&mut app, Insertable::SplineFollower, Some(part));

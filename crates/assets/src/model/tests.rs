@@ -3,7 +3,7 @@ use super::*;
 /// The example project's model: a square pyramid 4 wide and 3 tall,
 /// with a checkered texture, all embedded in one `.gltf` file.
 fn example_folder() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh/assets/models")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh/assets/models")
 }
 
 fn example_bytes() -> Vec<u8> {
@@ -851,6 +851,32 @@ fn a_gltf_materials_extras_say_how_it_moves_in_the_wind() {
     assert_eq!(wind(r#"{"axcenity_sway": "lots"}"#), (0.0, 0.0));
     let none = super::wind_of(&None);
     assert_eq!((none.sway, none.flutter), (0.0, 0.0));
+    assert!(!none.hangs);
+
+    // What hangs says so with `true` or a number above 0, and one value of
+    // the wrong sort doesn't lose the others.
+    let hangs = |extras: &str| {
+        let raw = serde_json::value::RawValue::from_string(extras.to_owned()).unwrap();
+        let material = super::wind_of(&Some(raw));
+        (material.hangs, material.sway)
+    };
+    assert_eq!(
+        hangs(r#"{"axcenity_sway": 0.5, "axcenity_hang": 1}"#),
+        (true, 0.5)
+    );
+    assert_eq!(
+        hangs(r#"{"axcenity_sway": 0.5, "axcenity_hang": true}"#),
+        (true, 0.5)
+    );
+    assert_eq!(
+        hangs(r#"{"axcenity_sway": 0.5, "axcenity_hang": 0}"#),
+        (false, 0.5)
+    );
+    assert_eq!(
+        hangs(r#"{"axcenity_sway": 0.5, "axcenity_hang": "yes"}"#),
+        (false, 0.5)
+    );
+    assert_eq!(hangs(r#"{"axcenity_sway": 0.5}"#), (false, 0.5));
 }
 
 #[test]

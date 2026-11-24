@@ -6,7 +6,7 @@ use axcenity_script::OutputKind;
 use super::*;
 
 fn example() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-plugins")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/plugins")
 }
 
 /// A new empty folder for one test.

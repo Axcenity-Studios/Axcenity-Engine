@@ -75,7 +75,7 @@ fn named(app: &EditorApp, parent: InstanceId, name: &str) -> InstanceId {
 
 #[test]
 fn insert_vehicle_makes_a_car_in_one_step_that_drives_with_wasd_and_a_gamepad() {
-    let folder = copy_of_example("hello-vehicle", "insert-vehicle");
+    let folder = copy_of_example("vehicle", "insert-vehicle");
     let mut app = EditorApp::new(Some(&folder));
     // Only the inserted car, beside the character (at x = 0, z = 8).
     for name in ["Car", "AutoCar"] {

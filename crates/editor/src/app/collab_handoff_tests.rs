@@ -111,7 +111,7 @@ pub(super) fn on_loopback(app: &mut EditorApp) {
     team.recovery_wait = Duration::from_secs(2);
 }
 
-/// Paul hosts hello-part; Sam and Kim join, each offering to host on a
+/// Paul hosts part; Sam and Kim join, each offering to host on a
 /// loopback port, with short timings.
 pub(super) fn session(
     name: &str,
@@ -120,7 +120,7 @@ pub(super) fn session(
         .iter()
         .map(|who| data_folder(&format!("{name}-{who}")))
         .collect();
-    let project = copy_of_example("hello-part", &format!("handoff-{name}"));
+    let project = copy_of_example("part", &format!("handoff-{name}"));
     let mut paul = Box::new(EditorApp::new(Some(&project)));
     let invite = paul
         .host_network_session(Some(&folders[0]), 0)

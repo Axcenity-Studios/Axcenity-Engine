@@ -71,10 +71,10 @@ fn bend_quality(mesh: &EditMesh, posed: &[Vec3]) -> (f32, f32) {
     (flipped as f32 / total as f32, stretch)
 }
 
-/// The Walking character's skeleton from `hello-character`: Mixamo's own.
+/// The Walking character's skeleton from `character`: Mixamo's own.
 fn mixamo_rig() -> axcenity_assets::Rig {
     let folder = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-character/assets/models/Walking");
+        .join("../samples/projects/character/assets/models/Walking");
     let bytes = std::fs::read(folder.join("Walking.fbx")).unwrap();
     let model = load_model(&bytes, &folder, ModelFormat::Fbx).unwrap();
     model.rig.as_deref().unwrap().clone()

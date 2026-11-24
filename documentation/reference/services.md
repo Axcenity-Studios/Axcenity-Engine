@@ -1,7 +1,7 @@
 ---
 description: The globals every script has, the task library, and each service with what it's for, from input and tweens to saves, levels and the network.
 icon: globe
-samples: [hello-tween, hello-saves, hello-levels, hello-data]
+samples: [tween, saves, levels, data]
 ---
 
 # Services and globals
@@ -76,4 +76,4 @@ if SaveService:HasSlot(1) then
 end
 ```
 
-Save slots keep the world's state; `SaveService:SetPlayerData()` keeps a value for one player across games. The **hello-saves** sample shows both.
+Save slots keep the world's state; `SaveService:SetPlayerData()` keeps a value for one player across games. The **saves** sample shows both.

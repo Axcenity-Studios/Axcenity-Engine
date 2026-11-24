@@ -138,3 +138,127 @@ fn route_lays_points_up_a_hill_within_max_grade_as_one_step() {
     app.undo();
     assert_eq!(crate::splines::points(&app.world, spline), ends);
 }
+
+#[test]
+fn apply_paints_a_ragged_shoulder_and_clears_painted_foliage_as_one_step() {
+    let (mut app, terrain, _, path) = road(|_, _| 20.0, Vec2::new(100.0, 0.0));
+    let gravel = app.world.create(ClassName::TerrainLayer).unwrap();
+    app.world.set_name(gravel, "Gravel".to_owned()).unwrap();
+    app.world.set_parent(gravel, Some(terrain)).unwrap();
+    // Painted scrub every 4 studs over the middle of the terrain.
+    let mut data = TerrainData::clone(app.world.terrain(terrain).unwrap());
+    for z in (40..90).step_by(2) {
+        for x in (20..110).step_by(2) {
+            data.foliage_mut().push(axcenity_core::FoliageInstance {
+                source: axcenity_core::FoliageSource::Plant(axcenity_core::FoliagePlant::Bush),
+                x: x as f32 + 0.3,
+                z: z as f32 + (x % 5) as f32 * 0.2,
+                yaw: 0.0,
+                scale: 1.0,
+                collide: false,
+                lean: 0.0,
+                sink: 0.0,
+            });
+        }
+    }
+    app.world.set_terrain(terrain, Arc::new(data));
+    for (name, value) in [
+        ("Layer", Value::String("Road".into())),
+        ("ShoulderLayer", Value::String("Gravel".into())),
+        ("Falloff", Value::Number(10.0)),
+        ("ClearFalloff", Value::Number(10.0)),
+        ("Flatten", Value::Bool(false)),
+    ] {
+        app.apply(path, Edit::Property(name, value));
+    }
+    app.history.seal();
+    let was = app.world.terrain(terrain).unwrap().clone();
+    let placement = axcenity_terrain::Placement::of(app.world.get(terrain).unwrap()).unwrap();
+    // The road's and the shoulder's paint at world (x, z), and how many
+    // painted bushes stand within `from` to `to` studs of the road.
+    let paint = |app: &EditorApp, x: f32, z: f32| {
+        let data = app.world.terrain(terrain).unwrap();
+        let grid = placement.to_grid(data, x, z);
+        let weights = data.paint()[data.index(grid.x as usize, grid.y as usize)];
+        (weights[1], weights[2])
+    };
+    let bushes = |app: &EditorApp, from: f32, to: f32| {
+        let data = app.world.terrain(terrain).unwrap();
+        data.foliage()
+            .iter()
+            .filter(|i| {
+                let at = placement.to_world_xz(data, Vec2::new(i.x, i.z));
+                at.x.abs() < 60.0 && (from..to).contains(&at.y.abs())
+            })
+            .count()
+    };
+    let before = (
+        bushes(&app, 0.0, 5.0),
+        bushes(&app, 5.0, 15.0),
+        bushes(&app, 15.0, 40.0),
+    );
+    assert!(before.0 > 30, "{before:?}");
+
+    app.apply(path, Edit::ApplyTerrainPath);
+    let name = app.world.get(path).unwrap().name().to_owned();
+    assert_eq!(
+        app.history.undo_label(),
+        Some(format!("Apply {name}").as_str())
+    );
+    // The road is all Road; just past its edge (4 studs) is all Gravel.
+    assert_eq!(paint(&app, 10.0, 0.0), (255, 0));
+    let beside = paint(&app, 10.0, 6.0);
+    assert!(beside.0 < 128 && beside.1 > 100, "{beside:?}");
+    // The shoulder's outer edge isn't a straight line: how many samples
+    // out (2 studs each) Gravel reaches differs along the road.
+    let reach = |app: &EditorApp, x: f32| {
+        (0..20)
+            .take_while(|&step| step < 3 || paint(app, x, step as f32 * 2.0).1 > 0)
+            .count()
+    };
+    let reaches: Vec<usize> = (-30..30)
+        .map(|step| reach(&app, step as f32 * 2.0))
+        .collect();
+    let (least, most) = (
+        *reaches.iter().min().unwrap(),
+        *reaches.iter().max().unwrap(),
+    );
+    assert!(most >= least + 2, "an even edge: {reaches:?}");
+    // No bushes on the road, fewer beside it, all of them further off.
+    let after = (
+        bushes(&app, 0.0, 5.0),
+        bushes(&app, 5.0, 15.0),
+        bushes(&app, 15.0, 40.0),
+    );
+    assert_eq!(after.0, 0);
+    assert!(after.1 > 0 && after.1 < before.1, "{after:?} of {before:?}");
+    assert_eq!(after.2, before.2);
+    assert!(
+        app.output
+            .lines()
+            .iter()
+            .any(|entry| entry.text.contains("painted items off it")),
+    );
+
+    // One undo puts the paint and every bush back.
+    app.undo();
+    let data = app.world.terrain(terrain).unwrap();
+    assert_eq!(data.paint(), was.paint());
+    assert_eq!(data.foliage(), was.foliage());
+    app.redo();
+    assert_eq!(paint(&app, 10.0, 0.0), (255, 0));
+    assert_eq!(bushes(&app, 0.0, 5.0), 0);
+
+    // A Shoulder Layer the terrain doesn't have is a warning, not an error.
+    app.apply(
+        path,
+        Edit::Property("ShoulderLayer", Value::String("Dust".into())),
+    );
+    app.apply(path, Edit::ApplyTerrainPath);
+    assert!(
+        app.output
+            .lines()
+            .iter()
+            .any(|entry| entry.text.contains("Shoulder Layer Dust isn't one of")),
+    );
+}

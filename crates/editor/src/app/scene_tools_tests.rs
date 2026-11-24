@@ -77,7 +77,7 @@ fn script_tab(app: &EditorApp) -> Pane {
 
 #[test]
 fn world_tools_wait_for_the_scene_to_show() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     settle(&mut app, &ctx);
     assert!(app.scene_shown(&ctx));
@@ -130,7 +130,7 @@ fn world_tools_wait_for_the_scene_to_show() {
 /// The ribbon's Show Scene button brings the Scene back to the front.
 #[test]
 fn show_scene_brings_the_scene_back() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     app.open_script("scripts/Script.server.lua", None);
     settle(&mut app, &ctx);

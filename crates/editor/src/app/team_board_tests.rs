@@ -49,7 +49,7 @@ fn as_person(app: &mut EditorApp, name: &str) {
 
 #[test]
 fn a_task_is_made_assigned_and_moved_and_kept_as_a_file() {
-    let project = copy_of_example("hello-part", "team-board");
+    let project = copy_of_example("part", "team-board");
     let mut app = EditorApp::new(Some(&project));
     as_person(&mut app, "Paul");
     draw_board(&mut app, "team-board-empty", egui::vec2(260.0, 420.0));
@@ -116,7 +116,7 @@ fn a_task_is_made_assigned_and_moved_and_kept_as_a_file() {
 
 #[test]
 fn a_teammates_task_reaches_the_host_and_says_who_was_assigned() {
-    let project = copy_of_example("hello-part", "team-board-host");
+    let project = copy_of_example("part", "team-board-host");
     let mut a = EditorApp::new(Some(&project));
     as_person(&mut a, "Paul");
     let invite = over_loopback(
@@ -166,7 +166,7 @@ fn a_teammates_task_reaches_the_host_and_says_who_was_assigned() {
 
 #[test]
 fn a_viewer_sees_the_board_but_cannot_change_it() {
-    let project = copy_of_example("hello-part", "team-board-viewer");
+    let project = copy_of_example("part", "team-board-viewer");
     let mut a = EditorApp::new(Some(&project));
     let hub = a.host_team_session();
     as_person(&mut a, "Paul");
@@ -201,7 +201,7 @@ fn a_viewer_sees_the_board_but_cannot_change_it() {
 
 #[test]
 fn bugs_are_reported_from_the_last_error_and_from_the_explorer() {
-    let project = copy_of_example("hello-part", "team-board-bugs");
+    let project = copy_of_example("part", "team-board-bugs");
     let mut app = EditorApp::new(Some(&project));
     as_person(&mut app, "Sam");
     app.output
@@ -265,7 +265,7 @@ fn bugs_are_reported_from_the_last_error_and_from_the_explorer() {
 #[test]
 fn a_goal_counts_its_tasks_and_my_work_lists_mine_soonest_first() {
     use axcenity_teamwork::Kind;
-    let project = copy_of_example("hello-part", "team-board-goals");
+    let project = copy_of_example("part", "team-board-goals");
     let mut app = EditorApp::new(Some(&project));
     as_person(&mut app, "Sam");
     let today = Date::of(axcenity_teamwork::time::now());
@@ -372,7 +372,7 @@ fn rename(app: &mut EditorApp, id: axcenity_core::InstanceId, name: &str) {
 fn each_persons_saves_board_changes_and_session_edits_are_kept_and_shown() {
     use axcenity_teamwork::history::{History, What};
     use axcenity_teamwork::{Kind, Link};
-    let project = copy_of_example("hello-part", "team-history");
+    let project = copy_of_example("part", "team-history");
     let mut a = EditorApp::new(Some(&project));
     as_person(&mut a, "Paul");
     a.team_board.history.computer = Some("PC".into());

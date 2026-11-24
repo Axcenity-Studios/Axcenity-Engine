@@ -1,6 +1,6 @@
 # Abilities and Effects
 
-Phase 76: a small version of a gameplay ability system, over the attributes and tags every Instance has. Code: `crates/gameplay/src/ability.rs` (state and Lua) and `ability_system.rs` (the game system: hooks, `step_abilities`, `ability_bar`; roadmap L7), `crates/core/src/ability.rs` (`AbilitySlot`), `crates/ui/src/ability_bar.rs`. The example is `examples/hello-abilities` (Q casts a Fireball, R heals, the yellow pad stuns), with game tests in its `tests/`.
+Phase 76: a small version of a gameplay ability system, over the attributes and tags every Instance has. Code: `crates/gameplay/src/ability.rs` (state and Lua) and `ability_system.rs` (the game system: hooks, `step_abilities`, `ability_bar`; roadmap L7), `crates/core/src/ability.rs` (`AbilitySlot`), `crates/ui/src/ability_bar.rs`. The example is `crates/samples/projects/abilities` (Q casts a Fireball, R heals, the yellow pad stuns), with game tests in its `tests/`.
 
 ## Ability
 
@@ -51,4 +51,4 @@ An `Effect` is active while its Parent is a Model in the Workspace. Keep templat
 - The **ability bar** (`axcenity_gameplay::ability_bar` → `ui::ability_bar_items`) sits at the bottom right in the player and editor Play: one slot per held Ability with an `ActivationKey`, its icon or name, its key, and while cooling down a dark sweep from the top that shrinks with the cooldown and the seconds left. `Ability` rules style slots, `Ability::key` the key.
 - Editor: the ribbon's Gameplay ▸ Character menu offers Ability and Effect beside Health and Damage Zone, with their own icons.
 
-Tests: `gameplay/src/ability_tests.rs`, `net/src/ability_tests.rs`, `ui/src/ability_bar.rs`, and `examples/hello-abilities/tests/abilities.spec.lua`.
+Tests: `gameplay/src/ability_tests.rs`, `net/src/ability_tests.rs`, `ui/src/ability_bar.rs`, and `crates/samples/projects/abilities/tests/abilities.spec.lua`.

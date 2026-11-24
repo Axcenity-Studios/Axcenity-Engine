@@ -28,16 +28,16 @@ fn set(app: &mut EditorApp, id: InstanceId, property: &str, value: Value) {
 /// A project where `wood.png` is used by a material (on a Part), by a
 /// MeshPart's SurfaceAppearance and by a script that puts it on a sign.
 fn project(test: &str) -> (EditorApp, PathBuf, InstanceId) {
-    let folder = copy_of_example("hello-touched", test);
+    let folder = copy_of_example("touched", test);
     let examples = super::tests::example("");
     let copy = |from: &str, to: &str| {
         let to = folder.join(to);
         fs::create_dir_all(to.parent().unwrap()).unwrap();
         fs::copy(examples.join(from), to).unwrap();
     };
-    copy("hello-data/assets/textures/sword.png", WOOD);
+    copy("data/assets/textures/sword.png", WOOD);
     copy(
-        "hello-csg/assets/models/Doorway.union.glb",
+        "csg/assets/models/Doorway.union.glb",
         "assets/models/Crate.glb",
     );
     fs::create_dir_all(folder.join("assets/materials")).unwrap();
@@ -256,11 +256,8 @@ const LOOSE: [&str; 7] = [
 
 #[test]
 fn organize_puts_each_materials_loose_maps_in_a_folder_and_keeps_what_uses_them() {
-    let folder = copy_of_example("hello-touched", "organize-packs");
-    let picture = fs::read(super::tests::example(
-        "hello-data/assets/textures/sword.png",
-    ))
-    .unwrap();
+    let folder = copy_of_example("touched", "organize-packs");
+    let picture = fs::read(super::tests::example("data/assets/textures/sword.png")).unwrap();
     for path in LOOSE {
         let disk = folder.join(path);
         fs::create_dir_all(disk.parent().unwrap()).unwrap();
@@ -360,13 +357,10 @@ fn organize_puts_each_materials_loose_maps_in_a_folder_and_keeps_what_uses_them(
 
 #[test]
 fn a_dropped_download_folder_comes_in_as_one_texture_set_per_material() {
-    let folder = copy_of_example("hello-touched", "import-pack");
+    let folder = copy_of_example("touched", "import-pack");
     let downloads = folder.with_extension("downloads");
     let _ = fs::remove_dir_all(&downloads);
-    let picture = fs::read(super::tests::example(
-        "hello-data/assets/textures/sword.png",
-    ))
-    .unwrap();
+    let picture = fs::read(super::tests::example("data/assets/textures/sword.png")).unwrap();
     let pack = downloads.join("Moss002_2K-JPG");
     fs::create_dir_all(&pack).unwrap();
     for name in [

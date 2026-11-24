@@ -85,9 +85,9 @@ pub(crate) fn mossy_stone(stone: &str, moss: &str) -> NodeGraph {
     graph
 }
 
-/// hello-material-graph's folder.
+/// material-graph's folder.
 fn example() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-material-graph")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/material-graph")
 }
 
 #[test]

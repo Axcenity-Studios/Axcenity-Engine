@@ -158,7 +158,7 @@ The fallback is today's renderer, unchanged: cascaded PCSS sun shadows, SSAO, ba
 - `Capabilities` gains `ray_queries` (the adapter has `EXPERIMENTAL_RAY_QUERY` and isn't software).
 - `GraphicsSettings` gains a ray tracing setting, **off at every preset**. Each effect is its own switch once it exists (Sun shadows, Probe GI, AO, Reflections), so a machine turns on only what it can afford.
 - `effective` turns it off with a note when the GPU can't, as it does for MSAA and shadow sizes. The editor and player show it only when supported.
-- Off means no acceleration structures, no passes, no memory: frames are identical to today's (`hello-graphics` references must still match).
+- Off means no acceleration structures, no passes, no memory: frames are identical to today's (`graphics` references must still match).
 
 A software fallback (compute-shader BVH, like Unity's UnifiedRayTracing or Lumen's distance fields) is **not** recommended: the existing probes and cascades already cover non-RT GPUs, and a second tracing path doubles the work.
 

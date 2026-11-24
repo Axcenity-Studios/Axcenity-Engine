@@ -102,7 +102,7 @@ fn joined(app: &EditorApp) -> bool {
 #[test]
 fn the_host_is_asked_about_a_new_joiner_and_lets_them_in() {
     let (data_a, data_b) = (data_folder("paul"), data_folder("sam"));
-    let mut a = EditorApp::new(Some(&copy_of_example("hello-part", "collab-trust-host")));
+    let mut a = EditorApp::new(Some(&copy_of_example("part", "collab-trust-host")));
     a.team_panel.trust = Trust::AskNewMembers;
     let invite = a.host_network_session(Some(&data_a), 0).expect("hosting");
     let port = invite.host.rsplit(':').next().unwrap().to_owned();

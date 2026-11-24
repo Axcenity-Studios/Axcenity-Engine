@@ -103,6 +103,7 @@ fn gpu_particles_look_like_the_same_sprites_drawn_from_the_cpu() {
         spin_degrees: 0.0,
         brightness: 1.5,
         light_emission: 0.4,
+        light_influence: 0.0,
         texture: None,
         curves: None,
         flipbook: None,
@@ -124,6 +125,7 @@ fn gpu_particles_look_like_the_same_sprites_drawn_from_the_cpu() {
             opacity: 0.4,
             brightness: 1.5,
             light_emission: 0.4,
+            light_influence: 0.0,
             texture: None,
             frame: None,
         };
@@ -191,6 +193,7 @@ fn gpu_particles_draw_their_curves_in_place_of_the_start_and_end_values() {
             opacity: 1.0 - transparency,
             brightness: 1.0,
             light_emission: 0.0,
+            light_influence: 0.0,
             texture: None,
             frame: None,
         };
@@ -544,6 +547,7 @@ fn a_sprite_draws_its_flipbook_frame_of_the_texture() {
             opacity: 1.0,
             brightness: 1.0,
             light_emission: 0.0,
+            light_influence: 0.0,
             texture: Some(four_frames()),
             frame: Some(crate::FlipbookFrame { grid: 2, frame }),
         }];

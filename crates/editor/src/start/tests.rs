@@ -280,7 +280,7 @@ fn the_reference_draws_results_and_an_open_entry() {
 fn every_tutorial_names_a_sample_that_loads() {
     for tutorial in learn::TUTORIALS {
         let folder = learn::find_sample(tutorial.sample)
-            .unwrap_or_else(|| panic!("examples/{} wasn't found", tutorial.sample));
+            .unwrap_or_else(|| panic!("the sample {} wasn't found", tutorial.sample));
         let project = axcenity_project::load(&folder).unwrap();
         assert_eq!(
             project.manifest.name, tutorial.sample_name,

@@ -102,7 +102,15 @@ pub(super) fn download(
             let stamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |time| time.as_millis());
-            let root = std::env::temp_dir().join(format!("axcenity-texture-{id}-{stamp}"));
+            // Its own folder each time: two installs of one texture in the
+            // same millisecond (two projects, or two tests) shared one, and
+            // the first to finish removed it under the other.
+            static INSTALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let turn = INSTALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "axcenity-texture-{id}-{stamp}-{}-{turn}",
+                std::process::id()
+            ));
             let outcome = install(&root, &dir, &fetched, project, record, cancel);
             let _ = fs::remove_dir_all(&root);
             outcome?

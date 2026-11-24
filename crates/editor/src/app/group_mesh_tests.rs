@@ -44,7 +44,7 @@ fn workspace_names(app: &EditorApp) -> Vec<String> {
         .collect()
 }
 
-/// A plate, a brick on it and the hello-csg Doorway's model as a
+/// A plate, a brick on it and the csg Doorway's model as a
 /// MeshPart beside them.
 fn build(app: &mut EditorApp) -> [InstanceId; 3] {
     let plate = part(app, "Plate", [8.0, 1.0, 8.0], [0.0, 0.5, 0.0]);
@@ -69,7 +69,7 @@ fn build(app: &mut EditorApp) -> [InstanceId; 3] {
 
 #[test]
 fn group_as_mesh_makes_one_meshpart_keeping_the_parts_as_one_undo_step() {
-    let folder = copy_of_example("hello-csg", "group-mesh");
+    let folder = copy_of_example("csg", "group-mesh");
     let mut app = EditorApp::new(Some(&folder));
     let parts = build(&mut app);
     let names = workspace_names(&app);
@@ -142,7 +142,7 @@ fn group_as_mesh_makes_one_meshpart_keeping_the_parts_as_one_undo_step() {
 
 #[test]
 fn ungroup_mesh_puts_the_parts_where_the_moved_turned_and_stretched_group_is() {
-    let folder = copy_of_example("hello-csg", "ungroup-mesh");
+    let folder = copy_of_example("csg", "ungroup-mesh");
     let mut app = EditorApp::new(Some(&folder));
     let plate = part(&mut app, "Plate", [8.0, 1.0, 8.0], [0.0, 0.5, 0.0]);
     let brick = part(&mut app, "Brick", [2.0, 1.0, 4.0], [3.0, 1.5, 0.0]);
@@ -184,7 +184,7 @@ fn ungroup_mesh_puts_the_parts_where_the_moved_turned_and_stretched_group_is() {
 
 #[test]
 fn a_selected_model_is_kept_whole_and_names_the_group() {
-    let folder = copy_of_example("hello-csg", "group-mesh-model");
+    let folder = copy_of_example("csg", "group-mesh-model");
     let mut app = EditorApp::new(Some(&folder));
     let house = app.world.create(ClassName::Model).unwrap();
     app.world.set_name(house, "House").unwrap();
@@ -258,7 +258,7 @@ fn a_selected_model_is_kept_whole_and_names_the_group() {
 
 #[test]
 fn group_as_mesh_needs_two_parts_and_does_nothing_during_play() {
-    let folder = copy_of_example("hello-csg", "group-mesh-play");
+    let folder = copy_of_example("csg", "group-mesh-play");
     let mut app = EditorApp::new(Some(&folder));
     let [plate, brick, _] = build(&mut app);
     app.select_many(vec![plate]);
@@ -276,7 +276,7 @@ fn group_as_mesh_needs_two_parts_and_does_nothing_during_play() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// The hello-mesh example's 31 props (one Model of textured MeshParts),
+/// The mesh example's 31 props (one Model of textured MeshParts),
 /// with a plate and a wall of flush bricks, drawn before and after Group
 /// as Mesh from the same camera, lit and as a wireframe: the lit pictures
 /// must match. With `AXCENITY_SNAPSHOTS` naming a folder, the four are
@@ -293,7 +293,7 @@ fn a_grouped_build_looks_the_same() {
     else {
         return;
     };
-    let folder = copy_of_example("hello-mesh", "group-mesh-look");
+    let folder = copy_of_example("mesh", "group-mesh-look");
     let mut app = EditorApp::new(Some(&folder));
     let props = app
         .world
@@ -440,14 +440,14 @@ fn a_grouped_build_looks_the_same() {
 #[ignore = "a measurement"]
 fn grouping_whole_examples() {
     for name in [
-        "hello-part",
-        "hello-mesh",
-        "hello-buildings",
-        "hello-physics",
-        "hello-welds",
-        "hello-vehicle",
-        "hello-csg",
-        "hello-touched",
+        "part",
+        "mesh",
+        "buildings",
+        "physics",
+        "welds",
+        "vehicle",
+        "csg",
+        "touched",
     ] {
         let folder = copy_of_example(name, &format!("group-whole-{name}"));
         let mut app = EditorApp::new(Some(&folder));
@@ -483,7 +483,7 @@ fn grouping_whole_examples() {
 #[test]
 fn group_as_mesh_offers_choice_between_multi_material_and_single_overwrite() {
     use super::group_mesh::GroupChoice;
-    let folder = copy_of_example("hello-csg", "group-mesh-multi-mat");
+    let folder = copy_of_example("csg", "group-mesh-multi-mat");
     let mut app = EditorApp::new(Some(&folder));
     let wood = part(&mut app, "WoodBlock", [4.0, 1.0, 4.0], [0.0, 0.5, 0.0]);
     let brick = part(&mut app, "BrickBlock", [4.0, 1.0, 4.0], [4.0, 0.5, 0.0]);

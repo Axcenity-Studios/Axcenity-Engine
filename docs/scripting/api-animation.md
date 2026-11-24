@@ -19,4 +19,4 @@ Animation from Lua.
   - `track.KeyframeReached` fires with an event's name each time it passes one; `track:GetMarkerReachedSignal(name)` is an event for one name, whose handler gets the name.
   - A clip that doesn't loop stops at its end: its last frame is applied, `Stopped` fires, and it lets go. Properties keep the value last given; bones go back to what plays under it.
 - **Blending**: each frame an Animator plays its state machine first, then its tracks and played Animations over it, the oldest start first, so where two animate the same thing the one started last wins. A track counts by its weight: bones it moves are mixed toward its pose, and properties it keys toward its values, by `WeightCurrent`. Root motion comes from the state machine only. See `docs/rendering/animation.md`.
-- `examples/hello-door` plays its door with `door.Animator:LoadAnimation(door.Open)` when something lands on the Pad; `examples/hello-animation` drives a state machine from keys.
+- `crates/samples/projects/door` plays its door with `door.Animator:LoadAnimation(door.Open)` when something lands on the Pad; `crates/samples/projects/animation` drives a state machine from keys.

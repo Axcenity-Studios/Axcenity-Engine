@@ -1,4 +1,4 @@
-//! Phase 45: the hello-tools example's sword, torch and shield, in the
+//! Phase 45: the tools example's sword, torch and shield, in the
 //! player's frame order with physics.
 
 use std::path::{Path, PathBuf};
@@ -30,16 +30,16 @@ struct Game {
 }
 
 impl Game {
-    /// hello-tools from a copy, with its save slots in a folder of the
+    /// tools from a copy, with its save slots in a folder of the
     /// test's own.
     fn start(test: &str) -> Self {
-        Self::start_in("hello-tools", test)
+        Self::start_in("tools", test)
     }
 
-    /// The example `name` from a copy, as [`Game::start`] does hello-tools.
+    /// The example `name` from a copy, as [`Game::start`] does tools.
     fn start_in(name: &str, test: &str) -> Self {
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples")
+            .join("../samples/projects")
             .join(name);
         let folder = TempCopy::of(
             &example,
@@ -380,12 +380,12 @@ fn snapshot(game: &Game, path: &Path) {
         .unwrap();
 }
 
-/// Phase 75: hello-decals' Blaster fired 500 times leaves a bullet hole
+/// Phase 75: decals' Blaster fired 500 times leaves a bullet hole
 /// where each shot hits the target, and the Workspace keeps no more than
 /// its MaxSpawnedDecals of them, the newest.
 #[test]
 fn five_hundred_bullet_holes_from_the_blaster_stay_under_the_cap() {
-    let mut game = Game::start_in("hello-decals", "holes");
+    let mut game = Game::start_in("decals", "holes");
     game.frames(5);
     let holes = |game: &Game| -> Vec<InstanceId> {
         let workspace = game.world.workspace();

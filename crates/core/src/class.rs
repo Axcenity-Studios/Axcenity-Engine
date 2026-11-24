@@ -257,6 +257,13 @@ pub enum ClassName {
     /// (color correction, exposure, fog, atmosphere and bloom) replace the
     /// world's. Where volumes overlap, the higher `Priority` wins.
     GraphicsVolume,
+    /// An invisible part that sets the weather inside its box by hand,
+    /// wherever the camera is: whether rain and snow fall there
+    /// (`Precipitation`), how much of the world's snow lies (`Snow`) and
+    /// how wet surfaces are (`Wetness`), in place of the shelter the engine
+    /// finds. By default it's a shelter: an interior, dry and bare. Where
+    /// volumes overlap, the higher `Priority` wins.
+    WeatherVolume,
     /// Inside a GraphicsVolume: the exposure there, in place of Lighting's.
     ExposureEffect,
     /// Inside a GraphicsVolume: distance fog there, in place of the world's.
@@ -582,6 +589,7 @@ impl ClassName {
         ClassName::SunRaysEffect,
         ClassName::MotionBlurEffect,
         ClassName::GraphicsVolume,
+        ClassName::WeatherVolume,
         ClassName::ExposureEffect,
         ClassName::FogEffect,
         ClassName::BloomEffect,
@@ -732,6 +740,7 @@ impl ClassName {
             ClassName::SunRaysEffect => "SunRaysEffect",
             ClassName::MotionBlurEffect => "MotionBlurEffect",
             ClassName::GraphicsVolume => "GraphicsVolume",
+            ClassName::WeatherVolume => "WeatherVolume",
             ClassName::ExposureEffect => "ExposureEffect",
             ClassName::FogEffect => "FogEffect",
             ClassName::BloomEffect => "BloomEffect",
@@ -831,6 +840,7 @@ impl ClassName {
             | ClassName::DamageZone
             | ClassName::ReverbZone
             | ClassName::GraphicsVolume
+            | ClassName::WeatherVolume
             | ClassName::SpawnLocation => &["Part", "BasePart", "PVInstance"],
             ClassName::VehicleSeat => &["Seat", "Part", "BasePart", "PVInstance"],
             ClassName::Model => &["PVInstance"],
@@ -881,8 +891,8 @@ impl ClassName {
     }
 
     /// A Part or one of the classes that are Parts: NegateOperation, Seat,
-    /// VehicleSeat, DamageZone, ReverbZone, GraphicsVolume and
-    /// SpawnLocation. They have a
+    /// VehicleSeat, DamageZone, ReverbZone, GraphicsVolume, WeatherVolume
+    /// and SpawnLocation. They have a
     /// `Shape`, a `Material` and the rest.
     pub fn is_part(self) -> bool {
         matches!(
@@ -894,6 +904,7 @@ impl ClassName {
                 | ClassName::DamageZone
                 | ClassName::ReverbZone
                 | ClassName::GraphicsVolume
+                | ClassName::WeatherVolume
                 | ClassName::SpawnLocation
         )
     }
@@ -1410,6 +1421,8 @@ impl ClassName {
                 // Snow layer thickness in studs (0 to 2): controls visual
                 // depth, terrain lift, and footprint depression depth.
                 ("SnowThickness", Value::Number(0.35)),
+                // How often lightning flashes, from 0 (never) to 1.
+                ("Lightning", Value::Number(0.0)),
                 // Seconds a change takes to ease in: rain wetting surfaces,
                 // drying, snow settling or melting.
                 ("TransitionTime", Value::Number(10.0)),
@@ -1646,6 +1659,9 @@ impl ClassName {
                     ("FlipbookStartRandom", Value::Bool(false)),
                     // 0 paints over what's behind; 1 adds light (fire, sparks).
                     ("LightEmission", Value::Number(0.0)),
+                    // 0 keeps its color whatever the hour; 1 is lit by the
+                    // sun, sky and ambient light (dust, smoke).
+                    ("LightInfluence", Value::Number(0.0)),
                     // Above 1 glows (and blooms).
                     ("Brightness", Value::Number(1.0)),
                 ],
@@ -2276,6 +2292,7 @@ impl ClassName {
             | ClassName::DamageZone
             | ClassName::ReverbZone
             | ClassName::GraphicsVolume
+            | ClassName::WeatherVolume
             | ClassName::SpawnLocation => {
                 let material = Material::Plastic;
                 let preset = material.preset();
@@ -2399,6 +2416,44 @@ impl ClassName {
                         // Studs outside its faces over which its look fades
                         // in as the camera comes closer. Inside, it's whole.
                         ("BlendDistance", Value::Number(5.0)),
+                        // Where volumes overlap, the higher one wins; equal
+                        // ones follow Explorer order, the later winning.
+                        ("Priority", Value::Number(0.0)),
+                    ]);
+                }
+                if self == ClassName::WeatherVolume {
+                    // Something to walk into and not see: the weather it
+                    // keeps out (or lets in) is what shows.
+                    for (name, value) in [
+                        ("Anchored", Value::Bool(true)),
+                        ("CanCollide", Value::Bool(false)),
+                        ("CanQuery", Value::Bool(false)),
+                        ("Transparency", Value::Number(1.0)),
+                        ("Color", Value::Color3(Color3::new(0.35, 0.75, 0.9))),
+                        ("CastShadow", Value::Bool(false)),
+                        ("Size", Value::Vector3(Vector3::new(20.0, 12.0, 20.0))),
+                    ] {
+                        if let Some(slot) = properties.iter_mut().find(|(n, _)| *n == name) {
+                            slot.1 = value;
+                        }
+                    }
+                    // The defaults make a shelter: no drops, dry, no snow.
+                    properties.extend([
+                        // Off, it changes nothing.
+                        ("Enabled", Value::Bool(true)),
+                        // Whether rain and snow fall inside it: false keeps
+                        // them out even under open sky, true lets them in
+                        // even under a roof.
+                        ("Precipitation", Value::Bool(false)),
+                        // How much of the world's snow lies inside, from 0
+                        // (none) through 1 (as outside) to 2 (twice as deep).
+                        ("Snow", Value::Number(0.0)),
+                        // How much of the world's wetness is inside, from 0
+                        // (dry) through 1 (as outside) to 2.
+                        ("Wetness", Value::Number(0.0)),
+                        // Studs over which its effect fades across its
+                        // faces, half outside and half inside them.
+                        ("BlendDistance", Value::Number(1.0)),
                         // Where volumes overlap, the higher one wins; equal
                         // ones follow Explorer order, the later winning.
                         ("Priority", Value::Number(0.0)),
@@ -2682,10 +2737,19 @@ impl ClassName {
                 // The TerrainLayer (by name) Apply paints the strip with.
                 // Empty paints nothing.
                 ("Layer", Value::String(String::new())),
-                // Whether scatter rules keep off the strip, and how many
-                // studs past its edges they keep.
+                // The TerrainLayer (by name) Apply paints its shoulders
+                // with, from each edge out over Falloff. Empty paints none.
+                ("ShoulderLayer", Value::String(String::new())),
+                // 0 to 1: breaks the paint's outer edge up with noise
+                // NoiseScale studs across, so it isn't a clean line.
+                ("EdgeNoise", Value::Number(0.5)),
+                ("NoiseScale", Value::Number(10.0)),
+                // Whether scatter rules keep off the strip (and Apply
+                // takes painted foliage off it), how many studs past its
+                // edges they keep, and over how many more they thin out.
                 ("ClearScatter", Value::Bool(true)),
                 ("ClearMargin", Value::Number(1.0)),
+                ("ClearFalloff", Value::Number(4.0)),
                 // Route's steepest climb, in degrees.
                 ("MaxGrade", Value::Number(8.0)),
             ],
@@ -3466,6 +3530,7 @@ impl ClassName {
             | ClassName::DamageZone
             | ClassName::ReverbZone
             | ClassName::GraphicsVolume
+            | ClassName::WeatherVolume
             | ClassName::SpawnLocation => &["Touched", "TouchEnded"],
             // `OnServerEvent` fires in Scripts for each `FireServer`, and
             // `OnClientEvent` in LocalScripts for each `FireClient`.
@@ -3795,6 +3860,62 @@ mod tests {
         for class in ClassName::ALL {
             assert!(class.is_a("Instance") && class.is_a(class.as_str()));
         }
+    }
+
+    #[test]
+    fn a_weather_volume_is_an_invisible_part_that_shelters_by_default() {
+        use crate::{Color3, Value, Vector3};
+        let class = ClassName::WeatherVolume;
+        assert!(class.is_part() && class.is_base_part() && class.is_a("BasePart"));
+        assert!(class.is_a("Part") && !class.is_a("GraphicsVolume"));
+        let properties = class.default_properties();
+        let value = |name: &str| {
+            properties
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, value)| value.clone())
+        };
+        // A box to walk into and not see, nothing to bump into or click.
+        for (name, expected) in [
+            ("Anchored", Value::Bool(true)),
+            ("CanCollide", Value::Bool(false)),
+            ("CanQuery", Value::Bool(false)),
+            ("Transparency", Value::Number(1.0)),
+            ("CastShadow", Value::Bool(false)),
+            ("Size", Value::Vector3(Vector3::new(20.0, 12.0, 20.0))),
+            // A shelter until told otherwise: no drops, bare and dry.
+            ("Enabled", Value::Bool(true)),
+            ("Precipitation", Value::Bool(false)),
+            ("Snow", Value::Number(0.0)),
+            ("Wetness", Value::Number(0.0)),
+            ("BlendDistance", Value::Number(1.0)),
+            ("Priority", Value::Number(0.0)),
+        ] {
+            assert_eq!(value(name), Some(expected), "{name}");
+        }
+        // Its own color, to tell it from a GraphicsVolume when it's shown.
+        let color = |class: ClassName| {
+            class
+                .default_properties()
+                .into_iter()
+                .find(|(n, _)| *n == "Color")
+                .map(|(_, value)| value)
+        };
+        assert_eq!(
+            color(class),
+            Some(Value::Color3(Color3::new(0.35, 0.75, 0.9)))
+        );
+        assert_ne!(color(class), color(ClassName::GraphicsVolume));
+        // Everything else a Part has, with no property named twice.
+        for (name, _) in ClassName::Part.default_properties() {
+            assert!(value(name).is_some(), "{name}");
+        }
+        let mut names: Vec<_> = properties.iter().map(|(name, _)| *name).collect();
+        names.sort_unstable();
+        let count = names.len();
+        names.dedup();
+        assert_eq!(names.len(), count);
+        assert_eq!(class.events(), ClassName::Part.events());
     }
 
     #[test]

@@ -14,7 +14,14 @@ fn part_properties_are_grouped_like_studio_and_none_are_left_out() {
     let sections = sections(instance);
     assert_eq!(
         titles(&sections),
-        ["Appearance", "Behavior", "Physics", "Part", "Tiling"]
+        [
+            "Appearance",
+            "Behavior",
+            "Physics",
+            "Part",
+            "Pivot",
+            "Tiling"
+        ]
     );
     let names: Vec<&str> = sections
         .iter()
@@ -51,6 +58,7 @@ fn part_properties_are_grouped_like_studio_and_none_are_left_out() {
             "Position",
             "Orientation",
             "Size",
+            "PivotOffset",
             "TileSize"
         ]
     );

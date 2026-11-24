@@ -1,7 +1,7 @@
 ---
 description: Output and errors, changing scripts while the game runs, breakpoints, the Developer Console (F9), the Profiler's Game, Graphics and Memory tabs, visual overlays, game tests and keeping a game fast.
 icon: bug
-samples: [hello-script, hello-character]
+samples: [script, character]
 ---
 
 # Debugging and performance

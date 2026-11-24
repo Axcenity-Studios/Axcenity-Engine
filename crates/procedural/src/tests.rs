@@ -1,5 +1,5 @@
 //! Phase 74: SplineMesh pieces, SplineScatter layouts and Flatten Terrain
-//! Along, with the hello-roads example's models.
+//! Along, with the roads example's models.
 
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ use glam::Vec3;
 use super::*;
 
 fn example_assets() -> Assets {
-    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-roads"))
+    Assets::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/roads"))
 }
 
 fn set(world: &mut World, id: InstanceId, name: &str, value: Value) {

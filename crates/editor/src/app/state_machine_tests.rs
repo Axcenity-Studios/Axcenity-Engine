@@ -31,7 +31,7 @@ fn draw_tab(app: &mut EditorApp, ctx: &egui::Context, frames: Vec<Vec<egui::Even
 
 #[test]
 fn a_wire_from_idle_to_walk_saying_speed_over_0_1_plays_in_the_preview_and_in_play() {
-    let folder = copy_of_example("hello-animation", "blueprint-machine");
+    let folder = copy_of_example("animation", "blueprint-machine");
     let machine = StateMachineFile {
         parameters: vec![ParameterDef::Number {
             name: "Speed".into(),

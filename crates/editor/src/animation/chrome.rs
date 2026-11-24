@@ -1,5 +1,9 @@
 use super::*;
 
+/// What draws the Sequencer inside the Animation workspace, when it's
+/// shown there.
+pub type SequencerUi<'a> = dyn FnMut(&mut egui::Ui, &World) + 'a;
+
 impl AnimationStudio {
     /// Whether the Animation tab takes K, Delete and Ctrl+C/X/V this frame:
     /// a property clip is shown and the mouse is over it, as drawn last
@@ -52,7 +56,7 @@ impl AnimationStudio {
         world: &mut World,
         stylesheets: &[axcenity_ui::Stylesheet],
         output: &mut Output,
-        mut sequencer_ui: Option<&mut dyn FnMut(&mut egui::Ui, &World)>,
+        mut sequencer_ui: Option<&mut SequencerUi<'_>>,
     ) -> Vec<StudioAction> {
         let mut actions = Vec::new();
         let Some(project) = project else {

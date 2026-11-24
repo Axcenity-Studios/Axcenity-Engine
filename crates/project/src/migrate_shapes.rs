@@ -398,7 +398,7 @@ mod tests {
         // 0.2.0-alpha.1 wrote format 5 (`releases/history`); the 0.1.0
         // alphas wrote format 2, which `migrate_animation`'s tests take
         // from there to now.
-        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
         let mut names: Vec<_> = fs::read_dir(&examples)
             .unwrap()
             .flatten()

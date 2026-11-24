@@ -89,7 +89,7 @@ fn animate_noodle(app: &mut EditorApp) -> (InstanceId, String) {
 
 #[test]
 fn a_pose_made_with_ik_and_keyed_with_record_plays_the_same_in_the_preview_and_in_play() {
-    let folder = copy_of_example("hello-animation", "ik-record");
+    let folder = copy_of_example("animation", "ik-record");
     let mut app = EditorApp::new(Some(&folder));
     let (noodle, _) = animate_noodle(&mut app);
     let rig = rig(&app);
@@ -131,7 +131,7 @@ fn a_pose_made_with_ik_and_keyed_with_record_plays_the_same_in_the_preview_and_i
 
 #[test]
 fn record_and_k_key_only_the_bones_a_moved_joint_turned() {
-    let folder = copy_of_example("hello-animation", "ik-keys");
+    let folder = copy_of_example("animation", "ik-keys");
     let mut app = EditorApp::new(Some(&folder));
     animate_noodle(&mut app);
     app.animation.set_record(false);
@@ -197,7 +197,7 @@ fn record_and_k_key_only_the_bones_a_moved_joint_turned() {
 
 #[test]
 fn undoing_an_ik_pose_puts_back_the_keys_and_redo_brings_back_the_same_pose() {
-    let folder = copy_of_example("hello-animation", "ik-undo");
+    let folder = copy_of_example("animation", "ik-undo");
     let mut app = EditorApp::new(Some(&folder));
     let (_, clip) = animate_noodle(&mut app);
     let by = hat_move(&app);
@@ -243,7 +243,7 @@ fn undoing_an_ik_pose_puts_back_the_keys_and_redo_brings_back_the_same_pose() {
 
 #[test]
 fn pins_stay_with_their_clip_while_the_editor_runs_and_are_never_saved() {
-    let folder = copy_of_example("hello-animation", "ik-pins");
+    let folder = copy_of_example("animation", "ik-pins");
     let mut app = EditorApp::new(Some(&folder));
     let (noodle, clip) = animate_noodle(&mut app);
     {
@@ -305,7 +305,7 @@ fn pins_stay_with_their_clip_while_the_editor_runs_and_are_never_saved() {
 
 #[test]
 fn a_pinned_joint_holds_while_another_bone_turns() {
-    let folder = copy_of_example("hello-animation", "ik-pin-holds");
+    let folder = copy_of_example("animation", "ik-pin-holds");
     let mut app = EditorApp::new(Some(&folder));
     animate_noodle(&mut app);
     let rig = rig(&app);

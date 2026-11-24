@@ -13,7 +13,7 @@ use super::*;
 const SIZE: egui::Vec2 = egui::vec2(320.0, 400.0);
 
 fn opened(test: &str) -> EditorApp {
-    let folder = copy_of_example("hello-plugins", test);
+    let folder = copy_of_example("plugins", test);
     let mut app = EditorApp::new(None);
     app.open(&folder);
     app
@@ -105,7 +105,7 @@ fn align_to_grid_snaps_the_selection_to_one_stud_as_one_undo_step() {
 
 #[test]
 fn edits_between_waypoints_are_one_step_and_a_plugin_destroy_undoes() {
-    let folder = copy_of_example("hello-plugins", "plugin-waypoints");
+    let folder = copy_of_example("plugins", "plugin-waypoints");
     let plugin = folder.join("plugins/steps");
     std::fs::create_dir_all(&plugin).unwrap();
     std::fs::write(
@@ -196,7 +196,7 @@ fn edits_between_waypoints_are_one_step_and_a_plugin_destroy_undoes() {
 
 #[test]
 fn an_erroring_plugin_shows_file_and_line_in_the_console_and_panel_and_the_editor_runs_on() {
-    let folder = copy_of_example("hello-plugins", "plugin-error");
+    let folder = copy_of_example("plugins", "plugin-error");
     let plugin = folder.join("plugins/broken");
     std::fs::create_dir_all(&plugin).unwrap();
     std::fs::write(
@@ -523,7 +523,7 @@ fn dragging_part_tools_height_handle_resizes_the_part_as_one_undo_step() {
 /// the part it's clicked for.
 #[test]
 fn plugin_properties_rows_set_attributes_and_buttons_call_the_plugin() {
-    let folder = copy_of_example("hello-plugins", "plugin-rows");
+    let folder = copy_of_example("plugins", "plugin-rows");
     let speed = folder.join("plugins").join("speed");
     std::fs::create_dir_all(&speed).unwrap();
     std::fs::write(
@@ -598,7 +598,7 @@ fn plugin_properties_rows_set_attributes_and_buttons_call_the_plugin() {
 /// gets the asset's path.
 #[test]
 fn a_plugin_imports_its_kind_of_file_and_hears_of_other_imports() {
-    let folder = copy_of_example("hello-plugins", "plugin-importer");
+    let folder = copy_of_example("plugins", "plugin-importer");
     let layout = folder.join("plugins").join("layout");
     std::fs::create_dir_all(&layout).unwrap();
     std::fs::write(

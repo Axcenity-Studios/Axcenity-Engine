@@ -81,6 +81,7 @@ Instance classes: everything that can be in the tree.
 | [SunRaysEffect](classes/SunRaysEffect.md) | Inside Lighting: shafts of light streaming from the sun past whatever is in front of it, such as bright sky between leaves or a window, worked out on screen from what's drawn (so they show only while the sun is in or near the view). |
 | [MotionBlurEffect](classes/MotionBlurEffect.md) | Inside Lighting: streaks what moves across the view along its motion, as a camera's shutter does: parts that move, posed characters, and everything when the camera moves. |
 | [GraphicsVolume](classes/GraphicsVolume.md) | A Part that changes the look while the camera is inside it, fading in over BlendDistance studs outside it and out again on leaving. |
+| [WeatherVolume](classes/WeatherVolume.md) | A Part that sets the weather inside its box by hand, wherever the camera is: whether rain and snow fall there (Precipitation), how much of the world's snow lies (Snow) and how wet surfaces are (Wetness), in place of the shelter the engine finds from roofs. |
 | [ExposureEffect](classes/ExposureEffect.md) | Inside a GraphicsVolume: the exposure while the camera is in the volume, in place of Lighting's Exposure. |
 | [FogEffect](classes/FogEffect.md) | Inside a GraphicsVolume: distance fog from Start to End studs in Color while the camera is in the volume, in place of the world's fog. |
 | [BloomEffect](classes/BloomEffect.md) | Inside a GraphicsVolume: how bright light blooms while the camera is in the volume, in place of Lighting's BloomIntensity and BloomThreshold. |

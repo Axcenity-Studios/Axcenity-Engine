@@ -47,7 +47,7 @@ fn frame(app: &mut EditorApp, events: Vec<egui::Event>) -> Vec<egui::Event> {
 
 #[test]
 fn in_play_tab_arrows_and_enter_move_focus_and_click_and_other_keys_reach_the_game() {
-    let folder = copy_of_example("hello-menu", "navigation");
+    let folder = copy_of_example("menu", "navigation");
     let mut app = EditorApp::new(Some(&folder));
     let none = egui::Modifiers::NONE;
 
@@ -108,7 +108,7 @@ fn in_play_tab_arrows_and_enter_move_focus_and_click_and_other_keys_reach_the_ga
 
 #[test]
 fn dragging_a_focus_arrow_onto_an_element_points_it_there_in_one_undo_step() {
-    let folder = copy_of_example("hello-menu", "focus-arrows");
+    let folder = copy_of_example("menu", "focus-arrows");
     let mut app = EditorApp::new(Some(&folder));
     let play = named(&app, "Play");
     let status = named(&app, "Status");

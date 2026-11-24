@@ -1,4 +1,4 @@
-//! Phase 79: IKControls posing the `hello-character` example's Remy.
+//! Phase 79: IKControls posing the `character` example's Remy.
 
 use std::path::Path;
 
@@ -13,7 +13,7 @@ const STATE_MACHINE: &str = "assets/animations/Dummy/Dummy.statemachine.json";
 const FRAME: f64 = 1.0 / 60.0;
 
 fn assets() -> Assets {
-    Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-character"))
+    Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/character"))
 }
 
 /// A standing character: a skinned MeshPart at the origin, facing +Z as the

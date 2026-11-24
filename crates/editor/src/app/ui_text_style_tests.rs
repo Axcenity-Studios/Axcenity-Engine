@@ -13,7 +13,7 @@ use super::*;
 
 #[test]
 fn the_text_toolbar_writes_bold_italic_underline_into_the_elements_own_rule() {
-    let folder = copy_of_example("hello-touched", "ui-designer-text-toolbar");
+    let folder = copy_of_example("touched", "ui-designer-text-toolbar");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -130,7 +130,7 @@ fn the_text_toolbar_writes_bold_italic_underline_into_the_elements_own_rule() {
 
 #[test]
 fn ctrl_b_i_u_toggle_the_selected_labels_text_unless_typing() {
-    let folder = copy_of_example("hello-touched", "ui-designer-text-shortcuts");
+    let folder = copy_of_example("touched", "ui-designer-text-shortcuts");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -209,7 +209,7 @@ fn ctrl_b_i_u_toggle_the_selected_labels_text_unless_typing() {
 
 #[test]
 fn selected_text_in_the_typing_box_is_wrapped_in_rich_text_tags() {
-    let folder = copy_of_example("hello-touched", "ui-designer-rich-text");
+    let folder = copy_of_example("touched", "ui-designer-rich-text");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(
@@ -376,7 +376,7 @@ fn the_states_editor_writes_hover_and_pressed_rules_that_show_in_its_preview_and
     use crate::ui_designer::state_style_action;
     use axcenity_render::UiDrawItem;
     use axcenity_ui::{UiInput, UiInteraction, UiState};
-    let folder = copy_of_example("hello-touched", "ui-designer-states");
+    let folder = copy_of_example("touched", "ui-designer-states");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -596,7 +596,7 @@ fn the_states_editor_writes_hover_and_pressed_rules_that_show_in_its_preview_and
 #[test]
 fn mouse_enter_leave_and_a_disabled_button_reach_the_game_in_play() {
     use axcenity_ui::UiEvent;
-    let folder = copy_of_example("hello-buttons", "ui-designer-hover-play");
+    let folder = copy_of_example("buttons", "ui-designer-hover-play");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     let world = app.play.as_ref().expect("playing").world();
@@ -673,7 +673,7 @@ fn a_raised_bevel_lights_the_top_left_and_flips_while_held_in_the_designer_and_i
     use crate::ui_designer::state_style_action;
     use axcenity_render::UiDrawItem;
     use axcenity_ui::{UiInput, UiInteraction, UiState};
-    let folder = copy_of_example("hello-touched", "ui-designer-bevel");
+    let folder = copy_of_example("touched", "ui-designer-bevel");
     let mut app = EditorApp::new(Some(&folder));
     act(&mut app, DesignerAction::NewScreenGui);
     let gui = app.selected.unwrap();
@@ -817,7 +817,7 @@ fn a_raised_bevel_lights_the_top_left_and_flips_while_held_in_the_designer_and_i
 
 #[test]
 fn dragging_the_slice_editors_lines_changes_the_border_image_css() {
-    let folder = copy_of_example("hello-touched", "ui-designer-slice");
+    let folder = copy_of_example("touched", "ui-designer-slice");
     // A 40 × 40 picture to cut.
     let picture = folder.join("assets/ui/frame.png");
     std::fs::create_dir_all(picture.parent().unwrap()).unwrap();

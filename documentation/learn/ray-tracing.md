@@ -1,7 +1,7 @@
 ---
 description: Turn on hardware ray tracing in a couple of clicks, check that it's working, and get good ray traced shadows and lighting.
 icon: sun
-samples: [hello-graphics, hello-lights]
+samples: [graphics, lights]
 ---
 
 # Ray tracing: the best look, simply

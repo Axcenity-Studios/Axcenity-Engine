@@ -137,6 +137,9 @@ impl ScriptRuntime {
                 self.fire_instance_event(world, id, event, &args);
             }
         }
+        // A preset transition (`Lighting:TransitionToPreset`) moves on
+        // before the Sequences, so what a playing sequence keys wins.
+        self.environment.0.borrow_mut().step(world, seconds);
         // Then Sequences move on, after scripts that play them.
         let stepped = {
             let mut camera = self.client_camera();

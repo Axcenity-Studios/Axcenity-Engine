@@ -16,7 +16,8 @@
 //! Not synced ([`is_synced`]): the World's own files (`world.json`,
 //! `levels/`; the World travels as operations), per-machine data
 //! (`.axcenity/`: the cooked cache, local version history, editor layout),
-//! `plugins/` (they run Lua with the editor's powers) and hidden files.
+//! `plugins/` (they run Lua with the editor's powers), `movies/` (rendered
+//! movies) and hidden files.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -73,13 +74,16 @@ pub const CHUNK: usize = 1 << 20;
 /// The largest file a session takes.
 pub const MAX_FILE: u64 = 1 << 30;
 
-/// Paths that are the World itself or per-machine.
+/// Paths that are the World itself or per-machine. `movies` is where the
+/// editor's Render Movie writes by default: what one machine rendered,
+/// often gigabytes, and made again from the sequence.
 const NOT_SYNCED: &[&str] = &[
     "world.json",
     "world.backup.json",
     "levels",
     "plugins",
     "thumbnail.png",
+    "movies",
 ];
 
 /// Each person's history (`team/history`, the teamwork crate's T4): in a

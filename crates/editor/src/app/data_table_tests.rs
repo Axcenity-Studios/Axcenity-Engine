@@ -64,7 +64,7 @@ fn size_y(app: &EditorApp, name: &str) -> f32 {
 
 #[test]
 fn a_weapons_table_made_in_the_grid_is_read_by_a_script() {
-    let folder = copy_of_example("hello-data", "data-made");
+    let folder = copy_of_example("data", "data-made");
     // Start without the example's table and script, to make them here.
     std::fs::remove_file(folder.join(WEAPONS)).unwrap();
     std::fs::write(
@@ -140,7 +140,7 @@ fn a_weapons_table_made_in_the_grid_is_read_by_a_script() {
 
 #[test]
 fn changing_a_cell_during_play_changes_what_the_script_reads_next() {
-    let folder = copy_of_example("hello-data", "data-live");
+    let folder = copy_of_example("data", "data-live");
     let mut app = EditorApp::new(Some(&folder));
     app.play();
     play_for(&mut app, 0.2);
@@ -174,7 +174,7 @@ fn changing_a_cell_during_play_changes_what_the_script_reads_next() {
 
 #[test]
 fn search_filter_and_sort_change_only_what_is_shown() {
-    let folder = copy_of_example("hello-data", "data-view");
+    let folder = copy_of_example("data", "data-view");
     let mut app = EditorApp::new(Some(&folder));
     app.data_table_action(TableAction::Show(WEAPONS.to_owned()));
     let table = app.data_tables.document(WEAPONS).unwrap().table.clone();
@@ -202,7 +202,7 @@ fn a_missing_row_or_asset_in_a_table_is_in_asset_check_and_its_fixes_work() {
 
     use crate::asset_check::FixChoice;
 
-    let folder = copy_of_example("hello-data", "data-check");
+    let folder = copy_of_example("data", "data-check");
     // The bow's icon moved, and the crossbow names ammo there isn't.
     std::fs::create_dir_all(folder.join("assets/textures/moved")).unwrap();
     std::fs::rename(

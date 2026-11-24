@@ -1,8 +1,10 @@
 //! TerrainPaths in the editor (procedural worlds PW4): Apply flattens and
-//! paints the ground under a path, and Route lays its Spline's points over
-//! the terrain within its MaxGrade. Each is one undo step. Scatter rules
-//! keep off a path by themselves (`procedural::terrain_scatter`), so moving
-//! its points needs nothing here.
+//! paints the ground under a path (its Layer, and its ShoulderLayer out
+//! over the falloff with a ragged edge) and takes painted foliage off it,
+//! and Route lays its Spline's points over the terrain within its
+//! MaxGrade. Each is one undo step. Scatter rules keep off a path by
+//! themselves (`procedural::terrain_scatter`), so moving its points needs
+//! nothing here.
 
 use std::sync::Arc;
 
@@ -47,8 +49,10 @@ impl EditorApp {
     }
 
     /// Apply to Terrain: every terrain under the TerrainPath `id`'s Spline
-    /// flattened to its curve (with `Flatten`) and painted with its
-    /// `Layer`, `Width` wide and blending in over `Falloff`, as one undo
+    /// flattened to its curve (with `Flatten`), painted with its `Layer`
+    /// `Width` wide and its `ShoulderLayer` out over `Falloff` (the outer
+    /// edge broken up by `EdgeNoise`), and cleared of painted foliage
+    /// (with `ClearScatter`, thinning over `ClearFalloff`), as one undo
     /// step.
     pub(super) fn apply_terrain_path(&mut self, id: InstanceId) {
         if self.playing() {
@@ -62,9 +66,11 @@ impl EditorApp {
                 .warning(format!("{name}'s Spline has no points to apply along."));
             return;
         };
-        if !settings.flatten && settings.layer.is_empty() {
+        let paints = !settings.layer.is_empty() || !settings.shoulder_layer.is_empty();
+        if !settings.flatten && !paints && !settings.clear_scatter {
             self.output.warning(format!(
-                "{name} has Flatten off and no Layer, so there's nothing to apply."
+                "{name} has Flatten and Clear Scatter off and no Layer or Shoulder Layer, so \
+                 there's nothing to apply."
             ));
             return;
         }
@@ -75,50 +81,71 @@ impl EditorApp {
             return;
         }
         let before = self.world.clone();
-        let mut changed = 0;
-        let mut missing_layer = false;
+        let mut changed = axcenity_procedural::Applied::default();
+        // Whether the Layer, and the Shoulder Layer, is one some terrain lacks.
+        let mut missing = [false; 2];
         for (terrain, placement) in terrains {
-            let layer = if settings.layer.is_empty() {
-                None
-            } else {
-                let found = axcenity_terrain::materials::layers(&self.world, terrain)
+            let layers = axcenity_terrain::materials::layers(&self.world, terrain);
+            let find = |wanted: &str| {
+                layers
                     .iter()
-                    .position(|&layer| {
-                        self.world
-                            .get(layer)
-                            .is_some_and(|l| l.name() == settings.layer)
-                    });
-                missing_layer |= found.is_none();
-                found
+                    .position(|&layer| self.world.get(layer).is_some_and(|l| l.name() == wanted))
             };
+            let mut places = [None; 2];
+            for (index, wanted) in [&settings.layer, &settings.shoulder_layer]
+                .into_iter()
+                .enumerate()
+            {
+                if !wanted.is_empty() {
+                    places[index] = find(wanted);
+                    missing[index] |= places[index].is_none();
+                }
+            }
             let Some(mut data) = self.world.terrain(terrain).map(|d| TerrainData::clone(d)) else {
                 continue;
             };
-            let set =
-                axcenity_procedural::apply_path(&mut data, &placement, &curve, &settings, layer);
-            if set > 0 {
-                changed += set;
+            let applied = axcenity_procedural::apply_path(
+                &mut data, &placement, &curve, &settings, places[0], places[1],
+            );
+            if applied.any() {
+                changed.samples += applied.samples;
+                changed.foliage += applied.foliage;
                 self.world.set_terrain(terrain, Arc::new(data));
             }
         }
-        if missing_layer {
-            self.output.warning(format!(
-                "{name}'s Layer {} isn't one of the terrain's layers, so it wasn't painted.",
-                settings.layer
-            ));
+        for (index, (label, layer)) in [
+            ("Layer", &settings.layer),
+            ("Shoulder Layer", &settings.shoulder_layer),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if missing[index] {
+                self.output.warning(format!(
+                    "{name}'s {label} {layer} isn't one of the terrain's layers, so it wasn't \
+                     painted."
+                ));
+            }
         }
-        if changed == 0 {
+        if !changed.any() {
             self.world = before;
-            self.output.warning(format!(
-                "{name} isn't over a Terrain, so nothing was changed."
-            ));
+            self.output.warning(if settings.flatten || paints {
+                format!("{name} isn't over a Terrain, so nothing was changed.")
+            } else {
+                format!("{name} has no painted foliage on it to clear, so nothing was changed.")
+            });
             return;
         }
         self.history
             .record_world(&mut self.world, format!("Apply {name}"), before);
+        let cleared = match changed.foliage {
+            0 => String::new(),
+            1 => " and cleared 1 painted item off it".to_owned(),
+            n => format!(" and cleared {n} painted items off it"),
+        };
         self.output.info(format!(
-            "Applied {name} to {changed} terrain samples, {} studs wide.",
-            settings.width
+            "Applied {name} to {} terrain samples, {} studs wide{cleared}.",
+            changed.samples, settings.width
         ));
     }
 

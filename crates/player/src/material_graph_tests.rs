@@ -1,4 +1,4 @@
-//! Material graphs in the player, on hello-material-graph: the player reads
+//! Material graphs in the player, on material-graph: the player reads
 //! only the WGSL the editor's graph made. Its two walls mix stone and moss
 //! by noise; the second is an instance that changes only the moss's tint.
 
@@ -33,7 +33,7 @@ fn a_graph_mixing_stone_and_moss_by_noise_draws_and_an_instance_changes_only_its
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let (mut world, mut scripts, folder) = start_example_in("hello-material-graph");
+    let (mut world, mut scripts, folder) = start_example_in("material-graph");
     let (mut physics, mut clock) = (Physics::new(), 0);
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 0.2);
     let camera = FlyCamera::looking_at(Vec3::new(0.0, 4.0, 16.0), Vec3::new(0.0, 2.5, 0.0));

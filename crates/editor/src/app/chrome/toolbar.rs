@@ -575,8 +575,9 @@ impl EditorApp {
                 insert_menu(
                     ui,
                     (icons::APERTURE, "Post FX"),
-                    "Insert a lens effect over the whole picture, or a Graphics Volume that \
-                     changes the look inside it.",
+                    "Insert a lens effect over the whole picture, a Graphics Volume that \
+                     changes the look inside it, or a Weather Volume that keeps rain and snow \
+                     out of a room.",
                     &[&Insertable::LENS, &Insertable::VOLUMES],
                     playing,
                     &mut clicks.insert,

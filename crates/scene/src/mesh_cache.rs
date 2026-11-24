@@ -245,7 +245,7 @@ mod tests {
     const LIMIT: Duration = Duration::from_secs(30);
 
     fn examples() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects")
     }
 
     fn mesh_part(world: &mut World, mesh_id: &str) -> InstanceId {
@@ -286,7 +286,7 @@ mod tests {
         let mut world = World::new();
         mesh_part(&mut world, PYRAMID);
         mesh_part(&mut world, PYRAMID);
-        let assets = Assets::new(examples().join("hello-mesh"));
+        let assets = Assets::new(examples().join("mesh"));
         let mut cache = TerrainCache::new();
         let first = draw(&world, &assets, &Poses::new(), &mut cache);
         let second = draw(&world, &assets, &Poses::new(), &mut cache);
@@ -309,7 +309,7 @@ mod tests {
             std::env::temp_dir().join(format!("axcenity-mesh-cache-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(folder.join("assets/models")).unwrap();
-        let file = std::fs::read(examples().join("hello-mesh").join(PYRAMID)).unwrap();
+        let file = std::fs::read(examples().join("mesh").join(PYRAMID)).unwrap();
         std::fs::write(folder.join(PYRAMID), &file).unwrap();
         let mut world = World::new();
         let part = mesh_part(&mut world, PYRAMID);
@@ -351,7 +351,7 @@ mod tests {
     fn a_model_still_loading_draws_nothing_and_doesnt_hold_up_the_frame() {
         let mut world = World::new();
         mesh_part(&mut world, PYRAMID);
-        let assets = Assets::new(examples().join("hello-mesh"));
+        let assets = Assets::new(examples().join("mesh"));
         assets.load_textures_in_background(|| {});
         let (release, reached) = gate_loads(&assets);
         let mut cache = TerrainCache::new();
@@ -383,7 +383,7 @@ mod tests {
         const GONE: &str = "assets/models/gone.glb";
         let mut world = World::new();
         mesh_part(&mut world, GONE);
-        let assets = Assets::new(examples().join("hello-mesh"));
+        let assets = Assets::new(examples().join("mesh"));
         assets.load_textures_in_background(|| {});
         let (release, reached) = gate_loads(&assets);
         let mut cache = TerrainCache::new();
@@ -401,7 +401,7 @@ mod tests {
     fn a_model_being_read_again_stays_on_screen() {
         let mut world = World::new();
         mesh_part(&mut world, PYRAMID);
-        let assets = Assets::new(examples().join("hello-mesh"));
+        let assets = Assets::new(examples().join("mesh"));
         assets.load_textures_in_background(|| {});
         assert_eq!(assets.request_model(PYRAMID).wait(), LoadStatus::Ready);
         let mut cache = TerrainCache::new();
@@ -427,7 +427,7 @@ mod tests {
         const NOODLE: &str = "assets/models/noodle.fbx";
         let mut world = World::new();
         let part = mesh_part(&mut world, NOODLE);
-        let assets = Assets::new(examples().join("hello-animation"));
+        let assets = Assets::new(examples().join("animation"));
         let model = assets.model_blocking(NOODLE).unwrap();
         let rig = model.rig.clone().unwrap();
         let rest = Arc::new(model.pose(&rig.rest_pose()).unwrap());

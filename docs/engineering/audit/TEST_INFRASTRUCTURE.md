@@ -20,7 +20,7 @@
 | `cargo test --locked --no-fail-fast` (7 extracted `editor-*` crates) | **FAIL (FLAKY)** | **300 passed**, **1 FAILED** under parallel run (`axcenity-editor-toolbox::tests::a_package_is_downloaded_once_and_installed_into_each_project`), 4 ignored. **Re-run in isolation: PASS (0.00s)** — confirmed parallel-race flakiness. |
 | `cargo test --locked -p axcenity-render -- --test-threads=1` | **PASS** | **422 passed**, **0 failed**, 6 ignored (231.56s headless GPU suite) |
 | `cargo test --workspace --doc --locked --exclude axcenity-project` | **PASS** | 0 failed (note: 0 doc-tests exist across workspace crates) |
-| `cargo run --locked -p axcenity-testing --bin axcenity-test -- examples/hello-character` | **PASS** | **3 passed, 0 failed** (`tests/walk.spec.lua`) |
+| `cargo run --locked -p axcenity-testing --bin axcenity-test -- crates/samples/projects/character` | **PASS** | **3 passed, 0 failed** (`tests/walk.spec.lua`) |
 
 ## 3. Evaluation by Test Category
 
@@ -28,7 +28,7 @@
 |---|---|---|
 | **Unit Tests** | Strong (5,579 `#[test]`) | Broad coverage across all 47 crates, but **currently broken on `main`** (`project` compile error, 2 `script` failures, 1 flaky `editor-toolbox` test). |
 | **Integration Tests (`tests/*.rs`)** | Uneven | Strong in `avatar` (11 files), `testing` (3), `updater` (2), `anim` (2), `mcp` (1). Absent in `editor-model-studio`, `editor-ui-designer`, `editor-node-graph`, `editor-tools`, `editor-toolbox`, `editor-benchmark`, `plugins`, `project`, `player`, `release`. |
-| **Luau Game Tests (`axcenity-test`)** | Implemented | Clean isolated world runner with JUnit XML export (`crates/testing/src/junit.rs`). Verified passing on `examples/hello-character`. |
+| **Luau Game Tests (`axcenity-test`)** | Implemented | Clean isolated world runner with JUnit XML export (`crates/testing/src/junit.rs`). Verified passing on `crates/samples/projects/character`. |
 | **GPU & Visual Regression Tests** | Implemented | 422 headless GPU tests in `axcenity-render` pass sequentially (`--test-threads=1`). Known flakiness under parallel GPU contention (`every_example_renders` black frames, tracked in `wiki/Roadmap/Technical-Debt.md`). |
 | **Fuzzing & Security Tests** | Weak | `collab/src/wire_fuzz_tests.rs` runs 20k seeded mutation rounds, and `axcenity-bots` has `--flood`/`--cheat`. **Zero `cargo-fuzz`/libFuzzer harnesses** for `net`, `relay`, `collab` Yjs, `project` unpackers, or `assets` parsers; no adversarial host→client tests in `collab`. |
 | **Performance Benchmarks** | Implemented (Local-Only) | `benchmarks/baselines.json` + `axcenity-bench-check` + S10k + XB10k cross-engine suite (`benchmarks/cross-engine/`). Baselines last recorded `2026-11-11` at `15965da` on Ryzen 9 9950X3D / RX 9070 XT (S10k player 7.12 ms, test 3.75 ms, server 3.85 ms; XB10k Axcenity 5.14 ms vs Unity 3.11 ms vs Godot 10.27 ms). **No recent benchmark run recorded for `8f4c2420`**. |

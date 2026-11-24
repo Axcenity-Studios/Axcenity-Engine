@@ -12,7 +12,7 @@ const BLOCKS: &str = "scripts/pad.server.blocks.json";
 
 /// The blocks example, with a Lua script naming the same ball.
 fn project(test: &str) -> (EditorApp, PathBuf) {
-    let folder = copy_of_example("hello-touched-blocks", test);
+    let folder = copy_of_example("touched-blocks", test);
     fs::write(
         folder.join(LUA),
         "local ball = workspace.BlueBall\nprint(ball.Name, \"BlueBalls\")\n",

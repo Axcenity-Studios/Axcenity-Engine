@@ -24,8 +24,8 @@ fn child(world: &World, parent: InstanceId, name: &str) -> InstanceId {
 
 #[test]
 fn inserted_health_bars_follow_the_nearest_health_with_no_script() {
-    // hello-seat has a character but no Health and no stylesheet.
-    let folder = copy_of_example("hello-seat", "insert-health-bar");
+    // seat has a character but no Health and no stylesheet.
+    let folder = copy_of_example("seat", "insert-health-bar");
     let mut app = EditorApp::new(Some(&folder));
     app.viewport
         .look_at(Vec3::new(0.0, 10.0, 20.0), Vec3::new(0.0, 0.0, 0.0));

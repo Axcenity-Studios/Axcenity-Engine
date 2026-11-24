@@ -21,7 +21,8 @@ Source and tests win when a doc is wrong. Update the topic file you used.
 | Multiplayer: the `net` crate, `axcenity-server`, `NetworkService`, hosting, joining, LAN discovery, lag compensation, replays (`ReplayService`) | [architecture/networking.md](architecture/networking.md) |
 | World streaming: `StreamingEnabled`, `ModelStreamingMode`, `RequestStreamAroundAsync`, `StreamingState`, `Instance.StreamedIn`, unloading from the GPU, far physics sleeping | [architecture/streaming.md](architecture/streaming.md) |
 | Levels, `LevelService`, the Levels panel | [project/levels.md](project/levels.md) |
-| Cutscene sequences, the Sequence Instance, the Sequencer tab | [project/sequences.md](project/sequences.md) |
+| Cutscene sequences, the Sequence Instance, the Sequencer tab, camera cut transitions, what a sequence can key, environment presets (the sky and weather under one name), the Environment track and `Lighting:TransitionToPreset` | [project/sequences.md](project/sequences.md) |
+| Render Movie: a sequence drawn to a video file or a PNG sequence (the window, the job, `ffmpeg`, `--render-movie`) | [editor/movie.md](editor/movie.md) |
 | Platforms or file access | [architecture/portability.md](architecture/portability.md) |
 | The user-facing system requirements (supported systems, minimum and recommended processor, memory, graphics, network, storage) | [../documentation/reference/system-requirements.md](../documentation/reference/system-requirements.md) |
 | Build speed, test commands, or nextest settings | [development.md](development.md) |
@@ -57,7 +58,7 @@ Source and tests win when a doc is wrong. Update the topic file you used.
 | The Model Studio tab, editable meshes (`EditMesh`, `ModelDoc`), modeling operations (`MeshOp`), modifiers and the `.meshedit.json` sidecar, Generate LODs, saving `.glb` | [editor/model-studio.md](editor/model-studio.md) |
 | Paint, materials, lights, or the angular tool | [editor/building.md](editor/building.md) |
 | The Assets panel | [editor/assets.md](editor/assets.md) |
-| The Scatter pane (painting a palette of props and models onto terrain), `.axscatter` palettes, the Scatter brush op | [editor/scatter.md](editor/scatter.md) |
+| The Scatter pane (painting a palette of props and models onto terrain), `.axscatter` palettes, the Scatter brush op, an item's masks (noise, slope, height, moisture), the Ground Clutter palette, the decal brush (Paint decals) | [editor/scatter.md](editor/scatter.md) |
 | Learn, the Documentation page, the API Reference page, `documentation/` (user docs and GitBook) or generating `documentation/api/` | [editor/learn-and-docs.md](editor/learn-and-docs.md) |
 | Scripts, LocalScripts, or RemoteEvents in the editor | [editor/sides.md](editor/sides.md) |
 | Lua, the sandbox, blocks, or graphs | [scripting.md](scripting.md), then one file |
@@ -67,6 +68,7 @@ Source and tests win when a doc is wrong. Update the topic file you used.
 | Data tables, the Data Table tab, or `DataService` | [project/data-tables.md](project/data-tables.md) |
 | Dialogues, quests, `DialogueService`, `QuestService`, the Dialogue tab | [scripting/api-dialogue.md](scripting/api-dialogue.md) |
 | AutoRecover (Settings > Saving, `.axcenity/autorecover/`, the Recover unsaved work? prompt) | [project/autorecover.md](project/autorecover.md) |
+| The engine's own sample projects (`crates/samples/projects/`, the `samples` crate): where tests, benchmarks and the Learn page find them, and the rules for adding one | [project/samples.md](project/samples.md) |
 | New Project's genre templates (`templates/`) and your own (`.axtemplate`, Save as Template…) | [project/templates.md](project/templates.md) |
 | Game tests (`tests/*.spec.lua`), the Tests panel, `axcenity-test` | [project/game-tests.md](project/game-tests.md) |
 | Editor plugins (`plugins/`, the plugin API, the Plugins panel) | [editor/plugins.md](editor/plugins.md) |

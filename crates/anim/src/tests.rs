@@ -1,4 +1,4 @@
-//! Animators running the `hello-animation` example's noodle, and doors,
+//! Animators running the `animation` example's noodle, and doors,
 //! swords and tracks on top.
 
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use axcenity_core::{ClassName, InstanceId, PlayRequest, Value, Vector3, World};
 use crate::{AnimatorEvent, Animators, ClipFile, StateMachineFile};
 
 fn example() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation")
 }
 
 /// The noodle's corners in `posed`, at full detail.
@@ -191,7 +191,7 @@ fn removing_the_animator_puts_the_model_back() {
 #[test]
 fn hello_doors_clip_is_saved_as_the_engine_writes_it() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-door/assets/animations/Door/Door.anim.json");
+        .join("../samples/projects/door/assets/animations/Door/Door.anim.json");
     let text = std::fs::read_to_string(path).unwrap().replace("\r\n", "\n");
     assert_eq!(ClipFile::from_json(&text).unwrap().to_json(), text);
 }

@@ -86,11 +86,14 @@ fn view_position(uv: vec2<f32>, depth: f32) -> vec3<f32> {
 // How near what the ray from `origin` along `direction` hits is, as a
 // share of `radius` (1 touching, 0 at the radius or nothing hit).
 // `near` is how near a cut-out may be and not count (`cut_out_near`).
+const AO_TIGHT: f32 = 1.35;
 fn hidden_along(origin: vec3<f32>, direction: vec3<f32>, radius: f32, near: f32) -> f32 {
     let nearest = min(
         nearest_hit(origin, direction, MASK_SOLID, 0.0, radius),
         nearest_hit(origin, direction, MASK_CUT_OUTS, min(near, radius), radius));
-    return 1.0 - nearest / radius;
+    // Nearness counts more than in proportion, so the shade gathers tight
+    // in the contact under a bucket or a tyre and thins quickly away from it.
+    return pow(1.0 - nearest / radius, AO_TIGHT);
 }
 
 // How far along the ray from `origin` the nearest item of `mask` is,

@@ -794,7 +794,7 @@ mod tests {
         let model = "assets/models/Helmet.glb";
         fs::copy(
             Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../examples/hello-pbr/assets/models/DamagedHelmet/DamagedHelmet.glb"),
+                .join("../samples/projects/pbr/assets/models/DamagedHelmet/DamagedHelmet.glb"),
             project.join(model),
         )
         .unwrap();
@@ -1025,7 +1025,7 @@ mod tests {
     #[test]
     fn a_built_game_carries_its_models_cooked_copies_and_simpler_copies() {
         let model = "assets/models/CityPropsCollection.fbx";
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
         let project = temp_folder("mesh-cache");
         let _ = fs::remove_dir_all(&project);
         fs::create_dir_all(project.join("assets/models")).unwrap();
@@ -1106,7 +1106,7 @@ mod tests {
 
     #[test]
     fn a_built_game_has_every_data_table() {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-data");
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/data");
         let output = temp_folder("data-tables");
         unpack_game(&pack_game(&source).unwrap(), &output).unwrap();
         for name in ["weapons", "ammo"] {
@@ -1127,9 +1127,9 @@ mod tests {
     #[test]
     fn hello_touched_blocks_exports_translated_lua() {
         let source =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-touched-blocks");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/touched-blocks");
         let packed = pack_game(&source).unwrap();
-        let output = temp_folder("hello-touched-blocks-export");
+        let output = temp_folder("touched-blocks-export");
         unpack_game(&packed, &output).unwrap();
         let lua = fs::read_to_string(output.join("scripts/pad.server.lua")).unwrap();
         assert!(

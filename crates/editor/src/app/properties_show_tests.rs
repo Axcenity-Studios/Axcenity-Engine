@@ -9,7 +9,7 @@ use super::*;
 
 #[test]
 fn showing_the_properties_of_anything_in_the_examples_changes_nothing() {
-    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     let mut names: Vec<String> = std::fs::read_dir(&examples)
         .unwrap()
         .filter_map(|entry| {

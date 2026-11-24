@@ -47,7 +47,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Mesh hulls | #21 | Physics queries | Biome patch Input 30.9 → 0.006 ms | Desktop |
 | M5 | #18, #19 | Assets | Arid Dry Patch launch to assets 5,056 → 3,204 ms | Desktop |
 | M2 | #17 | Core | S10k test runner frame 6.68 → 5.91 ms | Desktop |
-| I11 | #8 | Player startup | hello-roads first frame 2,069–5,431 → 341–398 ms | Container |
+| I11 | #8 | Player startup | the `roads` sample first frame 2,069–5,431 → 341–398 ms | Container |
 | I10 | #9 | Watcher | Reload latency 463 → 103 ms | Container |
 | I9 | #11 | Core | S10k Input −15%, Scripts −6 to −10% | Container |
 | I8 | #10 | Scene | 2,000 MeshParts draw list 1.84–1.90 → 0.90–0.99 ms | Container |
@@ -148,8 +148,8 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | **PR** | #61 |
 | **Problem** | `.axgame` v1 stored files raw; unpacking reset modified times so cooked copies were re-hashed |
 | **Solution** | v2: zstd level 3 per entry when it saves ≥ 5%, restored mtimes, unpacking on up to 8 threads |
-| **Before → after** | hello-roads 830 → 745 MB, unpack 210 → 166 ms; S10k 10 → 0.2 MB |
-| **Trade-offs** | Packing slower (hello-roads 1.0 → 3.3 s). Read-in-place not done: unpacking is only 30–170 ms |
+| **Before → after** | the `roads` sample 830 → 745 MB, unpack 210 → 166 ms; S10k 10 → 0.2 MB |
+| **Trade-offs** | Packing slower (the `roads` sample 1.0 → 3.3 s). Read-in-place not done: unpacking is only 30–170 ms |
 
 ### L4 query bounds
 
@@ -189,7 +189,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | **Problem** | First frames spent seconds decoding JPEGs, making CPU mips and uploading RGBA8; models parsed FBX/glTF and simplified LODs on every load |
 | **Solution** | Editor cooks offline: BC7 mips (`intel_tex_2`), BC5 normal maps, `.axlod` LOD cache, whole `.axmodel` models |
 | **Before → after** | 4096² map: upload 55–61 → 0.9–1.1 ms, worker read ~650 → ~30 ms, GPU 85 → 21 MiB. Simplifying CityProps 68 → 6 ms. Cooked model CityProps 143 → 1.7–1.9 ms, Walking.fbx 178 → 19–24 ms |
-| **Trade-offs** | Built games carry sources and cooked copies (hello-roads 393 → 830 MB). BC7 "very fast" PSNR 35.8 dB color; normal maps needed BC5. lavapipe shows no first-frame gain (software BC7 decode) |
+| **Trade-offs** | Built games carry sources and cooked copies (the `roads` sample 393 → 830 MB). BC7 "very fast" PSNR 35.8 dB color; normal maps needed BC5. lavapipe shows no first-frame gain (software BC7 decode) |
 
 ### M14: UI layout cache
 
@@ -218,7 +218,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | **Root cause** | Physics re-read what it wrote itself; any reparent forced a full resync; any script change woke every body; write-back each substep converted quaternions to Euler |
 | **Solution** | Physics-owned revisions, per-service structure versions, wake neighbours, write back once per frame (awake bodies), rapier `parallel` |
 | **Before → after** | Physics 11.32 → 8.87 ms (test runner), 9.91 → 8.15 ms (server); sync 1.6–1.7 → 0.7 ms; rapier's step −17% |
-| **Trade-offs** | `parallel` costs tiny scenes (`hello-vehicle` 0.05–0.07 → 0.19 ms) |
+| **Trade-offs** | `parallel` costs tiny scenes (`vehicle` 0.05–0.07 → 0.19 ms) |
 
 ### M1: one frame schedule
 
@@ -286,7 +286,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | Root cause → fix | Measured |
 |---|---|---|
-| I11 (#8) | First frame decoded every texture on the main thread → preload thread from project load | hello-roads first frame 2,069–5,431 → 341–398 ms |
+| I11 (#8) | First frame decoded every texture on the main thread → preload thread from project load | the `roads` sample first frame 2,069–5,431 → 341–398 ms |
 | I10 (#9) | 0.5 s polling walk → `notify` events, polling fallback | Reload latency 463 → 103 ms (100 ms is the settle wait) |
 | I9 (#11) | Allocating `descendants()`, SipHash on ID keys → `descendants_iter`, `FxHashMap` (needed `#[inline]`, else Scripts got 40% slower) | Input −15%, Scripts −6 to −10.5%, Characters −6.5% |
 | I8 (#10) | A new mesh and LOD copies per MeshPart per frame → shared per model (`mesh_cache.rs`) | 2,000 helmets draw list 1.84–1.90 → 0.90–0.99 ms |

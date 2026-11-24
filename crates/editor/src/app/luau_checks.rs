@@ -423,7 +423,7 @@ mod tests {
             eprintln!("skipped: no luau-lsp");
             return;
         };
-        let folder = copy_of_example("hello-touched", "luau-checks");
+        let folder = copy_of_example("touched", "luau-checks");
         let mut app = EditorApp::new(Some(&folder));
         app.luau.start_with(program);
         let path = "scripts/pad.server.lua";
@@ -483,7 +483,7 @@ mod tests {
         app.luau.looked = true;
         assert!(!app.check_scripts(0.0));
 
-        let folder = copy_of_example("hello-touched", "built-in-checks");
+        let folder = copy_of_example("touched", "built-in-checks");
         let mut app = EditorApp::new(Some(&folder));
         app.luau.enabled = true;
         app.luau.looked = true;
@@ -530,7 +530,7 @@ mod tests {
             eprintln!("skipped: no luau-lsp");
             return;
         };
-        let folder = copy_of_example("hello-modules", "luau-requires");
+        let folder = copy_of_example("modules", "luau-requires");
         let mut app = EditorApp::new(Some(&folder));
         app.luau.start_with(program);
 
@@ -600,7 +600,7 @@ print(#steps)
             return;
         };
         let checker = Checker::start(program).unwrap();
-        let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
         let mut checked = 0;
         let mut errors = Vec::new();
         for entry in std::fs::read_dir(&examples).unwrap().flatten() {

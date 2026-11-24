@@ -523,6 +523,9 @@ fn command_description(command: &Command) -> String {
         Command::GraphicsBenchmark => {
             "Measure how this computer draws the viewport and get recommended editor graphics settings."
         }
+        Command::RenderMovie => {
+            "Draw the open sequence frame by frame into a video file or a folder of PNGs."
+        }
         Command::AnimatorInspector => {
             "During Play: the selected Animator's state, blends, layers, tracks, parameters and events, live."
         }

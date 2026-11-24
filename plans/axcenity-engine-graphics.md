@@ -86,11 +86,11 @@ Each has a proposed answer. The phase named goes ahead with it unless told other
 
 ### What to build
 
-A scene that later phases must keep rendering correctly, built before anything changes. `examples/hello-graphics` has plastic, metal, glass and Neon parts, a textured PBR MeshPart (reusing `hello-pbr`'s assets), a SurfaceAppearance part with `TileSize`, a non-uniformly sized wedge, a point light and a spot light inside lamp parts, sun shadows across all three cascades, and a bright emissive part for bloom. Its `reference.png` is the full 480×270 frame from today's `main`, so the existing example snapshot test compares the whole frame. Render tests are added for what the audit took on trust: an sRGB→linear→sRGB round trip of the draw-list colors through the real pipeline, and a non-uniformly scaled block lit like a uniform one on the face it shares.
+A scene that later phases must keep rendering correctly, built before anything changes. `crates/samples/projects/graphics` has plastic, metal, glass and Neon parts, a textured PBR MeshPart (reusing `pbr`'s assets), a SurfaceAppearance part with `TileSize`, a non-uniformly sized wedge, a point light and a spot light inside lamp parts, sun shadows across all three cascades, and a bright emissive part for bloom. Its `reference.png` is the full 480×270 frame from today's `main`, so the existing example snapshot test compares the whole frame. Render tests are added for what the audit took on trust: an sRGB→linear→sRGB round trip of the draw-list colors through the real pipeline, and a non-uniformly scaled block lit like a uniform one on the face it shares.
 
 ### Acceptance criteria
 
-- [x] `hello-graphics` loads in the player and the editor with no asset errors, and the example snapshot test matches its `reference.png`.
+- [x] `graphics` loads in the player and the editor with no asset errors, and the example snapshot test matches its `reference.png`.
 - [x] A mid-grey part's pixel comes back within 2 levels of its sRGB `Color` under flat white light with post-processing off.
 - [x] A block stretched 4× along X has the same top-face shade as a unit block.
 
@@ -110,7 +110,7 @@ The editor gets a **Graphics** section in its Settings window (`editor/src/app/s
 - [x] `effective` lowers a setting the capabilities can't meet, notes why, and never raises one (unit tests).
 - [x] With shadows Off in the settings, a world with `ShadowsEnabled` on draws no shadow and allocates no shadow map. With Low, the map is 1024² with 2 cascades. A shadow distance ceiling below the world's value cuts shadows at the ceiling (GPU tests).
 - [x] Switching shadow quality 50 times leaves one shadow map alive (a resource count test).
-- [x] `hello-graphics` at High still matches its reference.
+- [x] `graphics` at High still matches its reference.
 - [x] Changing the editor setting changes the viewport at once and survives a restart.
 
 ---
@@ -138,7 +138,7 @@ An anti-aliasing setting: Off, FXAA, MSAA 2×, MSAA 4×. **MSAA** draws the HDR 
 ### Acceptance criteria
 
 - [x] The edge of a tilted block over the sky has in-between pixel values with MSAA 4× and FXAA, and hard steps with Off (GPU test on edge pixels).
-- [x] Cut-out (MASK) and see-through items, terrain, sprites and the sky draw correctly with each mode. `hello-graphics` matches its reference with MSAA (within the harness tolerance, regenerated once if edges alone differ, and that difference reviewed by eye).
+- [x] Cut-out (MASK) and see-through items, terrain, sprites and the sky draw correctly with each mode. `graphics` matches its reference with MSAA (within the harness tolerance, regenerated once if edges alone differ, and that difference reviewed by eye).
 - [x] An adapter that lacks MSAA 4× for the HDR format gets 2× or FXAA, with a note, and doesn't crash (capabilities unit test).
 - [x] Switching modes at run time frees the multisampled targets when they're unused.
 
@@ -168,7 +168,7 @@ A Lighting property `ToneMapping` (`Enum.ToneMapping`): `Classic` (today's knee,
 
 - [x] A glTF with a texture transform and a double-sided leaf plane draws with the transform applied and both sides lit (GPU test with a small test model).
 - [x] A SurfaceAppearance with tiling 2 repeats its map twice as often, and an offset of 0.5 shifts it by half (GPU test on pixel colors).
-- [x] Existing models and `hello-pbr` look unchanged, and the example snapshots still pass.
+- [x] Existing models and `pbr` look unchanged, and the example snapshots still pass.
 
 ---
 
@@ -221,12 +221,12 @@ The new `FrameTargets` owns the HDR, depth, MSAA, prepass, SSAO and bloom target
 
 ### What to build
 
-The brief's Phase 1 acceptance criteria are checked together. `UserGameSettings` (question 3) gives LocalScripts and blocks `GraphicsQuality` and the per-setting overrides. Setting them changes the player's graphics settings and saves them to `graphics.json`. Server scripts get an error. The editor's Play uses the editor's own Graphics settings. `hello-graphics` gets a LocalScript that cycles the quality with a key, and a reference image per preset (Low, Medium, High, Ultra), rendered by setting graphics settings on the test's `TextureRenderer`. The docs are updated: a new `docs/rendering/settings.md` (settings, presets, capabilities, the look-versus-cost rule), entries in `docs/rendering.md`, `pipeline.md`, `post.md`, `shadows.md`, `lights.md`, `models.md`, the scripting API docs and the `render` crate's `CLAUDE.md`. A resource test creates and drops renderers and switches every setting through every value, and checks that the caches and targets come back to their starting counts.
+The brief's Phase 1 acceptance criteria are checked together. `UserGameSettings` (question 3) gives LocalScripts and blocks `GraphicsQuality` and the per-setting overrides. Setting them changes the player's graphics settings and saves them to `graphics.json`. Server scripts get an error. The editor's Play uses the editor's own Graphics settings. `graphics` gets a LocalScript that cycles the quality with a key, and a reference image per preset (Low, Medium, High, Ultra), rendered by setting graphics settings on the test's `TextureRenderer`. The docs are updated: a new `docs/rendering/settings.md` (settings, presets, capabilities, the look-versus-cost rule), entries in `docs/rendering.md`, `pipeline.md`, `post.md`, `shadows.md`, `lights.md`, `models.md`, the scripting API docs and the `render` crate's `CLAUDE.md`. A resource test creates and drops renderers and switches every setting through every value, and checks that the caches and targets come back to their starting counts.
 
 ### Acceptance criteria
 
 - [x] The workspace builds, tests and passes clippy. Every example still renders and matches its reference.
-- [x] `hello-graphics` renders correctly at each preset and matches each preset's reference.
+- [x] `graphics` renders correctly at each preset and matches each preset's reference.
 - [x] Lighting changes (sun direction, `EnvironmentIntensity`, a lamp's color) change metal, rough plastic, glass and textured materials consistently, compared with the reference.
 - [x] Shadows, exposure, tone mapping and anti-aliasing are configurable in the editor and from a LocalScript, and each change shows in the rendered frame.
 - [x] A forced-unsupported capability (no MSAA, a small max texture size) renders with fallbacks and notes, without crashing.
@@ -284,7 +284,7 @@ If the 20-character benchmark shows CPU posing as a real cost, skin on the GPU: 
 ### Acceptance criteria
 
 - [x] A posed character looks the same skinned on the GPU as on the CPU (pixel comparison test), and the character benchmark improves.
-- [ ] `examples/hello-animation` and the Animation window's preview still play correctly.
+- [ ] `crates/samples/projects/animation` and the Animation window's preview still play correctly.
 
 ---
 
@@ -601,4 +601,4 @@ Viewport View modes: lit, unlit, wireframe (drawn in the shader from barycentric
 
 ### Acceptance criteria
 
-- [x] Each view shows what it names on `hello-graphics`, and switching back to lit restores the normal frame.
+- [x] Each view shows what it names on `graphics`, and switching back to lit restores the normal frame.

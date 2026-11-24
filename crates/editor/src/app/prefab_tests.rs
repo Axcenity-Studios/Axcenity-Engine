@@ -39,7 +39,7 @@ fn file(app: &EditorApp, path: &str) -> Option<String> {
 }
 
 fn opened(test: &str) -> EditorApp {
-    let folder = copy_of_example("hello-part", test);
+    let folder = copy_of_example("part", test);
     let mut app = EditorApp::new(None);
     app.open(&folder);
     app

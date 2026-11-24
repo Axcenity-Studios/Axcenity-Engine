@@ -734,6 +734,14 @@ music:Play()"#,
 end)"#,
     ),
     (
+        "Lighting.TransitionToPreset",
+        r#"local Lighting = game:GetService("Lighting")
+-- A storm rolls in over half a minute, then clears.
+Lighting:TransitionToPreset("Storm", 30)
+task.wait(90)
+Lighting:TransitionToPreset("Clear", 60)"#,
+    ),
+    (
         "Workspace.Gravity",
         r#"workspace.Gravity = 30 -- low gravity, like the moon"#,
     ),

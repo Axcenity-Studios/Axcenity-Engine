@@ -18,7 +18,7 @@ const PATIENCE: Duration = Duration::from_secs(20);
 
 static FOLDERS: AtomicUsize = AtomicUsize::new(0);
 
-/// A copy of `examples/hello-part` and a data folder beside it, removed
+/// A copy of `crates/samples/projects/part` and a data folder beside it, removed
 /// when the test ends.
 struct Place(PathBuf);
 
@@ -30,7 +30,7 @@ impl Place {
             FOLDERS.fetch_add(1, Ordering::Relaxed)
         ));
         let _ = std::fs::remove_dir_all(&root);
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-part");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/part");
         copy_folder(&example, &root.join("project"));
         Place(root)
     }

@@ -1,5 +1,5 @@
 //! Phase 41 in the editor: a Ragdoll inserted and built from its
-//! Properties, its overlay, and hello-character's Dummy knocked over in Play
+//! Properties, its overlay, and character's Dummy knocked over in Play
 //! as the player runs it.
 
 use axcenity_anim::Animators;
@@ -21,7 +21,7 @@ fn children(world: &World, id: InstanceId) -> usize {
 
 #[test]
 fn insert_ragdoll_then_build_makes_its_bodies_and_joints_as_one_undo_step() {
-    let folder = copy_of_example("hello-character", "ragdoll-build");
+    let folder = copy_of_example("character", "ragdoll-build");
     let mut app = EditorApp::new(Some(&folder));
     let walking = app
         .world
@@ -63,7 +63,7 @@ fn insert_ragdoll_then_build_makes_its_bodies_and_joints_as_one_undo_step() {
 
 #[test]
 fn building_a_ragdoll_outside_a_skinned_mesh_part_says_why() {
-    let folder = copy_of_example("hello-character", "ragdoll-nowhere");
+    let folder = copy_of_example("character", "ragdoll-nowhere");
     let mut app = EditorApp::new(Some(&folder));
     let floor = app
         .world
@@ -98,7 +98,7 @@ fn overlay_shapes(world: &World, selection: &[InstanceId]) -> usize {
 
 #[test]
 fn the_overlay_shows_a_ragdoll_while_it_or_its_mesh_part_is_selected() {
-    let folder = copy_of_example("hello-character", "ragdoll-overlay");
+    let folder = copy_of_example("character", "ragdoll-overlay");
     let app = EditorApp::new(Some(&folder));
     let dummy = app
         .world
@@ -134,7 +134,7 @@ fn bodies(world: &World) -> Vec<(String, Vector3)> {
 
 #[test]
 fn the_dummy_is_knocked_down_the_same_in_play_as_the_player_runs_it() {
-    let folder = copy_of_example("hello-character", "ragdoll-play");
+    let folder = copy_of_example("character", "ragdoll-play");
     let mut app = EditorApp::new(Some(&folder));
     // Played in the editor, past the push at 2 seconds...
     app.play();

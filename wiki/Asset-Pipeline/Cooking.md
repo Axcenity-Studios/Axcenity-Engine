@@ -45,7 +45,7 @@ Textures whose sides aren't multiples of 4, and generated textures (built-in sur
 
 ## Performance
 
-**Measured** (cloud container unless noted): 4096² map upload 55–61 → 0.9–1.1 ms, GPU memory 85 → 21 MiB, worker read ~650 ms (JPEG decode) → ~30 ms; hello-roads cooks in 32 s on 4 cores (418 MB of copies). Quality with "very fast": PSNR 35.8 dB color, 47.4 dB roughness; normal maps were 28.1 dB as BC7 before BC5. Cooked models: CityPropsCollection.fbx 143 → 1.7–1.9 ms, Walking.fbx 178 → 19–24 ms, AWP.glb 243 → 61–63 ms. On lavapipe the first frame didn't improve (it decodes BC7 in software); a real GPU is needed to see it.
+**Measured** (cloud container unless noted): 4096² map upload 55–61 → 0.9–1.1 ms, GPU memory 85 → 21 MiB, worker read ~650 ms (JPEG decode) → ~30 ms; the `roads` sample cooks in 32 s on 4 cores (418 MB of copies). Quality with "very fast": PSNR 35.8 dB color, 47.4 dB roughness; normal maps were 28.1 dB as BC7 before BC5. Cooked models: CityPropsCollection.fbx 143 → 1.7–1.9 ms, Walking.fbx 178 → 19–24 ms, AWP.glb 243 → 61–63 ms. On lavapipe the first frame didn't improve (it decodes BC7 in software); a real GPU is needed to see it.
 
 ## Terrain layers
 
@@ -53,7 +53,7 @@ The terrain builds its texture arrays from its TerrainLayers' **pixels**, so eve
 
 ## Trade-offs
 
-- A built game ships each texture **twice** (source and cooked copy): hello-roads 393 MB → 830 MB. Dropping sources with current copies would about halve it, but the player still reads some sources' pixels ([Known bottlenecks](../Performance/Known-Bottlenecks.md)).
+- A built game ships each texture **twice** (source and cooked copy): the `roads` sample 393 MB → 830 MB. Dropping sources with current copies would about halve it, but the player still reads some sources' pixels ([Known bottlenecks](../Performance/Known-Bottlenecks.md)).
 - `.axcenity/` is per machine: not exported, backed up or versioned; deleting it only means cooking again.
 
 ## Development guidance

@@ -5,7 +5,7 @@ Phase 71. A console over the game (F9), a game's own commands (`ConsoleService`)
 ## Who has it
 
 - **Editor Play**: always. F9 over the viewport (not while an editor text field has the keyboard).
-- **Player, project folder** (`cargo run -p axcenity-player -- examples/x`): a development run, always.
+- **Player, project folder** (`cargo run -p axcenity-player -- crates/samples/projects/x`): a development run, always.
 - **Player, built game** (`.axgame`, or one bundled next to the player): only when the project setting is on (`developer_console` in `axcenity.json`; File ▸ Build Game ▸ Developer Console (F9), also in the command palette), or the player is started with `--dev`. Otherwise F9 is an ordinary key for the game. The rule is `player::dev_console::console_allowed`.
 
 ## The console

@@ -27,7 +27,7 @@ fn console_said(app: &EditorApp, text: &str) -> bool {
 
 #[test]
 fn f9_in_play_opens_the_console_which_runs_timescale_and_the_games_commands() {
-    let folder = copy_of_example("hello-part", "dev-console");
+    let folder = copy_of_example("part", "dev-console");
     std::fs::write(
         folder.join("scripts/Commands.server.lua"),
         r#"

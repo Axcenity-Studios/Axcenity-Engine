@@ -603,3 +603,56 @@ fn a_plant_swaying_in_the_wind_has_motion_of_its_own() {
     let still = motion_at(&motion, pixel_of(uv_of(&now, Vec3::new(4.0, 4.0, -10.0))));
     assert!(still.length() < 1e-4, "the wall didn't move: {still}");
 }
+
+/// A camera cut in a rendered movie: without forgetting, motion blur
+/// streaks the first frame after the jump and TAA mixes the old view in.
+#[test]
+fn forgetting_history_draws_the_frame_after_a_camera_jump_as_a_first_frame() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let at = |camera: f32| {
+        let mut list = list_of(vec![
+            wall(-8.0),
+            cube(Vec3::new(-2.5, 0.0, -5.0), 1.2, 2),
+            cube(Vec3::new(1.5, 0.0, -5.0), 1.2, 3),
+        ]);
+        list.camera.position.x += camera;
+        list.camera.look_at.x += camera;
+        list.lens = LensEffects {
+            motion_blur: Some(1.0),
+            ..LensEffects::default()
+        };
+        list
+    };
+    let graphics = settings(AntiAliasing::Taa, MotionBlurQuality::High);
+    let (before, after) = (at(0.0), at(1.5));
+    // What the view after the jump looks like with nothing before it.
+    let first = draw(&mut renderer(&device, &queue, &graphics), &after);
+    let differing = |pixels: &[u8]| {
+        pixels
+            .chunks_exact(4)
+            .zip(first.chunks_exact(4))
+            .filter(|(a, b)| (0..3).any(|c| a[c].abs_diff(b[c]) > 20))
+            .count()
+    };
+
+    let mut kept = renderer(&device, &queue, &graphics);
+    let mut forgotten = renderer(&device, &queue, &graphics);
+    for _ in 0..4 {
+        draw(&mut kept, &before);
+        draw(&mut forgotten, &before);
+    }
+    let smeared = differing(&draw(&mut kept, &after));
+    assert!(
+        smeared > 200,
+        "the jump streaks and ghosts while the history is kept: {smeared} pixels"
+    );
+    forgotten.forget_history();
+    assert_eq!(
+        draw(&mut forgotten, &after),
+        first,
+        "forgotten, it's drawn as a first frame"
+    );
+}

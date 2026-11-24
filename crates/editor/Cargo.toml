@@ -33,6 +33,7 @@ axcenity-physics.workspace = true
 axcenity-plugins.workspace = true
 axcenity-procedural.workspace = true
 axcenity-project.workspace = true
+axcenity-samples.workspace = true
 axcenity-repo.workspace = true
 axcenity-teamwork.workspace = true
 axcenity-release.workspace = true

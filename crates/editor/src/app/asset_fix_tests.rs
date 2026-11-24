@@ -41,7 +41,7 @@ fn clip_texts(folder: &std::path::Path) -> String {
 
 #[test]
 fn a_moved_model_is_fixed_everywhere_in_one_undo_step() {
-    let folder = copy_of_example("hello-animation", "asset-fix-moved");
+    let folder = copy_of_example("animation", "asset-fix-moved");
     fs::create_dir_all(folder.join("assets/models/moved")).unwrap();
     fs::rename(folder.join(MODEL), folder.join(MOVED)).unwrap();
     let clips_before = clip_texts(&folder);
@@ -92,7 +92,7 @@ fn a_moved_model_is_fixed_everywhere_in_one_undo_step() {
 
 #[test]
 fn ignored_problems_stay_hidden_after_reopening_and_delete_file_undoes() {
-    let folder = copy_of_example("hello-part", "asset-fix-ignore");
+    let folder = copy_of_example("part", "asset-fix-ignore");
     let broken = folder.join("assets/models/broken.glb");
     fs::create_dir_all(broken.parent().unwrap()).unwrap();
     fs::write(&broken, b"not a glb").unwrap();
@@ -125,7 +125,7 @@ fn the_fixes_fit_a_narrow_column() {
     use crate::theme;
     use eframe::egui;
 
-    let folder = copy_of_example("hello-animation", "asset-fix-draw");
+    let folder = copy_of_example("animation", "asset-fix-draw");
     fs::create_dir_all(folder.join("assets/models/moved")).unwrap();
     fs::rename(folder.join(MODEL), folder.join(MOVED)).unwrap();
     fs::write(folder.join("assets/models/broken.glb"), b"not a glb").unwrap();
@@ -166,7 +166,7 @@ fn the_fixes_fit_a_narrow_column() {
 fn locate_copies_an_outside_file_in_and_a_models_texture_next_to_the_model() {
     // An ImageLabel whose image is gone, and a file picked outside the
     // project for it.
-    let folder = copy_of_example("hello-part", "asset-fix-locate");
+    let folder = copy_of_example("part", "asset-fix-locate");
     let outside = folder.with_extension("outside");
     let _ = fs::remove_dir_all(&outside);
     fs::create_dir_all(&outside).unwrap();
@@ -211,7 +211,7 @@ fn locate_copies_an_outside_file_in_and_a_models_texture_next_to_the_model() {
     let _ = fs::remove_dir_all(&folder);
 
     // A model whose texture is gone: the picked image goes next to it.
-    let folder = copy_of_example("hello-pbr", "asset-fix-locate-texture");
+    let folder = copy_of_example("pbr", "asset-fix-locate-texture");
     let color = fs::read(folder.join("assets/models/maps/color.png")).unwrap();
     fs::write(outside.join("color.png"), &color).unwrap();
     fs::remove_file(folder.join("assets/models/maps/color.png")).unwrap();
@@ -246,7 +246,7 @@ fn locate_copies_an_outside_file_in_and_a_models_texture_next_to_the_model() {
 
 #[test]
 fn merge_points_a_duplicate_model_at_the_kept_file_and_undo_puts_it_back() {
-    let folder = copy_of_example("hello-animation", "asset-fix-merge");
+    let folder = copy_of_example("animation", "asset-fix-merge");
     let copy = "assets/models/imported/noodle.fbx";
     fs::create_dir_all(folder.join("assets/models/imported")).unwrap();
     fs::copy(folder.join(MODEL), folder.join(copy)).unwrap();

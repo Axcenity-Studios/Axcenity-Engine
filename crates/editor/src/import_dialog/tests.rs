@@ -247,7 +247,7 @@ fn the_files_say_where_the_model_and_its_textures_go() {
 #[test]
 fn the_whole_dialog_fits_an_800_by_600_window_with_import_clickable() {
     let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-animation/assets/models/noodle.fbx");
+        .join("../samples/projects/animation/assets/models/noodle.fbx");
     let objects = axcenity_assets::list_model_objects(&file).unwrap();
     let model = axcenity_assets::load_model_file(&file).unwrap();
     let takes = axcenity_assets::load_takes_file(&file).unwrap();

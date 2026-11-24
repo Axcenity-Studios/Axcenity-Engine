@@ -99,7 +99,7 @@ fn record(data: &Path, id: &str) -> ProjectRecord {
 #[test]
 fn a_project_keeps_its_members_and_id_across_hosts_and_members_rejoin_without_an_invite() {
     let (data_a, data_b) = (data_folder("paul"), data_folder("sam"));
-    let project = copy_of_example("hello-part", "collab-project-host");
+    let project = copy_of_example("part", "collab-project-host");
     let mut a = EditorApp::new(Some(&project));
     let invite = a.host_network_session(Some(&data_a), 0).expect("hosting");
     // The project's ID is written into collaborate.json, and is the
@@ -196,7 +196,7 @@ fn a_project_keeps_its_members_and_id_across_hosts_and_members_rejoin_without_an
 #[test]
 fn someone_no_longer_a_member_cant_rejoin_or_host() {
     let data = data_folder("removed");
-    let project = copy_of_example("hello-part", "collab-project-removed");
+    let project = copy_of_example("part", "collab-project-removed");
     let mut app = EditorApp::new(Some(&project));
     // A record whose members list doesn't have this computer's key.
     let mut kept = ProjectRecord::new("0123456789abcdef", "Castle", &project);

@@ -1,4 +1,4 @@
-//! Phase 51: the Sequencer tab on copies of the hello-cutscene example:
+//! Phase 51: the Sequencer tab on copies of the cutscene example:
 //! its preview against Play, edits written as undo steps, and New and
 //! Insert.
 
@@ -83,7 +83,7 @@ fn same(a: &Shown, b: &Shown, at: f64) {
 
 #[test]
 fn the_preview_scrubs_without_play_and_shows_what_play_shows() {
-    let folder = copy_of_example("hello-cutscene", "sequencer-preview");
+    let folder = copy_of_example("cutscene", "sequencer-preview");
     let mut app = EditorApp::new(Some(&folder));
     app.open_sequence(INTRO);
     assert!(app.layout.is_open(Pane::Sequencer));
@@ -134,7 +134,7 @@ fn the_preview_scrubs_without_play_and_shows_what_play_shows() {
 
 #[test]
 fn an_edit_is_written_once_the_mouse_is_up_as_one_undo_step() {
-    let folder = copy_of_example("hello-cutscene", "sequencer-edit");
+    let folder = copy_of_example("cutscene", "sequencer-edit");
     let mut app = EditorApp::new(Some(&folder));
     app.open_sequence(INTRO);
     let read = |app: &EditorApp| {
@@ -171,7 +171,7 @@ fn an_edit_is_written_once_the_mouse_is_up_as_one_undo_step() {
 
 #[test]
 fn new_makes_a_sequence_and_insert_puts_a_sequence_that_plays_it_in_the_workspace() {
-    let folder = copy_of_example("hello-cutscene", "sequencer-new");
+    let folder = copy_of_example("cutscene", "sequencer-new");
     let mut app = EditorApp::new(Some(&folder));
     app.new_sequence("Outro");
     let path = "assets/sequences/Outro.sequence.json";
@@ -204,7 +204,7 @@ fn the_tab_and_the_preview_draw() {
     let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS") else {
         return;
     };
-    let folder = copy_of_example("hello-cutscene", "sequencer-draw");
+    let folder = copy_of_example("cutscene", "sequencer-draw");
     let mut app = EditorApp::new(Some(&folder));
     app.open_sequence(INTRO);
     app.sequencer.doc.as_mut().unwrap().keys.playhead = 10.0;
@@ -246,7 +246,7 @@ fn the_tab_and_the_preview_draw() {
 /// above the keys while previewing, and in an empty dope sheet.
 #[test]
 fn the_sequencer_says_to_turn_the_preview_off_to_move_things() {
-    let folder = copy_of_example("hello-cutscene", "sequencer-hints");
+    let folder = copy_of_example("cutscene", "sequencer-hints");
     let mut app = EditorApp::new(Some(&folder));
     app.new_sequence("Outro");
     let ctx = crate::theme::test_context();

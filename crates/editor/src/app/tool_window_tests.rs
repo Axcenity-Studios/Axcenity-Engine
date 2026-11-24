@@ -29,7 +29,7 @@ type Window = (&'static str, fn(&mut EditorApp), fn(&EditorApp) -> bool);
 
 #[test]
 fn every_tool_window_opens_and_escape_closes_it() {
-    let windows: [Window; 10] = [
+    let windows: [Window; 11] = [
         (
             "Settings",
             |app| app.settings.open = true,
@@ -76,8 +76,17 @@ fn every_tool_window_opens_and_escape_closes_it() {
             |app| app.ribbon_tabs.edit(None),
             |app| app.ribbon_tabs.is_editing(),
         ),
+        (
+            "Render Movie",
+            |app| {
+                app.open_render_movie();
+                // Not this machine's ffmpeg: the test is the same anywhere.
+                app.movie.set_ffmpeg(None);
+            },
+            |app| app.movie.open,
+        ),
     ];
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     for _ in 0..3 {
         frame(&mut app, &ctx, Vec::new());
@@ -109,7 +118,7 @@ fn every_tool_window_opens_and_escape_closes_it() {
 /// stays open.
 #[test]
 fn escape_while_input_listens_for_a_key_keeps_the_window() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     app.input_settings.open = true;
     for _ in 0..3 {
@@ -129,7 +138,7 @@ fn escape_while_input_listens_for_a_key_keeps_the_window() {
 /// Two windows open: Escape closes the one on top only.
 #[test]
 fn escape_closes_only_the_window_on_top() {
-    let mut app = EditorApp::new(Some(&example("hello-part")));
+    let mut app = EditorApp::new(Some(&example("part")));
     let ctx = theme::test_context();
     app.collision_groups.open = true;
     for _ in 0..2 {

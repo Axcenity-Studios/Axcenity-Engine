@@ -368,25 +368,39 @@ pub const MAX_FLUTTER: f32 = 0.95;
 pub const LEAF_TRANSLUCENCY: f32 = 0.42;
 
 /// The wind and leaf values in a glTF material's `extras` (`axcenity_sway`,
-/// `axcenity_flutter`, `axcenity_translucency`) on a default material.
-/// Anything missing, not a number or below 0 is 0, so a file without them
-/// stays still; a material that flutters is a leaf, and lets
-/// [`LEAF_TRANSLUCENCY`] through unless it says otherwise.
+/// `axcenity_flutter`, `axcenity_translucency`, `axcenity_hang`) on a
+/// default material. Anything missing, not a number or below 0 is 0, so a
+/// file without them stays still; a material that flutters is a leaf, and
+/// lets [`LEAF_TRANSLUCENCY`] through unless it says otherwise.
+/// `axcenity_hang` is `true` or a number above 0 for what hangs (drapes,
+/// washing on a line): it sways from its top down.
 fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
+    // Each on its own, so one of the wrong kind doesn't lose the others.
     #[derive(serde::Deserialize)]
     struct Wind {
-        axcenity_sway: Option<f32>,
-        axcenity_flutter: Option<f32>,
-        axcenity_translucency: Option<f32>,
+        axcenity_sway: Option<serde_json::Value>,
+        axcenity_flutter: Option<serde_json::Value>,
+        axcenity_translucency: Option<serde_json::Value>,
+        axcenity_hang: Option<serde_json::Value>,
     }
     let wind = extras
         .as_ref()
         .and_then(|raw| serde_json::from_str::<Wind>(raw.get()).ok());
-    let (sway, flutter, translucency) = wind.map_or((None, None, None), |wind| {
+    let number = |value: &Option<serde_json::Value>| {
+        value
+            .as_ref()
+            .and_then(serde_json::Value::as_f64)
+            .map(|v| v as f32)
+    };
+    let (sway, flutter, translucency, hangs) = wind.map_or((None, None, None, false), |wind| {
         (
-            wind.axcenity_sway,
-            wind.axcenity_flutter,
-            wind.axcenity_translucency,
+            number(&wind.axcenity_sway),
+            number(&wind.axcenity_flutter),
+            number(&wind.axcenity_translucency),
+            match &wind.axcenity_hang {
+                Some(serde_json::Value::Bool(hangs)) => *hangs,
+                other => number(other).is_some_and(|v| v > 0.0),
+            },
         )
     });
     let usable = |value: Option<f32>| value.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(0.0);
@@ -399,6 +413,7 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
     ModelMaterial {
         sway: usable(sway).min(2.0),
         flutter,
+        hangs,
         translucency: translucency
             .filter(|v| v.is_finite() && *v >= 0.0)
             .unwrap_or(leaf)
@@ -644,6 +659,10 @@ pub struct ModelMaterial {
     /// bending: leaves do, the branches they grow on don't. From glTF
     /// `extras`: `axcenity_flutter`.
     pub flutter: f32,
+    /// Whether what's drawn with it hangs (drapes, washing on a line): it
+    /// then sways from the top of its model down, its top staying put.
+    /// From glTF `extras`: `axcenity_hang`.
+    pub hangs: bool,
     /// How much light passes through it from behind, 0 for none: leaves.
     /// From glTF `extras`: `axcenity_translucency`, or a leaf's default.
     pub translucency: f32,
@@ -746,6 +765,7 @@ impl Default for ModelMaterial {
             double_sided: false,
             sway: 0.0,
             flutter: 0.0,
+            hangs: false,
             translucency: 0.0,
             shading: ModelShading::Standard,
             defined_normal_texture: None,

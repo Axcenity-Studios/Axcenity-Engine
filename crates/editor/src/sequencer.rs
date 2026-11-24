@@ -5,9 +5,11 @@
 //! and the end, which is the duration) and the property editor's dope
 //! sheet and Curves view, over the sequence's property tracks and its own
 //! camera keys (`@Camera`). Under the timeline, a row of sections for each
-//! other track: camera cuts, clips on Animators, Sounds, fades, letterbox,
-//! subtitles and levels; drag a section to move it, or its ends to resize
-//! it, and pick one to set it in the inspector below.
+//! other track: camera cuts, the Environment track's keys (each names an
+//! environment preset: the sky and the weather blend from one key to the
+//! next), clips on Animators, Sounds, fades, letterbox, subtitles and
+//! levels; drag a section to move it, or its ends to resize it, and pick
+//! one to set it in the inspector below.
 //!
 //! Above the timeline, the Animation tab's transport bar (start, a frame
 //! back, play or pause, a frame on, end, stop, a seek bar, the time and the
@@ -27,12 +29,16 @@
 
 use std::path::Path;
 
+use axcenity_anim::environment::{ClockTurn, EnvironmentKey};
 use axcenity_anim::sequence::{
     AnimationSection, AudioSection, CAMERA_TARGET, CameraCut, FadeSection, LetterboxSection,
     LevelSection, SEQUENCE_EXTENSION, SEQUENCES_FOLDER, SequenceFile, SequenceRun, Shot,
-    SubtitleSection,
+    SubtitleSection, Transition,
 };
-use axcenity_anim::{Animators, ClipEvent, EvaluatedProperty, Poses, PropertyName};
+use axcenity_anim::{
+    Animators, ClipEvent, Easing, EasingDirection, EasingStyle, EvaluatedProperty, Interp, Poses,
+    PropertyName,
+};
 use axcenity_assets::Assets;
 use axcenity_audio::{GameAudio, Listener};
 use axcenity_core::{InstanceId, Vector3, World};
@@ -69,6 +75,8 @@ pub fn sequence_name(path: &str) -> &str {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Row {
     Camera,
+    /// The Environment track: keys that name environment presets.
+    Environment,
     Animation,
     Audio,
     Fade,
@@ -78,8 +86,9 @@ pub enum Row {
 }
 
 impl Row {
-    pub const ALL: [Row; 7] = [
+    pub const ALL: [Row; 8] = [
         Row::Camera,
+        Row::Environment,
         Row::Animation,
         Row::Audio,
         Row::Fade,
@@ -91,6 +100,7 @@ impl Row {
     pub fn label(self) -> &'static str {
         match self {
             Row::Camera => "Camera cuts",
+            Row::Environment => "Environment",
             Row::Animation => "Animation",
             Row::Audio => "Audio",
             Row::Fade => "Fade",
@@ -103,6 +113,7 @@ impl Row {
     fn icon(self) -> &'static str {
         match self {
             Row::Camera => icons::VIDEO_CAMERA,
+            Row::Environment => icons::CLOUD_SUN,
             Row::Animation => icons::PERSON_SIMPLE_WALK,
             Row::Audio => icons::WAVEFORM,
             Row::Fade => icons::CIRCLE_HALF,
@@ -110,6 +121,12 @@ impl Row {
             Row::Subtitle => icons::CHAT_TEXT,
             Row::Level => icons::STACK,
         }
+    }
+
+    /// Whether its sections are moments, not spans: a camera cut or an
+    /// environment key is at one time and lasts until the next.
+    pub fn is_point(self) -> bool {
+        matches!(self, Row::Camera | Row::Environment)
     }
 }
 
@@ -147,6 +164,9 @@ pub struct SequencerScene<'a> {
     pub clips: &'a [String],
     /// The project's levels, for level sections.
     pub levels: &'a [String],
+    /// Every environment preset's name (the built-ins, then the
+    /// project's), for the Environment track's keys.
+    pub presets: &'a [String],
     pub picked: Option<Picked>,
     /// The world as the preview shows it now, to key what's picked.
     pub world: &'a World,
@@ -162,6 +182,8 @@ pub enum SequencerAction {
     New(String),
     /// A Sequence Instance in the Workspace that plays the open file.
     Insert(String),
+    /// Open the Render Movie window (`movie.rs`).
+    RenderMovie,
 }
 
 /// One open sequence.
@@ -251,6 +273,18 @@ impl SequenceDoc {
                 }
                 cuts
             }
+            Row::Environment => f
+                .environment
+                .iter()
+                .enumerate()
+                .map(|(i, key)| {
+                    let end = f
+                        .environment
+                        .get(i + 1)
+                        .map_or(self.duration(), |next| next.time);
+                    (key.time, end, key.preset.clone())
+                })
+                .collect(),
             Row::Animation => f
                 .animations
                 .iter()
@@ -299,7 +333,8 @@ impl SequenceDoc {
         }
     }
 
-    /// Moves `section` to run from `start` to `end` (a cut only moves its time).
+    /// Moves `section` to run from `start` to `end` (a cut or an
+    /// environment key only moves its time).
     pub fn set_span(&mut self, section: Section, start: f64, end: f64) {
         let duration = self.duration();
         let start = start.clamp(0.0, duration);
@@ -321,6 +356,22 @@ impl SequenceDoc {
                     let index = f.camera_cuts.iter().position(|c| c.id == id);
                     self.selected = index.map(|index| Section {
                         row: Row::Camera,
+                        index,
+                    });
+                }
+            }
+            Row::Environment => {
+                // The selection follows a picked key that moves past another.
+                let picked = self.selected == Some(section);
+                if let Some(key) = f.environment.get_mut(i) {
+                    key.time = start;
+                }
+                let id = f.environment.get(i).map(|key| key.id.clone());
+                f.environment.sort_by(|a, b| a.time.total_cmp(&b.time));
+                if picked && let Some(id) = id {
+                    let index = f.environment.iter().position(|key| key.id == id);
+                    self.selected = index.map(|index| Section {
+                        row: Row::Environment,
                         index,
                     });
                 }
@@ -369,6 +420,7 @@ impl SequenceDoc {
         }
         match section.row {
             Row::Camera => take(&mut f.camera_cuts, i),
+            Row::Environment => take(&mut f.environment, i),
             Row::Animation => take(&mut f.animations, i),
             Row::Audio => take(&mut f.audio, i),
             Row::Fade => take(&mut f.fades, i),
@@ -386,6 +438,7 @@ impl SequenceDoc {
             .camera_cuts
             .iter()
             .map(|s| s.id.as_str())
+            .chain(f.environment.iter().map(|s| s.id.as_str()))
             .chain(f.animations.iter().map(|s| s.id.as_str()))
             .chain(f.audio.iter().map(|s| s.id.as_str()))
             .chain(f.fades.iter().map(|s| s.id.as_str()))
@@ -400,7 +453,8 @@ impl SequenceDoc {
     }
 
     /// Adds a section to `row` at the playhead, `binding` (when it takes
-    /// one) bound to what's picked. Returns it.
+    /// one) bound to what's picked; `extra` is its clip, string key, level
+    /// or environment preset. Returns it.
     pub fn add(&mut self, row: Row, binding: String, extra: &str) -> Section {
         let start = self.keys.playhead.clamp(0.0, self.duration());
         let end = (start + 2.0).min(self.duration());
@@ -412,9 +466,23 @@ impl SequenceDoc {
                     id: id.clone(),
                     time: start,
                     camera: binding,
+                    transition: Default::default(),
                 });
                 f.camera_cuts.sort_by(|a, b| a.time.total_cmp(&b.time));
                 f.camera_cuts.iter().position(|c| c.id == id).unwrap_or(0)
+            }
+            Row::Environment => {
+                let id = self.new_id("sky");
+                let f = &mut self.file;
+                // A key at this very time is replaced, as a property key is.
+                f.environment.retain(|key| key.time != start);
+                f.environment
+                    .push(EnvironmentKey::new(id.clone(), start, extra));
+                f.environment.sort_by(|a, b| a.time.total_cmp(&b.time));
+                f.environment
+                    .iter()
+                    .position(|key| key.id == id)
+                    .unwrap_or(0)
             }
             Row::Animation => {
                 let id = self.new_id("clip");
@@ -619,7 +687,9 @@ impl Sequencer {
                     self.preview = Some(Preview {
                         made_from,
                         world: world.clone(),
-                        run,
+                        // The Environment track's presets, the project's
+                        // own included.
+                        run: run.with_presets(assets),
                         animators: Animators::new(),
                         shown_at: None,
                         camera: None,
@@ -660,6 +730,12 @@ impl Sequencer {
         self.preview
             .as_ref()
             .filter(|_| self.preview_on && self.doc.is_some())
+    }
+
+    /// An environment preset's file changed: the preview is made again
+    /// with it the next time it's asked for.
+    pub fn presets_changed(&mut self) {
+        self.stop_preview();
     }
 
     /// Stops the preview's Sounds and forgets it.
@@ -776,7 +852,20 @@ impl Sequencer {
         let range = self.mode.range.map(|_| self.mode.bounds(doc.duration()));
         // Both rows draw every frame; a click is on one of them.
         let main = transport::bar_with(ui, &doc.keys, &mut self.rate, range);
-        let more = transport::sequence_bar(ui, &doc.keys, &self.mode);
+        let more = transport::sequence_bar(ui, &doc.keys, &self.mode, |ui| {
+            ui.add_space(6.0);
+            if ui
+                .small_button(theme::with_icon(icons::FILM_STRIP, "Render Movie"))
+                .on_hover_text(
+                    "Draw the sequence frame by frame into a video file or a folder of \
+                     PNGs: camera cuts, transitions, the overlay, particles and weather, at \
+                     any size and quality",
+                )
+                .clicked()
+            {
+                actions.push(SequencerAction::RenderMovie);
+            }
+        });
         let command = main.or(more);
         if let Some(command) = command {
             let edits = doc.edit_points();
@@ -939,12 +1028,13 @@ fn binding_of(picked: &Picked, by_tag: bool) -> String {
 }
 
 /// What can be keyed on `picked`, as it is in `world` now.
-fn picked_focus(world: &World, picked: &Picked, by_tag: bool) -> Option<Focus> {
+pub(crate) fn picked_focus(world: &World, picked: &Picked, by_tag: bool) -> Option<Focus> {
     let target = binding_of(picked, by_tag);
     let applied = axcenity_anim::Applied::default();
     let root = world.root();
     let path = axcenity_anim::target_path(world, root, picked.id)?;
-    let values: Vec<EvaluatedProperty> = PropertyName::keyable()
+    // A sequence keys the sky, the weather, lights and lens effects too.
+    let values: Vec<EvaluatedProperty> = PropertyName::sequence_keyable()
         .filter(|p| *p != PropertyName::Bone)
         .filter_map(|property| {
             let value = axcenity_anim::current_numbers(world, root, &path, property, &applied)?;
@@ -1041,6 +1131,38 @@ fn sections_view(
                 hit = Some((section, bar, pos));
             }
         }
+        // An environment key, as a tick where its preset is reached: the
+        // bar after it is the blend toward the next.
+        if row == Row::Environment {
+            for (start, _, _) in &sections {
+                painter.rect_filled(
+                    egui::Rect::from_min_max(
+                        egui::pos2(x_of(*start), rect.top() + 2.0),
+                        egui::pos2(x_of(*start) + 2.0, rect.bottom() - 2.0),
+                    ),
+                    0.0,
+                    palette.accent,
+                );
+            }
+        }
+        // A cut's transition, as a line under the cut over the seconds it
+        // takes.
+        if row == Row::Camera {
+            let mut cuts = SequenceFile::new(duration);
+            cuts.camera_cuts.clone_from(&doc.file.camera_cuts);
+            for index in 0..cuts.camera_cuts.len() {
+                if let Some((start, end)) = cuts.transition_span(index) {
+                    painter.rect_filled(
+                        egui::Rect::from_min_max(
+                            egui::pos2(x_of(start), rect.bottom() - 4.0),
+                            egui::pos2(x_of(end), rect.bottom() - 1.0),
+                        ),
+                        1.0,
+                        palette.accent,
+                    );
+                }
+            }
+        }
         // The row's name, on a chip at its right end.
         let name = painter.layout_no_wrap(
             theme::with_icon(row.icon(), row.label()),
@@ -1065,9 +1187,9 @@ fn sections_view(
         if response.drag_started()
             && let Some((section, bar, pos)) = hit
         {
-            let grab = if row != Row::Camera && (pos.x - bar.left()).abs() < EDGE {
+            let grab = if !row.is_point() && (pos.x - bar.left()).abs() < EDGE {
                 Grab::Start
-            } else if row != Row::Camera && (pos.x - bar.right()).abs() < EDGE {
+            } else if !row.is_point() && (pos.x - bar.right()).abs() < EDGE {
                 Grab::End
             } else {
                 let (start, end, _) = &sections[section.index];
@@ -1130,6 +1252,27 @@ fn add_menu(ui: &mut egui::Ui, doc: &mut SequenceDoc, scene: &SequencerScene) {
                 doc.add(Row::Camera, String::new(), "");
                 ui.close();
             }
+            crate::widgets::menu_button(ui, None, "Environment key", |ui| {
+                for preset in scene.presets {
+                    if ui
+                        .button(preset)
+                        .on_hover_text(
+                            "At the playhead the sky and the weather look like this preset; \
+                             between two keys they blend from one to the next",
+                        )
+                        .clicked()
+                    {
+                        doc.add(Row::Environment, String::new(), preset);
+                        ui.close();
+                    }
+                }
+            })
+            .response
+            .on_hover_text(
+                "The Environment track: one key sets the time of day, the air, the clouds, \
+                 the weather and the wind together, from a preset. Save your own from the \
+                 Properties panel's Environment presets (with nothing or Lighting selected).",
+            );
             ui.add_enabled_ui(binding.is_some(), |ui| {
                 crate::widgets::menu_button(ui, None, "Animation", |ui| {
                     if scene.clips.is_empty() {
@@ -1188,6 +1331,211 @@ fn add_menu(ui: &mut egui::Ui, doc: &mut SequenceDoc, scene: &SequencerScene) {
     });
 }
 
+/// How long a transition is when one is first picked, in seconds.
+const NEW_TRANSITION: f64 = 1.0;
+
+/// What a transition is called in the picker.
+fn transition_label(transition: &Transition) -> &'static str {
+    match transition {
+        Transition::Cut => "Cut",
+        Transition::Dissolve { .. } => "Dissolve",
+        Transition::FadeThrough { .. } => "Fade through color",
+    }
+}
+
+/// A camera cut's transition: its kind, how long it lasts and, for a fade
+/// through a color, the color.
+fn transition_rows(ui: &mut egui::Ui, transition: &mut Transition) {
+    // A change of kind keeps the length.
+    let length = match transition.duration() {
+        length if length > 0.0 => length,
+        _ => NEW_TRANSITION,
+    };
+    let kinds = [
+        (Transition::Cut, "From one frame to the next."),
+        (
+            Transition::Dissolve { duration: length },
+            "The shot before fades into this one. Drawn in rendered movies (Render Movie); \
+             the game and this preview show a cut, because a dissolve draws the world twice.",
+        ),
+        (
+            Transition::FadeThrough {
+                duration: length,
+                color: [0.0, 0.0, 0.0],
+            },
+            "The screen fades to a color, the cut happens behind it, and it clears again. \
+             The same in the game, this preview and a movie.",
+        ),
+    ];
+    ui.label("Transition");
+    egui::ComboBox::from_id_salt("sequence transition")
+        .selected_text(transition_label(transition))
+        .show_ui(ui, |ui| {
+            for (kind, hint) in kinds {
+                let chosen = transition_label(transition) == transition_label(&kind);
+                if ui
+                    .selectable_label(chosen, transition_label(&kind))
+                    .on_hover_text(hint)
+                    .clicked()
+                    && !chosen
+                {
+                    *transition = kind;
+                }
+            }
+        })
+        .response
+        .on_hover_text(
+            "How this cut takes over from the shot before it. A transition is centred on \
+             the cut: half before, half after.",
+        );
+    ui.end_row();
+    let (Transition::Dissolve { duration } | Transition::FadeThrough { duration, .. }) = transition
+    else {
+        return;
+    };
+    ui.label("Lasts");
+    ui.add(
+        egui::DragValue::new(duration)
+            .speed(0.05)
+            .range(0.0..=60.0)
+            .suffix(" s"),
+    );
+    ui.end_row();
+    match transition {
+        Transition::FadeThrough { color, .. } => {
+            ui.label("Color");
+            ui.color_edit_button_rgb(color);
+            ui.end_row();
+        }
+        Transition::Dissolve { .. } => {
+            ui.label("");
+            ui.weak("In the game and the preview it plays as a cut.");
+            ui.end_row();
+        }
+        Transition::Cut => {}
+    }
+}
+
+/// What an environment key's way to the next key is called in the picker.
+fn blend_label(key: &EnvironmentKey) -> String {
+    match key.interp {
+        Interp::Step => "Hold, then switch".to_owned(),
+        Interp::Linear => "Linear".to_owned(),
+        Interp::Bezier => "Bezier".to_owned(),
+        Interp::Ease => {
+            let easing = key.easing.unwrap_or_default();
+            format!(
+                "Ease {} {}",
+                easing.style.as_str(),
+                easing.direction.as_str()
+            )
+        }
+    }
+}
+
+/// An environment key: its preset, how it blends to the next key and
+/// which way the clock turns on the way.
+fn environment_rows(ui: &mut egui::Ui, key: &mut EnvironmentKey, presets: &[String], last: bool) {
+    ui.label("Preset");
+    egui::ComboBox::from_id_salt("sequence environment preset")
+        .selected_text(key.preset.clone())
+        .show_ui(ui, |ui| {
+            for preset in presets {
+                ui.selectable_value(&mut key.preset, preset.clone(), preset);
+            }
+        })
+        .response
+        .on_hover_text(
+            "What the sky and the weather look like at this key: a built-in preset or one \
+             saved in this project (assets/environments).",
+        );
+    ui.end_row();
+    if !presets.contains(&key.preset) {
+        ui.label("");
+        ui.colored_label(
+            theme::palette(ui.ctx()).warning,
+            "This preset isn't in the project: the key is skipped.",
+        );
+        ui.end_row();
+    }
+    ui.label("Blend");
+    egui::ComboBox::from_id_salt("sequence environment blend")
+        .selected_text(blend_label(key))
+        .show_ui(ui, |ui| {
+            let mut pick =
+                |ui: &mut egui::Ui, interp: Interp, easing: Option<Easing>, hint: &str| {
+                    let choice = EnvironmentKey {
+                        interp,
+                        easing,
+                        ..key.clone()
+                    };
+                    let chosen = key.interp == interp && key.easing == easing;
+                    if ui
+                        .selectable_label(chosen, blend_label(&choice))
+                        .on_hover_text(hint)
+                        .clicked()
+                    {
+                        key.interp = interp;
+                        key.easing = easing;
+                        if interp != Interp::Bezier {
+                            key.bezier = None;
+                        }
+                    }
+                };
+            pick(ui, Interp::Linear, None, "At an even pace to the next key.");
+            for direction in [
+                EasingDirection::InOut,
+                EasingDirection::In,
+                EasingDirection::Out,
+            ] {
+                for style in [EasingStyle::Sine, EasingStyle::Quad, EasingStyle::Cubic] {
+                    pick(
+                        ui,
+                        Interp::Ease,
+                        Some(Easing::new(style, direction)),
+                        "Slow at the eased end: In at the start, Out at the end, InOut at both.",
+                    );
+                }
+            }
+            pick(
+                ui,
+                Interp::Step,
+                None,
+                "Keeps this preset until the next key, then changes at once.",
+            );
+        })
+        .response
+        .on_hover_text("How the look gets from this key to the next one.");
+    ui.end_row();
+    ui.label("Clock");
+    egui::ComboBox::from_id_salt("sequence environment clock")
+        .selected_text(clock_label(key.clock))
+        .show_ui(ui, |ui| {
+            for turn in ClockTurn::ALL {
+                ui.selectable_value(&mut key.clock, turn, clock_label(turn));
+            }
+        })
+        .response
+        .on_hover_text(
+            "Which way the time of day turns to the next key. The short way from morning \
+             (6) to evening (20) is back through midnight: pick Forward for a day to pass.",
+        );
+    ui.end_row();
+    if last {
+        ui.label("");
+        ui.weak("The last key: its look is held to the end.");
+        ui.end_row();
+    }
+}
+
+fn clock_label(turn: ClockTurn) -> &'static str {
+    match turn {
+        ClockTurn::Shortest => "The short way",
+        ClockTurn::Forward => "Forward (time passes)",
+        ClockTurn::Backward => "Backward",
+    }
+}
+
 /// The selected section's settings.
 fn section_inspector(ui: &mut egui::Ui, doc: &mut SequenceDoc, scene: &SequencerScene) {
     let Some(section) = doc.selected else {
@@ -1235,14 +1583,14 @@ fn section_inspector(ui: &mut egui::Ui, doc: &mut SequenceDoc, scene: &Sequencer
     crate::responsive::form(ui, "sequence section", |ui| {
         seconds(
             ui,
-            if section.row == Row::Camera {
+            if section.row.is_point() {
                 "Time"
             } else {
                 "Start"
             },
             &mut start,
         );
-        if section.row != Row::Camera {
+        if !section.row.is_point() {
             seconds(ui, "End", &mut end);
         }
         let f = &mut doc.file;
@@ -1254,6 +1602,13 @@ fn section_inspector(ui: &mut egui::Ui, doc: &mut SequenceDoc, scene: &Sequencer
                     ui.label("");
                     ui.weak("Empty: the sequence's own camera keys");
                     ui.end_row();
+                    transition_rows(ui, &mut cut.transition);
+                }
+            }
+            Row::Environment => {
+                let last = i + 1 == f.environment.len();
+                if let Some(key) = f.environment.get_mut(i) {
+                    environment_rows(ui, key, scene.presets, last);
                 }
             }
             Row::Animation => {

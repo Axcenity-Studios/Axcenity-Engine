@@ -19,7 +19,7 @@ fn header(icon: &str, title: &str) -> String {
 
 #[test]
 fn the_inspector_lists_everyday_sections_first_and_the_fine_tuning_last() {
-    let folder = copy_of_example("hello-touched", "ui-inspector-order");
+    let folder = copy_of_example("touched", "ui-inspector-order");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     let sheets = stylesheets(&app);
@@ -57,7 +57,7 @@ fn the_inspector_lists_everyday_sections_first_and_the_fine_tuning_last() {
 
 #[test]
 fn a_folded_section_opens_on_its_header_stays_open_and_names_what_it_has() {
-    let folder = copy_of_example("hello-touched", "ui-inspector-fold");
+    let folder = copy_of_example("touched", "ui-inspector-fold");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(&mut app, DesignerAction::Select(Some(menu.play)));
@@ -116,7 +116,7 @@ fn a_folded_section_opens_on_its_header_stays_open_and_names_what_it_has() {
 
 #[test]
 fn with_states_folded_the_text_toolbar_edits_the_normal_look() {
-    let folder = copy_of_example("hello-touched", "ui-inspector-states");
+    let folder = copy_of_example("touched", "ui-inspector-states");
     let mut app = EditorApp::new(Some(&folder));
     let menu = build_menu(&mut app);
     act(&mut app, DesignerAction::Select(Some(menu.play)));

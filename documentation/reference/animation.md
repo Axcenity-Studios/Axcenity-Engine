@@ -1,7 +1,7 @@
 ---
 description: Clips, state machines, blend trees and blend spaces, layers, root motion, events, AnimationTracks, IK, ragdolls, property animation, cutscenes and the animation file formats.
 icon: person
-samples: [hello-animation, hello-character, hello-cutscene]
+samples: [animation, character, cutscene]
 ---
 
 # Animation
@@ -14,7 +14,8 @@ One clip format animates skeletons and properties alike. Each frame, every **Ani
 |---|---|
 | `assets/animations/<name>/<clip>.anim.json` | A clip: bone keys or property tracks, its length, looping and events. A **linked** clip plays a take from an FBX file in `assets/models/`. |
 | `assets/animations/<name>/<name>.statemachine.json` | A state machine: parameters, states, transitions, blend trees and layers. |
-| `assets/sequences/<name>.sequence.json` | A cutscene: camera cuts, clip, property and sound tracks. |
+| `assets/sequences/<name>.sequence.json` | A cutscene: camera cuts (with transitions), clip, property and sound tracks, and the Environment track. The Sequencer's **Render Movie** draws it to a video file. |
+| `assets/environments/<name>.environment.json` | An environment preset of your own: the sky's and the weather's values under one name. |
 
 ## State machines
 
@@ -41,6 +42,30 @@ end)
 ## Property animation
 
 An **Animation** Instance plays a property clip on its parent: a door's Position, a light's Brightness, a UI element's Size and colour. Tick **AutoPlay** to play it when the game starts, or play it from a script with `animator:LoadAnimation(animation)`, which gives an AnimationTrack (`Animation:Play()` and the rest were removed and now give an error that says this). When a player turns on **reduced motion** (`GuiService.ReducedMotion`), UI animations hold still.
+
+## Environment presets
+
+A preset holds values of Lighting, the Atmosphere, Clouds, Weather and ColorCorrectionEffect in it, and the Workspace's GlobalWind. A value it leaves out isn't changed.
+
+| Preset | ClockTime | Clouds' Cover | What falls | Wetness | SnowCover | GlobalWind |
+|---|---|---|---|---|---|---|
+| Clear | 13.4 | 0.3 | Nothing | 0 | 0 | 4, 0, 1.5 |
+| Evening | 19.2 | 0.3 | Nothing | 0 | 0 | 3, 0, 1 |
+| Overcast | 13.4 | 0.8 | Nothing | 0 | 0 | 8, 0, 3 |
+| Storm | 15 | 0.85 | Rain at 0.9 | 0.9 | 0 | 16, 0, 6 |
+| SnowDay | 13 | 0.8 | Snow at 0.6 | 0 | 1 | 4, 0, 1.5 |
+| SnowNight | 19.3 | 0.8 | Snow at 0.6 | 0 | 1 | 4, 0, 1.5 |
+
+Each built-in preset also sets Lighting's Exposure, the Atmosphere's Density and Haze, the Clouds' Density, Color and Speed, the Weather's SnowThickness and the ColorCorrectionEffect's Saturation. A preset of your own with a built-in's name is used in its place.
+
+How two presets blend, on a sequence's **Environment** track and in `Lighting:TransitionToPreset(name, seconds, clock)`:
+
+- Numbers, colors and the wind go straight from one to the other.
+- ClockTime turns the short way round the clock, or Forward or Backward when the key (or the script's third value) says so.
+- Rain turning to snow, or snow to rain, eases to nothing by half way and starts again as the other. From nothing falling, rain or snow starts gently at once.
+- A switch changes half way.
+- On a sequence, a property track on the same property wins over the Environment track. A playing sequence wins over a script's transition.
+- The weather you see follows the Weather's properties by its TransitionTime: set it to 0 to follow a blend exactly.
 
 ## IK and ragdolls
 

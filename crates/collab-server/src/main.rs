@@ -14,7 +14,7 @@ use anyhow::{Context, Result, bail};
 use axcenity_collab_server::{Options, Server};
 
 const USAGE: &str = "usage: axcenity-collab <project-folder> [--port <port>] [--data <folder>] [--address <host:port>] [--no-tailscale]\n\
-                     example: cargo run -p axcenity-collab-server -- examples/hello-part";
+                     example: cargo run -p axcenity-collab-server -- crates/samples/projects/part";
 
 fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Options> {
     let mut project = None;

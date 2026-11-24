@@ -1051,7 +1051,7 @@ mod tests {
     #[test]
     fn a_painted_model_appears_when_it_has_loaded() {
         let folder =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
         let assets = Assets::new(&folder);
         assets.load_textures_in_background(|| {});
         let (release, released) = std::sync::mpsc::channel::<()>();
@@ -1111,7 +1111,7 @@ mod tests {
         // A model painted on a terrain carries that distance (its scale
         // counted), and its group is passed over past it.
         let folder =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-mesh");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
         let assets = Assets::new(&folder);
         let path = "assets/models/pyramid.gltf";
         let model = assets.model_blocking(path).expect("the example's pyramid");

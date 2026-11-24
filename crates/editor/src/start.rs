@@ -1202,7 +1202,7 @@ fn same_folder(a: &Path, b: &Path) -> bool {
     }
 }
 
-/// The sample folder (in `examples/`) of every tutorial, for tests that
+/// The sample folder (in `crates/samples/projects/`) of every tutorial, for tests that
 /// check each one still opens and plays.
 #[cfg(test)]
 pub fn tutorial_samples() -> Vec<&'static str> {

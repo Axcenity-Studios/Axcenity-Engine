@@ -211,6 +211,8 @@ pub(super) enum Command {
     CheckForUpdates,
     /// Debug > Graphics Benchmark…
     GraphicsBenchmark,
+    /// The Sequencer's Render Movie button: the Render Movie window.
+    RenderMovie,
     /// Debug > Animator Inspector… (AP6)
     AnimatorInspector,
     PanicDuringPlay,
@@ -941,6 +943,17 @@ impl EditorApp {
             Ok(()),
         );
         add(
+            Command::RenderMovie,
+            "Render Movie…",
+            "Sequencer",
+            &["Movie", "Video", "Film", "MP4", "Export video", "Cutscene"],
+            None,
+            when(
+                self.sequencer.doc.is_some(),
+                "Open a sequence in the Sequencer tab first.",
+            ),
+        );
+        add(
             Command::AnimatorInspector,
             "Animator Inspector…",
             "Debug",
@@ -1394,6 +1407,7 @@ impl EditorApp {
             Command::About => self.about_open = true,
             Command::CheckForUpdates => self.open_updates(),
             Command::GraphicsBenchmark => self.open_graphics_benchmark(),
+            Command::RenderMovie => self.open_render_movie(),
             Command::AnimatorInspector => self.open_animator_inspector(),
             Command::PanicDuringPlay => {
                 if let Some(session) = &mut self.play {

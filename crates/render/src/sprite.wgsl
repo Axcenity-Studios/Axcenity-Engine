@@ -8,6 +8,9 @@ struct Sprites {
     up: vec4<f32>,
     // Where the camera is.
     eye: vec4<f32>,
+    // The scene's light on a sprite with a light influence: what a white
+    // matte thing in the open gives back (sprites.rs's `scene_light`).
+    light: vec4<f32>,
     fog: Fog,
 };
 
@@ -20,8 +23,10 @@ struct SpriteIn {
     @location(0) center_size: vec4<f32>,
     // Linear color, already times brightness and opacity, and the opacity.
     @location(1) color: vec4<f32>,
-    // The turn in radians, the light emission, then the flipbook frame
-    // shown and how many frames along each side (0 or 1: the whole picture).
+    // The turn in radians, the light emission (0 to 1) plus twice the
+    // light influence in 127 steps (sprites.rs's `packed_light`), then the
+    // flipbook frame shown and how many frames along each side (0 or 1: the
+    // whole picture).
     @location(2) params: vec4<f32>,
 };
 
@@ -61,8 +66,11 @@ fn vs_main(@builtin(vertex_index) index: u32, sprite: SpriteIn) -> VertexOut {
     let frame = sprite.params.z;
     let cell = vec2<f32>(frame - grid * floor(frame / grid), floor(frame / grid));
     out.uv = (out.uv + cell) / grid;
-    out.color = sprite.color;
-    out.emission = sprite.params.y;
+    // The light influence: how far the scene's light shows on it.
+    let steps = floor(sprite.params.y * 0.5);
+    let lit = mix(vec3<f32>(1.0), sprites.light.rgb, clamp(steps / 127.0, 0.0, 1.0));
+    out.color = vec4<f32>(sprite.color.rgb * lit, sprite.color.a);
+    out.emission = sprite.params.y - 2.0 * steps;
     out.world = world;
     return out;
 }

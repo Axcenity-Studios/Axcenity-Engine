@@ -5,7 +5,7 @@ Runs `axcenity-server` and `axcenity-bots` (build them first:
 `cargo build --release -p axcenity-server --bins`) and writes a report.
 
 One machine, server and bots:
-  python scripts/net-scale.py run examples/hello-spawn --bots 32 --seconds 120
+  python scripts/net-scale.py run crates/samples/projects/spawn --bots 32 --seconds 120
 
 Two machines (the server and some bots on one, more bots on the other):
   on the host:    python scripts/net-scale.py run <game> --bots 16 --seconds 300 --port 47800

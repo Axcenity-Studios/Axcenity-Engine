@@ -160,7 +160,7 @@ mod tests {
 
         let path = "assets/textures/stone.png";
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/hello-material-graph/assets/textures/stone.png");
+            .join("../samples/projects/material-graph/assets/textures/stone.png");
         std::fs::copy(example, folder.join(path)).unwrap();
         cooker.cook_again();
         assert_eq!(wait(), 1);

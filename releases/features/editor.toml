@@ -143,3 +143,15 @@ docs = "docs/editor/mcp.md"
 version = "unreleased"
 evidence = "reconstructed"
 source = "PR #102 (MCP toolkit: axcenity-mcp crate and a read-only server), after v0.1.0-alpha.3"
+
+[[feature]]
+id = "editor.render-movie"
+name = "Render Movie"
+subsystem = "editor"
+description = "Draw a sequence frame by frame into a video file or a PNG sequence, at any size and quality, from the Sequencer or `axcenity-editor --render-movie`."
+status = "active"
+docs = "docs/editor/movie.md"
+[feature.introduced]
+version = "unreleased"
+evidence = "verified"
+source = "Render Movie in the Sequencer tab (crates/editor/src/movie.rs), after v0.3.0-alpha.1"

@@ -1,6 +1,6 @@
 # Water
 
-Water surfaces (graphics Phase 29): animated waves, what's under seen through the water and bent by its waves, reflections, depth tint and shoreline foam. `examples/hello-water` is a pool with a shallow and a deep end.
+Water surfaces (graphics Phase 29): animated waves, what's under seen through the water and bent by its waves, reflections, depth tint and shoreline foam. `crates/samples/projects/water` is a pool with a shallow and a deep end.
 
 ## Making water
 
@@ -66,5 +66,5 @@ Nothing without water: no target, pass or pipeline is used. From Medium up, with
 - `render/src/renderer/tests/water.rs` (GPU): an open sea with variation 1 varies more in roughness from place to place than with 0 (`varied_waves_gather_into_rougher_and_calmer_patches`; `AXCENITY_WATER_SHOTS=<folder>` keeps both frames as raw RGBA, 256 square). Through still water the shallow floor and its stripes show, and 8 studs down it's darker and blue; still water doesn't change over time, and waves change what's seen through it. The water reflects a blue sky; at High it reflects a red block standing in it, and at Medium it doesn't. Snow doesn't whiten deep water, white fog lightens it, and everything at once (an atmosphere's sky, distance and volumetric fog at Ultra, clouds, rain, and wind swaying a reed in the water, over waves) draws it tinted. Each preset picks its mode; at Low water is blended with no copy and no target bytes; from Medium one copy lives while water is drawn and none after, through repeated switching. Water is batched after solid items and before glass, and casts no shadow.
 - `render/src/renderer/water.rs`: water's values reach the uniform, never match a plain material, and broken numbers are made finite. `render/src/water.rs`: the grid is the top of the unit box, every triangle facing up.
 - `assets/src/material.rs`: `water` round-trips, an instance changes its base's waves value by value, and `{}` is the defaults. `scene/src/material.rs`: a part with a water material draws as water on the grid.
-- `player` `every_example_renders` draws `hello-water`.
+- `player` `every_example_renders` draws `water`.
 - `render/src/renderer/tests/water.rs` `ray_traced_water_reflects_what_is_off_the_screen` (ray queries only): a glowing block above the frame shows in the water at High with rays, not without ray queries, and not at Medium, which traces nothing.

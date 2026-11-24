@@ -144,6 +144,7 @@ pub fn build_draw_list_posed(
         clouds: settings.clouds,
         weather: crate::weather::settled(world),
         weather_field: None,
+        weather_boxes: crate::weather::weather_boxes(world),
         wind: crate::particles::global_wind(world),
         camera,
         sun: look.sun,
@@ -761,7 +762,7 @@ pub(crate) fn push_model(
             id,
             cull_distance,
             skin: None,
-            sway: material::box_sway(piece.sway, piece.flutter, transform),
+            sway: material::box_sway(piece.sway, piece.flutter, piece.hangs, transform),
             decal_role: Default::default(),
         });
     }
@@ -775,6 +776,7 @@ pub(crate) struct ModelPiece {
     material: Material,
     sway: f32,
     flutter: f32,
+    hangs: bool,
 }
 
 /// The [`ModelPiece`]s of `model`, one per primitive.
@@ -788,6 +790,7 @@ pub(crate) fn model_pieces(model: &Arc<Model>) -> Vec<ModelPiece> {
             material: model_material(&primitive.material),
             sway: primitive.material.sway,
             flutter: primitive.material.flutter,
+            hangs: primitive.material.hangs,
         })
         .collect()
 }

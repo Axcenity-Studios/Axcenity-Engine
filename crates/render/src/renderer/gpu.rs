@@ -791,13 +791,23 @@ pub(super) fn upload_mesh(
     name: &str,
     mesh: &MeshData,
 ) -> GpuMesh {
+    // The skirt uses the mesh's own corners, so its indices fit in 16 bits
+    // as the mesh's do.
+    let wide: Vec<u32> = mesh.indices.iter().map(|&index| u32::from(index)).collect();
+    let skirt: Vec<u16> = super::snow_caps::skirt(&mesh.vertices, &wide)
+        .into_iter()
+        .map(|index| index as u16)
+        .collect();
     upload_buffers(
         device,
         bytes,
         name,
         &mesh.vertices,
-        bytemuck::cast_slice(&mesh.indices),
-        mesh.indices.len(),
+        (
+            bytemuck::cast_slice(&mesh.indices),
+            bytemuck::cast_slice(&skirt),
+        ),
+        (mesh.indices.len(), skirt.len()),
         wgpu::IndexFormat::Uint16,
     )
 }
@@ -812,13 +822,14 @@ pub(super) fn upload_custom_mesh(
 ) -> Option<GpuMesh> {
     let vertices = custom_vertices(source)?;
     let indices = source.indices();
+    let skirt = super::snow_caps::skirt(&vertices, indices);
     let mut mesh = upload_buffers(
         device,
         bytes,
         "mesh",
         &vertices,
-        bytemuck::cast_slice(indices),
-        indices.len(),
+        (bytemuck::cast_slice(indices), bytemuck::cast_slice(&skirt)),
+        (indices.len(), skirt.len()),
         wgpu::IndexFormat::Uint32,
     );
     mesh.version = source.version();
@@ -892,10 +903,13 @@ pub(super) fn upload_buffers(
     bytes: &GpuBytes,
     name: &str,
     vertices: &[Vertex],
-    indices: &[u8],
-    index_count: usize,
+    (indices, skirt): (&[u8], &[u8]),
+    (index_count, skirt_count): (usize, usize),
     index_format: wgpu::IndexFormat,
 ) -> GpuMesh {
+    // The mesh's indices, then its skirt's (`snow_caps.rs`).
+    let indices = [indices, skirt].concat();
+    let indices = indices.as_slice();
     let corners = vertices;
     let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some(name),
@@ -920,6 +934,7 @@ pub(super) fn upload_buffers(
         vertices,
         indices,
         index_count: index_count as u32,
+        cap_index_count: (index_count + skirt_count) as u32,
         vertex_count: corners.len() as u32,
         index_format,
         version: 0,

@@ -1,4 +1,4 @@
-//! Phase 51: the hello-cutscene example in the player's frame order, from a
+//! Phase 51: the cutscene example in the player's frame order, from a
 //! built game: its 20-second Intro sequence plays as the editor's preview
 //! shows it (the same `SequenceRun`, applied to a copy of the world and
 //! posed), skipping jumps to its end, and input is locked while it plays.
@@ -14,10 +14,16 @@ use super::*;
 const FRAME: f32 = 1.0 / 60.0;
 const SEQUENCE: &str = "assets/sequences/Intro.sequence.json";
 
-/// hello-cutscene built with Build Game and unpacked, opened as the
+/// cutscene built with Build Game and unpacked, opened as the
 /// player opens a game.
 fn built_game(test: &str) -> (App, World, PathBuf) {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-cutscene");
+    built_game_with(test, |_| {})
+}
+
+/// [`built_game`], with `prepare` changing the project's files before it's
+/// built.
+fn built_game_with(test: &str, prepare: impl FnOnce(&Path)) -> (App, World, PathBuf) {
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/cutscene");
     let temp = |what: &str| {
         let folder = std::env::temp_dir().join(format!(
             "axcenity-player-cutscene-{test}-{what}-{}",
@@ -28,6 +34,7 @@ fn built_game(test: &str) -> (App, World, PathBuf) {
     };
     let source = temp("source");
     copy_folder(&example, &source);
+    prepare(&source);
     let packed = axcenity_project::pack_game(&source).unwrap();
     let folder = temp("built");
     axcenity_project::unpack_game(&packed, &folder).unwrap();
@@ -322,4 +329,128 @@ fn input_is_locked_while_it_plays_and_control_comes_back_after() {
     let moved = ((walked.x - held.x).powi(2) + (walked.z - held.z).powi(2)).sqrt();
     assert!(moved > 2.0, "W walks it again after: {held:?} → {walked:?}");
     let _ = fs::remove_dir_all(folder);
+}
+
+/// A sequence's Environment track plays in a built game: the blend of its
+/// presets, the project's own preset packed with the game beside it.
+#[test]
+fn the_environment_track_plays_in_a_built_game_with_the_projects_own_preset() {
+    use axcenity_anim::environment::{
+        ENVIRONMENTS_FOLDER, EnvironmentKey, EnvironmentPreset, EnvironmentTarget,
+        EnvironmentTrack, PresetValue, capture_like, preset_path,
+    };
+    use axcenity_anim::sequence::SequenceFile;
+
+    let (mut app, _, folder) = built_game_with("environment", |source| {
+        // Clear, then the project's Dusk at 10 s, then Storm at the end.
+        let path = source.join(SEQUENCE);
+        let mut file = SequenceFile::from_json(&fs::read_to_string(&path).unwrap()).unwrap();
+        file.environment = [
+            ("a", 0.0, "Clear"),
+            ("b", 10.0, "Dusk"),
+            ("c", 20.0, "Storm"),
+        ]
+        .into_iter()
+        .map(|(id, time, preset)| EnvironmentKey {
+            interp: axcenity_anim::Interp::Linear,
+            easing: None,
+            ..EnvironmentKey::new(id, time, preset)
+        })
+        .collect();
+        fs::write(&path, file.to_json()).unwrap();
+        let mut dusk = EnvironmentPreset::new();
+        dusk.set(
+            EnvironmentTarget::Lighting,
+            "ClockTime",
+            PresetValue::Number(18.0),
+        );
+        dusk.set(
+            EnvironmentTarget::Workspace,
+            "GlobalWind",
+            PresetValue::Triple([10.0, 0.0, 0.0]),
+        );
+        fs::create_dir_all(source.join(ENVIRONMENTS_FOLDER)).unwrap();
+        fs::write(source.join(preset_path("Dusk")), dusk.to_json()).unwrap();
+    });
+    assert!(
+        folder.join(preset_path("Dusk")).is_file(),
+        "Build Game packs the project's presets"
+    );
+    let keys = load_sequence(&app.sim.assets, SEQUENCE)
+        .unwrap()
+        .environment;
+    assert_eq!(keys.len(), 3);
+    let track = EnvironmentTrack::load(&keys, &app.sim.assets);
+    assert!(track.missing.is_empty(), "{:?}", track.missing);
+
+    let lighting = EnvironmentTarget::Lighting;
+    let number = |world: &World, name: &str| {
+        let instance = world.get(world.lighting()).unwrap();
+        instance.property(name).unwrap().as_number().unwrap()
+    };
+    let wind = |world: &World| vector(world, world.workspace(), "GlobalWind");
+    let mut printed = Vec::new();
+    let mut hours = Vec::new();
+    for frame in 1..=1200 {
+        app.cutscene_frame();
+        printed.extend(app.printed());
+        if frame % 150 != 0 {
+            continue;
+        }
+        let time = f64::from(frame) * f64::from(FRAME);
+        let want = track.sample(time).expect("the track has keys");
+        let world = &app.sim.world;
+        let hour = number(world, "ClockTime");
+        assert!(
+            (hour - want.number(lighting, "ClockTime").unwrap()).abs() < 1e-3,
+            "the hour at {time:.2}s: {hour}"
+        );
+        assert!(
+            (number(world, "Exposure") - want.number(lighting, "Exposure").unwrap()).abs() < 1e-3,
+            "the exposure at {time:.2}s"
+        );
+        let Some(PresetValue::Triple([x, y, z])) =
+            want.get(EnvironmentTarget::Workspace, "GlobalWind")
+        else {
+            panic!("the wind is three numbers");
+        };
+        close(
+            wind(world),
+            Vector3::new(*x, *y, *z),
+            &format!("the wind at {time:.2}s"),
+        );
+        // Nothing but what the presets set and this world has is touched.
+        assert_eq!(capture_like(world, &want).fields().count(), 3);
+        hours.push(hour);
+    }
+    // From Clear's 13.4 through Dusk's 18 back to Storm's 15, and the wind
+    // from 4 through the project's 10 to Storm's 16.
+    assert!((hours[1] - 15.7).abs() < 1e-3, "at 5 s: {}", hours[1]);
+    assert!((hours[3] - 18.0).abs() < 1e-3, "at 10 s: {}", hours[3]);
+    assert!((hours[7] - 15.0).abs() < 1e-3, "at 20 s: {}", hours[7]);
+    close(
+        wind(&app.sim.world),
+        Vector3::new(16.0, 0.0, 6.0),
+        "Storm's wind",
+    );
+    // The example's Lighting has no Clouds or Weather for the presets'
+    // values: said once each, and the cutscene's own lines are all there.
+    for missing in ["Lighting/Clouds", "Lighting/Weather"] {
+        assert_eq!(
+            printed.iter().filter(|line| line.contains(missing)).count(),
+            1,
+            "{printed:?}"
+        );
+    }
+    assert!(
+        printed
+            .iter()
+            .any(|line| line == "cutscene finished: walk around")
+    );
+    assert!(
+        !printed
+            .iter()
+            .any(|line| line.contains("environment preset"))
+    );
+    let _ = fs::remove_dir_all(&folder);
 }

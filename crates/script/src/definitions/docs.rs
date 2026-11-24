@@ -999,6 +999,36 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "Where volumes overlap, the one with the higher Priority wins (0 by default). Equal ones follow Explorer order, the later winning.",
     ),
     (
+        ClassName::WeatherVolume,
+        "Enabled",
+        "If false, it changes nothing.",
+    ),
+    (
+        ClassName::WeatherVolume,
+        "Precipitation",
+        "Whether rain and snow fall inside it (false by default). False keeps the drops, their splashes and drips out even under open sky; true lets them fall inside even under a roof, such as an open-sided shed or an overhang the wind blows under.",
+    ),
+    (
+        ClassName::WeatherVolume,
+        "Snow",
+        "How much of the world's snow lies inside it, from 0 to 2 (0 by default): 0 none, 1 as much as under open sky, 2 twice as deep. It takes the place of the shelter the engine finds, so 1 puts snow under a roof. Above 1 the snow is deeper (terrain rises further and the snow on things stands higher) but no whiter.",
+    ),
+    (
+        ClassName::WeatherVolume,
+        "Wetness",
+        "How much of the world's wetness is inside it, from 0 to 2 (0 by default): 0 dry, 1 as wet as under open sky, more wetter still, up to soaked. It takes the place of the shelter the engine finds, so 1 wets the floor under a roof.",
+    ),
+    (
+        ClassName::WeatherVolume,
+        "BlendDistance",
+        "Studs over which its snow and wetness fade across its faces, half outside them and half inside (1 by default). 0 switches at the faces. Rain and snow stop at the faces whatever it is.",
+    ),
+    (
+        ClassName::WeatherVolume,
+        "Priority",
+        "Where volumes overlap, the one with the higher Priority wins (0 by default). Equal ones follow Explorer order, the later winning.",
+    ),
+    (
         ClassName::ExposureEffect,
         "Enabled",
         "If false, it changes nothing.",
@@ -1854,17 +1884,22 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     (
         ClassName::Weather,
         "Wetness",
-        "How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier. Rain wets them at least as much as its Intensity.",
+        "How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier, with puddles on level ground from 0.35. Rain wets them at least as much as its Intensity, and while it falls its drops ring the puddles and splash on solid surfaces.",
     ),
     (
         ClassName::Weather,
         "SnowCover",
-        "How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: more cover whitens flat tops fully and reaches further down slopes. Walls stay bare. Falling snow covers them at least as much as its Intensity.",
+        "How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: light cover lies in patches, more whitens flat tops fully and reaches further down slopes. Walls stay bare; plants are capped with it. Falling snow covers them at least as much as its Intensity.",
     ),
     (
         ClassName::Weather,
         "SnowThickness",
-        "Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.",
+        "How deep the snow lies, in studs, from 0 to 2 (0.35 by default): snow on terrain rises that far (in drifts a little deeper and shallower), burying the foot of whatever stands on the ground, and footprints press that deep into it.",
+    ),
+    (
+        ClassName::Weather,
+        "Lightning",
+        "How often lightning flashes, from 0 (never, the default) to 1: the chance of a flash every 2.6 seconds. A flash is two or three strokes within half a second from somewhere in the clouds; it lights what's open to the sky (a tenth as much under a roof or in an interior) and glows inside the cloud round it. It needs no rain, but only shows in the sky where there are Clouds.",
     ),
     (
         ClassName::Weather,
@@ -2148,6 +2183,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     ),
     (
         ClassName::ParticleEmitter,
+        "LightInfluence",
+        "From 0 (particles keep their color whatever the hour) to 1 (they are lit by the sun, the sky and the ambient light, so dust and smoke go dark at night). Lamps and shadows don't count.",
+    ),
+    (
+        ClassName::ParticleEmitter,
         "Brightness",
         "How brightly particles glow: 1 is their color as it is; higher values bloom.",
     ),
@@ -2226,6 +2266,21 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::Part,
         "CanQuery",
         "If false, scripts' raycasts, shape casts and overlap queries (`workspace:Raycast`, `GetPartsInPart`, ...) pass it by. It still collides.",
+    ),
+    (
+        ClassName::Part,
+        "PivotOffset",
+        "Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.",
+    ),
+    (
+        ClassName::MeshPart,
+        "PivotOffset",
+        "Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.",
+    ),
+    (
+        ClassName::Model,
+        "PivotOffset",
+        "Where the Model's pivot is, from the middle of the box round its parts, and how it's turned: the point the editor's Move and Rotate tools hold the Model by and turn it about (set with the Pivot tool). At the middle, unturned, at first.",
     ),
     (
         ClassName::Part,
@@ -2945,7 +3000,7 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     (
         ClassName::TerrainPath,
         "Falloff",
-        "Studs past each edge over which Apply's flattening and paint blend into the ground around. 4 by default.",
+        "Studs past each edge over which Apply's flattening and paint blend into the ground around. With a ShoulderLayer, the shoulder is this wide. 4 by default.",
     ),
     (
         ClassName::TerrainPath,
@@ -2959,13 +3014,33 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     ),
     (
         ClassName::TerrainPath,
+        "ShoulderLayer",
+        "The name of the TerrainLayer Apply paints the road's shoulders with (gravel or dust, say): full at each edge and fading into the ground over Falloff, while the road's own Layer blends into it over the first quarter of that. Empty (the default) paints no shoulder, and Layer itself fades over Falloff.",
+    ),
+    (
+        ClassName::TerrainPath,
+        "EdgeNoise",
+        "0 to 1: how much noise breaks up the outer edge of what Apply paints, so the road doesn't end in a clean line. The paint reaches Falloff times 1 - EdgeNoise to 1 + EdgeNoise studs past the road's edge, from place to place. The flattening is never ragged. 0.5 by default; 0 is an even edge.",
+    ),
+    (
+        ClassName::TerrainPath,
+        "NoiseScale",
+        "Studs across the edge noise's patches: how long each bulge and bite of the ragged edge is. 10 by default.",
+    ),
+    (
+        ClassName::TerrainPath,
         "ClearScatter",
-        "If true (the default), the terrain's ScatterRules place nothing within Width / 2 + ClearMargin studs of the curve, seen from above. They keep off it as soon as it's there and wherever its points move, on every device.",
+        "If true (the default), the terrain's ScatterRules place nothing within Width / 2 + ClearMargin studs of the curve, seen from above, and fewer over ClearFalloff past that. They keep off it as soon as it's there and wherever its points move, on every device. The editor's Apply also takes the painted foliage (the Scatter pane's) off the same strip.",
     ),
     (
         ClassName::TerrainPath,
         "ClearMargin",
         "Studs past each edge that scatter rules keep clear, so trees don't stand on the verge. 1 by default.",
+    ),
+    (
+        ClassName::TerrainPath,
+        "ClearFalloff",
+        "Studs past the cleared strip over which scatter thins out: nearly none beside the strip, all of it this far away, so plants close in on the road gradually. 4 by default; 0 is a clean edge.",
     ),
     (
         ClassName::TerrainPath,
@@ -5891,7 +5966,7 @@ pub(super) fn class_doc(class: ClassName) -> &'static str {
             "Inside a Terrain: an area of the ground, such as a forest or an alpine meadow (procedural worlds PW2). It covers ground where its height, slope and moisture settings hold, with soft edges (later biomes cover earlier ones), and wherever its GroundLayer is painted. Its GroundLayer is laid under the other layers' own rules there, and the ScatterRules inside it place only where it covers, thinning out at its edges. ScatterRules outside every Biome place anywhere."
         }
         ClassName::TerrainPath => {
-            "Inside a Spline: a road or path on the terrain (procedural worlds PW4), Width studs across along the Spline's curve. ScatterRules keep off it (ClearScatter) wherever it goes, on every device, without changing the terrain. In the editor, Apply to Terrain flattens the ground under it to the curve and paints its Layer, blending in over Falloff (one undo step), and Route lays the Spline's points over the terrain from its first point to its last, no stretch climbing more than MaxGrade degrees, so a road winds round or up a hill (one undo step). Put a SplineMesh in the same Spline for the road's surface."
+            "Inside a Spline: a road or path on the terrain (procedural worlds PW4), Width studs across along the Spline's curve. ScatterRules keep off it (ClearScatter) wherever it goes, on every device, without changing the terrain. In the editor, Apply to Terrain flattens the ground under it to the curve, paints its Layer and its ShoulderLayer out over Falloff with an edge EdgeNoise breaks up, and takes painted foliage off it, thinning it over ClearFalloff (one undo step), and Route lays the Spline's points over the terrain from its first point to its last, no stretch climbing more than MaxGrade degrees, so a road winds round or up a hill (one undo step). Put a SplineMesh in the same Spline for the road's surface."
         }
         ClassName::BuildingGenerator => {
             "A building made from a footprint (procedural worlds PW6). Standing free, its footprint is its own box (Position, Size, and its turn round Y from Orientation, front facing -Z), which the editor's Move, Rotate and Scale handles change; inside a Spline, the Spline's points are its corners. On a foundation Size.Y studs thick, it stacks Floors storeys FloorHeight studs tall of wall bays about BayWidth studs wide, each a window (WindowChance of them) or plain wall, with a doorway in the middle of the front, under a Flat or Gable roof. Bays, the door and corners are built-in parts unless WallModel, WindowModel, DoorModel or CornerModel name a model to stretch into place. The same Seed gives the same building. Its parts are made again on every device whenever its settings change and are never saved; Bake in the editor keeps them as a Model."
@@ -5931,6 +6006,9 @@ pub(super) fn class_doc(class: ClassName) -> &'static str {
         }
         ClassName::GraphicsVolume => {
             "A Part that changes the look while the camera is inside it, fading in over BlendDistance studs outside it and out again on leaving. The effects inside it replace that part of the world's look: a ColorCorrectionEffect, an ExposureEffect, a FogEffect, an Atmosphere (the sky, the sun's color and height fog) or a BloomEffect; what it doesn't hold stays as it is. Where volumes overlap, the higher Priority wins. Invisible, anchored and walked through (CanCollide off) by default. Everything a Part has, and Enabled, BlendDistance and Priority."
+        }
+        ClassName::WeatherVolume => {
+            "A Part that sets the weather inside its box by hand, wherever the camera is: whether rain and snow fall there (Precipitation), how much of the world's snow lies (Snow) and how wet surfaces are (Wetness), in place of the shelter the engine finds from roofs. As made it's a shelter, for an interior or under an overhang: no drops, dry and bare. Turn the three up to let the weather into an open shed or deepen a snowdrift. It does nothing without a Weather in Lighting. Where volumes overlap, the higher Priority wins; the 8 nearest the camera are drawn. Invisible, anchored and walked through (CanCollide off) by default. Everything a Part has, and Enabled, Precipitation, Snow, Wetness, BlendDistance and Priority."
         }
         ClassName::ExposureEffect => {
             "Inside a GraphicsVolume: the exposure while the camera is in the volume, in place of Lighting's Exposure."

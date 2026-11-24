@@ -28,6 +28,8 @@ How the Model streams. Default: a Model with no Models inside loads and unloads 
 Model.PivotOffset: CFrame
 ```
 
+Where the Model's pivot is, from the middle of the box round its parts, and how it's turned: the point the editor's Move and Rotate tools hold the Model by and turn it about (set with the Pivot tool). At the middle, unturned, at first.
+
 #### Locked
 
 ```luau

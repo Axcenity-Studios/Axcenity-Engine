@@ -1,4 +1,4 @@
-//! Phase 50: hello-csg's Doorway, a wall the editor unioned with a negated
+//! Phase 50: csg's Doorway, a wall the editor unioned with a negated
 //! block, lets a character walk through with Precise fidelity; its script
 //! scoops a crater out of the ground at runtime with `SubtractAsync`; and
 //! the union saves, reloads and packs into a built game.
@@ -39,9 +39,9 @@ fn vector(world: &World, id: InstanceId, name: &str) -> Vector3 {
         .unwrap()
 }
 
-/// A copy of hello-csg to open, in a folder of its own.
+/// A copy of csg to open, in a folder of its own.
 fn example_copy(tag: &str) -> TempCopy {
-    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-csg");
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/csg");
     TempCopy::of(
         &example,
         &format!(
@@ -119,7 +119,7 @@ impl Game {
     }
 }
 
-/// hello-csg's world, with the crater script left out, a character that
+/// csg's world, with the crater script left out, a character that
 /// takes the (empty) player input far away, and one in front of the
 /// Doorway with a Humanoid, facing it.
 fn doorway_world(folder: &std::path::Path, fidelity: &str) -> (World, InstanceId) {

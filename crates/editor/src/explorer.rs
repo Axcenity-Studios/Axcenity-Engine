@@ -1811,6 +1811,14 @@ pub fn insert_hint(what: Insertable) -> String {
              Correction or an Atmosphere inside it; where volumes overlap, the higher Priority \
              wins."
         }
+        Insertable::WeatherVolume => {
+            "Insert a Weather Volume: an invisible box that sets the weather inside it, for a \
+             room, a porch or under an overhang. As made it keeps rain and snow out and the \
+             ground in it dry and bare. Turn on Precipitation to let drops fall inside (an \
+             open shed), and set Snow and Wetness from 0 (none) to 1 (as outside) or up to 2 \
+             (deeper snow, wetter). Fit it to the space; where volumes overlap, the higher \
+             Priority wins."
+        }
         Insertable::FogVolume => {
             "Insert a Fog Volume: a big invisible box of haze (200 × 60 × 200 studs) that the \
              sun's light shines through in shafts, lit by lamps too. Resize it to fit; its Fog \

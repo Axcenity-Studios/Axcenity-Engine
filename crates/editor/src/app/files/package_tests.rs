@@ -8,12 +8,12 @@ use axcenity_project::Clashes;
 const MACHINE: &str = "assets/animations/noodle/noodle.statemachine.json";
 const WALK: &str = "assets/animations/noodle/Walk.anim.json";
 
-/// The noodle's state machine exported from a copy of hello-animation, as
+/// The noodle's state machine exported from a copy of animation, as
 /// Export Package… in the Assets panel does, into `file`.
 fn export_noodle(file: &Path) {
     // One source copy per package file: tests calling this run in parallel.
     let stem = file.file_stem().unwrap().to_string_lossy();
-    let source = copy_of_example("hello-animation", &format!("package-source-{stem}"));
+    let source = copy_of_example("animation", &format!("package-source-{stem}"));
     let mut app = EditorApp::new(Some(&source));
     assert!(app.export_package(file, "noodle", vec![MACHINE.to_owned()], Vec::new()));
     assert!(
@@ -66,7 +66,7 @@ fn files_in(folder: &Path, under: &str) -> usize {
 fn a_package_imports_into_another_project_as_one_undo_step_and_twice_adds_nothing() {
     let file = package_file("one-step");
     export_noodle(&file);
-    let folder = copy_of_example("hello-part", "package-import");
+    let folder = copy_of_example("part", "package-import");
     let mut app = EditorApp::new(Some(&folder));
 
     let dialog = import(&mut app, &file);
@@ -113,7 +113,7 @@ fn a_changed_clip_is_a_clash_settled_by_keep_both_replace_or_skip_existing() {
     let file = package_file("clash");
     export_noodle(&file);
     for clashes in [Clashes::KeepBoth, Clashes::Replace, Clashes::SkipExisting] {
-        let folder = copy_of_example("hello-part", &format!("package-{clashes:?}"));
+        let folder = copy_of_example("part", &format!("package-{clashes:?}"));
         let mut app = EditorApp::new(Some(&folder));
         let first = import(&mut app, &file);
         app.import_package_chosen(&first);
@@ -176,12 +176,12 @@ fn a_changed_clip_is_a_clash_settled_by_keep_both_replace_or_skip_existing() {
 
 #[test]
 fn an_object_in_the_explorer_exports_as_a_prefab_with_every_asset_it_uses() {
-    let source = copy_of_example("hello-animation", "package-object");
+    let source = copy_of_example("animation", "package-object");
     let mut app = EditorApp::new(Some(&source));
     let noodle = app
         .world
         .find_first_child(app.world.workspace(), "Noodle")
-        .expect("hello-animation has noodle");
+        .expect("animation has noodle");
     let (name, prefab) = app.object_prefab(noodle).unwrap();
     assert_eq!(name, "Noodle");
     assert_eq!(prefab.0, "assets/prefabs/Noodle.prefab.json");
@@ -201,7 +201,7 @@ fn an_object_in_the_explorer_exports_as_a_prefab_with_every_asset_it_uses() {
     assert!(!source.join("assets/prefabs/Noodle.prefab.json").exists());
 
     // Imported into another project, the prefab and all it uses check out.
-    let folder = copy_of_example("hello-part", "package-object-import");
+    let folder = copy_of_example("part", "package-object-import");
     let mut other = EditorApp::new(Some(&folder));
     let dialog = import(&mut other, &file);
     other.import_package_chosen(&dialog);
@@ -222,15 +222,15 @@ fn an_object_in_the_explorer_exports_as_a_prefab_with_every_asset_it_uses() {
 
 #[test]
 fn a_packages_scripts_inside_objects_come_in_only_when_kept() {
-    // hello-object-scripts' door prefab, exported with its script.
+    // object-scripts' door prefab, exported with its script.
     let file = package_file("door-scripts");
-    let source = copy_of_example("hello-object-scripts", "package-door-source");
+    let source = copy_of_example("object-scripts", "package-door-source");
     let mut exporter = EditorApp::new(Some(&source));
     let door = "assets/prefabs/Door.prefab.json".to_owned();
     assert!(exporter.export_package(&file, "Door", vec![door.clone()], Vec::new()));
     let _ = fs::remove_dir_all(&source);
 
-    let folder = copy_of_example("hello-part", "package-door-import");
+    let folder = copy_of_example("part", "package-door-import");
     let mut app = EditorApp::new(Some(&folder));
     let mut dialog = import(&mut app, &file);
     let package = dialog.package.as_mut().unwrap();

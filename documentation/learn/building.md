@@ -1,7 +1,7 @@
 ---
 description: Insert parts, move, resize and rotate them with handles and snapping, and use the building tools.
 icon: cube
-samples: [hello-part, primitives, hello-csg]
+samples: [part, primitives, csg]
 ---
 
 # Building and moving objects
@@ -19,6 +19,8 @@ The Explorer's right-click **Insert** menu has every kind of object, grouped: pa
 Click a part in the Scene or a row in the Explorer. **Ctrl**-click adds or removes one; **Shift**-click in the Explorer selects a range. Selected parts get a blue box. Click empty space to clear the selection. A part with **Locked** on is clicked through, so a baseplate never gets in the way; unlock it from its right-click menu in the Explorer.
 
 ## Move, resize and rotate
+
+![Diagram of Axcenity's 3D coordinate system (+X right, +Y up, +Z depth in studs), the five transform tools with keyboard shortcuts 1 through 5, and precision snapping modes.](../images/building-transforms.png)
 
 | Key | Tool | Handles |
 |---|---|---|

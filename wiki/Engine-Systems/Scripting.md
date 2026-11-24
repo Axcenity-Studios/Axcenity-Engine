@@ -22,7 +22,7 @@ tags: [system/scripting, lua]
 flowchart TB
   RT[ScriptRuntime] --> SC["Context: server<br/>mlua::Lua + Scheduler + Connections + Modules"]
   RT --> CC["Context: client<br/>mlua::Lua + Scheduler + Connections + Modules"]
-  RT --> SVC["Gameplay services<br/>tween, save, humanoid, tool, health,<br/>prompt, ability, dialogue, quest, sequence, …"]
+  RT --> SVC["Gameplay services<br/>tween, save, humanoid, tool, health,<br/>prompt, ability, dialogue, quest, sequence,<br/>environment presets, …"]
   SC & CC --> LENT["lent.rs: World swapped into the<br/>Lua app-data slot per call"]
   LENT --> W[(World)]
   SC & CC --> SB["sandbox.rs: allowlist env per script<br/>(read-only libraries, safeenv)"]
@@ -30,6 +30,7 @@ flowchart TB
 ```
 
 - **Two interpreters** (Phase 14): each `Context` has its own `mlua::Lua`, so the sides share no globals, libraries or string metatable. On one device both use the one `World`, lent to whichever side runs (`lent.rs`, I4). A joined device runs only LocalScripts on a replica (`become_client`); a dedicated server only Scripts (`set_dedicated`).
+- **Shared playback state** lives outside both VMs and is stepped once a frame by `ScriptRuntime::step` after both sides' scripts: SplineFollowers, then the environment preset transition (`environment.rs`, `Lighting:TransitionToPreset`; 2026-11-23), then the Sequences (`sequence.rs`), so a playing sequence's keys win over a transition ([Lighting and atmosphere](Lighting-and-Atmosphere.md#environment-presets)).
 - **Lua Instances are IDs.** A Lua Instance is userdata holding an `InstanceId`; a per-VM weak-valued cache makes the same Instance the same userdata, so Instances work as table keys (I2).
 - **The API** is written by hand in Rust (`instance.rs` property access, `tree.rs`, `collection.rs`, `types.rs` for Vector3, CFrame, Color3, UDim2, …). `definitions.rs` generates `definitions/axcenity.d.luau` for luau-lsp and the editor's API Reference from the same tables.
 

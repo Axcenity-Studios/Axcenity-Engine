@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "editor"
+title = "Brush ground clutter and stains: a Ground Clutter palette and a decal brush in the Scatter pane"
+details = "The Scatter pane makes a Ground Clutter palette (gravel, pebbles and stones that lie to the slope and sink in a little) with one click, and a palette can hold pictures: Paint decals lays them on the ground as projected decals with a random turn, size and opacity each, for stains, tire tracks and dirt round a building's foot or under a vehicle. Shift+drag takes them away; each stroke is one undo step. Projected decals aren't drawn at Low quality and only the nearest are drawn above it (128 within 150 studs at Medium), so the brush stops when a place has that many and says so."
+features = ["renderer.decals"]

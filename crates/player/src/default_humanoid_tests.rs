@@ -1,5 +1,5 @@
 //! The default humanoid (`assets/characters/humanoid`, shown by
-//! `examples/hello-humanoid`): its glTF animations play on its model, its
+//! `crates/samples/projects/humanoid`): its glTF animations play on its model, its
 //! skeleton maps to every humanoid role with nothing to fix, and its head
 //! carries the facial profile's shapes.
 
@@ -19,7 +19,7 @@ const ANIMATIONS: &str = "assets/models/Humanoid/HumanoidAnimations.glb";
 
 #[test]
 fn hello_humanoid_plays_its_glb_animations_on_each_humanoid() {
-    let (mut world, _scripts, folder) = start_example_in("hello-humanoid");
+    let (mut world, _scripts, folder) = start_example_in("humanoid");
     let assets = Assets::new(&folder);
     let mut animators = Animators::new();
     let mut joints_at = |world: &mut World, seconds: u32| {
@@ -43,7 +43,7 @@ fn hello_humanoid_plays_its_glb_animations_on_each_humanoid() {
 
 #[test]
 fn the_default_humanoid_skeleton_maps_every_role_with_no_problems() {
-    let (_world, _scripts, folder) = start_example_in("hello-humanoid");
+    let (_world, _scripts, folder) = start_example_in("humanoid");
     let assets = Assets::new(&folder);
     let model = assets.model_blocking(MODEL).unwrap();
     let bones = &model.rig.as_ref().unwrap().bones;
@@ -75,7 +75,7 @@ fn the_default_humanoid_skeleton_maps_every_role_with_no_problems() {
 
 #[test]
 fn the_default_humanoid_head_has_the_facial_profile_shapes_at_rest() {
-    let (_world, _scripts, folder) = start_example_in("hello-humanoid");
+    let (_world, _scripts, folder) = start_example_in("humanoid");
     let assets = Assets::new(&folder);
     let model = assets.model_blocking(MODEL).unwrap();
     let names: Vec<&str> = model

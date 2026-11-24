@@ -68,7 +68,7 @@ These were decided in the developer's interview of 2026-10-27.
 - Open checks, Animation window: the old panel's features in the one Animation tab.
 - Phase 25: an editor label change rebuilds and relaunches (re-checked with `--features engine-dev` in Phase 89).
 - Phase 30: `MouseBehavior = LockCenter` with `GetMouseDelta` in a real window (the Lua side is covered by `script` `input_tests.rs`).
-- Phase 53: `axcenity-test examples/hello-character` on Windows and macOS (Linux checked in the cloud).
+- Phase 53: `axcenity-test crates/samples/projects/character` on Windows and macOS (Linux checked in the cloud).
 - Phase 55: a Blender model opened and saved unchanged in Model Studio reopens in Blender the same.
 - Phase 63: `FindLanGames` across two computers (the developer's PC and Mac).
 
@@ -585,7 +585,7 @@ Replays work in single-player too, because it runs over the same replication.
 
 ### Acceptance criteria
 
-- [ ] **Deferred** (Milestone 20, development policy): `examples/hello-part` and `examples/hello-character` run on the Android emulator and the iOS simulator, with touch controls.
+- [ ] **Deferred** (Milestone 20, development policy): `crates/samples/projects/part` and `crates/samples/projects/character` run on the Android emulator and the iOS simulator, with touch controls.
 - [ ] **Deferred** (Milestone 20, development policy): Sending the game to the background and back keeps its state, sound and picture, on a real Android phone and a real iPhone.
 - [ ] **Deferred** (Milestone 20, development policy): A TextBox shows the soft keyboard, and typed text arrives in Lua.
 - [ ] **Deferred** (Milestone 20, development policy): A save slot written on the phone is still there after the app is closed and opened again.

@@ -402,7 +402,7 @@ impl Spots {
                 if at.x < min.x || at.y < min.y || at.x >= max.x || at.y >= max.y {
                     continue;
                 }
-                if strips.iter().any(|strip| strip.covers(at + corner)) {
+                if strips.iter().any(|strip| strip.clears(at + corner)) {
                     continue;
                 }
                 if let Some(margin) = rule.part_margin

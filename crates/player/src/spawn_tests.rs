@@ -101,9 +101,9 @@ impl Game {
         }
     }
 
-    /// hello-spawn from a copy, its scripts started as the player does.
+    /// spawn from a copy, its scripts started as the player does.
     fn example(test: &str) -> Self {
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-spawn");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/spawn");
         let folder = TempCopy::of(
             &example,
             &format!("axcenity-player-spawn-{test}-{}", std::process::id()),
@@ -594,7 +594,7 @@ fn coins_in_leaderstats_show_on_the_leaderboard_and_update() {
     assert_eq!(game.leaderboard().len(), 4);
 }
 
-/// hello-spawn after spawning, from the character's camera with the
+/// spawn after spawning, from the character's camera with the
 /// leaderboard over it: saved as `spawn-leaderboard.png` when
 /// `AXCENITY_SNAPSHOTS` names a folder.
 #[test]

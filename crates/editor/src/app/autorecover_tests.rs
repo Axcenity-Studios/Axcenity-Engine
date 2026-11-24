@@ -30,11 +30,11 @@ fn age_snapshot(folder: &Path) {
         .unwrap();
 }
 
-/// An editor on a copy of hello-touched with an unsaved part named
+/// An editor on a copy of touched with an unsaved part named
 /// "Recovered" and unsaved text in the pad script's tab, and AutoRecover's
 /// snapshot of it written.
 fn unsaved_work(test: &str) -> (EditorApp, PathBuf) {
-    let folder = copy_of_example("hello-touched", test);
+    let folder = copy_of_example("touched", test);
     let mut app = EditorApp::new(Some(&folder));
     let part = inserted(&mut app, Insertable::Part(PartType::Block), None);
     app.world.set_name(part, "Recovered").unwrap();
@@ -162,7 +162,7 @@ fn discard_then_open_again() {
 
 #[test]
 fn with_autorecover_off_nothing_is_written() {
-    let folder = copy_of_example("hello-touched", "autorecover-off");
+    let folder = copy_of_example("touched", "autorecover-off");
     let mut app = EditorApp::new(Some(&folder));
     app.autorecover.read("0");
     assert_eq!(app.autorecover.to_text(), "0");

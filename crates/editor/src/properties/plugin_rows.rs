@@ -193,7 +193,8 @@ mod tests {
             rows: &rows,
         }];
         let ctx = crate::theme::test_context();
-        let size = egui::vec2(260.0, 1400.0);
+        // Tall enough for every section of a Part above the plugin's.
+        let size = egui::vec2(260.0, 2000.0);
         let mut action = None;
         let mut fits = true;
         let mut frame = |events: Vec<egui::Event>| {

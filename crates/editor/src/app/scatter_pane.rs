@@ -9,6 +9,9 @@
 //! it's armed, `scatter_brush_view` gives the viewport its circle and the
 //! mouse goes to `scatter_pointer`. Arming it puts a terrain tool down, and
 //! picking a terrain tool puts it down.
+//!
+//! Paint decals arms the same brush to lay the palette's pictures as
+//! ProjectedDecals instead: `decal_scatter.rs`.
 
 use axcenity_core::FoliageSource;
 use axcenity_project::{
@@ -29,6 +32,9 @@ const BRUSH_STEP: f32 = 1.15;
 /// How much of the brush's radius fades toward its rim, thinning items there.
 const FALLOFF: f32 = 0.3;
 
+#[path = "decal_scatter.rs"]
+mod decal_scatter;
+
 impl EditorApp {
     /// The Scatter panel.
     pub(super) fn scatter_pane(&mut self, ui: &mut egui::Ui) {
@@ -37,9 +43,20 @@ impl EditorApp {
             .scatter_terrain()
             .and_then(|id| self.world.get(id))
             .map(|instance| instance.name().to_owned());
+        let heights = self
+            .scatter_terrain()
+            .and_then(|id| self.world.get(id))
+            .and_then(axcenity_terrain::Placement::of)
+            .map(|placement| {
+                (
+                    placement.position.y,
+                    placement.position.y + placement.size.y,
+                )
+            });
         let cx = ScatterContext {
             editing: self.project.is_some() && !self.playing(),
             terrain,
+            heights,
         };
         let actions = self.scatter.show(ui, &cx);
         for action in actions {
@@ -58,27 +75,45 @@ impl EditorApp {
             return;
         }
         match action {
-            ScatterAction::Paint(on) => {
+            ScatterAction::Paint(on) | ScatterAction::PaintDecals(on) => {
                 self.finish_scatter_stroke();
                 self.scatter.painting = on && self.scatter_terrain().is_some();
+                self.scatter.decals =
+                    self.scatter.painting && matches!(action, ScatterAction::PaintDecals(_));
                 if self.scatter.painting {
                     // One brush at a time.
                     self.terrain.pick(None);
                 }
             }
-            ScatterAction::Pick(on) => self.scatter.picking = on,
+            // One kind of picking at a time.
+            ScatterAction::Pick(on) => {
+                self.scatter.picking = on;
+                self.scatter.picking_decals &= !on;
+            }
+            ScatterAction::PickDecals(on) => {
+                self.scatter.picking_decals = on;
+                self.scatter.picking &= !on;
+            }
             ScatterAction::Select(index) => {
                 self.save_scatter_palette();
                 if index < self.scatter.palettes.len() {
                     self.scatter.current = index;
                 }
             }
-            ScatterAction::New => {
+            ScatterAction::New | ScatterAction::NewGroundClutter => {
                 self.save_scatter_palette();
-                let name = unique_name(&self.scatter.palettes, FIRST_PALETTE, None);
+                let palette = if action == ScatterAction::New {
+                    ScatterPalette::new(&unique_name(&self.scatter.palettes, FIRST_PALETTE, None))
+                } else {
+                    ScatterPalette::ground_clutter(&unique_name(
+                        &self.scatter.palettes,
+                        axcenity_project::GROUND_CLUTTER_PALETTE,
+                        None,
+                    ))
+                };
                 self.scatter.palettes.push(PaletteEntry {
                     file: None,
-                    palette: ScatterPalette::new(&name),
+                    palette,
                 });
                 self.scatter.current = self.scatter.palettes.len() - 1;
                 self.scatter.dirty = true;
@@ -258,6 +293,7 @@ impl EditorApp {
         if self.playing() || self.project.is_none() || !open {
             self.scatter.painting = false;
             self.scatter.picking = false;
+            self.scatter.picking_decals = false;
             self.finish_scatter_stroke();
         }
         // A terrain tool picked since the brush was armed puts it down.
@@ -315,6 +351,10 @@ impl EditorApp {
     /// continues and ends strokes. Shift erases.
     pub(in crate::app) fn scatter_pointer(&mut self, pointer: TerrainPointer) {
         if self.playing() {
+            return;
+        }
+        if self.scatter.decals {
+            self.decal_pointer(pointer);
             return;
         }
         let Some(terrain) = self.scatter_terrain() else {
@@ -381,6 +421,7 @@ impl EditorApp {
     /// Ends the stroke under way, as one undo step if it changed anything,
     /// named by how many items it placed.
     pub(in crate::app) fn finish_scatter_stroke(&mut self) {
+        self.finish_decal_stroke();
         let Some(mut active) = self.scatter.stroke.take() else {
             return;
         };

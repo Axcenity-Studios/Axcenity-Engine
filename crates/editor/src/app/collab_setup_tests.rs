@@ -126,10 +126,7 @@ fn draw(app: &mut EditorApp, name: &str) {
 
 #[test]
 fn every_wizard_page_draws_and_follows_tailscale() {
-    let mut app = EditorApp::new(Some(&copy_of_example(
-        "hello-touched",
-        "collab-setup-pages",
-    )));
+    let mut app = EditorApp::new(Some(&copy_of_example("touched", "collab-setup-pages")));
     // Join opens the wizard the first time.
     app.join_team_create();
     assert_eq!(app.team_panel.setup.open, Some(Purpose::Join));
@@ -167,10 +164,7 @@ fn every_wizard_page_draws_and_follows_tailscale() {
 
 #[test]
 fn start_session_hosts_with_the_name_in_the_invite() {
-    let mut app = EditorApp::new(Some(&copy_of_example(
-        "hello-touched",
-        "collab-setup-start",
-    )));
+    let mut app = EditorApp::new(Some(&copy_of_example("touched", "collab-setup-start")));
     // Once set up, Start goes straight to the dialog.
     app.team_panel.setup.done = true;
     app.share_with_team_create();

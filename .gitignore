@@ -8,4 +8,4 @@ packaging/linux/.generated/
 .axcenity/
 
 # Large local-only example assets
-examples/hello-part/assets/textures/
+crates/samples/projects/part/assets/textures/

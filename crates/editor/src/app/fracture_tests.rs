@@ -12,7 +12,7 @@ fn pieces_id(app: &EditorApp, fracture: InstanceId) -> String {
 
 #[test]
 fn insert_fracture_then_generate_saves_the_pieces_as_one_undo_step() {
-    let folder = copy_of_example("hello-welds", "fracture-generate");
+    let folder = copy_of_example("welds", "fracture-generate");
     let mut app = EditorApp::new(Some(&folder));
     let top = app
         .world
@@ -45,7 +45,7 @@ fn insert_fracture_then_generate_saves_the_pieces_as_one_undo_step() {
 
 #[test]
 fn generating_a_fracture_outside_a_part_says_why() {
-    let folder = copy_of_example("hello-welds", "fracture-nowhere");
+    let folder = copy_of_example("welds", "fracture-nowhere");
     let mut app = EditorApp::new(Some(&folder));
     let fracture = inserted(&mut app, Insertable::Fracture, None);
     app.apply(fracture, Edit::GenerateFracture);

@@ -8,7 +8,7 @@ use super::*;
 
 pub(super) fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -16,8 +16,55 @@ pub(super) fn last_line(app: &EditorApp) -> &OutputLine {
     app.output.lines().last().unwrap()
 }
 
+/// Removes the scratch projects earlier test runs left in the temp
+/// directory, once a run: a test that fails, or doesn't remove its folder,
+/// leaves a copy of an example behind (up to 200 MB each, a few GB a run),
+/// which fills a small temp volume within a few runs. A folder is an
+/// earlier run's when its name ends in another process's id, and that
+/// process is gone (where `/proc` says so) or the folder is over half an
+/// hour old.
+fn sweep_stale_scratch() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+            return;
+        };
+        let own = std::process::id().to_string();
+        let proc_listed = Path::new("/proc/self").exists();
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+            let Some((stem, pid)) = name.rsplit_once('-') else {
+                continue;
+            };
+            if !stem.starts_with("axcenity-editor-") || !stem.ends_with("-test") || pid == own {
+                continue;
+            }
+            if pid.is_empty() || !pid.bytes().all(|byte| byte.is_ascii_digit()) {
+                continue;
+            }
+            let gone = if proc_listed {
+                !Path::new("/proc").join(pid).exists()
+            } else {
+                entry
+                    .metadata()
+                    .and_then(|data| data.modified())
+                    .ok()
+                    .and_then(|at| at.elapsed().ok())
+                    .is_some_and(|age| age.as_secs() > 1800)
+            };
+            if gone && entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
+    });
+}
+
 /// A project folder in the temp directory with these files in it.
 fn temp_project(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    sweep_stale_scratch();
     let folder = std::env::temp_dir().join(format!(
         "axcenity-editor-{name}-test-{}",
         std::process::id()
@@ -32,7 +79,7 @@ fn temp_project(name: &str, files: &[(&str, &str)]) -> PathBuf {
 
 #[test]
 fn parts_from_the_menu_start_as_blueprints_and_other_inserts_do_not() {
-    let folder = copy_of_example("hello-touched", "blueprint-parts");
+    let folder = copy_of_example("touched", "blueprint-parts");
     let mut app = EditorApp::new(Some(&folder));
     let flag = |app: &EditorApp, id| {
         app.world
@@ -50,7 +97,7 @@ fn parts_from_the_menu_start_as_blueprints_and_other_inserts_do_not() {
 
 #[test]
 fn locking_from_the_explorer_is_one_undo_step_and_stops_delete_until_unlocked() {
-    let folder = copy_of_example("hello-touched", "lock-part");
+    let folder = copy_of_example("touched", "lock-part");
     let mut app = EditorApp::new(Some(&folder));
     let part = inserted(&mut app, Insertable::Part(PartType::Block), None);
     app.history.seal();
@@ -77,7 +124,7 @@ fn locking_from_the_explorer_is_one_undo_step_and_stops_delete_until_unlocked() 
 
 #[test]
 fn opens_the_milestone_1_demo_and_says_so_in_output() {
-    let app = EditorApp::new(Some(&example("hello-touched")));
+    let app = EditorApp::new(Some(&example("touched")));
 
     let workspace = app.world.workspace();
     for part in ["Floor", "Pad", "Ball"] {
@@ -98,7 +145,7 @@ fn opens_the_milestone_1_demo_and_says_so_in_output() {
 /// SurfaceAppearance maps, and drawing it finds no broken asset.
 #[test]
 fn opens_the_graphics_reference_scene_with_no_asset_errors() {
-    let app = EditorApp::new(Some(&example("hello-graphics")));
+    let app = EditorApp::new(Some(&example("graphics")));
     assert!(
         app.output
             .lines()
@@ -158,7 +205,7 @@ fn unsupported_css_properties_are_reported_as_output_warnings() {
 
 #[test]
 fn stylesheet_edits_restyle_the_viewport_immediately_and_save() {
-    let folder = copy_of_example("hello-css", "stylesheet-live-edit");
+    let folder = copy_of_example("css", "stylesheet-live-edit");
     let mut app = EditorApp::new(Some(&folder));
     let path = "ui.css";
     let original = std::fs::read_to_string(folder.join(path)).unwrap();
@@ -198,7 +245,7 @@ fn stylesheet_edits_restyle_the_viewport_immediately_and_save() {
 
 #[test]
 fn the_style_section_rewrites_and_adds_css_for_the_selected_element() {
-    let folder = copy_of_example("hello-css", "style-section");
+    let folder = copy_of_example("css", "style-section");
     let mut app = EditorApp::new(Some(&folder));
     let hud = app
         .world
@@ -277,7 +324,7 @@ fn the_style_section_rewrites_and_adds_css_for_the_selected_element() {
 
 #[test]
 fn a_stylesheet_edited_in_another_program_restyles_the_viewport() {
-    let folder = copy_of_example("hello-css", "stylesheet-outside-edit");
+    let folder = copy_of_example("css", "stylesheet-outside-edit");
     let mut app = EditorApp::new(Some(&folder));
     let hud = app
         .world
@@ -311,7 +358,7 @@ fn a_stylesheet_edited_in_another_program_restyles_the_viewport() {
 
 #[test]
 fn ui_elements_inserted_with_no_screen_gui_get_one() {
-    let folder = copy_of_example("hello-part", "ui-insert");
+    let folder = copy_of_example("part", "ui-insert");
     let mut app = EditorApp::new(Some(&folder));
     app.insert(Insertable::TextButton, None);
     let button = app.selected.unwrap();
@@ -327,7 +374,7 @@ fn ui_elements_inserted_with_no_screen_gui_get_one() {
 
 #[test]
 fn a_spawn_location_goes_on_the_ground_and_a_team_into_teams() {
-    let folder = copy_of_example("hello-part", "spawn-insert");
+    let folder = copy_of_example("part", "spawn-insert");
     let mut app = EditorApp::new(Some(&folder));
     app.insert(Insertable::SpawnLocation, None);
     let spawn = app.selected.unwrap();
@@ -354,7 +401,7 @@ fn a_spawn_location_goes_on_the_ground_and_a_team_into_teams() {
 /// one is saved and can be edited.
 #[test]
 fn sound_groups_effects_and_reverb_zones_go_where_they_work() {
-    let folder = copy_of_example("hello-part", "audio-insert");
+    let folder = copy_of_example("part", "audio-insert");
     let mut app = EditorApp::new(Some(&folder));
     app.insert(Insertable::SoundGroup, None);
     let master = app.selected.unwrap();
@@ -388,7 +435,7 @@ fn sound_groups_effects_and_reverb_zones_go_where_they_work() {
 /// correction or Atmosphere goes into a selected volume, or else Lighting.
 #[test]
 fn graphics_volumes_hold_the_effects_inserted_into_them() {
-    let folder = copy_of_example("hello-part", "volume-insert");
+    let folder = copy_of_example("part", "volume-insert");
     let mut app = EditorApp::new(Some(&folder));
     app.insert(Insertable::FogEffect, None);
     let fog = app.selected.unwrap();
@@ -425,7 +472,7 @@ fn graphics_volumes_hold_the_effects_inserted_into_them() {
 /// selection is, and its properties sit together in one section.
 #[test]
 fn lens_effects_go_into_lighting_with_their_own_properties_section() {
-    let folder = copy_of_example("hello-part", "lens-insert");
+    let folder = copy_of_example("part", "lens-insert");
     let mut app = EditorApp::new(Some(&folder));
     let part = app
         .world
@@ -446,6 +493,73 @@ fn lens_effects_go_into_lighting_with_their_own_properties_section() {
         assert!(!titles.contains(&"Appearance"), "{titles:?}");
         let lens = sections.iter().find(|s| s.title == "Lens").unwrap();
         assert!(lens.properties.iter().any(|(name, _)| *name == "Enabled"));
+    }
+    drop(app);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+/// A Weather Volume goes into the Workspace as a shelter standing on the
+/// ground, wherever the selection is, with its own Properties section,
+/// every row of which says what it does; it's on the ribbon's Volumes list
+/// and its Insert hover says what it's for.
+#[test]
+fn a_weather_volume_goes_into_the_workspace_as_a_shelter_with_its_own_section() {
+    let folder = copy_of_example("part", "weather-volume-insert");
+    let mut app = EditorApp::new(Some(&folder));
+    assert!(Insertable::VOLUMES.contains(&Insertable::WeatherVolume));
+    assert_eq!(Insertable::WeatherVolume.label(), "Weather Volume");
+    let hint = crate::explorer::insert_hint(Insertable::WeatherVolume);
+    assert!(hint.contains("rain and snow") && hint.contains("Priority"));
+
+    // Even with a Graphics Volume selected: it holds no Weather Volume.
+    app.insert(Insertable::GraphicsVolume, None);
+    let look = app.selected;
+    app.insert(Insertable::WeatherVolume, look);
+    let inside = app.selected.unwrap();
+    assert_eq!(
+        app.world.get(inside).unwrap().parent(),
+        Some(app.world.workspace())
+    );
+    app.insert(Insertable::WeatherVolume, None);
+    let volume = app.selected.unwrap();
+    let instance = app.world.get(volume).unwrap();
+    assert_eq!(instance.class(), ClassName::WeatherVolume);
+    assert_eq!(instance.parent(), Some(app.world.workspace()));
+    assert!(tree::check_editable(&app.world, volume).is_ok());
+    for (name, value) in [
+        ("CanCollide", Value::Bool(false)),
+        ("Transparency", Value::Number(1.0)),
+        ("Precipitation", Value::Bool(false)),
+        ("Snow", Value::Number(0.0)),
+        ("Wetness", Value::Number(0.0)),
+    ] {
+        assert_eq!(instance.property(name), Some(&value), "{name}");
+    }
+    let sections = crate::properties::sections(instance);
+    let titles: Vec<&str> = sections.iter().map(|section| section.title).collect();
+    assert!(titles.contains(&"Weather Volume"), "{titles:?}");
+    assert!(!titles.contains(&"Graphics Volume"), "{titles:?}");
+    assert!(!titles.contains(&"Weather"), "{titles:?}");
+    assert!(!titles.contains(&"Other"), "{titles:?}");
+    let own = sections
+        .iter()
+        .find(|section| section.title == "Weather Volume")
+        .unwrap();
+    let names: Vec<&str> = own.properties.iter().map(|(name, _)| *name).collect();
+    assert_eq!(
+        names,
+        [
+            "Enabled",
+            "Precipitation",
+            "Snow",
+            "Wetness",
+            "BlendDistance",
+            "Priority"
+        ]
+    );
+    for name in names {
+        let says = crate::properties::description(ClassName::WeatherVolume, name);
+        assert!(says.is_some_and(|text| !text.is_empty()), "{name}");
     }
     drop(app);
     std::fs::remove_dir_all(folder).unwrap();
@@ -472,7 +586,7 @@ fn the_whole_editor_draws_in_each_theme_and_density() {
             },
         ),
     ] {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         let pad = app
             .world
             .get(app.world.workspace())
@@ -512,7 +626,7 @@ fn the_whole_editor_draws_in_each_theme_and_density() {
 #[test]
 fn every_panel_fits_a_narrow_column_and_a_short_strip() {
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = app
         .world
         .get(app.world.workspace())
@@ -695,7 +809,7 @@ fn select_pad(app: &mut EditorApp) -> InstanceId {
 
 #[test]
 fn animate_makes_an_animator_a_clip_and_an_animation_as_one_undo_step() {
-    let folder = copy_of_example("hello-touched", "animate");
+    let folder = copy_of_example("touched", "animate");
     let mut app = EditorApp::new(Some(&folder));
     let pad = select_pad(&mut app);
     let name = app.world.get(pad).unwrap().name().to_owned();
@@ -754,7 +868,7 @@ fn animate_makes_an_animator_a_clip_and_an_animation_as_one_undo_step() {
 #[test]
 fn a_bare_door_animated_with_record_on_and_auto_play_swings_in_play_with_no_script() {
     use axcenity_anim::{EvaluatedProperty, PropertyName};
-    let folder = copy_of_example("hello-touched", "door-auto-play");
+    let folder = copy_of_example("touched", "door-auto-play");
     let mut app = EditorApp::new(Some(&folder));
     let world = &mut app.world;
     let door = world.create(ClassName::Model).unwrap();
@@ -831,7 +945,7 @@ fn a_bare_door_animated_with_record_on_and_auto_play_swings_in_play_with_no_scri
 #[test]
 fn the_animation_tab_says_where_you_are_and_fits_any_shape() {
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let folder = copy_of_example("hello-touched", "animation-tab");
+    let folder = copy_of_example("touched", "animation-tab");
     let mut app = EditorApp::new(Some(&folder));
     let pad = select_pad(&mut app);
     let name = app.world.get(pad).unwrap().name().to_owned();
@@ -923,7 +1037,7 @@ fn starting_without_a_project_shows_nothing_open() {
 
 #[test]
 fn closing_a_project_returns_to_the_start_screen() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-part");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/part");
     let mut app = EditorApp::new(Some(&root));
     assert!(app.project.is_some());
     app.finish_closing_project();
@@ -947,7 +1061,7 @@ fn draw_until_loaded(app: &mut EditorApp, ctx: &egui::Context) {
 fn a_project_opened_in_the_background_opens_once_it_is_read() {
     let ctx = theme::test_context();
     let mut app = EditorApp::new(None);
-    app.begin_open(&ctx, &example("hello-touched"));
+    app.begin_open(&ctx, &example("touched"));
     assert_eq!(app.loading.as_ref().unwrap().name, "Hello Touched");
     assert!(app.project.is_none(), "nothing opens before it's read");
 
@@ -1011,7 +1125,7 @@ fn a_broken_world_file_is_reported_with_its_line_and_the_rest_still_opens() {
             ),
         ],
     );
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     app.open(&folder);
 
     let error = app
@@ -1064,6 +1178,7 @@ pub(super) fn copy_of_example(name: &str, test: &str) -> PathBuf {
             }
         }
     }
+    sweep_stale_scratch();
     let folder = std::env::temp_dir().join(format!(
         "axcenity-editor-{test}-test-{}",
         std::process::id()
@@ -1104,7 +1219,7 @@ pub(super) fn edit_the_pad(app: &mut EditorApp) -> InstanceId {
 #[test]
 fn selecting_a_part_in_the_viewport_highlights_it_in_the_explorer_too() {
     // A part two levels down, inside a closed branch.
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     let child = app.world.create(ClassName::Part).unwrap();
     app.world.set_parent(child, Some(pad)).unwrap();
@@ -1122,7 +1237,7 @@ fn selecting_a_part_in_the_viewport_highlights_it_in_the_explorer_too() {
 
 #[test]
 fn edits_show_in_the_next_draw_list_and_count_as_unsaved() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     assert!(!app.unsaved());
     let pad = edit_the_pad(&mut app);
     assert!(app.unsaved());
@@ -1159,7 +1274,7 @@ fn edits_show_in_the_next_draw_list_and_count_as_unsaved() {
 
 #[test]
 fn setting_a_value_it_already_has_is_not_an_unsaved_change() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     app.apply(pad, Edit::Name("Pad".to_string()));
     app.apply(pad, Edit::Property("Anchored", Value::Bool(true)));
@@ -1168,7 +1283,7 @@ fn setting_a_value_it_already_has_is_not_an_unsaved_change() {
 
 #[test]
 fn scripts_cannot_be_renamed_from_properties() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let script = app
         .world
         .find_first_child(app.world.server_script_service(), "pad")
@@ -1180,7 +1295,7 @@ fn scripts_cannot_be_renamed_from_properties() {
 
 #[test]
 fn save_close_and_reopen_reproduces_the_edits_exactly() {
-    let folder = copy_of_example("hello-touched", "save-reopen");
+    let folder = copy_of_example("touched", "save-reopen");
     let mut app = EditorApp::new(Some(&folder));
     edit_the_pad(&mut app);
     assert!(app.save());
@@ -1217,7 +1332,7 @@ fn save_close_and_reopen_reproduces_the_edits_exactly() {
 
 #[test]
 fn closing_with_unsaved_changes_asks_first() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     // Nothing to lose: go straight ahead.
     assert_eq!(app.request(Discard::Quit), Some(Discard::Quit));
     assert_eq!(app.asking, None);
@@ -1237,7 +1352,7 @@ fn closing_with_unsaved_changes_asks_first() {
 
 #[test]
 fn save_in_the_prompt_saves_then_goes_ahead_but_not_if_saving_fails() {
-    let folder = copy_of_example("hello-touched", "prompt-save");
+    let folder = copy_of_example("touched", "prompt-save");
     let mut app = EditorApp::new(Some(&folder));
     edit_the_pad(&mut app);
     app.request(Discard::Quit);
@@ -1297,7 +1412,7 @@ pub(super) fn inserted(
 
 #[test]
 fn each_primitive_is_inserted_in_front_of_the_camera_on_the_floor() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let workspace = app.world.workspace();
     // Looking down at the Floor (40 × 40, its top at Y = 0), past the Pad.
     let eye = Vec3::new(30.0, 20.0, 10.0);
@@ -1395,7 +1510,7 @@ fn each_primitive_is_inserted_in_front_of_the_camera_on_the_floor() {
 /// saved to check the Corner Wedge's faces by eye.
 #[test]
 fn every_part_shape_is_drawn_and_picked_where_it_is() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let mut parts = Vec::new();
     for (n, what) in Insertable::PARTS.into_iter().enumerate() {
         let part = inserted(&mut app, what, None);
@@ -1449,7 +1564,7 @@ fn every_part_shape_is_drawn_and_picked_where_it_is() {
 
 #[test]
 fn looking_at_the_sky_a_new_part_goes_ahead_and_stays_in_view() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     // Standing on the Floor, looking just above the horizon.
     let eye = Vec3::new(0.0, 4.0, 15.0);
     app.viewport.look_at(eye, eye + Vec3::new(0.0, 0.3, -1.0));
@@ -1467,7 +1582,7 @@ fn looking_at_the_sky_a_new_part_goes_ahead_and_stays_in_view() {
 
 #[test]
 fn a_duplicate_stays_on_its_original_wherever_the_camera_looks() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     app.select_from_viewport(Some(pad));
     app.viewport
@@ -1483,7 +1598,7 @@ fn a_duplicate_stays_on_its_original_wherever_the_camera_looks() {
 
 #[test]
 fn inserting_gives_a_unique_default_name_among_siblings() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let block = Insertable::Part(PartType::Block);
     let names: Vec<String> = [block, block, Insertable::Model, Insertable::Folder]
         .into_iter()
@@ -1546,7 +1661,7 @@ pub(super) fn describe(world: &World, id: InstanceId) -> Vec<String> {
 
 #[test]
 fn deleting_a_model_deletes_its_children_and_undo_restores_them_all() {
-    let folder = copy_of_example("hello-touched", "delete-model");
+    let folder = copy_of_example("touched", "delete-model");
     let mut app = EditorApp::new(Some(&folder));
     let workspace = app.world.workspace();
     let model = inserted(&mut app, Insertable::Model, None);
@@ -1611,7 +1726,7 @@ fn deleting_a_model_deletes_its_children_and_undo_restores_them_all() {
 
 #[test]
 fn moving_into_another_parent_is_one_step_and_moves_into_itself_are_rejected() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let workspace = app.world.workspace();
     let model = inserted(&mut app, Insertable::Model, None);
     let pad = part(&app, "Pad");
@@ -1655,7 +1770,7 @@ fn moving_into_another_parent_is_one_step_and_moves_into_itself_are_rejected() {
 
 #[test]
 fn services_and_scripts_cannot_be_deleted_or_duplicated() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let script = app
         .world
         .find_first_child(app.world.server_script_service(), "pad")
@@ -1673,7 +1788,7 @@ fn services_and_scripts_cannot_be_deleted_or_duplicated() {
 
 #[test]
 fn models_and_folders_save_and_reopen() {
-    let folder = copy_of_example("hello-touched", "save-groups");
+    let folder = copy_of_example("touched", "save-groups");
     let mut app = EditorApp::new(Some(&folder));
     let props = inserted(&mut app, Insertable::Folder, None);
     let car = inserted(&mut app, Insertable::Model, Some(props));
@@ -1698,7 +1813,7 @@ fn models_and_folders_save_and_reopen() {
 
 #[test]
 fn delete_ctrl_d_and_f2_act_on_the_selection() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let pad = part(&app, "Pad");
     app.selected = Some(pad);
     press(&mut app, egui::Modifiers::COMMAND, egui::Key::D);
@@ -1738,7 +1853,7 @@ pub(super) fn press(app: &mut EditorApp, modifiers: egui::Modifiers, key: egui::
 
 #[test]
 fn keys_1_to_5_pick_the_tools_as_in_studio_and_ctrl_z_and_ctrl_y_undo_and_redo() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let command = egui::Modifiers::COMMAND;
     assert_eq!(app.tool, Tool::Select);
     for (key, tool) in [
@@ -1786,7 +1901,7 @@ pub(super) fn printed(app: &EditorApp) -> Vec<&str> {
 
 #[test]
 fn set_up_autocomplete_writes_the_files_and_opening_refreshes_old_definitions() {
-    let folder = copy_of_example("hello-events", "autocomplete");
+    let folder = copy_of_example("events", "autocomplete");
     let mut app = EditorApp::new(Some(&folder));
     let scripts = app.project.as_ref().unwrap().scripts.len();
     app.set_up_autocomplete();
@@ -1827,15 +1942,15 @@ fn quoted_lists_read_like_a_sentence() {
 
 #[test]
 fn opening_another_project_stops_the_game() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     app.play();
-    app.open(&example("hello-part"));
+    app.open(&example("part"));
     assert!(!app.playing());
 }
 
 #[test]
 fn building_tools_change_the_whole_selection_in_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let first = inserted(&mut app, Insertable::Part(PartType::Block), None);
     let second = inserted(&mut app, Insertable::Part(PartType::Ball), None);
     app.selection = vec![first, second];
@@ -1877,7 +1992,7 @@ fn building_tools_change_the_whole_selection_in_one_undo_step() {
 
 #[test]
 fn a_light_with_no_part_stands_free_and_one_taken_out_of_its_part_stays_put() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     app.selection.clear();
     app.selected = None;
     // No lamp: just the light, at the camera's focus point, which the Move
@@ -1930,7 +2045,7 @@ fn a_light_with_no_part_stands_free_and_one_taken_out_of_its_part_stays_put() {
 
 #[test]
 fn f3x_keys_pick_tools_while_editing() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     for (key, tool) in [
         (egui::Key::V, Tool::Paint),
         (egui::Key::M, Tool::Anchor),
@@ -1944,7 +2059,7 @@ fn f3x_keys_pick_tools_while_editing() {
 
 #[test]
 fn the_angular_tool_places_its_copies_in_one_undo_step() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let workspace = app.world.workspace();
     let block = inserted(&mut app, Insertable::Part(PartType::Block), None);
     let before = children(&app, workspace).len();
@@ -1991,7 +2106,7 @@ fn class_of(world: &World, id: InstanceId) -> ClassName {
 
 #[test]
 fn a_first_person_controller_leaves_a_third_person_one_alone_and_saves_as_its_own_class() {
-    let folder = copy_of_example("hello-character", "first-person-insert");
+    let folder = copy_of_example("character", "first-person-insert");
     let mut app = EditorApp::new(Some(&folder));
     let workspace = app.world.workspace();
     let model = part(&app, "Character");
@@ -2045,7 +2160,7 @@ fn a_first_person_controller_leaves_a_third_person_one_alone_and_saves_as_its_ow
 
 #[test]
 fn a_first_person_camera_stays_at_the_eyes_during_play_and_stop_restores_the_fly_camera() {
-    let folder = copy_of_example("hello-touched", "first-person-play");
+    let folder = copy_of_example("touched", "first-person-play");
     let mut app = EditorApp::new(Some(&folder));
     let first = inserted(&mut app, Insertable::FirstPersonController, None);
     let model = app.world.get(first).unwrap().parent().unwrap();
@@ -2088,7 +2203,7 @@ fn a_first_person_camera_stays_at_the_eyes_during_play_and_stop_restores_the_fly
 #[test]
 fn the_view_mode_changes_the_viewport_at_once_and_lit_comes_back() {
     use crate::viewport::ViewMode;
-    let mut app = EditorApp::new(Some(&example("hello-graphics")));
+    let mut app = EditorApp::new(Some(&example("graphics")));
     // Models load the first time they're drawn, so the lit frame is the
     // second, and the third shows it's steady.
     let modes = [
@@ -2309,7 +2424,7 @@ pub(super) fn drawn_texts(output: &egui::FullOutput) -> Vec<(String, egui::Pos2)
 fn recording_and_unkeyed_moves_are_said_above_the_timeline() {
     use axcenity_anim::{EvaluatedProperty, PropertyName};
     let snapshots = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from);
-    let folder = copy_of_example("hello-touched", "key-status");
+    let folder = copy_of_example("touched", "key-status");
     let mut app = EditorApp::new(Some(&folder));
     let pad = select_pad(&mut app);
     app.animate(pad);
@@ -2406,7 +2521,7 @@ fn recording_and_unkeyed_moves_are_said_above_the_timeline() {
 
 #[test]
 fn the_profilers_scripts_tab_finds_the_slow_heartbeat_handler_in_play() {
-    let folder = copy_of_example("hello-events", "script-profiler");
+    let folder = copy_of_example("events", "script-profiler");
     let slow = r#"local RunService = game:GetService("RunService")
 
 local function spin()

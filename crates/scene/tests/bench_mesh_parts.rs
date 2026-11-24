@@ -1,5 +1,5 @@
 //! The CPU side of the player's `bench_2000_mesh_parts`, with no GPU: how
-//! long `build_draw_list_posed` takes for 2,000 copies of hello-pbr's
+//! long `build_draw_list_posed` takes for 2,000 copies of pbr's
 //! helmet, with a `TerrainCache` kept across frames as hosts keep theirs.
 //! Each frame's draw list is dropped before the next, as a host's is.
 //! Ignored by default:
@@ -47,8 +47,8 @@ fn bench_build_2000_mesh_parts() {
             world.set_property(part, name, value).unwrap();
         }
     }
-    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
-    let assets = Assets::new(examples.join("hello-pbr"));
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
+    let assets = Assets::new(examples.join("pbr"));
     let camera = Camera {
         position: Vec3::new(0.0, 90.0, 190.0),
         look_at: Vec3::new(0.0, 0.0, 10.0),

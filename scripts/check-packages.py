@@ -38,7 +38,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HOST = {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
 OSES = ("windows", "macos", "linux")
-EXAMPLE = ROOT / "examples" / "hello-part"
+EXAMPLE = ROOT / "crates" / "samples" / "projects" / "part"
 VERSION = "0.0.0-local.1"
 
 

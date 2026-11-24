@@ -291,7 +291,7 @@ pub fn show(
                     if ui
                         .button(theme::with_icon(icons::MOUNTAINS, "Apply to Terrain"))
                         .on_hover_text(
-                            "Flatten the ground under its Spline to the curve (with Flatten) and paint its Layer, Width wide, blending into the ground over Falloff. One undo step.",
+                            "Flatten the ground under its Spline to the curve (with Flatten), paint its Layer Width wide and its Shoulder Layer out over Falloff with an edge Edge Noise breaks up, and take painted foliage off it, thinning over Clear Falloff (with Clear Scatter). One undo step.",
                         )
                         .clicked()
                     {
@@ -471,7 +471,7 @@ pub fn show(
                                 Edit::Property(name, Value::PhysicalProperties(custom))
                             })
                         }
-                        value => value_control(ui, name, value, assets),
+                        value => value_control(ui, instance.class(), name, value, assets),
                     })
                     .inner;
                     if made.is_some() {
@@ -800,6 +800,7 @@ fn section_titled(
         "Color Correction" => icons::SWATCHES,
         "Lens" => icons::APERTURE,
         "Graphics Volume" => icons::BOUNDING_BOX,
+        "Weather Volume" => icons::UMBRELLA,
         "Effect" => icons::APERTURE,
         "Post-processing" => icons::SPARKLE,
         "Light" => icons::LIGHTBULB,
@@ -1069,7 +1070,7 @@ pub fn property_rows(
                         ui.weak("(in Properties)");
                         None
                     }
-                    value => value_control(ui, name, value, assets),
+                    value => value_control(ui, class, name, value, assets),
                 })
                 .inner;
             if made.is_some() {
@@ -1081,15 +1082,36 @@ pub fn property_rows(
     edit
 }
 
-/// Draws the control for one property and returns the edit if the user
-/// changed it this frame.
+/// The slider for a WeatherVolume's `Snow` or `Wetness`: the share of the
+/// world's it has inside, from 0 (none) through 1 (as outside) to 2.
+fn weather_share_control(ui: &mut egui::Ui, mut share: f64) -> Option<f64> {
+    // `Edits`, not `Always`, which writes the value back every frame.
+    ui.add(
+        egui::Slider::new(&mut share, 0.0..=2.0)
+            .clamping(egui::SliderClamping::Edits)
+            .max_decimals(2),
+    )
+    .changed()
+    .then_some(share)
+}
+
+/// Draws the control for one property of a `class` and returns the edit
+/// if the user changed it this frame.
 fn value_control(
     ui: &mut egui::Ui,
+    class: ClassName,
     name: &'static str,
     value: Value,
     assets: &Assets,
 ) -> Option<Edit> {
     match value {
+        // A WeatherVolume's shares go up to 2 (a Weather's own Wetness
+        // stops at 1).
+        Value::Number(share)
+            if class == ClassName::WeatherVolume && matches!(name, "Snow" | "Wetness") =>
+        {
+            weather_share_control(ui, share).map(|share| Edit::Property(name, Value::Number(share)))
+        }
         Value::String(path) if is_map(name) => map_control(ui, name, &path, assets),
         Value::String(path) if name == "SoundId" => sound_control(ui, &path, assets),
         Value::String(path) if name == "Image" => image_control(ui, &path),

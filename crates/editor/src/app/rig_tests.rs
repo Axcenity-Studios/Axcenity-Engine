@@ -1,5 +1,5 @@
 //! Phase 62 in the editor: a humanoid rigged in the Model Studio, saved as
-//! a skinned `.glb`, playing hello-character's Mixamo walk through an
+//! a skinned `.glb`, playing character's Mixamo walk through an
 //! Animator without retargeting; and a shoulder's weights painted and
 //! saved, deforming the game's MeshPart just as the Studio's Pose test.
 
@@ -51,7 +51,7 @@ fn mesh_part(app: &mut EditorApp, mesh_id: &str) -> InstanceId {
 
 #[test]
 fn a_humanoid_rigged_in_the_studio_plays_a_mixamo_walk_through_an_animator_without_retargeting() {
-    let folder = copy_of_example("hello-character", "rigged-walk");
+    let folder = copy_of_example("character", "rigged-walk");
     let mut app = EditorApp::new(Some(&folder));
     rigged_humanoid(&mut app);
     let path = app.save_model_studio().unwrap();
@@ -182,7 +182,7 @@ fn largest_gap(a: &[Vec3], b: &[Vec3]) -> f32 {
 
 #[test]
 fn weight_painting_a_shoulder_and_saving_changes_the_deformation_in_the_game_as_in_the_studio() {
-    let folder = copy_of_example("hello-character", "rigged-shoulder");
+    let folder = copy_of_example("character", "rigged-shoulder");
     let mut app = EditorApp::new(Some(&folder));
     rigged_humanoid(&mut app);
     // The left arm raised in Pose test.
@@ -234,7 +234,7 @@ fn snapshots_of_the_walk() {
     let Some(shots) = std::env::var_os("AXCENITY_SNAPSHOTS") else {
         return;
     };
-    let folder = copy_of_example("hello-character", "rigged-walk-shot");
+    let folder = copy_of_example("character", "rigged-walk-shot");
     let mut app = EditorApp::new(Some(&folder));
     rigged_humanoid(&mut app);
     let path = app.save_model_studio().unwrap();

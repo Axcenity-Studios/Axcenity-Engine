@@ -9,7 +9,7 @@
 //! - 200 Scripts: 100 turn a spinner every `Heartbeat`, 97 loop on
 //!   `task.wait` reading and recoloring a grid block, and three drive the
 //!   drops, the Sounds and the agents.
-//! - 50 looping Sounds, 20 animated characters (hello-animation's Noodle,
+//! - 50 looping Sounds, 20 animated characters (animation's Noodle,
 //!   each with an Animator) and 10 navigation agents walking back and
 //!   forth across the grid.
 //!
@@ -40,42 +40,42 @@ const WAIT_SCRIPTS: usize = SCRIPTS - SPINNERS - 3;
 const SPACING: f32 = 4.0;
 const SIDE: usize = 95;
 
-/// hello-animation's character and its clips, so the scene needs no
+/// animation's character and its clips, so the scene needs no
 /// other folder.
 const ASSETS: &[(&str, &[u8])] = &[
     (
         "assets/models/noodle.fbx",
-        include_bytes!("../../../examples/hello-animation/assets/models/noodle.fbx"),
+        include_bytes!("../../samples/projects/animation/assets/models/noodle.fbx"),
     ),
     (
         "assets/animations/noodle/noodle.statemachine.json",
         include_bytes!(
-            "../../../examples/hello-animation/assets/animations/noodle/noodle.statemachine.json"
+            "../../samples/projects/animation/assets/animations/noodle/noodle.statemachine.json"
         ),
     ),
     (
         "assets/animations/noodle/Idle.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Idle.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Idle.anim.json"),
     ),
     (
         "assets/animations/noodle/Walk.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Walk.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Walk.anim.json"),
     ),
     (
         "assets/animations/noodle/Run.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Run.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Run.anim.json"),
     ),
     (
         "assets/animations/noodle/Hop.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Hop.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Hop.anim.json"),
     ),
     (
         "assets/animations/noodle/Wave.anim.json",
-        include_bytes!("../../../examples/hello-animation/assets/animations/noodle/Wave.anim.json"),
+        include_bytes!("../../samples/projects/animation/assets/animations/noodle/Wave.anim.json"),
     ),
     (
         "assets/audio/chime.wav",
-        include_bytes!("../../../examples/hello-audio/assets/audio/chime.wav"),
+        include_bytes!("../../samples/projects/audio/assets/audio/chime.wav"),
     ),
 ];
 

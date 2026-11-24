@@ -20,7 +20,7 @@
 set -euo pipefail
 
 mode="${1:-cone}"
-game="${2:-examples/hello-spawn}"
+game="${2:-crates/samples/projects/spawn}"
 bots="${3:-4}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${NAT_LAB_OUT:-$root/target/nat-lab/$mode}"

@@ -207,7 +207,7 @@ fn encode(pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>, png::Encodi
 
 /// Runs `future` to its end on this thread. wgpu's native adapter and
 /// device requests are ready at once, so this only polls.
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
+pub(crate) fn block_on<F: std::future::Future>(future: F) -> F::Output {
     let mut future = std::pin::pin!(future);
     let mut context = std::task::Context::from_waker(std::task::Waker::noop());
     loop {

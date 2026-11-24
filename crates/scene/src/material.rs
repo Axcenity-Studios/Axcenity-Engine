@@ -359,27 +359,34 @@ fn layers_on(layers: &SkinLayers) -> bool {
 /// in the wind: by height over the bottom of its box, as much as the
 /// material's `sway` says. `None` when it says 0.
 pub(crate) fn variant_sway(standard: &StandardMaterial, transform: Mat4) -> Option<Sway> {
-    box_sway(standard.sway, 0.0, transform)
+    box_sway(standard.sway, 0.0, false, transform)
 }
 
 /// How a piece of a model at `transform` (the model's 1×1×1 box) sways by
 /// what its own material says. Every piece of the model gets the same
 /// box, so a tree's bark and leaves bend as one.
 pub(crate) fn model_sway(material: &ModelMaterial, transform: Mat4) -> Option<Sway> {
-    box_sway(material.sway, material.flutter, transform)
+    box_sway(material.sway, material.flutter, material.hangs, transform)
 }
 
-pub(crate) fn box_sway(strength: f32, flutter: f32, transform: Mat4) -> Option<Sway> {
+/// The sway of what fills the 1×1×1 box at `transform`: standing on the
+/// bottom of the box, or (`hangs`) hanging from its top.
+pub(crate) fn box_sway(strength: f32, flutter: f32, hangs: bool, transform: Mat4) -> Option<Sway> {
     // `filter` leaves out a NaN too.
     let strength = Some(strength).filter(|&sway| sway > 0.0)?;
     // Half the box's height: how far up each of its axes reaches.
     let half_height =
         0.5 * (transform.x_axis.y.abs() + transform.y_axis.y.abs() + transform.z_axis.y.abs());
-    Some(Sway {
-        base: transform.w_axis.y - half_height,
-        height: 2.0 * half_height,
-        strength,
-        flutter,
+    let middle = transform.w_axis.y;
+    Some(if hangs {
+        Sway::hanging(middle + half_height, 2.0 * half_height, strength, flutter)
+    } else {
+        Sway {
+            base: middle - half_height,
+            height: 2.0 * half_height,
+            strength,
+            flutter,
+        }
     })
 }
 
@@ -608,6 +615,16 @@ mod tests {
         assert!((sway.height - 8.0).abs() < 1e-4, "{sway:?}");
         assert_eq!((sway.strength, sway.flutter), (0.4, 0.2));
         assert_eq!(model_sway(&ModelMaterial::default(), box_of_it), None);
+
+        // A drape hangs from the top of its box and sways down from there.
+        let drape = ModelMaterial {
+            hangs: true,
+            ..leaves
+        };
+        let hung = model_sway(&drape, box_of_it).expect("it sways");
+        assert_eq!(hung, Sway::hanging(9.0, 8.0, 0.4, 0.2));
+        assert!(hung.height < 0.0 && !hung.is_still(), "{hung:?}");
+        assert!((hung.reach() - sway.reach()).abs() < 1e-5);
     }
     use crate::build_draw_list;
 

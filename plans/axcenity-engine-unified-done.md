@@ -6,12 +6,12 @@ The built part of [axcenity-engine-unified.md](axcenity-engine-unified.md): its 
 
 Tick these in the source plan once they've been checked by hand. Where a test already covers a criterion, it is named, so a failure can be traced.
 
-**v2 Phase 12, third-person walk and run** (`examples/hello-character`):
+**v2 Phase 12, third-person walk and run** (`crates/samples/projects/character`):
 
 - [x] During Play, walk and run move the character across a flat floor at different speeds, and it doesn't tip over or fall. Tests: `character` `walk_and_run_move_at_different_speeds_and_stay_upright`, player `hello_character_walks_runs_and_switches_from_lua_and_blocks`.
 - [x] The third-person camera follows behind the character during Play, and after Stop the fly camera is back. Test: `the_camera_starts_behind_the_character`. Following and the handoff on Stop are checked only by hand.
 - [x] An unanchored crate still falls and collides, and the controller's speeds don't change crate gravity or friction. Tests: `a_wall_stops_the_character_and_a_crate_still_falls`, `walk_speed_does_not_change_how_a_crate_falls`.
-- [x] The controller saves, reloads, and switches between walk and run from Lua and from blocks. Tests: the save round trip in `project/src/world_file.rs`, and the hello-character player test.
+- [x] The controller saves, reloads, and switches between walk and run from Lua and from blocks. Tests: the save round trip in `project/src/world_file.rs`, and the `character` sample player test.
 
 **v3 Phases 4 and 8, Animation window:**
 
@@ -1637,7 +1637,7 @@ Live preview scrubs in the editor without entering Play. Blocks: "play cutscene"
 ### Acceptance criteria
 
 - [x] A spec that holds W for one second and expects the character to have moved more than 5 studs passes. Changing `WalkSpeed` to 0 makes it fail with the line and the values.
-- [ ] `axcenity-test examples/hello-character` runs the same tests as the editor panel, with the same results, on Windows, macOS and Linux. Test: `the_panel_runs_the_same_tests_as_the_command_line_with_the_same_results`. Check each platform with `scripts/check-platform.sh` (`.ps1` on Windows; docs/development.md).
+- [ ] `axcenity-test crates/samples/projects/character` runs the same tests as the editor panel, with the same results, on Windows, macOS and Linux. Test: `the_panel_runs_the_same_tests_as_the_command_line_with_the_same_results`. Check each platform with `scripts/check-platform.sh` (`.ps1` on Windows; docs/development.md).
 - [x] Tests don't change the project's files, and a test that errors doesn't stop the others.
 
 ---

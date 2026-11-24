@@ -1,0 +1,5 @@
+category = "feature"
+subsystem = "animation"
+title = "Environment presets blend the weather and the time of day on one Sequencer track, or from a script"
+details = "An environment preset holds the whole look of the sky and the weather: the time of day and exposure, the air's haze, the clouds, rain or snow and how hard it falls, wet and snow-covered ground, the wind and the color's saturation. Clear, Evening, Overcast, Storm, SnowDay and SnowNight are built in, and Save current as (Properties, with Lighting or nothing selected) keeps your own in assets/environments. The Sequencer's new Environment track keys presets by name and blends from one to the next as you scrub, in the game and in rendered movies: the clock turns the short way (or forward, if the key says), and rain eases off before snow starts. Property tracks on the same property win. From a script, Lighting:TransitionToPreset(\"Storm\", 30) eases the world there over 30 seconds and can be replaced part way by another call. The same Properties section applies a preset to the world in one undo step."
+features = ["editor.sequencer", "renderer.weather", "animation.environment-presets"]

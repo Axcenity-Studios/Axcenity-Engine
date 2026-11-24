@@ -798,7 +798,9 @@ const PROBE_BEFORE: [[f32; 3]; 5] = [
     [139.763, 139.763, 139.763],
     [150.704, 150.704, 150.704],
     [204.0, 204.0, 204.0],
-    [80.142, 100.923, 73.941],
+    // The leaf: measured again on 2026-11-23, when low plants began to
+    // take their light as the ground does (shader.wgsl's `LEAF_GROUND_LIFT`).
+    [85.302, 109.154, 78.308],
 ];
 
 /// Human skin's diffusion profile: d'Eon and Luebke's sum of six Gaussians

@@ -1,7 +1,7 @@
 ---
 description: Luau scripts, where they run (server, client, modules), the API's main ideas, events, waiting, talking between server and client, and finding API entries.
 icon: code
-samples: [hello-script, hello-events, hello-tasks, hello-modules, hello-remote]
+samples: [script, events, tasks, modules, remote]
 ---
 
 # Scripting and the API
@@ -9,6 +9,8 @@ samples: [hello-script, hello-events, hello-tasks, hello-modules, hello-remote]
 Games are scripted in **Luau**, a fast, typed dialect of Lua. The API will feel familiar if you know Roblox: `workspace`, `game:GetService()`, Instances with properties, events you `:Connect()` to, and `task.wait()`. Blocks and graphs (see [Blocks: visual programming](blocks.md)) become the same Lua, so there's one scripting runtime.
 
 ## Where scripts live
+
+![Client-server scripting model showing authoritative server Scripts, client LocalScripts, and shared ReplicatedStorage objects (RemoteEvent, RemoteFunction, and ModuleScript) bridging them.](../images/scripting-client-server.png)
 
 | Kind | File | Runs | Use it for |
 |---|---|---|---|
@@ -75,7 +77,7 @@ Engine systems are **services**: `game:GetService("TweenService")`, `"UserInputS
 
 ## Server and client
 
-In a multiplayer game the server owns the world, and each player's LocalScripts handle their input and screen. They talk through **RemoteEvents** in ReplicatedStorage: a LocalScript calls `RemoteEvent:FireServer()` and a Script hears `RemoteEvent.OnServerEvent`, or the other way with `RemoteEvent:FireClient()` and `RemoteEvent.OnClientEvent`. In a single-player game the same code works unchanged. The **hello-remote** sample shows both sides.
+In a multiplayer game the server owns the world, and each player's LocalScripts handle their input and screen. They talk through **RemoteEvents** in ReplicatedStorage: a LocalScript calls `RemoteEvent:FireServer()` and a Script hears `RemoteEvent.OnServerEvent`, or the other way with `RemoteEvent:FireClient()` and `RemoteEvent.OnClientEvent`. In a single-player game the same code works unchanged. The **remote** sample shows both sides.
 
 ## Finding your way in the API
 

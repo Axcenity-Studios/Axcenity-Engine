@@ -164,6 +164,10 @@ impl Context {
                 .expect("creating Sequence methods only fails when out of memory"),
         );
         methods.extend(
+            crate::environment::methods(&lua)
+                .expect("creating Lighting's preset methods only fails when out of memory"),
+        );
+        methods.extend(
             crate::data_layers::methods(&lua)
                 .expect("creating the DataLayerService methods only fails when out of memory"),
         );

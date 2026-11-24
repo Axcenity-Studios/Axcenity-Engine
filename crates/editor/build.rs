@@ -54,12 +54,14 @@ fn main() {
     write_doc_files(&manifest_dir.join("../../documentation"));
 }
 
-/// Writes `doc_files.rs`: every `.md` under `documentation/` but `api/`.
+/// Writes `doc_files.rs`: every `.md` and `.png` under `documentation/` but `api/`.
 fn write_doc_files(root: &Path) {
     println!("cargo:rerun-if-changed={}", root.display());
     let mut files = Vec::new();
-    markdown_files(root, root, &mut files);
+    let mut images = Vec::new();
+    collect_doc_assets(root, root, &mut files, &mut images);
     files.sort();
+    images.sort();
     let mut out = String::from(
         "/// The documentation built in: path relative to `documentation/`, and text.\n\
          pub const DOC_FILES: &[(&str, &str)] = &[\n",
@@ -73,14 +75,33 @@ fn write_doc_files(root: &Path) {
         )
         .unwrap();
     }
+    out.push_str("];\n\n");
+    out.push_str(
+        "/// The documentation images built in: path relative to `documentation/`, and PNG bytes.\n\
+         pub const DOC_IMAGES: &[(&str, &[u8])] = &[\n",
+    );
+    for (name, path) in &images {
+        let path = path.canonicalize().unwrap();
+        writeln!(
+            out,
+            "    ({name:?}, include_bytes!({:?})),",
+            path.display().to_string()
+        )
+        .unwrap();
+    }
     out.push_str("];\n");
     let target = PathBuf::from(env::var("OUT_DIR").unwrap()).join("doc_files.rs");
     fs::write(target, out).unwrap();
 }
 
-/// The `.md` files under `dir`, named relative to `root` with `/`. Cargo
+/// The `.md` and `.png` files under `dir`, named relative to `root` with `/`. Cargo
 /// only watches a folder's own entries, so each folder is watched too.
-fn markdown_files(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) {
+fn collect_doc_assets(
+    root: &Path,
+    dir: &Path,
+    files: &mut Vec<(String, PathBuf)>,
+    images: &mut Vec<(String, PathBuf)>,
+) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -95,11 +116,14 @@ fn markdown_files(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) {
         if path.is_dir() {
             if relative != "api" && !relative.starts_with('.') {
                 println!("cargo:rerun-if-changed={}", path.display());
-                markdown_files(root, &path, files);
+                collect_doc_assets(root, &path, files, images);
             }
         } else if path.extension().is_some_and(|e| e == "md") {
             println!("cargo:rerun-if-changed={}", path.display());
             files.push((relative, path));
+        } else if path.extension().is_some_and(|e| e == "png") {
+            println!("cargo:rerun-if-changed={}", path.display());
+            images.push((relative, path));
         }
     }
 }

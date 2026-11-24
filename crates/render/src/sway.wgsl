@@ -10,7 +10,8 @@ const SWAY_WIND: f32 = 20.0;
 
 // Where the world-space corner `world` of a plant (its instance's `sway`:
 // the height of its ground, 1 over its height, its strength) is bent by
-// the frame's wind. It leans downwind, more the stronger the wind and the
+// the frame's wind. A negative height is something hanging that far down
+// from `sway.x` (drapes): its top stays put, its foot swings and rises. It leans downwind, more the stronger the wind and the
 // higher up the plant, and stays still in no wind. Gusts roll over the
 // ground with the wind, and a flutter shakes it. Both vary smoothly over
 // the world, so a plant drawn as several items bends as one. The farthest
@@ -29,7 +30,7 @@ fn swayed_at(world: vec3<f32>, sway: vec4<f32>, clock: vec4<f32>) -> vec3<f32> {
     // Stiff at the foot, giving more toward the top.
     let bend = up * up;
     let time = clock.x;
-    let lean = SWAY_LEAN * sway.z / sway.y * (1.0 - exp(-speed / SWAY_WIND));
+    let lean = SWAY_LEAN * sway.z / abs(sway.y) * (1.0 - exp(-speed / SWAY_WIND));
     let gust = cloud_noise2((world.xz - wind * time) * 0.03);
     let flutter = sin(time * (1.7 + speed * 0.05) + dot(world.xz, vec2<f32>(0.21, 0.17)));
     let along = lean * bend * (0.7 + 0.5 * gust + 0.15 * flutter);

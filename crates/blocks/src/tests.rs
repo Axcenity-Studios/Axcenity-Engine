@@ -2203,7 +2203,7 @@ fn data_blocks_read_a_tables_row_and_column_and_come_back_from_lua() {
         "{source}"
     );
 
-    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-data");
+    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/data");
     let mut world = World::new();
     let lua = world.create(ClassName::Script).unwrap();
     world
@@ -2381,7 +2381,7 @@ fn the_animation_examples_blocks_drive_its_animator() {
     use axcenity_core::{KeyCode, Parameter};
     use axcenity_script::KeyEvent;
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-animation/scripts/Keys.client.blocks.json");
+        .join("../samples/projects/animation/scripts/Keys.client.blocks.json");
     let text = std::fs::read_to_string(path).unwrap();
     let blocks: BlockScript = serde_json::from_str(&text).unwrap();
     let source = translate(&blocks).unwrap().source;
@@ -3237,7 +3237,7 @@ fn code_with_a_syntax_error_says_where() {
 
 #[test]
 fn every_example_script_can_switch_to_blocks_and_back() {
-    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects");
     let mut checked = 0;
     for project in std::fs::read_dir(examples).unwrap() {
         let scripts = project.unwrap().path().join("scripts");

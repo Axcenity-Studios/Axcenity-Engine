@@ -17,7 +17,7 @@ const FRAME: f32 = 1.0 / 60.0;
 /// given, opened as the player opens a game: the input map, then the scripts.
 pub(super) fn open(name: &str, map: Option<&InputMap>) -> (App, TempCopy) {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name);
     let folder = TempCopy::of(
         &example,
@@ -141,7 +141,7 @@ impl App {
 
 #[test]
 fn a_local_script_gets_the_click_and_a_click_on_a_text_button_is_game_processed() {
-    let (mut app, _copy) = open("hello-menu", None);
+    let (mut app, _copy) = open("menu", None);
     let script = app.sim.world.create(ClassName::LocalScript).unwrap();
     app.sim
         .world
@@ -201,7 +201,7 @@ fn rebinding_jump_to_e_in_the_input_map_makes_both_controllers_jump_on_e() {
     let mut map = InputMap::default();
     map.rebind("Jump", vec![Input::Key(KeyCode::E)]).unwrap();
     for first_person in [false, true] {
-        let (mut app, _copy) = open("hello-character", Some(&map));
+        let (mut app, _copy) = open("character", Some(&map));
         if first_person {
             app.first_person();
         }
@@ -215,7 +215,7 @@ fn rebinding_jump_to_e_in_the_input_map_makes_both_controllers_jump_on_e() {
 
 #[test]
 fn a_scripts_rebind_changes_what_the_controller_jumps_on_at_once() {
-    let (mut app, _copy) = open("hello-character", None);
+    let (mut app, _copy) = open("character", None);
     assert!(app.jumps_on(KeyCode::Space));
     let script = app.sim.world.create(ClassName::LocalScript).unwrap();
     app.sim
@@ -234,7 +234,7 @@ fn a_scripts_rebind_changes_what_the_controller_jumps_on_at_once() {
 
 #[test]
 fn a_gamepads_left_stick_walks_the_character_and_its_a_button_jumps_with_no_script() {
-    let (mut app, _copy) = open("hello-character", None);
+    let (mut app, _copy) = open("character", None);
     let mut pads = PadNavigation::default();
     // What `poll_pads` does with what the controller reports.
     let mut pad = |app: &mut App, kind: InputKind| {

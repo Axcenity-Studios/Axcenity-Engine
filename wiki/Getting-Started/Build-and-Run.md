@@ -23,11 +23,11 @@ The commands, tools and settings for working on the engine. The detailed referen
 
 | Task | Command |
 |---|---|
-| Run the editor | `cargo run -p axcenity-editor -- examples/hello-touched` |
-| Run the player | `cargo run -p axcenity-player -- examples/hello-part` |
-| Host / join | `cargo run -p axcenity-player -- --host examples/hello-part`, then `-- --join 127.0.0.1:47800 examples/hello-part` |
-| Dedicated server | `cargo run -p axcenity-server -- examples/hello-part` |
-| Game tests | `cargo run -p axcenity-testing -- examples/hello-character` |
+| Run the editor | `cargo run -p axcenity-editor -- crates/samples/projects/touched` |
+| Run the player | `cargo run -p axcenity-player -- crates/samples/projects/part` |
+| Host / join | `cargo run -p axcenity-player -- --host crates/samples/projects/part`, then `-- --join 127.0.0.1:47800 crates/samples/projects/part` |
+| Dedicated server | `cargo run -p axcenity-server -- crates/samples/projects/part` |
+| Game tests | `cargo run -p axcenity-testing -- crates/samples/projects/character` |
 | Build everything | `cargo build --workspace` |
 | All tests | `cargo nextest run --workspace` (about 25 s warm) |
 | One crate and its dependents | `cargo nextest run --workspace -E 'rdeps(axcenity-core)'` |

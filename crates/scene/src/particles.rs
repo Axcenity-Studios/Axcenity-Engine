@@ -436,13 +436,12 @@ impl Particles {
     /// `list`'s camera. Before the first [`update`](Self::update) the
     /// list keeps the world's settled weather.
     pub fn add_weather(&self, list: &mut DrawList) {
-        self.weather.note_camera(list.camera.position);
+        self.weather.note_camera(list.camera);
         if let Some(look) = self.weather.look() {
             list.weather = look;
         }
         list.weather_field = self.weather.field();
-        list.sprites
-            .extend(self.weather.sprites(list.camera.position));
+        list.sprites.extend(self.weather.sprites(list.camera));
     }
 
     /// Gives off `count` particles from `emitter` now, whether or not it's
@@ -718,6 +717,7 @@ impl Particles {
                     spin_degrees: look.spin,
                     brightness: look.brightness,
                     light_emission: look.light_emission,
+                    light_influence: look.light_influence,
                     texture: look.texture,
                     curves: look.curves,
                     flipbook: look.flipbook,
@@ -762,6 +762,7 @@ impl Particles {
                     opacity: 1.0 - transparency,
                     brightness: look.brightness,
                     light_emission: look.light_emission,
+                    light_influence: look.light_influence,
                     texture: look.texture.clone(),
                     // The same frame as on the GPU, from the same kind of
                     // seed (its life; the GPU mixes in its slot).
@@ -927,6 +928,7 @@ struct Look {
     rotation: f32,
     spin: f32,
     light_emission: f32,
+    light_influence: f32,
     brightness: f32,
     texture: Option<Arc<dyn TextureSource>>,
     /// While any of the OverLife sequences is set (roadmap R17.1).
@@ -977,6 +979,7 @@ impl Look {
             rotation: number("Rotation", 0.0),
             spin: number("RotSpeed", 0.0),
             light_emission: number("LightEmission", 0.0).clamp(0.0, 1.0),
+            light_influence: number("LightInfluence", 0.0).clamp(0.0, 1.0),
             brightness: number("Brightness", 1.0).max(0.0),
             texture,
             flipbook,
@@ -1119,9 +1122,131 @@ fn parent_transform(world: &World, emitter: &Instance) -> Option<Mat4> {
     })
 }
 
+/// The picture a raindrop's splash shows: a crown of spray thrown up and
+/// out from the middle of its foot, each jet ending in a bead.
+pub(crate) fn rain_splash() -> Arc<dyn TextureSource> {
+    static PICTURE_OF_SPLASH: OnceLock<Arc<BuiltIn>> = OnceLock::new();
+    PICTURE_OF_SPLASH
+        .get_or_init(|| {
+            let side = PICTURE;
+            // Jets: how far each leans from upright (radians), how long it
+            // is (a share of the picture's height) and how bright.
+            let jets = [
+                (-1.2, 0.42, 0.55),
+                (-0.6, 0.62, 0.8),
+                (0.1, 0.86, 1.0),
+                (0.7, 0.58, 0.8),
+                (1.25, 0.4, 0.55),
+            ];
+            let mut rgba = Vec::with_capacity((side * side * 4) as usize);
+            for row in 0..side {
+                for column in 0..side {
+                    // From the middle of the picture's foot: x across, y up.
+                    let x = (column as f32 + 0.5) / side as f32 - 0.5;
+                    let y = 1.0 - (row as f32 + 0.5) / side as f32;
+                    let reach = x.hypot(y);
+                    let lean = x.atan2(y);
+                    let mut alpha: f32 = 0.0;
+                    for (jet, length, bright) in jets {
+                        let along = reach / length;
+                        if along > 1.15 {
+                            continue;
+                        }
+                        // Thin at the foot, a bead at the tip.
+                        let width = 0.05 + 0.04 * along;
+                        let across = ((lean - jet) * reach / width).powi(2);
+                        let stem = (-across).exp() * (1.0 - along).clamp(0.0, 1.0).powf(0.6) * 0.75;
+                        let tip_x = length * jet.sin();
+                        let tip_y = length * jet.cos();
+                        let bead = (-((x - tip_x).powi(2) + (y - tip_y).powi(2)) / 0.0016).exp();
+                        alpha = alpha.max(bright * stem.max(bead));
+                    }
+                    // A low mist round the foot.
+                    let mist = (-(x * x / 0.07 + y * y / 0.02)).exp() * 0.7;
+                    let alpha = alpha.max(mist).clamp(0.0, 1.0);
+                    rgba.extend_from_slice(&[255, 255, 255, (alpha * 255.0).round() as u8]);
+                }
+            }
+            Arc::new(BuiltIn {
+                key: u64::MAX - 65,
+                side,
+                rgba,
+            })
+        })
+        .clone()
+}
+
+/// How many flakes along each side of [`snow_flakes`]'s picture.
+pub(crate) const FLAKE_GRID: u32 = 2;
+
+/// The pictures falling snowflakes show, four in a grid of two by two
+/// (a sprite shows one, as a flipbook's frame): each a small clump of
+/// crystals, no two the same shape, soft at the edge, and drawn out a
+/// little along its fall as a camera's shutter draws a falling flake out.
+/// The top of a picture is the way the flake falls from.
+pub(crate) fn snow_flakes() -> Arc<dyn TextureSource> {
+    static PICTURE_OF_FLAKES: OnceLock<Arc<BuiltIn>> = OnceLock::new();
+    PICTURE_OF_FLAKES
+        .get_or_init(|| {
+            let cell = PICTURE;
+            let side = cell * FLAKE_GRID;
+            let mut random = Random(0x05f1_a4e5_9e37_79b9);
+            // Each flake: a few soft blobs near the middle of its cell
+            // (where, how wide, how bright), the clump they make.
+            let flakes: Vec<Vec<(f32, f32, f32, f32)>> = (0..FLAKE_GRID * FLAKE_GRID)
+                .map(|flake| {
+                    (0..3 + flake % 3)
+                        .map(|blob| {
+                            let reach = if blob == 0 { 0.0 } else { 0.11 };
+                            (
+                                (random.next() - 0.5) * 2.0 * reach,
+                                (random.next() - 0.5) * 2.0 * reach,
+                                0.045 + 0.05 * random.next(),
+                                if blob == 0 {
+                                    1.0
+                                } else {
+                                    0.5 + 0.5 * random.next()
+                                },
+                            )
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut rgba = Vec::with_capacity((side * side * 4) as usize);
+            for row in 0..side {
+                for column in 0..side {
+                    let flake = (row / cell) * FLAKE_GRID + column / cell;
+                    // From the middle of the flake's cell, x across, y down.
+                    let x = ((column % cell) as f32 + 0.5) / cell as f32 - 0.5;
+                    let y = ((row % cell) as f32 + 0.5) / cell as f32 - 0.5;
+                    let mut alpha: f32 = 0.0;
+                    for &(at_x, at_y, width, bright) in &flakes[flake as usize] {
+                        // Drawn out along the fall: the shutter's blur,
+                        // fading up the way it came from.
+                        let along = (y - at_y) / (width * if y < at_y { 2.1 } else { 1.0 });
+                        let across = (x - at_x) / width;
+                        alpha += bright * (-(across * across + along * along)).exp();
+                    }
+                    // Nothing at the cell's edge, so no flake shows its square.
+                    let edge = (1.0 - (x.hypot(y) / 0.5).powi(4)).clamp(0.0, 1.0);
+                    let alpha = (alpha * edge).clamp(0.0, 1.0);
+                    rgba.extend_from_slice(&[255, 255, 255, (alpha * 255.0).round() as u8]);
+                }
+            }
+            Arc::new(BuiltIn {
+                key: u64::MAX - 66,
+                side,
+                rgba,
+            })
+        })
+        .clone()
+}
+
 /// A built-in particle picture.
 struct BuiltIn {
     key: u64,
+    /// Texels along each side.
+    side: u32,
     rgba: Vec<u8>,
 }
 
@@ -1130,7 +1255,7 @@ impl TextureSource for BuiltIn {
         self.key
     }
     fn size(&self) -> (u32, u32) {
-        (PICTURE, PICTURE)
+        (self.side, self.side)
     }
     fn rgba(&self) -> &[u8] {
         &self.rgba
@@ -1148,6 +1273,7 @@ pub fn built_in(kind: ParticleType) -> Arc<dyn TextureSource> {
                 Arc::new(BuiltIn {
                     // Far from the keys `assets` hands out, which count up from 1.
                     key: u64::MAX - i as u64,
+                    side: PICTURE,
                     rgba: draw(kind),
                 })
             })
@@ -1160,20 +1286,36 @@ pub fn built_in(kind: ParticleType) -> Arc<dyn TextureSource> {
     pictures[index].clone()
 }
 
+/// Texels along each side of the raindrop's picture: finer than the other
+/// built-in pictures, so its streak can be a few millimetres wide on a
+/// sprite as long as the streak.
+const RAIN_PICTURE: u32 = 256;
+/// Half the streak's width, as a share of its length: 0.03 studs wide in
+/// all on a 1.4 stud streak. Three times that (as it was) drew each drop
+/// near the camera as a bar.
+const RAIN_HALF_WIDTH: f32 = 0.0105;
+
 /// The picture raindrops show: a thin streak down the middle, fading at
 /// its ends, so a drop looks like it's falling fast.
 pub(crate) fn rain_streak() -> Arc<dyn TextureSource> {
     static PICTURE_OF_RAIN: OnceLock<Arc<BuiltIn>> = OnceLock::new();
     PICTURE_OF_RAIN
         .get_or_init(|| {
-            let mut rgba = Vec::with_capacity((PICTURE * PICTURE * 4) as usize);
-            for row in 0..PICTURE {
-                for column in 0..PICTURE {
-                    let x = (column as f32 + 0.5) / PICTURE as f32 - 0.5;
-                    let y = (row as f32 + 0.5) / PICTURE as f32 - 0.5;
-                    let across = (1.0 - x.abs() / 0.03).clamp(0.0, 1.0);
-                    let along = (1.0 - (y / 0.5).powi(2)).clamp(0.0, 1.0);
-                    let alpha = across * along;
+            let side = RAIN_PICTURE;
+            let mut rgba = Vec::with_capacity((side * side * 4) as usize);
+            for row in 0..side {
+                for column in 0..side {
+                    let x = (column as f32 + 0.5) / side as f32 - 0.5;
+                    let y = (row as f32 + 0.5) / side as f32 - 0.5;
+                    // Soft across; along it, a drop's blur over the time the
+                    // shutter is open: thin where it came from (the top),
+                    // fullest just above its rounded foot.
+                    let across = (1.0 - x.abs() / RAIN_HALF_WIDTH).clamp(0.0, 1.0);
+                    let across = across * across * (3.0 - 2.0 * across);
+                    let down = y + 0.5;
+                    let tail = (down / 0.8).clamp(0.0, 1.0).powf(1.5);
+                    let foot = ((1.0 - down) / 0.06).clamp(0.0, 1.0);
+                    let alpha = across * tail * foot;
                     rgba.extend_from_slice(&[255, 255, 255, (alpha * 255.0).round() as u8]);
                 }
             }
@@ -1181,6 +1323,7 @@ pub(crate) fn rain_streak() -> Arc<dyn TextureSource> {
             // hands out.
             Arc::new(BuiltIn {
                 key: u64::MAX - 64,
+                side,
                 rgba,
             })
         })
@@ -1881,7 +2024,7 @@ mod tests {
 
     #[test]
     fn small_emitters_stay_on_the_cpu_with_the_gpu_allowed() {
-        // hello-particles' busiest emitter: 40 a second for a second.
+        // particles' busiest emitter: 40 a second for a second.
         let (mut world, _, emitter) = world_with_emitter(40.0);
         set(&mut world, emitter, "Lifetime", 1.0);
         let mut particles = Particles::new();
@@ -1976,6 +2119,7 @@ mod tests {
             ("RotSpeed", 90.0),
             ("Brightness", 3.0),
             ("LightEmission", 1.0),
+            ("LightInfluence", 0.5),
         ] {
             set(&mut world, emitter, name, value);
         }
@@ -2022,6 +2166,7 @@ mod tests {
         assert_eq!(look.transparency, [0.25, 1.0]);
         assert_eq!((look.rotation_degrees, look.spin_degrees), (15.0, 90.0));
         assert_eq!((look.brightness, look.light_emission), (3.0, 1.0));
+        assert_eq!(look.light_influence, 0.5);
         assert!(look.texture.is_some(), "the built-in circle");
         let cylinder = SpawnShape {
             kind: SpawnKind::Cylinder,

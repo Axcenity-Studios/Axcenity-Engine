@@ -71,6 +71,7 @@ mod debugger;
 mod decals;
 mod definitions;
 mod edit;
+mod environment;
 mod errors;
 mod events;
 mod face;
@@ -292,6 +293,9 @@ pub struct ScriptRuntime {
     level_loads: Vec<String>,
     /// Sequences played on either side (Phase 51).
     sequences: sequence::SharedSequences,
+    /// The environment preset transition under way on either side
+    /// (`Lighting:TransitionToPreset`).
+    environment: environment::SharedEnvironment,
     /// SplineFollowers moving their parts (Phase 73), on the server.
     followers: spline::Followers,
     /// What SplineMeshes and SplineScatters make (Phase 74), on every
@@ -418,6 +422,9 @@ impl ScriptRuntime {
         let sequences = sequence::SharedSequences::default();
         server.lua.set_app_data(sequences.clone());
         client.lua.set_app_data(sequences.clone());
+        let environment = environment::SharedEnvironment::default();
+        server.lua.set_app_data(environment.clone());
+        client.lua.set_app_data(environment.clone());
         let ownership = ownership::SharedOwnership::default();
         server.lua.set_app_data(ownership.clone());
         client.lua.set_app_data(ownership.clone());
@@ -445,6 +452,7 @@ impl ScriptRuntime {
             levels,
             level_loads: Vec::new(),
             sequences,
+            environment,
             followers: spline::Followers::default(),
             generators: axcenity_procedural::Generators::default(),
             ownership,
@@ -1117,6 +1125,9 @@ mod reload_tests;
 mod save_tests;
 #[cfg(test)]
 mod sequence_tests;
+
+#[cfg(test)]
+mod environment_tests;
 
 #[cfg(test)]
 mod user_settings_tests;

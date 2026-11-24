@@ -3,12 +3,12 @@ use axcenity_core::{ClassName, Material, PartType, ToneMapping, Value, World};
 
 fn examples_folder() -> PathBuf {
     // CARGO_MANIFEST_DIR is this crate's folder: crates/project.
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects")
 }
 
 #[test]
 fn hello_part_example_loads() {
-    let project = load(&examples_folder().join("hello-part")).unwrap();
+    let project = load(&examples_folder().join("part")).unwrap();
     assert_eq!(project.manifest.name, "Hello Part");
     assert!(project.problems.is_empty() && project.world_loaded);
 
@@ -23,7 +23,7 @@ fn hello_part_example_loads() {
 
 #[test]
 fn hello_ui_example_loads_with_client_script_and_stylesheet() {
-    let project = load(&examples_folder().join("hello-ui")).unwrap();
+    let project = load(&examples_folder().join("ui")).unwrap();
     assert!(project.problems.is_empty() && project.world_loaded);
     assert_eq!(project.scripts.len(), 1);
     assert_eq!(project.scripts[0].path, "scripts/menu.client.lua");
@@ -507,7 +507,7 @@ fn missing_folder_names_the_manifest() {
 fn project_names_come_from_the_manifest() {
     let examples = examples_folder();
     assert_eq!(
-        project_name(&examples.join("hello-touched")).as_deref(),
+        project_name(&examples.join("touched")).as_deref(),
         Some("Hello Touched")
     );
     assert_eq!(project_name(&examples.join("does-not-exist")), None);
@@ -653,7 +653,9 @@ fn block_scripts_load_as_lua_scripts_and_keep_their_class_when_renamed() {
     let script = BlockScript {
         blocks: vec![Block::new(BlockKind::WhenStarted {
             body: vec![Block::new(BlockKind::PlaySound {
-                target: "Music".to_owned(),
+                target: axcenity_blocks_runtime::ObjectRef::path("Music"),
+                pitch: None,
+                wait_until_done: false,
             })],
         })],
         ..Default::default()
@@ -738,7 +740,7 @@ fn the_world_file_is_kept_under_a_free_name() {
     assert!(!world_left);
 }
 
-/// Every folder in `examples/` must load.
+/// Every folder in `crates/samples/projects/` must load.
 fn every_example() -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = fs::read_dir(examples_folder())
         .unwrap()
@@ -783,7 +785,7 @@ fn primitives_example_is_already_in_saved_form() {
     assert_eq!(
         write_world(&load(&folder).unwrap().world),
         text,
-        "re-save examples/primitives/world.json with `project::save_world`"
+        "re-save crates/samples/projects/primitives/world.json with `project::save_world`"
     );
 }
 
@@ -874,7 +876,7 @@ fn a_damaged_string_table_is_reported_and_the_rest_loads() {
 
 #[test]
 fn hello_strings_loads_its_table_and_a_built_game_keeps_it() {
-    let example = examples_folder().join("hello-strings");
+    let example = examples_folder().join("strings");
     let project = load(&example).unwrap();
     assert!(project.problems.is_empty(), "{:?}", project.problems);
     let world = &project.world;
@@ -884,7 +886,7 @@ fn hello_strings_loads_its_table_and_a_built_game_keeps_it() {
     );
     assert_eq!(world.translate("menu.play"), Some("Play"));
 
-    let built = temp_folder("hello-strings-built");
+    let built = temp_folder("strings-built");
     unpack_game(&pack_game(&example).unwrap(), &built).unwrap();
     assert!(built.join(STRINGS_FILE).is_file());
     assert_eq!(load(&built).unwrap().world.strings(), world.strings());
@@ -947,7 +949,7 @@ fn sound_groups_and_their_effects_save_with_the_world() {
 /// the game.
 #[test]
 fn built_games_and_the_game_ui_have_no_plugin_files() {
-    let example = examples_folder().join("hello-plugins");
+    let example = examples_folder().join("plugins");
     assert!(example.join("plugins/part-tools/widget.css").is_file());
     let project = load(&example).unwrap();
     assert!(project.problems.is_empty(), "{:?}", project.problems);
@@ -958,7 +960,7 @@ fn built_games_and_the_game_ui_have_no_plugin_files() {
         "{stylesheets:?}"
     );
 
-    let built = temp_folder("hello-plugins-built");
+    let built = temp_folder("plugins-built");
     unpack_game(&pack_game(&example).unwrap(), &built).unwrap();
     assert!(built.join(WORLD_FILE).is_file());
     assert!(!built.join(PLUGINS_FOLDER).exists());
@@ -1004,7 +1006,7 @@ fn streaming_settings_save_with_the_world_and_old_worlds_have_it_off() {
 
 #[test]
 fn hello_streaming_example_loads_with_streaming_on() {
-    let project = load(&examples_folder().join("hello-streaming")).unwrap();
+    let project = load(&examples_folder().join("streaming")).unwrap();
     assert!(
         project.problems.is_empty() && project.world_loaded,
         "{:?}",

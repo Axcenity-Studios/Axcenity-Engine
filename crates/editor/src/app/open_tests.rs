@@ -16,7 +16,7 @@ fn first_of(app: &EditorApp, class: ClassName) -> InstanceId {
 
 #[test]
 fn a_script_opens_in_one_tab_however_often_it_is_opened() {
-    let folder = copy_of_example("hello-touched", "open-script");
+    let folder = copy_of_example("touched", "open-script");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let pad = first_of(&app, ClassName::Script);
@@ -29,7 +29,7 @@ fn a_script_opens_in_one_tab_however_often_it_is_opened() {
 
 #[test]
 fn a_part_is_selected_and_framed_in_the_viewport() {
-    let folder = copy_of_example("hello-touched", "open-part");
+    let folder = copy_of_example("touched", "open-part");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let part = first_of(&app, ClassName::Part);
@@ -49,7 +49,7 @@ fn a_part_is_selected_and_framed_in_the_viewport() {
 
 #[test]
 fn ui_opens_in_the_ui_designer_and_an_animation_in_the_animation_tab() {
-    let folder = copy_of_example("hello-ui", "open-ui");
+    let folder = copy_of_example("ui", "open-ui");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let gui = first_of(&app, ClassName::ScreenGui);
@@ -58,7 +58,7 @@ fn ui_opens_in_the_ui_designer_and_an_animation_in_the_animation_tab() {
     assert!(app.layout.is_open(Pane::UiDesigner));
     let _ = std::fs::remove_dir_all(&folder);
 
-    let folder = copy_of_example("hello-door", "open-animation");
+    let folder = copy_of_example("door", "open-animation");
     let mut app = EditorApp::new(Some(&folder));
     let animation = first_of(&app, ClassName::Animation);
     app.open_instance(&ctx, animation);
@@ -70,7 +70,7 @@ fn ui_opens_in_the_ui_designer_and_an_animation_in_the_animation_tab() {
 /// Object Viewer tab opens on a copy; the edit world is left alone.
 #[test]
 fn view_shows_an_object_or_a_prefab_in_the_object_viewer_tab() {
-    let folder = copy_of_example("hello-object-scripts", "open-view");
+    let folder = copy_of_example("object-scripts", "open-view");
     let mut app = EditorApp::new(Some(&folder));
     let part = first_of(&app, ClassName::Part);
     let name = app.world.get(part).unwrap().name().to_owned();
@@ -97,7 +97,7 @@ fn view_shows_an_object_or_a_prefab_in_the_object_viewer_tab() {
 /// A material file is shown on a ball wearing it.
 #[test]
 fn view_shows_a_material_on_a_ball() {
-    let folder = copy_of_example("hello-toon", "open-view-material");
+    let folder = copy_of_example("toon", "open-view-material");
     let mut app = EditorApp::new(Some(&folder));
     let path = "assets/materials/Cel.material.json";
     app.view_asset(path);
@@ -119,7 +119,7 @@ fn view_shows_a_material_on_a_ball() {
 /// The viewer's tab fits a narrow column and says what to do when empty.
 #[test]
 fn an_empty_object_viewer_says_how_to_fill_it() {
-    let folder = copy_of_example("hello-touched", "open-view-empty");
+    let folder = copy_of_example("touched", "open-view-empty");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     let input = egui::RawInput {

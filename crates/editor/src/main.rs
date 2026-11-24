@@ -51,6 +51,7 @@ mod data_table;
 mod dialog;
 mod dialogue_editor;
 mod effect_editor;
+mod environment_presets;
 mod explorer;
 mod find_in_scripts;
 mod game_tests;
@@ -69,6 +70,7 @@ mod luau_lsp;
 mod material_editor;
 mod material_graph;
 mod mixer;
+mod movie;
 mod output;
 mod people_history;
 mod placing;
@@ -184,7 +186,7 @@ fn main() -> eframe::Result {
     )
     .init();
 
-    // An optional project folder to open, such as `examples/hello-touched`.
+    // An optional project folder to open, such as `crates/samples/projects/touched`.
     // `args_os` instead of `args` so folder names that aren't valid Unicode still work.
     // An editor relaunched into, after a rebuild or by Restart now (a
     // setting that needs a restart, such as Hardware ray tracing), gets
@@ -218,6 +220,11 @@ fn main() -> eframe::Result {
                 false
             });
         std::process::exit(if served { 0 } else { 1 });
+    }
+    if first.as_deref() == Some(movie::cli::FLAG.as_ref()) {
+        // A sequence rendered as a movie, without a window (`movie/cli.rs`).
+        let rendered = movie::cli::run_from_command_line(args);
+        std::process::exit(if rendered { 0 } else { 1 });
     }
     if first.as_deref() == Some(build_game::BUILD_FLAG.as_ref()) {
         let built = build_game::build_from_command_line(args);

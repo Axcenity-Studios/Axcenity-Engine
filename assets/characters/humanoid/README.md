@@ -47,7 +47,7 @@ python -m venv .bpy && .bpy/bin/pip install bpy
 .bpy/bin/python assets/characters/humanoid/build.py --out assets/characters/humanoid
 ```
 
-It takes about 15 seconds and prints each part's triangle count. Copy `Humanoid.glb` and `HumanoidAnimations.glb` into `examples/hello-humanoid/assets/models/Humanoid/` too. Refreshing `source/` from the bundle: `python source/extract.py path/to/human_base_meshes_bundle.blend` (see the URL and checksum in `extract.py`).
+It takes about 15 seconds and prints each part's triangle count. Copy `Humanoid.glb` and `HumanoidAnimations.glb` into `crates/samples/projects/humanoid/assets/models/Humanoid/` too. Refreshing `source/` from the bundle: `python source/extract.py path/to/human_base_meshes_bundle.blend` (see the URL and checksum in `extract.py`).
 
 ## Conventions
 

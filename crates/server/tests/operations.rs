@@ -25,7 +25,7 @@ end)
 fn bots_rejoin_a_server_that_crashed_and_started_again_with_their_saves() {
     let folder = scratch("crash");
     let game = folder.join("game");
-    copy_folder(std::path::Path::new(&example("hello-spawn")), &game);
+    copy_folder(std::path::Path::new(&example("spawn")), &game);
     std::fs::write(game.join("scripts/visits.server.lua"), VISITS).unwrap();
     let game = game.to_str().unwrap().to_owned();
     let saves = folder.join("saves");
@@ -77,7 +77,7 @@ fn bots_rejoin_a_server_that_crashed_and_started_again_with_their_saves() {
 #[test]
 fn bots_that_keep_coming_and_going_leave_nothing_behind_on_the_server() {
     let folder = scratch("churn");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let stats = folder.join("server.jsonl");
     let server = server_with(
         &game,
@@ -135,7 +135,7 @@ fn bots_that_keep_coming_and_going_leave_nothing_behind_on_the_server() {
 #[test]
 fn connections_that_never_say_who_they_are_are_dropped_and_players_get_in_after() {
     let folder = scratch("silent");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     // Two players and netcode's four spare connections: the flood takes
     // every one of them.
     let server = server_with(&game, 0, &["--max-players", "2"], &[]);
@@ -176,7 +176,7 @@ fn connections_that_never_say_who_they_are_are_dropped_and_players_get_in_after(
 #[test]
 fn connections_without_a_token_hold_no_slot_on_a_secured_server() {
     let folder = scratch("tokenless");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let server = server_with(&game, 0, &["--max-players", "2"], &[]);
     server.wait_for_all(&["Secured: connect tokens"], 10);
     // Far more than the slots, the whole time the players join (MP4:
@@ -208,7 +208,7 @@ fn connections_without_a_token_hold_no_slot_on_a_secured_server() {
 #[test]
 fn junk_is_refused_and_spammers_are_kicked_while_players_play_on() {
     let folder = scratch("spam");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let stats = folder.join("server.jsonl");
     let server = server_with(
         &game,
@@ -316,7 +316,7 @@ fn junk_is_refused_and_spammers_are_kicked_while_players_play_on() {
 #[test]
 fn cheating_clients_are_held_back_and_kicked_while_players_play_on() {
     let folder = scratch("cheats");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let server = server_with(&game, 0, &["--max-players", "8"], &[]);
     let report = folder.join("bots.jsonl");
     let running = bots(

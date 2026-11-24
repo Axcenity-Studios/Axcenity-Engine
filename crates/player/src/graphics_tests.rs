@@ -1,4 +1,4 @@
-//! The graphics foundation, checked on hello-graphics (the graphics
+//! The graphics foundation, checked on graphics (the graphics
 //! reference scene): each preset against its reference image, lighting
 //! changes on each kind of material, a LocalScript changing the graphics
 //! settings, and a GPU that can't do what the settings ask.
@@ -20,11 +20,11 @@ use super::*;
 
 pub(super) const SIZE: (u32, u32) = (480, 270);
 
-/// hello-graphics after its scripts' first second, with its assets, the
+/// graphics after its scripts' first second, with its assets, the
 /// player's starting camera, and the copy the assets load from (keep it
 /// until they're drawn).
 fn hello_graphics() -> (World, ScriptRuntime, Assets, FlyCamera, TempCopy) {
-    let (mut world, mut scripts, folder) = start_example_in("hello-graphics");
+    let (mut world, mut scripts, folder) = start_example_in("graphics");
     let (mut physics, mut clock) = (Physics::new(), 0);
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 1.0);
     let camera = FlyCamera::looking_at(START_CAMERA_POSITION, Vec3::ZERO);
@@ -96,7 +96,7 @@ pub(super) fn average(pixels: &[u8], at: &[usize]) -> [f64; 3] {
     sum.map(|total| total / at.len() as f64)
 }
 
-/// hello-graphics' reference image for `quality`. High's is the one the
+/// graphics' reference image for `quality`. High's is the one the
 /// every-example test also checks.
 fn reference(quality: Quality) -> std::path::PathBuf {
     let name = match quality {
@@ -104,11 +104,11 @@ fn reference(quality: Quality) -> std::path::PathBuf {
         other => format!("reference-{}.png", other.label().to_lowercase()),
     };
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/hello-graphics")
+        .join("../samples/projects/graphics")
         .join(name)
 }
 
-/// Each preset draws hello-graphics as its reference image shows. With
+/// Each preset draws graphics as its reference image shows. With
 /// `AXCENITY_WRITE_REFERENCES` set, the Low, Medium and Ultra images are
 /// written first (look at them before committing); High's `reference.png`
 /// is left alone, since every example's test checks it too.

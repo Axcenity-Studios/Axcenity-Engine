@@ -106,7 +106,7 @@ Since rendering Phase 1 (PR #83): frame rate with 1% lows, CPU- or GPU-bound, pe
 ## Testing
 
 - `cargo nextest run -p axcenity-render` (277 tests; GPU tests in the `gpu` group, at most 8 at once).
-- `axcenity-player`'s `every_example_renders` compares `examples/hello-graphics` against `reference.png` per preset (fails at a mean drift of 6+ per channel).
+- `axcenity-player`'s `every_example_renders` compares `crates/samples/projects/graphics` against `reference.png` per preset (fails at a mean drift of 6+ per channel).
 - Benchmarks: `cargo test -p axcenity-player --release -- --ignored bench_ --nocapture --test-threads 1`; your own project with `AXCENITY_BENCH_PROJECT`.
 
 ## Limitations

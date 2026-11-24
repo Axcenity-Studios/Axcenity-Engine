@@ -243,14 +243,9 @@ impl EditorApp {
         let mut confirm = false;
         let mut cancel = false;
         let palette = theme::palette(ctx);
-        egui::Window::new("Group as Mesh")
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .default_width(420.0)
-            .max_width(420.0)
-            .open(&mut open)
-            .show(ctx, |ui| {
+        widgets::tool_window(icons::ARROWS_MERGE, "Group as Mesh")
+            .fit(420.0)
+            .show(ctx, &mut open, |ui| {
                 let textured_count = dialog.materials.iter().filter(|m| m.textured).count();
                 let mat_names: Vec<&str> = dialog
                     .materials

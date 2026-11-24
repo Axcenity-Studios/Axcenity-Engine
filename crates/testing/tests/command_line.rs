@@ -7,7 +7,7 @@ use std::process::Command;
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -27,7 +27,7 @@ fn copy_folder(from: &Path, to: &Path) {
 #[test]
 fn the_example_passes_and_exits_with_success() {
     let output = Command::new(env!("CARGO_BIN_EXE_axcenity-test"))
-        .arg(example("hello-character"))
+        .arg(example("character"))
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -44,7 +44,7 @@ fn a_failure_exits_with_one_and_is_in_the_junit_xml() {
         .join("axcenity-testing-tests")
         .join(format!("command-line-{}", std::process::id()));
     let _ = fs::remove_dir_all(&folder);
-    copy_folder(&example("hello-character"), &folder);
+    copy_folder(&example("character"), &folder);
     let world = folder.join("world.json");
     let text = fs::read_to_string(&world).unwrap();
     fs::write(

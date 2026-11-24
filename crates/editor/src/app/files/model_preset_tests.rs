@@ -29,7 +29,7 @@ fn mesh_parts(app: &EditorApp) -> Vec<InstanceId> {
 
 #[test]
 fn the_dialog_starts_with_default_and_a_preset_sets_its_choices() {
-    let folder = copy_of_example("hello-part", "model-preset-pick");
+    let folder = copy_of_example("part", "model-preset-pick");
     let mut app = EditorApp::new(Some(&folder));
     let props = write_props(&outside(&folder));
     app.import_model(&props);
@@ -66,7 +66,7 @@ fn the_dialog_starts_with_default_and_a_preset_sets_its_choices() {
 
 #[test]
 fn a_static_prop_import_is_anchored_with_hull_collision_and_remembered() {
-    let folder = copy_of_example("hello-part", "model-preset-prop");
+    let folder = copy_of_example("part", "model-preset-prop");
     let mut app = EditorApp::new(Some(&folder));
     let props = write_props(&outside(&folder));
     app.import_model(&props);
@@ -98,7 +98,7 @@ fn a_static_prop_import_is_anchored_with_hull_collision_and_remembered() {
 
 #[test]
 fn scale_and_z_up_shape_every_part_about_the_insert_point() {
-    let folder = copy_of_example("hello-part", "model-preset-shape");
+    let folder = copy_of_example("part", "model-preset-shape");
     let mut app = EditorApp::new(Some(&folder));
     let props = write_props(&outside(&folder));
     app.import_model(&props);
@@ -170,7 +170,7 @@ fn scale_and_z_up_shape_every_part_about_the_insert_point() {
 
 #[test]
 fn save_as_preset_writes_the_project_file_as_one_undo_step() {
-    let folder = copy_of_example("hello-part", "model-preset-save");
+    let folder = copy_of_example("part", "model-preset-save");
     let mut app = EditorApp::new(Some(&folder));
     let file = folder.join(axcenity_assets::PRESETS_FILE);
     let _ = fs::remove_file(&file);
@@ -209,7 +209,7 @@ fn save_as_preset_writes_the_project_file_as_one_undo_step() {
 
 #[test]
 fn a_model_with_nothing_to_ask_still_gets_the_last_preset() {
-    let folder = copy_of_example("hello-part", "model-preset-direct");
+    let folder = copy_of_example("part", "model-preset-direct");
     let mut app = EditorApp::new(Some(&folder));
     axcenity_assets::remember_model_preset(&folder, "Static prop").unwrap();
     // One object, no maps: no dialog.
@@ -235,7 +235,7 @@ fn a_model_with_nothing_to_ask_still_gets_the_last_preset() {
 
 #[test]
 fn the_preset_row_and_settings_tab_draw() {
-    let folder = copy_of_example("hello-part", "model-preset-draw");
+    let folder = copy_of_example("part", "model-preset-draw");
     let mut app = EditorApp::new(Some(&folder));
     let props = write_props(&outside(&folder));
     app.import_model(&props);

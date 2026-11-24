@@ -214,7 +214,7 @@ mod tests {
         pollster::block_on(adapter.request_device(&Default::default())).ok()
     }
 
-    /// `hello-graphics` copied to a temporary folder, so bakes don't land
+    /// `graphics` copied to a temporary folder, so bakes don't land
     /// in the example.
     fn scratch_copy(name: &str) -> std::path::PathBuf {
         let folder = std::env::temp_dir().join(format!(
@@ -222,7 +222,7 @@ mod tests {
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&folder);
-        let source = super::super::tests::example("hello-graphics");
+        let source = super::super::tests::example("graphics");
         for entry in walk(&source) {
             let to = folder.join(entry.strip_prefix(&source).unwrap());
             std::fs::create_dir_all(to.parent().unwrap()).unwrap();

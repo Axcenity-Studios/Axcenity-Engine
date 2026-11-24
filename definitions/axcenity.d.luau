@@ -1766,6 +1766,10 @@ declare extern type Lighting extends Instance with
 	--- How far north of the equator the world is, in degrees (negative is south). The noon sun stands this far from straight up, toward +Z north of the equator.
 	GeographicLatitude: number
 	[string]: any
+	--- Eases the sky and the weather from how they are now to the environment preset `name` over `seconds` (0 if left out: at once, before the call returns), slowly at both ends. A preset is a built-in ("Clear", "Evening", "Overcast", "Storm", "SnowDay" or "SnowNight") or one of the project's own, `assets/environments/<name>.environment.json`, saved from the editor's Properties panel. It sets what the preset holds of Lighting (ClockTime, Exposure), its Atmosphere, Clouds, Weather and ColorCorrectionEffect, and the Workspace's GlobalWind, and leaves everything else alone; values for something Lighting hasn't got (no Clouds, say) are skipped with a warning. Numbers, colors and the wind go straight there; rain turning to snow stops falling half way and starts again as snow. `clock` says which way ClockTime turns: "Shortest" (the default; 22 to 2 goes through midnight), "Forward" (as time passes) or "Backward". One transition runs at a time: calling it again takes over from where the world is at that moment, and StopPresetTransition leaves it there. A playing Sequence's keys win over it. The Weather still eases toward its own properties by its TransitionTime, so set that to 0 for rain and snow to follow the transition exactly. Call it from a Script for every player to see it. An unknown preset is an error.
+	function TransitionToPreset(self, name: string, seconds: number?, clock: string?): ()
+	--- Stops the transition TransitionToPreset started, leaving the sky and the weather where they've got to. Does nothing when none is under way.
+	function StopPresetTransition(self): ()
 end
 
 --- The service for things Scripts and LocalScripts share, such as RemoteEvents and ModuleScripts.
@@ -1809,6 +1813,7 @@ declare extern type Part extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -1923,6 +1928,7 @@ declare extern type MeshPart extends Instance with
 	Orientation: Vector3
 	--- The size of the model's box in studs along X, Y and Z. The model stretches to fill it.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- If false, the part casts no sun shadow. It's still shaded by other parts' shadows.
 	CastShadow: boolean
@@ -2019,6 +2025,7 @@ declare extern type UnionOperation extends Instance with
 	Orientation: Vector3
 	--- The size of the model's box in studs along X, Y and Z. The model stretches to fill it.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- If true, the whole solid is drawn in Color. If false (the default), each face keeps the color and material of the part it came from.
 	UsePartColor: boolean
@@ -2119,6 +2126,7 @@ declare extern type NegateOperation extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2240,6 +2248,7 @@ declare extern type Seat extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2360,6 +2369,7 @@ declare extern type VehicleSeat extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2494,6 +2504,7 @@ declare extern type DamageZone extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2608,6 +2619,7 @@ declare extern type ReverbZone extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2724,6 +2736,7 @@ declare extern type SpawnLocation extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -2930,6 +2943,7 @@ end
 declare extern type Model extends Instance with
 	--- How the Model streams. Default: a Model with no Models inside loads and unloads whole, and one with Models inside streams each piece on its own. Atomic: always whole, with the Models inside. Persistent: always on every device.
 	ModelStreamingMode: EnumModelStreamingMode | "Default" | "Atomic" | "Persistent"
+	--- Where the Model's pivot is, from the middle of the box round its parts, and how it's turned: the point the editor's Move and Rotate tools hold the Model by and turn it about (set with the Pivot tool). At the middle, unturned, at first.
 	PivotOffset: CFrame
 	--- If true, the editor's viewport can't select or change it, and the building tools leave it alone. It has no effect in a running game.
 	Locked: boolean
@@ -3967,12 +3981,14 @@ declare extern type Weather extends Instance with
 	Precipitation: EnumPrecipitation | "None" | "Rain" | "Snow"
 	--- How hard the rain or snow falls, from 0 to 1 (0.5 by default): more drops, and wetter or deeper on the ground.
 	Intensity: number
-	--- How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier. Rain wets them at least as much as its Intensity.
+	--- How wet surfaces are whatever is falling, from 0 (dry, the default) to 1 (soaked): darker and glossier, with puddles on level ground from 0.35. Rain wets them at least as much as its Intensity, and while it falls its drops ring the puddles and splash on solid surfaces.
 	Wetness: number
-	--- How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: more cover whitens flat tops fully and reaches further down slopes. Walls stay bare. Falling snow covers them at least as much as its Intensity.
+	--- How much snow lies on surfaces facing up whatever is falling, from 0 (none, the default) to 1: light cover lies in patches, more whitens flat tops fully and reaches further down slopes. Walls stay bare; plants are capped with it. Falling snow covers them at least as much as its Intensity.
 	SnowCover: number
-	--- Snow layer thickness in studs, from 0 to 2 (0.35 by default): controls snow accumulation lift on terrain and how deeply footprints press into the snow.
+	--- How deep the snow lies, in studs, from 0 to 2 (0.35 by default): snow on terrain rises that far (in drifts a little deeper and shallower), burying the foot of whatever stands on the ground, and footprints press that deep into it.
 	SnowThickness: number
+	--- How often lightning flashes, from 0 (never, the default) to 1: the chance of a flash every 2.6 seconds. A flash is two or three strokes within half a second from somewhere in the clouds; it lights what's open to the sky (a tenth as much under a roof or in an interior) and glows inside the cloud round it. It needs no rain, but only shows in the sky where there are Clouds.
+	Lightning: number
 	--- Seconds a change takes to ease in (10 by default): rain starting and stopping, surfaces wetting and drying, snow settling and melting. 0 changes at once.
 	TransitionTime: number
 	--- When true (the default), rain and snow are occluded by solid roofs and geometry, and sheltered interior surfaces stay dry and bare.
@@ -4107,6 +4123,7 @@ declare extern type GraphicsVolume extends Instance with
 	Orientation: Vector3
 	--- The part's size in studs along X, Y and Z.
 	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
 	PivotOffset: CFrame
 	--- The part's color.
 	Color: Color3
@@ -4157,6 +4174,131 @@ declare extern type GraphicsVolume extends Instance with
 	--- If false, it changes nothing.
 	Enabled: boolean
 	--- Studs outside its faces over which its look fades in as the camera comes closer, and out as it leaves (5 by default). Inside it, the look is whole. 0 switches it on at the faces.
+	BlendDistance: number
+	--- Where volumes overlap, the one with the higher Priority wins (0 by default). Equal ones follow Explorer order, the later winning.
+	Priority: number
+	--- If true, the editor's viewport can't select or change it, and the building tools leave it alone. It has no effect in a running game.
+	Locked: boolean
+	--- Its Position and Orientation as one CFrame. Setting it sets both; it isn't saved itself.
+	CFrame: CFrame
+	--- The mass of everything moving with it: the parts welded into its assembly, except Massless ones (a part alone keeps its own mass). Read-only.
+	AssemblyMass: number
+	--- Where its mass is centered, in the world: the middle of a block or ball. Read-only.
+	AssemblyCenterOfMass: Vector3
+	--- Its assembly's mass times its `AssemblyLinearVelocity`: how hard it is to stop. Read-only.
+	AssemblyLinearMomentum: Vector3
+	--- The physical properties in use: `CustomPhysicalProperties`, or its Material's when that's nil. Read-only.
+	CurrentPhysicalProperties: PhysicalProperties
+	--- Fires when another part starts touching this one, once per new contact (not every frame while they touch). The handler gets the other part: `part.Touched:Connect(function(otherPart) ... end)`.
+	Touched: Signal
+	--- Fires when another part stops touching this one: once they've been apart for a few physics steps, or at once when one of them can't touch the other any more (`CanTouch` off, or set not to collide). The handler gets the other part.
+	TouchEnded: Signal
+	[string]: any
+	--- Joins the part and `parts` into one solid and returns it as a new UnionOperation (its Parent is nil), with this part's look and physics. NegateOperations among `parts` are cut out. The work runs in the background and the script waits for it. Errors, saying why, if a part isn't a closed solid (a Capsule, or a model with holes). `options.CollisionFidelity` sets the union's.
+	function UnionAsync(self, parts: {Instance}, options: {[string]: any}?): UnionOperation
+	--- Cuts every one of `parts` out of the part and returns what's left as a new UnionOperation (its Parent is nil), with this part's look and physics: a crater where a ball was. The work runs in the background and the script waits for it. Errors, saying why, if a part isn't a closed solid or nothing is left. `options.CollisionFidelity` sets the union's.
+	function SubtractAsync(self, parts: {Instance}, options: {[string]: any}?): UnionOperation
+	--- Keeps only where the part and all of `parts` overlap, as a new UnionOperation (its Parent is nil), with this part's look and physics. The work runs in the background and the script waits for it. Errors, saying why, if a part isn't a closed solid or they don't overlap. `options.CollisionFidelity` sets the union's.
+	function IntersectAsync(self, parts: {Instance}, options: {[string]: any}?): UnionOperation
+	--- The part, then the parts welded to it by an enabled WeldConstraint; with `recursive` true, every part in its assembly.
+	function GetConnectedParts(self, recursive: boolean?): {Instance}
+	--- The root of its assembly: an anchored part if there is one, then one that isn't Massless, then the largest. A part alone is its own root.
+	function GetRootPart(self): Instance
+	--- Where it turns and moves from: a part's own CFrame, or for a Model the centre of the box around its parts, unturned.
+	function GetPivot(self): CFrame
+	--- Moves and turns it so its pivot is at `target`. A Model's parts all move together and keep their places relative to each other.
+	function PivotTo(self, target: CFrame): ()
+	--- Scripts only (Phase 66): `player`'s device simulates this part's whole assembly from now on, so it responds at once for them, and the server sees what it does; nil gives it back to the server. An anchored part has no owner (an error). Scripts only.
+	function SetNetworkOwner(self, player: Instance?): ()
+	--- Scripts only: the Player whose device simulates this part's assembly now, or nil for the server. An anchored part has no owner (an error). Scripts only.
+	function GetNetworkOwner(self): Instance?
+	--- Scripts only: the engine chooses who simulates this part's assembly: the player driving a VehicleSeat in it, else the nearest player within 40 studs, else the server. Scripts only.
+	function SetNetworkOwnershipAuto(self): ()
+	--- Scripts only: true after SetNetworkOwnershipAuto, until SetNetworkOwner. Scripts only.
+	function GetNetworkOwnershipAuto(self): boolean
+	--- Pushes the part through its center of mass: its velocity changes by `impulse` divided by its assembly's mass (`AssemblyMass`, which is `GetMass()` for a part alone). Pushes in one frame add up. Anchored parts don't move.
+	function ApplyImpulse(self, impulse: Vector3): ()
+	--- Pushes the part at `position` in the world: it speeds up as `ApplyImpulse` would, and an impulse off its center of mass also spins it.
+	function ApplyImpulseAtPosition(self, impulse: Vector3, position: Vector3): ()
+	--- Spins the part: its `AssemblyAngularVelocity` changes by `impulse` (radians a second times inertia) through its inertia.
+	function ApplyAngularImpulse(self, impulse: Vector3): ()
+	--- Pushes the part's assembly with `force` for `seconds` (one physics step, 1/60 s, if left out): its `AssemblyLinearVelocity` changes by force times time over its mass. To push steadily, call it every Heartbeat with that frame's time, or use a VectorForce.
+	function ApplyForce(self, force: Vector3, seconds: number?): ()
+	--- Turns the part's assembly with `torque` for `seconds` (one physics step if left out): its `AssemblyAngularVelocity` changes by torque times time through its inertia. To turn steadily, call it every Heartbeat with that frame's time, or use a Torque.
+	function ApplyTorque(self, torque: Vector3, seconds: number?): ()
+	--- Its density times its volume: a 1×1×1 Plastic block weighs 1. MeshParts weigh their collision shape.
+	function GetMass(self): number
+end
+
+--- A Part that sets the weather inside its box by hand, wherever the camera is: whether rain and snow fall there (Precipitation), how much of the world's snow lies (Snow) and how wet surfaces are (Wetness), in place of the shelter the engine finds from roofs. As made it's a shelter, for an interior or under an overhang: no drops, dry and bare. Turn the three up to let the weather into an open shed or deepen a snowdrift. It does nothing without a Weather in Lighting. Where volumes overlap, the higher Priority wins; the 8 nearest the camera are drawn. Invisible, anchored and walked through (CanCollide off) by default. Everything a Part has, and Enabled, Precipitation, Snow, Wetness, BlendDistance and Priority.
+declare extern type WeatherVolume extends Instance with
+	--- If true, the part stays where it is. If false, it falls and collides with other parts.
+	Anchored: boolean
+	--- Block, Ball, Cylinder (along X), Wedge, Capsule (along X, with round ends) or CornerWedge (rising to a point over its back right corner).
+	Shape: EnumPartType | "Block" | "Ball" | "Cylinder" | "Wedge" | "Capsule" | "CornerWedge"
+	--- Where the part's center is, in studs. Setting it on an unanchored part teleports it and stops it moving.
+	Position: Vector3
+	--- Rotation in degrees around X, Y and Z, applied Z first, then X, then Y.
+	Orientation: Vector3
+	--- The part's size in studs along X, Y and Z.
+	Size: Vector3
+	--- Where the part's pivot is, from its center, and how it's turned: the point the editor's Move and Rotate tools hold it by and turn it about (set with the Pivot tool). At the center, unturned, at first.
+	PivotOffset: CFrame
+	--- The part's color.
+	Color: Color3
+	--- Plastic, Metal, Glass (see-through) or Neon (glows). Setting it resets Metalness and Roughness.
+	Material: EnumMaterial | "Plastic" | "SmoothPlastic" | "Wood" | "WoodPlanks" | "Marble" | "Granite" | "Concrete" | "Slate" | "Brick" | "Fabric" | "Sand" | "Metal" | "Glass" | "Neon" | "Ice" | "Rubber"
+	--- A material file in the project, such as "assets/materials/brick.material.json", drawn in place of Material, Metalness, Roughness and Emission; Color tints it and Transparency fades it. A SurfaceAppearance inside the part wins over it. Empty for none.
+	MaterialVariant: string
+	--- If true, a plain Plastic part is drawn in a prototype grid texture while editing, to build by. It never shows in Play or in a built game.
+	BlueprintTexture: boolean
+	--- From 0 (not metal) to 1 (metal).
+	Metalness: number
+	--- From 0 (mirror-smooth) to 1 (matte).
+	Roughness: number
+	--- If false, the part casts no sun shadow. It's still shaded by other parts' shadows.
+	CastShadow: boolean
+	--- From 0 (as solid as its material) to 1 (invisible).
+	Transparency: number
+	--- If false, other parts pass through it. It still fires Touched. An unanchored part that can't collide falls through the floor.
+	CanCollide: boolean
+	--- If true and the part isn't anchored, workspace.GlobalWind pushes it, harder for parts with bigger faces.
+	WindAffected: boolean
+	--- The color the part glows in when Emission is above 0.
+	EmissiveColor: Color3
+	--- How brightly the part glows in EmissiveColor: 0 is no glow, 1 as bright as a white surface in full light, higher values bloom.
+	Emission: number
+	--- Studs one copy of a SurfaceAppearance's textures covers. 0 leaves the shape's own coordinates unscaled.
+	TileSize: number
+	--- The collision group it's in, `"Default"` at first. Parts in two groups set not to collide (the Collision Groups window, or `PhysicsService:CollisionGroupSetCollidable`) pass through each other and don't touch. A name that isn't registered counts as Default.
+	CollisionGroup: string
+	--- If false, scripts' raycasts, shape casts and overlap queries (`workspace:Raycast`, `GetPartsInPart`, ...) pass it by. It still collides.
+	CanQuery: boolean
+	--- If false, it fires no Touched or TouchEnded, and touching it fires neither on other parts. It still collides.
+	CanTouch: boolean
+	--- If true, the part adds no mass to an assembly it shares with other parts. A part on its own (every part, until welds exist) keeps its own mass.
+	Massless: boolean
+	--- Its own density, friction, elasticity and their weights (`PhysicalProperties.new(...)`), or nil for its Material's. Read `CurrentPhysicalProperties` for the ones in use.
+	CustomPhysicalProperties: PhysicalProperties?
+	--- How fast the part moves, in studs a second. Physics updates it as the part moves; setting it throws the part. Anchored parts don't move.
+	AssemblyLinearVelocity: Vector3
+	--- How fast the part spins, in radians a second around each world axis. Physics updates it; setting it spins the part.
+	AssemblyAngularVelocity: Vector3
+	--- Air resistance on its speed: each second its assembly loses about that share of it (1 takes away about 63%). 0 at first. Welded parts use their root part's.
+	LinearDrag: number
+	--- Air resistance on its spin, like LinearDrag. 0.5 at first, so a spinning part slows by itself; 0 spins on.
+	AngularDrag: number
+	--- Extra spin slowing while its assembly touches anything, so a ball rolls to a stop on the ground but spins on in the air. 0 at first. Welded parts use their root part's.
+	RollingFriction: number
+	--- If false, it changes nothing.
+	Enabled: boolean
+	--- Whether rain and snow fall inside it (false by default). False keeps the drops, their splashes and drips out even under open sky; true lets them fall inside even under a roof, such as an open-sided shed or an overhang the wind blows under.
+	Precipitation: boolean
+	--- How much of the world's snow lies inside it, from 0 to 2 (0 by default): 0 none, 1 as much as under open sky, 2 twice as deep. It takes the place of the shelter the engine finds, so 1 puts snow under a roof. Above 1 the snow is deeper (terrain rises further and the snow on things stands higher) but no whiter.
+	Snow: number
+	--- How much of the world's wetness is inside it, from 0 to 2 (0 by default): 0 dry, 1 as wet as under open sky, more wetter still, up to soaked. It takes the place of the shelter the engine finds, so 1 wets the floor under a roof.
+	Wetness: number
+	--- Studs over which its snow and wetness fade across its faces, half outside them and half inside (1 by default). 0 switches at the faces. Rain and snow stop at the faces whatever it is.
 	BlendDistance: number
 	--- Where volumes overlap, the one with the higher Priority wins (0 by default). Equal ones follow Explorer order, the later winning.
 	Priority: number
@@ -4334,6 +4476,8 @@ declare extern type ParticleEmitter extends Instance with
 	FlipbookStartRandom: boolean
 	--- From 0 (particles paint over what's behind them, like smoke) to 1 (they add their light, like fire and sparks).
 	LightEmission: number
+	--- From 0 (particles keep their color whatever the hour) to 1 (they are lit by the sun, the sky and the ambient light, so dust and smoke go dark at night). Lamps and shadows don't count.
+	LightInfluence: number
 	--- How brightly particles glow: 1 is their color as it is; higher values bloom.
 	Brightness: number
 	--- Where it is in the world when it isn't inside a part, in studs. Inside a part it works from the part and this isn't used.
@@ -6039,22 +6183,30 @@ declare extern type Biome extends Instance with
 	[string]: any
 end
 
---- Inside a Spline: a road or path on the terrain (procedural worlds PW4), Width studs across along the Spline's curve. ScatterRules keep off it (ClearScatter) wherever it goes, on every device, without changing the terrain. In the editor, Apply to Terrain flattens the ground under it to the curve and paints its Layer, blending in over Falloff (one undo step), and Route lays the Spline's points over the terrain from its first point to its last, no stretch climbing more than MaxGrade degrees, so a road winds round or up a hill (one undo step). Put a SplineMesh in the same Spline for the road's surface.
+--- Inside a Spline: a road or path on the terrain (procedural worlds PW4), Width studs across along the Spline's curve. ScatterRules keep off it (ClearScatter) wherever it goes, on every device, without changing the terrain. In the editor, Apply to Terrain flattens the ground under it to the curve, paints its Layer and its ShoulderLayer out over Falloff with an edge EdgeNoise breaks up, and takes painted foliage off it, thinning it over ClearFalloff (one undo step), and Route lays the Spline's points over the terrain from its first point to its last, no stretch climbing more than MaxGrade degrees, so a road winds round or up a hill (one undo step). Put a SplineMesh in the same Spline for the road's surface.
 declare extern type TerrainPath extends Instance with
 	--- If false, scatter rules don't keep off it and the editor's Apply and Route do nothing. True by default.
 	Enabled: boolean
 	--- Studs across the road or path. Apply flattens and paints this strip fully. 8 by default.
 	Width: number
-	--- Studs past each edge over which Apply's flattening and paint blend into the ground around. 4 by default.
+	--- Studs past each edge over which Apply's flattening and paint blend into the ground around. With a ShoulderLayer, the shoulder is this wide. 4 by default.
 	Falloff: number
 	--- If true (the default), Apply levels the strip to the height of its Spline's curve.
 	Flatten: boolean
 	--- The name of the TerrainLayer Apply paints the strip with. Empty (the default) paints nothing.
 	Layer: string
-	--- If true (the default), the terrain's ScatterRules place nothing within Width / 2 + ClearMargin studs of the curve, seen from above. They keep off it as soon as it's there and wherever its points move, on every device.
+	--- The name of the TerrainLayer Apply paints the road's shoulders with (gravel or dust, say): full at each edge and fading into the ground over Falloff, while the road's own Layer blends into it over the first quarter of that. Empty (the default) paints no shoulder, and Layer itself fades over Falloff.
+	ShoulderLayer: string
+	--- 0 to 1: how much noise breaks up the outer edge of what Apply paints, so the road doesn't end in a clean line. The paint reaches Falloff times 1 - EdgeNoise to 1 + EdgeNoise studs past the road's edge, from place to place. The flattening is never ragged. 0.5 by default; 0 is an even edge.
+	EdgeNoise: number
+	--- Studs across the edge noise's patches: how long each bulge and bite of the ragged edge is. 10 by default.
+	NoiseScale: number
+	--- If true (the default), the terrain's ScatterRules place nothing within Width / 2 + ClearMargin studs of the curve, seen from above, and fewer over ClearFalloff past that. They keep off it as soon as it's there and wherever its points move, on every device. The editor's Apply also takes the painted foliage (the Scatter pane's) off the same strip.
 	ClearScatter: boolean
 	--- Studs past each edge that scatter rules keep clear, so trees don't stand on the verge. 1 by default.
 	ClearMargin: number
+	--- Studs past the cleared strip over which scatter thins out: nearly none beside the strip, all of it this far away, so plants close in on the road gradually. 4 by default; 0 is a clean edge.
+	ClearFalloff: number
 	--- The steepest the editor's Route lets the road climb, in degrees. 8 by default.
 	MaxGrade: number
 	[string]: any
@@ -6187,6 +6339,7 @@ declare extern type InstanceLibrary with
 		& ((className: "SunRaysEffect") -> SunRaysEffect)
 		& ((className: "MotionBlurEffect") -> MotionBlurEffect)
 		& ((className: "GraphicsVolume") -> GraphicsVolume)
+		& ((className: "WeatherVolume") -> WeatherVolume)
 		& ((className: "ExposureEffect") -> ExposureEffect)
 		& ((className: "FogEffect") -> FogEffect)
 		& ((className: "BloomEffect") -> BloomEffect)

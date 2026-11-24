@@ -149,6 +149,9 @@ pub enum Picking {
     /// its `Models` entries: a click on a prop or model adds it or takes
     /// it out.
     ScatterModels(Vec<String>),
+    /// The pictures the Scatter pane's palette lays as decals, while it's
+    /// adding them from Assets: a click on an image or texture adds it.
+    ScatterDecals(Vec<String>),
 }
 
 impl Picking {
@@ -158,6 +161,9 @@ impl Picking {
             Picking::Scatter(_) => matches!(entry.kind, AssetKind::Prop | AssetKind::Model),
             Picking::SplineModels(_) => entry.kind == AssetKind::Model,
             Picking::ScatterModels(_) => matches!(entry.kind, AssetKind::Prop | AssetKind::Model),
+            Picking::ScatterDecals(_) => {
+                matches!(entry.kind, AssetKind::Image | AssetKind::Texture)
+            }
         }
     }
 
@@ -173,6 +179,10 @@ impl Picking {
             Picking::ScatterModels(entries) => entry.foliage_source().is_some_and(|source| {
                 entries.contains(&axcenity_procedural::terrain_scatter::entry(&source))
             }),
+            Picking::ScatterDecals(textures) => {
+                matches!(entry.kind, AssetKind::Image | AssetKind::Texture)
+                    && textures.contains(&entry.path)
+            }
         }
     }
 
@@ -182,6 +192,9 @@ impl Picking {
             Picking::SplineModels(_) => "Click to use this model along the selected spline.",
             Picking::ScatterModels(_) => {
                 "Click to have the selected scatter rule place this (click again to take it out)."
+            }
+            Picking::ScatterDecals(_) => {
+                "Click to add this picture to the scatter palette's decals."
             }
         }
     }

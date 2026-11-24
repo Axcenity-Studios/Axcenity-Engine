@@ -1,6 +1,6 @@
 # Game tests
 
-A project's automated tests (unified Phase 53). Code: `crates/testing` (the runner, its Lua `src/runner.lua`, the headless `TestGame`, JUnit XML and the `axcenity-test` binary), `crates/script/src/spec.rs` (`ScriptRuntime::start_spec`, the runner's way into a game), `crates/editor/src/game_tests.rs` and `app/game_tests.rs` (the Tests panel). Example: `examples/hello-character/tests/walk.spec.lua`.
+A project's automated tests (unified Phase 53). Code: `crates/testing` (the runner, its Lua `src/runner.lua`, the headless `TestGame`, JUnit XML and the `axcenity-test` binary), `crates/script/src/spec.rs` (`ScriptRuntime::start_spec`, the runner's way into a game), `crates/editor/src/game_tests.rs` and `app/game_tests.rs` (the Tests panel). Example: `crates/samples/projects/character/tests/walk.spec.lua`.
 
 ## Spec files
 
@@ -33,6 +33,6 @@ A failure reads `tests/walk.spec.lua:14: expected 0 to be greater than 5`: the s
 ## Running them
 
 - **Editor:** View > Panels > **Tests**. **Run all**, the play button on a file (run file) or a test (run one). The tree shows each file and test as not run, queued, passed or failed; a failure shows its `file:line` (opens the spec there) and message. Clicking a test's name opens it at its `it`. **Re-run on save** runs the last tests again whenever the editor saves (a script, a spec, or the project). Runs read the saved files, on a thread of their own. Spec tabs save as plain files; no Script is made for them.
-- **Command line:** `axcenity-test <project> [--junit results.xml]` (`cargo run -p axcenity-testing -- examples/hello-character`). It prints `PASS`/`FAIL` per test, with failures' messages and output, then the counts. Exit code 0 when all passed, 1 when any failed, 2 when the project can't be opened or the arguments are wrong. `--junit` writes one `testsuite` per spec file for CI.
+- **Command line:** `axcenity-test <project> [--junit results.xml]` (`cargo run -p axcenity-testing -- crates/samples/projects/character`). It prints `PASS`/`FAIL` per test, with failures' messages and output, then the counts. Exit code 0 when all passed, 1 when any failed, 2 when the project can't be opened or the arguments are wrong. `--junit` writes one `testsuite` per spec file for CI.
 
 Both go through `axcenity_testing::Runner`, so they find the same tests and get the same results.

@@ -267,6 +267,12 @@ fn skin_surface(
     let sun = sun_arrival_parts(world_position, geometric, pixel, solid);
     var lit = skin_light(n, diffuse_n, red_n, geometric, v, sun, base_color, row, sharp, broad)
         * sun.arrival.radiance;
+    let flash = lightning_arrival(world_position, sun.arrival.l, sun.shadow);
+    if flash.radiance.b > 0.0 {
+        lit += skin_light(n, diffuse_n, red_n, geometric, v, ArrivalParts(flash, flash.visible, 1.0),
+            base_color, row, sharp, broad) * flash.radiance
+            + lightning_fill(world_position, diffuse_n, base_color, flash);
+    }
     let lamps = tile_lamps(pixel);
     var slot = 0u;
     for (var i = 0u; i < lamps.count; i++) {

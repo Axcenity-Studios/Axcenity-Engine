@@ -15,7 +15,7 @@ fn bots_join_by_the_servers_relay_link_through_the_relay_or_directly() {
     })
     .expect("a free port");
     let folder = scratch("relay");
-    let game = example("hello-spawn");
+    let game = example("spawn");
     let address = format!("127.0.0.1:{}", relay.port());
     let server = server_with(&game, 0, &["--relay", &address], &[]);
     let said = server.wait_for_all(&["Join code"], 15);

@@ -254,7 +254,7 @@ mod tests {
 
     /// The example's noodle rig and its takes.
     fn noodle() -> (Arc<Rig>, Arc<Vec<Take>>) {
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation");
         let assets = Assets::new(example);
         let model = assets.model_blocking("assets/models/noodle.fbx").unwrap();
         let takes = assets.takes("assets/models/noodle.fbx").unwrap();

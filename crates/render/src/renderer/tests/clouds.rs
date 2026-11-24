@@ -220,3 +220,51 @@ fn every_cloud_quality_draws_clouds_and_casts_the_same_shadows() {
         "every quality shades the ground the same"
     );
 }
+
+#[test]
+fn an_overcast_turns_the_skys_light_grey() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+    // A white floor lit by a blue sky alone.
+    let mut list = floor_from(40.0);
+    list.sun.intensity = 0.0;
+    list.ambient.intensity = 0.0;
+    list.sky.top_color = [0.1, 0.3, 1.0];
+    list.sky.horizon_color = [0.2, 0.4, 1.0];
+    list.sky.environment_intensity = 1.0;
+    let blueness = |renderer: &mut TextureRenderer, list: &DrawList| {
+        renderer.render(list).unwrap();
+        let pixels = renderer.read_pixels();
+        let middle = &pixels[(32 * 64 + 32) * 4..][..4];
+        (
+            i32::from(middle[2]) - i32::from(middle[0]),
+            i32::from(middle[2]),
+        )
+    };
+    let (clear, clear_blue) = blueness(&mut renderer, &list);
+    assert!(clear > 40, "the floor takes the sky's blue: {clear}");
+
+    // Fair-weather cloud leaves the sky's light as it is.
+    list.clouds = Clouds {
+        cover: 0.3,
+        density: 0.7,
+        ..Clouds::default()
+    };
+    assert_eq!(blueness(&mut renderer, &list), (clear, clear_blue));
+
+    // Under a thick overcast it's grey, and a little dimmer.
+    list.clouds.cover = 1.0;
+    let (overcast, overcast_blue) = blueness(&mut renderer, &list);
+    assert!(
+        overcast.abs() < clear / 4,
+        "{clear} clear, {overcast} overcast"
+    );
+    assert!(overcast_blue < clear_blue, "the layer takes some of it");
+
+    // A veil of no depth changes nothing, however much of the sky it covers.
+    list.clouds.density = 0.0;
+    assert_eq!(blueness(&mut renderer, &list), (clear, clear_blue));
+}

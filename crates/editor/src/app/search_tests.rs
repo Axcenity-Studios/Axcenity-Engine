@@ -66,7 +66,7 @@ fn listings(app: &EditorApp) -> usize {
 
 #[test]
 fn ctrl_k_searches_every_category_and_enter_opens_the_pick() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     frame(
         &mut app,
@@ -118,7 +118,7 @@ fn ctrl_k_searches_every_category_and_enter_opens_the_pick() {
 
 #[test]
 fn tab_narrows_the_list_to_one_category() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.palette.toggle();
     frame(&mut app, &ctx, Vec::new());
@@ -146,7 +146,7 @@ fn tab_narrows_the_list_to_one_category() {
 
 #[test]
 fn typing_ranks_again_but_lists_nothing_again() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     frame(
         &mut app,
@@ -173,7 +173,7 @@ fn typing_ranks_again_but_lists_nothing_again() {
 
 #[test]
 fn the_index_follows_creating_renaming_and_deleting_objects() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
     let listed = listings(&app);
@@ -220,7 +220,7 @@ fn the_index_follows_creating_renaming_and_deleting_objects() {
 
 #[test]
 fn play_searches_the_session_world_and_stop_goes_back() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
     let editing = titles(&app, Category::Object);
@@ -235,7 +235,7 @@ fn play_searches_the_session_world_and_stop_goes_back() {
 
 #[test]
 fn assets_show_up_and_go_as_files_come_and_go() {
-    let folder = copy_of_example("hello-touched", "search-assets");
+    let folder = copy_of_example("touched", "search-assets");
     let mut app = EditorApp::new(Some(&folder));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
@@ -264,7 +264,7 @@ fn assets_show_up_and_go_as_files_come_and_go() {
 
 #[test]
 fn synonyms_and_descriptions_find_commands_and_tools() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
     assert_eq!(best(&app, "> remove").0, "Delete");
@@ -295,7 +295,7 @@ fn synonyms_and_descriptions_find_commands_and_tools() {
 fn every_searchable_setting_is_found_on_its_page() {
     let ctx = theme::test_context();
     // With a project open, so the Project page has its rows.
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let mut clock = 0.0;
     for row in settings::SEARCHABLE {
         if row.page == SettingsPage::Engine {
@@ -355,7 +355,7 @@ fn every_searchable_setting_is_found_on_its_page() {
 
 #[test]
 fn a_property_row_shows_that_property_of_the_selection() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     app.refresh_search(&ctx, true);
     assert!(
@@ -386,7 +386,7 @@ fn a_property_row_shows_that_property_of_the_selection() {
 /// what the highlighted one does.
 #[test]
 fn universal_search_draws_categories_and_what_the_pick_does() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let size = egui::vec2(1100.0, 700.0);
     app.palette.toggle();
     app.palette.query = "pad".to_owned();
@@ -445,7 +445,7 @@ fn universal_search_draws_categories_and_what_the_pick_does() {
 fn search_cost_at_100_1000_and_10000_objects() {
     let ctx = theme::test_context();
     for count in [100, 1_000, 10_000] {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         let workspace = app.world.workspace();
         let folder = app.world.create(ClassName::Folder).unwrap();
         app.world.set_parent(folder, Some(workspace)).unwrap();
@@ -510,7 +510,7 @@ const WIDE: egui::Vec2 = egui::vec2(1280.0, 800.0);
 /// searches, the results drop down under it, and Enter runs the pick.
 #[test]
 fn the_header_search_box_drops_its_results_under_it_and_runs_the_pick() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     let mut clock = 0.0;
     editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
@@ -571,7 +571,7 @@ fn the_header_search_box_drops_its_results_under_it_and_runs_the_pick() {
 /// Studio; picking an object selects it, and Escape closes the results.
 #[test]
 fn ctrl_k_focuses_the_header_box_and_an_object_can_be_picked() {
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let ctx = theme::test_context();
     let mut clock = 0.0;
     editor_frame(&mut app, &ctx, &mut clock, WIDE, Vec::new());
@@ -640,7 +640,7 @@ fn ctrl_k_focuses_the_header_box_and_an_object_can_be_picked() {
 fn narrow_windows_and_the_start_screen_search_in_the_middle() {
     let ctx = theme::test_context();
     let mut clock = 0.0;
-    let mut app = EditorApp::new(Some(&example("hello-touched")));
+    let mut app = EditorApp::new(Some(&example("touched")));
     let narrow = egui::vec2(620.0, 600.0);
     editor_frame(&mut app, &ctx, &mut clock, narrow, Vec::new());
     editor_frame(&mut app, &ctx, &mut clock, narrow, Vec::new());
@@ -713,7 +713,7 @@ fn the_header_search_draws_in_both_themes() {
             None,
         ),
     ] {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         let mut frame = 0;
         crate::snapshot::snapshot(
             &folder.join(format!("{name}.png")),

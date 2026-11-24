@@ -260,7 +260,25 @@ fn fs_composite(in: VertexOut) -> @location(0) vec4<f32> {
         }
         color = to_linear(shown);
     }
+    // The picture is kept in 8 bits a color, which shows a smooth sky as
+    // bands of single shades. Under a shade of noise per pixel breaks the
+    // bands up (only while tone mapping, so flat colors drawn as they are
+    // stay exact).
+    if post.flags.y > 0.5 {
+        color = dithered(color, in.clip_position.xy);
+    }
     return vec4<f32>(color, 1.0);
+}
+
+// `color` (linear) with noise of at most one 8-bit shade added to its
+// sRGB encoding at output pixel `pixel`: two numbers' sum, so it averages
+// to nothing and rounding the result has no bias. None on pure black or
+// white, which stay as they are.
+fn dithered(color: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
+    let shown = to_srgb(color);
+    let noise = (grain_noise(floor(pixel), 7.0) + grain_noise(floor(pixel), 13.0) - 1.0) / 255.0;
+    let room = clamp(min(shown, 1.0 - shown) * 255.0, vec3<f32>(0.0), vec3<f32>(1.0));
+    return to_linear(clamp(shown + noise * room, vec3<f32>(0.0), vec3<f32>(1.0)));
 }
 
 fn to_srgb(color: vec3<f32>) -> vec3<f32> {

@@ -14,7 +14,7 @@ const MODEL: &str = "assets/models/Walking/Walking.fbx";
 const HEIGHT: f32 = 3.78;
 
 fn assets() -> Assets {
-    Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-character"))
+    Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/character"))
 }
 
 /// A skinned character whose feet are at `feet`, with an Animator (playing

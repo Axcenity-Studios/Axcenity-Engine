@@ -8,7 +8,7 @@ use axcenity_render::Camera;
 use super::*;
 
 fn noodle() -> Arc<Model> {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-animation");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/animation");
     Assets::new(example)
         .model_blocking("assets/models/noodle.fbx")
         .unwrap()
@@ -494,7 +494,7 @@ fn shown(folds: &mut Folds, model: &str, rig: &Rig, keys: &[usize]) -> Vec<Strin
 
 #[test]
 fn a_mixamo_rigs_bone_tree_folds_unfolds_and_collapses_to_its_root() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-events");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/events");
     let walking = "assets/models/Walking/Walking.fbx";
     let model = Assets::new(example).model_blocking(walking).unwrap();
     let rig = model.rig.as_deref().unwrap();
@@ -558,7 +558,7 @@ fn a_mixamo_rigs_bone_tree_folds_unfolds_and_collapses_to_its_root() {
 }
 
 fn mixamo() -> Arc<Model> {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-events");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/events");
     Assets::new(example)
         .model_blocking("assets/models/Walking/Walking.fbx")
         .unwrap()

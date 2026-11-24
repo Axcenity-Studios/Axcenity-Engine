@@ -301,11 +301,11 @@ fn bench_10000_parts() {
     }
 }
 
-/// 2,000 copies of one textured PBR MeshPart (hello-pbr's helmet).
+/// 2,000 copies of one textured PBR MeshPart (pbr's helmet).
 #[test]
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_2000_mesh_parts() {
-    let (mut world, _scripts, folder) = start_example_in("hello-pbr");
+    let (mut world, _scripts, folder) = start_example_in("pbr");
     // Only the floor, made wider, and the copies.
     let workspace = world.workspace();
     let floor = world.find_first_child(workspace, "Floor").unwrap();
@@ -354,7 +354,7 @@ fn bench_2000_mesh_parts() {
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_2000_mesh_parts_behind_a_wall() {
     for helmets in [true, false] {
-        let (mut world, _scripts, folder) = start_example_in("hello-pbr");
+        let (mut world, _scripts, folder) = start_example_in("pbr");
         let workspace = world.workspace();
         let floor = world.find_first_child(workspace, "Floor").unwrap();
         for name in ["DamagedHelmet", "PbrPanel", "PhongPanel"] {
@@ -477,30 +477,20 @@ fn bench_terrain_with_foliage() {
     });
 }
 
-/// 20 copies of hello-animation's animated character, each posed on the
+/// 20 copies of animation's animated character, each posed on the
 /// CPU every frame by its Animator.
 #[test]
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_20_animated_characters() {
-    animated_characters(
-        "bench_20_animated_characters",
-        "hello-animation",
-        "Noodle",
-        3.8,
-    );
+    animated_characters("bench_20_animated_characters", "animation", "Noodle", 3.8);
 }
 
-/// 20 copies of hello-character's walking character, a full rig of about
+/// 20 copies of character's walking character, a full rig of about
 /// 30,000 triangles, each posed on the CPU every frame by its Animator.
 #[test]
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_20_walking_characters() {
-    animated_characters(
-        "bench_20_walking_characters",
-        "hello-character",
-        "Walking",
-        1.9,
-    );
+    animated_characters("bench_20_walking_characters", "character", "Walking", 1.9);
 }
 
 /// Draws an example's animated `character` and 19 copies of it in a grid at
@@ -649,13 +639,13 @@ fn bench_effects() {
 }
 
 /// Phase 75: 500 bullet holes spawned by `workspace:SpawnDecal` on the
-/// graphics reference scene (hello-graphics), all kept (its cap raised),
+/// graphics reference scene (graphics), all kept (its cap raised),
 /// against the same view without them. The holes must stay within a 60
 /// frames a second budget on the GPU (where it can be timed).
 #[test]
 #[ignore = "benchmark: run with --release -- --ignored bench_"]
 fn bench_500_bullet_holes_in_the_graphics_reference_scene() {
-    let (mut world, mut scripts, folder) = start_example_in("hello-graphics");
+    let (mut world, mut scripts, folder) = start_example_in("graphics");
     let workspace = world.workspace();
     world
         .set_property(workspace, "MaxSpawnedDecals", Value::Number(1000.0))

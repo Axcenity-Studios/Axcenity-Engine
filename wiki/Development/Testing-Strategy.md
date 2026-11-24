@@ -18,14 +18,14 @@ Testing is **local**: GitHub Actions runs only for release tags and CI only by h
 | Layer | Where | Runs with |
 |---|---|---|
 | Unit tests | `#[test]` beside the code (`foo_tests.rs`, `tests.rs`) in every crate; about 3,150 | `cargo nextest run --workspace` |
-| Real-path integration | Player tests stepping loaded examples (`crates/player/src/*_tests.rs`), scripts through the real runtime, block scripts translated and run, projects saved and reloaded | same |
-| GPU and image tests | `render` and `player` (`gpu` test group, max 8 at once); `every_example_renders` compares `hello-graphics` with `reference.png` per preset | same (needs a GPU) |
+| Real-path integration | Player tests stepping loaded samples (`crates/samples/projects/`, from `crates/player/src/*_tests.rs`), scripts through the real runtime, block scripts translated and run, projects saved and reloaded | same |
+| GPU and image tests | `render` and `player` (`gpu` test group, max 8 at once); `every_example_renders` compares `graphics` with `reference.png` per preset | same (needs a GPU) |
 | Editor drawing tests | egui harness with `theme::test_context()`; PNGs to `AXCENITY_SNAPSHOTS` for inspection | same |
 | Golden and drift tests | Frame order (`sim/src/golden.rs`), definitions file up to date, frame-loop doc table, example round trips | same |
 | Game tests | `tests/**/*.spec.lua` in projects, each `it` in a fresh headless `TestGame` | `axcenity-test <project>` (JUnit with `--junit`), editor Tests panel |
 | Headless server | `crates/server/tests/headless.rs` runs the real binary | nextest; `check-platform` with no display |
 | Benchmarks and micro-benchmarks | `#[ignore]` tests and `--bench` | [Benchmarking](../Performance/Benchmarking.md) |
-| Platform check | Everything above plus clippy, doc tests, `axcenity-test examples/hello-character`, headless server | `scripts/check-platform.sh` / `.ps1` |
+| Platform check | Everything above plus clippy, doc tests, `axcenity-test crates/samples/projects/character`, headless server | `scripts/check-platform.sh` / `.ps1` |
 | Packages | Installers, Build Game per OS | `python3 scripts/check-packages.py` |
 | By hand | LAN between two computers; feel and visuals | Documented per phase in the plans' "Open checks" |
 

@@ -7,7 +7,7 @@ use crate::{level_names, load};
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples")
+        .join("../samples/projects")
         .join(name)
 }
 
@@ -15,7 +15,7 @@ fn has(world: &World, name: &str) -> bool {
     world.find_first_child(world.workspace(), name).is_some()
 }
 
-/// A copy of hello-levels in a folder of its own.
+/// A copy of levels in a folder of its own.
 fn copy(test: &str) -> PathBuf {
     fn copy_folder(from: &Path, to: &Path) {
         fs::create_dir_all(to).unwrap();
@@ -34,13 +34,13 @@ fn copy(test: &str) -> PathBuf {
         std::process::id()
     ));
     let _ = fs::remove_dir_all(&folder);
-    copy_folder(&example("hello-levels"), &folder);
+    copy_folder(&example("levels"), &folder);
     folder
 }
 
 #[test]
 fn a_project_with_only_world_json_has_no_other_levels_and_loads_as_before() {
-    let folder = example("hello-part");
+    let folder = example("part");
     assert!(level_names(&folder).is_empty());
     let project = load(&folder).unwrap();
     assert_eq!(project.manifest.start_level, DEFAULT_START_LEVEL);
@@ -51,7 +51,7 @@ fn a_project_with_only_world_json_has_no_other_levels_and_loads_as_before() {
 
 #[test]
 fn hello_levels_lists_its_levels_and_each_round_trips_through_saving() {
-    let folder = example("hello-levels");
+    let folder = example("levels");
     assert_eq!(level_names(&folder), ["Castle", "Dungeon"]);
     assert_eq!(load(&folder).unwrap().manifest.start_level, "Meadow");
     for name in level_names(&folder) {
@@ -64,7 +64,7 @@ fn hello_levels_lists_its_levels_and_each_round_trips_through_saving() {
 
 #[test]
 fn a_level_loads_with_the_projects_services_and_scripts() {
-    let folder = example("hello-levels");
+    let folder = example("levels");
     let project = load_with_level(&folder, Some("Castle"), &mut |_| {}).unwrap();
     assert!(project.problems.is_empty(), "{:?}", project.problems);
     let world = &project.world;

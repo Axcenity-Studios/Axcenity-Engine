@@ -1,4 +1,4 @@
-//! Phase 40: the hello-vehicle example's cars.
+//! Phase 40: the vehicle example's cars.
 
 use axcenity_core::{InstanceId, Value, Vector3};
 
@@ -18,7 +18,7 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
-        let (world, scripts) = start_example("hello-vehicle");
+        let (world, scripts) = start_example("vehicle");
         Self {
             world,
             scripts,

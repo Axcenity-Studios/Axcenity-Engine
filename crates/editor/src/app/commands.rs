@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn lua_reads_the_edit_world_and_prints_the_value() {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         app.run_console_command("print(workspace.Floor.Name)");
         app.run_console_command("workspace.Pad.Name");
         let lines = texts(&app);
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn a_lua_change_is_one_undo_step() {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         let floor = part(&app, "Floor");
         let before = app
             .world
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn lua_runs_against_the_game_during_play() {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         app.play();
         assert!(app.playing());
         app.run_console_command("x = 21");
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn built_ins_work_and_mistakes_are_reported() {
-        let mut app = EditorApp::new(Some(&example("hello-touched")));
+        let mut app = EditorApp::new(Some(&example("touched")));
         let pad = part(&app, "Pad");
         app.run_console_command("select Workspace.Pad");
         assert_eq!(app.selected, Some(pad));

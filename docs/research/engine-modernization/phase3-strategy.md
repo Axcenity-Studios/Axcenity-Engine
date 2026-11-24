@@ -194,7 +194,7 @@ assembly (`player/main.rs:1698-1789` ≈ `editor/viewport.rs:1299-1355`) becomes
 **Migration (tests stay green).** (1) Add `profiling` spans in the current loops (I1), so there is a before-picture. (2) Write `STANDARD`
 by transcribing the player's order. Add a **golden test** asserting `names_for(host)` for each host *as each host behaves today*
 (explicit, per-host exceptions for the editor drift). (3) Port `TestGame` (the smallest; fixed dt), then server, then player, each in its own
-PR, with the full game-test suite (`axcenity-test examples/*`) green. (4) Port editor Play last. Then **remove the drift exceptions one at a time**
+PR, with the full game-test suite (`axcenity-test crates/samples/projects/*`) green. (4) Port editor Play last. Then **remove the drift exceptions one at a time**
 (each is a deliberate behaviour change with its own test: e.g. animators before render_step). This is the main risk: editor Play semantics change.
 
 ### 2.2 Dirty-driven render proxies: Godot servers/RIDs + Unreal FPrimitiveSceneProxy
@@ -364,7 +364,7 @@ It shrinks M2's diff.
 background stat walk. *Risk:* platform event quirks, so keep the poll fallback. *Verdict:* do, low priority within the tier.
 
 **I11. Player background texture loading + preload.** Call `load_textures_in_background` in the player (only the editor does, `editor/src/app.rs:1183`), and
-drive the existing loading screen from `scene::asset_files`. *Effort* S–M (2–4 d). *Metric:* first-frame and max-frame ms on hello-pbr / bench project.
+drive the existing loading screen from `scene::asset_files`. *Effort* S–M (2–4 d). *Metric:* first-frame and max-frame ms on the `pbr` sample / bench project.
 *Risk:* textures pop in. *Verdict:* do; it is the cheap half of 2.4.
 
 ### 3.2 Medium-term (weeks)

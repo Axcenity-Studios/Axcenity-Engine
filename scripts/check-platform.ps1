@@ -43,8 +43,8 @@ Step "Every test" {
     }
 }
 Step "Doc tests" { cargo test --workspace --doc --locked }
-Step "axcenity-test examples/hello-character" {
-    cargo run -p axcenity-testing --locked -- examples/hello-character
+Step "axcenity-test crates/samples/projects/character" {
+    cargo run -p axcenity-testing --locked -- crates/samples/projects/character
 }
 Step "axcenity-server headless" { cargo test -p axcenity-server --test headless --locked }
 

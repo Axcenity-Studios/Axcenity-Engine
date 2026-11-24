@@ -1,7 +1,7 @@
 ---
 description: Importing models, textures, skies, sounds and fonts, the Assets panel, the Toolbox of free online assets, prefabs, global assets, packages and Asset Check.
 icon: download
-samples: [hello-mesh, hello-pbr]
+samples: [mesh, pbr]
 ---
 
 # Assets: import and manage

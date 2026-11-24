@@ -20,7 +20,7 @@ fn layer(app: &EditorApp, name: &str) -> InstanceId {
 
 #[test]
 fn a_new_layer_holds_the_selection_and_rename_and_delete_are_one_undo_step_each() {
-    let folder = copy_of_example("hello-touched", "layers-edit");
+    let folder = copy_of_example("touched", "layers-edit");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.select_many(vec![pad]);
@@ -85,7 +85,7 @@ fn a_new_layer_holds_the_selection_and_rename_and_delete_are_one_undo_step_each(
 
 #[test]
 fn a_hidden_layer_is_this_persons_view_and_play_shows_it() {
-    let folder = copy_of_example("hello-touched", "layers-view");
+    let folder = copy_of_example("touched", "layers-view");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     app.select_many(vec![pad]);
@@ -151,7 +151,7 @@ fn a_hidden_layer_is_this_persons_view_and_play_shows_it() {
 /// shows it.
 #[test]
 fn an_unloaded_region_is_set_aside_but_saved_unchanged() {
-    let folder = copy_of_example("hello-touched", "regions-view");
+    let folder = copy_of_example("touched", "regions-view");
     let mut app = EditorApp::new(Some(&folder));
     let pad = part(&app, "Pad");
     let region = app.world.create(ClassName::Folder).unwrap();

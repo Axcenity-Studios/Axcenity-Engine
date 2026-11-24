@@ -26,7 +26,8 @@ struct Emitter {
     // sRGB colors and transparencies when born and when dying.
     color_start: vec4<f32>,
     color_end: vec4<f32>,
-    // The spin (radians a second), brightness, light emission, and 1
+    // The spin (radians a second), brightness, light emission with the
+    // light influence (packed as sprite.wgsl takes them apart), and 1
     // while the curves below are used instead of the start and end values.
     look: vec4<f32>,
     // The spawn shape (0 box, 1 sphere, 2 cylinder, 3 disc), 1 for only
@@ -434,7 +435,7 @@ fn write(@builtin(global_invocation_id) id: vec3<u32>) {
             }
             out.params = vec4<f32>(
                 emitter.life_size.w + emitter.look.x * age,
-                clamp(emitter.look.z, 0.0, 1.0),
+                emitter.look.z,
                 frame,
                 grid,
             );

@@ -1330,7 +1330,7 @@ mod tests {
     #[test]
     fn example_sounds_decode_without_audio_output() {
         let folder =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-audio");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/audio");
         let assets = Assets::new(folder);
         for sound_id in ["assets/audio/chime.wav", "assets/audio/ambient-loop.wav"] {
             let bytes = assets.read_file(sound_id).unwrap();
@@ -1455,7 +1455,7 @@ mod tests {
         std::fs::create_dir_all(folder.join("assets/audio")).unwrap();
         let example = |name: &str| {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../examples/hello-audio/assets/audio")
+                .join("../samples/projects/audio/assets/audio")
                 .join(name)
         };
         let path = "assets/audio/tone.wav";

@@ -1,4 +1,4 @@
-//! Materials' surface shaders in the player, on hello-shader: its
+//! Materials' surface shaders in the player, on shader: its
 //! conveyor's chevrons scroll with the frame's time, and a shader with an
 //! error is reported on its own line while the rest of the scene draws.
 
@@ -12,9 +12,9 @@ use super::*;
 
 const CONVEYOR: &str = "assets/materials/Conveyor.material.json";
 
-/// hello-shader's folder (a copy), world, assets and the player's camera.
+/// shader's folder (a copy), world, assets and the player's camera.
 fn hello_shader() -> (TempCopy, World, Assets, FlyCamera) {
-    let (mut world, mut scripts, folder) = start_example_in("hello-shader");
+    let (mut world, mut scripts, folder) = start_example_in("shader");
     let (mut physics, mut clock) = (Physics::new(), 0);
     run_until(&mut world, &mut scripts, &mut physics, &mut clock, 0.5);
     let camera = FlyCamera::looking_at(START_CAMERA_POSITION, Vec3::ZERO);

@@ -44,6 +44,14 @@ pub(crate) fn library() -> &'static Library {
     LIBRARY.get_or_init(|| Library::load(files::DOC_FILES))
 }
 
+/// The built-in PNG bytes for `path` (relative to `documentation/`), if present.
+pub(crate) fn image_bytes(path: &str) -> Option<&'static [u8]> {
+    files::DOC_IMAGES
+        .iter()
+        .find(|(name, _)| *name == path)
+        .map(|(_, bytes)| *bytes)
+}
+
 /// The page's state: the open page and the search box.
 #[derive(Default)]
 pub(super) struct Docs {

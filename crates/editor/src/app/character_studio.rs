@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn the_studio_edits_a_face_and_saves_its_files_as_undo_steps() {
-        let folder = super::super::tests::copy_of_example("hello-character", "character-studio");
+        let folder = super::super::tests::copy_of_example("character", "character-studio");
         let mut app = EditorApp::new(None);
         app.open(&folder);
         let workspace = app.world.workspace();

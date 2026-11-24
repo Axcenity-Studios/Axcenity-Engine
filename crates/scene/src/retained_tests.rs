@@ -27,7 +27,7 @@ fn camera() -> Camera {
 }
 
 fn examples() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects")
 }
 
 fn vector(x: f32, y: f32, z: f32) -> Value {
@@ -408,7 +408,7 @@ fn edit(world: &mut World, scene: &mut Scene, random: &mut Random) {
 
 #[test]
 fn retained_frames_match_frames_from_scratch_through_random_edits() {
-    let assets = Assets::new(examples().join("hello-mesh"));
+    let assets = Assets::new(examples().join("mesh"));
     for seed in 1..=12_u64 {
         let mut random = Random(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let mut world = World::new();
@@ -461,7 +461,7 @@ fn a_frame_with_nothing_changed_makes_nothing_again() {
 
 #[test]
 fn a_surface_appearance_child_changing_updates_its_part_and_mesh_part() {
-    let assets = Assets::new(examples().join("hello-mesh"));
+    let assets = Assets::new(examples().join("mesh"));
     let mut world = World::new();
     let workspace = world.workspace();
     let part = part(&mut world, workspace);
@@ -716,7 +716,7 @@ fn an_animated_mesh_part_is_drawn_posed_then_still_again() {
     let mut world = World::new();
     let workspace = world.workspace();
     let part = mesh_part(&mut world, workspace, NOODLE);
-    let assets = Assets::new(examples().join("hello-animation"));
+    let assets = Assets::new(examples().join("animation"));
     let model = assets.model_blocking(NOODLE).unwrap();
     let rig = model.rig.clone().unwrap();
     let rest = Arc::new(model.pose(&rig.rest_pose()).unwrap());
@@ -766,7 +766,7 @@ fn mesh_key(item: &DrawItem) -> u64 {
 
 #[test]
 fn a_hot_reloaded_model_is_drawn_new() {
-    let hello_mesh = examples().join("hello-mesh");
+    let hello_mesh = examples().join("mesh");
     let folder = project_with("reload", &hello_mesh, PYRAMID);
     let mut world = World::new();
     let workspace = world.workspace();
@@ -785,7 +785,7 @@ fn a_hot_reloaded_model_is_drawn_new() {
 
 #[test]
 fn a_model_finishing_loading_on_a_worker_is_drawn() {
-    let hello_mesh = examples().join("hello-mesh");
+    let hello_mesh = examples().join("mesh");
     let folder = project_with("async-model", &hello_mesh, PYRAMID);
     let mut world = World::new();
     let workspace = world.workspace();
@@ -807,7 +807,7 @@ fn a_model_finishing_loading_on_a_worker_is_drawn() {
 #[test]
 fn a_texture_finishing_loading_on_a_worker_appears_on_a_kept_item() {
     const IMAGE: &str = "assets/textures/picture.png";
-    let hello_mesh = examples().join("hello-mesh");
+    let hello_mesh = examples().join("mesh");
     let folder = project_with("async-texture", &hello_mesh, PYRAMID);
     std::fs::create_dir_all(folder.join("assets/textures")).unwrap();
     image::RgbaImage::new(2, 2)

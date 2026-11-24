@@ -3,7 +3,7 @@ use std::path::Path;
 use super::*;
 
 fn demo_world() -> World {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-touched");
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/touched");
     axcenity_project::load(&folder).unwrap().world
 }
 

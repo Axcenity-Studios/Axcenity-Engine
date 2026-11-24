@@ -1,7 +1,7 @@
 ---
 description: How Axcenity draws a frame, materials and shaders, lights and shadows, post-processing, graphics quality presets, levels of detail and what each setting costs.
 icon: image
-samples: [hello-graphics, hello-pbr, hello-lights, hello-shader, hello-material-graph]
+samples: [graphics, pbr, lights, shader, material-graph]
 ---
 
 # Rendering and graphics
@@ -48,7 +48,7 @@ TAA (temporal anti-aliasing) and **real-time global illumination** are overrides
 - A part's **Material** picks a preset look (Plastic, Metal, Wood, Neon…); **Color**, **Metalness** and **Roughness** adjust it.
 - A **SurfaceAppearance** gives a part or MeshPart texture maps: colour, normal, metalness, roughness, glow and ambient occlusion.
 - **Material files** (`.material.json`), edited in the **Material** tab, save a look to reuse. Their **Graph** view builds a material from nodes.
-- Advanced: a material can carry a **surface shader** written in WGSL, the GPU language. The editor checks it as you type. See the **hello-shader** sample. This is for experienced users and is checked, not sandboxed like Lua.
+- Advanced: a material can carry a **surface shader** written in WGSL, the GPU language. The editor checks it as you type. See the **shader** sample. This is for experienced users and is checked, not sandboxed like Lua.
 
 ## Measuring
 

@@ -1,6 +1,6 @@
 # Stylized shading
 
-Shading models (graphics Phase 30): a material file's `shading` picks how it's lit. `Standard` is physically based (the default), `Unlit` shows its color whatever the light, and `Toon` lights it in flat bands with a rim light and a sharp highlight. `examples/hello-toon` has one of each side by side.
+Shading models (graphics Phase 30): a material file's `shading` picks how it's lit. `Standard` is physically based (the default), `Unlit` shows its color whatever the light, and `Toon` lights it in flat bands with a rim light and a sharp highlight. `crates/samples/projects/toon` has one of each side by side.
 
 ## Material files
 
@@ -33,7 +33,7 @@ The item shader already reads all 16 sampled textures it may, so a toon ramp is 
 
 ## Outlines
 
-Graphics Phase 31: two kinds, each optional and each free while unused. `examples/hello-outlines` has both: a toon character with a material outline, near and far, and plain blocks outlined by an `OutlineEffect`.
+Graphics Phase 31: two kinds, each optional and each free while unused. `crates/samples/projects/outlines` has both: a toon character with a material outline, near and far, and plain blocks outlined by an `OutlineEffect`.
 
 ### A material's outline (inverted hull)
 
@@ -61,6 +61,6 @@ The last pixel of the thickness is blended by how much of it the line covers. Th
 
 ## Tests
 
-`render` `renderer/tests/shading.rs`: Standard, Unlit and Toon spheres side by side in one frame (Standard shades smoothly, Unlit is its color on both sides and ignores a brighter sun, Toon has exactly its bands), the highlight and rim showing only when asked for, a ramp coloring the light, a toon floor taking a block's shadow with a hard edge and a lamp's light, and the shading picking the material binding (a Standard material keeps the plain one). `assets` `a_toon_instance_changes_its_bases_bands_value_by_value`; `scene` `a_materials_shading_reaches_the_draw_list_and_files_without_one_stay_standard`; `editor` `toon_shading_set_in_the_tab_draws_in_the_viewport_and_play_and_saves`. `player` `every_example_renders` draws `hello-toon` and `hello-outlines`.
+`render` `renderer/tests/shading.rs`: Standard, Unlit and Toon spheres side by side in one frame (Standard shades smoothly, Unlit is its color on both sides and ignores a brighter sun, Toon has exactly its bands), the highlight and rim showing only when asked for, a ramp coloring the light, a toon floor taking a block's shadow with a hard edge and a lamp's light, and the shading picking the material binding (a Standard material keeps the plain one). `assets` `a_toon_instance_changes_its_bases_bands_value_by_value`; `scene` `a_materials_shading_reaches_the_draw_list_and_files_without_one_stay_standard`; `editor` `toon_shading_set_in_the_tab_draws_in_the_viewport_and_play_and_saves`. `player` `every_example_renders` draws `toon` and `outlines`.
 
 Outlines: `render` `renderer/tests/outlines.rs`: an outlined toon sphere's outline is about 4 pixels on every side near and far (with MSAA too) and none without one, twice the width is twice as wide, and the item's own pixels don't change; an outline is one more draw call and a see-through item gets none; screen-space edges draw exactly the block's silhouette and its two creases over a grey-on-grey scene (Off, FXAA and MSAA), leave open floor and flat faces untouched, a thick line fills the block's side of its edge and leaves the floor beside it alone, even just above the floor, take the world's color, and keep the prepass alive only while set. `assets` `an_outline_instance_changes_its_bases_outline_value_by_value`; `scene` `a_materials_outline_reaches_the_draw_list_and_files_without_one_have_none`, `lightings_outline_effect_draws_edges_unless_disabled`; `editor` `an_outline_set_in_the_tab_draws_in_the_viewport_and_play_and_saves`.

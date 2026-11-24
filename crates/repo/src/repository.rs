@@ -117,8 +117,10 @@ fn same_folder(a: &Path, b: &Path) -> bool {
 /// The `.gitignore` a linked project gets when it has none.
 pub const GITIGNORE: &str = "\
 # Axcenity: per-computer data (cooked cache, Version History, Collaborate's
-# journal and recovery files) and temporary files never go in the repository.
+# journal and recovery files), rendered movies and temporary files never go
+# in the repository.
 .axcenity/
+movies/
 *.tmp
 Thumbs.db
 desktop.ini

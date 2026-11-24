@@ -179,7 +179,7 @@ mod tests {
     fn a_backup_zip_opens_as_the_project_somewhere_else() {
         let root = temp("open");
         let project = root.join("Hello Part");
-        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello-part");
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/part");
         copy_dir(&example, &project);
         crate::record_version(&project, "Save").unwrap();
         assert!(project.join(crate::versions::HISTORY_DIR).is_dir());

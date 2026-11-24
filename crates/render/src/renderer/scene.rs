@@ -401,6 +401,8 @@ impl ScenePipeline {
             no_ray_reflections,
             weather_field,
             weather_field_capacity,
+            weather_prints_uploaded: None,
+            weather_print_bytes: 0,
             ray_ao: None,
             ray_gi: None,
             soft_scene: None,
@@ -552,6 +554,14 @@ impl ScenePipeline {
     pub(super) fn resize(&mut self, width: u32, height: u32) {
         self.output_size = (width, height);
         self.fit_targets();
+    }
+
+    /// See [`crate::TextureRenderer::forget_history`].
+    pub(super) fn forget_history(&mut self) {
+        self.history.reset();
+        if let Some(fog) = &mut self.volumetric_fog {
+            fog.forget_history();
+        }
     }
 
     /// Remakes the scene's targets if they weren't made for this output
@@ -1001,14 +1011,23 @@ impl ScenePipeline {
             .as_ref()
             .filter(|field| !list.weather.is_clear() && field.is_valid())
         {
-            if field.cells.len() > self.weather_field_capacity {
-                self.weather_field_capacity = field.cells.len();
+            // The snow's print map goes after the field's cells, four of
+            // its cells to an entry.
+            let prints = field
+                .prints
+                .as_ref()
+                .filter(|prints| prints.cells.is_valid() && prints.fill.is_finite());
+            let print_entries = prints.map_or(0, |prints| prints.cells.cells.len() / 4);
+            let entries = field.cells.len() + print_entries;
+            if entries > self.weather_field_capacity {
+                self.weather_field_capacity = entries;
                 self.weather_field = self.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("weather field"),
                     size: (self.weather_field_capacity * size_of::<[f32; 4]>()) as u64,
                     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
+                self.weather_prints_uploaded = None;
                 self.bind_frame();
             }
             self.queue
@@ -1020,6 +1039,19 @@ impl ScenePipeline {
                 field.cell_size,
                 field.size as f32,
             ];
+            match prints {
+                Some(prints) => {
+                    self.upload_weather_prints(&prints.cells, field.cells.len());
+                    frame_uniform.weather_prints = [
+                        prints.cells.origin[0],
+                        prints.cells.origin[1],
+                        prints.cells.cells_per_stud,
+                        prints.cells.size as f32,
+                    ];
+                    frame_uniform.precipitation[3] = prints.fill;
+                }
+                None => self.weather_prints_uploaded = None,
+            }
         }
         let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform);
         self.queue
@@ -1308,7 +1340,11 @@ impl ScenePipeline {
                 &self.device,
                 &self.queue,
                 list,
-                (drawn_view_proj, frame_uniform.fog),
+                (
+                    drawn_view_proj,
+                    frame_uniform.fog,
+                    super::sprites::scene_light(list, self.environment.light_from_above()),
+                ),
                 &camera_view,
                 |key| {
                     textures
@@ -1523,6 +1559,9 @@ impl ScenePipeline {
             lod_items,
             ..FrameCounts::default()
         };
+        // While snow with a thickness lies, the passes that lift corners
+        // under it draw each mesh's skirt too (`snow_caps.rs`).
+        let snow_caps = list.weather.snow > 0.0 && list.weather.snow_thickness > 0.0;
         let mut shadow_casters_drawn = 0;
         let mut count = |mesh: &GpuMesh, instances: &Range<u32>| {
             let instances = u64::from(instances.end - instances.start);
@@ -1674,7 +1713,7 @@ impl ScenePipeline {
                         continue;
                     };
                     count(mesh, &batch.instances);
-                    pass.draw_indexed(0..mesh.index_count, 0, batch.instances.clone());
+                    pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
                 }
             }
             // The motion vectors, from what the prepass drew.
@@ -1847,7 +1886,7 @@ impl ScenePipeline {
                 count(mesh, &batch.instances);
                 drawn.0 += batch.instances.end - batch.instances.start;
                 drawn.1 += 1;
-                pass.draw_indexed(0..mesh.index_count, 0, batch.instances.clone());
+                pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
             }
             if water_bound {
                 pass.set_bind_group(0, frame_bind_group, &[]);
@@ -1891,7 +1930,7 @@ impl ScenePipeline {
                 depth_fill.0 += 1;
                 depth_fill.1 += u64::from(mesh.index_count / 3) * instances;
                 depth_fill.2 += u64::from(mesh.vertex_count) * instances;
-                pass.draw_indexed(0..mesh.index_count, 0, batch.instances.clone());
+                pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
             }
             draw_batches(&mut pass, solid);
             pass.set_pipeline(&self.sky_pipeline);
@@ -2309,6 +2348,40 @@ impl ScenePipeline {
             layout,
             entries: &entries,
         })
+    }
+
+    /// Writes the snow's print map into `weather_field` from entry `first`
+    /// on: the rows that changed since the version the buffer holds, or all
+    /// of it when it holds another map, or this one somewhere else.
+    pub(super) fn upload_weather_prints(&mut self, map: &crate::WeatherPrintCells, first: usize) {
+        let had = match self.weather_prints_uploaded {
+            Some((key, version, at)) if key == map.key && at == first => Some(version),
+            _ => None,
+        };
+        if had == Some(map.version) {
+            return;
+        }
+        let side = map.size as usize;
+        let row_bytes = (side * size_of::<f32>()) as u64;
+        let start = (first * size_of::<[f32; 4]>()) as u64;
+        let changed = |row: usize| had.is_none_or(|had| map.row_versions[row] > had);
+        // Each run of changed rows is one write.
+        let mut row = 0;
+        while row < side {
+            if !changed(row) {
+                row += 1;
+                continue;
+            }
+            let from = row;
+            while row < side && changed(row) {
+                row += 1;
+            }
+            let bytes: &[u8] = bytemuck::cast_slice(&map.cells[from * side..row * side]);
+            self.queue
+                .write_buffer(&self.weather_field, start + from as u64 * row_bytes, bytes);
+            self.weather_print_bytes += bytes.len() as u64;
+        }
+        self.weather_prints_uploaded = Some((map.key, map.version, first));
     }
 
     pub(super) fn bind_frame(&mut self) {

@@ -63,7 +63,7 @@ fn own_value(app: &EditorApp, id: InstanceId, suffix: &str, property: &str) -> O
 
 #[test]
 fn a_built_in_style_set_styles_every_state_in_one_step_and_stays_editable() {
-    let folder = copy_of_example("hello-touched", "ui-styles-built-in");
+    let folder = copy_of_example("touched", "ui-styles-built-in");
     let mut app = EditorApp::new(Some(&folder));
     let (_, play) = play_button(&mut app);
 
@@ -149,7 +149,7 @@ fn a_built_in_style_set_styles_every_state_in_one_step_and_stays_editable() {
 
 #[test]
 fn a_rule_and_its_states_import_from_a_project_stylesheet_onto_several_elements() {
-    let folder = copy_of_example("hello-touched", "ui-styles-import");
+    let folder = copy_of_example("touched", "ui-styles-import");
     std::fs::write(
         folder.join("looks.css"),
         ".fancy { background-color: #123456; border-radius: 6px; }\n\
@@ -197,7 +197,7 @@ fn a_rule_and_its_states_import_from_a_project_stylesheet_onto_several_elements(
 #[test]
 fn code_and_animation_links_write_handlers_find_mentions_and_animate() {
     use crate::ui_designer::links::{ScriptText, animations_of, lua_path, mentions};
-    let folder = copy_of_example("hello-menu", "ui-links");
+    let folder = copy_of_example("menu", "ui-links");
     let mut app = EditorApp::new(Some(&folder));
     let menu = app
         .world
