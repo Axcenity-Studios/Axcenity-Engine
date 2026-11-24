@@ -11,7 +11,7 @@ use super::super::{
     Category, CharacterWorkspace, DEFAULT_BASE, Start, find_character_library, nav, toolbar,
 };
 use super::materials::{DRAWN_TODAY, value_label};
-use super::parameters::{hidden_changes, rows};
+use super::parameters::{found, hidden_changes, matches, rows};
 use crate::character_studio::test_folder;
 
 fn realistic() -> (Arc<Library>, BaseManifest) {
@@ -46,12 +46,16 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
             // R4's eye controls.
             "eye_corner_left",
             "upper_lid_fold_left",
-            "lower_lid_left"
+            "lower_lid_left",
+            // The finer face controls (2026-11-24); the openness and the
+            // upper lid's fullness are advanced.
+            "inner_corner_fold_left",
+            "under_eye_left"
         ]
     );
     // Advanced adds the depth; Symmetry off shows both sides.
     assert!(ids(&eyes(&description, Level::Advanced, true)).contains(&"eye_depth_left".into()));
-    assert_eq!(eyes(&description, Level::Detailed, false).len(), 14);
+    assert_eq!(eyes(&description, Level::Detailed, false).len(), 18);
     // Audit D-11: a pair whose sides differ shows both, even with Symmetry.
     description.parameters.insert("eye_size_left".into(), 0.3);
     let shown = eyes(&description, Level::Detailed, true);
@@ -101,6 +105,96 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
         )
         .is_empty()
     );
+}
+
+/// "Search controls": every word typed, in a parameter's label, ID or
+/// `about`, capitals aside; in any feature and at any level; a pair shown
+/// as one row is found by either side.
+#[test]
+fn a_search_finds_a_groups_rows_at_every_level_by_label_id_or_about() {
+    let (_, base) = realistic();
+    let mut description = Description::new("x", DEFAULT_BASE);
+    // (Of the jaw's first five parameters: the manifest may have more.)
+    let jaw = |description: &Description, search: &str, symmetry| {
+        let mut ids = ids(&found(&base, description, "jaw", search, symmetry));
+        ids.retain(|id| {
+            [
+                "jaw_width_left",
+                "jaw_width_right",
+                "jaw_angle_left",
+                "jaw_angle_right",
+                "jaw_shift",
+            ]
+            .contains(&id.as_str())
+        });
+        ids
+    };
+    // The jaw's rows at every level: its width is Quick, its angle
+    // Detailed, its shift Advanced. With Symmetry a pair is one row.
+    assert_eq!(
+        jaw(&description, "jaw", true),
+        ["jaw_width_left", "jaw_angle_left", "jaw_shift"]
+    );
+    assert_eq!(jaw(&description, "jaw", false).len(), 5, "both sides");
+    // Every word must be there; capitals don't matter.
+    assert_eq!(jaw(&description, "JAW angle", true), ["jaw_angle_left"]);
+    assert!(jaw(&description, "jaw nostril", true).is_empty());
+    // The ID is searched, and the side a merged row doesn't show.
+    assert_eq!(jaw(&description, "jaw_shift", true), ["jaw_shift"]);
+    assert_eq!(
+        jaw(&description, "right jaw width", true),
+        ["jaw_width_left"],
+        "the pair's one row"
+    );
+    // A pair whose sides differ shows both: only the side asked for.
+    description.parameters.insert("jaw_width_left".into(), 0.3);
+    assert_eq!(
+        jaw(&description, "right jaw width", true),
+        ["jaw_width_right"]
+    );
+    // Another group has its own: the eyes' depth is an Advanced control.
+    assert!(found(&base, &description, "nose", "jaw", true).is_empty());
+    assert!(
+        ids(&found(&base, &description, "eyes", "depth", true)).contains(&"eye_depth_left".into())
+    );
+    // What a control does (its `about`) is searched too.
+    let told = base
+        .parameters
+        .iter()
+        .find(|p| {
+            p.about
+                .as_deref()
+                .is_some_and(|about| about.split_whitespace().count() > 2)
+        })
+        .expect("a parameter that says what it does");
+    let word = told
+        .about
+        .as_deref()
+        .unwrap()
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .max_by_key(|word| word.len())
+        .unwrap();
+    assert!(matches(told, word), "{word} in {:?}", told.about);
+    assert!(matches(told, ""), "no search matches everything");
+    assert!(!matches(told, "zzzz"));
+}
+
+/// Picture tiles: as many across as fit at about 120 points each (three
+/// in the panel at its default width), never fewer than two.
+#[test]
+fn tiles_are_as_many_across_as_fit_the_panel() {
+    let gap = super::browser::GAP;
+    // The panel's width less its margins (12 points a side).
+    for (panel, columns) in [(320.0, 2), (400.0, 3), (520.0, 4), (640.0, 5), (270.0, 2)] {
+        let width = panel - 24.0;
+        assert_eq!(super::tile_columns(width, gap), columns, "{panel}");
+        let tile = (width - gap * (columns as f32 - 1.0)) / columns as f32;
+        assert!(
+            (100.0..=150.0).contains(&tile),
+            "{panel}: tiles {tile} wide"
+        );
+    }
 }
 
 #[test]
@@ -154,7 +248,16 @@ fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
     assert_eq!(
         face_ids,
         [
-            "eyes", "brows", "nose", "cheeks", "jaw", "chin", "lips", "forehead", "ears"
+            "face_shape",
+            "eyes",
+            "brows",
+            "nose",
+            "cheeks",
+            "jaw",
+            "chin",
+            "lips",
+            "forehead",
+            "ears"
         ]
     );
     assert_eq!(face.iter().find(|f| f.id == "nose").unwrap().changed, 2);

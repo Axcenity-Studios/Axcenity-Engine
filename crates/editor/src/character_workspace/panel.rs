@@ -1,7 +1,10 @@
 //! The contextual panel on the right (brief §3.2): only what the selected
-//! category, or the feature picked in it, can change. Its header holds the
-//! detail level (Quick, Detailed, Advanced: brief §3.3) and Symmetry. Every
-//! page returns [`Intent`]s; nothing here changes the workspace.
+//! category, or the feature picked in it, can change. Its header is one
+//! line: the title, the detail level (Quick, Detailed, Advanced: brief
+//! §3.3) and Symmetry. Under it, on the pages that are lists of sliders
+//! (Body, Face, Skin and Makeup), a "Search controls" field finds a slider
+//! by its name in every feature and at every level. Every page returns
+//! [`Intent`]s; nothing here changes the workspace.
 
 mod browser;
 mod expressions;
@@ -29,14 +32,18 @@ use super::{Category, CharacterWorkspace, chosen_slots, items_for, worn_in};
 use crate::theme::{self, icons};
 use crate::widgets;
 
-/// What a category is for, under its title and on its tooltip.
+/// What a category is for: its title's tooltip, and its tooltip in the
+/// navigation.
 pub(super) fn about(category: Category) -> &'static str {
     match category {
         Category::Body => "Pick the body type, then shape the body. Changes show as you drag.",
         Category::Face => "Shape the face, one feature at a time.",
-        Category::Hair => "Pick a hairstyle: point at one to see it on the character.",
+        Category::Hair => {
+            "Pick a hairstyle: point at one to see it on the character, click to wear it."
+        }
         Category::Clothing => {
-            "Dress the character one piece at a time: point at a piece to see it on."
+            "Dress the character one piece at a time: point at a piece to see it on, click to \
+             wear it, click it again to take it off."
         }
         Category::SkinAndMakeup => "The skin's colour and surface.",
         Category::Accessories => "Glasses, jewellery, hats and bags.",
@@ -60,6 +67,163 @@ fn has_sliders(category: Category) -> bool {
             | Category::Hair
             | Category::Clothing
     )
+}
+
+/// Whether `category`'s page has the "Search controls" field: the pages
+/// that are lists of sliders.
+fn has_search(category: Category) -> bool {
+    matches!(
+        category,
+        Category::Body | Category::Face | Category::SkinAndMakeup
+    )
+}
+
+/// Whether every word of `search` is in one of `texts` (case aside). An
+/// empty search matches everything.
+pub(super) fn has_words(texts: &[&str], search: &str) -> bool {
+    let haystack = texts.join(" ").to_lowercase();
+    search
+        .split_whitespace()
+        .all(|word| haystack.contains(&word.to_lowercase()))
+}
+
+/// How many picture tiles go across `width`: as many as fit at about 120
+/// points each, two at least.
+pub(super) fn tile_columns(width: f32, gap: f32) -> usize {
+    (((width + gap) / (TILE + gap)).round() as usize).max(2)
+}
+
+/// How wide a picture tile is about (the Hair and Clothing browsers', the
+/// online wardrobe's, the presets').
+const TILE: f32 = 120.0;
+
+/// The panel's header, on one line: the page's title (its tooltip says
+/// what the page is for), then from the right the detail level (a menu
+/// that says what each level shows), Symmetry and, with a feature picked,
+/// the way back to the whole category.
+fn header(
+    ui: &mut egui::Ui,
+    workspace: &CharacterWorkspace,
+    base: Option<&BaseManifest>,
+    title: &str,
+    feature: bool,
+) -> Vec<Intent> {
+    use egui::containers::menu;
+    let palette = theme::palette(ui.ctx());
+    let mut intents = Vec::new();
+    let selection = &workspace.selection;
+    let category = selection.category;
+    let (row, _) = ui.allocate_exact_size(
+        vec2(ui.available_width(), theme::size::BUTTON_HEIGHT),
+        Sense::hover(),
+    );
+    let font = egui::FontId::new(18.0, theme::display_family());
+    let natural = ui
+        .painter()
+        .layout_no_wrap(title.to_owned(), font.clone(), palette.text_strong)
+        .size()
+        .x;
+    // The controls, from the right; the title has what they leave.
+    let mut right = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(row)
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    {
+        let ui = &mut right;
+        ui.spacing_mut().item_spacing.x = 6.0;
+        if has_sliders(category) {
+            let level = selection.level;
+            let button = egui::Button::new(
+                egui::RichText::new(format!("{}  {}", level.label(), icons::CARET_DOWN))
+                    .color(palette.text_secondary),
+            )
+            .corner_radius(theme::radius::CONTROL);
+            let (response, _) = menu::MenuButton::from_button(button).ui(ui, |ui| {
+                ui.set_min_width(230.0);
+                for option in Level::ALL {
+                    if ui
+                        .selectable_label(option == level, option.label())
+                        .clicked()
+                    {
+                        if option != level {
+                            intents.push(Intent::PickLevel(option));
+                        }
+                        ui.close();
+                    }
+                    ui.label(
+                        egui::RichText::new(option.about())
+                            .small()
+                            .color(palette.text_weak),
+                    );
+                    ui.add_space(2.0);
+                }
+            });
+            response.on_hover_text(format!(
+                "How much is shown. {}: {}",
+                level.label(),
+                level.about().to_lowercase()
+            ));
+            // Quick keeps Symmetry on and doesn't show it (ux patterns,
+            // section 2); a page without left and right pairs hasn't it.
+            let pairs = base.is_some_and(|base| {
+                let data = category.data();
+                base.parameters.iter().any(|p| {
+                    p.mirror.is_some()
+                        && base
+                            .groups
+                            .iter()
+                            .any(|g| g.id == p.group && Some(g.category) == data)
+                })
+            });
+            if selection.level != Level::Quick && pairs {
+                let mut symmetry = workspace.symmetry;
+                let tip = "Symmetry: move a left and right pair together";
+                // Its word where the title leaves room for it.
+                let changed = if natural + 250.0 <= row.width() {
+                    ui.checkbox(&mut symmetry, "Symmetry")
+                        .on_hover_text(tip)
+                        .changed()
+                } else {
+                    let clicked =
+                        widgets::icon_button(ui, icons::ARROWS_LEFT_RIGHT, tip, symmetry).clicked();
+                    symmetry ^= clicked;
+                    clicked
+                };
+                if changed {
+                    intents.push(Intent::SetSymmetry(symmetry));
+                }
+            }
+        }
+    }
+    // The way back to the whole category sits right after the title.
+    let close = if feature {
+        ui.spacing().interact_size.y + 4.0
+    } else {
+        0.0
+    };
+    let room = (right.min_rect().left() - row.left() - 8.0 - close).max(40.0);
+    let galley = widgets::elided(ui, title, font, palette.text_strong, room, 1);
+    let at = egui::pos2(row.left(), row.center().y - galley.size().y / 2.0);
+    let drawn = egui::Rect::from_min_size(at, galley.size());
+    ui.painter().galley(at, galley, palette.text_strong);
+    ui.interact(drawn, ui.id().with("panel title"), Sense::hover())
+        .on_hover_text(format!("{title}\n{}", about(category)));
+    if feature {
+        let after = egui::Rect::from_min_max(
+            egui::pos2(drawn.right() + 4.0, row.top()),
+            egui::pos2(drawn.right() + 4.0 + close, row.bottom()),
+        );
+        let mut ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(after)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        if widgets::icon_button(&mut ui, icons::X, "Show the whole category", false).clicked() {
+            intents.push(Intent::PickFeature(None));
+        }
+    }
+    intents
 }
 
 /// Draws the panel and returns what it asks for.
@@ -89,67 +253,28 @@ pub(super) fn show(
         Some(feature) => format!("{} › {feature}", super::nav::label(category)),
         None => super::nav::label(category).to_owned(),
     };
-    ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new(title)
-                .family(theme::display_family())
-                .size(20.0)
-                .color(palette.text_strong),
-        );
-        if feature.is_some() {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::icon_button(ui, icons::X, "Show the whole category", false).clicked() {
-                    intents.push(Intent::PickFeature(None));
-                }
-            });
-        }
-    });
-    ui.label(egui::RichText::new(about(category)).color(palette.text_weak));
-    ui.add_space(6.0);
-    if has_sliders(category) {
-        ui.horizontal_wrapped(|ui| {
-            let mut level = selection.level;
-            let options: Vec<(Level, Option<&str>, &str)> = Level::ALL
-                .iter()
-                .map(|level| (*level, None, level.label()))
-                .collect();
-            if widgets::segmented(ui, &mut level, &options) {
-                intents.push(Intent::PickLevel(level));
-            }
-            // Quick keeps Symmetry on and doesn't show it (ux patterns,
-            // section 2); a page without left and right pairs hasn't it.
-            let pairs = base.is_some_and(|base| {
-                let data = category.data();
-                base.parameters.iter().any(|p| {
-                    p.mirror.is_some()
-                        && base
-                            .groups
-                            .iter()
-                            .any(|g| g.id == p.group && Some(g.category) == data)
-                })
-            });
-            if selection.level != Level::Quick && pairs {
-                let mut symmetry = workspace.symmetry;
-                if ui
-                    .checkbox(&mut symmetry, "Symmetry")
-                    .on_hover_text("Move a left and right pair together")
-                    .changed()
-                {
-                    intents.push(Intent::SetSymmetry(symmetry));
-                }
-            }
-        });
-        ui.label(
-            egui::RichText::new(selection.level.about())
-                .small()
-                .color(palette.text_muted),
-        );
-        ui.add_space(4.0);
-    }
+    intents.extend(header(ui, workspace, base, &title, feature.is_some()));
     let Some(base) = base else {
         ui.label("This body isn't in the library.");
         return intents;
     };
+    // The page's sliders by name (label, ID, what they do): editor state.
+    let search = if has_search(category) {
+        let mut text = workspace.control_search.clone();
+        let width = ui.available_width();
+        widgets::search_field(ui, &mut text, "Search controls", width).on_hover_text(
+            "Find a control of this page by its name or what it does, in every feature and at \
+             every level",
+        );
+        if text != workspace.control_search {
+            intents.push(Intent::SearchControls(text));
+        }
+        workspace.control_search.trim()
+    } else {
+        ""
+    };
+    let searching = !search.is_empty();
+    ui.add_space(2.0);
     // Quick always moves both sides together.
     let symmetry = workspace.symmetry || selection.level == Level::Quick;
     // What a side's reset puts back (the asymmetry tools), for the pages
@@ -159,64 +284,83 @@ pub(super) fn show(
     } else {
         workspace.description().clone()
     };
+    // What the body type wears (the underwear) is said in one line under
+    // a browser's tiles, always in view.
+    let footer = super::browser::Shelf::of(category)
+        .map(|shelf| super::browser::body_type_wears(library, workspace.description(), shelf))
+        .filter(|wears| !wears.is_empty());
+    let footer_height = if footer.is_some() { 22.0 } else { 0.0 };
     egui::ScrollArea::vertical()
         .id_salt("character workspace panel")
         .auto_shrink(false)
+        .max_height((ui.available_height() - footer_height).max(40.0))
         .show(ui, |ui| {
             let description = workspace.description();
+            // The page's sliders: every match while searching.
+            let parameters = |ui: &mut egui::Ui| {
+                parameters::show(
+                    ui,
+                    base,
+                    description,
+                    &defaults,
+                    selection,
+                    category,
+                    symmetry,
+                    &workspace.locks,
+                    search,
+                )
+            };
+            let nothing_found = |ui: &mut egui::Ui| {
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new(format!("No control matches \"{search}\"."))
+                        .color(palette.text_weak),
+                );
+            };
             intents.extend(match category {
-                Category::Body => {
+                Category::Body | Category::Face => {
                     let mut asked = Vec::new();
-                    if selection.feature.is_none() {
-                        asked.extend(base_picker(ui, workspace, library));
-                        asked.extend(preset_chips(ui, workspace, library, PresetKind::Body));
+                    if selection.feature.is_none() && !searching {
+                        if category == Category::Body {
+                            asked.extend(base_picker(ui, workspace, library));
+                        }
+                        let kind = if category == Category::Body {
+                            PresetKind::Body
+                        } else {
+                            PresetKind::Face
+                        };
+                        asked.extend(preset_chips(ui, workspace, library, kind, None));
+                    } else if let (Some(feature), false) = (&selection.feature, searching) {
+                        // The picked feature's own shapes (a nose, a face
+                        // shape): the rest of the face is left alone.
+                        asked.extend(preset_chips(
+                            ui,
+                            workspace,
+                            library,
+                            PresetKind::Feature,
+                            Some(feature),
+                        ));
                     }
-                    asked.extend(parameters::show(
-                        ui,
-                        base,
-                        description,
-                        &defaults,
-                        selection,
-                        category,
-                        symmetry,
-                        &workspace.locks,
-                    ));
-                    asked
-                }
-                Category::Face => {
-                    let mut asked = Vec::new();
-                    if selection.feature.is_none() {
-                        asked.extend(preset_chips(ui, workspace, library, PresetKind::Face));
+                    let (sliders, found) = parameters(ui);
+                    asked.extend(sliders);
+                    if searching && !found {
+                        nothing_found(ui);
                     }
-                    asked.extend(parameters::show(
-                        ui,
-                        base,
-                        description,
-                        &defaults,
-                        selection,
-                        category,
-                        symmetry,
-                        &workspace.locks,
-                    ));
                     asked
                 }
                 Category::SkinAndMakeup => {
-                    let mut asked = materials::skin(ui, workspace, base);
+                    let (mut asked, mut found) = materials::skin(ui, workspace, base, search);
                     if base
                         .groups
                         .iter()
                         .any(|group| group.category == axcenity_avatar::Category::Skin)
                     {
-                        asked.extend(parameters::show(
-                            ui,
-                            base,
-                            description,
-                            &defaults,
-                            selection,
-                            category,
-                            symmetry,
-                            &workspace.locks,
-                        ));
+                        let (sliders, more) = parameters(ui);
+                        asked.extend(sliders);
+                        found |= more;
+                    }
+                    if searching && !found {
+                        nothing_found(ui);
                     }
                     asked
                 }
@@ -235,18 +379,35 @@ pub(super) fn show(
                 Category::Presets => presets_page(ui, workspace, library),
             });
         });
+    if let Some(wears) = footer {
+        let text = wears
+            .iter()
+            .map(|(slot, item)| format!("{slot}: {item}, which comes with the body type."))
+            .collect::<Vec<_>>()
+            .join(" ");
+        ui.add(
+            egui::Label::new(egui::RichText::new(&text).small().color(palette.text_muted))
+                .truncate(),
+        )
+        .on_hover_text(format!(
+            "{text}\nIt changes with the body type (Body page), and can't be taken off here."
+        ));
+    }
     intents
 }
 
 /// A kind's presets as "Start from" chips at the top of the Body or Face
 /// page (ux patterns P1): a good start first. A body preset tagged for a
 /// body type shows only on that body type. "Custom" is lit when none of
-/// them is what the character is.
+/// them is what the character is. With `feature`, the feature presets of
+/// that feature (`PresetKind::Feature`: the nose shapes on the Nose page,
+/// the face shapes on Face shape), as "Shape" chips.
 fn preset_chips(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
     library: &Library,
     kind: PresetKind,
+    feature: Option<&String>,
 ) -> Vec<Intent> {
     let mut intents = Vec::new();
     let description = workspace.description();
@@ -257,21 +418,34 @@ fn preset_chips(
         .presets_of(library, kind)
         .into_iter()
         .filter(|listed| kind != PresetKind::Body || presets::suits(listed, description, base))
+        .filter(|listed| kind != PresetKind::Feature || listed.info.feature.as_ref() == feature)
         .collect();
     if listed.is_empty() {
         return intents;
     }
-    widgets::section_label(ui, "Start from");
     let mut any = false;
     ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        let what = if kind == PresetKind::Feature {
+            "feature"
+        } else {
+            kind.name()
+        };
+        widgets::section_label(
+            ui,
+            if kind == PresetKind::Feature {
+                "Shape"
+            } else {
+                "Start from"
+            },
+        );
         for listed in &listed {
             let matched = matches_preset(description, listed.preset, library);
             any |= matched;
             if widgets::chip(ui, listed.label(), matched)
                 .on_hover_text(format!(
-                    "{} Sets the {} only; you can undo it.",
+                    "{} Sets this {what} only; you can undo it.",
                     listed.info.about,
-                    kind.name()
                 ))
                 .clicked()
             {
@@ -279,12 +453,10 @@ fn preset_chips(
             }
         }
         // Not a button: it says the character is its own.
-        widgets::chip(ui, "Custom", !any).on_hover_text(format!(
-            "Lit when the {} is none of these presets",
-            kind.name()
-        ));
+        widgets::chip(ui, "Custom", !any)
+            .on_hover_text(format!("Lit when the {what} is none of these presets"));
     });
-    ui.add_space(8.0);
+    ui.add_space(2.0);
     intents
 }
 
@@ -299,8 +471,9 @@ fn base_picker(
     let mut intents = Vec::new();
     let current = &workspace.description().base;
     let families = presets::families(library);
-    widgets::section_label(ui, "Family");
     ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        widgets::section_label(ui, "Family");
         for base in families {
             let on = base.id == *current;
             let response = widgets::chip(ui, &base.label, on);
@@ -317,7 +490,6 @@ fn base_picker(
             }
         }
     });
-    ui.add_space(8.0);
     intents
 }
 
@@ -458,8 +630,8 @@ fn presets_page(
                 .on_hover_text("The character is none of these");
             }
         });
-        let columns = 3;
         let gap = 6.0;
+        let columns = tile_columns(ui.available_width(), gap);
         let width =
             ((ui.available_width() - gap * (columns as f32 - 1.0)) / columns as f32).floor();
         for row in listed.chunks(columns) {
@@ -596,7 +768,7 @@ fn savable_kinds(base: &BaseManifest) -> Vec<PresetKind> {
                 .slots
                 .iter()
                 .any(|slot| matches!(slot.category, Data::Clothing | Data::Accessories)),
-            PresetKind::Other => false,
+            PresetKind::Feature | PresetKind::Other => false,
         })
         .collect()
 }

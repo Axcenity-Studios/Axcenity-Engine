@@ -21,6 +21,20 @@ Each parameter has an `about` sentence (`ABOUT`), its group as its
 `advanced` where it is flagged so; else `detailed`). `features()` names
 the shapes that find each face feature for `anchors.py`.
 
+The finer controls (2026-11-24; `facedetail.py` makes their shapes) come
+after the others in each group, and the outline of the face has a group
+and a feature of its own, `face_shape`, first in the face's list: its
+width, length, taper, roundness and narrowness. Three of them have one end
+only (`ONE_SIDED`): a chin's cleft and an inner-corner fold, from 0 to 1,
+and the eye's openness, from -1 to 0. A blink is a shape added to the
+face, so it cannot follow an opening that has changed: on a narrowed eye
+the closed upper lid only lies further over the lower one, but on a
+widened one the closed lids stayed 2 mm apart with the eye showing between
+them (the engine's capture, 2026-11-24). So the eye only narrows until the
+engine scales a blink by it. Randomize draws those three from the low part
+of their range (`RANDOM`), not its middle half: a face drawn at random
+would otherwise always have half a cleft, half a fold and half-shut eyes.
+
 The pupil has no parameter: `Pupil_Size` is a shape of the `Eyes` part
 that moves 1.3 mm of the eye, which is not a slider's worth (a parameter
 has to be seen on the body); the eye shading's `pupil_size` (CO7) or a
@@ -29,6 +43,7 @@ script setting the part's shape is what should drive it.
 
 # (group id, label): all in the studio's `face` category.
 GROUPS = [
+    ("face_shape", "Face shape"),
     ("eyes", "Eyes"),
     ("brows", "Brows"),
     ("nose", "Nose"),
@@ -63,6 +78,16 @@ PAIRED = [
     ("Face_Ear_Height", "ear_height", "ear height", "ears", True),
     ("Face_Ear_Out", "ear_out", "ear protrusion", "ears", False),
     ("Face_Earlobe", "earlobe", "earlobe", "ears", False),
+    # The finer controls (`facedetail.py`).
+    ("Face_Eye_Open", "eye_openness", "eye openness", "eyes", True),
+    ("Face_Eye_Inner_Fold", "inner_corner_fold", "inner corner fold", "eyes", False),
+    ("Face_Lid_Fullness", "upper_lid_fullness", "upper lid fullness", "eyes", True),
+    ("Face_Under_Eye", "under_eye", "under-eye fullness", "eyes", False),
+    ("Face_Nostril_Flare", "nostril_flare", "nostril flare", "nose", True),
+    ("Face_Nostril_Height", "nostril_height", "nostril height", "nose", True),
+    ("Face_Cheek_Hollow", "cheek_hollow", "cheek hollow", "cheeks", False),
+    ("Face_Cheekbone_Height", "cheekbone_height", "cheekbone height", "cheeks", True),
+    ("Face_Mouth_Corner", "mouth_corner_height", "mouth corner height", "lips", False),
 ]
 
 # Single: (shape, id, label, group, advanced).
@@ -86,7 +111,28 @@ SINGLE = [
     ("Face_Forehead_Height", "forehead_height", "Forehead height", "forehead", False),
     ("Face_Forehead_Slope", "forehead_slope", "Forehead fullness", "forehead", False),
     ("Face_Head_Width", "temple_width", "Temple width", "forehead", False),
+    # The outline of the face, and the finer controls (`facedetail.py`).
+    ("Face_Shape_Width", "face_width", "Face width", "face_shape", False),
+    ("Face_Shape_Length", "face_length", "Face length", "face_shape", False),
+    ("Face_Shape_Taper", "face_taper", "Taper to the chin", "face_shape", False),
+    ("Face_Shape_Round", "face_roundness", "Roundness", "face_shape", False),
+    ("Face_Shape_Narrow", "face_narrow", "Narrow face", "face_shape", False),
+    ("Face_Nose_Hump", "nose_hump", "Bridge hump", "nose", False),
+    ("Face_Nose_Root", "nose_root", "Bridge root", "nose", False),
+    ("Face_Nose_Bridge_Width", "nose_bridge_width", "Bridge width", "nose", False),
+    ("Face_Nose_Tip_Width", "nose_tip_width", "Nose tip width", "nose", False),
+    ("Face_Nose_Columella", "nose_columella", "Columella", "nose", True),
+    ("Face_Jaw_Definition", "jaw_definition", "Jawline definition", "jaw", False),
+    ("Face_Chin_Shape", "chin_shape", "Chin shape", "chin", False),
+    ("Face_Chin_Cleft", "chin_cleft", "Chin cleft", "chin", True),
+    ("Face_Lip_Bow", "cupids_bow", "Cupid's bow", "lips", True),
+    ("Face_Lip_Protrusion", "lip_protrusion", "Lip protrusion", "lips", False),
 ]
+
+# Parameters with one end only: their range (0 is the face as built).
+ONE_SIDED = {"chin_cleft": [0, 1], "inner_corner_fold": [0, 1], "eye_openness": [-1, 0]}
+# The part of its range Randomize draws each of them from.
+RANDOM = {"chin_cleft": [0, 0.4], "inner_corner_fold": [0, 0.5], "eye_openness": [-0.5, 0]}
 
 
 # Features with a shape for each end: {shape stem: the raising shape's
@@ -140,6 +186,32 @@ ABOUT = {
     "forehead_height": "How tall the forehead is, from the brows to the hairline.",
     "forehead_slope": "How full and upright the forehead is.",
     "temple_width": "How wide the head is at the temples.",
+    "face_width": "How wide the whole face is, from the temples down the cheekbones to the jaw.",
+    "face_length": "How long the face is: the forehead's top up, and the nose, the mouth and the chin drawn down.",
+    "face_taper": "How the face narrows to the chin: wide cheekbones over a narrow jaw (a heart), or a jaw as wide "
+                  "as the cheekbones (square).",
+    "face_roundness": "How round the face's outline is, from flat sides and a square jaw corner to full, soft sides.",
+    "face_narrow": "How narrow the soft face is between the cheekbones and the chin, with the skull and the ears held.",
+    "nose_hump": "How far the bridge bows out along its length (a convex, aquiline nose) or scoops in.",
+    "nose_root": "How far forward the top of the bridge sits between the eyes: a high root runs straight from the "
+                 "brow, a low one is deep.",
+    "nose_bridge_width": "How wide the upper nose is, above the tip and the nostrils.",
+    "nose_tip_width": "How wide and round the tip of the nose is, from pinched to bulbous.",
+    "nose_columella": "How low the column between the nostrils hangs under them, or how far it is drawn up.",
+    "nostril_flare": "How far the {side} nostril's wing rounds out from its base.",
+    "nostril_height": "How high the {side} nostril's wing sits on the face.",
+    "eye_openness": "How far open the {side} eye rests: lower values bring the upper lid down over it.",
+    "inner_corner_fold": "How far the upper lid's skin folds down over the inner corner of the {side} eye.",
+    "upper_lid_fullness": "How full the {side} upper lid is between its crease and the brow, from deep-set to full.",
+    "under_eye": "How full the skin under the {side} eye is, from a hollow to a bag.",
+    "cheek_hollow": "How deep the hollow under the {side} cheekbone is.",
+    "cheekbone_height": "How high the {side} cheekbone sits.",
+    "mouth_corner_height": "How far the {side} corner of the mouth turns up, or down.",
+    "jaw_definition": "How sharp the edge of the jaw is, from soft and full under it to cut clear of the neck.",
+    "chin_shape": "How square the chin is, from a point to a flat, square end.",
+    "chin_cleft": "How deep the cleft down the middle of the chin is.",
+    "cupids_bow": "How sharply the upper lip's edge rises to its two peaks, from a flat edge to a marked bow.",
+    "lip_protrusion": "How far the mouth stands forward of the face: both lips, with the teeth behind them.",
 }
 
 # The quick level (brief §3.3, broad facial adjustments): the face's main
@@ -149,6 +221,9 @@ QUICK = {"eye_size", "nose_length", "mouth_width", "jaw_width"}
 # The face's features (R1), one per group, found by the shapes that move
 # them (`anchors.py`); `{side}` makes a pair. The anchors sit on the skin.
 FEATURES = [
+    ("face_shape", "Face shape", "The outline of the face: its width and length, how it tapers to the chin and "
+     "how round it is.",
+     ["Face_Shape_Width", "Face_Shape_Length", "Face_Shape_Taper", "Face_Shape_Round", "Face_Shape_Narrow"]),
     ("eyes", "Eyes", "Their height, spacing, depth, size, tilt and corners, and the lids' shape.",
      ["Face_Eye_Height_{side}", "Face_Eye_Spacing_{side}", "Face_Eye_Size_{side}", "Face_Eye_Tilt_{side}"]),
     ("brows", "Brows", "Their height, arch and length, and the ridge under them.",
@@ -169,10 +244,26 @@ FEATURES = [
 ]
 
 
+# Features anchored on the front of the face (`anchors.measure`).
+FRONT = {"face_shape"}
+# Features that are a body region, not the skin their shapes move. The
+# outline's shapes move the whole face, and Character Studio shares the
+# face's skin between the features whose shapes move it (`direct.rs`,
+# `compete`): as one of those the outline took the skin from the nose, the
+# eyes and every other, which then had no highlight of their own. Named by
+# the head's region it is lit as the whole head and shares nothing, and a
+# click on the head still picks the smaller `head` feature.
+REGIONS = {"face_shape": ["head"]}
+
+
 def features():
     """The face's feature definitions for `anchors.measure`."""
     return [{"id": fid, "label": label, "category": "face", "about": about, "icon": fid,
-             "shapes": shapes, "paired": any("{side}" in s for s in shapes), "on_skin": True}
+             "shapes": shapes, "paired": any("{side}" in s for s in shapes), "on_skin": True,
+             # (The outline's shapes move the whole face: its anchor is
+             # the front of the face at their middle, not the nearest
+             # vertex to it, which is inside the head.)
+             "front": fid in FRONT, "regions": REGIONS.get(fid)}
             for fid, label, about, shapes in FEATURES]
 
 
@@ -204,8 +295,11 @@ def parameters(face_identity):
     def parameter(pid, label, group, shape, advanced, mirror=None, raising=None, stem=None, side=None):
         stem = stem or pid
         level = "advanced" if advanced else "quick" if stem in QUICK else "detailed"
-        p = {"id": pid, "label": label, "group": group, "range": [-1, 1],
+        span = ONE_SIDED.get(stem, [-1, 1])
+        p = {"id": pid, "label": label, "group": group, "range": span,
              "about": ABOUT[stem].format(side=side), "feature": group, "level": level}
+        if stem in RANDOM:
+            p["random"] = RANDOM[stem]
         if advanced:
             p["advanced"] = True
         if mirror:
@@ -213,7 +307,7 @@ def parameters(face_identity):
         if raising:
             p["shapes"] = [{"shape": shape, "from": [-1, 0], "to": [-1, 0]}, {"shape": raising, "from": [0, 1]}]
         else:
-            p["shapes"] = [{"shape": shape, "from": [-1, 1]}]
+            p["shapes"] = [{"shape": shape, "from": span}]
         bones = []
         for bone, change in sorted(face_identity.get(shape, {}).get("bones", {}).items()):
             bones.append(dict({"bone": bone}, **change, **{"from": [-1, 1]}))

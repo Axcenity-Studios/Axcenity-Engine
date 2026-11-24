@@ -75,6 +75,10 @@
     "Face_Forehead_Height",
     "Face_Forehead_Slope",
     "Face_Head_Width",
+    "Face_Shape_Length",
+    "Face_Shape_Round",
+    "Face_Shape_Taper",
+    "Face_Shape_Width",
     "Feminine_Fat_Over_Muscle",
     "Feminine_Fat_Soft",
     "Feminine_Muscle_Down_Fat_Down",
@@ -113,6 +117,10 @@
     "Face_Forehead_Height",
     "Face_Forehead_Slope",
     "Face_Head_Width",
+    "Face_Shape_Length",
+    "Face_Shape_Round",
+    "Face_Shape_Taper",
+    "Face_Shape_Width",
     "Feminine_Fat_Over_Muscle",
     "Feminine_Fat_Soft",
     "Feminine_Muscle_Down_Fat_Down",
@@ -142,6 +150,58 @@
       "sparse": 3,
       "hairline": 3,
       "short": 5
+    }
+  },
+  "grafted_shapes": {
+    "about": "Shapes added to the shipped model by graft_shapes.py from a fresh build; everything else in the model is as it was shipped.",
+    "shipped": {
+      "binary_bytes": 17447008,
+      "binary_sha256": "bb8ab014dc5c9610e08ecdeb66f322360cb765d2d2dc84c49ecb894781dc557b",
+      "binary_crc32": 1516660148
+    },
+    "meshes": {
+      "Hair_ShortCrop": {
+        "shapes": [
+          "Face_Shape_Length",
+          "Face_Shape_Round",
+          "Face_Shape_Taper",
+          "Face_Shape_Width"
+        ],
+        "moved_most_mm": {
+          "Face_Shape_Length": 3.0,
+          "Face_Shape_Round": 0.38,
+          "Face_Shape_Taper": 3.18,
+          "Face_Shape_Width": 6.84
+        }
+      },
+      "Hair_ShortCrop_LOD1": {
+        "shapes": [
+          "Face_Shape_Length",
+          "Face_Shape_Round",
+          "Face_Shape_Taper",
+          "Face_Shape_Width"
+        ],
+        "moved_most_mm": {
+          "Face_Shape_Length": 3.0,
+          "Face_Shape_Round": 0.38,
+          "Face_Shape_Taper": 2.99,
+          "Face_Shape_Width": 6.83
+        }
+      },
+      "Hair_ShortCrop_LOD2": {
+        "shapes": [
+          "Face_Shape_Length",
+          "Face_Shape_Round",
+          "Face_Shape_Taper",
+          "Face_Shape_Width"
+        ],
+        "moved_most_mm": {
+          "Face_Shape_Length": 3.0,
+          "Face_Shape_Round": 0.24,
+          "Face_Shape_Taper": 2.83,
+          "Face_Shape_Width": 6.73
+        }
+      }
     }
   }
 }

@@ -19,9 +19,8 @@ use crate::theme::{self, icons};
 use crate::toolbox_panel::size_text;
 use crate::widgets;
 
-/// Tiles across the panel, as the browser's.
-const COLUMNS: usize = 3;
-const GAP: f32 = 6.0;
+/// The room between tiles, as the browser's.
+const GAP: f32 = super::browser::GAP;
 /// A tile's label and its button, under its picture.
 const LABEL: f32 = 20.0;
 const BUTTON: f32 = 22.0;
@@ -192,7 +191,9 @@ pub(super) fn section(
         );
         return intents;
     }
-    // The page's category and search narrow these too.
+    // The page's category, cut and search narrow these too.
+    let feminine = super::super::browser::feminine_body(&workspace.description, base);
+    items.retain(|item| filters.cut.lists(&item.catalogue.tags, feminine));
     items.retain(|item| filters.slot.as_ref().is_none_or(|slot| item.slot == *slot));
     items.retain(|item| matches(item, slot_label(base, item), &filters.search));
     let order = |item: &PackItem| base.slots.iter().position(|slot| slot.id == item.slot);
@@ -204,8 +205,10 @@ pub(super) fn section(
         );
         return intents;
     }
-    let width = ((ui.available_width() - GAP * (COLUMNS as f32 - 1.0)) / COLUMNS as f32).floor();
-    for row in items.chunks(COLUMNS) {
+    // As many across as the browser's tiles.
+    let columns = super::tile_columns(ui.available_width(), GAP);
+    let width = ((ui.available_width() - GAP * (columns as f32 - 1.0)) / columns as f32).floor();
+    for row in items.chunks(columns) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = GAP;
             for item in row {
@@ -430,7 +433,7 @@ fn tile(
 /// The part of a picture `texture` in size that fills a rectangle
 /// `shown` in size without stretching: its middle, cut at the sides or at
 /// the top and bottom.
-fn cropped(texture: egui::Vec2, shown: egui::Vec2) -> egui::Rect {
+pub(super) fn cropped(texture: egui::Vec2, shown: egui::Vec2) -> egui::Rect {
     let whole = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
     if texture.x <= 0.0 || texture.y <= 0.0 || shown.x <= 0.0 || shown.y <= 0.0 {
         return whole;

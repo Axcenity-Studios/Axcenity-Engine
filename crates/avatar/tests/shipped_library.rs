@@ -360,10 +360,21 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
     }
     let count = |kind| kinds.get(&("axcenity/realistic".to_owned(), kind)).copied();
     // Seven builds for each frame (Custom is "none matches"), nine faces,
-    // the six characters the editor had in code.
+    // the six characters the editor had in code, and the feature presets:
+    // ten noses and six face shapes.
     assert_eq!(count(PresetKind::Body), Some(14));
     assert_eq!(count(PresetKind::Face), Some(9));
     assert_eq!(count(PresetKind::Character), Some(6));
+    assert_eq!(count(PresetKind::Feature), Some(16));
+    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
+        let of_feature = library
+            .presets
+            .values()
+            .filter_map(|preset| preset.preset())
+            .filter(|block| block.feature.as_deref() == Some(feature))
+            .count();
+        assert_eq!(of_feature, presets, "{feature}");
+    }
 }
 
 /// The realistic base model's parameters say what they are (R1): a
@@ -373,8 +384,10 @@ fn the_realistic_parameters_say_what_they_are() {
     use axcenity_avatar::Level;
     let library = read();
     let base = library.base("axcenity/realistic").unwrap();
-    // (75 at R1; R4 added the face's 14.)
-    assert_eq!(base.parameters.len(), 89);
+    // (75 at R1; R4 added the face's 14; the finer face controls of
+    // 2026-11-24 another 33: the outline's five, and more of the nose,
+    // eyes, cheeks, jaw, chin and lips.)
+    assert_eq!(base.parameters.len(), 122);
     for parameter in &base.parameters {
         let id = &parameter.id;
         let about = parameter.about.as_deref().unwrap_or_default();
@@ -407,6 +420,7 @@ fn the_realistic_parameters_say_what_they_are() {
         "thighs",
         "calves",
         "feet",
+        "face_shape",
         "eyes",
         "brows",
         "nose",
@@ -618,4 +632,110 @@ fn every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks
             );
         }
     }
+}
+
+/// Every `*.build.json` under `folder`.
+fn build_data_files(folder: &Path, out: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(folder).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            build_data_files(&path, out);
+        } else if path.to_string_lossy().ends_with(".build.json") {
+            out.push(path);
+        }
+    }
+}
+
+/// CRC-32 (the zip and PNG one), as `graft_shapes.py` records it.
+fn crc32(bytes: &[u8]) -> u32 {
+    let table: Vec<u32> = (0..256u32)
+        .map(|n| {
+            (0..8).fold(n, |c, _| {
+                (c >> 1) ^ (0xEDB8_8320 & 0u32.wrapping_sub(c & 1))
+            })
+        })
+        .collect();
+    !bytes.iter().fold(!0u32, |c, b| {
+        table[((c ^ u32::from(*b)) & 0xFF) as usize] ^ (c >> 8)
+    })
+}
+
+/// A model with shapes grafted on (`graft_shapes.py`: the realistic body
+/// and its hairstyle since 2026-11-24) is still the model that shipped
+/// with the new shapes after the others: garments are bound to the shipped
+/// body's triangles and texture coordinates, and a build over it would
+/// move them. The build data's `grafted_shapes` record says what shipped
+/// (how much binary data, and its checksum) and which shapes each mesh
+/// gained, in order.
+#[test]
+fn a_grafted_model_is_the_shipped_one_with_its_new_shapes_last() {
+    let mut files = Vec::new();
+    build_data_files(&root(), &mut files);
+    let mut body_checked = false;
+    for file in files {
+        let data: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        let Some(record) = data.get("grafted_shapes") else {
+            continue;
+        };
+        let name = file.file_name().unwrap().to_string_lossy().into_owned();
+        body_checked |= name == "Realistic.build.json";
+        // The body's parts are in `<Base>Parts.glb`; a part built apart
+        // from it has its own name.
+        let model = if file
+            .with_file_name(name.replace(".build.json", ".glb"))
+            .exists()
+        {
+            file.with_file_name(name.replace(".build.json", ".glb"))
+        } else {
+            file.with_file_name(name.replace(".build.json", "Parts.glb"))
+        };
+        let label = model.display().to_string();
+        let bytes = std::fs::read(&model).unwrap();
+        // A binary glTF: a 12-byte header, then the JSON chunk and the
+        // binary one, each after its length and kind.
+        let word = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+        let json_length = word(12);
+        let gltf: serde_json::Value = serde_json::from_slice(&bytes[20..20 + json_length]).unwrap();
+        let binary = &bytes[20 + json_length + 8..][..word(20 + json_length)];
+
+        let shipped = &record["shipped"];
+        let length = shipped["binary_bytes"].as_u64().expect("what shipped") as usize;
+        assert!(length <= binary.len(), "{label} is shorter than it shipped");
+        assert_eq!(
+            u64::from(crc32(&binary[..length])),
+            shipped["binary_crc32"].as_u64().unwrap(),
+            "{label}: the data it shipped with has changed (see the package's README, \"Rebuilding\")"
+        );
+        for (mesh, entry) in record["meshes"].as_object().unwrap() {
+            let found = gltf["meshes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|m| m["name"] == mesh.as_str())
+                .unwrap_or_else(|| panic!("{label} has no mesh `{mesh}`"));
+            let names = found["extras"]["targetNames"].as_array().unwrap();
+            let shapes = entry["shapes"].as_array().unwrap();
+            assert!(!shapes.is_empty() && shapes.len() <= names.len());
+            assert_eq!(
+                &names[names.len() - shapes.len()..],
+                &shapes[..],
+                "{label}: `{mesh}`'s grafted shapes are not its last"
+            );
+            for primitive in found["primitives"].as_array().unwrap() {
+                assert_eq!(
+                    primitive["targets"].as_array().map_or(0, Vec::len),
+                    names.len(),
+                    "{label}: a primitive of `{mesh}` hasn't every shape"
+                );
+            }
+        }
+    }
+    // The realistic body is grafted. (Built over on purpose, with every
+    // garment refitted, this is the line to change; a part nothing is
+    // bound to, the hairstyle, may be rebuilt, and then has no record.)
+    assert!(
+        body_checked,
+        "the realistic body has no `grafted_shapes` record: was it built over?"
+    );
 }

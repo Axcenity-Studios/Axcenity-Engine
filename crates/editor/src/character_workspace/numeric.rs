@@ -51,6 +51,8 @@ pub const FINE: f32 = 0.25;
 pub const COARSE: f32 = 2.0;
 /// How long a row's note ("kept to the range") stays, in seconds.
 const NOTE_SECONDS: f64 = 4.0;
+/// How wide a row's value is drawn ([`field`]), shown or typed in.
+pub const FIELD_WIDTH: f32 = 48.0;
 
 /// The speed `modifiers` ask for: 1, a quarter with Shift, double with
 /// Ctrl (egui's `command`, Cmd on macOS).
@@ -292,22 +294,24 @@ fn drag(
     out
 }
 
-/// A slider's track across `ui`'s width for `value` in `range`: a relative
-/// drag by this module's rule, the arrow keys while it has the focus
-/// (a hundred and tenth of the range a press, with Shift and Ctrl as a
-/// drag). Returns the track's response (a double click is the row's
-/// reset) and the value asked for.
+/// A slider's track, `width` points wide (the middle of a one-line row,
+/// between its label and its value), for `value` in `range`: a relative
+/// drag by this module's rule, the same whatever the width, and the arrow
+/// keys while it has the focus (a hundred and tenth of the range a press,
+/// with Shift and Ctrl as a drag). Returns the track's response (a double
+/// click is the row's reset) and the value asked for.
 pub fn track(
     ui: &mut egui::Ui,
     row: &str,
     value: f32,
     range: [f32; 2],
     about: &str,
+    width: f32,
 ) -> (egui::Response, Option<(f32, Gesture)>) {
     let height = ui
         .text_style_height(&egui::TextStyle::Body)
         .max(ui.spacing().interact_size.y);
-    let size = egui::vec2(ui.available_width(), height);
+    let size = egui::vec2(width, height);
     // The track's ID is its row's, not egui's next automatic one: a page
     // that shows something above the row once its value changes (the
     // Expressions page) would otherwise give the track a new ID mid-drag,
@@ -376,7 +380,7 @@ fn paint_track(
     let corner = widgets.inactive.corner_radius;
     ui.painter()
         .rect_filled(rail, corner, widgets.inactive.bg_fill);
-    let radius = rect.height() / 2.5;
+    let radius = (rect.height() / 2.5).min(8.0);
     let [low, high] = range;
     let share = if (high - low).abs() > 1.0e-9 {
         ((value - low) / (high - low)).clamp(0.0, 1.0)
@@ -407,16 +411,20 @@ pub fn field(ui: &mut egui::Ui, row: &str, value: f32, range: [f32; 2]) -> Optio
     let palette = theme::palette(ui.ctx());
     let id = draft_id(row);
     let draft = ui.data(|data| data.get_temp::<Draft>(id));
-    let width = 52.0;
+    let width = FIELD_WIDTH;
     let mut out = None;
     let rect;
     match draft {
         Some(mut draft) => {
             let text_id = id.with("text");
+            // As wide as the value it's typed over, margins and all, so a
+            // one-line row keeps its shape while it's typed in.
+            let margin = egui::Margin::symmetric(4, 2);
             let response = ui.add(
                 egui::TextEdit::singleline(&mut draft.text)
                     .id(text_id)
-                    .desired_width(width)
+                    .desired_width(width - f32::from(margin.left + margin.right))
+                    .margin(margin)
                     .horizontal_align(egui::Align::RIGHT)
                     .font(egui::TextStyle::Small),
             );
@@ -445,15 +453,18 @@ pub fn field(ui: &mut egui::Ui, row: &str, value: f32, range: [f32; 2]) -> Optio
             }
         }
         None => {
-            let text = egui::RichText::new(shown(value, range))
-                .small()
-                .color(palette.text_secondary);
+            let text = shown(value, range);
             let [low, high] = ends(range);
+            // Its ID is its row's, as the track's is: what a page draws
+            // above the row may change while the value is dragged.
+            let height = ui.spacing().interact_size.y;
+            let (_, space) = ui.allocate_space(egui::vec2(width, height));
+            rect = space;
             let response = ui
-                .add(
-                    egui::Button::new(text)
-                        .min_size(egui::vec2(width, 0.0))
-                        .sense(egui::Sense::click_and_drag()),
+                .interact(
+                    rect,
+                    egui::Id::new(("numeric value", row)),
+                    egui::Sense::click_and_drag(),
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal)
                 .on_hover_text(format!(
@@ -461,7 +472,27 @@ pub fn field(ui: &mut egui::Ui, row: &str, value: f32, range: [f32; 2]) -> Optio
                     shown(low, range),
                     shown(high, range)
                 ));
-            rect = response.rect;
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), &text)
+            });
+            if ui.is_rect_visible(rect) {
+                // Drawn as a button is: the value reads as a field.
+                let visuals = ui.style().interact(&response);
+                ui.painter().rect(
+                    rect.expand(visuals.expansion),
+                    visuals.corner_radius,
+                    visuals.weak_bg_fill,
+                    visuals.bg_stroke,
+                    egui::StrokeKind::Inside,
+                );
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    &text,
+                    egui::TextStyle::Small.resolve(ui.style()),
+                    palette.text_secondary,
+                );
+            }
             out = drag(ui, &response, response.id, value, range);
             if response.clicked() || response.double_clicked() {
                 begin_typing(ui.ctx(), row, value, range);

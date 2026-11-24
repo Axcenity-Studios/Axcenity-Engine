@@ -1,0 +1,25 @@
+{
+  "format_version": 2,
+  "name": "Long and thin",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "nose_bridge_width": -0.6,
+    "nose_length": 0.9,
+    "nose_root": 0.3,
+    "nose_tip_projection": 0.3,
+    "nose_tip_width": -0.6,
+    "nose_width": -0.7,
+    "nostril_width_left": -0.5,
+    "nostril_width_right": -0.5
+  },
+  "preset": {
+    "id": "axcenity/realistic-nose-long-thin",
+    "kind": "feature",
+    "about": "Long from the bridge to the tip and narrow all the way down.",
+    "feature": "nose",
+    "tags": [
+      "shape"
+    ],
+    "order": 80
+  }
+}

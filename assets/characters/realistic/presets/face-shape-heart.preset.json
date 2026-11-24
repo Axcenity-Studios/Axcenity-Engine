@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Heart-shaped",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "face_narrow": 0.3,
+    "face_roundness": -0.1,
+    "face_taper": 1.0,
+    "face_width": 0.2
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-shape-heart",
+    "kind": "feature",
+    "about": "Wide at the temples and cheekbones, narrowing to a small chin.",
+    "feature": "face_shape",
+    "tags": [
+      "shape"
+    ],
+    "order": 40
+  }
+}

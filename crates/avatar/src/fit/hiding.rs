@@ -59,6 +59,35 @@ pub fn outside_cloth(garments: &[Surface], skin: &Surface, p: Vec3, n: Vec3) -> 
             Some(hit) => hit.distance,
         })
         .fold(HOLE_REACH, f32::min);
+    shut_in(garments, skin, p, n, out)
+}
+
+/// How far `p` (a body corner, with its normal `n`) is from under the
+/// cloth of `garments`, the least over them: what a player could see
+/// through if the skin at `p` were not drawn (ADR-0045's cover maps).
+///
+/// 0 where a garment's cloth lies over `p`, whichever of the two is
+/// nearer the eye: skin that isn't drawn can't come through cloth, so
+/// cloth sunk a little into where the skin would be is the cloth one
+/// sees, not a hole (that is what hiding the skin is for). Where the
+/// nearest cloth lies beside `p`, past its edge, the whole distance to
+/// it: nothing is over `p` there. Skin shut in a crease is covered, as
+/// for [`outside_cloth`].
+pub fn uncovered(garments: &[Surface], skin: &Surface, p: Vec3, n: Vec3) -> f32 {
+    let out = garments
+        .iter()
+        .map(|surface| match surface.closest(p, HOLE_REACH) {
+            None => HOLE_REACH,
+            Some(hit) if hit.is_over(p) => 0.0,
+            Some(hit) => hit.distance,
+        })
+        .fold(HOLE_REACH, f32::min);
+    shut_in(garments, skin, p, n, out)
+}
+
+/// `out` (how far `p` is outside or beside the cloth), or 0 where `p` is
+/// shut in a crease: see [`outside_cloth`].
+fn shut_in(garments: &[Surface], skin: &Surface, p: Vec3, n: Vec3, out: f32) -> f32 {
     if out <= HOLE {
         return out;
     }

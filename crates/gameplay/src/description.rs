@@ -282,6 +282,7 @@ pub fn apply_description(
         base,
         mesh_id(&resolved.body.model),
         &resolved.hidden_regions,
+        &resolved.covers,
     );
     let current = text_property(world, body, "MeshId");
     if current != wanted {
@@ -391,7 +392,25 @@ pub fn apply_description(
                 None => continue,
             },
         };
-        let wanted = mesh_id(&part.model);
+        // A garment worn under another leaves out its cloth under it
+        // (ADR-0045).
+        let wanted = if part.under.is_empty() {
+            mesh_id(&part.model)
+        } else {
+            assets.hide_regions(
+                &mesh_id(&part.model),
+                &Arc::new(axcenity_assets::RegionHiding {
+                    map: String::new(),
+                    hidden: Vec::new(),
+                    covers: part.under.iter().map(|map| mesh_id(map)).collect(),
+                    whole: part.tucked_into.iter().map(|map| mesh_id(map)).collect(),
+                    garment: true,
+                    // One made on the body by its package (the underwear)
+                    // has no skin coordinates: it borrows the body's.
+                    skin: mesh_id(&resolved.body.model),
+                }),
+            )
+        };
         if text_property(world, instance, "MeshId") != wanted {
             let _ = world.set_property(instance, "MeshId", Value::String(wanted));
         }
@@ -502,15 +521,17 @@ pub fn is_baked(world: &World, character: InstanceId) -> bool {
     })
 }
 
-/// The body's `MeshId` with the map regions in `hidden` left out (CO9,
-/// `axcenity_assets::RegionHiding`): its base's own when nothing worn
-/// hides a region of the base's region map.
+/// The body's `MeshId` with the map regions in `hidden` and the skin
+/// under the worn garments' cover maps `covers` (library paths,
+/// ADR-0045) left out (CO9, `axcenity_assets::RegionHiding`): its base's
+/// own when nothing worn hides any of it.
 fn hidden_body(
     assets: &Assets,
     library: &Library,
     base: &axcenity_avatar::BaseManifest,
     body: String,
     hidden: &[String],
+    covers: &[String],
 ) -> String {
     let indices: Vec<u8> = hidden
         .iter()
@@ -521,16 +542,25 @@ fn hidden_body(
         .regions_map
         .as_deref()
         .and_then(|map| library.path_of(&base.id, map));
-    match map {
-        Some(map) if !indices.is_empty() => assets.hide_regions(
-            &body,
-            &Arc::new(axcenity_assets::RegionHiding {
-                map: format!("{LIBRARY_FOLDER}/{map}"),
-                hidden: indices,
-            }),
-        ),
-        _ => body,
-    }
+    let covers: Vec<String> = covers
+        .iter()
+        .map(|cover| format!("{LIBRARY_FOLDER}/{cover}"))
+        .collect();
+    let (map, indices) = match map {
+        Some(map) if !indices.is_empty() => (format!("{LIBRARY_FOLDER}/{map}"), indices),
+        _ => (String::new(), Vec::new()),
+    };
+    assets.hide_regions(
+        &body,
+        &Arc::new(axcenity_assets::RegionHiding {
+            map,
+            hidden: indices,
+            covers,
+            whole: Vec::new(),
+            garment: false,
+            skin: String::new(),
+        }),
+    )
 }
 
 /// How a worn part is told apart from the others: its item, or its model

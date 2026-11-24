@@ -1,0 +1,26 @@
+{
+  "format_version": 2,
+  "name": "Button",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "nose_bridge": -0.3,
+    "nose_hump": -0.3,
+    "nose_length": -0.8,
+    "nose_tip_projection": -0.2,
+    "nose_tip_rotation": 0.35,
+    "nose_tip_width": 0.5,
+    "nose_width": -0.2,
+    "nostril_width_left": -0.2,
+    "nostril_width_right": -0.2
+  },
+  "preset": {
+    "id": "axcenity/realistic-nose-button",
+    "kind": "feature",
+    "about": "Small and round: a short nose with a low bridge and a round tip.",
+    "feature": "nose",
+    "tags": [
+      "shape"
+    ],
+    "order": 50
+  }
+}

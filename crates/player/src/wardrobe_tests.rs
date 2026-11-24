@@ -365,18 +365,20 @@ const REST: [Known; 6] = [
     known("Underwear_Bra through Shirt_CrewTee", "rest", 21, 0.0054),
     known("Underwear_Briefs through Pants_Joggers", "rest", 1, 0.0011),
 ];
-const IDLE: [Known; 6] = [
+const IDLE: [Known; 5] = [
     known("Pants_Joggers", "idle", 53, 0.0311),
     known("Pants_Joggers through Shirt_CrewTee", "idle", 54, 0.0226),
-    known("Shirt_CrewTee", "idle", 54, 0.0422),
+    // (Idle's numbers moved a little when its arms were put at ease,
+    // 2026-11-24: the tee 42.2 to 40.5 mm, the bra through it 15.8 to
+    // 15.9 mm, and the briefs no longer come through the joggers.)
+    known("Shirt_CrewTee", "idle", 54, 0.0405),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "idle",
         32,
         0.0094,
     ),
-    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0158),
-    known("Underwear_Briefs through Pants_Joggers", "idle", 1, 0.0011),
+    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0160),
 ];
 const WALK: [Known; 6] = [
     known("Pants_Joggers", "Walk@18", 53, 0.0222),

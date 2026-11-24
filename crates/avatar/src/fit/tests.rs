@@ -26,7 +26,7 @@ fn bump(y: f32, angle: f32) -> f32 {
 
 /// A closed tube 1 m tall: its sides (rings of `SIDES` corners, the
 /// texture's U round it and V down it) and two flat caps.
-fn tube_body() -> BodyMesh {
+pub(super) fn tube_body() -> BodyMesh {
     let mut positions = Vec::new();
     let mut normals = Vec::new();
     let mut uvs = Vec::new();
@@ -399,6 +399,167 @@ fn coverage_finds_the_regions_a_garment_covers_whole() {
     assert!(covered.share(1) < 0.05, "{covered:?}");
 }
 
+/// ADR-0045: a garment's cover map lights the skin under it, set back
+/// from its openings, less for cloth worn beneath it than for the skin;
+/// and a garment's corners find their place on that map.
+#[test]
+fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
+    let body = tube_body();
+    // A sleeve from 0.3 to 0.7 m, two centimetres off the skin.
+    let fitted = fit_garment(&body, &sleeve(0.17, false), &FitOptions::default()).unwrap();
+    let surface = Surface::new(
+        fitted.garment.positions(),
+        fitted.garment.normals(),
+        fitted.garment.triangles(),
+    );
+    // Every triangle has a region (none is the head's).
+    let regions = vec![1u8; body.triangles.len()];
+    let (map, report) = cover_map(
+        &body,
+        &regions,
+        &surface,
+        (&fitted.joints, &fitted.weights),
+        None,
+        256,
+    );
+    assert_eq!(map.rgba.len(), 256 * 256 * 4);
+    assert!(report.covered > 0);
+    assert!(
+        report.skin > 0 && report.skin < report.cloth && report.cloth < report.covered,
+        "{report:?}"
+    );
+    // The tube's texture runs down it: V is 1 - height.
+    let at = |height: f32, channel: usize| {
+        let y = (((1.0 - height) * 256.0) as usize).min(255);
+        map.rgba[(y * 256 + 128) * 4 + channel]
+    };
+    // Its middle is hidden, skin and cloth.
+    assert_eq!((at(0.5, 0), at(0.5, 1)), (255, 255));
+    // Past its ends nothing is.
+    for height in [0.2, 0.8] {
+        assert_eq!((at(height, 0), at(height, 1)), (0, 0), "at {height}");
+    }
+    // Just inside an opening (three and a half centimetres up from the
+    // hem, the cloth two off): the skin is still drawn, since it would
+    // be seen under the hem; cloth worn beneath is already left out.
+    assert_eq!(at(0.335, 0), 0, "skin by the hem stays");
+    assert_eq!(at(0.335, 1), 255, "cloth by the hem goes");
+    // Covered at all (blue) right up to the hem.
+    assert_eq!(at(0.31, 2), 255);
+
+    // Cloth that doesn't move with the skin under it hides none of the
+    // skin (the same sleeve following a bone the skin there doesn't),
+    // though it still hides cloth worn beneath it.
+    let elsewhere = vec![[7u16, 0, 0, 0]; fitted.joints.len()];
+    let (_, loose) = cover_map(
+        &body,
+        &regions,
+        &surface,
+        (&elsewhere, &fitted.weights),
+        None,
+        256,
+    );
+    assert_eq!(loose.skin, 0);
+    assert_eq!((loose.covered, loose.cloth), (report.covered, report.cloth));
+
+    // Tried in poses, the same cloth hides the skin it stays over: all
+    // of it in a pose that moves nothing, whatever bone it follows.
+    let lower = vec![[0u16, 0, 0, 0]; fitted.joints.len()];
+    let whole = vec![[1.0f32, 0.0, 0.0, 0.0]; fitted.joints.len()];
+    let rest = fitted.garment.positions();
+    let cloth_at = |_: &[(String, f32)]| rest.clone();
+    let still = FitPose {
+        name: "still".to_owned(),
+        bones: body.rig.rest_pose(),
+        correctives: Vec::new(),
+    };
+    let (_, proved) = cover_map(
+        &body,
+        &regions,
+        &surface,
+        (&lower, &whole),
+        Some(&Proof {
+            poses: std::slice::from_ref(&still),
+            states: &[],
+            cloth_at: &cloth_at,
+        }),
+        256,
+    );
+    assert_eq!(proved, report);
+    // In a pose that lifts the body's upper half out of the sleeve (the
+    // sleeve staying with the lower half), the skin that comes out from
+    // under it stays drawn, and the skin still under it is hidden.
+    let mut lifted = still.clone();
+    lifted.name = "lifted".to_owned();
+    lifted.bones[body.rig.joints[1].bone].translation.y += 0.3;
+    let (map, torn) = cover_map(
+        &body,
+        &regions,
+        &surface,
+        (&lower, &whole),
+        Some(&Proof {
+            poses: &[still, lifted],
+            states: &[],
+            cloth_at: &cloth_at,
+        }),
+        256,
+    );
+    let at = |height: f32, channel: usize| {
+        let y = (((1.0 - height) * 256.0) as usize).min(255);
+        map.rgba[(y * 256 + 128) * 4 + channel]
+    };
+    assert!(torn.skin > 0 && torn.skin < report.skin, "{torn:?}");
+    assert_eq!(at(0.42, 0), 255, "skin that stays under the sleeve goes");
+    assert_eq!(at(0.6, 0), 0, "skin lifted out of the sleeve stays");
+    // The cloth worn beneath is hidden as before.
+    assert_eq!(torn.cloth, report.cloth);
+
+    // Each of the garment's corners lies over the skin at its own height.
+    let uvs = skin_uvs(&body, &fitted.binding);
+    assert_eq!(uvs.len(), fitted.garment.len());
+    for (uv, p) in uvs.iter().zip(fitted.garment.positions()) {
+        assert!((1.0 - uv[1] - p.y).abs() < 0.02, "{uv:?} for {p:?}");
+    }
+}
+
+/// A web (cloth joined across a joint, drawn out when it bends) comes out
+/// of a garment when the fit is asked to cut them, and only then.
+#[test]
+fn a_web_drawn_out_by_a_pose_is_cut_when_asked() {
+    let body = tube_body();
+    // The tube bent at its upper bone: the sleeve's corners follow one
+    // bone or the other, and the cloth between them is drawn out.
+    let bent = {
+        let mut bones = body.rig.rest_pose();
+        let last = bones.len() - 1;
+        bones[last].translation += Vec3::new(0.6, 0.0, 0.0);
+        FitPose {
+            name: "pulled".to_owned(),
+            bones,
+            correctives: Vec::new(),
+        }
+    };
+    let whole = fit_garment(&body, &sleeve(0.16, false), &FitOptions::default()).unwrap();
+    assert_eq!(whole.report.webs_cut, 0);
+    let cut = fit_garment(
+        &body,
+        &sleeve(0.16, false),
+        &FitOptions {
+            poses: vec![bent],
+            cut_webs: 2.5,
+            ..FitOptions::default()
+        },
+    )
+    .unwrap();
+    assert!(cut.report.webs_cut > 0, "{:?}", cut.report.webs_cut);
+    assert_eq!(
+        cut.garment.triangles().len() + cut.report.webs_cut,
+        whole.garment.triangles().len()
+    );
+    // Its corners are all still there: the weights and shapes still fit.
+    assert_eq!(cut.garment.len(), whole.garment.len());
+}
+
 /// A grid of corners, `profile` (x, y) extruded along Z over `zs`, with
 /// triangles facing up (+Y) where the profile goes +X: a strip of skin or
 /// a sheet of cloth.
@@ -501,6 +662,9 @@ fn a_fitted_garment_written_as_gltf_loads_with_its_skeleton_weights_and_shapes()
         armature: "Armature",
         object: "Sleeve",
         shading: "cloth",
+        maps: &[],
+        skin_uvs: &[],
+        least_move: 0.0,
     });
     let model = axcenity_assets::load_model(
         &bytes,

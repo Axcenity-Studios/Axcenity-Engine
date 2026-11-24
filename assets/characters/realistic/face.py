@@ -2414,6 +2414,10 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     face = Face(topo, M, eyes_m, radius, jaw, Teeth(points, solid, upper), other=other)
     expressions = face.expressions()
     identity = face.identity()
+    # The finer identity shapes (`facedetail.py`), after those: every
+    # shape that was there keeps its place among the body's.
+    import facedetail
+    identity.update(facedetail.shapes(face))
     shapes = dict(expressions)
     shapes.update({name: shape for name, (shape, _) in identity.items()})
     if mirror is not None:
@@ -2428,7 +2432,7 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     order = ["Frame_Feminine", *shapes]
     made = {}
     shell, mix = eyelib.shell(face, out_dir)
-    on_lids = set(expressions)
+    on_lids = set(expressions) | facedetail.ON_LIDS
     hair.add_shapes(shell, {name: eyelib.follow(face, mix, following[name], name in on_lids) for name in order})
     made["EyeShell"] = shell
     lash, roots = hair.lashes(face, out_dir)
@@ -2460,7 +2464,8 @@ def build(body, topo, M, F, eyes_m, eyes_f, radius, joints, joints_f, weights, t
     made["Brows"] = brow
     made["LipSeal"] = lip_seal(face, F, shapes, jaw_w)
     # The teeth go where the mouth goes (and their simpler copies alike).
-    lifts = {name: identity[name][0][face.mouth.mid] for name in ("Face_Mouth_Height", "Face_Philtrum_Length")}
+    lifts = {name: identity[name][0][face.mouth.mid] for name in ("Face_Mouth_Height", "Face_Philtrum_Length",
+                                                                   *facedetail.MOVE_THE_MOUTH)}
     for part in (teeth, *teeth_copies):
         _teeth_follow(part, lifts)
     bones = {}

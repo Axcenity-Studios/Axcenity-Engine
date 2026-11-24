@@ -109,6 +109,11 @@
       "category": "body"
     },
     {
+      "id": "face_shape",
+      "label": "Face shape",
+      "category": "face"
+    },
+    {
       "id": "eyes",
       "label": "Eyes",
       "category": "face"
@@ -1206,6 +1211,111 @@
       "level": "detailed"
     },
     {
+      "id": "face_width",
+      "label": "Face width",
+      "group": "face_shape",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How wide the whole face is, from the temples down the cheekbones to the jaw.",
+      "feature": "face_shape",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Shape_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "face_length",
+      "label": "Face length",
+      "group": "face_shape",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How long the face is: the forehead's top up, and the nose, the mouth and the chin drawn down.",
+      "feature": "face_shape",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Shape_Length",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "face_taper",
+      "label": "Taper to the chin",
+      "group": "face_shape",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How the face narrows to the chin: wide cheekbones over a narrow jaw (a heart), or a jaw as wide as the cheekbones (square).",
+      "feature": "face_shape",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Shape_Taper",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "face_roundness",
+      "label": "Roundness",
+      "group": "face_shape",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How round the face's outline is, from flat sides and a square jaw corner to full, soft sides.",
+      "feature": "face_shape",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Shape_Round",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "face_narrow",
+      "label": "Narrow face",
+      "group": "face_shape",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How narrow the soft face is between the cheekbones and the chin, with the skull and the ears held.",
+      "feature": "face_shape",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Shape_Narrow",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "eye_height_left",
       "label": "Left eye height",
       "group": "eyes",
@@ -1664,6 +1774,202 @@
       ]
     },
     {
+      "id": "eye_openness_left",
+      "label": "Left eye openness",
+      "group": "eyes",
+      "range": [
+        -1,
+        0
+      ],
+      "about": "How far open the left eye rests: lower values bring the upper lid down over it.",
+      "feature": "eyes",
+      "level": "advanced",
+      "random": [
+        -0.5,
+        0
+      ],
+      "advanced": true,
+      "mirror": "eye_openness_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Open_Left",
+          "from": [
+            -1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eye_openness_right",
+      "label": "Right eye openness",
+      "group": "eyes",
+      "range": [
+        -1,
+        0
+      ],
+      "about": "How far open the right eye rests: lower values bring the upper lid down over it.",
+      "feature": "eyes",
+      "level": "advanced",
+      "random": [
+        -0.5,
+        0
+      ],
+      "advanced": true,
+      "mirror": "eye_openness_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Open_Right",
+          "from": [
+            -1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inner_corner_fold_left",
+      "label": "Left inner corner fold",
+      "group": "eyes",
+      "range": [
+        0,
+        1
+      ],
+      "about": "How far the upper lid's skin folds down over the inner corner of the left eye.",
+      "feature": "eyes",
+      "level": "detailed",
+      "random": [
+        0,
+        0.5
+      ],
+      "mirror": "inner_corner_fold_right",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Inner_Fold_Left",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inner_corner_fold_right",
+      "label": "Right inner corner fold",
+      "group": "eyes",
+      "range": [
+        0,
+        1
+      ],
+      "about": "How far the upper lid's skin folds down over the inner corner of the right eye.",
+      "feature": "eyes",
+      "level": "detailed",
+      "random": [
+        0,
+        0.5
+      ],
+      "mirror": "inner_corner_fold_left",
+      "shapes": [
+        {
+          "shape": "Face_Eye_Inner_Fold_Right",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lid_fullness_left",
+      "label": "Left upper lid fullness",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full the left upper lid is between its crease and the brow, from deep-set to full.",
+      "feature": "eyes",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "upper_lid_fullness_right",
+      "shapes": [
+        {
+          "shape": "Face_Lid_Fullness_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lid_fullness_right",
+      "label": "Right upper lid fullness",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full the right upper lid is between its crease and the brow, from deep-set to full.",
+      "feature": "eyes",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "upper_lid_fullness_left",
+      "shapes": [
+        {
+          "shape": "Face_Lid_Fullness_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "under_eye_left",
+      "label": "Left under-eye fullness",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full the skin under the left eye is, from a hollow to a bag.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "under_eye_right",
+      "shapes": [
+        {
+          "shape": "Face_Under_Eye_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "under_eye_right",
+      "label": "Right under-eye fullness",
+      "group": "eyes",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How full the skin under the right eye is, from a hollow to a bag.",
+      "feature": "eyes",
+      "level": "detailed",
+      "mirror": "under_eye_left",
+      "shapes": [
+        {
+          "shape": "Face_Under_Eye_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "brow_height_left",
       "label": "Left brow height",
       "group": "brows",
@@ -1927,6 +2233,98 @@
       ]
     },
     {
+      "id": "nostril_flare_left",
+      "label": "Left nostril flare",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the left nostril's wing rounds out from its base.",
+      "feature": "nose",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "nostril_flare_right",
+      "shapes": [
+        {
+          "shape": "Face_Nostril_Flare_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nostril_flare_right",
+      "label": "Right nostril flare",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the right nostril's wing rounds out from its base.",
+      "feature": "nose",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "nostril_flare_left",
+      "shapes": [
+        {
+          "shape": "Face_Nostril_Flare_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nostril_height_left",
+      "label": "Left nostril height",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How high the left nostril's wing sits on the face.",
+      "feature": "nose",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "nostril_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Nostril_Height_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nostril_height_right",
+      "label": "Right nostril height",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How high the right nostril's wing sits on the face.",
+      "feature": "nose",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "nostril_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Nostril_Height_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "nose_length",
       "label": "Nose length",
       "group": "nose",
@@ -2086,6 +2484,112 @@
       ]
     },
     {
+      "id": "nose_hump",
+      "label": "Bridge hump",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the bridge bows out along its length (a convex, aquiline nose) or scoops in.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Hump",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_root",
+      "label": "Bridge root",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far forward the top of the bridge sits between the eyes: a high root runs straight from the brow, a low one is deep.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Root",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_bridge_width",
+      "label": "Bridge width",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How wide the upper nose is, above the tip and the nostrils.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Bridge_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_tip_width",
+      "label": "Nose tip width",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How wide and round the tip of the nose is, from pinched to bulbous.",
+      "feature": "nose",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Nose_Tip_Width",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nose_columella",
+      "label": "Columella",
+      "group": "nose",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How low the column between the nostrils hangs under them, or how far it is drawn up.",
+      "feature": "nose",
+      "level": "advanced",
+      "advanced": true,
+      "shapes": [
+        {
+          "shape": "Face_Nose_Columella",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "cheekbone_left",
       "label": "Left cheekbone",
       "group": "cheeks",
@@ -2166,6 +2670,96 @@
       "shapes": [
         {
           "shape": "Face_Cheek_Fullness_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheek_hollow_left",
+      "label": "Left cheek hollow",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How deep the hollow under the left cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
+      "mirror": "cheek_hollow_right",
+      "shapes": [
+        {
+          "shape": "Face_Cheek_Hollow_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheek_hollow_right",
+      "label": "Right cheek hollow",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How deep the hollow under the right cheekbone is.",
+      "feature": "cheeks",
+      "level": "detailed",
+      "mirror": "cheek_hollow_left",
+      "shapes": [
+        {
+          "shape": "Face_Cheek_Hollow_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheekbone_height_left",
+      "label": "Left cheekbone height",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How high the left cheekbone sits.",
+      "feature": "cheeks",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "cheekbone_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Cheekbone_Height_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cheekbone_height_right",
+      "label": "Right cheekbone height",
+      "group": "cheeks",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How high the right cheekbone sits.",
+      "feature": "cheeks",
+      "level": "advanced",
+      "advanced": true,
+      "mirror": "cheekbone_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Cheekbone_Height_Right",
           "from": [
             -1,
             1
@@ -2284,6 +2878,27 @@
       ]
     },
     {
+      "id": "jaw_definition",
+      "label": "Jawline definition",
+      "group": "jaw",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How sharp the edge of the jaw is, from soft and full under it to cut clear of the neck.",
+      "feature": "jaw",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Jaw_Definition",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "chin_length",
       "label": "Chin height",
       "group": "chin",
@@ -2347,6 +2962,53 @@
       ]
     },
     {
+      "id": "chin_shape",
+      "label": "Chin shape",
+      "group": "chin",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How square the chin is, from a point to a flat, square end.",
+      "feature": "chin",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Chin_Shape",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chin_cleft",
+      "label": "Chin cleft",
+      "group": "chin",
+      "range": [
+        0,
+        1
+      ],
+      "about": "How deep the cleft down the middle of the chin is.",
+      "feature": "chin",
+      "level": "advanced",
+      "random": [
+        0,
+        0.4
+      ],
+      "advanced": true,
+      "shapes": [
+        {
+          "shape": "Face_Chin_Cleft",
+          "from": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
       "id": "mouth_width_left",
       "label": "Left mouth width",
       "group": "lips",
@@ -2383,6 +3045,50 @@
       "shapes": [
         {
           "shape": "Face_Mouth_Width_Right",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mouth_corner_height_left",
+      "label": "Left mouth corner height",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the left corner of the mouth turns up, or down.",
+      "feature": "lips",
+      "level": "detailed",
+      "mirror": "mouth_corner_height_right",
+      "shapes": [
+        {
+          "shape": "Face_Mouth_Corner_Left",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mouth_corner_height_right",
+      "label": "Right mouth corner height",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the right corner of the mouth turns up, or down.",
+      "feature": "lips",
+      "level": "detailed",
+      "mirror": "mouth_corner_height_left",
+      "shapes": [
+        {
+          "shape": "Face_Mouth_Corner_Right",
           "from": [
             -1,
             1
@@ -2467,6 +3173,49 @@
       "shapes": [
         {
           "shape": "Face_Philtrum_Length",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cupids_bow",
+      "label": "Cupid's bow",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How sharply the upper lip's edge rises to its two peaks, from a flat edge to a marked bow.",
+      "feature": "lips",
+      "level": "advanced",
+      "advanced": true,
+      "shapes": [
+        {
+          "shape": "Face_Lip_Bow",
+          "from": [
+            -1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lip_protrusion",
+      "label": "Lip protrusion",
+      "group": "lips",
+      "range": [
+        -1,
+        1
+      ],
+      "about": "How far the mouth stands forward of the face: both lips, with the teeth behind them.",
+      "feature": "lips",
+      "level": "detailed",
+      "shapes": [
+        {
+          "shape": "Face_Lip_Protrusion",
           "from": [
             -1,
             1
@@ -5237,6 +5986,27 @@
       ]
     },
     {
+      "id": "face_shape",
+      "label": "Face shape",
+      "category": "face",
+      "about": "The outline of the face: its width and length, how it tapers to the chin and how round it is.",
+      "icon": "face_shape",
+      "anchors": [
+        {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.0087,
+            0.1341
+          ]
+        }
+      ],
+      "radius": 0.1153,
+      "regions": [
+        "head"
+      ]
+    },
+    {
       "id": "eyes",
       "label": "Eyes",
       "category": "face",
@@ -5528,6 +6298,892 @@
   ],
   "handles": [
     {
+      "id": "outline_forehead",
+      "feature": "face_shape",
+      "label": "Forehead top",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.1264,
+          0.0934
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "forehead_height",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0114,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "forehead_slope",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.0067,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_temple_left",
+      "feature": "face_shape",
+      "label": "Left temple",
+      "mirror": "outline_temple_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0763,
+          0.0721,
+          0.0348
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "temple_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_temple_right",
+      "feature": "face_shape",
+      "label": "Right temple",
+      "mirror": "outline_temple_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0764,
+          0.0721,
+          0.0348
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "temple_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_cheekbone_left",
+      "feature": "face_shape",
+      "label": "Left cheekbone edge",
+      "mirror": "outline_cheekbone_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0662,
+          0.0176,
+          0.0756
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.007,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "cheekbone_height_left",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0033,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_cheekbone_right",
+      "feature": "face_shape",
+      "label": "Right cheekbone edge",
+      "mirror": "outline_cheekbone_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0662,
+          0.0176,
+          0.0756
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.007,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "cheekbone_height_right",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0034,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_cheek_left",
+      "feature": "face_shape",
+      "label": "Left cheek",
+      "mirror": "outline_cheek_right",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          0.0669,
+          -0.0348,
+          0.0335
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_roundness",
+          "axis": [
+            0.9566,
+            -0.1573,
+            0.2452
+          ],
+          "travel": 0.0086,
+          "screen": {
+            "front": [
+              0.987,
+              -0.162
+            ],
+            "three_quarter": [
+              0.983,
+              -0.182
+            ],
+            "back": [
+              -0.987,
+              -0.162
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_cheek_right",
+      "feature": "face_shape",
+      "label": "Right cheek",
+      "mirror": "outline_cheek_left",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0669,
+          -0.0348,
+          0.0335
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_roundness",
+          "axis": [
+            -0.9636,
+            -0.1511,
+            0.2206
+          ],
+          "travel": 0.0086,
+          "screen": {
+            "front": [
+              -0.988,
+              -0.155
+            ],
+            "three_quarter": [
+              -0.961,
+              -0.276
+            ],
+            "back": [
+              0.988,
+              -0.155
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_jaw_left",
+      "feature": "face_shape",
+      "label": "Left jaw corner",
+      "mirror": "outline_jaw_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0635,
+          -0.0355,
+          0.0085
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_taper",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0125,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_angle_left",
+          "axis": [
+            0.0,
+            -0.5459,
+            -0.8378
+          ],
+          "travel": 0.0136,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.735,
+              -0.678
+            ],
+            "side": [
+              -0.838,
+              -0.546
+            ],
+            "back": [
+              -0.0,
+              -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_jaw_right",
+      "feature": "face_shape",
+      "label": "Right jaw corner",
+      "mirror": "outline_jaw_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0635,
+          -0.0355,
+          0.0085
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_taper",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0125,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_angle_right",
+          "axis": [
+            0.0,
+            -0.5489,
+            -0.8359
+          ],
+          "travel": 0.0136,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.733,
+              -0.68
+            ],
+            "side": [
+              -0.836,
+              -0.549
+            ],
+            "back": [
+              -0.0,
+              -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_jawline_left",
+      "feature": "face_shape",
+      "label": "Left jawline",
+      "mirror": "outline_jawline_right",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          0.0481,
+          -0.0739,
+          0.0327
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_narrow",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0039,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_definition",
+          "axis": [
+            0.6868,
+            -0.723,
+            0.0746
+          ],
+          "travel": 0.003,
+          "screen": {
+            "front": [
+              0.689,
+              -0.725
+            ],
+            "three_quarter": [
+              0.597,
+              -0.802
+            ],
+            "side": [
+              0.103,
+              -0.995
+            ],
+            "back": [
+              -0.689,
+              -0.725
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_jawline_right",
+      "feature": "face_shape",
+      "label": "Right jawline",
+      "mirror": "outline_jawline_left",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0481,
+          -0.0739,
+          0.0327
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_narrow",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0039,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "jaw_definition",
+          "axis": [
+            -0.6711,
+            -0.7385,
+            0.0658
+          ],
+          "travel": 0.003,
+          "screen": {
+            "front": [
+              -0.673,
+              -0.74
+            ],
+            "three_quarter": [
+              -0.501,
+              -0.865
+            ],
+            "side": [
+              0.089,
+              -0.996
+            ],
+            "back": [
+              0.673,
+              -0.74
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_chin_left",
+      "feature": "face_shape",
+      "label": "Left chin corner",
+      "mirror": "outline_chin_right",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          0.0191,
+          -0.0832,
+          0.0843
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "chin_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0077,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_shape",
+          "axis": [
+            0.5917,
+            -0.8062,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              0.592,
+              -0.806
+            ],
+            "three_quarter": [
+              0.461,
+              -0.888
+            ],
+            "side": [
+              0.0,
+              -1.0
+            ],
+            "back": [
+              -0.592,
+              -0.806
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_chin_right",
+      "feature": "face_shape",
+      "label": "Right chin corner",
+      "mirror": "outline_chin_left",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0191,
+          -0.0832,
+          0.0843
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "chin_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0077,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_shape",
+          "axis": [
+            -0.5917,
+            -0.8062,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              -0.592,
+              -0.806
+            ],
+            "three_quarter": [
+              -0.461,
+              -0.888
+            ],
+            "side": [
+              -0.0,
+              -1.0
+            ],
+            "back": [
+              0.592,
+              -0.806
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "outline_chin",
+      "feature": "face_shape",
+      "label": "Chin",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0,
+          -0.0813,
+          0.0914
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "face_length",
+          "axis": [
+            -0.0,
+            -1.0,
+            0.0
+          ],
+          "travel": 0.013,
+          "screen": {
+            "front": [
+              -0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.0,
+              -1.0
+            ],
+            "side": [
+              -0.0,
+              -1.0
+            ],
+            "back": [
+              0.0,
+              -1.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_forward",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
       "id": "nose_tip",
       "feature": "nose",
       "label": "Nose tip",
@@ -5668,11 +7324,54 @@
               0.0
             ]
           }
+        },
+        {
+          "parameter": "nostril_height_left",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0068,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "nostril_flare_left",
+          "axis": [
+            0.9225,
+            -0.1255,
+            0.365
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "side": [
+              0.946,
+              -0.325
+            ]
+          }
         }
       ],
       "views": [
         "front",
         "three_quarter",
+        "side",
         "back"
       ]
     },
@@ -5712,11 +7411,364 @@
               0.0
             ]
           }
+        },
+        {
+          "parameter": "nostril_height_right",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0068,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "nostril_flare_right",
+          "axis": [
+            -0.9199,
+            -0.1043,
+            0.3779
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "side": [
+              0.964,
+              -0.266
+            ]
+          }
         }
       ],
       "views": [
         "front",
         "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_root",
+      "feature": "nose",
+      "label": "Bridge root",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.0509,
+          0.1119
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_root",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.009,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "three_quarter",
+        "side"
+      ]
+    },
+    {
+      "id": "nose_hump",
+      "feature": "nose",
+      "label": "Bridge hump",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.0356,
+          0.1236
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_hump",
+          "axis": [
+            0.0,
+            0.5572,
+            0.8304
+          ],
+          "travel": 0.0083,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.725,
+              0.688
+            ],
+            "side": [
+              0.83,
+              0.557
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_bridge_left",
+      "feature": "nose",
+      "label": "Left of the bridge",
+      "mirror": "nose_bridge_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0116,
+          0.0297,
+          0.1163
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_bridge_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0065,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_bridge_right",
+      "feature": "nose",
+      "label": "Right of the bridge",
+      "mirror": "nose_bridge_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0116,
+          0.0297,
+          0.1163
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_bridge_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0065,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_tip_left",
+      "feature": "nose",
+      "label": "Left of the tip",
+      "mirror": "nose_tip_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0085,
+          0.0136,
+          0.1332
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_tip_width",
+          "axis": [
+            0.9882,
+            -0.0155,
+            0.1523
+          ],
+          "travel": 0.0058,
+          "screen": {
+            "front": [
+              1.0,
+              -0.016
+            ],
+            "three_quarter": [
+              1.0,
+              -0.019
+            ],
+            "back": [
+              -1.0,
+              -0.016
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_tip_right",
+      "feature": "nose",
+      "label": "Right of the tip",
+      "mirror": "nose_tip_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0085,
+          0.0136,
+          0.1332
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_tip_width",
+          "axis": [
+            -0.9873,
+            -0.0256,
+            0.1569
+          ],
+          "travel": 0.0058,
+          "screen": {
+            "front": [
+              -1.0,
+              -0.026
+            ],
+            "three_quarter": [
+              -0.999,
+              -0.043
+            ],
+            "back": [
+              1.0,
+              -0.026
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "nose_columella",
+      "feature": "nose",
+      "label": "Columella",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.0037,
+          0.1258
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "nose_columella",
+          "axis": [
+            0.0,
+            -0.9701,
+            0.2425
+          ],
+          "travel": 0.0066,
+          "screen": {
+            "front": [
+              0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              0.174,
+              -0.985
+            ],
+            "side": [
+              0.243,
+              -0.97
+            ],
+            "back": [
+              0.0,
+              -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
         "back"
       ]
     },
@@ -6039,6 +8091,536 @@
       ]
     },
     {
+      "id": "under_eye_left",
+      "feature": "eyes",
+      "label": "Under the left eye",
+      "mirror": "under_eye_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0337,
+          0.0339,
+          0.1018
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "under_eye_left",
+          "axis": [
+            0.1813,
+            -0.3112,
+            0.9329
+          ],
+          "travel": 0.0057,
+          "screen": {
+            "front": [
+              0.503,
+              -0.864
+            ],
+            "three_quarter": [
+              0.93,
+              -0.367
+            ],
+            "side": [
+              0.949,
+              -0.316
+            ],
+            "back": [
+              -0.503,
+              -0.864
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "under_eye_right",
+      "feature": "eyes",
+      "label": "Under the right eye",
+      "mirror": "under_eye_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0337,
+          0.0338,
+          0.1017
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "under_eye_right",
+          "axis": [
+            -0.1806,
+            -0.3177,
+            0.9308
+          ],
+          "travel": 0.0057,
+          "screen": {
+            "front": [
+              -0.494,
+              -0.869
+            ],
+            "three_quarter": [
+              0.858,
+              -0.514
+            ],
+            "side": [
+              0.946,
+              -0.323
+            ],
+            "back": [
+              0.494,
+              -0.869
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_inner_left",
+      "feature": "eyes",
+      "label": "Left inner corner",
+      "mirror": "eye_inner_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0181,
+          0.0491,
+          0.1012
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "inner_corner_fold_left",
+          "axis": [
+            0.5266,
+            -0.6517,
+            0.5458
+          ],
+          "travel": 0.0043,
+          "screen": {
+            "front": [
+              0.629,
+              -0.778
+            ],
+            "three_quarter": [
+              0.758,
+              -0.652
+            ],
+            "side": [
+              0.642,
+              -0.767
+            ],
+            "back": [
+              -0.629,
+              -0.778
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "eye_inner_right",
+      "feature": "eyes",
+      "label": "Right inner corner",
+      "mirror": "eye_inner_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0181,
+          0.049,
+          0.1014
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "inner_corner_fold_right",
+          "axis": [
+            -0.5505,
+            -0.6256,
+            0.5527
+          ],
+          "travel": 0.004,
+          "screen": {
+            "front": [
+              -0.661,
+              -0.751
+            ],
+            "three_quarter": [
+              0.003,
+              -1.0
+            ],
+            "side": [
+              0.662,
+              -0.749
+            ],
+            "back": [
+              0.661,
+              -0.751
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheekbone_left",
+      "feature": "cheeks",
+      "label": "Left cheekbone",
+      "mirror": "cheekbone_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0534,
+          0.0235,
+          0.0943
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheekbone_left",
+          "axis": [
+            0.5898,
+            0.077,
+            0.8039
+          ],
+          "travel": 0.0095,
+          "screen": {
+            "front": [
+              0.992,
+              0.129
+            ],
+            "three_quarter": [
+              0.997,
+              0.078
+            ],
+            "side": [
+              0.995,
+              0.095
+            ],
+            "back": [
+              -0.992,
+              0.129
+            ]
+          }
+        },
+        {
+          "parameter": "cheekbone_height_left",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheekbone_right",
+      "feature": "cheeks",
+      "label": "Right cheekbone",
+      "mirror": "cheekbone_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0534,
+          0.0234,
+          0.0943
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheekbone_right",
+          "axis": [
+            -0.6058,
+            0.0759,
+            0.792
+          ],
+          "travel": 0.0095,
+          "screen": {
+            "front": [
+              -0.992,
+              0.124
+            ],
+            "side": [
+              0.995,
+              0.095
+            ],
+            "back": [
+              0.992,
+              0.124
+            ]
+          }
+        },
+        {
+          "parameter": "cheekbone_height_right",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheek_left",
+      "feature": "cheeks",
+      "label": "Left cheek",
+      "mirror": "cheek_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0538,
+          -0.0128,
+          0.0845
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheek_fullness_left",
+          "axis": [
+            0.8058,
+            -0.2102,
+            0.5536
+          ],
+          "travel": 0.0118,
+          "screen": {
+            "front": [
+              0.968,
+              -0.252
+            ],
+            "three_quarter": [
+              0.977,
+              -0.214
+            ],
+            "side": [
+              0.935,
+              -0.355
+            ],
+            "back": [
+              -0.968,
+              -0.252
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheek_right",
+      "feature": "cheeks",
+      "label": "Right cheek",
+      "mirror": "cheek_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0538,
+          -0.0128,
+          0.0845
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheek_fullness_right",
+          "axis": [
+            -0.8058,
+            -0.2102,
+            0.5536
+          ],
+          "travel": 0.0118,
+          "screen": {
+            "front": [
+              -0.968,
+              -0.252
+            ],
+            "side": [
+              0.935,
+              -0.355
+            ],
+            "back": [
+              0.968,
+              -0.252
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheek_hollow_left",
+      "feature": "cheeks",
+      "label": "Left cheek hollow",
+      "mirror": "cheek_hollow_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0613,
+          0.0081,
+          0.0825
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheek_hollow_left",
+          "axis": [
+            -0.8321,
+            0.207,
+            -0.5146
+          ],
+          "travel": 0.0095,
+          "screen": {
+            "front": [
+              -0.97,
+              0.241
+            ],
+            "three_quarter": [
+              -0.977,
+              0.212
+            ],
+            "side": [
+              -0.928,
+              0.373
+            ],
+            "back": [
+              0.97,
+              0.241
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "cheek_hollow_right",
+      "feature": "cheeks",
+      "label": "Right cheek hollow",
+      "mirror": "cheek_hollow_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0613,
+          0.0081,
+          0.0825
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "cheek_hollow_right",
+          "axis": [
+            0.8428,
+            0.2032,
+            -0.4983
+          ],
+          "travel": 0.0095,
+          "screen": {
+            "front": [
+              0.972,
+              0.234
+            ],
+            "side": [
+              -0.926,
+              0.378
+            ],
+            "back": [
+              -0.972,
+              0.234
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "side",
+        "back"
+      ]
+    },
+    {
       "id": "jaw_left",
       "feature": "jaw",
       "label": "Left jaw corner",
@@ -6171,6 +8753,315 @@
             "back": [
               -0.0,
               -1.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "jawline_left",
+      "feature": "jaw",
+      "label": "Left jawline",
+      "mirror": "jawline_right",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          0.0481,
+          -0.0739,
+          0.0327
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "jaw_definition",
+          "axis": [
+            0.6868,
+            -0.723,
+            0.0746
+          ],
+          "travel": 0.003,
+          "screen": {
+            "front": [
+              0.689,
+              -0.725
+            ],
+            "three_quarter": [
+              0.597,
+              -0.802
+            ],
+            "side": [
+              0.103,
+              -0.995
+            ],
+            "back": [
+              -0.689,
+              -0.725
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "jawline_right",
+      "feature": "jaw",
+      "label": "Right jawline",
+      "mirror": "jawline_left",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0481,
+          -0.0739,
+          0.0327
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "jaw_definition",
+          "axis": [
+            -0.6711,
+            -0.7385,
+            0.0658
+          ],
+          "travel": 0.003,
+          "screen": {
+            "front": [
+              -0.673,
+              -0.74
+            ],
+            "three_quarter": [
+              -0.501,
+              -0.865
+            ],
+            "side": [
+              0.089,
+              -0.996
+            ],
+            "back": [
+              0.673,
+              -0.74
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "chin",
+      "feature": "chin",
+      "label": "Chin",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0,
+          -0.0813,
+          0.0914
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "chin_length",
+          "axis": [
+            -0.0,
+            -1.0,
+            0.0
+          ],
+          "travel": 0.0115,
+          "screen": {
+            "front": [
+              -0.0,
+              -1.0
+            ],
+            "three_quarter": [
+              -0.0,
+              -1.0
+            ],
+            "side": [
+              -0.0,
+              -1.0
+            ],
+            "back": [
+              0.0,
+              -1.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_forward",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "chin_left",
+      "feature": "chin",
+      "label": "Left chin corner",
+      "mirror": "chin_right",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          0.0191,
+          -0.0832,
+          0.0843
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "chin_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0077,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_shape",
+          "axis": [
+            0.5917,
+            -0.8062,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              0.592,
+              -0.806
+            ],
+            "three_quarter": [
+              0.461,
+              -0.888
+            ],
+            "side": [
+              0.0,
+              -1.0
+            ],
+            "back": [
+              -0.592,
+              -0.806
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "chin_right",
+      "feature": "chin",
+      "label": "Right chin corner",
+      "mirror": "chin_left",
+      "anchor": {
+        "bone": "Jaw",
+        "offset": [
+          -0.0191,
+          -0.0832,
+          0.0843
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "chin_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0077,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "parameter": "chin_shape",
+          "axis": [
+            -0.5917,
+            -0.8062,
+            0.0
+          ],
+          "travel": 0.0071,
+          "screen": {
+            "front": [
+              -0.592,
+              -0.806
+            ],
+            "three_quarter": [
+              -0.461,
+              -0.888
+            ],
+            "side": [
+              -0.0,
+              -1.0
+            ],
+            "back": [
+              0.592,
+              -0.806
             ]
           }
         }
@@ -6418,6 +9309,161 @@
       "views": [
         "three_quarter",
         "side"
+      ]
+    },
+    {
+      "id": "forehead",
+      "feature": "forehead",
+      "label": "Forehead",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0,
+          0.1264,
+          0.0934
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "forehead_height",
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "travel": 0.0114,
+          "screen": {
+            "front": [
+              0.0,
+              1.0
+            ],
+            "three_quarter": [
+              0.0,
+              1.0
+            ],
+            "side": [
+              0.0,
+              1.0
+            ],
+            "back": [
+              0.0,
+              1.0
+            ]
+          }
+        },
+        {
+          "parameter": "forehead_slope",
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "travel": 0.0067,
+          "screen": {
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "side": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "side",
+        "back"
+      ]
+    },
+    {
+      "id": "temple_left",
+      "feature": "forehead",
+      "label": "Left temple",
+      "mirror": "temple_right",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          0.0763,
+          0.0721,
+          0.0348
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "temple_width",
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "front": [
+              1.0,
+              0.0
+            ],
+            "three_quarter": [
+              1.0,
+              0.0
+            ],
+            "back": [
+              -1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
+      ]
+    },
+    {
+      "id": "temple_right",
+      "feature": "forehead",
+      "label": "Right temple",
+      "mirror": "temple_left",
+      "anchor": {
+        "bone": "Head",
+        "offset": [
+          -0.0764,
+          0.0721,
+          0.0348
+        ]
+      },
+      "drives": [
+        {
+          "parameter": "temple_width",
+          "axis": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "travel": 0.0104,
+          "screen": {
+            "front": [
+              -1.0,
+              0.0
+            ],
+            "three_quarter": [
+              -1.0,
+              0.0
+            ],
+            "back": [
+              1.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "views": [
+        "front",
+        "three_quarter",
+        "back"
       ]
     },
     {

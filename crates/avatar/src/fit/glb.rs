@@ -31,6 +31,28 @@ pub struct FittedModel<'a> {
     pub object: &'a str,
     /// The shading model each material is drawn with (`cloth`).
     pub shading: &'a str,
+    /// Each piece's texture maps, in the pieces' order (pieces past its end
+    /// have none).
+    pub maps: &'a [PieceMaps],
+    /// Each corner's place on the body's skin, in the pieces' order
+    /// ([`skin_uvs`](super::skin_uvs)), or empty: written as
+    /// `_AXCENITY_SKIN_UV`, by which a garment worn over this one hides
+    /// the cloth under it (ADR-0045).
+    pub skin_uvs: &'a [[f32; 2]],
+    /// A shape's move of a corner is written only when it is longer than
+    /// this (metres; 0 writes every move). Smoothed moves fade out over
+    /// the whole garment, and their tails are most of the file.
+    pub least_move: f32,
+}
+
+/// One piece's texture maps, each an encoded image file's bytes (PNG or
+/// JPEG, told apart by how they start).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PieceMaps {
+    pub colour: Option<Vec<u8>>,
+    pub normal: Option<Vec<u8>>,
+    /// Roughness in green and metalness in blue, as glTF has them.
+    pub metal_rough: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -161,7 +183,23 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
         armature,
         object,
         shading,
+        maps,
+        skin_uvs,
+        least_move,
     } = model;
+    let mut images: Vec<Value> = Vec::new();
+    let mut textures: Vec<Value> = Vec::new();
+    let mut texture = |buffer: &mut Buffer, bytes: &[u8]| -> usize {
+        let view = buffer.view(bytes, None);
+        let mime = if bytes.starts_with(&[0xFF, 0xD8]) {
+            "image/jpeg"
+        } else {
+            "image/png"
+        };
+        images.push(json!({"bufferView": view, "mimeType": mime}));
+        textures.push(json!({"source": images.len() - 1, "sampler": 0}));
+        textures.len() - 1
+    };
     let mut buffer = Buffer::default();
 
     // The skeleton: one node per bone, after the armature node (unless a
@@ -241,12 +279,15 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
         if piece.uvs.len() == count {
             attributes["TEXCOORD_0"] = json!(buffer.floats(&piece.uvs, "VEC2"));
         }
+        if let Some(skin) = skin_uvs.get(range.clone()) {
+            attributes[axcenity_assets::SKIN_UV_ATTRIBUTE] = json!(buffer.floats(skin, "VEC2"));
+        }
         let targets: Vec<Value> = fitted
             .shapes
             .iter()
             .map(|shape| {
                 let moved: Vec<u32> = (0..count as u32)
-                    .filter(|&k| shape.offsets[start + k as usize].length() > 0.0)
+                    .filter(|&k| shape.offsets[start + k as usize].length() > *least_move)
                     .collect();
                 let offsets: Vec<Vec3> = moved
                     .iter()
@@ -276,7 +317,7 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
         } else {
             piece.material.clone()
         };
-        materials.push(json!({
+        let mut material = json!({
             "name": name,
             "doubleSided": true,
             "pbrMetallicRoughness": {
@@ -285,7 +326,23 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
                 "roughnessFactor": piece.roughness,
             },
             "extras": {"axcenity_shading": shading},
-        }));
+        });
+        if let Some(maps) = maps.get(index) {
+            let pbr = &mut material["pbrMetallicRoughness"];
+            if let Some(bytes) = &maps.colour {
+                pbr["baseColorTexture"] = json!({"index": texture(&mut buffer, bytes)});
+            }
+            if let Some(bytes) = &maps.metal_rough {
+                // The map holds the values: the factors only scale it.
+                pbr["metallicRoughnessTexture"] = json!({"index": texture(&mut buffer, bytes)});
+                pbr["metallicFactor"] = json!(1.0);
+                pbr["roughnessFactor"] = json!(1.0);
+            }
+            if let Some(bytes) = &maps.normal {
+                material["normalTexture"] = json!({"index": texture(&mut buffer, bytes)});
+            }
+        }
+        materials.push(material);
         start += count;
     }
     let mut mesh = json!({"name": object, "primitives": primitives});
@@ -299,7 +356,7 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
     while !buffer.bytes.len().is_multiple_of(4) {
         buffer.bytes.push(0);
     }
-    let document = json!({
+    let mut document = json!({
         "asset": {"version": "2.0", "generator": "Axcenity Engine garment fitting (CO9)"},
         "scene": 0,
         "scenes": [{"nodes": scene_roots}],
@@ -311,6 +368,12 @@ pub fn write_fitted_glb(model: &FittedModel) -> Vec<u8> {
         "bufferViews": buffer.views,
         "accessors": buffer.accessors,
     });
+    if !textures.is_empty() {
+        document["images"] = json!(images);
+        document["textures"] = json!(textures);
+        // Repeating, smoothed, with mipmaps.
+        document["samplers"] = json!([{"magFilter": 9729, "minFilter": 9987}]);
+    }
     glb(&document, &buffer.bytes)
 }
 

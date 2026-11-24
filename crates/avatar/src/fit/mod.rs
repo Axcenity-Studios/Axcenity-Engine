@@ -29,10 +29,15 @@
 //! character facing +Z), not the engine's fitted 1×1×1 space.
 
 mod bind;
+mod cover;
 mod coverage;
 mod glb;
+mod hang;
 mod hiding;
 mod import;
+mod intake;
+mod mend;
+mod parts;
 mod pose;
 mod posed;
 mod surface;
@@ -48,15 +53,23 @@ use axcenity_assets::{Model, Rig};
 use glam::{Mat3, Mat4, Vec3};
 
 pub use bind::{Binding, Bound, bind, place};
+pub use cover::{COVER_SIZE, ClothAt, CoverMap, CoverReport, Proof, cover_map, skin_uvs};
 pub use coverage::{
     Coverage, HIDE_SHARE, RegionMap, SlotGuess, classify, coverage, hidden_regions,
     triangle_regions,
 };
-pub use glb::{FittedModel, write_fitted_glb};
-pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides};
+pub use glb::{FittedModel, PieceMaps, write_fitted_glb};
+pub use hang::{Hang, Hung, Worn, WornWith};
+pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides, uncovered};
 pub use import::{
-    Alignment, ImportRequest, Imported, align, extremes_of, import_garment, pose_states_of,
+    Alignment, ImportRequest, Imported, WornWithRequest, align, extremes_of, import_garment,
+    pose_states_of, remake_cover_map,
 };
+pub use intake::{
+    Conform, Ease, GarmentKind, IntakeOptions, IntakeReport, Openings, Prepared, Welding,
+    describe_reading, prepare,
+};
+pub use mend::Mended;
 pub use pose::{
     CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses, skin,
     skin_matrices,

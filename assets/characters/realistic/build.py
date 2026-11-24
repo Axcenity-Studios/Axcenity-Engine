@@ -231,8 +231,24 @@ def export_glb(path, armature, objects):
         export_image_format="AUTO")
 
 
-def main(out_dir, texture_size=2048, bakes=True):
+def grafted(out_dir):
+    """Whether `out_dir` holds a grafted model (`graft_shapes.py`): the
+    shipped one with later shapes added, which garments are fitted to and
+    this build does not reproduce (README, "Rebuilding")."""
+    try:
+        with open(os.path.join(out_dir, DATA_FILE)) as f:
+            return "grafted_shapes" in json.load(f)
+    except (OSError, ValueError):
+        return False
+
+
+def main(out_dir, texture_size=2048, bakes=True, over_grafted=False):
     out_dir = os.path.abspath(out_dir)
+    if grafted(out_dir) and not over_grafted:
+        sys.exit(f"{out_dir} holds a grafted model: building over it would move the body every fitted garment "
+                 "is bound to. Build into a scratch folder (--out DIR) and graft the new shapes on "
+                 "(graft_shapes.py; README, \"Rebuilding\"), or pass --over-grafted to replace it and refit "
+                 "every garment.")
     os.makedirs(out_dir, exist_ok=True)
     armature, objects, data, report = build(out_dir, texture_size, bakes)
     for name, obj in objects.items():
@@ -259,6 +275,6 @@ if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     out = argv[argv.index("--out") + 1] if "--out" in argv else os.path.dirname(os.path.abspath(__file__))
     size = int(argv[argv.index("--texture-size") + 1]) if "--texture-size" in argv else 2048
-    rep = main(out, size, bakes="--skip-bakes" not in argv)
+    rep = main(out, size, bakes="--skip-bakes" not in argv, over_grafted="--over-grafted" in argv)
     for k in sorted(rep):
         print(f"{k:24s} {rep[k]:6d}")

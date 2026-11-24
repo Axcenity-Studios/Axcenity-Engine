@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Square",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "face_length": -0.2,
+    "face_roundness": -0.8,
+    "face_taper": -0.9,
+    "face_width": 0.3
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-shape-square",
+    "kind": "feature",
+    "about": "A jaw as wide as the cheekbones, with flat sides and a square corner.",
+    "feature": "face_shape",
+    "tags": [
+      "shape"
+    ],
+    "order": 30
+  }
+}

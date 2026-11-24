@@ -733,6 +733,10 @@ fn copy_library(from: &Path, to: &Path) -> Result<(), String> {
         if let Some(strands) = item.groom.as_ref().and_then(|g| g.strands.as_deref()) {
             files.extend(library.path_of(id, strands));
         }
+        // What it hides when worn (ADR-0045).
+        if let Some(cover) = item.cover_map.as_deref() {
+            files.extend(library.path_of(id, cover));
+        }
     }
     files.sort();
     files.dedup();

@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Aquiline",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "nose_bridge": 0.3,
+    "nose_hump": 0.7,
+    "nose_length": 0.3,
+    "nose_root": 0.3,
+    "nose_tip_rotation": -0.35
+  },
+  "preset": {
+    "id": "axcenity/realistic-nose-aquiline",
+    "kind": "feature",
+    "about": "A high bridge that bows out along its length, the tip turned a little down.",
+    "feature": "nose",
+    "tags": [
+      "shape"
+    ],
+    "order": 20
+  }
+}

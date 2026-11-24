@@ -46,6 +46,9 @@ pub fn kind_label(kind: PresetKind) -> &'static str {
         PresetKind::Hair => "Hairstyles",
         PresetKind::Outfit => "Outfits",
         PresetKind::Skin => "Skin",
+        // (Feature presets, a nose or a face shape, aren't in `KINDS`: no
+        // by-kind list shows them yet.)
+        PresetKind::Feature => "Features",
         PresetKind::Other => "Other",
     }
 }
@@ -59,6 +62,7 @@ pub fn kind_name(kind: PresetKind) -> &'static str {
         PresetKind::Hair => "Hair",
         PresetKind::Outfit => "Outfit",
         PresetKind::Skin => "Skin",
+        PresetKind::Feature => "Feature",
         PresetKind::Other => "Other",
     }
 }
@@ -320,6 +324,7 @@ pub fn make(
         tags,
         thumbnail: None,
         order: None,
+        feature: None,
     };
     preset.extra.insert(
         "preset".to_owned(),
@@ -384,6 +389,10 @@ struct FavouritesFile {
     /// The items worn last from a browser, newest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     recent_items: Vec<String>,
+    /// How wide the person made the workspace's panel, in points (left
+    /// out until they drag its edge).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    panel_width: Option<f32>,
 }
 
 fn read_file(folder: &Path) -> FavouritesFile {
@@ -415,6 +424,19 @@ pub fn write_favourites(folder: &Path, favourites: &BTreeSet<String>) {
     update_file(folder, |file| {
         file.presets = favourites.iter().cloned().collect();
     });
+}
+
+/// How wide the person made the workspace's panel, if they did (editor
+/// state, kept beside the favourites).
+pub fn read_panel_width(folder: &Path) -> Option<f32> {
+    read_file(folder)
+        .panel_width
+        .filter(|width| width.is_finite())
+}
+
+/// Keeps the panel's width in `folder` (the favourites are kept).
+pub fn write_panel_width(folder: &Path, width: f32) {
+    update_file(folder, |file| file.panel_width = Some(width));
 }
 
 /// The browsers' favourite items and recently used items in `folder`

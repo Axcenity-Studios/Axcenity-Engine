@@ -62,6 +62,56 @@ def relaxed(p, curl=14.0, arm_down=36.0, elbow=12.0, weight=1.0):
     return p
 
 
+# How far a hanging arm's forearm is turned about its length so the palm
+# faces the thigh and the thumb points ahead (degrees). Without it the
+# palms face forward, as they do in the A-pose the skeleton rests in: a
+# person standing so looks braced, not at ease.
+AT_EASE = 25.0
+
+
+def turn_forearms(p, sides=SIDES, turn=AT_EASE):
+    """Turns the forearms of `sides` about their length by `turn`, keeping
+    the elbow's bend (the forearm's X so far) forward. Keys are XYZ
+    angles, which bend first and turn after, and a turn after the bend
+    swings the hand across the body; so the angles are worked out from the
+    turn made first and the bend after it. Call it once the pose's elbow
+    bends are all in."""
+    for side in sides:
+        bone = f"{side}LowerArm"
+        bend = p.get(bone, (0.0, 0.0, 0.0))[0]
+        made = (Euler((math.radians(bend), 0, 0)).to_matrix()
+                @ Euler((0, math.radians(turn), 0)).to_matrix())
+        rot = tuple(math.degrees(a) for a in made.to_euler("XYZ"))
+        p[bone] = rot if side == "Left" else mirror(rot)
+    return p
+
+
+def at_ease(p, sides=SIDES):
+    """Makes the hanging arms of `sides` hang as a relaxed person's: the
+    palm to the thigh and the elbow and fingers a little softer than
+    `relaxed` leaves them. The upper arm stays as far out as `relaxed`
+    has it (about 9 degrees): nearer, the forearm covers the waist seen
+    from the front, where Character Studio's waist handles are."""
+    for side in sides:
+        p.side(side, "LowerArm", (2, 0, 0))
+        # The hand in line with the forearm (`relaxed` cocks it out).
+        p.side(side, "Hand", (0, 0, -4))
+    hand(p, 6, sides=sides)
+    return turn_forearms(p, sides)
+
+
+def standing(free=()):
+    """Standing at ease: what Idle holds, and where the gestures start and
+    end. The arms hang by the sides with the palms to the thighs, the
+    back and neck give a little. A side named in `free` keeps `relaxed`'s
+    arm, for a gesture to pose from."""
+    p = relaxed(Pose())
+    at_ease(p, sides=[side for side in SIDES if side not in free])
+    p.add("Spine", (1.5, 0, 0)).add("Chest", (1.5, 0, 0))
+    p.add("Neck", (2.0, 0, 0)).add("Head", (-2.0, 0, 0))
+    return p
+
+
 def hand(p, curl, thumb=None, sides=SIDES):
     for side in sides:
         for f in FINGERS:
@@ -181,7 +231,7 @@ def keyframes(t, keys):
 # ---------------------------------------------------------------------------
 
 def idle(t):
-    p = relaxed(Pose())
+    p = standing()
     b = osc(t)
     p.add("Spine", (1.2 * b, 0, 0)).add("Chest", (1.0 * b, 0, 0))
     p.add("UpperChest", (-1.0 * b, 0, 0))
@@ -220,7 +270,9 @@ def gait(t, speed, stride, lift, arm_swing, lean, bounce, crouch=0.0, dir_turn=0
     p.hips = Vector((0.012 * osc(t, 1), 0, -0.012 - crouch * 0.33 + bounce * osc(t, 2, 0.0)))
     if dir_turn:
         p.root_turn = dir_turn
-    return p
+    # The palms to the thighs, as when standing (so a step from Idle
+    # doesn't turn the hands).
+    return turn_forearms(p)
 
 
 WALK_SPEED = 1.45  # m/s the walk is keyed for
@@ -242,7 +294,7 @@ def sprint(t):
 
 
 def crouch_idle(t):
-    p = relaxed(Pose(), arm_down=30, elbow=30)
+    p = turn_forearms(relaxed(Pose(), arm_down=30, elbow=30))
     b = osc(t)
     p.both("UpperLeg", (62, 0, 4)).both("LowerLeg", (-100, 0, 0)).both("Foot", (38, 0, 0))
     p.add("Spine", (18 + b, 0, 0)).add("Chest", (6, 0, 0)).add("Neck", (-14, 0, 0)).add("Head", (-8, 0, 0))
@@ -259,7 +311,7 @@ def crouch_walk(t):
 
 def strafe(t, side_sign, speed):
     """Sideways steps toward +X (character's left) when side_sign is 1."""
-    p = relaxed(Pose(), arm_down=36)
+    p = turn_forearms(relaxed(Pose(), arm_down=36))
     amp = 14 if speed < 3 else 22
     for side, ph in (("Left", 0.0), ("Right", 0.5)):
         s = osc(t, 1, ph + 0.25)
@@ -297,7 +349,7 @@ def jump(t):
     tuck.both("UpperLeg", (50, 0, 0)).both("LowerLeg", (-80, 0, 0)).both("Foot", (10, 0, 0))
     tuck.add("Spine", (6, 0, 0))
     tuck.hips = Vector((0, 0, -0.02))
-    return keyframes(t, [(0.0, relaxed(Pose())), (0.35, crouch), (0.6, up), (1.0, tuck)])
+    return keyframes(t, [(0.0, standing()), (0.35, crouch), (0.6, up), (1.0, tuck)])
 
 
 def fall(t):
@@ -325,8 +377,8 @@ def land(t):
 # ---------------------------------------------------------------------------
 
 def wave(t):
-    base = relaxed(Pose())
-    up = relaxed(Pose())
+    base = standing()
+    up = standing(free=("Right",))
     up.side("Right", "UpperArm", (5, -80, 40))  # raise and turn the right arm
     up.side("Right", "LowerArm", (95, 0, 0))
     hand(up, 0, 0, sides=("Right",))
@@ -343,8 +395,8 @@ def wave(t):
 
 
 def point(t):
-    base = relaxed(Pose())
-    aim = relaxed(Pose())
+    base = standing()
+    aim = standing(free=("Right",))
     aim.side("Right", "UpperArm", (78, 0, 30))
     aim.side("Right", "LowerArm", (8, 0, 0))
     hand(aim, 75, 40, sides=("Right",))
@@ -355,7 +407,7 @@ def point(t):
 
 
 def pick_up(t):
-    base = relaxed(Pose())
+    base = standing()
     low = relaxed(Pose(), arm_down=10, elbow=10)
     low.both("UpperArm", (55, 0, 0))
     low.both("UpperLeg", (70, 0, 6)).both("LowerLeg", (-105, 0, 0)).both("Foot", (35, 0, 0))
@@ -371,8 +423,8 @@ def pick_up(t):
 
 
 def use_object(t):
-    base = relaxed(Pose())
-    reach = relaxed(Pose())
+    base = standing()
+    reach = standing(free=("Right",))
     reach.side("Right", "UpperArm", (62, 0, 26))
     reach.side("Right", "LowerArm", (35, 0, 0))
     reach.add("Spine", (6, -8, 0)).add("Head", (8, -4, 0))
@@ -413,8 +465,8 @@ def pull(t):
 
 def interact(t):
     """A short 'press a button / take an item' gesture at chest height."""
-    base = relaxed(Pose())
-    out = relaxed(Pose())
+    base = standing()
+    out = standing(free=("Right",))
     out.side("Right", "UpperArm", (55, 0, 22))
     out.side("Right", "LowerArm", (45, 0, 0))
     hand(out, 10, 10, sides=("Right",))
@@ -472,7 +524,7 @@ def sit(t):
 
 
 def emote_cheer(t):
-    base = relaxed(Pose())
+    base = standing()
     up = Pose()
     up.both("UpperArm", (20, 0, 95))
     up.both("LowerArm", (10, 0, 0))
@@ -498,7 +550,7 @@ def emote_clap(t):
 
 
 def emote_shrug(t):
-    base = relaxed(Pose())
+    base = standing()
     up = relaxed(Pose(), arm_down=30, elbow=80)
     up.both("Shoulder", (0, 0, 14))
     up.both("LowerArm", (0, -40, 0))

@@ -106,6 +106,10 @@ pub struct PackItem {
 pub struct PackEntry {
     /// The manifest's path in a library (`realistic/imports/x/X.item.json`).
     pub manifest: String,
+    /// The item's tags (who a garment is cut for: `masculine`,
+    /// `feminine`, `unisex`).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// One file of an item.

@@ -2,9 +2,9 @@
 //! §3.4, §4.3 and §5.3; `references/ux/patterns.md` section 3). The
 //! viewport is a control as well as a view:
 //!
-//! - **Hover** tints the feature under the pointer (a soft overlay drawn
-//!   over the preview, never a material change) and names it in the status
-//!   line. What's under the pointer is found by a ray against the skin as
+//! - **Hover** highlights the feature under the pointer (a soft mask
+//!   drawn over the preview, [`mask`], never a material change) and names
+//!   it in the status line. What's under the pointer is found by a ray against the skin as
 //!   it's drawn (`scene::ray_parts`: posed, skinned, the identity worn
 //!   live), and which feature that is from the manifest's `features`
 //!   (their anchors, measured at rest, and the body regions they name).
@@ -19,10 +19,12 @@
 //!   undo step and Esc takes it back. Any other drag turns the camera as
 //!   before, Alt with a drag always does, and the right button pans.
 //! - **Only what the camera sees** is drawn: the overlay is egui's, over
-//!   the preview, with no depth of its own, so a small CPU depth buffer of
-//!   the character as posed ([`depth`]) hides handles and tint behind
-//!   other skin (the far jaw angle behind the cheek), and a hidden handle
-//!   can't be grabbed.
+//!   the preview, with no depth of its own, so the character as posed is
+//!   rasterized into a small buffer on the CPU ([`depth`]). The highlight
+//!   is read from it (each texel's nearest surface, the body's or a worn
+//!   part's), and its depth of the body alone hides a handle behind other
+//!   skin (the far jaw angle behind the cheek); a hidden handle can't be
+//!   grabbed.
 //! - **The switch** ([`Intent::SetHandles`], in the toolbar) turns all
 //!   of it off: the viewport is the camera only.
 //!
@@ -34,7 +36,8 @@
 //! Ctrl double. Two drives of one handle are solved together, each held
 //! still until its own part of the drag passes [`DEAD_ZONE`].
 
-use std::collections::{HashMap, HashSet};
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -47,6 +50,8 @@ use axcenity_scene::{CameraView, Corner, Ray};
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke};
 
 use self::depth::Depth;
+use self::mask::{Layer, Mask, Surface};
+use self::worn::WornMap;
 use super::intent::{Gesture, Intent};
 use super::numeric;
 use super::selection::Level;
@@ -72,8 +77,8 @@ const THROUGH: f32 = 0.03;
 /// How far from a feature's anchors (times its radius) a point still
 /// picks it.
 const REACH: f32 = 1.2;
-/// Where a corner's weight for a feature (its tint) crosses this, the
-/// feature's outline runs.
+/// Where a point's weight for a feature is at least this, it's the
+/// feature's: lit when the feature is, and picked as it.
 const EDGE: f32 = 0.5;
 /// A face feature's tint reaches this many times its radius from each of
 /// its anchors and handles...
@@ -95,20 +100,38 @@ const BROAD: f32 = 4.0;
 const APART: f32 = 25.0;
 
 mod depth;
+mod mask;
+mod worn;
 
-/// Skin more than this many metres (of the file) behind what the camera
-/// sees there is hidden: its handles aren't drawn, nor its tint.
+/// A handle on skin more than this many metres (of the file) behind the
+/// skin the camera sees there is hidden.
 const HIDDEN: f32 = 0.003;
-/// What the character wears hides only skin more than this many metres
-/// behind it: the hips under the briefs are still the hips (and their
-/// handles show on the briefs), but the far side seen through the skin's
-/// opening under clothing is hidden.
+/// A part that can't carry a feature's highlight itself (the base's own:
+/// underwear, brows, lashes; or one with no skeleton to follow the body
+/// by) counts this many metres farther than it is, so the skin just under
+/// it is what's seen there and lights up. A skinned garment carries the
+/// weights of the skin under it ([`WornMap`]) and counts where it is.
 const WORN: f32 = 0.015;
+/// A ray that meets a worn item first still picks the skin behind it
+/// within this many metres: a coat stands well off the body it dresses.
+const THROUGH_WORN: f32 = 0.25;
 /// How far round a handle (texels of the depth buffer, about two points
 /// each) skin that shows lets it show: a handle at the skin's outline is a
-/// little behind the skin just inside it. The tint looks only at the
-/// texels it's between.
+/// little behind the skin just inside it.
 const HANDLE_SIGHT: i32 = 3;
+/// A corner of the skin lights up as far as it faces the camera: fully
+/// from this much of straight on, fading to nothing edge on (the inside of
+/// a nostril, which faces away, never does).
+const FACING: f32 = 0.3;
+/// How strong the selected feature's highlight is: inside, and that much
+/// more along its edge.
+const SELECTED: [f32; 2] = [0.10, 0.10];
+/// The hovered feature's, a little stronger.
+const HOVERED: [f32; 2] = [0.18, 0.14];
+
+/// A feature's weights on a worn model's points, primitive by primitive
+/// ([`WornMap::weights`]).
+type ClothWeights = Arc<Vec<Vec<f32>>>;
 
 /// Direct manipulation's editor state (never saved, never undone).
 pub struct Direct {
@@ -130,13 +153,31 @@ pub struct Direct {
     /// What a body model's features and handles are, worked out once per
     /// model and base model.
     prepared: HashMap<(u64, String), Arc<Prepared>>,
+    /// For each body model and worn model (by their keys): which of the
+    /// body's corners each of the worn model's points lies over, worked
+    /// out once (`None`: the worn model can't follow the body).
+    worn_maps: HashMap<(u64, u64), Option<Arc<WornMap>>>,
+    /// The same by the body's shape at rest ([`rest_print`], kept for each
+    /// body model in `shapes`): a body with other skin hidden is another
+    /// model with the same corners, and what lies over them is the same.
+    worn_by_shape: HashMap<(u64, u64), Option<Arc<WornMap>>>,
+    shapes: HashMap<u64, u64>,
+    /// A feature's weights on a worn model's points ([`WornMap::weights`]),
+    /// by the body's features (where they're kept), the worn model and
+    /// the feature: worked out the first time they're asked for.
+    cloth: HashMap<(usize, u64, String), ClothWeights>,
     /// A line for the status bar while hovering or dragging.
     pub status: Option<String>,
     /// Where the pointer and the camera were when `hovered` was found.
     picked_at: Option<(Pos2, Orbit)>,
-    /// The tint's polygons' corners last frame, in the world (for tests).
-    #[cfg(test)]
-    tint_points: Vec<Vec3>,
+    /// What the camera saw of the character when it was last looked at,
+    /// kept while nothing it's made from changes.
+    sight: Option<Arc<Sight>>,
+    /// How many times `sight` was made.
+    sights: u64,
+    /// The highlight, and what it was last made for.
+    mask: Mask,
+    mask_key: Option<MaskKey>,
 }
 
 impl Default for Direct {
@@ -151,10 +192,16 @@ impl Default for Direct {
             drag: None,
             focus: None,
             prepared: HashMap::new(),
+            worn_maps: HashMap::new(),
+            worn_by_shape: HashMap::new(),
+            shapes: HashMap::new(),
+            cloth: HashMap::new(),
             status: None,
             picked_at: None,
-            #[cfg(test)]
-            tint_points: Vec::new(),
+            sight: None,
+            sights: 0,
+            mask: Mask::default(),
+            mask_key: None,
         }
     }
 }
@@ -215,9 +262,6 @@ struct Prepared {
     /// Turns a step in the fitted space into the file's metres
     /// (`scene::to_metres`).
     metres: Vec3,
-    /// Each primitive's open edges (by corner, lower first): where its
-    /// skin ends, such as round what clothing hides.
-    open: Vec<OpenEdges>,
 }
 
 struct PreparedFeature {
@@ -233,24 +277,17 @@ struct PreparedFeature {
     weights: Vec<Vec<f32>>,
     /// Its tint is the skin its shapes move (a face feature's).
     shaped: bool,
-    /// Each primitive's corners inside a hollow ([`hollows_out`]).
-    hollow: Vec<HashSet<u32>>,
 }
 
 /// A feature's tint, as [`tint_weights`] works it out.
 struct Tint {
     weights: Vec<Vec<f32>>,
     shaped: bool,
-    hollow: Vec<HashSet<u32>>,
 }
 
 impl Tint {
     fn of(weights: Vec<Vec<f32>>, shaped: bool) -> Self {
-        Self {
-            weights,
-            shaped,
-            hollow: Vec::new(),
-        }
+        Self { weights, shaped }
     }
 }
 
@@ -289,9 +326,9 @@ impl PreparedDrive {
 }
 
 /// How much each corner of each of `model`'s primitives belongs to a
-/// feature, for its tint and outline (ux patterns P6: from data the build
-/// already has, no painted map). The outline is where this crosses
-/// [`EDGE`].
+/// feature, for its highlight and for picking it (ux patterns P6: from
+/// data the build already has, no painted map). The feature's edge is
+/// where this crosses [`EDGE`].
 ///
 /// - A feature with body regions is its regions.
 /// - One whose parameters drive shapes (the face's) is the skin those
@@ -304,13 +341,12 @@ impl PreparedDrive {
 ///   socket as one, out to the brows and the upper cheek, so the shapes
 ///   alone can't tell the eyes from those: [`compete`] gives that skin to
 ///   the brows and cheeks.
-///   Smoothed over the mesh twice, so the outline runs smoothly across the
+///   Smoothed over the mesh twice, so the edge runs smoothly across the
 ///   triangles rather than along them.
 /// - Any other fades out from its anchors.
 ///
-/// Only the skin is tinted, not the inside of the mouth: the overlay has
-/// no depth, so that would show through the lips. Distances are in the
-/// file's metres (`radius` is), not in the fitted box.
+/// Only the skin carries weight, not the inside of the mouth. Distances
+/// are in the file's metres (`radius` is), not in the fitted box.
 fn tint_weights(
     model: &Model,
     base: &BaseManifest,
@@ -408,10 +444,8 @@ fn tint_weights(
     let usual = areas.get(areas.len() / 2).copied().unwrap_or(0.0);
     let broad = |target: u16| area.get(&target).is_some_and(|a| *a > BROAD * usual);
     if most.values().any(|most| *most > 0.0) {
-        let mut hollow = Vec::new();
         for (primitive, out) in model.primitives.iter().zip(&mut weights) {
             if !tinted(primitive) {
-                hollow.push(HashSet::new());
                 continue;
             }
             for morph in primitive
@@ -434,13 +468,9 @@ fn tint_weights(
                 *weight *= near.clamp(0.0, 1.0);
             }
             smooth(&primitive.positions, &primitive.indices, out, 2);
-            hollow.push(hollows_out(primitive, out, metres));
+            hollows_out(primitive, out, metres);
         }
-        return Tint {
-            weights,
-            shaped: true,
-            hollow,
-        };
+        return Tint::of(weights, true);
     }
     for (primitive, out) in model.primitives.iter().zip(&mut weights) {
         if !tinted(primitive) {
@@ -455,7 +485,7 @@ fn tint_weights(
 }
 
 /// Face features share the skin between them: where another's tint is
-/// stronger, a feature's fades, and its outline runs where the two are
+/// stronger, a feature's fades, and its edge runs where the two are
 /// equal. The eyes' shapes move the brows and the upper cheek too, but the
 /// brows' and the cheeks' shapes move them more. Smoothed once more after,
 /// so that shared edge runs smoothly too.
@@ -490,13 +520,8 @@ fn compete(model: &Model, mut features: Vec<PreparedFeature>) -> Vec<PreparedFea
 /// Takes the tint off the skin inside a hollow: a corner whose normal
 /// meets the feature's own skin within [`HOLLOW`] (the inside of a nostril
 /// faces its other wall, as do the eyes' corners; open skin faces the
-/// air). A tinted hollow showed as a pale patch in a dark opening. The
-/// hollow's corners are returned: the outline doesn't run round them.
-fn hollows_out(
-    primitive: &axcenity_assets::Primitive,
-    weights: &mut [f32],
-    metres: Vec3,
-) -> HashSet<u32> {
+/// air). A tinted hollow showed as a pale patch in a dark opening.
+fn hollows_out(primitive: &axcenity_assets::Primitive, weights: &mut [f32], metres: Vec3) {
     let at = |corner: u32| {
         primitive
             .positions
@@ -547,63 +572,15 @@ fn hollows_out(
             .then_some(corner)
         })
         .collect();
-    for corner in &hollow {
-        weights[*corner] = 0.0;
+    for corner in hollow {
+        weights[corner] = 0.0;
     }
-    hollow.into_iter().map(|corner| corner as u32).collect()
-}
-
-/// An edge of a primitive, by its corners (the lower first).
-type Edge = (u32, u32);
-/// A corner's place, its position's bits (corners at one place are a
-/// seam's two sides).
-type Place = [u32; 3];
-/// A primitive's open edges, each with its twin across a seam, if any
-/// ([`open_edges`]).
-type OpenEdges = HashMap<Edge, Option<Edge>>;
-
-/// `primitive`'s edges that only one triangle has (by corner, lower
-/// first), each with its twin: the edge at the same place on the seam's
-/// other side, if there is one. A body region's corners are split from
-/// the next region's along its border (each corner holds one region), so
-/// a region's border is such a seam; where the skin really ends (cut away
-/// under clothing) there's no twin.
-fn open_edges(primitive: &axcenity_assets::Primitive) -> OpenEdges {
-    let place = |corner: u32| {
-        primitive
-            .positions
-            .get(corner as usize)
-            .map(|p| p.map(f32::to_bits))
-    };
-    let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
-    for triangle in primitive.indices.as_chunks::<3>().0 {
-        for k in 0..3 {
-            let (a, b) = (triangle[k], triangle[(k + 1) % 3]);
-            *uses.entry((a.min(b), a.max(b))).or_default() += 1;
-        }
-    }
-    let mut at_place: HashMap<(Place, Place), Vec<Edge>> = HashMap::new();
-    for &(a, b) in uses.iter().filter(|(_, n)| **n == 1).map(|(edge, _)| edge) {
-        let (Some(pa), Some(pb)) = (place(a), place(b)) else {
-            continue;
-        };
-        let key = if pa < pb { (pa, pb) } else { (pb, pa) };
-        at_place.entry(key).or_default().push((a, b));
-    }
-    let mut open = HashMap::new();
-    for edges in at_place.into_values() {
-        for &edge in &edges {
-            let twin = edges.iter().copied().find(|other| *other != edge);
-            open.insert(edge, twin);
-        }
-    }
-    open
 }
 
 /// Averages each corner's weight with its neighbours' (the corners it
 /// shares a triangle with), `passes` times. Corners at one place (the two
-/// sides of a seam) are kept equal, so the outline crosses a seam without
-/// a gap.
+/// sides of a seam) are kept equal, so the feature's edge crosses a seam
+/// without a gap.
 fn smooth(positions: &[[f32; 3]], indices: &[u32], weights: &mut [f32], passes: usize) {
     let count = weights.len().min(positions.len());
     let mut neighbours: Vec<Vec<u32>> = vec![Vec::new(); count];
@@ -690,11 +667,8 @@ impl Prepared {
                             .map(|at| (at, radius * REACH_TINT))
                         }),
                 );
-                let Tint {
-                    weights,
-                    shaped,
-                    hollow,
-                } = tint_weights(model, base, &feature.id, &reach, &regions);
+                let Tint { weights, shaped } =
+                    tint_weights(model, base, &feature.id, &reach, &regions);
                 PreparedFeature {
                     id: feature.id.clone(),
                     label: feature.label.clone(),
@@ -703,7 +677,6 @@ impl Prepared {
                     regions,
                     weights,
                     shaped,
-                    hollow,
                 }
             })
             .collect();
@@ -769,7 +742,6 @@ impl Prepared {
             features,
             handles,
             metres: axcenity_scene::to_metres(model),
-            open: model.primitives.iter().map(open_edges).collect(),
         }
     }
 
@@ -782,9 +754,9 @@ impl Prepared {
     }
 
     /// The feature `hit` (a ray's hit on `model`'s skin) belongs to: of the
-    /// features whose tint there is at least [`EDGE`] (inside their
-    /// outline), the smallest, so what's picked is what hovering shows (the
-    /// nose, not the head round it). Where no tint reaches (the inside of
+    /// features whose weight there is at least [`EDGE`] (inside their
+    /// highlight), the smallest, so what's picked is what hovering shows
+    /// (the nose, not the head round it). Where no tint reaches (the inside of
     /// an eye socket behind an eyeball), [`Self::feature_by_anchor`].
     fn feature_hit(
         &self,
@@ -875,12 +847,6 @@ impl Direct {
         self.focus.map(|focus| focus.to)
     }
 
-    /// How many handles were drawn last frame.
-    #[cfg(test)]
-    pub fn shown_count(&self) -> usize {
-        self.shown.len()
-    }
-
     /// Whether a handle is being dragged.
     pub fn dragging(&self) -> bool {
         self.drag.is_some()
@@ -963,14 +929,82 @@ fn from_rect(rect: Rect, point: Pos2) -> Vec2 {
     )
 }
 
-/// The preview's body this frame: the part, its model, its pose (with the
-/// identity on it) and where it stands.
+/// What tells one body's corners at rest from another's: where they are.
+fn rest_print(model: &Model) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for primitive in &model.primitives {
+        primitive.positions.len().hash(&mut hasher);
+        for position in &primitive.positions {
+            position.map(f32::to_bits).hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
+/// A part the character wears, as drawn this frame.
+struct WornNow {
+    model: Arc<Model>,
+    posed: Option<Arc<axcenity_assets::Posed>>,
+    transform: Mat4,
+    /// Its corners on the body, when it follows the body.
+    map: Option<Arc<WornMap>>,
+}
+
 type BodyNow = (
     axcenity_core::InstanceId,
     Arc<Model>,
     Option<Arc<axcenity_assets::Posed>>,
     Mat4,
 );
+
+/// What the camera sees of the character: made once for a camera, a pose
+/// and what's worn, and kept until one of them changes.
+struct Sight {
+    made_for: SightKey,
+    /// Which making this is ([`Direct::sights`]).
+    stamp: u64,
+    /// The body alone, its depth only: what hides a handle.
+    skin: Depth,
+    /// The body and what it wears, with what each texel shows. Its
+    /// surfaces are the body's primitives in order, then each worn part's.
+    all: Depth,
+}
+
+/// What a [`Sight`] is made from: the view, and each part drawn (the body
+/// first) by its model, its pose ([`pose_print`]), where it stands and
+/// whether it carries the highlight.
+#[derive(Clone, Debug, PartialEq)]
+struct SightKey {
+    rect: Rect,
+    orbit: Orbit,
+    parts: Vec<(u64, Option<u64>, [f32; 16], bool)>,
+}
+
+/// What tells one pose of a model from another: its joints and how far it
+/// leans toward each blend shape, which are all its corners are drawn
+/// from. (A pose's own version is new every frame, even standing still.)
+fn pose_print(posed: &axcenity_assets::Posed) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for joint in posed.joints() {
+        joint.to_cols_array().map(f32::to_bits).hash(&mut hasher);
+    }
+    for weight in posed.morph_weights() {
+        weight.to_bits().hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+/// What the highlight was made for: a [`Sight`] (its stamp), the body's
+/// features (by where they're kept), and each feature lit with its
+/// strengths.
+#[derive(Clone, Debug, PartialEq)]
+struct MaskKey {
+    sight: u64,
+    prepared: usize,
+    lit: Vec<(String, [f32; 2])>,
+}
 
 /// The studio's category for a manifest category.
 fn category_of(data: axcenity_avatar::Category) -> Option<Category> {
@@ -998,6 +1032,152 @@ impl CharacterWorkspace {
             .cloned();
         let transform = axcenity_scene::placement(&self.world, body)?;
         Some((body, model, posed, transform))
+    }
+
+    /// What the character wears over `body` (whose model is `model`), as
+    /// drawn this frame: the base's own parts and each worn item's.
+    fn worn_now(&mut self, body: axcenity_core::InstanceId, model: &Model) -> Vec<WornNow> {
+        let mut worn = Vec::new();
+        for part in self
+            .world
+            .all_below(body, |class| class == ClassName::MeshPart)
+        {
+            let Some(transform) = axcenity_scene::placement(&self.world, part) else {
+                continue;
+            };
+            let Some(worn_model) = self
+                .world
+                .get(part)
+                .and_then(|instance| instance.property("MeshId")?.as_str().map(str::to_owned))
+                .and_then(|mesh| self.assets.model_blocking(&mesh))
+            else {
+                continue;
+            };
+            let posed = self
+                .poses()
+                .get(&part)
+                .filter(|posed| posed.model_key == worn_model.key())
+                .cloned();
+            // Only what the description wears carries a feature's tint: the
+            // base's own parts (eyes, teeth, lashes) are no clothing.
+            let item = self.world.get(part).is_some_and(|instance| {
+                instance
+                    .attribute(applier::DESCRIPTION_PART)
+                    .and_then(|value| value.as_str())
+                    .is_some_and(|key| !key.starts_with("base:"))
+            });
+            let map = if item {
+                self.worn_map(model, &worn_model)
+            } else {
+                None
+            };
+            worn.push(WornNow {
+                model: worn_model,
+                posed,
+                transform,
+                map,
+            });
+        }
+        worn
+    }
+
+    /// `worn`'s points on the body `model` ([`WornMap`]), worked out the
+    /// first time the two are seen together; `None` when `worn` can't
+    /// follow the body.
+    fn worn_map(&mut self, model: &Model, worn: &Model) -> Option<Arc<WornMap>> {
+        let key = (model.key(), worn.key());
+        if let Some(map) = self.direct.worn_maps.get(&key) {
+            return map.clone();
+        }
+        // What is no longer worn is forgotten with the rest.
+        if self.direct.worn_maps.len() > 64 {
+            self.direct.worn_maps.clear();
+        }
+        if self.direct.worn_by_shape.len() > 24 {
+            self.direct.worn_by_shape.clear();
+        }
+        if self.direct.shapes.len() > 64 {
+            self.direct.shapes.clear();
+        }
+        let shape = *self
+            .direct
+            .shapes
+            .entry(model.key())
+            .or_insert_with(|| rest_print(model));
+        let map = self
+            .direct
+            .worn_by_shape
+            .entry((shape, worn.key()))
+            .or_insert_with(|| WornMap::new(model, worn).map(Arc::new))
+            .clone();
+        self.direct.worn_maps.insert(key, map.clone());
+        map
+    }
+
+    /// `feature`'s weights on the points of worn model `worn`
+    /// ([`WornMap::weights`]), kept from the first time they're asked
+    /// for (a primitive the feature doesn't reach at all keeps none: most
+    /// features are nowhere near most garments). `prepared` is where the
+    /// body's features are kept.
+    fn cloth(
+        &mut self,
+        prepared: &Arc<Prepared>,
+        feature: &PreparedFeature,
+        worn: &Model,
+        map: &WornMap,
+    ) -> ClothWeights {
+        // What is no longer worn is forgotten with the rest.
+        if self.direct.cloth.len() > 512 {
+            self.direct.cloth.clear();
+        }
+        let key = (
+            Arc::as_ptr(prepared) as usize,
+            worn.key(),
+            feature.id.clone(),
+        );
+        let weights = self.direct.cloth.entry(key).or_insert_with(|| {
+            let mut weights = map.weights(&feature.weights);
+            for weights in &mut weights {
+                if weights.iter().all(|weight| *weight <= 0.0) {
+                    *weights = Vec::new();
+                }
+            }
+            Arc::new(weights)
+        });
+        Arc::clone(weights)
+    }
+
+    /// The feature lit at `hit` on worn model `worn`: of the features
+    /// whose weight there is at least [`EDGE`], the smallest, as on the
+    /// skin ([`Prepared::feature_hit`]). What's picked on cloth is what's
+    /// lit on it.
+    fn feature_on_cloth(
+        &mut self,
+        prepared: &Arc<Prepared>,
+        worn: &Model,
+        map: &WornMap,
+        hit: &axcenity_scene::MeshHit,
+    ) -> Option<String> {
+        let corners = worn
+            .primitives
+            .get(hit.primitive)?
+            .indices
+            .get(hit.triangle * 3..hit.triangle * 3 + 3)?;
+        let corners = [corners[0], corners[1], corners[2]];
+        let fine = map.fine(hit.primitive).get(hit.triangle).copied();
+        let mut best: Option<&PreparedFeature> = None;
+        for feature in &prepared.features {
+            let weights = self.cloth(prepared, feature, worn, map);
+            let Some(weights) = weights.get(hit.primitive) else {
+                continue;
+            };
+            if worn::blend(weights, corners, hit.weights, fine) >= EDGE
+                && best.is_none_or(|best| feature.radius < best.radius)
+            {
+                best = Some(feature);
+            }
+        }
+        best.map(|feature| feature.id.clone())
     }
 
     /// The body model's features and handles for the description's base.
@@ -1099,18 +1279,17 @@ impl CharacterWorkspace {
         Some(to_rect(rect, view.project_point(point)?))
     }
 
-    /// What the overlay drew last frame, in the world: each shown handle's
-    /// point of the skin, then every corner of the tint's polygons.
+    /// Where each handle drawn last frame is in the world (its point of
+    /// the skin).
     #[cfg(test)]
-    pub fn drawn_points(&mut self) -> Vec<Vec3> {
+    pub fn handles_drawn(&mut self) -> Vec<Vec3> {
         let Some((_, model, posed, transform)) = self.body_now() else {
             return Vec::new();
         };
         let Some(prepared) = self.prepared(&model) else {
             return Vec::new();
         };
-        let mut points: Vec<Vec3> = self
-            .direct
+        self.direct
             .shown
             .iter()
             .filter_map(|shown| prepared.handle(&shown.id))
@@ -1118,9 +1297,104 @@ impl CharacterWorkspace {
                 axcenity_scene::corner_drawn(&model, posed.as_deref(), transform, handle.corner)
             })
             .map(|(point, _)| point)
+            .collect()
+    }
+
+    /// The highlight drawn last frame: each texel's middle on the screen
+    /// and its strength (0 to 1), row by row from the top, with how many
+    /// texels a row has. Empty when none was drawn.
+    #[cfg(test)]
+    pub fn highlight(&self) -> (usize, Vec<(Pos2, f32)>) {
+        let Some((width, rect, strengths)) = self.direct.mask.drawn() else {
+            return (0, Vec::new());
+        };
+        let texels = strengths
+            .into_iter()
+            .enumerate()
+            .map(|(at, strength)| {
+                let middle = egui::vec2((at % width) as f32 + 0.5, (at / width) as f32 + 0.5);
+                (rect.min + middle * depth::TEXEL, strength)
+            })
             .collect();
-        points.extend(self.direct.tint_points.iter().copied());
-        points
+        (width, texels)
+    }
+
+    /// How many times the highlight was made.
+    #[cfg(test)]
+    pub fn highlight_rebuilds(&self) -> usize {
+        self.direct.mask.rebuilds
+    }
+
+    /// `feature`'s weight on what an exact ray through the screen point
+    /// `at` meets first, by last frame's camera (not the overlay's own
+    /// buffer: rays against the posed parts), whether that's a worn item,
+    /// and how far the triangle met faces the camera (1: straight on). A
+    /// worn item's weight is what its corners take from the skin; a part
+    /// that takes none (the base's own) gives the skin's just behind it.
+    /// `None` on the backdrop.
+    #[cfg(test)]
+    pub fn weight_in_sight(&mut self, feature: &str, at: Pos2) -> Option<(f32, bool, f32)> {
+        let (view, rect) = (self.direct.view?, self.direct.view_rect?);
+        let (body, model, posed, transform) = self.body_now()?;
+        let prepared = self.prepared(&model)?;
+        let feature = prepared.feature(feature)?;
+        let ray = view.ray(from_rect(rect, at));
+        let mut parts = vec![body];
+        parts.extend(
+            self.world
+                .all_below(body, |class| class == ClassName::MeshPart),
+        );
+        let first =
+            axcenity_scene::ray_parts(&self.world, &self.assets, self.poses(), &parts, ray)?;
+        let blend = |hit: &axcenity_scene::MeshHit, of: &Model, weights: &[Vec<f32>]| {
+            let (Some(corners), Some(weights)) = (hit.corners(of), weights.get(hit.primitive))
+            else {
+                return 0.0;
+            };
+            corners
+                .iter()
+                .zip(hit.weights)
+                .map(|(corner, share)| share * weights.get(corner.index).copied().unwrap_or(0.0))
+                .sum::<f32>()
+        };
+        let facing = |hit: &axcenity_scene::MeshHit| hit.normal.dot(-ray.direction).abs();
+        if first.part == body {
+            let weight = blend(&first.hit, &model, &feature.weights);
+            return Some((weight, false, facing(&first.hit)));
+        }
+        let map = self
+            .direct
+            .worn_maps
+            .get(&(model.key(), first.model.key()))
+            .cloned()
+            .flatten();
+        if let Some(map) = map {
+            let hit = &first.hit;
+            let weights = map.weights(&feature.weights);
+            let corners = &first.model.primitives[hit.primitive].indices[hit.triangle * 3..];
+            let weight = worn::blend(
+                &weights[hit.primitive],
+                [corners[0], corners[1], corners[2]],
+                hit.weights,
+                map.fine(hit.primitive).get(hit.triangle).copied(),
+            );
+            return Some((weight, true, facing(hit)));
+        }
+        let per_metre = axcenity_scene::fitted_per_metre(&model).unwrap_or(1.0)
+            * transform.transform_vector3(Vec3::X).length();
+        let skin = axcenity_scene::ray_model(&model, posed.as_deref(), transform, ray)
+            .filter(|skin| skin.distance - first.hit.distance <= WORN * per_metre);
+        Some(match skin {
+            Some(skin) => (blend(&skin, &model, &feature.weights), false, facing(&skin)),
+            None => (0.0, false, 0.0),
+        })
+    }
+
+    /// How strong the highlight is inside a feature that's selected, and
+    /// one that's hovered.
+    #[cfg(test)]
+    pub fn highlight_strengths() -> [f32; 2] {
+        [SELECTED[0], HOVERED[0]]
     }
 
     /// Whether `point` (in the world) can be seen from last frame's camera,
@@ -1159,8 +1433,8 @@ impl CharacterWorkspace {
         })
     }
 
-    /// The skin inside `feature`'s outline at rest (its tint's weight at
-    /// least [`EDGE`]): its area in square centimetres and the size of its
+    /// The skin inside `feature`'s edge at rest (its weight at least
+    /// [`EDGE`]): its area in square centimetres and the size of its
     /// box in centimetres (x across, y up, z forward).
     #[cfg(test)]
     pub fn tint_extent(&mut self, feature: &str) -> Option<(f32, Vec3)> {
@@ -1449,6 +1723,7 @@ impl CharacterWorkspace {
         self.direct.view_rect = Some(rect);
         self.direct.shown.clear();
         self.direct.status = None;
+        self.direct.mask.hide();
         if !self.direct.on || looking {
             self.direct.forget_hover();
             self.direct.hovered_handle = None;
@@ -1463,10 +1738,17 @@ impl CharacterWorkspace {
         let (pointer, any_down) =
             ui.input(|input| (input.pointer.hover_pos(), input.pointer.any_down()));
         let pointer = pointer.filter(|point| rect.contains(*point));
-        // What the camera sees of the character, for the overlay to draw
-        // only on skin that shows (built when there's something to draw).
-        let depth = (self.selection.feature.is_some() || pointer.is_some())
-            .then(|| self.character_depth(body, &model, posed.as_deref(), transform, view, rect));
+        // What the camera sees of the character, looked at when there's
+        // something to draw: the highlight lies on the skin and the
+        // clothes over it, the handles on the skin whatever is worn over
+        // it (a handle under a coat is still the way to change the body:
+        // it shows on the coat).
+        let mut seeing: Option<(Vec<WornNow>, Arc<Sight>)> = None;
+        if self.selection.feature.is_some() {
+            let worn = self.worn_now(body, &model);
+            let sight = self.sight(&model, posed.as_deref(), transform, view, rect, &worn);
+            seeing = Some((worn, sight));
+        }
         let tolerance = HIDDEN
             * axcenity_scene::fitted_per_metre(&model).unwrap_or(1.0)
             * transform.transform_vector3(Vec3::X).length();
@@ -1506,9 +1788,9 @@ impl CharacterWorkspace {
                 // behind the cheek); one on the outline (a jaw's corner
                 // seen from the front) still shows.
                 if normal.dot(toward) < -0.5
-                    || depth
+                    || seeing
                         .as_ref()
-                        .is_some_and(|depth| depth.hidden(point, tolerance, HANDLE_SIGHT))
+                        .is_some_and(|(_, sight)| sight.skin.hidden(point, tolerance, HANDLE_SIGHT))
                 {
                     continue;
                 }
@@ -1616,43 +1898,103 @@ impl CharacterWorkspace {
             }
         }
 
-        // The overlay: the hovered feature's tint (stronger), the selected
-        // one's (fainter), then the handles on top.
+        // The overlay: the highlight of the selected feature (fainter) and
+        // of the hovered one (stronger), then the handles on top. One
+        // feature that is both is lit as both. None while a handle is
+        // dragged.
         let painter = ui.painter_at(rect);
         let palette = theme::palette(ui.ctx());
-        #[cfg(test)]
-        self.direct.tint_points.clear();
-        let tinted = [
-            (self.selection.feature.clone(), 0.10, 0.35),
-            (self.direct.hovered.clone(), 0.18, 0.75),
-        ];
-        for (feature, strength, line) in tinted {
-            let Some(feature) = feature.as_deref().and_then(|id| prepared.feature(id)) else {
-                continue;
+        let mut lit: Vec<(&PreparedFeature, [f32; 2])> = Vec::new();
+        if self.direct.drag.is_none() {
+            let features = [
+                (self.selection.feature.as_deref(), SELECTED),
+                (self.direct.hovered.as_deref(), HOVERED),
+            ];
+            for (feature, [fill, rim]) in features {
+                let Some(feature) = feature.and_then(|id| prepared.feature(id)) else {
+                    continue;
+                };
+                match lit.iter_mut().find(|(other, _)| other.id == feature.id) {
+                    // One tint over the other.
+                    Some((_, [under, under_rim])) => {
+                        *under = *under + fill - *under * fill;
+                        *under_rim = *under_rim + rim - *under_rim * rim;
+                    }
+                    None => lit.push((feature, [fill, rim])),
+                }
+            }
+        }
+        if !lit.is_empty() {
+            let (worn, sight) = match seeing {
+                Some(seeing) => seeing,
+                None => {
+                    let worn = self.worn_now(body, &model);
+                    let sight = self.sight(&model, posed.as_deref(), transform, view, rect, &worn);
+                    (worn, sight)
+                }
             };
-            if self.direct.drag.is_some() {
-                break;
+            // Made again only when what it shows changed: the camera, the
+            // pose, what's worn, or which features are lit.
+            let key = MaskKey {
+                sight: sight.stamp,
+                prepared: Arc::as_ptr(&prepared) as usize,
+                lit: lit
+                    .iter()
+                    .map(|(feature, strengths)| (feature.id.clone(), *strengths))
+                    .collect(),
+            };
+            if self.direct.mask_key.as_ref() != Some(&key) || !self.direct.mask.ready(ui.ctx()) {
+                let mut surfaces: Vec<Surface> = model
+                    .primitives
+                    .iter()
+                    .map(|primitive| Surface {
+                        indices: &primitive.indices,
+                        fine: &[],
+                    })
+                    .collect();
+                for part in &worn {
+                    let primitives = part.model.primitives.iter().enumerate();
+                    surfaces.extend(primitives.map(|(index, primitive)| Surface {
+                        indices: &primitive.indices,
+                        fine: part.map.as_ref().map_or(&[], |map| map.fine(index)),
+                    }));
+                }
+                // Each lit feature's weights on each worn part, then on
+                // everything the buffer holds.
+                let mut cloths = Vec::new();
+                for (feature, _) in &lit {
+                    let cloth: Vec<_> = worn
+                        .iter()
+                        .map(|part| {
+                            let map = part.map.as_ref()?;
+                            Some(self.cloth(&prepared, feature, &part.model, map))
+                        })
+                        .collect();
+                    cloths.push(cloth);
+                }
+                let layers: Vec<Layer> = lit
+                    .iter()
+                    .zip(&cloths)
+                    .map(|((feature, [fill, rim]), cloth)| Layer {
+                        weights: shown_weights(
+                            feature,
+                            &model,
+                            posed.as_deref(),
+                            transform,
+                            camera.position,
+                            &worn,
+                            cloth,
+                        ),
+                        fill: *fill,
+                        rim: *rim,
+                    })
+                    .collect();
+                self.direct
+                    .mask
+                    .rebuild(ui.ctx(), &sight.all, &surfaces, &layers, EDGE);
+                self.direct.mask_key = Some(key);
             }
-            let (mesh, outline, _points) = tint_mesh(
-                &model,
-                posed.as_deref(),
-                transform,
-                feature,
-                &prepared.open,
-                &view,
-                camera.position,
-                depth.as_ref().map(|depth| (depth, tolerance)),
-                rect,
-                palette.accent,
-                strength,
-            );
-            #[cfg(test)]
-            self.direct.tint_points.extend(_points);
-            painter.add(egui::Shape::mesh(mesh));
-            let stroke = Stroke::new(1.25, palette.accent.gamma_multiply(line));
-            for ends in outline {
-                painter.line_segment(ends, stroke);
-            }
+            self.direct.mask.paint(&painter, palette.accent);
         }
         for shown in &self.direct.shown {
             let hovered = self.direct.hovered_handle.as_deref() == Some(shown.id.as_str())
@@ -1689,65 +2031,102 @@ impl CharacterWorkspace {
     }
 
     /// What the camera sees of the character this frame: its body as
-    /// posed and the parts it wears (each as drawn), in a depth buffer over
-    /// `rect`.
-    fn character_depth(
-        &self,
-        body: axcenity_core::InstanceId,
+    /// posed and the parts `worn` (each as drawn), rasterized over `rect`.
+    /// The last one made is handed back while the view, the poses and
+    /// what's worn are the same. A part that carries the weights of the
+    /// skin under it counts where it is; any other, [`WORN`] farther.
+    fn sight(
+        &mut self,
         model: &Model,
         posed: Option<&axcenity_assets::Posed>,
         transform: Mat4,
         view: CameraView,
         rect: Rect,
-    ) -> Depth {
+        worn: &[WornNow],
+    ) -> Arc<Sight> {
+        let part = |model: &Model, posed: Option<&axcenity_assets::Posed>, at: Mat4, carries| {
+            let pose = posed
+                .filter(|posed| posed.model_key == model.key())
+                .map(pose_print);
+            (model.key(), pose, at.to_cols_array(), carries)
+        };
+        let mut parts = vec![part(model, posed, transform, true)];
+        parts.extend(worn.iter().map(|worn| {
+            part(
+                &worn.model,
+                worn.posed.as_deref(),
+                worn.transform,
+                worn.map.is_some(),
+            )
+        }));
+        let made_for = SightKey {
+            rect,
+            orbit: self.orbit,
+            parts,
+        };
+        if let Some(sight) = &self.direct.sight
+            && sight.made_for == made_for
+        {
+            return Arc::clone(sight);
+        }
         let camera = self.orbit.camera();
         let per_metre = axcenity_scene::fitted_per_metre(model).unwrap_or(1.0)
             * transform.transform_vector3(Vec3::X).length();
-        let mut depth = Depth::new(
+        let mut all = Depth::new(
             view,
             rect,
             camera.position,
             camera.look_at,
             camera.fov_y_degrees,
-        );
+        )
+        .recording();
+        let mut surface = 0;
         for (index, primitive) in model.primitives.iter().enumerate() {
             let corners = axcenity_scene::corners_drawn(model, posed, transform, index);
-            depth.add(&corners, &primitive.indices, 0.0);
+            all.add(surface, &corners, &primitive.indices, 0.0);
+            surface += 1;
         }
-        for part in self
-            .world
-            .all_below(body, |class| class == ClassName::MeshPart)
-        {
-            let Some(transform) = axcenity_scene::placement(&self.world, part) else {
-                continue;
+        let skin = all.depths();
+        for part in worn {
+            let slack = if part.map.is_some() {
+                0.0
+            } else {
+                WORN * per_metre
             };
-            let Some(worn) = self
-                .world
-                .get(part)
-                .and_then(|instance| instance.property("MeshId")?.as_str().map(str::to_owned))
-                .and_then(|mesh| self.assets.model_blocking(&mesh))
-            else {
-                continue;
-            };
-            let posed = self.poses().get(&part).map(|posed| posed.as_ref());
-            for (index, primitive) in worn.primitives.iter().enumerate() {
-                let corners = axcenity_scene::corners_drawn(&worn, posed, transform, index);
-                depth.add(&corners, &primitive.indices, WORN * per_metre);
+            for (index, primitive) in part.model.primitives.iter().enumerate() {
+                let corners = axcenity_scene::corners_drawn(
+                    &part.model,
+                    part.posed.as_deref(),
+                    part.transform,
+                    index,
+                );
+                all.add(surface, &corners, &primitive.indices, slack);
+                surface += 1;
             }
         }
-        depth
+        self.direct.sights += 1;
+        let sight = Arc::new(Sight {
+            made_for,
+            stamp: self.direct.sights,
+            skin,
+            all,
+        });
+        self.direct.sight = Some(Arc::clone(&sight));
+        sight
     }
 
-    /// The feature `ray` meets on the character: the skin's, or the skin's
-    /// just behind another part it meets first.
+    /// The feature `ray` meets on the character: the skin's; on a worn
+    /// item, the one lit there (the cloth carries the weights of the skin
+    /// under it, and that skin itself is often left out of the body); else
+    /// the skin's just behind the part it meets first.
     fn feature_under(
-        &self,
+        &mut self,
         ray: Ray,
         body: axcenity_core::InstanceId,
         model: &Model,
         posed: Option<&axcenity_assets::Posed>,
         transform: Mat4,
-        prepared: &Prepared,
+        prepared: &Arc<Prepared>,
     ) -> Option<String> {
         let mut parts = vec![body];
         parts.extend(
@@ -1759,10 +2138,26 @@ impl CharacterWorkspace {
         let hit = if first.part == body {
             first.hit
         } else {
+            let item = self.world.get(first.part).is_some_and(|instance| {
+                instance
+                    .attribute(applier::DESCRIPTION_PART)
+                    .and_then(|value| value.as_str())
+                    .is_some_and(|key| !key.starts_with("base:"))
+            });
+            if item
+                && let Some(map) = self.worn_map(model, &first.model)
+                && let Some(feature) =
+                    self.feature_on_cloth(prepared, &first.model, &map, &first.hit)
+            {
+                return Some(feature);
+            }
             let skin = axcenity_scene::ray_model(model, posed, transform, ray)?;
             let per_metre = axcenity_scene::fitted_per_metre(model).unwrap_or(1.0)
                 * transform.transform_vector3(Vec3::X).length();
-            if skin.distance - first.hit.distance > THROUGH * per_metre {
+            // Through what the description wears the skin is found much
+            // farther back than through the base's own parts (an eyeball).
+            let through = if item { THROUGH_WORN } else { THROUGH };
+            if skin.distance - first.hit.distance > through * per_metre {
                 return None;
             }
             skin
@@ -1832,253 +2227,63 @@ fn set(parameter: &str, value: f32, mirrored: bool, gesture: Gesture) -> Intent 
     }
 }
 
-/// A soft tint over the skin of `feature` as drawn, cut where its weight
-/// crosses [`EDGE`], and its outline along that cut (marching triangles:
-/// each crossing is placed along its edge by the corners' weights, so the
-/// outline runs smoothly across the triangles, not along them). Where the
-/// feature's skin is split from its neighbour's (a body region's border)
-/// or ends, the outline runs along that edge.
+/// `feature`'s weights as they show this frame, for each surface of the
+/// [`Sight`] (the body's primitives, then each of `worn`'s): `None` for
+/// one that carries none.
 ///
-/// A corner counts only as much as its skin faces the camera (the posed
-/// normal, not only the triangle's turn on the screen): the inside of a
-/// nostril or of the lips' seam, which faces away, drops out, and the
-/// outline follows the feature's own silhouette where it turns away. A
-/// triangle behind other skin (`depth`, with its tolerance in world units)
-/// isn't drawn at all, tint or outline.
-#[allow(clippy::too_many_arguments)]
-fn tint_mesh(
+/// A corner of the skin counts only as much as it faces the camera (the
+/// posed normal: [`FACING`]): the inside of a nostril or of the lips'
+/// seam, which faces away, drops out. A worn part's corners carry what
+/// the skin under them does (`cloth`: [`WornMap::weights`] for each of
+/// `worn`, `None` for a part that carries none), whichever way they face
+/// (cloth is seen from both sides).
+fn shown_weights<'a>(
+    feature: &PreparedFeature,
     model: &Model,
     posed: Option<&axcenity_assets::Posed>,
     transform: Mat4,
-    feature: &PreparedFeature,
-    open: &[OpenEdges],
-    view: &CameraView,
     camera: Vec3,
-    depth: Option<(&Depth, f32)>,
-    rect: Rect,
-    colour: Color32,
-    strength: f32,
-) -> (egui::Mesh, Vec<[Pos2; 2]>, Vec<Vec3>) {
-    let hidden =
-        |point: Vec3| depth.is_some_and(|(depth, tolerance)| depth.hidden(point, tolerance, 1));
-    let mut mesh = egui::Mesh::default();
-    let mut outline = Vec::new();
-    // The polygons' corners in the world (what tests check can be seen).
-    let mut drawn = Vec::new();
-    let tint = |weight: f32| {
-        let alpha = (strength * (0.55 + 0.45 * weight.clamp(0.0, 1.0)) * 255.0) as u8;
-        Color32::from_rgba_unmultiplied(colour.r(), colour.g(), colour.b(), alpha)
-    };
-    for (index, primitive) in model.primitives.iter().enumerate() {
-        let Some(weights) = feature.weights.get(index) else {
-            continue;
-        };
-        if weights.iter().all(|weight| *weight < EDGE) {
-            continue;
-        }
-        let corners = axcenity_scene::corners_drawn(model, posed, transform, index);
-        let normals = axcenity_scene::normals_drawn(model, posed, transform, index);
-        // Each corner's weight as it shows: its own, as far as its skin
-        // faces the camera (fading out from 0.3 to 0 of straight on).
-        let mut shown: HashMap<u32, f32> = HashMap::new();
-        let mut shown_at = |corner: u32| {
-            *shown.entry(corner).or_insert_with(|| {
-                let at = corner as usize;
-                let (Some(point), Some(normal)) = (corners.get(at), normals.get(at)) else {
-                    return 0.0;
-                };
-                let facing = normal.dot((camera - *point).normalize_or_zero());
-                let weight = weights.get(at).copied().unwrap_or(0.0);
-                weight * (facing / 0.3).clamp(0.0, 1.0)
-            })
-        };
-        for triangle in primitive.indices.as_chunks::<3>().0 {
-            let strong = triangle.map(&mut shown_at);
-            if strong.iter().all(|weight| *weight < EDGE) {
-                continue;
-            }
-            let points = triangle.map(|corner| corners.get(corner as usize).copied());
-            let [Some(a), Some(b), Some(c)] = points else {
-                continue;
-            };
-            let on_screen = [a, b, c].map(|point| view.project_point(point));
-            let [Some(sa), Some(sb), Some(sc)] = on_screen else {
-                continue;
-            };
-            // Counter-clockwise on the screen (y up) faces the camera.
-            if (sb - sa).perp_dot(sc - sa) <= 0.0 {
-                continue;
-            }
-            // The part of the triangle at or over the edge weight, and
-            // where its sides cross it. A crossing is worked out from the
-            // edge's lower-numbered corner, so the two triangles that share
-            // an edge put it at the same place and the outline joins.
-            let corner_point = |k: usize| (triangle[k], [a, b, c][k], strong[k]);
-            let mut polygon: Vec<(Vec3, f32)> = Vec::with_capacity(4);
-            let mut crossings: Vec<Vec3> = Vec::with_capacity(2);
-            let mut borders: Vec<[Vec3; 2]> = Vec::new();
-            for k in 0..3 {
-                let (p, q) = (corner_point(k), corner_point((k + 1) % 3));
-                let crossing = ((p.2 >= EDGE) != (q.2 >= EDGE)).then(|| {
-                    let (low, high) = if p.0 < q.0 { (p, q) } else { (q, p) };
-                    let t = (EDGE - low.2) / (high.2 - low.2);
-                    low.1 + (high.1 - low.1) * t
-                });
-                if p.2 >= EDGE {
-                    polygon.push((p.1, p.2));
-                }
-                if let Some(at) = crossing {
-                    polygon.push((at, EDGE));
-                    crossings.push(at);
-                }
-                // The skin's own edge, as far as it's inside the feature:
-                // where it ends, or a seam whose other side is outside it.
-                let edge = (p.0.min(q.0), p.0.max(q.0));
-                let border = match open.get(index).and_then(|open| open.get(&edge)) {
-                    Some(Some((c, d))) => shown_at(*c).max(shown_at(*d)) < EDGE,
-                    // Where the skin ends: under clothing, a body region's
-                    // edge; in a face, an opening (the lids' margin, the
-                    // lips' seam), which is no feature's edge.
-                    Some(None) => !feature.shaped,
-                    None => false,
-                };
-                if (p.2 >= EDGE || q.2 >= EDGE) && border {
-                    let from = if p.2 >= EDGE {
-                        p.1
-                    } else {
-                        crossing.unwrap_or(p.1)
-                    };
-                    let to = if q.2 >= EDGE {
-                        q.1
-                    } else {
-                        crossing.unwrap_or(q.1)
-                    };
-                    borders.push([from, to]);
-                }
-            }
-            // Behind other skin (the far side seen past the near): none of
-            // this triangle is drawn, tint or outline.
-            if polygon.iter().any(|(point, _)| hidden(*point)) {
-                continue;
-            }
-            for [from, to] in borders {
-                if let (Some(from), Some(to)) = (view.project_point(from), view.project_point(to)) {
-                    outline.push([to_rect(rect, from), to_rect(rect, to)]);
-                }
-            }
-            let projected: Vec<Option<(Pos2, f32)>> = polygon
+    worn: &[WornNow],
+    cloth: &'a [Option<ClothWeights>],
+) -> Vec<Option<Cow<'a, [f32]>>> {
+    let carries = |weights: &[f32]| weights.iter().any(|weight| *weight >= EDGE);
+    let mut shown = Vec::new();
+    for index in 0..model.primitives.len() {
+        let weights = feature.weights.get(index).filter(|w| carries(w));
+        shown.push(weights.map(|weights| {
+            let corners = axcenity_scene::corners_drawn(model, posed, transform, index);
+            let normals = axcenity_scene::normals_drawn(model, posed, transform, index);
+            let shown: Vec<f32> = weights
                 .iter()
-                .map(|(point, weight)| {
-                    view.project_point(*point)
-                        .map(|ndc| (to_rect(rect, ndc), *weight))
+                .zip(corners.iter().zip(&normals))
+                .map(|(weight, (point, normal))| {
+                    if *weight <= 0.0 {
+                        return 0.0;
+                    }
+                    let facing = normal.dot((camera - *point).normalize_or_zero());
+                    weight * (facing / FACING).clamp(0.0, 1.0)
                 })
                 .collect();
-            if projected.iter().any(Option::is_none) || projected.len() < 3 {
-                continue;
-            }
-            drawn.extend(polygon.iter().map(|(point, _)| *point));
-            let first = mesh.vertices.len() as u32;
-            for (at, weight) in projected.into_iter().flatten() {
-                mesh.colored_vertex(at, tint(weight));
-            }
-            for k in 1..polygon.len() as u32 - 1 {
-                mesh.add_triangle(first, first + k, first + k + 1);
-            }
-            // In a face, the outline ends where it meets an opening (the
-            // lids' margin) or a hollow (the eyes' corners): along its rim
-            // it would only zig-zag into the eye or the mouth.
-            let hollow = feature.hollow.get(index);
-            let at_opening = feature.shaped
-                && (0..3).any(|k| {
-                    let (p, q) = (triangle[k], triangle[(k + 1) % 3]);
-                    hollow.is_some_and(|hollow| hollow.contains(&p))
-                        || matches!(
-                            open.get(index)
-                                .and_then(|open| open.get(&(p.min(q), p.max(q)))),
-                            Some(None)
-                        )
-                });
-            if let [p, q] = crossings[..]
-                && !at_opening
-                && let (Some(p), Some(q)) = (view.project_point(p), view.project_point(q))
-            {
-                outline.push([to_rect(rect, p), to_rect(rect, q)]);
-            }
+            Cow::Owned(shown)
+        }));
+    }
+    for (part, weights) in worn.iter().zip(cloth) {
+        for index in 0..part.model.primitives.len() {
+            shown.push(
+                weights
+                    .as_ref()
+                    .and_then(|weights| weights.get(index))
+                    .filter(|weights| carries(weights))
+                    .map(|weights| Cow::Borrowed(weights.as_slice())),
+            );
         }
     }
-    (mesh, outer_loops(outline), drawn)
-}
-
-/// The outline's long loops: the feature's edge, not the holes inside it
-/// (an eye's opening, a nostril, the mouth). The edges are joined where
-/// their ends meet on the screen (to half a point: the skin's seams
-/// repeat corners), and a loop shorter than a third of the longest goes.
-fn outer_loops(edges: Vec<[Pos2; 2]>) -> Vec<[Pos2; 2]> {
-    let key = |point: Pos2| {
-        (
-            (point.x * 2.0).round() as i32,
-            (point.y * 2.0).round() as i32,
-        )
-    };
-    // Union-find over the edges' ends.
-    let mut parent: HashMap<(i32, i32), (i32, i32)> = HashMap::new();
-    fn root(parent: &mut HashMap<(i32, i32), (i32, i32)>, at: (i32, i32)) -> (i32, i32) {
-        let mut at = at;
-        while let Some(&up) = parent.get(&at) {
-            if up == at {
-                break;
-            }
-            at = up;
-        }
-        at
-    }
-    for [a, b] in &edges {
-        let (a, b) = (key(*a), key(*b));
-        parent.entry(a).or_insert(a);
-        parent.entry(b).or_insert(b);
-        let (ra, rb) = (root(&mut parent, a), root(&mut parent, b));
-        if ra != rb {
-            parent.insert(ra, rb);
-        }
-    }
-    let mut length: HashMap<(i32, i32), f32> = HashMap::new();
-    let roots: Vec<(i32, i32)> = edges
-        .iter()
-        .map(|[a, _]| root(&mut parent, key(*a)))
-        .collect();
-    for (edge, at) in edges.iter().zip(&roots) {
-        *length.entry(*at).or_default() += edge[0].distance(edge[1]);
-    }
-    let longest = length.values().copied().fold(0.0, f32::max);
-    edges
-        .into_iter()
-        .zip(roots)
-        .filter(|(_, at)| length[at] >= longest / 3.0)
-        .map(|(edge, _)| edge)
-        .collect()
+    shown
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_outline_keeps_the_edge_and_drops_the_holes() {
-        let square = |at: f32, side: f32| {
-            let [a, b, c, d] = [
-                egui::pos2(at, at),
-                egui::pos2(at + side, at),
-                egui::pos2(at + side, at + side),
-                egui::pos2(at, at + side),
-            ];
-            vec![[a, b], [b, c], [c, d], [d, a]]
-        };
-        let mut edges = square(0.0, 100.0);
-        edges.extend(square(40.0, 5.0)); // a hole
-        edges.extend(square(300.0, 60.0)); // the other side of a pair
-        let kept = outer_loops(edges);
-        assert_eq!(kept.len(), 8, "two loops kept, the hole dropped");
-    }
 
     #[test]
     fn a_camera_s_turn_names_its_framing() {

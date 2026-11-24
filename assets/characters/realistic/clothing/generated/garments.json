@@ -1,0 +1,438 @@
+{
+  "about": "The generated garments the realistic wardrobe is imported from: one entry per source file (matched by the start of its name), with what the intake can't read from the mesh (`kind`, `ease`, `cut_for`, `triangles`) and how closely it follows the body (`conform`: `structured` for jackets and coats, `partial` for sweaters and loose trousers, `moderate` for shirts and jeans, `body` for T-shirts and tank tops, `strong` for leggings) and what the browser needs to know (`also_fills`: a one-piece or a dress takes the bottoms slot too; `frame`: who it is cut for, `masculine`, `feminine` or `unisex`). A top or a jacket is fitted for the bottoms it is worn with: hanging over them (the default), by `worn_most` metres at the most, or, with `\"worn\": \"tucked\"` and layer 0, drawn in under them, for a top that lies on the body (import_generated.py, \"Bottoms first\"). See README.md.",
+  "author": "Axcenity",
+  "licence": "CC-BY-4.0",
+  "under": {
+    "bottom": [
+      "axcenity/realistic-briefs",
+      "axcenity/realistic-boxer-briefs"
+    ],
+    "other": [
+      "axcenity/realistic-briefs",
+      "axcenity/realistic-boxer-briefs",
+      "axcenity/realistic-sports-bra"
+    ]
+  },
+  "worn_most": 0.03,
+  "frames": {
+    "masculine": {
+      "tag": "masculine",
+      "limit": "frame=0..0.5=Cut for the masculine frame"
+    },
+    "feminine": {
+      "tag": "feminine",
+      "limit": "frame=0.5..1=Cut for the feminine frame"
+    },
+    "unisex": {
+      "tag": "unisex"
+    }
+  },
+  "garments": [
+    {
+      "file": "Meshy_AI_beige_turtleneck",
+      "id": "generated/turtleneck",
+      "label": "Turtleneck sweater",
+      "slot": "top",
+      "layer": 2,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_black_athletic_leggin",
+      "id": "generated/leggings",
+      "label": "Athletic leggings",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "strong",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_black_biker_jacket",
+      "id": "generated/biker-jacket",
+      "label": "Biker jacket",
+      "slot": "outerwear",
+      "layer": 3,
+      "frame": "feminine",
+      "conform": "structured",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_black_formal_tuxedo",
+      "id": "generated/tuxedo",
+      "label": "Formal tuxedo",
+      "slot": "outerwear",
+      "layer": 3,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "masculine",
+      "conform": "structured",
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_black_offshoulder",
+      "id": "generated/off-shoulder-top",
+      "label": "Off-shoulder top",
+      "slot": "top",
+      "layer": 0,
+      "frame": "feminine",
+      "conform": "body",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000,
+      "worn": "tucked"
+    },
+    {
+      "file": "Meshy_AI_black_running_shorts",
+      "id": "generated/running-shorts",
+      "label": "Running shorts",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "unisex",
+      "conform": "moderate",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_brown_leather_mini_sk",
+      "id": "generated/leather-mini-skirt",
+      "label": "Leather mini skirt",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "moderate",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_burgundy_dress_30k",
+      "id": "generated/burgundy-dress",
+      "label": "Evening dress",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "body",
+      "kind": "top",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_camel_wool_coat",
+      "id": "generated/wool-coat",
+      "label": "Wool coat",
+      "slot": "outerwear",
+      "layer": 3,
+      "frame": "feminine",
+      "conform": "structured",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_charcoal_business_pan",
+      "id": "generated/business-suit",
+      "label": "Business pantsuit",
+      "slot": "outerwear",
+      "layer": 3,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "structured",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_charcoal_dress_trouse",
+      "id": "generated/dress-trousers",
+      "label": "Dress trousers",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "masculine",
+      "conform": "moderate",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_charcoal_skinny_jeans",
+      "id": "generated/skinny-jeans",
+      "label": "Skinny jeans",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "body",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_cream_sherpa_jacket",
+      "id": "generated/sherpa-jacket",
+      "label": "Sherpa jacket",
+      "slot": "outerwear",
+      "layer": 3,
+      "frame": "unisex",
+      "conform": "structured",
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_dark_gray_sweatpants",
+      "id": "generated/sweatpants",
+      "label": "Sweatpants",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_denim_overalls",
+      "id": "generated/overalls",
+      "label": "Denim overalls",
+      "slot": "bottom",
+      "layer": 2,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_denim_shorts_30k",
+      "id": "generated/denim-shorts",
+      "label": "Denim shorts",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "moderate",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_forest_green_puffer",
+      "id": "generated/puffer-jacket",
+      "label": "Puffer jacket",
+      "slot": "outerwear",
+      "layer": 3,
+      "frame": "unisex",
+      "conform": "structured",
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_forest_green_vneck",
+      "id": "generated/vneck-sweater",
+      "label": "V-neck sweater",
+      "slot": "top",
+      "layer": 2,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_lavender_sweatshirt",
+      "id": "generated/cropped-sweatshirt",
+      "label": "Cropped sweatshirt",
+      "slot": "top",
+      "layer": 2,
+      "frame": "feminine",
+      "conform": "partial",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_light_wash_wide_leg",
+      "id": "generated/wide-leg-jeans",
+      "label": "Wide-leg jeans",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "partial",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_navy_bomber_jacket",
+      "id": "generated/bomber-jacket",
+      "label": "Bomber jacket",
+      "slot": "outerwear",
+      "layer": 3,
+      "frame": "unisex",
+      "conform": "structured",
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_navy_polo",
+      "id": "generated/polo",
+      "label": "Polo shirt",
+      "slot": "top",
+      "layer": 0,
+      "frame": "masculine",
+      "conform": "body",
+      "triangles": 6000,
+      "worn": "tucked"
+    },
+    {
+      "file": "Meshy_AI_olive_cargo_pants",
+      "id": "generated/cargo-pants",
+      "label": "Cargo pants",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_olive_jumpsuit",
+      "id": "generated/jumpsuit",
+      "label": "Jumpsuit",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "moderate",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_pale_blue_blouse",
+      "id": "generated/sleeveless-blouse",
+      "label": "Sleeveless blouse",
+      "slot": "top",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "moderate",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_pale_blue_shirt_dress",
+      "id": "generated/shirt-dress",
+      "label": "Shirt dress",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "moderate",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_pink_tank_top",
+      "id": "generated/tank-top",
+      "label": "Tank top",
+      "slot": "top",
+      "layer": 0,
+      "frame": "feminine",
+      "conform": "body",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000,
+      "worn": "tucked"
+    },
+    {
+      "file": "Meshy_AI_ruby_red_cocktail",
+      "id": "generated/cocktail-dress",
+      "label": "Cocktail dress",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "body",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_sage_maxi_dress",
+      "id": "generated/maxi-dress",
+      "label": "Maxi dress",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": [
+        "bottom"
+      ],
+      "frame": "feminine",
+      "conform": "body",
+      "kind": "top",
+      "ease": "snug",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_sand_chino_shorts",
+      "id": "generated/chino-shorts",
+      "label": "Chino shorts",
+      "slot": "bottom",
+      "layer": 1,
+      "frame": "masculine",
+      "conform": "moderate",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_unbuttoned_flannel",
+      "id": "generated/flannel-shirt",
+      "label": "Flannel shirt",
+      "slot": "top",
+      "layer": 2,
+      "frame": "unisex",
+      "conform": "partial",
+      "triangles": 6000
+    },
+    {
+      "file": "Meshy_AI_white_blouse",
+      "id": "generated/puff-blouse",
+      "label": "Puff-sleeve blouse",
+      "slot": "top",
+      "layer": 1,
+      "frame": "feminine",
+      "conform": "partial",
+      "cut_for": {
+        "Frame_Feminine": 1
+      },
+      "triangles": 6000
+    }
+  ]
+}

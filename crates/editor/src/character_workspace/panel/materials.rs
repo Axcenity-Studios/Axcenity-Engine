@@ -61,37 +61,58 @@ pub(in super::super) fn value_label(name: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Draws the skin materials' values and returns what they ask for.
+/// Draws the skin materials' values and returns what they ask for, and
+/// whether any control was drawn. `search` is the panel's "Search
+/// controls" text: with any, only the values and layers that match it
+/// (their label, name and meaning) are drawn.
 pub(super) fn skin(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
     base: &BaseManifest,
-) -> Vec<Intent> {
+    search: &str,
+) -> (Vec<Intent>, bool) {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
+    let searching = !search.trim().is_empty();
     let slots: Vec<_> = base
         .materials
         .iter()
         .filter(|slot| slot.shading == ShadingModel::Skin)
         .collect();
     if slots.is_empty() {
-        widgets::empty_state(
-            ui,
-            crate::theme::icons::DROP,
-            "No skin material",
-            "This body has no material with skin shading to adjust.",
-            None,
-        );
-        return intents;
+        if !searching {
+            widgets::empty_state(
+                ui,
+                crate::theme::icons::DROP,
+                "No skin material",
+                "This body has no material with skin shading to adjust.",
+                None,
+            );
+        }
+        return (intents, false);
     }
+    let mut any = false;
     for slot in slots {
+        let specs: Vec<_> = slot
+            .shading
+            .values()
+            .iter()
+            .filter(|spec| {
+                super::has_words(&[&value_label(spec.name), spec.name, spec.meaning], search)
+            })
+            .collect();
+        if specs.is_empty() {
+            continue;
+        }
+        any = true;
         widgets::section(
             crate::theme::icons::DROP,
             &format!("{} material", slot.name),
         )
         .id_salt(&slot.name)
+        .forced(searching.then_some(true))
         .show(ui, |ui| {
-            for spec in slot.shading.values() {
+            for spec in specs {
                 let drawn = DRAWN_TODAY.contains(&spec.name);
                 let about = if drawn {
                     spec.meaning.to_owned()
@@ -175,17 +196,21 @@ pub(super) fn skin(
             }
         });
     }
-    intents.extend(makeup(ui, workspace, base));
-    ui.add_space(6.0);
-    ui.label(
-        egui::RichText::new(
-            "Until skin shading lands, the preview draws the tint and roughness only; the \
-             other values are saved and take effect then.",
-        )
-        .small()
-        .color(palette.text_weak),
-    );
-    intents
+    let (asked, found) = makeup(ui, workspace, base, search);
+    intents.extend(asked);
+    any |= found;
+    if !searching {
+        ui.add_space(6.0);
+        ui.label(
+            egui::RichText::new(
+                "Until skin shading lands, the preview draws the tint and roughness only; the \
+                 other values are saved and take effect then.",
+            )
+            .small()
+            .color(palette.text_weak),
+        );
+    }
+    (intents, any)
 }
 
 /// The base's makeup layers and markings (R5, ADR-0042): each turned on
@@ -193,21 +218,36 @@ pub(super) fn skin(
 /// roughness (makeup), amount and pattern (markings). Each change asks for
 /// the whole layer ([`Intent::SetSkinLayer`]): one undo step, or one per
 /// slider drag.
-fn makeup(ui: &mut egui::Ui, workspace: &CharacterWorkspace, base: &BaseManifest) -> Vec<Intent> {
+fn makeup(
+    ui: &mut egui::Ui,
+    workspace: &CharacterWorkspace,
+    base: &BaseManifest,
+    search: &str,
+) -> (Vec<Intent>, bool) {
     let mut intents = Vec::new();
-    if base.skin_layers.is_empty() {
-        return intents;
+    let searching = !search.trim().is_empty();
+    // A layer found by a search is shown whole.
+    let layers: Vec<_> = base
+        .skin_layers
+        .iter()
+        .filter(|spec| spec.kind != SkinLayerKind::Other)
+        .filter(|spec| {
+            super::has_words(
+                &[&spec.label, &spec.id, spec.about.as_deref().unwrap_or("")],
+                search,
+            )
+        })
+        .collect();
+    if layers.is_empty() {
+        return (intents, false);
     }
     let palette = theme::palette(ui.ctx());
     widgets::section(crate::theme::icons::PAINT_BRUSH, "Makeup and markings")
         .id_salt("makeup and markings")
+        .forced(searching.then_some(true))
         .show(ui, |ui| {
-            for spec in &base.skin_layers {
-                let marking = match spec.kind {
-                    SkinLayerKind::Makeup => false,
-                    SkinLayerKind::Marking => true,
-                    SkinLayerKind::Other => continue,
-                };
+            for spec in layers {
+                let marking = spec.kind == SkinLayerKind::Marking;
                 let held = workspace.skin_layer(&spec.id).cloned();
                 let set = |layer: SkinLayer, gesture| Intent::SetSkinLayer {
                     id: spec.id.clone(),
@@ -335,5 +375,5 @@ fn makeup(ui: &mut egui::Ui, workspace: &CharacterWorkspace, base: &BaseManifest
                 });
             }
         });
-    intents
+    (intents, true)
 }

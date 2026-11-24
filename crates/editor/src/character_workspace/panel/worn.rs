@@ -1,17 +1,19 @@
-//! A worn item's own controls under the browser's tiles (brief §7.2,
-//! §8.3, §14.1): only what the item declares ([`Declared`]). Its variants
-//! as chips; for a hairstyle, natural colours (melanin and redness) for
-//! its colour, and for its highlights and roots only where the style has
-//! slots with those roles; for a garment, a colour button per colour role
-//! (primary, secondary, accent); its own parameters as sliders. A style
-//! that declares no highlights shows no highlight control.
+//! The worn items above the browser's tiles (brief §7.2, §8.3, §14.1), a
+//! line each: the item's name, its slot and a button that takes it off.
+//! Unfolded, the line shows the item's own controls, only what it declares
+//! ([`Declared`]). Its variants as chips; for a hairstyle, natural colours
+//! (melanin and redness) for its colour, and for its highlights and roots
+//! only where the style has slots with those roles; for a garment, a
+//! colour button per colour role (primary, secondary, accent); its own
+//! parameters as sliders. A style that declares no highlights shows no
+//! highlight control.
 
 use axcenity_avatar::{
     Colour, ItemKind, ItemManifest, MaterialRole, MaterialValue, ValueKind, WornItem,
 };
 use eframe::egui;
 
-use super::super::browser::{COLOUR_VALUE, Declared, HAIR_COLOURS, role_label};
+use super::super::browser::{Browse, COLOUR_VALUE, Declared, HAIR_COLOURS, Pick, role_label};
 use super::super::intent::{Gesture, Intent};
 use super::super::selection::Level;
 use super::row::{self, Row};
@@ -53,110 +55,226 @@ fn item_level(parameter: &axcenity_avatar::ItemParameter) -> Level {
     }
 }
 
-/// Draws the controls of `item`, worn as `worn`, at `level`.
+/// Draws worn item `item` (worn as `worn`, in the slot labelled `slot`)
+/// as one line: its name, "Draft" where it is one, and a button that takes
+/// it off (one undo step). A click on the line unfolds its own controls
+/// at `level` (`open`: they are unfolded), where it has any.
 pub(super) fn controls(
     ui: &mut egui::Ui,
     item: &ItemManifest,
     worn: &WornItem,
+    slot: &str,
     level: Level,
+    open: bool,
 ) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     let declared = Declared::of(item);
     let groom = item.kind == ItemKind::Groom;
-    let title = if item.is_draft() {
-        format!("{} (Draft)", item.label)
+    // An item with nothing to change and nothing to say has no fold.
+    let folds = !declared.is_empty() || item.about.is_some() || !item.limitations.is_empty();
+    let open = open && folds;
+    let id = ui.id().with(("worn item", &item.id));
+    let sense = if folds {
+        egui::Sense::click()
     } else {
-        item.label.clone()
+        egui::Sense::hover()
     };
-    widgets::section(theme::icons::SLIDERS_HORIZONTAL, &title)
-        .id_salt(&format!("worn item {}", item.id))
-        .show(ui, |ui| {
-            if let Some(about) = &item.about {
-                ui.label(egui::RichText::new(about).small().color(palette.text_weak));
-            }
-            if !item.variants.is_empty() {
-                widgets::section_label(ui, "Variant");
-                ui.horizontal_wrapped(|ui| {
-                    if widgets::chip(ui, "As made", worn.variant.is_none()).clicked()
-                        && worn.variant.is_some()
-                    {
-                        intents.push(Intent::SetItemVariant {
-                            item: item.id.clone(),
-                            variant: None,
-                        });
-                    }
-                    for variant in &item.variants {
-                        let on = worn.variant.as_deref() == Some(variant.id.as_str());
-                        if widgets::chip(ui, &variant.label, on).clicked() && !on {
+    let (row, response) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 26.0), sense);
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::CollapsingHeader,
+            ui.is_enabled(),
+            open,
+            &item.label,
+        )
+    });
+    let response = if folds {
+        response.on_hover_text(if open {
+            "Fold its controls away"
+        } else {
+            "Show its controls: colours, variants and its own sliders"
+        })
+    } else {
+        response
+    };
+    if ui.is_rect_visible(row) {
+        let fill = if response.hovered() {
+            palette.control
+        } else {
+            palette.inset
+        };
+        ui.painter().rect_filled(row, theme::radius::CARD, fill);
+    }
+    // The way to take it off, at the row's end (over the row: its click
+    // isn't the fold's).
+    let mut end = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(row.shrink2(egui::vec2(3.0, 0.0)))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    if widgets::icon_button(
+        &mut end,
+        theme::icons::X,
+        &format!("Take {} off (you can undo it)", item.label),
+        false,
+    )
+    .clicked()
+    {
+        // The tiles move up under the still pointer when its line goes:
+        // none is previewed until the pointer moves (as after a click on
+        // a tile).
+        intents.push(Intent::Browse(Browse::Clicked(Pick {
+            slot: item.slot.clone(),
+            item: Some(item.id.clone()),
+        })));
+        intents.push(Intent::Wear {
+            slot: item.slot.clone(),
+            item: None,
+        });
+    }
+    let mut left = row.left() + 8.0;
+    if folds {
+        let openness = ui.ctx().animate_bool(id, open);
+        let at = egui::Rect::from_center_size(
+            egui::pos2(row.left() + 11.0, row.center().y),
+            egui::vec2(12.0, 12.0),
+        );
+        widgets::chevron(ui, openness, &response.clone().with_new_rect(at));
+        left = at.right() + 6.0;
+    }
+    if ui.is_rect_visible(row) {
+        let mut job = egui::text::LayoutJob::default();
+        let font = egui::FontId::new(theme::type_scale::BODY, theme::medium_family());
+        job.append(
+            &item.label,
+            0.0,
+            egui::TextFormat::simple(font, palette.text_strong),
+        );
+        let small = egui::TextStyle::Small.resolve(ui.style());
+        job.append(
+            slot,
+            8.0,
+            egui::TextFormat::simple(small.clone(), palette.text_weak),
+        );
+        if item.is_draft() {
+            job.append(
+                "Draft",
+                8.0,
+                egui::TextFormat::simple(small, palette.warning),
+            );
+        }
+        job.wrap = egui::text::TextWrapping {
+            max_width: (end.min_rect().left() - left - 6.0).max(20.0),
+            max_rows: 1,
+            break_anywhere: true,
+            overflow_character: Some('…'),
+        };
+        let galley = ui.painter().layout_job(job);
+        let at = egui::pos2(left, row.center().y - galley.size().y / 2.0);
+        ui.painter().galley(at, galley, palette.text_strong);
+    }
+    if response.clicked() {
+        intents.push(Intent::Browse(Browse::Unfold(item.id.clone(), !open)));
+    }
+    if !open {
+        return intents;
+    }
+    ui.push_id(id, |ui| {
+        egui::Frame::new()
+            .inner_margin(egui::Margin {
+                left: 8,
+                right: 0,
+                top: 2,
+                bottom: 6,
+            })
+            .show(ui, |ui| {
+                if let Some(about) = &item.about {
+                    ui.label(egui::RichText::new(about).small().color(palette.text_weak));
+                }
+                if !item.variants.is_empty() {
+                    widgets::section_label(ui, "Variant");
+                    ui.horizontal_wrapped(|ui| {
+                        if widgets::chip(ui, "As made", worn.variant.is_none()).clicked()
+                            && worn.variant.is_some()
+                        {
                             intents.push(Intent::SetItemVariant {
                                 item: item.id.clone(),
-                                variant: Some(variant.id.clone()),
+                                variant: None,
                             });
                         }
-                    }
-                });
-                ui.add_space(4.0);
-            }
-            for (role, slots) in &declared.natural {
-                intents.extend(natural_colours(ui, item, worn, *role, slots));
-            }
-            // A hairstyle's natural colours come first; a tint over them is
-            // a fine control (ux patterns P4: coarse first).
-            if !groom || level == Level::Advanced {
-                for (role, slots) in &declared.roles {
-                    intents.extend(colour_button(ui, item, worn, *role, slots, groom));
-                }
-            }
-            for parameter in item
-                .parameters
-                .iter()
-                .filter(|p| level.shows(item_level(p)))
-            {
-                let value = worn.parameters.get(&parameter.id).copied().or_else(|| {
-                    item.variant(worn.variant.as_deref()?)?
-                        .parameters
-                        .get(&parameter.id)
-                        .copied()
-                });
-                let value = value.unwrap_or(parameter.default);
-                let id = format!("{}.{}", item.id, parameter.id);
-                let about = parameter
-                    .about
-                    .clone()
-                    .unwrap_or_else(|| parameter.label.clone());
-                // The slider row is shared with Body and Face, so it follows
-                // the drag rule (`numeric.rs`: a full range in 110 points,
-                // Shift 25%, Ctrl 2x, a typed value).
-                if let Some(row::Asked::Set(value, gesture)) = row::slider(
-                    ui,
-                    &Row {
-                        id: &id,
-                        label: &parameter.label,
-                        note: None,
-                        about: &about,
-                        value,
-                        range: parameter.range,
-                        default: parameter.default,
-                        locked: None,
-                    },
-                ) {
-                    intents.push(Intent::SetItemParameter {
-                        item: item.id.clone(),
-                        id: parameter.id.clone(),
-                        value,
-                        gesture,
+                        for variant in &item.variants {
+                            let on = worn.variant.as_deref() == Some(variant.id.as_str());
+                            if widgets::chip(ui, &variant.label, on).clicked() && !on {
+                                intents.push(Intent::SetItemVariant {
+                                    item: item.id.clone(),
+                                    variant: Some(variant.id.clone()),
+                                });
+                            }
+                        }
                     });
+                    ui.add_space(4.0);
                 }
-            }
-            for limitation in &item.limitations {
-                ui.label(
-                    egui::RichText::new(format!("{} {}", theme::icons::INFO, limitation.note))
-                        .small()
-                        .color(palette.text_weak),
-                );
-            }
-        });
+                for (role, slots) in &declared.natural {
+                    intents.extend(natural_colours(ui, item, worn, *role, slots));
+                }
+                // A hairstyle's natural colours come first; a tint over them is
+                // a fine control (ux patterns P4: coarse first).
+                if !groom || level == Level::Advanced {
+                    for (role, slots) in &declared.roles {
+                        intents.extend(colour_button(ui, item, worn, *role, slots, groom));
+                    }
+                }
+                for parameter in item
+                    .parameters
+                    .iter()
+                    .filter(|p| level.shows(item_level(p)))
+                {
+                    let value = worn.parameters.get(&parameter.id).copied().or_else(|| {
+                        item.variant(worn.variant.as_deref()?)?
+                            .parameters
+                            .get(&parameter.id)
+                            .copied()
+                    });
+                    let value = value.unwrap_or(parameter.default);
+                    let id = format!("{}.{}", item.id, parameter.id);
+                    let about = parameter
+                        .about
+                        .clone()
+                        .unwrap_or_else(|| parameter.label.clone());
+                    // The slider row is shared with Body and Face, so it follows
+                    // the drag rule (`numeric.rs`: a full range in 110 points,
+                    // Shift 25%, Ctrl 2x, a typed value).
+                    if let Some(row::Asked::Set(value, gesture)) = row::slider(
+                        ui,
+                        &Row {
+                            id: &id,
+                            label: &parameter.label,
+                            note: None,
+                            about: &about,
+                            value,
+                            range: parameter.range,
+                            default: parameter.default,
+                            locked: None,
+                        },
+                    ) {
+                        intents.push(Intent::SetItemParameter {
+                            item: item.id.clone(),
+                            id: parameter.id.clone(),
+                            value,
+                            gesture,
+                        });
+                    }
+                }
+                for limitation in &item.limitations {
+                    ui.label(
+                        egui::RichText::new(format!("{} {}", theme::icons::INFO, limitation.note))
+                            .small()
+                            .color(palette.text_weak),
+                    );
+                }
+            });
+    });
     intents
 }
 

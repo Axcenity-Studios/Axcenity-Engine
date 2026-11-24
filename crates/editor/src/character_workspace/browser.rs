@@ -8,23 +8,37 @@
 //!   (the slots a body type's choice fills, the underwear, are listed as
 //!   what the body type wears, not offered), and whose `also_fills` slots
 //!   are all such slots too. An item a slot can't take is not offered.
-//! - **Drafts** (`asset-quality.md` §5) are hidden unless "Show drafts" is
-//!   on, and marked "Draft" when shown. One that is worn is always listed.
+//! - **Drafts** (`asset-quality.md` §5) are marked "Draft". A page with
+//!   finished items hides its drafts unless "Show drafts" is on (the page
+//!   offers the switch only then); a page with nothing but drafts lists
+//!   them without asking, so it never opens empty. One that is worn is
+//!   always listed. Randomize never draws a draft, whatever is listed.
 //! - **Search** matches every word typed against the label, ID, tags and
 //!   `about`. **Filters**: a slot (the page's categories), a kind (one of
 //!   the listed items' tags), "Recolourable" (a colour role or variants),
 //!   "Fits this body" (no `limitations` range the character is outside)
 //!   and "Favourites".
+//! - **Who a garment is cut for** ([`Cut`]): the Clothing page lists the
+//!   garments for the character's own frame (masculine or feminine, with
+//!   the unisex ones), or one frame's, or all of them. A garment says
+//!   which with a tag (`masculine`, `feminine`, `unisex`; one that says
+//!   nothing is for both).
 //! - **The online wardrobe** (`wardrobe.rs`, `Browser::online`): the
 //!   Clothing page shows the library's clothes or, in their place, the
 //!   Axcenity Wardrobe's garments to download into the library.
 //! - **Favourites and recently used** are editor state, kept beside the
 //!   preset favourites (`presets.rs`, `favourites.json`).
-//! - **Preview without committing.** Hovering a tile, or picking one,
-//!   shows the character wearing it ([`Browser::preview`], shown in the
-//!   character's place by `compare.rs`'s `shown`), with no undo step and
-//!   no change to the description until "Wear". Esc, leaving the page or
-//!   any edit puts the character back.
+//! - **A click wears, a hover previews.** A click on a tile wears it
+//!   ([`CharacterWorkspace::wear`], one undo step); a click on the worn
+//!   tile takes it off. Hovering a tile shows the character wearing it
+//!   ([`Browser::preview`], shown in the character's place by
+//!   `compare.rs`'s `shown`), with no undo step and no change to the
+//!   description. Esc, moving off the tile, leaving the page or any edit
+//!   puts the character back. After a click or Esc the tile under the
+//!   still pointer is not previewed again until the pointer moves off it
+//!   ([`Browser::muted`]).
+//! - **The worn items' own controls** fold to one line each
+//!   ([`Browser::unfolded`], editor state).
 //!
 //! [`dressed`] is the one rule for what wearing an item takes off: the
 //! items in its slots and in its `also_fills`, and those it `excludes` (or
@@ -72,10 +86,87 @@ impl Shelf {
     }
 }
 
+/// Whose garments the Clothing page lists.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Cut {
+    /// The ones cut for the character's own frame, and the unisex ones.
+    #[default]
+    Body,
+    /// The ones cut for the masculine frame, and the unisex ones.
+    Masculine,
+    /// The ones cut for the feminine frame, and the unisex ones.
+    Feminine,
+    /// Every garment.
+    All,
+}
+
+impl Cut {
+    pub const ALL: [Cut; 4] = [Cut::Body, Cut::Masculine, Cut::Feminine, Cut::All];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Cut::Body => "This body",
+            Cut::Masculine => "Masculine",
+            Cut::Feminine => "Feminine",
+            Cut::All => "All",
+        }
+    }
+
+    pub fn about(self) -> &'static str {
+        match self {
+            Cut::Body => "Clothes cut for this character's frame, and unisex ones",
+            Cut::Masculine => "Clothes cut for the masculine frame, and unisex ones",
+            Cut::Feminine => "Clothes cut for the feminine frame, and unisex ones",
+            Cut::All => "Every garment, whoever it is cut for",
+        }
+    }
+
+    /// Whether it lists a garment with `tags` on a body that is feminine
+    /// or not (`None`: a body without frames, which every cut fits).
+    pub fn lists(self, tags: &[String], feminine_body: Option<bool>) -> bool {
+        let wanted = match self {
+            Cut::All => return true,
+            Cut::Body => feminine_body,
+            Cut::Masculine => Some(false),
+            Cut::Feminine => Some(true),
+        };
+        match (cut_for(tags), wanted) {
+            (Some(cut), Some(wanted)) => cut == wanted,
+            _ => true,
+        }
+    }
+}
+
+/// The tags that say who a garment is cut for.
+pub const CUT_TAGS: [&str; 3] = ["masculine", "feminine", "unisex"];
+/// The base parameter a body's frame is (0 masculine, 1 feminine).
+pub const FRAME: &str = "frame";
+
+/// Whether a garment with `tags` is cut for the feminine frame
+/// (`Some(true)`), the masculine one (`Some(false)`) or both (`None`:
+/// unisex, or it doesn't say).
+pub fn cut_for(tags: &[String]) -> Option<bool> {
+    let has = |tag: &str| tags.iter().any(|t| t.eq_ignore_ascii_case(tag));
+    match (has("masculine"), has("feminine")) {
+        (true, false) => Some(false),
+        (false, true) => Some(true),
+        _ => None,
+    }
+}
+
+/// Whether `description`'s body is nearer the feminine frame than the
+/// masculine one; `None` when its base has no frames.
+pub fn feminine_body(description: &Description, base: &BaseManifest) -> Option<bool> {
+    base.parameter(FRAME)?;
+    Some(value_of(description, Some(base), FRAME) >= 0.5)
+}
+
 /// A page's search and filters (editor state).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Filters {
     pub search: String,
+    /// Whose garments are listed.
+    pub cut: Cut,
     /// One slot of the page (`None`: all of them).
     pub slot: Option<String>,
     /// One tag (`None`: any).
@@ -92,6 +183,7 @@ impl Default for Filters {
     fn default() -> Self {
         Self {
             search: String::new(),
+            cut: Cut::default(),
             slot: None,
             kind: None,
             recolourable: false,
@@ -107,6 +199,7 @@ impl Filters {
     pub fn narrowed(&self) -> bool {
         let default = Filters::default();
         !self.search.trim().is_empty()
+            || self.cut != default.cut
             || self.slot.is_some()
             || self.kind.is_some()
             || self.recolourable
@@ -127,15 +220,20 @@ pub struct Pick {
 pub enum Browse {
     /// A page's search and filters, whole.
     Filters(Shelf, Filters),
-    /// Lists drafts (both pages), marked "Draft".
+    /// Lists drafts (both pages) beside the finished items, marked
+    /// "Draft". A page with nothing but drafts lists them either way.
     ShowDrafts(bool),
     /// The Clothing page shows the online wardrobe (`wardrobe.rs`) in
     /// place of the library's clothes, or the library's again.
     Online(bool),
     /// The tile under the pointer (`None`: none): previewed while it is.
     Hover(Option<Pick>),
-    /// The tile picked to try on, waiting for "Wear" (`None`: none).
-    Select(Option<Pick>),
+    /// A tile was clicked (what the click wears follows as its own
+    /// intent): its preview ends and it is muted, so the tile under the
+    /// still pointer isn't previewed again until the pointer moves off it.
+    Clicked(Pick),
+    /// Unfolds (or folds) the worn item's own controls, by its ID.
+    Unfold(String, bool),
 }
 
 /// The browsers' editor state: never in a description, never undone.
@@ -147,15 +245,18 @@ pub struct Browser {
     /// The Clothing page shows the online wardrobe, not the library.
     pub online: bool,
     pub hovered: Option<Pick>,
-    pub selected: Option<Pick>,
     /// What the preview shows in the character's place while a tile is
-    /// hovered or picked: the character wearing it.
+    /// hovered: the character wearing it.
     pub preview: Option<Description>,
-    /// The tile under the pointer when a preview ended (Esc, an edit) or a
-    /// tile was clicked: no Hover is taken until the pointer moves off it,
-    /// or the panel, still seeing the pointer there (or a tile shifted
-    /// under it), would bring a preview back.
+    /// The tile under the pointer when a preview ended (Esc, an edit such
+    /// as the click that wears it or takes it off): no Hover is taken
+    /// until the pointer moves off it, or the panel, still seeing the
+    /// pointer there (or a tile shifted under it), would bring a preview
+    /// back.
     pub muted: Option<Pick>,
+    /// The worn items whose own controls are unfolded, by ID (folded to
+    /// one line each otherwise).
+    pub unfolded: BTreeSet<String>,
 }
 
 impl Browser {
@@ -173,9 +274,9 @@ impl Browser {
         }
     }
 
-    /// The tile being previewed: the one hovered, else the one picked.
+    /// The tile being previewed: the one under the pointer.
     pub fn trying(&self) -> Option<&Pick> {
-        self.hovered.as_ref().or(self.selected.as_ref())
+        self.hovered.as_ref()
     }
 
     /// Whether a tile is shown on the character in its place.
@@ -183,26 +284,13 @@ impl Browser {
         self.preview.is_some()
     }
 
-    /// Forgets the tiles hovered and picked: the character is shown again.
-    /// The tile under the pointer is muted (see [`Browser::muted`]).
+    /// Forgets the tile hovered: the character is shown again. The tile
+    /// under the pointer is muted (see [`Browser::muted`]).
     pub fn end_preview(&mut self) {
-        if let Some(pick) = self.trying() {
-            self.muted = Some(pick.clone());
+        if let Some(pick) = self.hovered.take() {
+            self.muted = Some(pick);
         }
-        self.hovered = None;
-        self.selected = None;
         self.preview = None;
-    }
-
-    /// A click on a tile: picks `pick` (`None`: the worn tile, ending the
-    /// pick). The clicked tile is muted, as after Esc, so whatever else
-    /// comes under the still pointer (should the tiles shift) isn't
-    /// previewed until the pointer moves. A click is a new pick, even of a
-    /// muted tile.
-    pub fn select(&mut self, pick: Option<Pick>) {
-        let clicked = self.hovered.take().or_else(|| pick.clone());
-        self.muted = clicked.or_else(|| self.muted.take());
-        self.selected = pick;
     }
 
     /// Whether the panel should report `hovered`, the tile under the
@@ -228,8 +316,8 @@ impl Browser {
         true
     }
 
-    /// Works out the preview again for `description` (after a hover or a
-    /// pick): `None` when the tile is what's worn already.
+    /// Works out the preview again for `description` (after a hover):
+    /// `None` when the tile is what's worn already.
     pub fn update_preview(&mut self, description: &Description, library: &Library) {
         self.preview = self.trying().and_then(|pick| {
             let shown = dressed(description, library, &pick.slot, pick.item.as_deref());
@@ -297,16 +385,24 @@ pub struct Entry<'a> {
 pub struct Listing<'a> {
     /// The page's slots a person picks in (its categories).
     pub slots: Vec<&'a Slot>,
-    /// What the body type wears, by slot label, item label (the underwear).
-    pub body_type_wears: Vec<(String, String)>,
     /// The tiles that pass the search and filters, favourites first.
     pub entries: Vec<Entry<'a>>,
     /// The items last worn, newest first (only on the whole list).
     pub recent: Vec<Entry<'a>>,
-    /// The tags of the items offered, for the kind filter.
+    /// The tags of the items offered, for the kind filter (but the ones
+    /// that say who a garment is cut for: [`Cut`] is their filter).
     pub kinds: Vec<String>,
+    /// Whether any offered item says who it is cut for (so the page
+    /// offers the choice).
+    pub cuts: bool,
     /// Offered drafts left out because "Show drafts" is off.
     pub hidden_drafts: usize,
+    /// Offered items that aren't drafts. With none, the page lists its
+    /// drafts whatever "Show drafts" says.
+    pub finished: usize,
+    /// Offered drafts, listed or not. The page offers "Show drafts" only
+    /// when it has these and finished items both.
+    pub drafts: usize,
     /// Items offered at all before the search and filters.
     pub offered: usize,
 }
@@ -344,8 +440,22 @@ pub fn misfit(
     description: &Description,
     base: &BaseManifest,
 ) -> Option<String> {
+    misfits(item, description, base, false)
+}
+
+/// As [`misfit`]; `beside_frame` leaves out limits on the body's frame
+/// (for a page that was asked for another frame's garments: [`Cut`]).
+fn misfits(
+    item: &ItemManifest,
+    description: &Description,
+    base: &BaseManifest,
+    beside_frame: bool,
+) -> Option<String> {
     item.limitations.iter().find_map(|limit| {
         let parameter = base.parameter(limit.parameter.as_deref()?)?;
+        if beside_frame && parameter.id == FRAME {
+            return None;
+        }
         let [low, high] = limit.range?;
         let value = value_of(description, Some(base), &parameter.id);
         (value < low.min(high) || value > low.max(high)).then(|| limit.note.clone())
@@ -368,7 +478,33 @@ pub fn matches(item: &ItemManifest, search: &str) -> bool {
         .all(|word| haystack.contains(&word.to_lowercase()))
 }
 
-/// What the page `shelf` lists for `description`.
+/// What the body type wears on page `shelf` (the underwear), by slot
+/// label, item label: listed as said, never offered.
+pub fn body_type_wears(
+    library: &Library,
+    description: &Description,
+    shelf: Shelf,
+) -> Vec<(String, String)> {
+    let Some(base) = library.base(&description.base) else {
+        return Vec::new();
+    };
+    let chosen = chosen_slots(library, &base.id);
+    base.slots
+        .iter()
+        .filter(|slot| slot.category == shelf.data() && chosen.contains(&slot.id))
+        .filter_map(|slot| {
+            let worn = description
+                .items
+                .iter()
+                .find_map(|worn| library.item(&worn.id).filter(|item| item.slot == slot.id))?;
+            Some((slot.label.clone(), worn.label.clone()))
+        })
+        .collect()
+}
+
+/// What the page `shelf` lists for `description`. `show_drafts` is the
+/// page's switch: drafts are listed with it on, and also when the page has
+/// no finished item to list at all.
 #[allow(clippy::too_many_arguments)]
 pub fn list<'a>(
     library: &'a Library,
@@ -384,18 +520,6 @@ pub fn list<'a>(
     };
     let chosen = chosen_slots(library, &base.id);
     let slots = page_slots(base, shelf, &chosen);
-    let body_type_wears = base
-        .slots
-        .iter()
-        .filter(|slot| slot.category == shelf.data() && chosen.contains(&slot.id))
-        .filter_map(|slot| {
-            let worn = description
-                .items
-                .iter()
-                .find_map(|worn| library.item(&worn.id).filter(|item| item.slot == slot.id))?;
-            Some((slot.label.clone(), worn.label.clone()))
-        })
-        .collect();
     let worn_ids: BTreeSet<&str> = description.items.iter().map(|w| w.id.as_str()).collect();
     let entry = |item: &'a ItemManifest| -> Entry<'a> {
         let slot = slots
@@ -421,11 +545,18 @@ pub fn list<'a>(
             takes_off,
         }
     };
-    let mut hidden_drafts = 0;
-    let shown: Vec<&ItemManifest> = library
+    let all: Vec<&ItemManifest> = library
         .items
         .values()
         .filter(|item| offered(item, &base.id, &slots))
+        .collect();
+    let drafts = all.iter().filter(|item| item.is_draft()).count();
+    let finished = all.len() - drafts;
+    // A page with nothing but drafts lists them: it never opens empty.
+    let show_drafts = show_drafts || finished == 0;
+    let mut hidden_drafts = 0;
+    let shown: Vec<&ItemManifest> = all
+        .into_iter()
         .filter(|item| {
             let keep = show_drafts || !item.is_draft() || worn_ids.contains(item.id.as_str());
             hidden_drafts += usize::from(!keep);
@@ -435,6 +566,17 @@ pub fn list<'a>(
     let mut kinds: Vec<String> = shown.iter().flat_map(|item| item.tags.clone()).collect();
     kinds.sort();
     kinds.dedup();
+    let cuts = kinds.iter().any(|kind| CUT_TAGS.contains(&kind.as_str()));
+    kinds.retain(|kind| !CUT_TAGS.contains(&kind.as_str()));
+    let feminine = feminine_body(description, base);
+    // Asked for another frame's garments, the frame is no misfit.
+    let fits = |entry: &Entry| {
+        entry.worn
+            || match filters.cut {
+                Cut::Body => entry.misfit.is_none(),
+                _ => misfits(entry.item, description, base, true).is_none(),
+            }
+    };
     let mut entries: Vec<Entry> = shown
         .iter()
         .filter(|item| filters.slot.as_ref().is_none_or(|slot| item.slot == *slot))
@@ -446,8 +588,11 @@ pub fn list<'a>(
         })
         .filter(|item| !filters.recolourable || recolourable(item))
         .filter(|item| matches(item, &filters.search))
+        .filter(|item| {
+            filters.cut.lists(&item.tags, feminine) || worn_ids.contains(item.id.as_str())
+        })
         .map(|item| entry(item))
-        .filter(|entry| !filters.fits || entry.misfit.is_none() || entry.worn)
+        .filter(|entry| !filters.fits || fits(entry))
         .filter(|entry| !filters.favourites || entry.favourite)
         .collect();
     // By slot in the base's order, then label; favourites first (a stable
@@ -474,11 +619,13 @@ pub fn list<'a>(
     Listing {
         offered: shown.len() + hidden_drafts,
         slots,
-        body_type_wears,
         entries,
         recent,
         kinds,
+        cuts,
         hidden_drafts,
+        finished,
+        drafts,
     }
 }
 
@@ -596,38 +743,46 @@ impl CharacterWorkspace {
             Browse::Filters(shelf, filters) => *self.browser.filters_mut(shelf) = filters,
             Browse::ShowDrafts(on) => {
                 self.browser.show_drafts = on;
-                // A draft tile tried on goes when drafts are hidden.
+                // A draft tile previewed goes when drafts are hidden.
                 if !on {
                     let library = self.library();
-                    let draft = |pick: &Option<Pick>| {
-                        pick.as_ref()
-                            .and_then(|pick| pick.item.as_deref())
-                            .and_then(|id| library.item(id))
-                            .is_some_and(|item| {
-                                item.is_draft()
-                                    && !self.description.items.iter().any(|w| w.id == item.id)
-                            })
-                    };
-                    if draft(&self.browser.selected) {
-                        self.browser.selected = None;
-                    }
-                    if draft(&self.browser.hovered) {
+                    let draft = self
+                        .browser
+                        .hovered
+                        .as_ref()
+                        .and_then(|pick| pick.item.as_deref())
+                        .and_then(|id| library.item(id))
+                        .is_some_and(|item| {
+                            item.is_draft()
+                                && !self.description.items.iter().any(|w| w.id == item.id)
+                        });
+                    if draft {
                         self.browser.hovered = None;
                     }
                 }
             }
             Browse::Online(on) => {
                 self.browser.online = on;
-                // A tile tried on was one of the library's.
+                // A tile previewed was one of the library's.
                 self.browser.hovered = None;
-                self.browser.selected = None;
             }
             Browse::Hover(pick) => {
                 if !self.browser.hover(pick) {
                     return;
                 }
             }
-            Browse::Select(pick) => self.browser.select(pick),
+            Browse::Clicked(pick) => {
+                self.browser.hovered = None;
+                self.browser.muted = Some(pick);
+            }
+            Browse::Unfold(item, open) => {
+                if open {
+                    self.browser.unfolded.insert(item);
+                } else {
+                    self.browser.unfolded.remove(&item);
+                }
+                return;
+            }
         }
         let library = self.library();
         self.browser.update_preview(&self.description, &library);

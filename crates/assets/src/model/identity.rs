@@ -637,6 +637,7 @@ impl Model {
                 uvs: primitive.uvs.clone(),
                 tangents,
                 regions: primitive.regions.clone(),
+                skin_uvs: primitive.skin_uvs.clone(),
                 indices: primitive.indices.clone(),
                 material: primitive.material.clone(),
                 joints: primitive.joints.clone(),

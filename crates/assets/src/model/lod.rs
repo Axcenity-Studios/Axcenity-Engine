@@ -221,6 +221,61 @@ fn simplified(primitive: &Primitive) -> Vec<Vec<u32>> {
     lods
 }
 
+/// A mesh's triangles simplified to about `target` of them (never moving
+/// its surface by more than `max_error` of its size), as a list of its
+/// corners, three per triangle. Normals and texture coordinates (either
+/// may be empty) are weighed against moving corners, so creases and
+/// texture seams are kept. For tools that make a model ready, such as a
+/// garment's import: models are otherwise simplified when loaded.
+pub fn simplify_triangles(
+    positions: &[[f32; 3]],
+    normals: &[[f32; 3]],
+    uvs: &[[f32; 2]],
+    indices: &[u32],
+    target: usize,
+    max_error: f32,
+) -> Vec<u32> {
+    let bytes: Vec<u8> = positions
+        .iter()
+        .flatten()
+        .flat_map(|c| c.to_ne_bytes())
+        .collect();
+    let Ok(vertices) = meshopt::VertexDataAdapter::new(&bytes, 12, 0) else {
+        return indices.to_vec();
+    };
+    let count = positions.len();
+    let has_normals = normals.len() == count;
+    let has_uvs = uvs.len() == count;
+    let stride = 3 + if has_uvs { 2 } else { 0 };
+    let mut attributes = Vec::with_capacity(count * stride);
+    for vertex in 0..count {
+        attributes.extend(if has_normals {
+            normals[vertex]
+        } else {
+            [0.0; 3]
+        });
+        if has_uvs {
+            attributes.extend(uvs[vertex]);
+        }
+    }
+    let mut weights = vec![if has_normals { NORMAL_WEIGHT } else { 0.0 }; 3];
+    if has_uvs {
+        weights.extend([UV_WEIGHT; 2]);
+    }
+    meshopt::simplify_with_attributes_and_locks(
+        indices,
+        &vertices,
+        &attributes,
+        &weights,
+        stride * size_of::<f32>(),
+        &vec![false; count],
+        target * 3,
+        max_error,
+        meshopt::SimplifyOptions::None,
+        None,
+    )
+}
+
 impl Primitive {
     /// A primitive with no triangles and `like`'s material, to add to.
     fn empty_like(like: &Primitive) -> Self {
@@ -231,6 +286,7 @@ impl Primitive {
             uvs: Vec::new(),
             tangents: Vec::new(),
             regions: Vec::new(),
+            skin_uvs: Vec::new(),
             indices: Vec::new(),
             material: like.material.clone(),
             joints: Vec::new(),
@@ -272,6 +328,7 @@ impl Primitive {
             uvs: pick(&self.uvs, &used),
             tangents: pick(&self.tangents, &used),
             regions: pick(&self.regions, &used),
+            skin_uvs: pick(&self.skin_uvs, &used),
             indices,
             material: self.material.clone(),
             joints: pick(&self.joints, &used),
@@ -313,6 +370,7 @@ impl Primitive {
             [1.0, 0.0, 0.0, 1.0],
         );
         join(&mut self.regions, other.regions, before, added, 0);
+        join(&mut self.skin_uvs, other.skin_uvs, before, added, [0.0; 2]);
         join(&mut self.joints, other.joints, before, added, [0; 4]);
         join(&mut self.weights, other.weights, before, added, [0.0; 4]);
         super::morph::append(&mut self.morphs, other.morphs, before as u32);
@@ -336,6 +394,7 @@ mod tests {
             normals: Vec::new(),
             uvs: Vec::new(),
             regions: Vec::new(),
+            skin_uvs: Vec::new(),
             tangents: Vec::new(),
             indices: Vec::new(),
             material: Default::default(),

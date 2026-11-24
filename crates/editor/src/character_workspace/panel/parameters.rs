@@ -1,13 +1,19 @@
-//! A category's parameters by group, as compact sections: a slider row
-//! each (a chip row for a choice such as the body type), filtered by the
-//! detail level and the picked feature. A category with many features (the
-//! face) lists them folded until one is opened or picked. With Symmetry
-//! on, a left and right pair shows as one row while its sides agree; a pair
-//! whose sides differ shows both, so nothing is flattened unseen (audit
-//! D-11). A group with left and right pairs has a "Left and right" menu
-//! of the asymmetry tools (R4: mirror a side onto the other, reset a
-//! side) for the pairs it shows, and each paired row a ⇄ menu of the same
-//! tools for its own pair.
+//! A category's parameters by group, as compact sections: a one-line
+//! slider row each (a chip row for a choice such as the body type),
+//! filtered by the detail level and the picked feature. A category with
+//! many features (the face) lists them folded until one is opened or
+//! picked. With Symmetry on, a left and right pair shows as one row while
+//! its sides agree; a pair whose sides differ shows both, so nothing is
+//! flattened unseen (audit D-11). A group with left and right pairs has a
+//! "Left and right" menu of the asymmetry tools (R4: mirror a side onto
+//! the other, reset a side) for the pairs it shows, and each paired row a
+//! ⇄ menu of the same tools for its own pair.
+//!
+//! While the panel's "Search controls" field has text, the page lists
+//! instead every parameter of the category that matches it ([`matches`]:
+//! every word typed, in the label, the ID or `about`), whatever feature is
+//! picked and at every level: a row of a level above the one shown says
+//! which ("Advanced").
 
 use std::collections::BTreeSet;
 
@@ -20,7 +26,7 @@ use super::super::selection::{
 };
 use super::super::sides::{self, SideTool, SidesOf};
 use super::super::{Category, symmetric_label, value_of};
-use super::row::{self, Asked, Row};
+use super::row::{self, Asked, Row, Sides};
 use crate::theme::{self, icons};
 use crate::widgets;
 
@@ -66,6 +72,43 @@ pub(in super::super) fn rows<'a>(
                     mirrored: false,
                 }),
             }
+        })
+        .collect()
+}
+
+/// Whether every word of `search` is in `parameter`'s label, ID or
+/// `about` (case aside). An empty search matches everything.
+pub(in super::super) fn matches(parameter: &Parameter, search: &str) -> bool {
+    super::has_words(
+        &[
+            &parameter.label,
+            &parameter.id,
+            parameter.about.as_deref().unwrap_or(""),
+        ],
+        search,
+    )
+}
+
+/// The rows of group `group` that match `search`, at every level and for
+/// every feature. A pair shown as one row (Symmetry) matches by either
+/// side.
+pub(in super::super) fn found<'a>(
+    base: &'a BaseManifest,
+    description: &Description,
+    group: &str,
+    search: &str,
+    symmetry: bool,
+) -> Vec<Shown<'a>> {
+    rows(base, description, group, Level::Advanced, None, symmetry)
+        .into_iter()
+        .filter(|row| {
+            let mirror = row
+                .parameter
+                .mirror
+                .as_deref()
+                .filter(|_| row.mirrored)
+                .and_then(|mirror| base.parameter(mirror));
+            matches(row.parameter, search) || mirror.is_some_and(|mirror| matches(mirror, search))
         })
         .collect()
 }
@@ -144,8 +187,10 @@ fn sides_row(
     tool.map(|tool| Intent::Sides { tool, of })
 }
 
-/// Draws `category`'s groups and returns what they ask for. `defaults` is
-/// the body's default character (what a side's reset puts back).
+/// Draws `category`'s groups and returns what they ask for, and whether
+/// any row was drawn. `defaults` is the body's default character (what a
+/// side's reset puts back); `search` is the panel's "Search controls" text
+/// (empty: the level's and the feature's rows).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn show(
     ui: &mut egui::Ui,
@@ -156,12 +201,14 @@ pub(super) fn show(
     category: Category,
     symmetry: bool,
     locks: &BTreeSet<String>,
-) -> Vec<Intent> {
+    search: &str,
+) -> (Vec<Intent>, bool) {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     let Some(data) = category.data() else {
-        return intents;
+        return (intents, false);
     };
+    let searching = !search.trim().is_empty();
     let mut any = false;
     // Many features (the face's nine) start folded, so the page is a list
     // of features to open rather than a wall of sliders.
@@ -171,32 +218,54 @@ pub(super) fn show(
         .filter(|group| group.category == data)
         .count();
     for group in base.groups.iter().filter(|group| group.category == data) {
-        let shown = rows(
-            base,
-            description,
-            &group.id,
-            selection.level,
-            selection.feature.as_deref(),
-            symmetry,
-        );
+        let shown = if searching {
+            found(base, description, &group.id, search, symmetry)
+        } else {
+            rows(
+                base,
+                description,
+                &group.id,
+                selection.level,
+                selection.feature.as_deref(),
+                symmetry,
+            )
+        };
         if shown.is_empty() {
             continue;
         }
         any = true;
+        // One column for the ⇄ marks where any row of the group is a
+        // pair, so the group's tracks line up.
+        let paired = shown.iter().any(|row| row.parameter.mirror.is_some());
         let draw = |ui: &mut egui::Ui, intents: &mut Vec<Intent>| {
-            intents.extend(sides_row(
-                ui,
-                base,
-                description,
-                defaults,
-                &shown,
-                selection.level,
-            ));
+            if !searching {
+                intents.extend(sides_row(
+                    ui,
+                    base,
+                    description,
+                    defaults,
+                    &shown,
+                    selection.level,
+                ));
+            }
             for row in &shown {
-                intents.extend(parameter(ui, base, description, defaults, row, locks));
+                // What a search finds above the level shown says where
+                // it is.
+                let level = parameter_level(row.parameter);
+                let note = (searching && !selection.level.shows(level)).then(|| level.label());
+                intents.extend(parameter(
+                    ui,
+                    base,
+                    description,
+                    defaults,
+                    row,
+                    locks,
+                    paired,
+                    note,
+                ));
             }
         };
-        if selection.feature.is_some() {
+        if selection.feature.is_some() && !searching {
             // One feature: its rows without a header (the panel's title
             // names it).
             draw(ui, &mut intents);
@@ -204,8 +273,14 @@ pub(super) fn show(
             widgets::section(icon(&group.id), &group.label)
                 .id_salt(&group.id)
                 .default_open(groups <= 4)
+                // What was searched for is never folded away.
+                .forced(searching.then_some(true))
                 .show(ui, |ui| draw(ui, &mut intents));
         }
+    }
+    if searching {
+        // The panel says when nothing on the page matches.
+        return (intents, any);
     }
     if !any {
         ui.label(
@@ -245,7 +320,7 @@ pub(super) fn show(
             intents.push(Intent::PickLevel(needed));
         }
     }
-    intents
+    (intents, any)
 }
 
 /// The IDs a row's lock covers: the parameter and, on a mirrored row,
@@ -262,7 +337,10 @@ fn lock_ids(shown: &Shown) -> Vec<String> {
 }
 
 /// One parameter's row: a slider, or chips for a choice; each with a lock
-/// for Randomize, and a paired row with its pair's side tools.
+/// for Randomize, and a paired row with its pair's side tools (`paired`:
+/// a row of its group has them, so this one keeps their column). `note`
+/// is a quiet word after its label (the level a search found it at).
+#[allow(clippy::too_many_arguments)]
 fn parameter(
     ui: &mut egui::Ui,
     base: &BaseManifest,
@@ -270,6 +348,8 @@ fn parameter(
     defaults: &Description,
     shown: &Shown,
     locks: &BTreeSet<String>,
+    paired: bool,
+    note: Option<&str>,
 ) -> Option<Intent> {
     let parameter = shown.parameter;
     let value = value_of(description, Some(base), &parameter.id);
@@ -277,21 +357,19 @@ fn parameter(
     let locked = ids.iter().all(|id| locks.contains(id));
     if !parameter.choices.is_empty() {
         let picked = parameter.nearest_choice(value).map(|choice| choice.value);
-        let palette = theme::palette(ui.ctx());
         let mut out = None;
+        // One line, as a slider row is: the label in its share of the
+        // width, the choices, the lock at the end.
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(&parameter.label).color(palette.text_secondary))
-                .on_hover_text(parameter_about(parameter));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(locked) = row::lock_toggle(ui, locked) {
-                    out = Some(Intent::SetLock {
-                        ids: ids.clone(),
-                        locked,
-                    });
-                }
-            });
-        });
-        ui.horizontal_wrapped(|ui| {
+            let width = row::label_width(ui.available_width());
+            row::label(
+                ui,
+                &parameter.label,
+                note,
+                &parameter_about(parameter),
+                width,
+            );
+            ui.spacing_mut().item_spacing.x = 2.0;
             for choice in &parameter.choices {
                 if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
                     out = Some(Intent::Choose {
@@ -300,8 +378,18 @@ fn parameter(
                     });
                 }
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // Under the slider rows' locks: their reset's column is
+                // the last.
+                ui.add_space(row::MARK);
+                if let Some(locked) = row::lock_toggle(ui, locked) {
+                    out = Some(Intent::SetLock {
+                        ids: ids.clone(),
+                        locked,
+                    });
+                }
+            });
         });
-        ui.add_space(4.0);
         return out;
     }
     let label = if shown.mirrored {
@@ -318,19 +406,24 @@ fn parameter(
             &SidesOf::Pair(parameter.id.clone()),
         )
     });
+    let sides = match &tools {
+        Some(tools) => Sides::Tools(tools),
+        None if paired => Sides::Column,
+        None => Sides::None,
+    };
     let asked = row::slider_with_sides(
         ui,
         &Row {
             id: &parameter.id,
             label: &label,
-            note: None,
+            note,
             about: &about,
             value,
             range: parameter.range,
             default: parameter.default,
             locked: Some(locked),
         },
-        tools.as_deref(),
+        sides,
     )?;
     let (value, gesture) = match asked {
         Asked::Set(value, gesture) => (value, gesture),

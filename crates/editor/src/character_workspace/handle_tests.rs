@@ -386,6 +386,22 @@ fn hover_highlights_and_a_click_selects_and_frames_the_feature() {
     let hip = hip + vec2(6.0 * (middle - hip.x).signum(), 0.0);
     studio.hover(hip);
     assert_eq!(studio.workspace.direct.hovered.as_deref(), Some("hips"));
+    // Lit under the pointer, and not up at the chest.
+    let strength_at = |studio: &Studio, at: Pos2| {
+        let (_, texels) = studio.workspace.highlight();
+        texels
+            .iter()
+            .find(|(texel, _)| (texel.x - at.x).abs() <= 1.0 && (texel.y - at.y).abs() <= 1.0)
+            .map_or(0.0, |(_, strength)| *strength)
+    };
+    let [_, hover] = CharacterWorkspace::highlight_strengths();
+    assert!(
+        strength_at(&studio, hip) >= hover - 0.01,
+        "the hips are lit"
+    );
+    let chest = studio.workspace.handle_point("shoulder_left").unwrap();
+    let chest = egui::pos2(middle, chest.y + 40.0);
+    assert_eq!(strength_at(&studio, chest), 0.0, "the chest isn't");
     let texts =
         super::shell_tests::drawn_texts(&studio.frame(vec![egui::Event::PointerMoved(hip)]));
     assert!(texts.iter().any(|t| t.contains("Hips")), "{texts:?}");
@@ -465,8 +481,13 @@ fn handles_off_leaves_the_camera_only() {
     studio.workspace.apply(Intent::SetHandles(false));
     studio.settle();
     assert!(studio.workspace.handle_on_screen("eye_left").is_none());
+    assert!(
+        Lit::of(&studio).texels.is_empty(),
+        "the selection isn't lit"
+    );
     studio.hover(at);
     assert_eq!(studio.workspace.direct.hovered, None);
+    assert!(Lit::of(&studio).texels.is_empty(), "nor what's hovered");
     let orbit = studio.workspace.orbit;
     studio.drag(at, vec2(40.0, 0.0));
     assert_ne!(studio.workspace.orbit, orbit);
@@ -475,6 +496,8 @@ fn handles_off_leaves_the_camera_only() {
     studio.workspace.focus(ViewPreset::Face);
     studio.settle();
     assert!(studio.workspace.handle_on_screen("eye_left").is_some());
+    let lit = Lit::of(&studio);
+    assert!(lit.over(0.05).contains(&true), "the eyes are lit again");
 }
 
 /// A handle is drawn only where its skin can be seen: the far jaw angle
@@ -541,14 +564,102 @@ fn handles_on_the_far_side_are_hidden() {
     assert_eq!(studio.workspace.description(), &before);
 }
 
-/// Everything the overlay draws (the handles and the tint of the selected
-/// and the hovered feature) is skin that can be seen, checked with exact
-/// rays against the posed body from the studio's views where far-side
-/// skin lies behind near skin: the jaw from the Face view, the eyes turned
-/// 70 degrees, the shoulders and a hovered waist from three-quarter, the
-/// waist from the front (behind the arms) and the hips turned 45 degrees.
+/// The highlight drawn last frame, for looking at its texels.
+struct Lit {
+    /// Texels across.
+    width: usize,
+    /// Each texel's middle on the screen and its strength, row by row.
+    texels: Vec<(Pos2, f32)>,
+}
+
+impl Lit {
+    fn of(studio: &Studio) -> Self {
+        let (width, texels) = studio.workspace.highlight();
+        Self { width, texels }
+    }
+
+    /// The texels at least `strength` strong, as a grid of yes and no.
+    fn over(&self, strength: f32) -> Vec<bool> {
+        self.texels.iter().map(|(_, s)| *s >= strength).collect()
+    }
+
+    /// The sizes of the groups of texels of `grid` that are `lit` and
+    /// touch one another side to side, and whether each touches the
+    /// grid's edge.
+    fn groups(&self, grid: &[bool], lit: bool) -> Vec<(usize, bool)> {
+        let (width, height) = (self.width, grid.len() / self.width.max(1));
+        let mut seen = vec![false; grid.len()];
+        let mut groups = Vec::new();
+        for start in 0..grid.len() {
+            if seen[start] || grid[start] != lit {
+                continue;
+            }
+            let (mut size, mut at_edge, mut open) = (0, false, vec![start]);
+            seen[start] = true;
+            while let Some(at) = open.pop() {
+                size += 1;
+                let (x, y) = (at % width, at / width);
+                at_edge |= x == 0 || y == 0 || x + 1 == width || y + 1 == height;
+                let mut visit = |next: usize| {
+                    if !seen[next] && grid[next] == lit {
+                        seen[next] = true;
+                        open.push(next);
+                    }
+                };
+                if x > 0 {
+                    visit(at - 1);
+                }
+                if x + 1 < width {
+                    visit(at + 1);
+                }
+                if y > 0 {
+                    visit(at - width);
+                }
+                if y + 1 < height {
+                    visit(at + width);
+                }
+            }
+            groups.push((size, at_edge));
+        }
+        groups
+    }
+}
+
+/// The screen points round `at` exact rays are cast through: itself and
+/// `reach` points each way.
+fn round(at: Pos2, reach: f32) -> [Pos2; 5] {
+    [
+        at,
+        at + vec2(reach, 0.0),
+        at - vec2(reach, 0.0),
+        at + vec2(0.0, reach),
+        at - vec2(0.0, reach),
+    ]
+}
+
+/// The screen points within 6 points of `at` each way, a texel (2 points)
+/// apart, `at` itself first: a sliver of a feature one texel wide (the
+/// far shoulder past the neck) is still met.
+fn within_six(at: Pos2) -> impl Iterator<Item = Pos2> {
+    let steps = [0, -1, 1, -2, 2, -3, 3];
+    steps
+        .into_iter()
+        .flat_map(move |y| steps.map(move |x| at + vec2(x as f32 * 2.0, y as f32 * 2.0)))
+}
+
+/// Everything the overlay draws is what the camera sees, checked with
+/// exact rays against the posed character from the studio's views where
+/// far-side skin lies behind near skin: the jaw from the Face view, the
+/// eyes turned 70 degrees, the shoulders and a hovered waist from
+/// three-quarter, the waist from the front (behind the arms) and the hips
+/// turned 45 degrees. Each handle is on skin that can be seen. The
+/// highlight is lit only within 6 points of where a ray first meets a
+/// surface of the selected or the hovered feature (never the far shoulder
+/// over the chest), and wherever rays meet the hovered feature well inside
+/// it, facing the camera, the highlight is at its full strength: it covers
+/// the feature.
 #[test]
-fn the_overlay_is_drawn_only_where_the_skin_shows() {
+fn the_overlay_is_drawn_only_where_the_feature_shows() {
     let cases: [(&str, ViewPreset, Option<f32>, &str); 6] = [
         ("jaw", ViewPreset::Face, None, "jaw"),
         ("eyes", ViewPreset::Face, Some(70.0), "eyes"),
@@ -557,6 +668,7 @@ fn the_overlay_is_drawn_only_where_the_skin_shows() {
         ("waist", ViewPreset::Front, None, "waist"),
         ("hips", ViewPreset::Front, Some(45.0), "hips"),
     ];
+    let [_, hover] = CharacterWorkspace::highlight_strengths();
     let mut studio = Studio::new("handles-in-sight");
     let mut faults = Vec::new();
     for (selected, view, yaw, hovered) in cases {
@@ -567,37 +679,275 @@ fn the_overlay_is_drawn_only_where_the_skin_shows() {
         if let Some(at) = studio.workspace.anchor_point(hovered, 0) {
             studio.hover(at);
         }
-        let shown = studio.workspace.direct.shown_count();
-        let points = studio.workspace.drawn_points();
-        assert!(!points.is_empty(), "{selected}: something is drawn");
-        // Every handle, and about 150 of the tint's corners, spread out.
-        let step = ((points.len() - shown) / 150).max(1);
-        let (mut handles, mut tint) = (0, 0);
-        for (index, point) in points.iter().enumerate() {
-            let handle = index < shown;
-            if !handle && !(index - shown).is_multiple_of(step) {
-                continue;
-            }
-            // A handle shows within 6 points of skin that's seen (at its
-            // own outline), the tint within its buffer's texel and a half.
-            let slack = if handle { 6.0 } else { 3.0 };
-            if !studio.workspace.in_sight(*point, slack, 0.01) {
-                if handle {
-                    handles += 1;
-                } else {
-                    tint += 1;
+        // What's under the pointer there (an anchor can be inside the
+        // head: the skin in front of it may be another feature's).
+        let hovered = studio.workspace.direct.hovered.clone();
+        let hovered = hovered.as_deref().unwrap_or(selected);
+        let case = format!("{selected} in {view:?} at {yaw:?} hovering {hovered}");
+        let handles = studio.workspace.handles_drawn();
+        let unseen = handles
+            .iter()
+            .filter(|point| !studio.workspace.in_sight(**point, 6.0, 0.01))
+            .count();
+        if unseen > 0 {
+            faults.push(format!(
+                "{case}: {unseen} of {} handles behind the skin",
+                handles.len()
+            ));
+        }
+        let lit = Lit::of(&studio);
+        let shows: Vec<Pos2> = lit
+            .texels
+            .iter()
+            .filter(|(_, strength)| *strength > 0.02)
+            .map(|(at, _)| *at)
+            .collect();
+        assert!(!shows.is_empty(), "{case}: something is lit");
+        // About 150 of the lit texels, spread out: one of the lit
+        // features shows within 6 points of each.
+        let mut weight = |feature: &str, at: Pos2| studio.workspace.weight_in_sight(feature, at);
+        let step = (shows.len() / 150).max(1);
+        let sampled: Vec<Pos2> = shows.iter().copied().step_by(step).collect();
+        let astray = sampled
+            .iter()
+            .filter(|at| {
+                !within_six(**at).any(|near| {
+                    [selected, hovered].into_iter().any(|feature| {
+                        weight(feature, near).is_some_and(|(weight, _, _)| weight >= 0.4)
+                    })
+                })
+            })
+            .count();
+        if astray > 0 {
+            faults.push(format!(
+                "{case}: {astray} of {} sampled lit texels are not on a lit feature",
+                sampled.len()
+            ));
+        }
+        // And about 400 texels of the view: where the hovered feature
+        // shows well inside it, it's lit in full (at least; where the
+        // selected one is too, more).
+        let step = (lit.texels.len() / 400).max(1);
+        let (mut inside, mut dim) = (0, 0);
+        for (at, strength) in lit.texels.iter().step_by(step) {
+            let within = round(*at, 6.0).into_iter().all(|near| {
+                weight(hovered, near)
+                    .is_some_and(|(weight, _, facing)| weight >= 0.9 && facing >= 0.5)
+            });
+            if within {
+                inside += 1;
+                if *strength < hover - 0.01 {
+                    dim += 1;
                 }
             }
         }
-        if handles + tint > 0 {
+        if dim > 0 {
             faults.push(format!(
-                "{selected} in {view:?} at {yaw:?} hovering {hovered}: {handles} of {shown} \
-                 handles and {tint} of {} sampled tint corners behind the skin",
-                (points.len() - shown).div_ceil(step)
+                "{case}: {dim} of {inside} sampled texels well inside {hovered} are not lit in full"
             ));
         }
     }
     assert!(faults.is_empty(), "{faults:#?}");
+}
+
+/// Wears the realistic base's tee and joggers.
+fn dress(studio: &mut Studio) {
+    for (slot, item) in [
+        ("top", "axcenity/realistic-crew-tee"),
+        ("bottom", "axcenity/realistic-joggers"),
+    ] {
+        studio.workspace.apply(Intent::Wear {
+            slot: slot.to_owned(),
+            item: Some(item.to_owned()),
+        });
+    }
+    studio.settle();
+}
+
+/// A feature of the body under clothes is lit on the outside of the
+/// clothes, as one soft region (the bug this replaced: a tint of the
+/// garment's own triangles tested against a depth buffer, which showed as
+/// blotches with zig-zag outlines). With a tee and joggers on and the
+/// waist, then the hips, under the pointer from the front:
+///
+/// - the highlight is there, and nearly all of it lies on cloth;
+/// - what's lit is what's picked: the pointer anywhere inside it names
+///   the same feature (the cloth is picked by the weights it's lit by);
+/// - it's whole: no specks of highlight apart from it, no pinholes in it
+///   (every group of lit texels and every unlit gap inside it is large);
+/// - its edge is soft: along a line across its border the strength is
+///   even inside, rises once to the edge's rim and falls from full to
+///   nothing over 4 to 14 points, never rising again on the way out.
+#[test]
+fn a_clothed_feature_is_lit_on_the_cloth_as_one_soft_region() {
+    let [_, hover] = CharacterWorkspace::highlight_strengths();
+    let mut studio = Studio::new("handles-clothed");
+    dress(&mut studio);
+    studio.workspace.apply(Intent::PickCategory(Category::Body));
+    studio.workspace.apply(Intent::FocusView(ViewPreset::Front));
+    studio.settle();
+    for (feature, handle) in [("waist", "waist_left"), ("hips", "hip_left")] {
+        let side = studio.workspace.handle_point(handle).expect("on screen");
+        let middle = studio.workspace.direct.view_rect.unwrap().center().x;
+        let at = side + vec2(8.0 * (middle - side.x).signum(), 0.0);
+        studio.hover(at);
+        assert_eq!(studio.workspace.direct.hovered.as_deref(), Some(feature));
+        let lit = Lit::of(&studio);
+        let full = lit.over(hover - 0.01);
+        let count = full.iter().filter(|lit| **lit).count();
+        assert!(count > 200, "{feature}: {count} texels lit in full");
+
+        // On the cloth.
+        let texels: Vec<Pos2> = lit
+            .texels
+            .iter()
+            .zip(&full)
+            .filter(|(_, lit)| **lit)
+            .map(|((at, _), _)| *at)
+            .collect();
+        let sampled: Vec<Pos2> = texels
+            .iter()
+            .copied()
+            .step_by((count / 150).max(1))
+            .collect();
+        let on_cloth = sampled
+            .iter()
+            .filter(|at| {
+                studio
+                    .workspace
+                    .weight_in_sight(feature, **at)
+                    .is_some_and(|(_, worn, _)| worn)
+            })
+            .count();
+        assert!(
+            on_cloth * 10 >= sampled.len() * 9,
+            "{feature}: {on_cloth} of {} sampled lit texels are on cloth",
+            sampled.len()
+        );
+
+        // What's lit is what's picked: the pointer anywhere well inside
+        // it (4 texels from its edge or more) is over the same feature.
+        let inside: Vec<Pos2> = (0..lit.texels.len())
+            .filter(|at| {
+                let (x, y) = ((at % lit.width) as i32, (at / lit.width) as i32);
+                (-4..=4).step_by(4).all(|dy: i32| {
+                    (-4..=4).step_by(4).all(|dx: i32| {
+                        let (x, y) = (x + dx, y + dy);
+                        x >= 0
+                            && y >= 0
+                            && (x as usize) < lit.width
+                            && full
+                                .get(y as usize * lit.width + x as usize)
+                                .is_some_and(|lit| *lit)
+                    })
+                })
+            })
+            .map(|at| lit.texels[at].0)
+            .collect();
+        assert!(
+            inside.len() > 50,
+            "{feature}: {} texels inside",
+            inside.len()
+        );
+        for point in inside.iter().step_by((inside.len() / 12).max(1)) {
+            studio.hover(*point);
+            assert_eq!(
+                studio.workspace.direct.hovered.as_deref(),
+                Some(feature),
+                "under the pointer at {point:?}"
+            );
+        }
+        studio.hover(at);
+
+        // Whole: no specks, no pinholes.
+        let shows = lit.over(hover * 0.5);
+        let specks: Vec<usize> = lit
+            .groups(&shows, true)
+            .into_iter()
+            .map(|(size, _)| size)
+            .filter(|size| *size < 60)
+            .collect();
+        assert!(specks.is_empty(), "{feature}: specks of {specks:?} texels");
+        let pinholes: Vec<usize> = lit
+            .groups(&shows, false)
+            .into_iter()
+            .filter(|(size, at_edge)| !at_edge && *size < 60)
+            .map(|(size, _)| size)
+            .collect();
+        assert!(
+            pinholes.is_empty(),
+            "{feature}: pinholes of {pinholes:?} texels"
+        );
+
+        // Soft, and falling once: up a column of texels from inside the
+        // feature (half way from the pointer to the body's middle) to
+        // above it.
+        let from = egui::pos2((at.x + middle) / 2.0, at.y);
+        let column = lit
+            .texels
+            .iter()
+            .position(|(texel, _)| {
+                (texel.x - from.x).abs() <= 1.0 && (texel.y - from.y).abs() <= 1.0
+            })
+            .expect("the point is in the view");
+        let up: Vec<f32> = (0..=column / lit.width)
+            .map(|rows| lit.texels[column - rows * lit.width].1)
+            .collect();
+        assert!(up[0] >= hover - 0.01, "{feature}: lit at {from:?}");
+        let out = up
+            .iter()
+            .position(|strength| *strength == 0.0)
+            .expect("the feature ends above the pointer");
+        let up = &up[..=out];
+        // Even inside, a little stronger along the edge (the rim), then
+        // down to nothing: it never falls and rises again.
+        let strongest = up.iter().copied().fold(0.0, f32::max);
+        let rim = up.iter().position(|s| *s == strongest).unwrap();
+        assert!(
+            up[..=rim].windows(2).all(|pair| pair[1] >= pair[0] - 1e-6)
+                && up[rim..].windows(2).all(|pair| pair[1] <= pair[0] + 1e-6),
+            "{feature}: the edge rises to its rim and falls once: {up:?}"
+        );
+        let last_full = up.iter().rposition(|s| *s >= hover - 0.01).unwrap();
+        let fade = out - last_full;
+        assert!(
+            (2..=7).contains(&fade),
+            "{feature}: the edge fades over {fade} texels: {up:?}"
+        );
+    }
+}
+
+/// The highlight is made again only when what it shows changes: frames
+/// with the pointer still, the camera still and the same pose draw the
+/// texture as it is.
+#[test]
+fn a_still_view_keeps_its_highlight() {
+    let mut studio = Studio::new("handles-still");
+    studio.workspace.apply(Intent::PickCategory(Category::Body));
+    studio.workspace.apply(Intent::FocusView(ViewPreset::Front));
+    studio
+        .workspace
+        .apply(Intent::PreviewMotion(super::motion::Motion::Still));
+    studio.settle();
+    let hip = studio.workspace.handle_point("hip_left").unwrap();
+    let middle = studio.workspace.direct.view_rect.unwrap().center().x;
+    let hip = hip + vec2(6.0 * (middle - hip.x).signum(), 0.0);
+    studio.hover(hip);
+    assert_eq!(studio.workspace.direct.hovered.as_deref(), Some("hips"));
+    let made = studio.workspace.highlight_rebuilds();
+    assert!(made > 0, "the highlight was made");
+    for _ in 0..5 {
+        studio.frame(vec![egui::Event::PointerMoved(hip)]);
+    }
+    assert_eq!(studio.workspace.highlight_rebuilds(), made);
+    assert!(
+        !Lit::of(&studio).over(0.05).is_empty(),
+        "and it's still drawn"
+    );
+    // The camera turns: made again.
+    studio.turn(20.0);
+    studio.hover(hip);
+    assert!(studio.workspace.highlight_rebuilds() > made);
 }
 
 /// Drawn for real with `AXCENITY_SNAPSHOTS`: the hovered nose, the eyes
@@ -698,10 +1048,70 @@ fn handles_are_drawn_for_hover_selection_and_a_drag() {
     }
 }
 
+/// Drawn for real with `AXCENITY_SNAPSHOTS`: a dressed character (the
+/// tee and joggers) with the hips, the waist and the shoulders under the
+/// pointer from the front, the hips again close up and turned, and the
+/// waist selected with its handles. The highlight lies on the cloth.
+#[test]
+fn a_clothed_character_s_highlight_is_drawn() {
+    let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) else {
+        return;
+    };
+    let mut studio = Studio::new("handles-clothed-snapshots");
+    dress(&mut studio);
+    studio.workspace.apply(Intent::PickCategory(Category::Body));
+    let snap = |studio: &mut Studio, name: &str, at: Pos2| {
+        let workspace = &mut studio.workspace;
+        workspace.canvas = Canvas::default();
+        workspace.other_canvas = Canvas::default();
+        crate::snapshot::snapshot_rendered(
+            &snapshots.join(format!("character-studio-handles-clothed-{name}.png")),
+            egui::vec2(1440.0, 900.0),
+            vec![vec![egui::Event::PointerMoved(at)]; 4],
+            |ui, render_state| {
+                workspace.ui(ui, Some(render_state));
+            },
+        );
+    };
+    // Each: a name, the handle the pointer is beside, the camera's turn
+    // and how near it is (the view's own when `None`).
+    type Shot<'a> = (&'a str, &'a str, Option<f32>, Option<f32>);
+    let shots: [Shot; 6] = [
+        ("hips", "hip_left", None, None),
+        ("waist", "waist_left", None, None),
+        ("shoulders", "shoulder_left", None, None),
+        ("hips-close", "hip_left", None, Some(5.0)),
+        ("hips-turned", "hip_left", Some(40.0), Some(6.0)),
+        ("waist-turned", "waist_left", Some(-60.0), Some(6.0)),
+    ];
+    for (name, handle, yaw, distance) in shots {
+        studio.workspace.apply(Intent::PickFeature(None));
+        studio.workspace.apply(Intent::FocusView(ViewPreset::Front));
+        studio.settle();
+        if let Some(yaw) = yaw {
+            studio.workspace.orbit.yaw = yaw;
+        }
+        if let Some(distance) = distance {
+            let target = studio.workspace.handle_world(handle).unwrap();
+            studio.workspace.orbit.distance = distance;
+            studio.workspace.orbit.target.y = target.y;
+        }
+        studio.settle();
+        let side = studio.workspace.handle_point(handle).unwrap();
+        let middle = studio.workspace.direct.view_rect.unwrap().center().x;
+        let at = side + vec2(10.0 * (middle - side.x).signum(), 0.0);
+        snap(&mut studio, name, at);
+    }
+    studio.select("waist", ViewPreset::Front);
+    let at = studio.handle("waist_left");
+    snap(&mut studio, "waist-selected", at + vec2(0.0, 120.0));
+}
+
 /// What direct manipulation costs a frame: the studio's frame (no GPU)
 /// with it off, with the eyes selected and the pointer off the character
-/// (the depth buffer, the handles and the tint), and with the pointer moving
-/// over the face (a ray cast every frame, the hovered feature's tint too).
+/// (the buffer of what the camera sees, the handles and the highlight), and
+/// with the pointer moving over the face (a ray cast every frame, the
+/// hovered feature's highlight too).
 /// Ignored; run it alone in a release build:
 /// `cargo test -p axcenity-editor --release -- --ignored hover_costs --nocapture`.
 #[test]
@@ -733,6 +1143,88 @@ fn hover_costs_per_frame() {
         "frame: off {off:.2} ms; eyes selected, pointer away {selected:.2} ms; \
          pointer moving over the face {moving:.2} ms"
     );
+}
+
+/// What the highlight costs each time it's made, on the default realistic
+/// character in a tee and joggers: the studio's frame (no GPU) with the
+/// pointer over a feature against the same frame with editing on the
+/// character off. The difference is looking at the character (rasterizing
+/// the body and the clothes as posed into the viewport's buffer, a texel
+/// per 2 points), making the mask from that (the weights, the blur, the
+/// texture's update) and the ray under the pointer. With the hips under
+/// the pointer from the front, with the face under it close up (the mask
+/// is larger on the screen), and with the waist selected too. The idle
+/// motion moves the pose every frame, so each frame makes it again. Also
+/// the first frame over the clothes, which works out where they lie on
+/// the body (`direct/worn.rs`). Ignored; run it alone in a release build:
+/// `cargo test -p axcenity-editor --release -- --ignored highlight_costs --nocapture`.
+#[test]
+#[ignore = "timing: run alone with --release -- --ignored highlight_costs"]
+fn highlight_costs_per_rebuild() {
+    let mut studio = Studio::new("handles-highlight-timing");
+    dress(&mut studio);
+    studio.workspace.apply(Intent::PickCategory(Category::Body));
+    studio.workspace.apply(Intent::FocusView(ViewPreset::Front));
+    studio.settle();
+    let rect = studio.workspace.direct.view_rect.unwrap();
+    println!(
+        "viewport {} by {} points: a buffer of {} by {} texels",
+        rect.width(),
+        rect.height(),
+        (rect.width() / 2.0).ceil(),
+        (rect.height() / 2.0).ceil()
+    );
+    let side = studio.workspace.handle_point("hip_left").unwrap();
+    let hips = side + vec2(8.0 * (rect.center().x - side.x).signum(), 0.0);
+    let start = std::time::Instant::now();
+    studio.frame(vec![egui::Event::PointerMoved(hips)]);
+    println!(
+        "first frame over the clothes: {:.1} ms",
+        start.elapsed().as_secs_f64() * 1000.0
+    );
+    // The median of 60 frames, the pointer a point to and fro at `at`.
+    let median = |studio: &mut Studio, at: Pos2| {
+        let mut times: Vec<f64> = (0..60)
+            .map(|frame| {
+                let start = std::time::Instant::now();
+                studio.frame(vec![egui::Event::PointerMoved(
+                    at + vec2((frame % 2) as f32, 0.0),
+                )]);
+                start.elapsed().as_secs_f64() * 1000.0
+            })
+            .collect();
+        times.sort_by(f64::total_cmp);
+        times[times.len() / 2]
+    };
+    let measure = |studio: &mut Studio, name: &str, at: Pos2| {
+        let made = studio.workspace.highlight_rebuilds();
+        let on = median(studio, at);
+        let made = studio.workspace.highlight_rebuilds() - made;
+        let hovered = studio.workspace.direct.hovered.clone();
+        let lit = Lit::of(studio)
+            .over(0.02)
+            .iter()
+            .filter(|lit| **lit)
+            .count();
+        studio.workspace.apply(Intent::SetHandles(false));
+        let off = median(studio, at);
+        studio.workspace.apply(Intent::SetHandles(true));
+        studio.hover(at);
+        println!(
+            "{name} ({hovered:?}, {lit} texels lit, made {made} times in 60 frames): the frame \
+             {on:.2} ms, {off:.2} ms with editing on the character off: {:.2} ms for it",
+            on - off
+        );
+    };
+    measure(&mut studio, "hips, front", hips);
+    studio.workspace.apply(Intent::FocusView(ViewPreset::Face));
+    studio.settle();
+    studio.workspace.orbit.distance = 1.6;
+    studio.settle();
+    let lips = studio.workspace.handle_point("mouth_corner_left").unwrap();
+    measure(&mut studio, "the face, close", lips);
+    studio.select("waist", ViewPreset::Front);
+    measure(&mut studio, "waist selected, hips hovered", hips);
 }
 
 /// A face feature's tint is its own skin: the lips' is the mouth (its

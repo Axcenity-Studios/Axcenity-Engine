@@ -152,14 +152,14 @@ pub fn corrective_weights(rig: &Rig, bones: &[BoneTransform]) -> Vec<(String, f3
 
 /// A pose being built: bones turned one after another, each about its
 /// head in the file's space.
-struct Posing<'a> {
+pub(super) struct Posing<'a> {
     rig: &'a Rig,
     bones: Vec<BoneTransform>,
     finish: Option<FinishPose>,
 }
 
 impl<'a> Posing<'a> {
-    fn new(rig: &'a Rig, finish: Option<FinishPose>) -> Self {
+    pub(super) fn new(rig: &'a Rig, finish: Option<FinishPose>) -> Self {
         Posing {
             rig,
             bones: rig.rest_pose(),
@@ -171,12 +171,33 @@ impl<'a> Posing<'a> {
         self.rig.world(&self.bones)
     }
 
-    fn head(&self, bone: usize) -> Vec3 {
+    pub(super) fn head(&self, bone: usize) -> Vec3 {
         self.world()[bone].w_axis.truncate()
     }
 
+    /// Turns `bone` about its head so that the line from it to `tail` (a
+    /// bone below it) points along `toward`. Returns how far it turned
+    /// (degrees).
+    pub(super) fn aim(&mut self, bone: usize, tail: usize, toward: Vec3) -> f32 {
+        let now = (self.head(tail) - self.head(bone)).normalize_or_zero();
+        let toward = toward.normalize_or_zero();
+        if now == Vec3::ZERO || toward == Vec3::ZERO {
+            return 0.0;
+        }
+        self.turn(bone, Quat::from_rotation_arc(now, toward));
+        now.angle_between(toward).to_degrees()
+    }
+
+    /// The pose as the runtime would skin it (with [`FinishPose`] done).
+    pub(super) fn finished(mut self) -> Vec<BoneTransform> {
+        if let Some(finish) = self.finish {
+            finish(self.rig, &mut self.bones);
+        }
+        self.bones
+    }
+
     /// Turns `bone` by `turn` (in the file's space) about its head.
-    fn turn(&mut self, bone: usize, turn: Quat) {
+    pub(super) fn turn(&mut self, bone: usize, turn: Quat) {
         let world = self.world();
         let head = world[bone].w_axis.truncate();
         let turned = Mat4::from_translation(head)

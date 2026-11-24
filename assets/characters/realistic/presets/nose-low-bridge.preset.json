@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Low bridge",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "nose_bridge": -0.6,
+    "nose_bridge_width": 0.3,
+    "nose_hump": -0.2,
+    "nose_root": -1.0
+  },
+  "preset": {
+    "id": "axcenity/realistic-nose-low-bridge",
+    "kind": "feature",
+    "about": "A shallow root between the eyes and a low bridge under it.",
+    "feature": "nose",
+    "tags": [
+      "shape"
+    ],
+    "order": 100
+  }
+}

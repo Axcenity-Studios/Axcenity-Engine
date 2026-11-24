@@ -93,7 +93,7 @@ pub use face_profile::{
     is_face_profile, read_face_profiles, write_face_profile,
 };
 pub use fonts::{FontFile, is_font_file};
-pub use hidden::{RegionHiding, hidden_mesh_id, split_hidden};
+pub use hidden::{COVERED, RegionHiding, hidden_mesh_id, split_hidden};
 pub use import::{
     AUDIO_EXTENSIONS, ImportError, MESH_EDIT_FOLDER_SUFFIX, MESH_EDIT_SUFFIX, MODELS_FOLDER,
     PROJECT_AUDIO_FOLDER, PROJECT_SKY_FOLDER, PROJECT_TEXTURES_FOLDER, TEXTURE_EXTENSIONS,
@@ -129,10 +129,11 @@ pub use model::{
     ChannelTexture, Identity, IdentityLayer, Image, Joint, Keys, LevelReport, LiveIdentity,
     LodReport, LodWarning, MESH_CACHE_FOLDER, MODEL_CACHE_FOLDER, MODEL_EXTENSIONS, MapSlot, Model,
     ModelError, ModelFormat, ModelMaterial, ModelObject, ModelShading, MorphTarget, Pick, Pose,
-    Posed, PosedBone, PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig, Sheen, Take,
-    TextureRole, Track, apply_morphs, cached_meshes, cooked_models, derived_mesh_id,
-    embedded_files, is_collision_piece, list_objects, load_model, load_models, load_takes,
-    lod_level, split_derived, strip_tags, tangents, texture_pack_name, texture_roles,
+    Posed, PosedBone, PosedPrimitive, Primitive, PrimitiveMorph, PrimitiveReport, Rig,
+    SKIN_UV_ATTRIBUTE, Sheen, Take, TextureRole, Track, apply_morphs, cached_meshes, cooked_models,
+    derived_mesh_id, embedded_files, is_collision_piece, list_objects, load_model, load_models,
+    load_takes, lod_level, simplify_triangles, split_derived, strip_tags, tangents,
+    texture_pack_name, texture_roles,
 };
 pub use model_presets::{
     BringIn, DEFAULT_MODEL_PRESET, ImportCollision, LAST_MODEL_PRESET_FILE, ModelSettings, UpAxis,

@@ -919,6 +919,7 @@ impl Reader<'_> {
                 uvs,
                 tangents: Vec::new(),
                 regions: Vec::new(),
+                skin_uvs: Vec::new(),
                 indices,
                 material,
                 joints,

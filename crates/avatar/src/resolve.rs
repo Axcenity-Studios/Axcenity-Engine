@@ -142,6 +142,9 @@ pub struct Resolved {
     /// (CO9): a region with a `map_index` is left out of the body drawn
     /// (`axcenity_assets::RegionHiding`), one with a mask shape sinks.
     pub hidden_regions: Vec<String>,
+    /// The cover maps of the worn garments (ADR-0045), as library paths:
+    /// the body leaves out the skin they cover.
+    pub covers: Vec<String>,
 }
 
 /// One mesh of a resolved character.
@@ -169,6 +172,16 @@ pub struct ResolvedPart {
     /// How a socket item sits relative to how it was made (the worn
     /// item's `transform`; as made when it has none).
     pub transform: crate::Transform,
+    /// The cover maps (library paths) of the garments worn over this one
+    /// ([`ItemManifest::wearing_order`](crate::ItemManifest::wearing_order)):
+    /// its cloth under them is left out. Empty for the body's own parts
+    /// and for what isn't a garment.
+    pub under: Vec<String>,
+    /// Those of them it is **tucked into**: the cover maps of bottoms
+    /// worn over a top. A waistband has nothing to be seen under, as a
+    /// hem has, so this one's cloth is left out wherever theirs is over
+    /// it, with no setback from the waistband.
+    pub tucked_into: Vec<String>,
 }
 
 /// How a part follows the body.
@@ -219,6 +232,8 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             materials: BTreeMap::new(),
             shapes: BTreeMap::new(),
             transform: crate::Transform::default(),
+            under: Vec::new(),
+            tucked_into: Vec::new(),
         })
     };
     let body = own_part(&base.model.body).ok_or_else(|| {
@@ -304,6 +319,15 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         ));
     }
     let mut hidden: Vec<&str> = Vec::new();
+    // Each worn garment's cover map and where it is worn, inside out.
+    let covering: Vec<(&str, (u8, u8), String, bool)> = worn
+        .iter()
+        .filter_map(|(_, _, manifest)| {
+            let order = manifest.wearing_order()?;
+            let map = library.path_of(&manifest.id, manifest.cover_map.as_deref()?)?;
+            Some((manifest.id.as_str(), order, map, manifest.slot == "bottom"))
+        })
+        .collect();
     for (index, item, manifest) in &worn {
         let model = match manifest.kind {
             crate::ItemKind::Groom => manifest
@@ -382,6 +406,30 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             materials,
             shapes,
             transform: item.transform.unwrap_or_default(),
+            under: manifest
+                .wearing_order()
+                .map(|own| {
+                    covering
+                        .iter()
+                        .filter(|(id, order, _, _)| *id != manifest.id && *order > own)
+                        .map(|(_, _, map, _)| map.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            // A top or a jacket under a bottom is tucked into it.
+            tucked_into: manifest
+                .wearing_order()
+                .filter(|_| matches!(manifest.slot.as_str(), "top" | "outerwear"))
+                .map(|own| {
+                    covering
+                        .iter()
+                        .filter(|(id, order, _, bottom)| {
+                            *bottom && *id != manifest.id && *order > own
+                        })
+                        .map(|(_, _, map, _)| map.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
         });
         hidden.extend(manifest.hides.iter().map(String::as_str));
     }
@@ -497,6 +545,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .filter(|region| hidden.contains(&region.id.as_str()))
             .map(|region| region.id.clone())
             .collect(),
+        covers: covering.into_iter().map(|(_, _, map, _)| map).collect(),
     })
 }
 

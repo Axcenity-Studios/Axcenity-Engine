@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Round",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "face_length": -0.6,
+    "face_roundness": 1.0,
+    "face_taper": -0.2,
+    "face_width": 0.5
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-shape-round",
+    "kind": "feature",
+    "about": "As wide as long, with full sides and no corners.",
+    "feature": "face_shape",
+    "tags": [
+      "shape"
+    ],
+    "order": 20
+  }
+}

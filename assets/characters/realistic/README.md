@@ -6,8 +6,9 @@ The `axcenity/realistic` base model (Character Studio overhaul, CO4): a body wit
 | --- | --- |
 | `RealisticParts.glb` | Skeleton `AxcenityRealistic` (72 bones) with `Body`, `Body_LOD1`, `Body_LOD2`, `Eyes`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2`, `EyeShell`, `Lashes`, `Brows`, `LipSeal`, and the underwear `Underwear_BoxerBriefs`, `Underwear_Briefs`, `Underwear_Bra`. The skin maps are inside it. |
 | `items/*.item.json` | The underwear's item manifests (written by `manifests.py`). |
-| `Realistic.base.json` | The base model manifest (written by `manifests.py`), with every parameter's `about`, `feature` and `level`, the 23 `features`, whose anchors `anchors.py` measures on `RealisticParts.glb` (R1), and the 19 `handles` Character Studio's viewport draws for the nose, eyes, jaw, mouth, shoulders, waist and hips, whose skin corners, axes and travels `handles.py` measures (R2). `manifests.py` is plain Python with numpy and runs without Blender. |
-| `presets/*.preset.json` | The shipped presets: 14 body (seven per body type), 9 face, 6 character (written by `presets.py`; R1). |
+| `Realistic.base.json` | The base model manifest (written by `manifests.py`), with every parameter's `about`, `feature` and `level` (122 parameters, 94 of them the face's), the 24 `features`, whose anchors `anchors.py` measures on `RealisticParts.glb` (R1), and the 59 `handles` Character Studio's viewport draws: the ring round the face's outline (the `face_shape` feature) and those of the nose, eyes, cheeks, jaw, chin, mouth, forehead, shoulders, waist and hips, whose skin corners, axes and travels `handles.py` measures (R2; "Finer face controls" below). `manifests.py` needs numpy and, through `shapes.py`, the `bpy` module (or Blender: run `manifests.write(folder)` from a script). |
+| `presets/*.preset.json` | The shipped presets: 14 body (seven per body type), 9 face, 6 character and 16 feature presets, ten noses and six face shapes (written by `presets.py`; R1, 2026-11-24). |
+| `graft_shapes.py` | Adds a fresh build's new shapes to the shipped model without changing what is in it, and checks a grafted model against its record (`--check`; "Rebuilding", below). Plain Python with numpy. |
 | `Realistic.build.json` | What the build measured and decided: frame bone offsets, twist and helper rules, regions, texel density, how the eyes and teeth were fitted. The QA scripts read it. |
 | `RealisticRegions.png` | The body regions as an index map (below). |
 | `source/` | The vendored source meshes and `extract.py`, which made them; `body_shapes.npz`, MakeHuman's bodies on this topology (CO5, below). |
@@ -22,7 +23,9 @@ python -I assets/characters/realistic/build.py --out assets/characters/realistic
 python -I assets/characters/catalogue.py
 ```
 
-`--texture-size 4096` bakes the hero texture set (2048 is committed); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `rims.py` (twice the vertices round the lids), `skin.py` (bakes), `face.py` (the face put right at rest), `makeup.py` (the makeup and marking masks, measured on that face: R5, ADR-0042), `eyes.py`, `parts.py` and `teeth.py` (eyes, teeth, gums, tongue), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `face.py` again (expression and identity shapes; `EyeShell`, `Lashes`, `Brows` from `eyes.py` and `lashes.py`), `underwear.py`, `regions.py`, `lods.py` and `manifests.py` (with `faceparams.py`). It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same.
+**Read "Rebuilding" below before building over the shipped files: since 2026-11-24 the shipped model is not what this build gives byte for byte, and garments are fitted to the shipped one.**
+
+`--texture-size 4096` bakes the hero texture set (2048 is committed); `--skip-bakes` leaves the maps out for quick checks of the mesh and rig. The build is one pass through `body.py` (load, re-pose, stand), `uvs.py`, `rims.py` (twice the vertices round the lids), `skin.py` (bakes), `face.py` (the face put right at rest), `makeup.py` (the makeup and marking masks, measured on that face: R5, ADR-0042), `eyes.py`, `parts.py` and `teeth.py` (eyes, teeth, gums, tongue), `rig.py` (skeleton, weights), `shapes.py` and `correctives.py` (the body's shapes), `face.py` again (expression and identity shapes; `EyeShell`, `Lashes`, `Brows` from `eyes.py` and `lashes.py`), `underwear.py`, `regions.py`, `lods.py` and `manifests.py` (with `faceparams.py`). It reuses the stylized package's skeleton builder and manifest helpers (`common.stylized`), so bone names, slots and sockets stay the same. `face.py`'s identity shapes are followed by `facedetail.py`'s (the finer face controls).
 
 After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 
@@ -30,6 +33,53 @@ After a build, check it and render its sheets (see `../humanoid/qa/README.md`):
 python -I assets/characters/humanoid/qa/measure.py --package realistic --out docs/development/character-studio/co4/measurements.json --check assets/characters/realistic/qa/thresholds.json
 python -I assets/characters/humanoid/qa/render_baseline.py --package realistic --out docs/development/character-studio/co4
 ```
+
+## Rebuilding (the shipped model is grafted, not rebuilt)
+
+The shipped `RealisticParts.glb` came from another toolchain (commit 71b6edb6). Rebuilt **unchanged** with Blender 5.2.2 on 2026-11-24, `build.py` gives a model that differs from it:
+
+| Mesh | Against the shipped file |
+| --- | --- |
+| `Body` (12,692 corners, 22,184 triangles) | Same triangles, joints and shape names in the same order (185). Positions differ by up to 0.071 mm, texture coordinates by 2.8e-4, weights by 3.5e-5, inverse binds by 1.2e-5 and the existing shapes by up to 1.53 mm (`Jaw_Open`). |
+| `Body_LOD1` | Same triangles; weights differ by up to 7.7e-3. |
+| `Body_LOD2`, `Teeth`, `Teeth_LOD1`, `Teeth_LOD2` | Other triangles (the body's second copy has 3,411 corners against the shipped 3,410). |
+| `Brows`, `EyeShell`, `Lashes`, `LipSeal`, the underwear | Same triangles; positions within 0.17 mm, shapes within 1.5 mm. |
+
+Two builds on that one machine agree with each other exactly for every mesh but the teeth (`Teeth` and its copies come out with their vertices in another order each run), so the difference is the toolchain's. Garments are bound to the shipped body's triangles and texture coordinates and carry its shapes by name (ADR-0035), so the body is not rebuilt over. A new shape is **grafted** on:
+
+```bash
+blender -b --factory-startup --python-exit-code 1 --python build.py -- --out BUILT   # a fresh build, in a scratch folder
+python -I graft_shapes.py --shipped . --built BUILT --out OUT                         # the shipped model with BUILT's new shapes
+# write the manifest on OUT (`manifests.write(OUT)`), compare, then copy RealisticParts.glb, Realistic.base.json and Realistic.build.json
+```
+
+`graft_shapes.py` appends each shape the built mesh has and the shipped one lacks as a new morph target **after the existing ones**, and changes nothing else: the binary chunk begins with the shipped one, byte for byte, and every accessor and buffer view that was there is as it was (the script asserts it). Where the triangles are the same the built shape is taken corner by corner (the built body's rest positions are within 0.07 mm of the shipped one's); `Body_LOD2` takes each corner's offsets from the nearest point of the built full body, as `lods.py` binds a copy (at most 7.6 mm away, the coarse copy's own distance from the body), and the teeth from the built teeth (their two new shapes move every vertex alike). `Realistic.build.json` is the shipped one with the new shapes in the face's lists and a `grafted_shapes` record. The hairstyle rebuilds to the same vertices (`hair/build_hair.py`, against the grafted body), and takes its new shapes the same way: `graft_shapes.py ... --model hair/ShortCrop.glb`.
+
+**What keeps it so.** Each grafted model's build data (`Realistic.build.json`, `hair/ShortCrop.build.json`) has a `grafted_shapes` record: `shipped` (the length of the binary chunk before anything was grafted, with its SHA-256 and CRC-32: 40,052,300 bytes for the body, 17,447,008 for the hairstyle, the files of commit 71b6edb6) and, per mesh, the shapes added, in order. A later graft adds to the record and keeps `shipped`.
+
+- `build.py` stops before it builds when its `--out` folder (this one by default) has that record; `--over-grafted` builds over it, after which every garment must be refitted. `hair/build_hair.py` may rebuild the hairstyle (nothing is bound to it); its record goes with the rebuild.
+- `python -I graft_shapes.py --check .` checks every recorded model: its binary chunk still begins with the shipped bytes, and each mesh's shapes end with the recorded ones on every primitive.
+- `avatar`'s `shipped_library` test `a_grafted_model_is_the_shipped_one_with_its_new_shapes_last` checks the same in `cargo test`, and fails if the body's record is gone.
+
+So the body's shapes are in two orders: the 185 the build made, then the 33 grafted on 2026-11-24 (a fresh build has them before the brows' length shapes and the underwear's masks). Everything reads shapes by name.
+
+## Finer face controls (2026-11-24)
+
+Paul: "certain areas should receive more customizability and attention, such as allowing stitch outlining of the shape of the face." 33 more identity shapes (`facedetail.py`) and their parameters (`faceparams.py`), each made as `face.Face.identity`'s are:
+
+| Group | Parameters (a pair has `_left` and `_right`) |
+| --- | --- |
+| `face_shape` (new, first of the face's groups and features) | `face_width`, `face_length`, `face_taper` (+1 a heart, -1 a square jaw), `face_roundness`, `face_narrow` (the soft face between the cheekbones and the chin, the skull held) |
+| `nose` | `nose_hump` (convex or scooped), `nose_root` (a high or a low root between the eyes), `nose_bridge_width`, `nose_tip_width` (pinched to bulbous), `nose_columella` (advanced), the pairs `nostril_flare` and `nostril_height` (advanced). The tip's droop is `nose_tip_rotation`, which was there. |
+| `eyes` | The pairs `eye_openness` (advanced, -1 to 0: the eye only narrows, below), `inner_corner_fold` (0 to 1: the epicanthic fold), `upper_lid_fullness` (advanced: deep-set to full, between the crease and the brow), `under_eye` (a hollow to a bag). The lid's crease is `upper_lid_fold`, which was there. |
+| `cheeks` | The pairs `cheek_hollow` (under the cheekbone) and `cheekbone_height` (advanced) |
+| `jaw`, `chin` | `jaw_definition` (a soft or a sharp jawline), `chin_shape` (a point to a square end), `chin_cleft` (0 to 1, advanced) |
+| `lips` | `cupids_bow` (advanced), `lip_protrusion` (the mouth forward or back, the teeth with it), the pair `mouth_corner_height` |
+
+- **What follows.** The brows' card, the lashes, the eye's film and the lip seal follow the shapes that move them (`face.build`, as before); the teeth go with `Face_Shape_Length` and `Face_Lip_Protrusion`, which move the mouth whole (`facedetail.MOVE_THE_MOUTH`); the hairstyle carries the four outline shapes that move the scalp.
+- **Handles.** Selecting Face shape shows a ring of 14 handles round the outline: the forehead's top (`forehead_height`, `forehead_slope`), each temple (`temple_width`), each cheekbone's outer edge (`face_width`, `cheekbone_height`), each cheek (`face_roundness`), each jaw corner (`face_taper`, `jaw_angle`), each side of the jawline (`face_narrow`, `jaw_definition`), each corner of the chin (`chin_width`, `chin_shape`) and the chin (`face_length`, `chin_forward`). These are the one set of handles that drive other features' parameters. The nose has seven more (root, hump, each side of the bridge and of the tip, the columella) and its nostril handles also drive the nostril's height and, in profile, its flare; the eyes, cheeks, jawline, chin, forehead and temples have their own.
+- **Presets.** `feature` presets (architecture.md section 15a) set one feature's parameters: ten noses and six face shapes (`presets.py`).
+- **Limits.** A blink does not follow `eye_openness`: a shape adds, so a closed eye is off by what the opening changed. At -1 the upper lid's rim rests 2.0 mm lower (1.8 mm at the eye's middle, of an opening of 11.5 mm) and a blink lays it that much further over the lower lid, which reads as a closed eye; a widened eye stayed open by as much, with the eye showing between the lids (the engine's capture), so the parameter stops at 0 until the engine scales a blink by it. It, `chin_cleft` and `inner_corner_fold` have one end, and Randomize draws them from the low part of their range (`faceparams.RANDOM`). `cupids_bow` and `chin_cleft` are as fine as the mesh allows (the lip's border has a vertex every 4 mm across its middle, the chin one column of vertices down its middle). Nine parameters are smaller than `Body_LOD2`'s triangles and move it less than 2 mm: `nose_hump`, `nose_bridge_width`, `cupids_bow` and the pairs `eye_openness`, `upper_lid_fullness` and `under_eye` (`avatar`'s `realistic_parameters` test names them). Garments fitted before 2026-11-24 don't carry the new shapes (none reaches below the jaw).
 
 ## Source and licence
 

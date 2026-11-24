@@ -185,6 +185,158 @@ fn skin_and_character_presets() {
     assert_eq!(description.extra["note"], json!("mine, kept"));
 }
 
+/// A `feature` preset of the test body naming `feature` (or none).
+fn feature_preset(id: &str, feature: Option<&str>, body: &str) -> Description {
+    let feature = feature.map_or(String::new(), |f| format!(r#", "feature": "{f}""#));
+    let text = format!(
+        r#"{{ "format_version": 2, "name": "{id}", "base": "test/body", {body}
+             "preset": {{ "id": "test/{id}", "kind": "feature", "about": "A test preset."{feature} }} }}"#
+    );
+    Description::from_json(&text).expect("the test preset reads")
+}
+
+#[test]
+fn a_feature_preset_sets_its_feature_and_nothing_else() {
+    let library = fixtures::rich_library();
+    let wide = feature_preset(
+        "eyes-wide",
+        Some("eyes"),
+        r#""parameters": { "eye_size_left": 0.5 },"#,
+    );
+    let block = wide.preset().unwrap();
+    assert_eq!(block.kind, PresetKind::Feature);
+    assert_eq!(block.kind.name(), "feature");
+    assert_eq!(block.feature.as_deref(), Some("eyes"));
+    assert_eq!(
+        Description::from_json(&wide.to_json()).unwrap().preset(),
+        Some(block),
+        "the feature survives a round trip"
+    );
+    assert_eq!(texts(&check_preset(&wide, &library)), Vec::<String>::new());
+
+    let mut description = character();
+    assert!(!matches_preset(&description, &wide, &library));
+    apply_preset(&mut description, &wide, &library).unwrap();
+    // The feature's parameters: the one it names, and the one it leaves
+    // out back at its default (`eye_size_right` is in the feature by its
+    // group's ID).
+    assert_eq!(description.parameters["eye_size_left"], 0.5);
+    assert!(!description.parameters.contains_key("eye_size_right"));
+    // Nothing else: the other features, the items, the materials, the
+    // name, what the description doesn't know.
+    let before = character();
+    for id in ["frame", "fat", "height", "tone"] {
+        assert_eq!(description.parameters[id], before.parameters[id], "{id}");
+    }
+    assert_eq!(description.items, before.items);
+    assert_eq!(description.materials, before.materials);
+    assert_eq!(description.name, "Ada");
+    assert_eq!(description.extra["note"], json!("mine, kept"));
+    assert!(
+        description.preset().is_none(),
+        "the block never comes along"
+    );
+
+    // It matches until one of the feature's own parameters moves.
+    assert!(matches_preset(&description, &wide, &library));
+    description.parameters.insert("fat".to_owned(), 0.9);
+    description.items.clear();
+    assert!(
+        matches_preset(&description, &wide, &library),
+        "another feature's slider and the wardrobe don't unmatch it"
+    );
+    description
+        .parameters
+        .insert("eye_size_right".to_owned(), 0.2);
+    assert!(!matches_preset(&description, &wide, &library));
+
+    // A parameter that names its feature (`fat` and `muscle` are the
+    // torso's, in the `build` group with `height`, which is no feature's).
+    let heavy = feature_preset(
+        "torso-heavy",
+        Some("torso"),
+        r#""parameters": { "fat": 0.8 },"#,
+    );
+    assert_eq!(texts(&check_preset(&heavy, &library)), Vec::<String>::new());
+    let mut description = character();
+    description.parameters.insert("muscle".to_owned(), 0.6);
+    apply_preset(&mut description, &heavy, &library).unwrap();
+    assert_eq!(description.parameters["fat"], 0.8);
+    assert!(!description.parameters.contains_key("muscle"));
+    assert_eq!(description.parameters["height"], 1.2);
+    assert_eq!(description.parameters["eye_size_left"], -0.4);
+}
+
+#[test]
+fn a_feature_preset_names_a_feature_and_keeps_to_it() {
+    let library = fixtures::rich_library();
+    // No feature, and a feature the base model doesn't have: reported,
+    // and applying changes nothing.
+    for (preset, word) in [
+        (
+            feature_preset(
+                "nameless",
+                None,
+                r#""parameters": { "eye_size_left": 0.5 },"#,
+            ),
+            "names no feature",
+        ),
+        (
+            feature_preset(
+                "elsewhere",
+                Some("nose"),
+                r#""parameters": { "eye_size_left": 0.5 },"#,
+            ),
+            "nose",
+        ),
+    ] {
+        assert_problem(&check_preset(&preset, &library), &["preset.feature", word]);
+        let mut description = character();
+        let err = apply_preset(&mut description, &preset, &library).unwrap_err();
+        assert_eq!(err.at, "preset.feature", "{err}");
+        assert_eq!(description, character(), "nothing changed");
+        assert!(!matches_preset(&description, &preset, &library));
+    }
+    // A parameter of another feature, of no feature, an item, a material
+    // value and makeup: each reported.
+    let busy = feature_preset(
+        "busy",
+        Some("eyes"),
+        r##""parameters": { "eye_size_left": 0.5, "fat": 0.4, "height": 1.1 },
+            "items": [{ "id": "test/tee" }],
+            "materials": { "Skin": { "melanin": 0.5 } },"##,
+    );
+    let problems = check_preset(&busy, &library);
+    assert_problem(&problems, &["parameters.fat", "eyes", "torso"]);
+    assert_problem(&problems, &["parameters.height", "eyes", "no feature"]);
+    assert_problem(&problems, &["items[0]", "test/tee", "feature"]);
+    assert_problem(&problems, &["materials.Skin", "feature"]);
+    assert!(
+        !problems.iter().any(|p| p.at == "parameters.eye_size_left"),
+        "{:?}",
+        texts(&problems)
+    );
+    // Applied all the same, it sets only its feature's parameters.
+    let mut description = character();
+    apply_preset(&mut description, &busy, &library).unwrap();
+    assert_eq!(description.parameters["eye_size_left"], 0.5);
+    assert_eq!(description.parameters["fat"], 0.1);
+    assert_eq!(description.parameters["height"], 1.2);
+    assert_eq!(description.items, character().items);
+    assert_eq!(description.materials, character().materials);
+    // Another base model's is refused like any part preset.
+    let mut other = feature_preset("other", Some("eyes"), "");
+    other.base = "test/other".to_owned();
+    assert!(apply_preset(&mut description, &other, &library).is_err());
+    // A feature preset owns no category and no material values, and the
+    // other kinds write no `feature`.
+    assert!(!PresetKind::Feature.owns(crate::Category::Face));
+    assert!(!PresetKind::Feature.owns_materials());
+    let body = preset("body", "plain", "");
+    assert!(body.extra["preset"].get("feature").is_none());
+    assert_eq!(body.preset().unwrap().feature, None);
+}
+
 #[test]
 fn a_preset_that_cant_apply_says_why() {
     let library = fixtures::rich_library();

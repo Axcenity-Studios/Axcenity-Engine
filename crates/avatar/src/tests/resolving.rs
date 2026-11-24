@@ -270,3 +270,108 @@ fn a_worn_items_values_go_over_its_variants() {
         MaterialValue::Number(1.2)
     );
 }
+
+/// ADR-0045: what is worn over a garment hides it. The body leaves out
+/// the skin under every worn garment's cover map; a garment leaves out
+/// its cloth under the cover maps of the garments worn over it, by layer
+/// and then by slot (a top over the bottoms of its layer), never under
+/// its own or one worn beneath it.
+#[test]
+fn a_garment_is_hidden_under_the_ones_worn_over_it() {
+    let mut library = fixtures::rich_library();
+    // The tee, the skirt and the hood each with a cover map beside
+    // their manifest; the watch (no garment) with none.
+    for (id, file, map) in [
+        ("test/tee", "tee", "Tee.cover.png"),
+        ("test/skirt", "skirt", "Skirt.cover.png"),
+        ("test/hood", "hood", "Hood.cover.png"),
+    ] {
+        let mut item = library.item(id).expect("in the fixtures").clone();
+        item.cover_map = Some(map.to_owned());
+        assert!(item.validate().is_empty(), "{:?}", item.validate());
+        library.add_item(format!("test/items/{file}.item.json"), item);
+    }
+    let mut description = Description::new("Ada", "test/body");
+    // Put on outside in: the order worn doesn't decide what is over what.
+    for id in ["test/hood", "test/tee", "test/skirt", "test/watch"] {
+        description.items.push(WornItem::new(id));
+    }
+    let resolved = resolve(&library, &description).expect("it resolves");
+    assert!(resolved.problems.is_empty(), "{:?}", resolved.problems);
+    let covers = |paths: &[String]| -> Vec<String> {
+        let mut names: Vec<String> = paths
+            .iter()
+            .map(|path| path.rsplit('/').next().unwrap_or(path).to_owned())
+            .collect();
+        names.sort();
+        names
+    };
+    assert_eq!(
+        covers(&resolved.covers),
+        ["Hood.cover.png", "Skirt.cover.png", "Tee.cover.png"]
+    );
+    assert!(
+        resolved
+            .covers
+            .iter()
+            .all(|path| path.starts_with("test/items/"))
+    );
+    let under = |item: &str| {
+        let part = resolved
+            .parts
+            .iter()
+            .find(|part| part.item.as_deref() == Some(item))
+            .expect("worn");
+        covers(&part.under)
+    };
+    // The skirt (bottoms) is under the tee (a top of its layer) and the
+    // hood (outerwear, a layer further out).
+    assert_eq!(under("test/skirt"), ["Hood.cover.png", "Tee.cover.png"]);
+    assert_eq!(under("test/tee"), ["Hood.cover.png"]);
+    assert!(under("test/hood").is_empty());
+    // An accessory is no garment: nothing hides it.
+    assert!(under("test/watch").is_empty());
+    assert!(resolved.body.under.is_empty());
+    // Nothing is tucked in: the tee hangs over the skirt.
+    assert!(
+        resolved
+            .parts
+            .iter()
+            .all(|part| part.tucked_into.is_empty())
+    );
+
+    // The tee a layer down (0, a top that lies on the body) is worn under
+    // the skirt, and is tucked into it: hidden under its cover map whole.
+    let mut tee = library.item("test/tee").expect("in the fixtures").clone();
+    tee.layer = Some(0);
+    library.add_item("test/items/tee.item.json", tee);
+    let resolved = resolve(&library, &description).expect("it resolves");
+    let part = |item: &str| {
+        resolved
+            .parts
+            .iter()
+            .find(|part| part.item.as_deref() == Some(item))
+            .expect("worn")
+    };
+    assert_eq!(
+        covers(&part("test/tee").under),
+        ["Hood.cover.png", "Skirt.cover.png"]
+    );
+    assert_eq!(covers(&part("test/tee").tucked_into), ["Skirt.cover.png"]);
+    assert_eq!(covers(&part("test/skirt").under), ["Hood.cover.png"]);
+    assert!(part("test/skirt").tucked_into.is_empty());
+}
+
+#[test]
+fn garments_are_worn_in_order_of_layer_then_slot() {
+    let order = |text: &str| fixtures::item(text).wearing_order();
+    assert!(order(fixtures::SKIRT) < order(fixtures::TEE));
+    assert!(order(fixtures::TEE) < order(fixtures::HOOD));
+    assert_eq!(order(fixtures::WATCH), None);
+    assert_eq!(order(fixtures::HAIR), None);
+    // A layer counts before a slot: bottoms of the mid layer (overalls)
+    // go over a top of the base layer.
+    let mut overalls = fixtures::item(fixtures::SKIRT);
+    overalls.layer = Some(2);
+    assert!(overalls.wearing_order() > order(fixtures::TEE));
+}

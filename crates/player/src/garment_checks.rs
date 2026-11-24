@@ -750,16 +750,34 @@ pub(super) fn check_motion(
 /// The test tee's armpit, where the cloth bridging the arm and the side
 /// carries large copies of the swing correctives (the posed fit's
 /// following), jolts as the arm swings through hanging.
-const WALK_RECORDS: [Record; 1] = [Record {
-    what: "TestTee pop",
-    case: "Walk",
-    most: 0.0041,
-}];
-const RUN_RECORDS: [Record; 1] = [Record {
-    what: "TestTee pop",
-    case: "Run",
-    most: 0.0117,
-}];
+///
+/// Since the tee has a cover map (ADR-0045), a few hidden corners of the
+/// side under the arm (4 to 45 on the masculine cast) have no cloth over
+/// them as the arm swings back: the same bridging cloth.
+const WALK_RECORDS: [Record; 2] = [
+    Record {
+        what: "TestTee pop",
+        case: "Walk",
+        most: 0.0041,
+    },
+    Record {
+        what: "holes",
+        case: "Walk",
+        most: 0.0135,
+    },
+];
+const RUN_RECORDS: [Record; 2] = [
+    Record {
+        what: "TestTee pop",
+        case: "Run",
+        most: 0.0117,
+    },
+    Record {
+        what: "holes",
+        case: "Run",
+        most: 0.0128,
+    },
+];
 /// The stylized cargo pants between the legs (the bridge under the
 /// crotch) jolt past the thighs as a stride turns; four of the six
 /// stylized hairstyles (bob, long, ponytail, swept) have corners up to

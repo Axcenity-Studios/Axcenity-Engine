@@ -8,7 +8,7 @@ use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::bind::{BIND_REACH, Binding, bind, frames};
-use super::pose::FitPose;
+use super::pose::{FitPose, skin, skin_matrices};
 use super::posed::{self, PoseReport};
 use super::surface::Surface;
 use super::{BodyMesh, FitError, GarmentMesh, is_mask_shape};
@@ -28,6 +28,10 @@ const WEIGHT_ROUNDS: usize = 2;
 /// A shape that moves no bound point farther than this moves the garment
 /// by nothing worth checking.
 const LEAST: f32 = 1e-5;
+/// With [`FitOptions::smooth_shapes`]: a corner's move is mixed with its
+/// neighbours' half way each round where it lies on the skin, and all the
+/// way where it stands this far off it or farther (metres).
+const SHAPE_LOOSE: f32 = 0.05;
 
 /// What [`fit_garment`] does besides binding.
 #[derive(Clone, Debug)]
@@ -52,6 +56,46 @@ pub struct FitOptions {
     /// (`posed`). Empty: not posed.
     pub poses: Vec<FitPose>,
     pub pose_states: Vec<Vec<(String, f32)>>,
+    /// How many rounds each carried shape's moves are smoothed over the
+    /// garment before the push-out ([`SHAPE_LOOSE`]). 0, the default,
+    /// leaves them as the binding gives them, which is right for a garment
+    /// made on the body. An imported one that stands off the body, or has
+    /// stray geometry, is bound unevenly: neighbouring corners to far
+    /// apart skin, which a shape then pulls apart into spikes.
+    pub smooth_shapes: usize,
+    /// How deep inside the body or a lower layer a corner is still found
+    /// and pushed out (metres). The default, 0.03, is for a garment made
+    /// on the body; an imported one can start much deeper where its limbs
+    /// lie a little off the body's (a knee through a straight trouser
+    /// leg).
+    pub push_reach: f32,
+    /// Takes out **webs**: triangles one of whose sides grows to more
+    /// than this many times its length at rest when the garment is posed
+    /// with its weights in one of `poses`. 0, the default, takes none
+    /// out. A garment that wasn't made on the body often has its sleeve
+    /// joined to its side under the arm (it was modelled with the arms
+    /// hanging): cloth that follows the arm on one side and the trunk on
+    /// the other, and is drawn out into strips when the arm lifts. A hole
+    /// under the arm shows the skin; a web shows from everywhere. Cloth
+    /// under `skirt_from` is never cut.
+    pub cut_webs: f32,
+    /// Takes the skin weights by the garment's shares of the body's parts
+    /// (`parts`: a sleeve's from the arm all the way round, a skirt's
+    /// from both legs) instead of from the skin nearest each corner. Off
+    /// by default: a garment made on the body lies on the skin it
+    /// follows. One that wasn't hangs beside skin it doesn't.
+    pub weights_by_part: bool,
+    /// With `weights_by_part`: the height (the body's crotch) under
+    /// which the garment's cloth is a skirt's, hanging from the hips more
+    /// than following each leg. `None`: it has legs of its own, or isn't
+    /// taken by part.
+    pub skirt_from: Option<f32>,
+    /// The garments it will be worn with round the hips (the bottoms),
+    /// and whether it hangs over them or is tucked into them: its cloth
+    /// below the waist is moved clear of theirs before anything else
+    /// ([`Hang`](super::Hang)). `None`: it is fitted to the body and the
+    /// lower layers alone.
+    pub hang: Option<super::Hang>,
 }
 
 impl Default for FitOptions {
@@ -64,6 +108,12 @@ impl Default for FitOptions {
             rounds: 4,
             poses: Vec::new(),
             pose_states: Vec::new(),
+            smooth_shapes: 0,
+            push_reach: 0.03,
+            cut_webs: 0.0,
+            weights_by_part: false,
+            skirt_from: None,
+            hang: None,
         }
     }
 }
@@ -189,6 +239,16 @@ pub struct FitReport {
     /// What posing it with the body did ([`FitOptions::poses`]).
     #[serde(default)]
     pub posed: PoseReport,
+    /// The holes closed after the webs came out ([`Mended`](super::Mended)).
+    #[serde(default)]
+    pub mended: super::Mended,
+    /// Triangles taken out as webs ([`FitOptions::cut_webs`]).
+    #[serde(default)]
+    pub webs_cut: usize,
+    /// What hanging it over, or tucking it into, the garments it is worn
+    /// with did ([`FitOptions::hang`]).
+    #[serde(default)]
+    pub hung: super::Hung,
 }
 
 /// A garment fitted to a body: its rest (pushed out), skin weights and
@@ -339,6 +399,8 @@ fn projected_weights(
 /// the garment) and each lower layer.
 struct Obstacles {
     surfaces: Vec<(usize, Surface, bool)>,
+    /// How deep inside a surface a point is still found.
+    reach: f32,
 }
 
 /// Fits `garment` (in `body`'s rest pose and file space) to `body`.
@@ -365,8 +427,21 @@ pub fn fit_garment(
         .collect();
     let margin = options.margin;
 
+    // 0. Over, or under, the garments it is worn with round the hips.
+    // Before the push-out, so a tucked top drawn in comes to rest on the
+    // skin and the underwear, not in them.
+    let mut hung = super::Hung::default();
+    if let Some(hang) = &options.hang {
+        let skin = Surface::new(
+            body.positions.clone(),
+            body.normals.clone(),
+            body.triangles.clone(),
+        );
+        hung = super::hang::hang(&mut rest, &welds, &skin, hang);
+    }
+
     // 1. At rest: out of the body and the lower layers.
-    let at_rest = obstacles(body, &near, &options.under, &[]);
+    let at_rest = obstacles(body, &near, options, &[]);
     for _ in 0..options.rounds.max(1) {
         let (need, by) = needs(&at_rest, &rest, margin);
         if need.iter().all(|n| *n == Vec3::ZERO) {
@@ -399,6 +474,11 @@ pub fn fit_garment(
         &joints,
         &weights,
     );
+    let (joints, weights) = if options.weights_by_part {
+        super::parts::weights(body, &welds, &rest, (&joints, &weights), options.skirt_from)
+    } else {
+        (joints, weights)
+    };
     // Smoothed over the garment, so where neighbouring corners were bound
     // to different limbs (a sleeve meeting the torso) the cloth stretches
     // over a few corners instead of tearing at one edge.
@@ -410,6 +490,12 @@ pub fn fit_garment(
         .shapes
         .iter()
         .filter_map(|name| Some((body.shape_index(name)?, name)))
+        .collect();
+    // How loosely each corner lies (for `smooth_shapes`).
+    let loose: Vec<f32> = binding
+        .vertices
+        .iter()
+        .map(|b| 0.5 + 0.5 * (Vec3::from(b.local).length() / SHAPE_LOOSE).min(1.0))
         .collect();
     let worked = par_map(&carried, |&(index, name)| {
         let weights = [(name.clone(), 1.0)];
@@ -427,8 +513,11 @@ pub fn fit_garment(
         let moves =
             body.shapes[index].reach() > LEAST && offsets.iter().any(|o| o.length() > LEAST);
         let mut pushes = Vec::new();
+        if moves && options.smooth_shapes > 0 {
+            offsets = welds.smooth(&offsets, &loose, options.smooth_shapes);
+        }
         if moves {
-            let state = obstacles(body, &near, &options.under, &weights);
+            let state = obstacles(body, &near, options, &weights);
             for _ in 0..options.rounds.max(1) {
                 let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
                 let (need, by) = needs(&state, &now, margin);
@@ -518,7 +607,7 @@ pub fn fit_garment(
             let mut pushes = Vec::new();
             if shape.reach() > LEAST {
                 let weights = [(shape.name.clone(), 1.0)];
-                let state = obstacles(body, &near, &options.under, &weights);
+                let state = obstacles(body, &near, options, &weights);
                 for _ in 0..options.rounds.max(1) {
                     let now: Vec<Vec3> = rest.iter().zip(&offsets).map(|(p, o)| *p + *o).collect();
                     let (need, by) = needs(&state, &now, margin);
@@ -549,6 +638,8 @@ pub fn fit_garment(
             binding: &binding,
             joints: &joints,
             weights: &weights,
+            welds: &welds,
+            loose: options.smooth_shapes > 0,
         },
         &options.poses,
         &options.pose_states,
@@ -567,7 +658,7 @@ pub fn fit_garment(
     }
 
     // 6. What is left: the deepest anything is still inside.
-    let mut inside_most = deepest(&obstacles(body, &near, &options.under, &[]), &rest);
+    let mut inside_most = deepest(&obstacles(body, &near, options, &[]), &rest);
     for shape in &shapes {
         if shape.reach() <= LEAST {
             continue;
@@ -583,14 +674,11 @@ pub fn fit_garment(
             .zip(&shape.offsets)
             .map(|(p, o)| *p + *o)
             .collect();
-        inside_most = inside_most.max(deepest(
-            &obstacles(body, &near, &options.under, &weights),
-            &now,
-        ));
+        inside_most = inside_most.max(deepest(&obstacles(body, &near, options, &weights), &now));
     }
     let deepest_at = par_map(&options.extremes, |extreme| {
         let now = garment_at(&rest, &shapes, extreme);
-        deepest(&obstacles(body, &near, &options.under, extreme), &now)
+        deepest(&obstacles(body, &near, options, extreme), &now)
     });
     inside_most = deepest_at.into_iter().fold(inside_most, f32::max);
 
@@ -627,6 +715,50 @@ pub fn fit_garment(
     let mut fitted_garment = garment.clone();
     fitted_garment.set_positions(&rest);
     fitted_garment.set_normals(&fitted_normals);
+    // 8. Webs: cloth the poses draw out into strips comes out.
+    let mut webs_cut = 0;
+    if options.cut_webs > 0.0 && !options.poses.is_empty() {
+        let mut webbed = webs(
+            body,
+            &rest,
+            &triangles,
+            (&joints, &weights),
+            &options.poses,
+            options.cut_webs,
+        );
+        // A skirt's cloth is one sheet between two legs: a stride draws
+        // it out, and it is no web.
+        if let Some(from) = options.skirt_from {
+            for (web, t) in webbed.iter_mut().zip(&triangles) {
+                if t.iter().all(|&v| rest[v as usize].y < from) {
+                    *web = false;
+                }
+            }
+        }
+        webs_cut = webbed.iter().filter(|web| **web).count();
+        let mut at = 0;
+        for piece in &mut fitted_garment.pieces {
+            let count = piece.indices.len() / 3;
+            piece.indices = piece
+                .indices
+                .chunks_exact(3)
+                .zip(&webbed[at..at + count])
+                .filter(|(_, web)| !**web)
+                .flat_map(|(t, _)| t.iter().copied())
+                .collect();
+            at += count;
+        }
+    }
+    // 9. Mended: the holes cutting webs left (a web's two ends, in the
+    // sleeve and in the side) are closed, each with a patch no pose draws
+    // out into a web again.
+    let mut mended = super::Mended::default();
+    if webs_cut > 0 {
+        let stretch = Stretch::new(body, &rest, (&joints, &weights), &options.poses);
+        mended = super::mend::mend(&mut fitted_garment, body, |t| {
+            !stretch.is_web(t, options.cut_webs)
+        });
+    }
     let farthest = binding
         .vertices
         .iter()
@@ -650,6 +782,9 @@ pub fn fit_garment(
         lift_most,
         inside_most,
         posed: posed_report,
+        webs_cut,
+        mended,
+        hung,
     };
     Ok(Fitted {
         garment: fitted_garment,
@@ -659,6 +794,65 @@ pub fn fit_garment(
         binding,
         report,
     })
+}
+
+/// A garment skinned by its own weights in the fit poses, to tell which
+/// of its triangles are webs.
+struct Stretch<'a> {
+    rest: &'a [Vec3],
+    posed: Vec<Vec<Vec3>>,
+}
+
+impl<'a> Stretch<'a> {
+    fn new(
+        body: &BodyMesh,
+        rest: &'a [Vec3],
+        (joints, weights): (&[[u16; 4]], &[[f32; 4]]),
+        poses: &[FitPose],
+    ) -> Self {
+        // Not the arms raised overhead: there the cloth under any arm is
+        // drawn out, and a hole under each would show.
+        let poses: Vec<&FitPose> = poses
+            .iter()
+            .filter(|pose| pose.name != "arms-raised")
+            .collect();
+        let posed = par_map(&poses, |pose| {
+            let matrices = skin_matrices(&body.rig, &pose.bones);
+            skin(&matrices, joints, weights, rest, &[]).0
+        });
+        Stretch { rest, posed }
+    }
+
+    /// Whether one of `t`'s sides is more than `most` times as long as at
+    /// rest in one of the poses.
+    fn is_web(&self, t: &[u32; 3], most: f32) -> bool {
+        let sides = |positions: &[Vec3]| {
+            let [a, b, c] = t.map(|v| positions[v as usize]);
+            [a.distance(b), b.distance(c), c.distance(a)]
+        };
+        let at_rest = sides(self.rest);
+        self.posed.iter().any(|positions| {
+            sides(positions)
+                .iter()
+                .zip(&at_rest)
+                .any(|(now, was)| *now > most * was.max(1e-4))
+        })
+    }
+}
+
+/// Which of `triangles` are webs: one of their sides is more than `most`
+/// times as long as at rest (`rest`) in one of `poses`, the garment
+/// skinned there by its own weights.
+fn webs(
+    body: &BodyMesh,
+    rest: &[Vec3],
+    triangles: &[[u32; 3]],
+    skinned: (&[[u16; 4]], &[[f32; 4]]),
+    poses: &[FitPose],
+    most: f32,
+) -> Vec<bool> {
+    let stretch = Stretch::new(body, rest, skinned, poses);
+    triangles.iter().map(|t| stretch.is_web(t, most)).collect()
 }
 
 /// `extremes` as fitting `garment` needs them: each with only the weights
@@ -730,7 +924,7 @@ fn extreme_need(
     extreme: &[(String, f32)],
 ) -> Vec<Vec3> {
     let now = garment_at(rest, shapes, extreme);
-    let state = obstacles(body, near, &options.under, extreme);
+    let state = obstacles(body, near, options, extreme);
     needs(&state, &now, options.margin).0
 }
 
@@ -754,9 +948,10 @@ fn near_triangles(body: &BodyMesh, garment: &GarmentMesh) -> Vec<[u32; 3]> {
 fn obstacles(
     body: &BodyMesh,
     near: &[[u32; 3]],
-    under: &[Layer],
+    options: &FitOptions,
     weights: &[(String, f32)],
 ) -> Obstacles {
+    let under = &options.under;
     let (positions, normals) = body.shaped(weights);
     let mut surfaces = vec![(0, Surface::new(positions, normals, near.to_vec()), false)];
     for (k, layer) in under.iter().enumerate() {
@@ -768,7 +963,10 @@ fn obstacles(
             true,
         ));
     }
-    Obstacles { surfaces }
+    Obstacles {
+        surfaces,
+        reach: options.push_reach,
+    }
 }
 
 /// How each of `points` must move to be `margin` clear of every
@@ -781,7 +979,7 @@ fn needs(state: &Obstacles, points: &[Vec3], margin: f32) -> (Vec<Vec3>, Vec<usi
     let mut by = vec![0usize; points.len()];
     for (k, &p) in points.iter().enumerate() {
         for (layer, surface, only_over) in &state.surfaces {
-            let Some(hit) = surface.closest(p, margin + 0.03) else {
+            let Some(hit) = surface.closest(p, margin + state.reach) else {
                 continue;
             };
             if *only_over && !hit.is_over(p) {
@@ -806,7 +1004,7 @@ fn deepest(state: &Obstacles, points: &[Vec3]) -> f32 {
     let mut most = 0.0f32;
     for &p in points {
         for (_, surface, only_over) in &state.surfaces {
-            let Some(hit) = surface.closest(p, 0.03) else {
+            let Some(hit) = surface.closest(p, state.reach) else {
                 continue;
             };
             if *only_over && !hit.is_over(p) {
@@ -846,7 +1044,7 @@ fn record(layers: &mut [LayerOffset], need: &[Vec3], by: &[usize], shape: bool) 
 /// Corners at the same place (a seam between pieces or texture islands)
 /// are one, so a push never opens a seam; and which welded corners are
 /// neighbours, so a push spreads smoothly.
-struct Welds {
+pub(super) struct Welds {
     /// Each corner's welded group.
     group: Vec<usize>,
     /// Each group's neighbouring groups.
@@ -854,7 +1052,7 @@ struct Welds {
 }
 
 impl Welds {
-    fn new(positions: &[Vec3], triangles: &[[u32; 3]]) -> Welds {
+    pub(super) fn new(positions: &[Vec3], triangles: &[[u32; 3]]) -> Welds {
         let mut by_place: HashMap<[i64; 3], usize> = HashMap::new();
         let group: Vec<usize> = positions
             .iter()
@@ -884,7 +1082,7 @@ impl Welds {
 
     /// Smooth normals of `positions` over `triangles`, the same for welded
     /// corners (a seam between pieces or texture islands doesn't show).
-    fn normals(&self, positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<Vec3> {
+    pub(super) fn normals(&self, positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<Vec3> {
         let mut sums = vec![Vec3::ZERO; self.neighbours.len()];
         for &[a, b, c] in triangles {
             let (pa, pb, pc) = (
@@ -907,7 +1105,7 @@ impl Welds {
     /// Skin weights (per corner) made the same for welded corners and
     /// each round mixed half and half with the mean of the neighbours',
     /// the four largest kept, adding up to 1.
-    fn smooth_weights(
+    pub(super) fn smooth_weights(
         &self,
         joints: &[[u16; 4]],
         weights: &[[f32; 4]],
@@ -969,11 +1167,51 @@ impl Welds {
         self.group.iter().map(|g| limited[*g]).unzip()
     }
 
+    /// A field of moves (one per corner) smoothed over the surface: each
+    /// round a welded corner's move is mixed with the mean of its
+    /// neighbours', `share` of the way (one share per welded corner, or one
+    /// for all).
+    pub(super) fn smooth(&self, field: &[Vec3], shares: &[f32], rounds: usize) -> Vec<Vec3> {
+        let count = self.neighbours.len();
+        let mut sums = vec![Vec3::ZERO; count];
+        let mut share = vec![0.0f32; count];
+        let mut counts = vec![0u32; count];
+        for (corner, v) in field.iter().enumerate() {
+            let g = self.group[corner];
+            sums[g] += *v;
+            share[g] += shares
+                .get(corner)
+                .or(shares.first())
+                .copied()
+                .unwrap_or(0.5);
+            counts[g] += 1;
+        }
+        let mut now: Vec<Vec3> = sums
+            .iter()
+            .zip(&counts)
+            .map(|(s, c)| *s / (*c).max(1) as f32)
+            .collect();
+        for (s, c) in share.iter_mut().zip(&counts) {
+            *s /= (*c).max(1) as f32;
+        }
+        for _ in 0..rounds {
+            let before = now.clone();
+            for (g, list) in self.neighbours.iter().enumerate() {
+                if list.is_empty() {
+                    continue;
+                }
+                let mean = list.iter().map(|n| before[*n]).sum::<Vec3>() / list.len() as f32;
+                now[g] = before[g].lerp(mean, share[g]);
+            }
+        }
+        self.group.iter().map(|g| now[*g]).collect()
+    }
+
     /// The moves `need` (per corner) made the same for welded corners
     /// (the biggest) and spread over the neighbours, fading by [`SPREAD`] a
     /// ring: a corner takes a neighbour's move, faded, when that is bigger
     /// than its own, so nowhere moves less than asked.
-    fn spread(&self, need: &[Vec3]) -> Vec<Vec3> {
+    pub(super) fn spread(&self, need: &[Vec3]) -> Vec<Vec3> {
         let mut amount = vec![Vec3::ZERO; self.neighbours.len()];
         for (corner, n) in need.iter().enumerate() {
             let g = self.group[corner];

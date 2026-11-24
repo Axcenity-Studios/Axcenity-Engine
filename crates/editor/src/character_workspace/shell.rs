@@ -4,6 +4,11 @@
 //! draws from `&CharacterWorkspace` and returns [`Intent`]s; the shell
 //! applies them ([`CharacterWorkspace::apply`]), so only it changes the
 //! workspace. It also owns the keyboard shortcuts and the notices.
+//!
+//! The panel is as wide as the person made it ([`PANEL_WIDTH`] until they
+//! drag its inner edge, between [`PANEL_MIN`] and [`PANEL_MAX`]); a window
+//! too narrow for that narrows the panel first, down to [`PANEL_FLOOR`],
+//! so the viewport keeps [`VIEW_MIN`] ([`panel_width`]).
 
 use std::time::Instant;
 
@@ -11,7 +16,7 @@ use eframe::egui::{self, Rect, Sense, vec2};
 use eframe::egui_wgpu::RenderState;
 
 use super::compare::{self, OTHER_AT};
-use super::intent::Intent;
+use super::intent::{Gesture, Intent};
 use super::numeric;
 use super::stage::{self, ViewPreset};
 use super::{Category, CharacterWorkspace, NOTICE_FOR, Saved, bottom_bar, nav, panel, toolbar};
@@ -32,6 +37,82 @@ pub enum WorkspaceAction {
 const TOOLBAR: f32 = 48.0;
 const STATUS: f32 = 26.0;
 const BOTTOM_BAR: f32 = 40.0;
+
+/// How wide the panel on the right is until the person drags its edge.
+pub const PANEL_WIDTH: f32 = 400.0;
+/// The narrowest and the widest the person can make it.
+pub const PANEL_MIN: f32 = 320.0;
+pub const PANEL_MAX: f32 = 640.0;
+/// The narrowest a small window makes it, whatever was asked for.
+pub const PANEL_FLOOR: f32 = 270.0;
+/// What the viewport keeps while the panel can still give way.
+pub const VIEW_MIN: f32 = 420.0;
+/// How wide the strip on the panel's inner edge that drags it is.
+const PANEL_EDGE: f32 = 8.0;
+
+/// How wide the panel is drawn when the person asked for `wanted`, in a
+/// workspace `body` wide whose navigation takes `left`: what was asked
+/// for, less where the viewport would have under [`VIEW_MIN`], never under
+/// [`PANEL_FLOOR`] (a smaller window than that narrows the viewport).
+pub fn panel_width(wanted: f32, body: f32, left: f32) -> f32 {
+    wanted
+        .clamp(PANEL_MIN, PANEL_MAX)
+        .min(body - left - VIEW_MIN)
+        .max(PANEL_FLOOR)
+}
+
+/// The panel's inner edge, a strip between the viewport and the panel
+/// (`right`, in the workspace's `body`): dragged, it makes the panel wider
+/// or narrower; a double click puts the width back. Asks for the new
+/// width.
+fn panel_edge(ui: &mut egui::Ui, body: Rect, right: Rect) -> Option<Intent> {
+    let palette = theme::palette(ui.ctx());
+    let edge = Rect::from_min_max(
+        egui::pos2(right.left() - PANEL_EDGE / 2.0, body.top()),
+        egui::pos2(right.left() + PANEL_EDGE / 2.0, body.bottom()),
+    );
+    let response = ui
+        .interact(
+            edge,
+            ui.id().with("character studio panel edge"),
+            Sense::click_and_drag(),
+        )
+        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+    if response.hovered() || response.dragged() {
+        let colour = if response.dragged() {
+            palette.accent
+        } else {
+            palette.text_muted
+        };
+        ui.painter().vline(
+            right.left(),
+            body.y_range(),
+            egui::Stroke::new(2.0_f32, colour),
+        );
+    }
+    if response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+    let width = |at: egui::Pos2| (body.right() - at.x).clamp(PANEL_MIN, PANEL_MAX);
+    if response.double_clicked() {
+        return Some(Intent::SetPanelWidth {
+            width: PANEL_WIDTH,
+            gesture: Gesture::Commit,
+        });
+    }
+    let at = response.interact_pointer_pos()?;
+    if response.drag_stopped() {
+        // Let go: the width is kept for the next session.
+        return Some(Intent::SetPanelWidth {
+            width: width(at),
+            gesture: Gesture::Commit,
+        });
+    }
+    response.dragged().then(|| Intent::SetPanelWidth {
+        width: width(at),
+        gesture: Gesture::Drag,
+    })
+}
 
 impl CharacterWorkspace {
     /// Draws the workspace in `ui`'s whole space.
@@ -59,7 +140,7 @@ impl CharacterWorkspace {
         );
         // Narrow windows keep the viewport: the side panels get narrower.
         let left_w = (body.width() * 0.15).clamp(150.0, 200.0);
-        let right_w = (body.width() * 0.25).clamp(270.0, 340.0);
+        let right_w = panel_width(self.panel_width, body.width(), left_w);
         let left = Rect::from_min_size(body.min, vec2(left_w, body.height()));
         let right = Rect::from_min_max(egui::pos2(body.right() - right_w, body.top()), body.max);
         let centre = Rect::from_min_max(
@@ -119,6 +200,7 @@ impl CharacterWorkspace {
             panel_ui.disable();
         }
         intents.extend(panel::show(&mut panel_ui, self, &library));
+        intents.extend(panel_edge(ui, body, right));
         self.status(&mut child(ui, status.shrink2(vec2(12.0, 4.0))));
         if self.recovery.is_some() {
             self.offer_recovery(ui.ctx());
@@ -212,6 +294,13 @@ impl CharacterWorkspace {
             Intent::PickCategory(category) => self.pick_category(category),
             Intent::PickFeature(feature) => self.pick_feature(feature),
             Intent::PickLevel(level) => self.selection.level = level,
+            Intent::SearchControls(text) => self.control_search = text,
+            Intent::SetPanelWidth { width, gesture } => {
+                self.panel_width = width.clamp(PANEL_MIN, PANEL_MAX);
+                if gesture == Gesture::Commit {
+                    super::presets::write_panel_width(&self.folder, self.panel_width);
+                }
+            }
             Intent::SetSymmetry(on) => self.symmetry = on,
             Intent::SetHandles(on) => {
                 self.direct.on = on;
@@ -419,8 +508,10 @@ impl CharacterWorkspace {
         {
             self.focus(ViewPreset::FullBody);
         }
-        // A browser tile tried on is a preview of its page too.
+        // A browser tile previewed is a preview of its page too.
         self.end_preview();
+        // What was searched for was a control of the page left.
+        self.control_search.clear();
         self.selection.pick_category(category);
     }
 

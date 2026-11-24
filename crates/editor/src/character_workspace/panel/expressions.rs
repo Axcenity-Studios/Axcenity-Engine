@@ -33,6 +33,15 @@ fn icon(name: &str) -> &'static str {
 pub(in super::super) fn page(ui: &mut egui::Ui, workspace: &CharacterWorkspace) -> Vec<Intent> {
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
+    // Said first, in one line: the page changes nothing of the character.
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new("A preview only: nothing here is saved with the character.")
+                .small()
+                .color(palette.text_weak),
+        )
+        .truncate(),
+    );
     widgets::section_label(ui, "Pose and motion");
     intents.extend(super::motion_chips(ui, workspace));
     ui.label(
@@ -50,12 +59,9 @@ pub(in super::super) fn page(ui: &mut egui::Ui, workspace: &CharacterWorkspace) 
     intents.extend(controls(ui, workspace));
     ui.add_space(8.0);
     ui.label(
-        egui::RichText::new(
-            "A preview only: nothing here is saved with the character. Expressions are made \
-             and edited in the Game Editor's Face Rig tab.",
-        )
-        .small()
-        .color(palette.text_weak),
+        egui::RichText::new("Expressions are made and edited in the Game Editor's Face Rig tab.")
+            .small()
+            .color(palette.text_weak),
     );
     intents
 }

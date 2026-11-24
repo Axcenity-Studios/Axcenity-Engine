@@ -3,7 +3,8 @@
 //! thumbnail?, order?}`, which rides in the description's `extra`, so any
 //! version reads it. Its `kind` says what applying it changes; everything
 //! else in the character is left alone. [`apply_preset`] is the one rule,
-//! shared by Character Studio, scripts and Randomize.
+//! shared by Character Studio, scripts and Randomize. A `feature` preset
+//! (a nose, a face shape) also names the feature it sets (`feature`).
 
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +36,10 @@ pub enum PresetKind {
     Skin,
     /// Everything but the name: a whole character.
     Character,
+    /// Every parameter of one feature of the base model (a nose shape, a
+    /// face shape), which the block's `feature` names; no items and no
+    /// material values.
+    Feature,
     #[serde(other)]
     Other,
 }
@@ -49,12 +54,14 @@ impl PresetKind {
             PresetKind::Outfit => "outfit",
             PresetKind::Skin => "skin",
             PresetKind::Character => "character",
+            PresetKind::Feature => "feature",
             PresetKind::Other => "other",
         }
     }
 
     /// Whether a preset of this kind sets the parameters of groups, and
-    /// the items of slots, in `category`.
+    /// the items of slots, in `category`. A `feature` preset owns no
+    /// category: it sets its feature's parameters ([`PresetInfo::feature`]).
     pub fn owns(self, category: Category) -> bool {
         match self {
             PresetKind::Body => category == Category::Body,
@@ -63,7 +70,7 @@ impl PresetKind {
             PresetKind::Outfit => matches!(category, Category::Clothing | Category::Accessories),
             PresetKind::Skin => category == Category::Skin,
             PresetKind::Character => true,
-            PresetKind::Other => false,
+            PresetKind::Feature | PresetKind::Other => false,
         }
     }
 
@@ -90,6 +97,10 @@ pub struct PresetInfo {
     /// Where it goes in a list of its kind (lower first).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order: Option<i32>,
+    /// The feature of the base model a `feature` preset sets (`nose`): it
+    /// must name one. Other kinds don't read it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature: Option<String>,
 }
 
 /// Applies `preset` to `description`: sets what the preset's kind owns
@@ -97,10 +108,12 @@ pub struct PresetInfo {
 /// empty, but a parameter with choices, such as the frame, changes only
 /// when the preset names it) and leaves the rest, the name and every
 /// field it doesn't know alone; the `preset` block never comes along.
-/// What a parameter's choices wear is put right after. Changes nothing
-/// and says why when `preset` isn't a preset, is of a kind this version
-/// doesn't know, or (but for a `character` preset) is for another base
-/// model.
+/// What a parameter's choices wear is put right after. A `feature` preset
+/// sets the parameters of the feature it names and nothing else: no items,
+/// no material values. Changes nothing and says why when `preset` isn't a
+/// preset, is of a kind this version doesn't know, is a `feature` preset
+/// that names no feature of the base model, or (but for a `character`
+/// preset) is for another base model.
 pub fn apply_preset(
     description: &mut Description,
     preset: &Description,
@@ -145,8 +158,18 @@ pub fn apply_preset(
             ),
         ));
     }
+    // A feature preset: the feature it names, which the base model has.
+    let feature = if kind == PresetKind::Feature {
+        Some(feature_of(&block, base)?)
+    } else {
+        None
+    };
     for parameter in &base.parameters {
-        if !base.category_of(parameter).is_some_and(|c| kind.owns(c)) {
+        let owned = match feature {
+            Some(feature) => in_feature(base, parameter, feature),
+            None => base.category_of(parameter).is_some_and(|c| kind.owns(c)),
+        };
+        if !owned {
             continue;
         }
         match preset.parameters.get(&parameter.id) {
@@ -226,10 +249,40 @@ pub fn check_preset(preset: &Description, library: &Library) -> Vec<Problem> {
     if kind == PresetKind::Character {
         return problems;
     }
+    // A feature preset names a feature of its base model, and sets only
+    // that feature's parameters.
+    let feature = if kind == PresetKind::Feature {
+        match feature_of(&block, base) {
+            Ok(feature) => Some(feature),
+            Err(problem) => {
+                p.push(problem);
+                None
+            }
+        }
+    } else {
+        None
+    };
     for id in preset.parameters.keys() {
         let Some(parameter) = base.parameter(id) else {
             continue;
         };
+        if kind == PresetKind::Feature {
+            if let Some(feature) = feature
+                && !in_feature(base, parameter, feature)
+            {
+                p.push(Problem::new(
+                    format!("parameters.{id}"),
+                    format!(
+                        "a preset of the feature `{feature}` doesn't set `{id}`, {}",
+                        match base.feature_of(parameter) {
+                            Some(other) => format!("a parameter of `{}`", other.id),
+                            None => "a parameter of no feature".to_owned(),
+                        }
+                    ),
+                ));
+            }
+            continue;
+        }
         let category = base.category_of(parameter);
         if !category.is_some_and(|c| kind.owns(c)) {
             p.push(Problem::new(
@@ -279,6 +332,30 @@ pub fn check_preset(preset: &Description, library: &Library) -> Vec<Problem> {
     }
 
     problems
+}
+
+/// The feature a `feature` preset's block names, when `base` has it.
+fn feature_of<'a>(block: &'a PresetInfo, base: &crate::BaseManifest) -> Result<&'a str, Problem> {
+    let Some(feature) = block.feature.as_deref() else {
+        return Err(Problem::new(
+            "preset.feature",
+            format!("`{}` is a feature preset that names no feature", block.id),
+        ));
+    };
+    if base.feature(feature).is_none() {
+        return Err(Problem::new(
+            "preset.feature",
+            format!("`{}` has no feature `{feature}`", base.id),
+        ));
+    }
+    Ok(feature)
+}
+
+/// Whether `parameter` belongs to the feature `feature` of `base`
+/// ([`crate::BaseManifest::feature_of`]: its own `feature`, or its group's
+/// ID when a feature has that ID).
+fn in_feature(base: &crate::BaseManifest, parameter: &crate::Parameter, feature: &str) -> bool {
+    base.feature_of(parameter).is_some_and(|f| f.id == feature)
 }
 
 fn category_name(category: Category) -> &'static str {

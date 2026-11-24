@@ -123,11 +123,18 @@ class Body:
         return self.bones[int(np.argmax(totals))]
 
 
-def anchor(body, weight, on_skin):
-    """An anchor and a radius for the vertices weighted `weight`."""
+def anchor(body, weight, on_skin, front=False):
+    """An anchor and a radius for the vertices weighted `weight`. With
+    `front`, the anchor is the most forward of them within a centimetre of
+    their centre's place across and up the body (a feature that is the
+    whole face: its centre is inside the head)."""
     w = weight / weight.sum()
     centre = (body.P * w[:, None]).sum(axis=0)
-    if on_skin:
+    if front:
+        picked = np.where((weight > 0.0) & (np.abs(body.P[:, 0] - centre[0]) < 0.01)
+                          & (np.abs(body.P[:, 1] - centre[1]) < 0.01))[0]
+        centre = body.P[picked[np.argmax(body.P[picked, 2])]]
+    elif on_skin:
         picked = np.where(weight > 0.0)[0]
         centre = body.P[picked[np.argmin(np.linalg.norm(body.P[picked] - centre, axis=1))]]
     radius = float(np.sqrt((w * np.sum((body.P - centre) ** 2, axis=1)).sum()))
@@ -159,7 +166,7 @@ def measure(path, definitions, regions):
                 if side:
                     weight = weight * ((body.P[:, 0] > 0) == (side == "Left"))
             weight = np.where(weight > 1e-5, weight, 0.0)
-            a, r = anchor(body, weight, d.get("on_skin", False))
+            a, r = anchor(body, weight, d.get("on_skin", False), d.get("front", False))
             anchors.append(a)
             radii.append(r)
         feature = {"id": d["id"], "label": d["label"], "category": d["category"], "about": d["about"]}

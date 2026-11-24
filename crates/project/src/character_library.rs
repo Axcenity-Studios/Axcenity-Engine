@@ -161,6 +161,8 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             .map(|model| model.file.as_str())
             .chain(groom.and_then(|groom| groom.strands.as_deref()))
             .chain(item.thumbnail.as_deref())
+            // What it hides when worn (ADR-0045).
+            .chain(item.cover_map.as_deref())
             .chain(item.variants.iter().filter_map(|v| v.thumbnail.as_deref()));
         for file in files {
             if let Some(path) = shipped.path_of(id, file) {

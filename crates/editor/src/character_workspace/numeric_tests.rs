@@ -174,14 +174,19 @@ fn close(a: f32, b: f32) -> bool {
 }
 
 /// 110 points of horizontal drag move a slider row over its whole range,
-/// however wide the row (the panel is narrower in a narrower window); half
-/// that moves half. The drag is relative: it starts anywhere on the track
-/// and the value doesn't jump to the pointer.
+/// however wide the row (the panel as wide as the person made it, in a
+/// wide window and a narrower one); half that moves half. The drag is
+/// relative: it starts anywhere on the track and the value doesn't jump to
+/// the pointer.
 #[test]
 fn a_slider_row_takes_110_points_for_its_whole_range_at_any_width() {
     let mut widths = Vec::new();
-    for width in [1440.0, 1100.0] {
+    for (width, panel) in [(1440.0, 600.0), (1100.0, 330.0)] {
         let mut studio = Studio::waist(&format!("numeric-row-{width}"), vec2(width, 900.0));
+        studio.workspace.apply(Intent::SetPanelWidth {
+            width: panel,
+            gesture: Gesture::Drag,
+        });
         studio.workspace.apply(Intent::SetParameter {
             id: WAIST.into(),
             value: WAIST_RANGE[0],
@@ -204,6 +209,89 @@ fn a_slider_row_takes_110_points_for_its_whole_range_at_any_width() {
         widths[0] - widths[1] > 40.0,
         "the rows differ in width: {widths:?}"
     );
+}
+
+/// A row is one line: its label, its track and its value side by side,
+/// in a row no taller than 32 points, at the panel's default width and at
+/// its narrowest; a value that leaves its default changes neither the
+/// track nor the value's place (the reset mark has a column of its own),
+/// so a drag never moves what is dragged.
+#[test]
+fn a_slider_row_is_one_line_and_keeps_its_shape() {
+    // The Build section's two rows: muscle, and body fat under it.
+    const ROW: &str = "muscle";
+    for panel in [super::shell::PANEL_WIDTH, super::shell::PANEL_MIN] {
+        let mut studio = Studio::new(&format!("numeric-line-{panel}"), vec2(1440.0, 900.0));
+        studio.workspace.apply(Intent::PickCategory(Category::Body));
+        studio.workspace.apply(Intent::PickLevel(Level::Detailed));
+        studio.workspace.apply(Intent::SetPanelWidth {
+            width: panel,
+            gesture: Gesture::Drag,
+        });
+        studio.settle();
+        let (track, field) = (studio.track(ROW), studio.field(ROW));
+        // Side by side, on one line, inside the panel.
+        assert!(track.right() < field.left(), "{panel}: {track:?} {field:?}");
+        assert!(
+            (track.center().y - field.center().y).abs() < 1.0,
+            "{panel}: on one line"
+        );
+        assert!(track.height() <= 32.0 && field.height() <= 32.0);
+        assert!(track.width() >= 44.0, "{panel}: a track to see: {track:?}");
+        assert!(track.left() > 1440.0 - panel, "{panel}: {track:?}");
+        assert!(field.right() <= 1440.0 - 12.0, "{panel}: {field:?}");
+        // The next row starts within 32 points of this one.
+        let next = studio.track("fat");
+        let pitch = next.top() - track.top();
+        assert!(
+            (20.0..=32.0).contains(&pitch),
+            "{panel}: a row every {pitch} points"
+        );
+        // Off its default: the same places (and a reset mark beside it).
+        studio.workspace.apply(Intent::SetParameter {
+            id: ROW.into(),
+            value: 0.4,
+            gesture: Gesture::Commit,
+        });
+        studio.settle();
+        assert_eq!(studio.track(ROW), track, "{panel}: the track stays");
+        assert_eq!(studio.field(ROW), field, "{panel}: the value stays");
+        let drawn = drawn_texts(&studio.frame(Vec::new()));
+        assert!(
+            drawn
+                .iter()
+                .any(|t| t == crate::theme::icons::ARROW_COUNTER_CLOCKWISE),
+            "{panel}: the reset mark is drawn"
+        );
+    }
+}
+
+/// A double click on a row's track puts its value back to the default, as
+/// one undo step; so does its reset mark.
+#[test]
+fn a_double_click_on_the_track_resets_the_row() {
+    let mut studio = Studio::waist("numeric-reset", vec2(1440.0, 900.0));
+    studio.workspace.apply(Intent::SetParameter {
+        id: WAIST.into(),
+        value: 1.1,
+        gesture: Gesture::Commit,
+    });
+    studio.settle();
+    let at = studio.track(WAIST).center();
+    let button = |pressed| egui::Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    studio.frame(vec![egui::Event::PointerMoved(at)]);
+    for _ in 0..2 {
+        studio.frame(vec![button(true)]);
+        studio.frame(vec![button(false)]);
+    }
+    studio.settle();
+    assert_eq!(studio.value(WAIST), 1.0, "back to the default");
+    assert_eq!(studio.undo_depth(), 2, "one step more");
 }
 
 /// Shift moves a quarter as far, Ctrl twice as far; each drag is one undo

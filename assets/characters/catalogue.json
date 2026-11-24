@@ -551,6 +551,66 @@
       ]
     },
     {
+      "id": "axcenity/realistic-face-shape-heart",
+      "file": "realistic/presets/face-shape-heart.preset.json",
+      "label": "Heart-shaped",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-shape-long",
+      "file": "realistic/presets/face-shape-long.preset.json",
+      "label": "Long",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-shape-narrow",
+      "file": "realistic/presets/face-shape-narrow.preset.json",
+      "label": "Narrow",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-shape-oval",
+      "file": "realistic/presets/face-shape-oval.preset.json",
+      "label": "Oval",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-shape-round",
+      "file": "realistic/presets/face-shape-round.preset.json",
+      "label": "Round",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-face-shape-square",
+      "file": "realistic/presets/face-shape-square.preset.json",
+      "label": "Square",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
       "id": "axcenity/realistic-face-soft",
       "file": "realistic/presets/face-soft.preset.json",
       "label": "Soft features",
@@ -597,6 +657,106 @@
       "label": "Male",
       "kind": "character",
       "base": "axcenity/realistic"
+    },
+    {
+      "id": "axcenity/realistic-nose-aquiline",
+      "file": "realistic/presets/nose-aquiline.preset.json",
+      "label": "Aquiline",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-bulbous",
+      "file": "realistic/presets/nose-bulbous.preset.json",
+      "label": "Bulbous",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-button",
+      "file": "realistic/presets/nose-button.preset.json",
+      "label": "Button",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-hooked",
+      "file": "realistic/presets/nose-hooked.preset.json",
+      "label": "Hooked",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-long-thin",
+      "file": "realistic/presets/nose-long-thin.preset.json",
+      "label": "Long and thin",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-low-bridge",
+      "file": "realistic/presets/nose-low-bridge.preset.json",
+      "label": "Low bridge",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-snub",
+      "file": "realistic/presets/nose-snub.preset.json",
+      "label": "Snub",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-straight",
+      "file": "realistic/presets/nose-straight.preset.json",
+      "label": "Straight",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-upturned",
+      "file": "realistic/presets/nose-upturned.preset.json",
+      "label": "Upturned",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
+    },
+    {
+      "id": "axcenity/realistic-nose-wide",
+      "file": "realistic/presets/nose-wide.preset.json",
+      "label": "Wide",
+      "kind": "feature",
+      "base": "axcenity/realistic",
+      "tags": [
+        "shape"
+      ]
     },
     {
       "id": "axcenity/stylized-athletic",

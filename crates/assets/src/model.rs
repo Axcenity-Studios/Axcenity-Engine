@@ -31,6 +31,7 @@ pub use identity::{
     strip_tags,
 };
 pub use lod::level_of as lod_level;
+pub use lod::simplify_triangles;
 pub use lod_report::{LevelReport, LodReport, LodWarning, PrimitiveReport};
 pub use maps::{MapSlot, TextureRole, texture_pack_name, texture_roles};
 pub use morph::{MorphTarget, PrimitiveMorph, apply as apply_morphs};
@@ -182,6 +183,7 @@ impl Model {
                     uvs: primitive.uvs.clone(),
                     tangents,
                     regions: primitive.regions.clone(),
+                    skin_uvs: primitive.skin_uvs.clone(),
                     indices: primitive.indices.clone(),
                     material,
                     joints: primitive.joints.clone(),
@@ -253,6 +255,14 @@ pub struct Primitive {
     /// regions"). Picking on the character reads it (refinement R2). A
     /// second set that isn't such a map (a lightmap's) leaves it empty.
     pub regions: Vec<u8>,
+    /// One per position, or empty: for a garment fitted to a character's
+    /// body, the body's own texture coordinates at the point of its skin
+    /// each corner lies over ([`SKIN_UV_ATTRIBUTE`], written by the fit:
+    /// `axcenity_avatar::fit`). What an outer garment covers is an image
+    /// over the body's texture coordinates, so with these the triangles
+    /// of a garment that lie under another are left out as the body's
+    /// are (`hidden.rs`, `Model::without_covered`).
+    pub skin_uvs: Vec<[f32; 2]>,
     /// Three per triangle, counter-clockwise seen from outside.
     pub indices: Vec<u32>,
     pub material: ModelMaterial,
@@ -284,6 +294,7 @@ impl Primitive {
             + std::mem::size_of_val(self.uvs.as_slice())
             + std::mem::size_of_val(self.tangents.as_slice())
             + self.regions.len()
+            + std::mem::size_of_val(self.skin_uvs.as_slice())
             + std::mem::size_of_val(self.indices.as_slice())
             + std::mem::size_of_val(self.joints.as_slice())
             + std::mem::size_of_val(self.weights.as_slice())
@@ -344,6 +355,7 @@ impl Primitive {
             uvs,
             tangents: Vec::new(),
             regions: Vec::new(),
+            skin_uvs: Vec::new(),
             indices,
             material,
             joints: Vec::new(),
@@ -1942,6 +1954,22 @@ impl Reader<'_> {
                 .read_tex_coords(1)
                 .map(|uvs| region_map(uvs.into_f32(), count))
                 .unwrap_or_default();
+            // A fitted garment's place on the body's skin: an attribute
+            // of our own (glTF keeps `_NAME` for applications).
+            let skin_uvs: Vec<[f32; 2]> = primitive
+                .get(&gltf::Semantic::Extras(SKIN_UV_ATTRIBUTE[1..].to_owned()))
+                .filter(|accessor| {
+                    accessor.dimensions() == gltf::accessor::Dimensions::Vec2
+                        && accessor.data_type() == gltf::accessor::DataType::F32
+                })
+                .and_then(|accessor| {
+                    gltf::accessor::Iter::<[f32; 2]>::new(accessor, |buffer| {
+                        buffers.get(buffer.index()).map(|data| data.0.as_slice())
+                    })
+                })
+                .map(|uvs| uvs.collect())
+                .filter(|uvs: &Vec<[f32; 2]>| uvs.len() == count)
+                .unwrap_or_default();
 
             // Each corner's 4 joints (the skin's numbers after the ones
             // before it) and weights, adding up to 1.
@@ -2003,6 +2031,7 @@ impl Reader<'_> {
                 uvs,
                 tangents: Vec::new(),
                 regions,
+                skin_uvs,
                 indices,
                 material,
                 joints,
@@ -2409,6 +2438,10 @@ pub(crate) fn decode_image(bytes: &[u8], name: &str) -> Result<Image, String> {
     }
     Ok(Image::new(rgba.width(), rgba.height(), rgba.into_raw()))
 }
+
+/// The glTF attribute a fitted garment's [`Primitive::skin_uvs`] are kept
+/// in (two floats a corner).
+pub const SKIN_UV_ATTRIBUTE: &str = "_AXCENITY_SKIN_UV";
 
 /// A character body's region map read from its second texture coordinates
 /// (`Primitive::regions`): each corner's `u` is `(index + 0.5) / 16` and

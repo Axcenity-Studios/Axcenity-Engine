@@ -29,8 +29,9 @@ pub struct ItemManifest {
     /// A slot of the base models it fits.
     pub slot: String,
     /// Garments only: the order outward, for pushing layers clear of each
-    /// other. 0 underwear, 1 base (shirts, trousers, shoes), 2 mid
-    /// (sweaters, vests), 3 outer (jackets, coats).
+    /// other. 0 next to the skin (underwear, and a top worn tucked into
+    /// the bottoms), 1 base (shirts, trousers, shoes), 2 mid (sweaters,
+    /// vests), 3 outer (jackets, coats).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layer: Option<u8>,
     #[serde(default)]
@@ -43,6 +44,12 @@ pub struct ItemManifest {
     /// The body regions it hides, by ID.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hides: Vec<String>,
+    /// Its cover map (ADR-0045): an image over the body's first texture
+    /// coordinates, beside the manifest. Red (128 or more) is skin the
+    /// body leaves out under it; green is skin under which a garment
+    /// worn beneath it leaves its cloth out. Made by the fit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_map: Option<String>,
     /// Every material of its model, with its shading model.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub materials: Vec<MaterialSlot>,
@@ -277,6 +284,27 @@ impl ItemManifest {
     /// The slots it occupies: its own, then `also_fills`.
     pub fn slots(&self) -> impl Iterator<Item = &String> {
         std::iter::once(&self.slot).chain(&self.also_fills)
+    }
+
+    /// Where it is worn among the garments, inside out (ADR-0045): by
+    /// layer, then by slot (underwear, shoes, bottoms, tops, outerwear;
+    /// a top is worn over the waistband of trousers of its layer, and a
+    /// top of layer 0 under it, tucked in). A
+    /// garment with a greater order is worn over one with a lesser, and
+    /// its cover map hides the other's cloth under it; equal orders hide
+    /// nothing of each other. `None` for what isn't a garment.
+    pub fn wearing_order(&self) -> Option<(u8, u8)> {
+        if self.kind != ItemKind::Garment {
+            return None;
+        }
+        let slot = match self.slot.as_str() {
+            slot if slot.starts_with("underwear") => 0,
+            "shoes" => 1,
+            "bottom" => 2,
+            "outerwear" => 4,
+            _ => 3,
+        };
+        Some((self.layer.unwrap_or(1), slot))
     }
 
     /// Whether this item and `other` can't be worn together (either
@@ -539,6 +567,9 @@ impl ItemManifest {
         }
         if let Some(thumbnail) = &self.thumbnail {
             check_path(p, "thumbnail", thumbnail);
+        }
+        if let Some(cover_map) = &self.cover_map {
+            check_path(p, "cover_map", cover_map);
         }
         unique(p, "tags", self.tags.iter());
         if let Some(source) = &self.source {

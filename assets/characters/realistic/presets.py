@@ -16,6 +16,11 @@ R1; plan section 11.3): each a format 2 character description with a
   (references/face/README.md, section 3), both sides of a pair alike.
 - **Character**: the six starting characters Character Studio had in code
   (`crates/editor/src/character_workspace.rs`, `presets()`), as data.
+- **Feature** (2026-11-24; architecture.md section 15a): a preset of one
+  feature, which sets that feature's parameters and nothing else. Ten nose
+  shapes (`NOSES`, feature `nose`: the nose charts' types, each read in
+  profile and from the front) and six face shapes (`FACE_SHAPES`, feature
+  `face_shape`: the outline alone, so a nose or a pair of eyes is kept).
 
 These are starting values to tune against the references and the
 captures, not types of people.
@@ -125,8 +130,72 @@ CHARACTERS = [
 ]
 
 
-def preset(name, label, kind, about, parameters, order, tags=None, items=None):
+# Nose shapes: (name, label, about, parameters; `*` is a pair, both sides
+# alike). Each is the nose parameters that read as that type in profile
+# and from the front; what a type doesn't name is the nose as built.
+NOSES = [
+    ("straight", "Straight", "A straight bridge that runs from the brow to the tip without a dip or a hump.",
+     {"nose_root": 0.8, "nose_bridge": 0.2, "nose_tip_width": -0.2, "nose_width": -0.2}),
+    ("aquiline", "Aquiline", "A high bridge that bows out along its length, the tip turned a little down.",
+     {"nose_hump": 0.7, "nose_root": 0.3, "nose_bridge": 0.3, "nose_tip_rotation": -0.35, "nose_length": 0.3}),
+    ("hooked", "Hooked", "A strong hump and a sharp tip that hangs below the nostrils.",
+     {"nose_hump": 1.0, "nose_bridge": 0.4, "nose_tip_rotation": -0.9, "nose_length": 0.5,
+      "nose_tip_projection": 0.2, "nose_columella": 0.5, "nose_tip_width": -0.3}),
+    ("snub", "Snub", "Short, with a scooped bridge and a tip that turns up.",
+     {"nose_length": -0.6, "nose_hump": -0.6, "nose_tip_rotation": 0.6, "nose_tip_projection": -0.3,
+      "nose_root": -0.3, "nose_tip_width": 0.3}),
+    ("button", "Button", "Small and round: a short nose with a low bridge and a round tip.",
+     {"nose_length": -0.8, "nose_bridge": -0.3, "nose_hump": -0.3, "nose_tip_rotation": 0.35,
+      "nose_tip_width": 0.5, "nose_width": -0.2, "nostril_width*": -0.2, "nose_tip_projection": -0.2}),
+    ("upturned", "Upturned", "A tip that turns well up, so the nostrils show from the front.",
+     {"nose_tip_rotation": 0.9, "nose_hump": -0.4, "nose_length": -0.2, "nose_columella": -0.3,
+      "nose_tip_projection": 0.2, "nostril_height*": 0.3}),
+    ("bulbous", "Bulbous", "A wide, round tip over full nostrils.",
+     {"nose_tip_width": 1.0, "nose_tip_projection": 0.2, "nostril_flare*": 0.6, "nostril_width*": 0.3,
+      "nose_bridge_width": 0.3}),
+    ("long-thin", "Long and thin", "Long from the bridge to the tip and narrow all the way down.",
+     {"nose_length": 0.9, "nose_width": -0.7, "nose_bridge_width": -0.6, "nose_tip_width": -0.6,
+      "nostril_width*": -0.5, "nose_tip_projection": 0.3, "nose_root": 0.3}),
+    ("wide", "Wide", "A low, wide bridge over wide, flared nostrils.",
+     {"nose_width": 0.8, "nostril_width*": 0.8, "nostril_flare*": 0.7, "nose_bridge": -0.6,
+      "nose_bridge_width": 0.8, "nose_root": -0.5, "nose_tip_width": 0.5, "nose_tip_projection": -0.4}),
+    ("low-bridge", "Low bridge", "A shallow root between the eyes and a low bridge under it.",
+     {"nose_root": -1.0, "nose_bridge": -0.6, "nose_hump": -0.2, "nose_bridge_width": 0.3}),
+]
+
+# Face shapes: the outline's five parameters alone (feature `face_shape`).
+# Oval is the face as built.
+FACE_SHAPES = [
+    ("oval", "Oval", "The face as built: a little longer than wide, tapering gently to the chin.", {}),
+    ("round", "Round", "As wide as long, with full sides and no corners.",
+     {"face_width": 0.5, "face_length": -0.6, "face_roundness": 1.0, "face_taper": -0.2}),
+    ("square", "Square", "A jaw as wide as the cheekbones, with flat sides and a square corner.",
+     {"face_taper": -0.9, "face_roundness": -0.8, "face_width": 0.3, "face_length": -0.2}),
+    ("heart", "Heart-shaped", "Wide at the temples and cheekbones, narrowing to a small chin.",
+     {"face_taper": 1.0, "face_width": 0.2, "face_roundness": -0.1, "face_narrow": 0.3}),
+    ("long", "Long", "Long from the forehead to the chin and narrow across.",
+     {"face_length": 1.0, "face_width": -0.4, "face_narrow": 0.3}),
+    ("narrow", "Narrow", "Narrow across the temples, the cheekbones and the jaw.",
+     {"face_width": -0.8, "face_narrow": 0.7, "face_length": 0.2}),
+]
+
+
+def paired(values):
+    """`values` with each pair's stem (`name*`) as its left and right."""
+    out = {}
+    for parameter, value in values.items():
+        if parameter.endswith("*"):
+            out[f"{parameter[:-1]}_left"] = value
+            out[f"{parameter[:-1]}_right"] = value
+        else:
+            out[parameter] = value
+    return out
+
+
+def preset(name, label, kind, about, parameters, order, tags=None, items=None, feature=None):
     block = {"id": f"axcenity/realistic-{name}", "kind": kind, "about": about}
+    if feature:
+        block["feature"] = feature
     if tags:
         block["tags"] = tags
     block["order"] = order
@@ -161,6 +230,10 @@ def presets():
     for k, (name, label, about, values) in enumerate(CHARACTERS):
         wears = FEMALE_WEARS if values.get("frame") == 1 else MALE_WEARS
         out.append(preset(name, label, "character", about, values, 10 * (k + 1), items=wears))
+    for prefix, feature, rows in (("nose", "nose", NOSES), ("face-shape", "face_shape", FACE_SHAPES)):
+        for k, (name, label, about, values) in enumerate(rows):
+            out.append(preset(f"{prefix}-{name}", label, "feature", about, paired(values), 10 * (k + 1),
+                              tags=["shape"], feature=feature))
     return out
 
 
@@ -173,4 +246,5 @@ def write(folder=FOLDER):
 
 
 if __name__ == "__main__":
-    write()
+    import sys
+    write(sys.argv[1] if len(sys.argv) > 1 else FOLDER)

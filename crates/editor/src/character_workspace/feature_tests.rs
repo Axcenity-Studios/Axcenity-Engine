@@ -241,6 +241,71 @@ fn body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// A feature's own presets (a nose, a face shape) are "Shape" chips on
+/// that feature's page: one sets that feature's parameters and nothing
+/// else of the face, as one undo step, and is lit until a slider of the
+/// feature moves.
+#[test]
+fn a_feature_s_shapes_are_chips_that_set_that_feature_alone() {
+    const AQUILINE: &str = "axcenity/realistic-nose-aquiline";
+    let folder = test_folder("feature-shapes");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    let library = workspace.library();
+    let aquiline = library.preset(AQUILINE).unwrap().clone();
+    assert!(!aquiline.parameters.is_empty());
+
+    workspace.apply(set("jaw_definition", 0.5));
+    workspace.apply(set("nose_length", 0.3));
+    workspace.apply(Intent::ApplyPreset(AQUILINE.into()));
+    for (id, value) in &aquiline.parameters {
+        assert_eq!(workspace.parameter(id), *value, "{id}");
+    }
+    assert_eq!(
+        workspace.parameter("nose_length"),
+        aquiline
+            .parameters
+            .get("nose_length")
+            .copied()
+            .unwrap_or(0.0),
+        "a nose preset is a whole nose"
+    );
+    assert_eq!(
+        workspace.parameter("jaw_definition"),
+        0.5,
+        "the jaw is left"
+    );
+    assert!(matches_preset(workspace.description(), &aquiline, &library));
+    workspace.apply(Intent::Undo);
+    assert_eq!(workspace.parameter("nose_length"), 0.3, "one step back");
+    workspace.apply(Intent::Redo);
+
+    // The Nose page offers the nose's shapes, the applied one among them;
+    // the whole Face page and another feature's page don't.
+    workspace.apply(Intent::PickCategory(Category::Face));
+    let drawn = draw(&mut workspace);
+    assert!(!has(&drawn, "Aquiline"), "{drawn:?}");
+    workspace.apply(Intent::PickFeature(Some("nose".into())));
+    let drawn = draw(&mut workspace);
+    for text in [
+        "Shape",
+        "Straight",
+        "Aquiline",
+        "Snub",
+        "Low bridge",
+        "Custom",
+    ] {
+        assert!(has(&drawn, text), "{text} in {drawn:?}");
+    }
+    assert!(!has(&drawn, "Heart-shaped"), "{drawn:?}");
+    workspace.apply(Intent::PickFeature(Some("face_shape".into())));
+    let drawn = draw(&mut workspace);
+    for text in ["Shape", "Oval", "Round", "Square", "Heart-shaped"] {
+        assert!(has(&drawn, text), "{text} in {drawn:?}");
+    }
+    assert!(!has(&drawn, "Aquiline"), "{drawn:?}");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
 /// "Save as preset" writes a person's own preset of the chosen kind into
 /// `presets/` (only what the kind owns), lists it with the others, and a
 /// new workspace finds it; a second of the same name gets its own file.

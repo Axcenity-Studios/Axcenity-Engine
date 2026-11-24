@@ -59,6 +59,22 @@ fn object(library: &Library, path: &str) -> Model {
 
 /// Parameters that move a part the body carries an empty shape for (the
 /// brows' card), not the body: the part they move.
+/// Parameters whose shape is smaller than the crowd copy's triangles
+/// (`Body_LOD2`, 5,000 triangles for the whole body: an eyelid, the nose's
+/// bridge and the upper lip's edge have a vertex or two each). They are
+/// held on the body and its first copy, and may move the second less.
+const FINER_THAN_THE_CROWD_COPY: [&str; 9] = [
+    "nose_hump",
+    "nose_bridge_width",
+    "cupids_bow",
+    "eye_openness_left",
+    "eye_openness_right",
+    "upper_lid_fullness_left",
+    "upper_lid_fullness_right",
+    "under_eye_left",
+    "under_eye_right",
+];
+
 const PART_PARAMETERS: [(&str, &str); 2] = [
     ("brow_length_left", "AxcenityRealistic/Brows"),
     ("brow_length_right", "AxcenityRealistic/Brows"),
@@ -177,6 +193,9 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
                 let moved = rest(&model.bake(&resolved.identity));
                 for (level, (a, b)) in moved.iter().zip(&at_rest).enumerate() {
                     let far = farthest(a, b);
+                    if level == 2 && FINER_THAN_THE_CROWD_COPY.contains(&parameter.id.as_str()) {
+                        continue;
+                    }
                     assert!(far > SEEN, "{at}, level of detail {level}: moved {far} m");
                 }
             }
@@ -184,11 +203,13 @@ fn every_parameter_moves_the_body_and_its_simpler_copies() {
         }
     }
     // Frame (one end), muscle and fat, sixteen regions, nine proportions
-    // (both ends: the hips narrow too since R3), and the face's 61
-    // parameters (CO6's 45, the brows' length, and R4's 14: nose tip
+    // (both ends: the hips narrow too since R3), and the face's 94
+    // parameters (CO6's 45, the brows' length, R4's 14: nose tip
     // projection and rotation, nose width, philtrum length, and a pair each
-    // of jaw angle, upper lid fold, lower lid, eye corner and earlobe).
-    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) + 2 * 61);
+    // of jaw angle, upper lid fold, lower lid, eye corner and earlobe; and
+    // the finer controls' 33, five of them with one end: the chin's cleft
+    // and each eye's inner-corner fold and openness).
+    assert_eq!(checked, 1 + 2 * (2 + 16 + 9) + 2 * 94 - 5);
     // Every proportion's end moves its body slider but the hips' low end,
     // which moves the body by a shape.
     assert_eq!(proportions, 2 * 9 - 1);
@@ -319,8 +340,9 @@ fn a_baked_body_keeps_only_its_live_shapes() {
     // and R4's `Face_Nose_Tip_Rotation_Up` (`nose_tip_rotation`'s upturned
     // end, `faceparams.SPLIT`). Four more in wave 4 (CO9 part 2): the
     // shoulder's swing correctives, `Corrective_Shoulder_Forward_*` and
-    // `_Back_*`.
-    assert_eq!(model.morph_targets.len(), 185);
+    // `_Back_*`. Thirty-three more on 2026-11-24: the finer face controls'
+    // shapes, one each (`facedetail.py`), grafted on after the others.
+    assert_eq!(model.morph_targets.len(), 218);
 }
 
 /// The realistic body's underwear comes with Male or Female and is always

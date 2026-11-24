@@ -12,13 +12,18 @@
 //! the Expressions page's face controls and face preview (R9).
 //!
 //! The Hair and Clothing browsers (R6, R7; `browser.rs`) add `Browse`
-//! (search, filters, "Show drafts", the tile hovered or picked: editor
-//! state, the preview shown in the character's place), `EndPreview`,
-//! item favourites, and the worn item's own controls (`SetItemVariant`,
-//! `SetItemMaterial`, `SetItemParameter`), which are edits. `Wear` stays
-//! the one way an item goes on: one undo step. The Clothing page's online
-//! wardrobe adds `Wardrobe` (`wardrobe.rs`): its list and its downloads
-//! into the library, which are editor state.
+//! (search, filters, "Show drafts", the tile hovered, the worn items'
+//! folds: editor state, the preview shown in the character's place),
+//! `EndPreview`, item favourites, and the worn item's own controls
+//! (`SetItemVariant`, `SetItemMaterial`, `SetItemParameter`), which are
+//! edits. `Wear` stays the one way an item goes on or comes off (a click
+//! on its tile): one undo step. The Clothing page's online wardrobe adds
+//! `Wardrobe` (`wardrobe.rs`): its list and its downloads into the
+//! library, which are editor state.
+//!
+//! The panel's own shape is editor state too: `SearchControls` (the
+//! "Search controls" field of the slider pages) and `SetPanelWidth` (its
+//! inner edge dragged).
 //!
 //! [`CharacterWorkspace::apply`]: super::CharacterWorkspace::apply
 
@@ -106,8 +111,9 @@ pub enum Intent {
     /// Marks an item (a hairstyle, a garment) a favourite, or not
     /// (editor state, beside the preset favourites).
     ToggleItemFavourite(String),
-    /// A browser's search, filters, drafts, or the tile hovered or picked
-    /// (editor state: a tile is previewed on the character, never worn).
+    /// A browser's search, filters, drafts, the tile hovered or a worn
+    /// item's fold (editor state: a hovered tile is previewed on the
+    /// character, never worn).
     Browse(Browse),
     /// Takes a tile's preview off: the character as it is (Esc, leaving
     /// the page).
@@ -155,6 +161,18 @@ pub enum Intent {
     /// Picks a feature of the category (`None`: the whole category).
     PickFeature(Option<String>),
     PickLevel(Level),
+    /// The text of the panel's "Search controls" field: the Body, Face
+    /// and Skin and Makeup pages list the controls that match it, in
+    /// every feature and at every level (editor state: never saved, never
+    /// an undo step). Empty: the page as it is.
+    SearchControls(String),
+    /// How wide the panel on the right is, as its inner edge is dragged
+    /// (editor state; held to what the window leaves). `Commit`, the drag
+    /// let go, keeps it for the next session.
+    SetPanelWidth {
+        width: f32,
+        gesture: Gesture,
+    },
     SetSymmetry(bool),
     /// Turns editing on the character in the viewport on or off (R2): the
     /// hover highlight, picking by click and the handles. Off, the

@@ -9,9 +9,32 @@ use std::path::Path;
 
 use axcenity_avatar::{BaseManifest, Library};
 
-/// The features the brief asks handles for first, in its order (the
-/// mouth is the `lips` feature).
-const FEATURES: [&str; 7] = ["nose", "eyes", "jaw", "lips", "shoulders", "waist", "hips"];
+/// The features with handles, each feature's together, in the order
+/// `handles.py` lists them: the ring round the face's outline (the
+/// `face_shape` feature, 2026-11-24), then the brief's first seven in its
+/// order (nose, eyes, jaw, the mouth as the `lips` feature, shoulders,
+/// waist, hips) with the face's other features among them where the
+/// studio lists them (cheeks, chin, forehead).
+const FEATURES: [&str; 11] = [
+    "face_shape",
+    "nose",
+    "eyes",
+    "cheeks",
+    "jaw",
+    "chin",
+    "lips",
+    "forehead",
+    "shoulders",
+    "waist",
+    "hips",
+];
+
+/// The feature whose handles are the ring round the face's outline. They
+/// drive the outline's own parameters and those of the features the
+/// outline passes (the forehead's height, the temples' width, the jaw's
+/// angle, the chin's width and shape), so selecting Face shape shows one
+/// ring of markers that reshapes the whole outline.
+const OUTLINE: &str = "face_shape";
 
 /// The framings a handle's `views` and a drive's `screen` name.
 const VIEWS: [&str; 4] = ["front", "three_quarter", "side", "back"];
@@ -53,13 +76,18 @@ fn every_handle_drives_its_own_feature_s_parameters_and_pairs_name_each_other() 
             let parameter = base
                 .parameter(&drive.parameter)
                 .unwrap_or_else(|| panic!("{}: no {}", handle.id, drive.parameter));
-            let feature = base.feature_of(parameter).map(|f| f.id.as_str());
-            assert_eq!(
-                feature,
-                Some(handle.feature.as_str()),
-                "{}",
-                drive.parameter
-            );
+            let feature = base.feature_of(parameter).expect("a feature");
+            if handle.feature == OUTLINE {
+                // The outline's ring: any of the face's parameters.
+                assert_eq!(
+                    feature.category,
+                    axcenity_avatar::Category::Face,
+                    "{}",
+                    drive.parameter
+                );
+            } else {
+                assert_eq!(feature.id, handle.feature, "{}", drive.parameter);
+            }
         }
         let Some(mirror) = &handle.mirror else {
             continue;

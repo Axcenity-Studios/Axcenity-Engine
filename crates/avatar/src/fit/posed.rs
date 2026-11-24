@@ -25,10 +25,25 @@ use serde::{Deserialize, Serialize};
 use super::BodyMesh;
 use super::bind::{Binding, frames};
 use super::pose::{FitPose, skin, skin_matrices};
-use super::transfer::{CarriedShape, garment_at, par_map};
+use super::transfer::{CarriedShape, Welds, garment_at, par_map};
 
 /// A corrective leaning less than this in a pose takes none of the gap.
 const LEANING: f32 = 0.05;
+
+/// Loose cloth ([`Garment::loose`]) follows the skin it is bound to
+/// wholly while it lies within the first of these of it, and not at all
+/// beyond the second (metres): a sleeve hanging 6 cm off the arm isn't
+/// the arm's skin, and following its bound point round the shoulder
+/// swings it out of the cloth beside it.
+const FOLLOW_NEAR: (f32, f32) = (0.01, 0.04);
+
+/// How many rounds a loose garment's following is smoothed over its
+/// cloth each time it is added to a corrective.
+const FOLLOW_SMOOTH: usize = 6;
+
+/// The farthest a loose garment's corner follows in one corrective
+/// (metres): more than this is cloth bound to skin it doesn't lie on.
+const FOLLOW_MOST: f32 = 0.025;
 
 /// What the posed fit did.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -48,6 +63,15 @@ pub(super) struct Garment<'a> {
     pub binding: &'a Binding,
     pub joints: &'a [[u16; 4]],
     pub weights: &'a [[f32; 4]],
+    /// Its corners at the same place as one, and their neighbours: what
+    /// goes into a corrective is the same for both sides of a seam, so a
+    /// pose never opens one.
+    pub welds: &'a Welds,
+    /// Whether it stands off the body and is bound unevenly (an imported
+    /// garment, `FitOptions::smooth_shapes`): its following is then eased
+    /// by how near the skin each corner lies, smoothed over the cloth and
+    /// limited.
+    pub loose: bool,
 }
 
 pub(super) fn solve(
@@ -108,6 +132,25 @@ fn follow(
         .flat_map(|p| (0..states.len()).map(move |s| (p, s)))
         .collect();
     let mut moved: BTreeMap<String, f32> = BTreeMap::new();
+    // How much of its gap each corner takes: all of it on the skin, none
+    // where a loose garment hangs clear of it.
+    let near: Vec<f32> = if garment.loose {
+        garment
+            .binding
+            .vertices
+            .iter()
+            .map(|bound| {
+                let off = Vec3::from(bound.local).length();
+                let t = ((off - FOLLOW_NEAR.0) / (FOLLOW_NEAR.1 - FOLLOW_NEAR.0)).clamp(0.0, 1.0);
+                1.0 - t * t * (3.0 - 2.0 * t)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    // What each corrective has followed so far (a loose garment's is
+    // limited).
+    let mut followed_by: BTreeMap<String, Vec<Vec3>> = BTreeMap::new();
     for _ in 0..FOLLOW_ROUNDS {
         let gaps = par_map(&cases, |&(p, s)| {
             let at_rest = gap(body, garment, None, &states[s], rest, shapes);
@@ -151,13 +194,32 @@ fn follow(
             let Some(shape) = shapes.iter_mut().find(|s| s.name == name) else {
                 continue;
             };
-            let mut biggest = 0.0f32;
-            for ((o, s), c) in shape.offsets.iter_mut().zip(&sum).zip(&count) {
-                if *c > 0.0 {
-                    let step = *s / *c;
-                    *o += step;
-                    biggest = biggest.max(step.length());
+            let mut steps: Vec<Vec3> = sum
+                .iter()
+                .zip(&count)
+                .map(|(s, c)| if *c > 0.0 { *s / *c } else { Vec3::ZERO })
+                .collect();
+            if garment.loose {
+                for (step, near) in steps.iter_mut().zip(&near) {
+                    *step *= *near;
                 }
+                steps = garment.welds.smooth(&steps, &[0.5], FOLLOW_SMOOTH);
+                let so_far = followed_by
+                    .entry(name.clone())
+                    .or_insert_with(|| vec![Vec3::ZERO; rest.len()]);
+                for (step, total) in steps.iter_mut().zip(so_far.iter_mut()) {
+                    let wanted = (*total + *step).clamp_length_max(FOLLOW_MOST);
+                    *step = wanted - *total;
+                    *total = wanted;
+                }
+            } else {
+                // Both sides of a seam take the same.
+                steps = garment.welds.smooth(&steps, &[0.0], 0);
+            }
+            let mut biggest = 0.0f32;
+            for (o, step) in shape.offsets.iter_mut().zip(&steps) {
+                *o += *step;
+                biggest = biggest.max(step.length());
             }
             most = most.max(biggest);
             *moved.entry(name).or_default() += biggest;

@@ -29,8 +29,10 @@
 //! drawing from `&CharacterWorkspace` and returning [`Intent`]s that only
 //! the shell applies: `shell.rs` (the frame, shortcuts, notices, applying
 //! intents), `nav.rs` (categories and features down the left),
-//! `panel.rs` (the contextual panel on the right), `toolbar.rs` and
-//! `bottom_bar.rs` (camera, lighting and backdrop under the viewport).
+//! `panel.rs` (the contextual panel on the right: as wide as the person
+//! drags its inner edge, one-line slider rows, a search for a slider by
+//! name), `toolbar.rs` and `bottom_bar.rs` (camera, lighting and backdrop
+//! under the viewport).
 //! `intent.rs`, `selection.rs` and `edit.rs` are the contracts they share
 //! (what a panel can ask, what is shown, undo and reset). `random.rs` is
 //! Randomize and its locks, `compare.rs` the held versions (before and
@@ -38,10 +40,10 @@
 //! side), `motion.rs` the preview's pose and motion (Still, Idle, Walk,
 //! Run, gestures), `browser.rs` the Hair and Clothing browsers (search,
 //! filters, favourites, recently used, drafts, a tile previewed on the
-//! character until "Wear"), `expressions.rs` the Expressions page's
-//! expression, face controls and face preview (R9). `stage.rs` is the camera, lighting, backdrop and
-//! floor; `shelf.rs` lists the saved characters for the start page and
-//! deletes them.
+//! character while hovered and worn by a click), `expressions.rs` the
+//! Expressions page's expression, face controls and face preview (R9).
+//! `stage.rs` is the camera, lighting, backdrop and floor; `shelf.rs`
+//! lists the saved characters for the start page and deletes them.
 
 pub mod autosave;
 mod bottom_bar;
@@ -288,6 +290,14 @@ pub struct CharacterWorkspace {
     pub symmetry: bool,
     /// The category, feature and detail level shown (editor state).
     pub selection: Selection,
+    /// The text of the panel's "Search controls" field (editor state:
+    /// never saved, never an undo step). It belongs to the page it was
+    /// typed on: another category starts with none.
+    pub control_search: String,
+    /// How wide the person made the panel on the right (editor state,
+    /// kept with the favourites); the shell gives it what the window
+    /// leaves (`shell.rs`).
+    pub panel_width: f32,
     pub orbit: Orbit,
     /// The view preset the camera is at, until it's moved.
     pub view: Option<ViewPreset>,
@@ -429,6 +439,8 @@ impl CharacterWorkspace {
             applied: None,
             symmetry: true,
             selection: Selection::default(),
+            control_search: String::new(),
+            panel_width: presets::read_panel_width(folder).unwrap_or(shell::PANEL_WIDTH),
             orbit: Orbit::default(),
             view: Some(ViewPreset::FullBody),
             lighting: Lighting::default(),

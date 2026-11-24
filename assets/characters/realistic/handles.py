@@ -4,9 +4,18 @@
 
 A handle is a point on the skin that a person drags in the viewport. It
 holds no geometry of its own: it names parameters (`drives`) and moves
-them as their sliders would (plan section 11.3). The seven features come
-in the plan's order: nose, eyes, jaw, mouth (the `lips` feature),
-shoulders, waist and hips.
+them as their sliders would (plan section 11.3). The first seven features
+came in the plan's order: nose, eyes, jaw, mouth (the `lips` feature),
+shoulders, waist and hips. Since 2026-11-24 the face has more: a ring of
+handles round its outline (the `face_shape` feature: the forehead's top,
+the temples, the cheekbones' outer edges, the cheeks, the jaw's corners,
+the jawline, the chin's corners and the chin), which drive the outline's
+own parameters and those of the features the outline passes (the
+forehead's height, the temples' width, the jaw's angle, the chin's width),
+more on the nose (its root, the hump, the bridge's and the tip's sides, the
+columella), and handles for the cheeks, the chin, the jawline, the
+forehead and the skin round the eyes. A handle's features are kept
+together in the list, in the order the studio lists the features.
 
 Everything is measured on the built model, on the masculine frame (the
 model's own rest shape), with every other parameter at its default:
@@ -68,8 +77,17 @@ VIEWS = {"front": 0.0, "three_quarter": 45.0, "side": 90.0, "back": 180.0}
 # handles.
 TRUNK = ["torso", "waist", "hips", "thighs_top"]
 
+# Where the top of the forehead is from the head's joint (model space,
+# glTF axes): up and forward, about 54 degrees above level.
+FOREHEAD_TOP = [0.0, 0.81, 0.59]
+
+# The jawline's handle: half-way from the jaw's corner to the chin's.
+JAWLINE = ("between", ("moved", "jaw_width_{side}"), ("moved", "chin_shape"), 0.5)
+
 # The handles, by feature in the plan's order. `{side}` and `{Side}` make
-# a pair (`left`/`Left` first). `at` is how its corner is found:
+# a pair (`left`/`Left` first). `yields` names drives that take a framing
+# only when no other drive of the handle has their line there. `at` is how
+# its corner is found:
 #   ("moved", parameter, region?): the corner the parameter moves furthest
 #       over its range (in the region, by its ID, when one is given);
 #   ("forward", shape): of the corners the shape moves, the most forward;
@@ -89,27 +107,93 @@ TRUNK = ["torso", "waist", "hips", "thighs_top"]
 #       3 mm), so it shows from the front;
 #   ("narrowest", region) / ("widest", region): the side of the region
 #       where the trunk is narrowest or widest (in slices), the
-#       outline's corner half-way front to back.
+#       outline's corner half-way front to back;
+#   ("outline", parameter): the face's outline, seen from the front, at
+#       the height of the corner the parameter moves furthest: of the
+#       skin's corners within 5 mm of that height, off the ear and in
+#       front of its middle, the furthest out to the side, and of those
+#       within 4 mm of as far out, the most forward (the outline's corner
+#       that faces the front most);
+#   ("edge", parameter, share): the outer edge of what the parameter
+#       moves: of the corners it moves at least `share` of its furthest,
+#       the one furthest out to the side (the cheekbone's outer edge);
+#   ("between", rule, rule, share): the skin's corner nearest the point
+#       `share` of the way from one rule's corner to another's (the
+#       jawline, between the jaw's corner and the chin's);
+#   ("toward", bone, direction): of the skin's corners on the middle line,
+#       the one most nearly in `direction` from the bone's head (the top
+#       of the forehead, from the head's joint).
 HANDLES = [
+    # The ring round the face's outline, from the top down.
+    {"id": "outline_forehead", "feature": "face_shape", "label": "Forehead top",
+     "at": ("toward", "Head", FOREHEAD_TOP), "drives": ["forehead_height", "forehead_slope"]},
+    {"id": "outline_temple_{side}", "feature": "face_shape", "label": "{Side} temple",
+     "at": ("outline", "temple_width"), "drives": ["temple_width"]},
+    {"id": "outline_cheekbone_{side}", "feature": "face_shape", "label": "{Side} cheekbone edge",
+     "at": ("edge", "cheekbone_{side}", 0.4), "drives": ["face_width", "cheekbone_height_{side}"]},
+    {"id": "outline_cheek_{side}", "feature": "face_shape", "label": "{Side} cheek",
+     "at": ("outline", "cheek_fullness_{side}"), "drives": ["face_roundness"]},
+    {"id": "outline_jaw_{side}", "feature": "face_shape", "label": "{Side} jaw corner",
+     "at": ("moved", "jaw_width_{side}"), "drives": ["face_taper", "jaw_angle_{side}"]},
+    {"id": "outline_jawline_{side}", "feature": "face_shape", "label": "{Side} jawline",
+     "at": JAWLINE, "drives": ["face_narrow", "jaw_definition"]},
+    {"id": "outline_chin_{side}", "feature": "face_shape", "label": "{Side} chin corner",
+     "at": ("moved", "chin_shape"), "drives": ["chin_width", "chin_shape"]},
+    {"id": "outline_chin", "feature": "face_shape", "label": "Chin",
+     "at": ("middle", "chin_length"), "drives": ["face_length", "chin_forward"]},
     {"id": "nose_tip", "feature": "nose", "label": "Nose tip",
      "at": ("forward", "Face_Nose_Length"), "drives": ["nose_length", "nose_tip_projection"]},
     {"id": "nose_bridge", "feature": "nose", "label": "Bridge",
      "at": ("middle", "nose_bridge"), "drives": ["nose_bridge"]},
     {"id": "nostril_{side}", "feature": "nose", "label": "{Side} nostril",
-     "at": ("moved", "nostril_width_{side}"), "drives": ["nostril_width_{side}"]},
+     "at": ("moved", "nostril_width_{side}"),
+     "drives": ["nostril_width_{side}", "nostril_height_{side}", "nostril_flare_{side}"],
+     # (The flare runs nearly along the width's line: it takes only the
+     # framings the width leaves, the profile.)
+     "yields": ["nostril_flare_{side}"]},
+    {"id": "nose_root", "feature": "nose", "label": "Bridge root",
+     "at": ("middle", "nose_root"), "drives": ["nose_root"]},
+    {"id": "nose_hump", "feature": "nose", "label": "Bridge hump",
+     "at": ("middle", "nose_hump"), "drives": ["nose_hump"]},
+    {"id": "nose_bridge_{side}", "feature": "nose", "label": "{Side} of the bridge",
+     "at": ("moved", "nose_bridge_width"), "drives": ["nose_bridge_width"]},
+    {"id": "nose_tip_{side}", "feature": "nose", "label": "{Side} of the tip",
+     "at": ("moved", "nose_tip_width"), "drives": ["nose_tip_width"]},
+    {"id": "nose_columella", "feature": "nose", "label": "Columella",
+     "at": ("middle", "nose_columella"), "drives": ["nose_columella"]},
     {"id": "eye_{side}", "feature": "eyes", "label": "{Side} eye",
      "at": ("lid", "{Side}Eye", [0.0, 0.6, 0.8]),
      "drives": ["eye_spacing_{side}", "eye_height_{side}", "eye_depth_{side}"]},
     {"id": "eye_corner_{side}", "feature": "eyes", "label": "{Side} eye corner",
      "at": ("canthus", "{Side}Eye"), "drives": ["eye_size_{side}", "eye_tilt_{side}"]},
+    {"id": "under_eye_{side}", "feature": "eyes", "label": "Under the {side} eye",
+     "at": ("moved", "under_eye_{side}"), "drives": ["under_eye_{side}"]},
+    {"id": "eye_inner_{side}", "feature": "eyes", "label": "{Side} inner corner",
+     "at": ("moved", "inner_corner_fold_{side}"), "drives": ["inner_corner_fold_{side}"]},
+    {"id": "cheekbone_{side}", "feature": "cheeks", "label": "{Side} cheekbone",
+     "at": ("moved", "cheekbone_{side}"), "drives": ["cheekbone_{side}", "cheekbone_height_{side}"]},
+    {"id": "cheek_{side}", "feature": "cheeks", "label": "{Side} cheek",
+     "at": ("moved", "cheek_fullness_{side}"), "drives": ["cheek_fullness_{side}"]},
+    {"id": "cheek_hollow_{side}", "feature": "cheeks", "label": "{Side} cheek hollow",
+     "at": ("moved", "cheek_hollow_{side}"), "drives": ["cheek_hollow_{side}"]},
     {"id": "jaw_{side}", "feature": "jaw", "label": "{Side} jaw corner",
      "at": ("moved", "jaw_width_{side}"), "drives": ["jaw_width_{side}", "jaw_angle_{side}"]},
+    {"id": "jawline_{side}", "feature": "jaw", "label": "{Side} jawline",
+     "at": JAWLINE, "drives": ["jaw_definition"]},
+    {"id": "chin", "feature": "chin", "label": "Chin",
+     "at": ("middle", "chin_length"), "drives": ["chin_length", "chin_forward"]},
+    {"id": "chin_{side}", "feature": "chin", "label": "{Side} chin corner",
+     "at": ("moved", "chin_shape"), "drives": ["chin_width", "chin_shape"]},
     {"id": "mouth_corner_{side}", "feature": "lips", "label": "{Side} mouth corner",
      "at": ("moved", "mouth_width_{side}"), "drives": ["mouth_width_{side}", "mouth_height"]},
     {"id": "upper_lip", "feature": "lips", "label": "Upper lip",
      "at": ("middle", "upper_lip_fullness"), "drives": ["upper_lip_fullness"]},
     {"id": "lower_lip", "feature": "lips", "label": "Lower lip",
      "at": ("middle", "lower_lip_fullness"), "drives": ["lower_lip_fullness"]},
+    {"id": "forehead", "feature": "forehead", "label": "Forehead",
+     "at": ("toward", "Head", FOREHEAD_TOP), "drives": ["forehead_height", "forehead_slope"]},
+    {"id": "temple_{side}", "feature": "forehead", "label": "{Side} temple",
+     "at": ("outline", "temple_width"), "drives": ["temple_width"]},
     {"id": "shoulder_{side}", "feature": "shoulders", "label": "{Side} shoulder",
      "at": ("top", "shoulder_width", "upper_arms_top"), "drives": ["shoulder_width"]},
     {"id": "waist_{side}", "feature": "waist", "label": "{Side} waist",
@@ -340,6 +424,28 @@ def choose(model, at, side, ends):
         if not outside.any():
             raise ValueError(f"no skin facing out by the corner of {sided(at[1], side)}")
         return int(np.argmin(np.where(outside, apart, np.inf)))
+    if kind == "outline":
+        low, high = ends(sided(at[1], side))
+        moved = np.linalg.norm(high - low, axis=1)
+        height = P[int(np.argmax(np.where(on_side, moved, -1.0))), 1]
+        ear = np.linalg.norm(body.shapes[f"Face_Ear_Out_{side}"], axis=1) > 1e-5
+        allowed = on_side & ~ear & (np.abs(P[:, 1] - height) < 0.005) & (P[:, 2] > P[ear, 2].mean())
+        out = np.where(allowed, np.abs(P[:, 0]), -1.0)
+        return int(np.argmax(np.where(out >= out.max() - 0.004, P[:, 2], -np.inf)))
+    if kind == "edge":
+        low, high = ends(sided(at[1], side))
+        moved = np.where(on_side, np.linalg.norm(high - low, axis=1), -1.0)
+        return int(np.argmax(np.where(moved >= at[2] * moved.max(), np.abs(P[:, 0]), -1.0)))
+    if kind == "between":
+        a, b = (P[choose(model, rule, side, ends)] for rule in at[1:3])
+        distance = np.linalg.norm(P - (a + (b - a) * at[3]), axis=1)
+        return int(np.argmin(np.where(on_side, distance, np.inf)))
+    if kind == "toward":
+        offset = P - body.heads[at[1]]
+        out = offset / np.maximum(np.linalg.norm(offset, axis=1), 1e-9)[:, None]
+        want = np.array(at[2]) / np.linalg.norm(at[2])
+        allowed = model.skin & (np.abs(P[:, 0]) < 0.004)
+        return int(np.argmax(np.where(allowed, out @ want, -2.0)))
     if kind == "forward":
         moved = np.linalg.norm(body.shapes[at[1]], axis=1) > 1e-5
         return int(np.argmax(np.where(moved & on_side, P[:, 2], -np.inf)))
@@ -426,9 +532,11 @@ def handles(manifest, path):
                     if length >= LIVE:
                         shown.append((length, direction / length, drive))
                 # The drives that show most of their travel go first; one
-                # that shares a line with a drive kept gives way.
+                # that shares a line with a drive kept gives way. (A drive
+                # the handle says `yields` goes after the others.)
+                last = [sided(pid, side) for pid in spec.get("yields", [])]
                 kept = []
-                for length, direction, drive in sorted(shown, key=lambda s: -s[0]):
+                for length, direction, drive in sorted(shown, key=lambda s: (s[2]["parameter"] in last, -s[0])):
                     line = np.cos(np.radians(APART))
                     if all(abs(float(direction @ other)) < line for other in kept):
                         kept.append(direction)

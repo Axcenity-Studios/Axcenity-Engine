@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use axcenity_assets::{Assets, Model};
-use axcenity_avatar::fit::{ImportRequest, Surface, import_garment, outside_cloth};
+use axcenity_avatar::fit::{ImportRequest, Surface, import_garment, uncovered};
 use axcenity_avatar::{Catalogue, CatalogueBase, CatalogueItem, Description, Library, WornItem};
 use axcenity_core::{ClassName, InstanceId, Value, World};
 use axcenity_render::glam::{Mat3, Vec3};
@@ -103,6 +103,12 @@ pub(super) fn gate_library() -> &'static Path {
                 under: vec!["axcenity/realistic-sports-bra".to_owned()],
                 about: None,
                 finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
+                also_fills: Vec::new(),
+                tags: Vec::new(),
+                limitations: Vec::new(),
+                intake: None,
+                texture_size: None,
+                worn_with: None,
             })
             .expect("the test tee imports");
             // What it hides, and what it covers at rest but leaves drawn
@@ -519,11 +525,18 @@ pub(super) fn hidden_triangles(bare: &Posed, dressed: &Posed) -> Vec<[u32; 3]> {
 }
 
 /// Holes: how many corners of the body's `hidden` triangles (left out of
-/// the drawing by the worn items, [`hidden_triangles`]) are more than
-/// `POKE` outside every garment in this pose (`avatar::fit::outside_cloth`,
-/// the rule the import hides regions by), and the worst. Hiding a region takes its skin out of [`poke_through`]'s count,
-/// so this is what keeps hiding honest: hidden skin the cloth doesn't
-/// cover in a pose is a hole a player sees through.
+/// the drawing by the worn items, [`hidden_triangles`]) have no cloth
+/// over them in this pose, by more than `POKE` (`avatar::fit::uncovered`),
+/// and the worst. Hiding skin takes it out of [`poke_through`]'s count,
+/// so this is what keeps hiding honest: hidden skin with nothing over it
+/// is a hole a player sees through.
+///
+/// Since ADR-0045 (a garment's cover map hides the skin under it,
+/// triangle by triangle, set back from its openings) hidden skin that the
+/// cloth has sunk a little under is no hole: cloth is what is seen there,
+/// which is what hiding the skin is for. Before, the rule was
+/// `outside_cloth`, which counted it; an import still hides whole
+/// *regions* by that stricter rule (`pose_safe_hides`).
 pub(super) fn holes(
     label: &str,
     body: &Posed,
@@ -545,7 +558,7 @@ pub(super) fn holes(
     let mut worst = f32::NEG_INFINITY;
     for k in corners {
         let (p, n) = (body.positions[k as usize], body.normals[k as usize]);
-        let out = outside_cloth(&surfaces, &skin, p, n);
+        let out = uncovered(&surfaces, &skin, p, n);
         worst = worst.max(out);
         if out > POKE {
             count += 1;
@@ -875,7 +888,8 @@ fn gate(stance: Stance, known: &[Known]) {
 //   and the side band under it.
 // - The test tee with the arms raised: 2 bodies, 5.1 mm (every body, 16
 //   mm, at wave 3), at the base of the neck; back at its first wave-4
-//   value for the same reason. The bra through it: 2 bodies, 3.6 mm.
+//   value for the same reason. The bra through it: none since it is
+//   hidden under the tee (2 bodies, 3.6 mm before).
 // - Holes (`HOLES`): none. Every pose of the gate checks them.
 // - The boxer briefs: none. The masculine heavy-soft body's one corner
 //   (13.3 mm at rest, 17.9 mm in the walk) was skin beside the leg
@@ -911,7 +925,24 @@ fn garments_cover_the_cast_walking() {
                 garment: BRA_THROUGH_TEE,
                 pose: "Walk@18",
                 cases: 21,
-                worst: 0.0174,
+                // 17.4 mm before the forearms were turned at ease
+                // (2026-11-24): the walk's arms hang a little otherwise.
+                // 17.6 mm before the bra was hidden where it is well
+                // under the tee (the same evening: it borrows the body's
+                // texture coordinates).
+                worst: 0.0153,
+            },
+            // Since the tee has a cover map (ADR-0045): at the widest
+            // swing a few hidden corners of the side and the arm have no
+            // cloth over them (the cloth bridging the arm and the side
+            // follows the arm back), on six bodies.
+            Known {
+                garment: HOLES,
+                pose: "Walk@18",
+                cases: 6,
+                // 10.3 mm before hidden skin was tried in the fit's
+                // poses (`cover::Proof`).
+                worst: 0.0088,
             },
         ],
     );
@@ -931,14 +962,11 @@ fn garments_cover_the_cast_with_the_arms_raised() {
                 garment: "TestTee",
                 pose: "ArmsRaised",
                 cases: 2,
-                worst: 0.0052,
+                // 5.2 mm before its cover map hid the skin under it.
+                worst: 0.0038,
             },
-            Known {
-                garment: BRA_THROUGH_TEE,
-                pose: "ArmsRaised",
-                cases: 2,
-                worst: 0.0036,
-            },
+            // The bra through it (2 bodies, 3.6 mm) went when the bra
+            // was hidden where it is well under the tee.
         ],
     );
 }

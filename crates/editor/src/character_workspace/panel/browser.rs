@@ -1,25 +1,26 @@
 //! The Hair and Clothing pages as browsers (R6 CO25, R7 CO26; brief §7.1,
-//! §8.2): a search field, the page's slots as categories, filters (kind,
-//! "Recolourable", "Fits this body", favourites, "Show drafts"), a row of
-//! the items worn last and picture tiles of the character wearing each
-//! item. Hovering a tile, or clicking it, shows it on the character
-//! without wearing it; "Wear" (or a double click) wears it as one undo
-//! step. Above the tiles, the worn items' own controls (`worn.rs`). What
-//! is listed is `browser::list`; this only draws it and returns intents.
+//! §8.2): a search field with a "Filters" menu beside it (the kind,
+//! "Recolourable", "Fits this body", favourites and who a garment is cut
+//! for; the button says how many are changed), the page's slots as one row
+//! of categories, the worn items folded to a line each (`worn.rs`), a row
+//! of the items worn last and picture tiles of the character wearing each
+//! item, as many across as fit the panel. Hovering a tile shows it on the
+//! character without wearing it; a click wears it as one undo step, and a
+//! click on the worn tile takes it off. What is listed is `browser::list`;
+//! this only draws it and returns intents.
 
 use axcenity_avatar::{BaseManifest, Library};
 use eframe::egui::{self, Sense, vec2};
 
-use super::super::browser::{self, Browse, Entry, Filters, Pick, Shelf};
+use super::super::browser::{self, Browse, Browser, Cut, Entry, Filters, Listing, Pick, Shelf};
 use super::super::intent::Intent;
 use super::super::{CharacterWorkspace, nav};
 use super::{wardrobe, worn};
 use crate::theme::{self, icons};
 use crate::widgets;
 
-/// Tiles across the panel.
-const COLUMNS: usize = 3;
-const GAP: f32 = 6.0;
+/// The room between tiles.
+pub(super) const GAP: f32 = 6.0;
 
 /// What a tile shows and was asked.
 struct Tile<'a> {
@@ -28,9 +29,14 @@ struct Tile<'a> {
     /// The picture's key in the workspace (an item ID, or `""` + a slot).
     picture: String,
     draft: bool,
+    /// The item is worn (the "nothing" tile: nothing is worn there).
     worn: bool,
     favourite: Option<bool>,
+    /// The tile previewed on the character (the pointer is on it).
     trying: bool,
+    /// What a click on it wears (`None`: nothing in its slot), when a
+    /// click changes anything.
+    click: Option<Option<String>>,
     tip: String,
 }
 
@@ -39,7 +45,6 @@ struct Tile<'a> {
 struct Touched {
     hovered: bool,
     clicked: bool,
-    double_clicked: bool,
     star: bool,
 }
 
@@ -56,7 +61,6 @@ pub(super) fn page(
     base: &BaseManifest,
     shelf: Shelf,
 ) -> Vec<Intent> {
-    let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     let description = workspace.description();
     let state = &workspace.browser;
@@ -76,15 +80,6 @@ pub(super) fn page(
         (changed != filters).then_some(Intent::Browse(Browse::Filters(shelf, changed)))
     };
 
-    for (slot, item) in &listing.body_type_wears {
-        ui.label(
-            egui::RichText::new(format!("{slot}: {item}, which comes with the body type."))
-                .color(palette.text_weak),
-        );
-    }
-    if !listing.body_type_wears.is_empty() {
-        ui.add_space(6.0);
-    }
     if listing.slots.is_empty() {
         nothing_offered(ui, shelf);
         return intents;
@@ -106,30 +101,38 @@ pub(super) fn page(
         if widgets::segmented_tips(ui, &mut shown, &options, &tips).0 {
             intents.push(Intent::Browse(Browse::Online(shown)));
         }
-        ui.add_space(6.0);
+        ui.add_space(2.0);
     }
     if !online && listing.offered == 0 && listing.entries.is_empty() {
         nothing_offered(ui, shelf);
         return intents;
     }
 
-    // Search.
+    // Search, and the filters in a menu beside it.
     let mut search = filters.search.clone();
-    let width = (ui.available_width() - widgets::SEARCH_FIELD_MARGINS).max(60.0);
     let hint = match shelf {
         Shelf::Hair => "Search hairstyles",
         Shelf::Clothing if online => "Search the wardrobe",
         Shelf::Clothing => "Search clothes",
     };
-    widgets::search_field(ui, &mut search, hint, width);
+    // One row: the button at its end, the field in what it leaves.
+    ui.allocate_ui_with_layout(
+        vec2(ui.available_width(), theme::size::BUTTON_HEIGHT),
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            intents.extend(filters_menu(ui, shelf, &filters, &listing, online));
+            let width = ui.available_width();
+            widgets::search_field_sized(ui, &mut search, hint, width, theme::size::BUTTON_HEIGHT);
+        },
+    );
     if search != filters.search {
         intents.extend(set(&|f| f.search = search.clone()));
     }
-    ui.add_space(4.0);
 
     // The page's slots, as categories.
     if listing.slots.len() > 1 {
         ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
             if widgets::chip(ui, "All", filters.slot.is_none()).clicked() {
                 intents.extend(set(&|f| f.slot = None));
             }
@@ -146,103 +149,65 @@ pub(super) fn page(
                 }
             }
         });
-        ui.add_space(2.0);
     }
+
     if online {
-        // The search and the category above narrow the wardrobe too.
+        // The search, the category and the cut above narrow the wardrobe
+        // too.
         intents.extend(wardrobe::section(ui, workspace, base, &filters));
         return intents;
     }
 
-    // Filters.
-    ui.horizontal_wrapped(|ui| {
-        if !listing.kinds.is_empty() {
-            let current = filters
-                .kind
-                .clone()
-                .unwrap_or_else(|| "Any kind".to_owned());
-            egui::ComboBox::from_id_salt(("browser kind", shelf as u8))
-                .selected_text(capitalised(&current))
-                .width(96.0)
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_label(filters.kind.is_none(), "Any kind")
-                        .clicked()
-                    {
-                        intents.extend(set(&|f| f.kind = None));
-                    }
-                    for kind in &listing.kinds {
-                        let on = filters.kind.as_deref() == Some(kind.as_str());
-                        if ui.selectable_label(on, capitalised(kind)).clicked() {
-                            let kind = kind.clone();
-                            intents.extend(set(&|f| f.kind = Some(kind.clone())));
-                        }
-                    }
-                })
-                .response
-                .on_hover_text("Show one kind only (the items' tags)");
-        }
-        if widgets::chip(ui, "Recolourable", filters.recolourable)
-            .on_hover_text("Only items whose colours you can change")
-            .clicked()
-        {
-            intents.extend(set(&|f| f.recolourable = !f.recolourable));
-        }
-        if widgets::chip(ui, "Fits this body", filters.fits)
-            .on_hover_text("Hide items whose maker says they don't fit this body's shape")
-            .clicked()
-        {
-            intents.extend(set(&|f| f.fits = !f.fits));
-        }
-        if widgets::chip(
-            ui,
-            &format!("{} Favourites", theme::filled_icons::STAR),
-            filters.favourites,
-        )
-        .on_hover_text("Only your favourites")
-        .clicked()
-        {
-            intents.extend(set(&|f| f.favourites = !f.favourites));
-        }
-    });
-    let mut drafts = state.show_drafts;
-    let label = if listing.hidden_drafts > 0 {
-        format!("Show drafts ({} hidden)", listing.hidden_drafts)
-    } else {
-        "Show drafts".to_owned()
-    };
-    if ui
-        .checkbox(&mut drafts, label)
-        .on_hover_text(
-            "Drafts haven't passed the quality checks yet. They're marked \"Draft\" and never \
-             used by presets or Randomize.",
-        )
-        .changed()
-    {
-        intents.push(Intent::Browse(Browse::ShowDrafts(drafts)));
-    }
-    ui.add_space(4.0);
-
-    // What is being tried on, and the way to wear it. The bar is always
-    // there (a hint when nothing is picked), so picking a tile never moves
-    // the tiles under a still pointer: the tile above would be hovered.
-    intents.extend(trying_bar(ui, library, base, state.selected.as_ref()));
-
-    // The worn items' own controls (colours, variants, parameters), above
-    // the tiles so they're seen without scrolling; each folds away.
-    for worn in &description.items {
-        let Some(item) = library.item(&worn.id) else {
-            continue;
+    // "Show drafts" is a choice only where there are finished items to
+    // show without them: a page of drafts alone lists them.
+    if listing.finished > 0 && listing.drafts > 0 {
+        let mut drafts = state.show_drafts;
+        let label = if listing.hidden_drafts > 0 {
+            format!("Show drafts ({} hidden)", listing.hidden_drafts)
+        } else {
+            "Show drafts".to_owned()
         };
-        let on_page = listing.slots.iter().any(|slot| slot.id == item.slot);
-        let in_filter = filters.slot.as_ref().is_none_or(|slot| *slot == item.slot);
-        // An item with nothing to change and nothing to say has no section:
-        // its tile says it's worn.
-        let says = !browser::Declared::of(item).is_empty() || !item.limitations.is_empty();
-        if on_page && in_filter && says {
-            intents.extend(worn::controls(ui, item, worn, workspace.selection.level));
-            ui.add_space(6.0);
+        if ui
+            .checkbox(&mut drafts, label)
+            .on_hover_text(
+                "Drafts haven't passed the quality checks yet. They're marked \"Draft\" and \
+                 never used by presets or Randomize.",
+            )
+            .changed()
+        {
+            intents.push(Intent::Browse(Browse::ShowDrafts(drafts)));
         }
+    }
+
+    // The worn items, a line each above the tiles so they're seen without
+    // scrolling: its name, the way to take it off and, unfolded, its own
+    // controls (colours, variants, parameters).
+    let worn_here: Vec<_> = description
+        .items
+        .iter()
+        .filter_map(|worn| Some((library.item(&worn.id)?, worn)))
+        .filter(|(item, _)| listing.slots.iter().any(|slot| slot.id == item.slot))
+        .filter(|(item, _)| filters.slot.as_ref().is_none_or(|slot| *slot == item.slot))
+        .collect();
+    if !worn_here.is_empty() {
+        ui.add_space(2.0);
+        widgets::section_label(ui, "Wearing");
+        for (item, worn) in worn_here {
+            let slot = listing
+                .slots
+                .iter()
+                .find(|slot| slot.id == item.slot)
+                .map_or(item.slot.as_str(), |slot| slot.label.as_str());
+            intents.extend(worn::controls(
+                ui,
+                item,
+                worn,
+                slot,
+                workspace.selection.level,
+                state.unfolded.contains(&item.id),
+            ));
+        }
+        ui.add_space(4.0);
     }
 
     let mut hovered: Option<Pick> = None;
@@ -251,27 +216,32 @@ pub(super) fn page(
         let tiles: Vec<Tile> = listing
             .recent
             .iter()
-            .map(|entry| item_tile(entry, state.trying()))
+            .map(|entry| item_tile(entry, state))
             .collect();
         intents.extend(grid(ui, workspace, "recent", &tiles, &mut hovered));
-        ui.add_space(6.0);
+        ui.add_space(4.0);
     }
 
     if listing.entries.is_empty() {
         let sentence = if filters.narrowed() {
             "Nothing matches. Clear the search or a filter."
         } else if listing.hidden_drafts > 0 {
-            "Everything here is still a draft. Turn on Show drafts to see them."
+            "What fits here is still a draft. Turn on Show drafts to see it."
         } else {
             "Nothing in the library fits this body here yet."
         };
-        widgets::empty_state(
+        let clear = filters
+            .narrowed()
+            .then_some((icons::X, "Clear the search and filters"));
+        if widgets::empty_state(
             ui,
             icons::MAGNIFYING_GLASS,
             "Nothing to show",
             sentence,
-            None,
-        );
+            clear,
+        ) {
+            intents.extend(set(&|f| *f = Filters::default()));
+        }
     }
     // By slot, each with its "nothing worn" tile first (on the whole list).
     for slot in &listing.slots {
@@ -307,15 +277,22 @@ pub(super) fn page(
                 draft: false,
                 worn: !worn_here,
                 favourite: None,
-                tip: format!("Wear nothing here ({none})"),
+                // Nothing to take off where nothing is worn.
+                click: worn_here.then_some(None),
+                tip: if worn_here {
+                    format!("Click to wear nothing here ({none})")
+                } else {
+                    format!("Nothing is worn here ({none})")
+                },
             });
         }
-        tiles.extend(entries.iter().map(|entry| item_tile(entry, state.trying())));
+        tiles.extend(entries.iter().map(|entry| item_tile(entry, state)));
         intents.extend(grid(ui, workspace, &slot.id, &tiles, &mut hovered));
-        ui.add_space(8.0);
+        ui.add_space(4.0);
     }
     // After Esc or a click the tiles can shift under a still pointer (the
-    // worn controls change), so a muted tile waits for the pointer to move.
+    // worn items' lines change), so a muted tile waits for the pointer to
+    // move.
     let moved = ui.input(|input| input.pointer.delta() != egui::Vec2::ZERO);
     if state.hover_changed(&hovered, moved) {
         intents.push(Intent::Browse(Browse::Hover(hovered)));
@@ -324,8 +301,125 @@ pub(super) fn page(
     intents
 }
 
+/// How many of a page's filters (the "Filters" menu's: not the search or
+/// the category) differ from what the page opens with. `online`: the
+/// wardrobe's page, which only the cut narrows.
+fn filters_changed(filters: &Filters, online: bool) -> usize {
+    let default = Filters::default();
+    let cut = usize::from(filters.cut != default.cut);
+    if online {
+        return cut;
+    }
+    cut + usize::from(filters.kind.is_some())
+        + usize::from(filters.recolourable != default.recolourable)
+        + usize::from(filters.fits != default.fits)
+        + usize::from(filters.favourites != default.favourites)
+}
+
+/// The "Filters" menu beside the search field: "Recolourable", "Fits this
+/// body", favourites, the kind (one of the listed items' tags) and who a
+/// garment is cut for. Its button says how many are changed; the menu
+/// stays open while they're picked.
+fn filters_menu(
+    ui: &mut egui::Ui,
+    shelf: Shelf,
+    filters: &Filters,
+    listing: &Listing,
+    online: bool,
+) -> Vec<Intent> {
+    use egui::containers::menu;
+    let palette = theme::palette(ui.ctx());
+    let mut intents = Vec::new();
+    let mut changed = filters.clone();
+    let count = filters_changed(filters, online);
+    let label = if count == 0 {
+        "Filters".to_owned()
+    } else {
+        format!("Filters · {count}")
+    };
+    let button = widgets::button(
+        widgets::Role::Secondary,
+        Some(icons::FUNNEL),
+        &label,
+        &palette,
+    );
+    let config =
+        menu::MenuConfig::new().close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+    let (response, _) = menu::MenuButton::from_button(button)
+        .config(config)
+        .ui(ui, |ui| {
+            ui.set_min_width(190.0);
+            if !online {
+                ui.checkbox(&mut changed.fits, "Fits this body")
+                    .on_hover_text("Hide items whose maker says they don't fit this body's shape");
+                ui.checkbox(&mut changed.recolourable, "Recolourable")
+                    .on_hover_text("Only items whose colours you can change");
+                ui.checkbox(
+                    &mut changed.favourites,
+                    format!("{} Favourites", theme::filled_icons::STAR),
+                )
+                .on_hover_text("Only your favourites");
+            }
+            // Whose clothes: the character's frame's, one frame's, or all.
+            if listing.cuts || online {
+                if !online {
+                    ui.add_space(4.0);
+                }
+                widgets::section_label(ui, "Cut for");
+                for cut in Cut::ALL {
+                    ui.radio_value(&mut changed.cut, cut, cut.label())
+                        .on_hover_text(cut.about());
+                }
+            }
+            if !online && !listing.kinds.is_empty() {
+                ui.add_space(4.0);
+                widgets::section_label(ui, "Kind");
+                egui::ScrollArea::vertical()
+                    .id_salt(("browser kinds", shelf as u8))
+                    .max_height(180.0)
+                    .show(ui, |ui| {
+                        ui.radio_value(&mut changed.kind, None, "Any kind")
+                            .on_hover_text("Every kind (the items' tags)");
+                        for kind in &listing.kinds {
+                            ui.radio_value(
+                                &mut changed.kind,
+                                Some(kind.clone()),
+                                capitalised(kind),
+                            );
+                        }
+                    });
+            }
+            if count > 0 {
+                ui.add_space(4.0);
+                if ui
+                    .button("Reset filters")
+                    .on_hover_text("Back to what the page opens with")
+                    .clicked()
+                {
+                    let default = Filters::default();
+                    changed = Filters {
+                        search: changed.search.clone(),
+                        slot: changed.slot.clone(),
+                        ..default
+                    };
+                }
+            }
+        });
+    response.on_hover_text(if count == 0 {
+        "Narrow the list: what fits, what can be recoloured, favourites, kinds".to_owned()
+    } else if count == 1 {
+        "1 filter is changed from what the page opens with".to_owned()
+    } else {
+        format!("{count} filters are changed from what the page opens with")
+    });
+    if changed != *filters {
+        intents.push(Intent::Browse(Browse::Filters(shelf, changed)));
+    }
+    intents
+}
+
 /// A tile for `entry`.
-fn item_tile<'a>(entry: &'a Entry, trying: Option<&Pick>) -> Tile<'a> {
+fn item_tile<'a>(entry: &'a Entry, state: &Browser) -> Tile<'a> {
     let pick = Pick {
         slot: entry.item.slot.clone(),
         item: Some(entry.item.id.clone()),
@@ -352,91 +446,23 @@ fn item_tile<'a>(entry: &'a Entry, trying: Option<&Pick>) -> Tile<'a> {
         ));
     }
     tip.push_str(if entry.worn {
-        "\nWorn."
+        "\nWorn. Click to take it off."
     } else {
-        "\nClick to try it on; double-click to wear it."
+        "\nClick to wear it."
     });
     Tile {
-        trying: trying == Some(&pick),
+        trying: state.trying() == Some(&pick),
         pick,
         label: &entry.item.label,
         picture: entry.item.id.clone(),
         draft: entry.draft,
         worn: entry.worn,
         favourite: Some(entry.favourite),
+        // A click wears it; a click on what is worn takes it off (one
+        // undo step either way).
+        click: Some((!entry.worn).then(|| entry.item.id.clone())),
         tip,
     }
-}
-
-/// "Trying on X": Wear and Cancel.
-fn trying_bar(
-    ui: &mut egui::Ui,
-    library: &Library,
-    base: &BaseManifest,
-    pick: Option<&Pick>,
-) -> Vec<Intent> {
-    let palette = theme::palette(ui.ctx());
-    let mut intents = Vec::new();
-    let label = pick.map(|pick| match &pick.item {
-        Some(id) => library
-            .item(id)
-            .map_or_else(|| id.clone(), |item| item.label.clone()),
-        None => base
-            .slot(&pick.slot)
-            .and_then(|slot| slot.empty_label.clone())
-            .unwrap_or_else(|| "Nothing".to_owned()),
-    });
-    egui::Frame::new()
-        .fill(palette.inset)
-        .corner_radius(theme::radius::CARD)
-        .inner_margin(egui::Margin::symmetric(8, 6))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                // The same widgets either way, so the bar keeps its height.
-                match &label {
-                    Some(label) => ui
-                        .label(
-                            egui::RichText::new(format!("Trying on {label}"))
-                                .color(palette.text_strong),
-                        )
-                        .on_hover_text(
-                            "Shown on the character only: nothing is changed until you wear it",
-                        ),
-                    None => ui.label(
-                        egui::RichText::new("Point at a tile to try it on")
-                            .color(palette.text_muted),
-                    ),
-                };
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let wear = ui
-                        .add_enabled(
-                            pick.is_some(),
-                            widgets::button(
-                                widgets::Role::Primary,
-                                Some(icons::CHECK),
-                                "Wear",
-                                &palette,
-                            ),
-                        )
-                        .on_hover_text("Wear it (you can undo it)")
-                        .on_disabled_hover_text("Click a tile first");
-                    if let Some(pick) = pick.filter(|_| wear.clicked()) {
-                        intents.push(Intent::Wear {
-                            slot: pick.slot.clone(),
-                            item: pick.item.clone(),
-                        });
-                    }
-                    let back = ui.add_enabled_ui(pick.is_some(), |ui| {
-                        widgets::icon_button(ui, icons::X, "Put it back (Esc)", false)
-                    });
-                    if back.inner.clicked() {
-                        intents.push(Intent::EndPreview);
-                    }
-                });
-            });
-        });
-    ui.add_space(6.0);
-    intents
 }
 
 /// Lays `tiles` out in rows; notes the tile hovered in `hovered`.
@@ -461,8 +487,9 @@ fn grid_rows(
     hovered: &mut Option<Pick>,
 ) -> Vec<Intent> {
     let mut intents = Vec::new();
-    let width = ((ui.available_width() - GAP * (COLUMNS as f32 - 1.0)) / COLUMNS as f32).floor();
-    for row in tiles.chunks(COLUMNS) {
+    let columns = super::tile_columns(ui.available_width(), GAP);
+    let width = ((ui.available_width() - GAP * (columns as f32 - 1.0)) / columns as f32).floor();
+    for row in tiles.chunks(columns) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = GAP;
             for tile in row {
@@ -474,15 +501,16 @@ fn grid_rows(
                     if let Some(id) = &tile.pick.item {
                         intents.push(Intent::ToggleItemFavourite(id.clone()));
                     }
-                } else if touched.double_clicked {
+                } else if touched.clicked
+                    && let Some(item) = &tile.click
+                {
+                    // The clicked tile is under the pointer still: it
+                    // isn't previewed again until the pointer moves off.
+                    intents.push(Intent::Browse(Browse::Clicked(tile.pick.clone())));
                     intents.push(Intent::Wear {
                         slot: tile.pick.slot.clone(),
-                        item: tile.pick.item.clone(),
+                        item: item.clone(),
                     });
-                } else if touched.clicked {
-                    // What's worn has nothing to try on.
-                    let pick = (!tile.worn).then(|| tile.pick.clone());
-                    intents.push(Intent::Browse(Browse::Select(pick)));
                 }
             }
         });
@@ -492,7 +520,8 @@ fn grid_rows(
 }
 
 /// One tile: the character wearing it (a placeholder until drawn), its
-/// label, "Draft", a check when worn, a star for favourites.
+/// label, "Draft", an accent border and "Worn" when worn, a star for
+/// favourites.
 fn draw_tile(
     ui: &mut egui::Ui,
     picture: Option<&egui::TextureHandle>,
@@ -508,7 +537,8 @@ fn draw_tile(
     painter.rect_filled(image, theme::radius::CARD, palette.inset);
     match picture {
         Some(texture) => {
-            let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+            // The picture fills the tile, whatever shape it was drawn in.
+            let uv = wardrobe::cropped(texture.size_vec2(), image.size());
             painter.image(texture.id(), image, uv, egui::Color32::WHITE);
         }
         None => {
@@ -555,14 +585,13 @@ fn draw_tile(
     if tile.draft {
         badge("Draft", palette.elevated, palette.warning);
     }
-    if tile.worn {
+    // (The "nothing" tile of an empty slot is lit, not "worn".)
+    if tile.worn && tile.pick.item.is_some() {
         badge(
             &format!("{} Worn", icons::CHECK),
             palette.accent_solid,
             palette.on_accent,
         );
-    } else if tile.trying {
-        badge("Trying on", palette.elevated, palette.text_strong);
     }
     let colour = if tile.worn {
         palette.text_strong
@@ -585,7 +614,6 @@ fn draw_tile(
     let mut touched = Touched {
         hovered,
         clicked: false,
-        double_clicked: response.double_clicked(),
         star: false,
     };
     if let Some(favourite) = tile.favourite {

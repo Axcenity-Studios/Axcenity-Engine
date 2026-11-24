@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Narrow",
+  "base": "axcenity/realistic",
+  "parameters": {
+    "face_length": 0.2,
+    "face_narrow": 0.7,
+    "face_width": -0.8
+  },
+  "preset": {
+    "id": "axcenity/realistic-face-shape-narrow",
+    "kind": "feature",
+    "about": "Narrow across the temples, the cheekbones and the jaw.",
+    "feature": "face_shape",
+    "tags": [
+      "shape"
+    ],
+    "order": 60
+  }
+}

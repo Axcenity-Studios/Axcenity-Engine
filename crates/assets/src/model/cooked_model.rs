@@ -199,6 +199,7 @@ fn encode_primitive(out: &mut Output, images: &mut Images, primitive: &Primitive
         uvs,
         tangents,
         regions,
+        skin_uvs,
         indices,
         material,
         joints,
@@ -213,6 +214,7 @@ fn encode_primitive(out: &mut Output, images: &mut Images, primitive: &Primitive
     out.array(tangents);
     out.u32(regions.len() as u32);
     out.0.extend_from_slice(regions);
+    out.array(skin_uvs);
     out.u32s(indices);
     out.u32(joints.len() as u32);
     for joint in joints {
@@ -645,6 +647,7 @@ fn whole(primitive: &Primitive) -> bool {
         && fits(primitive.uvs.len())
         && fits(primitive.tangents.len())
         && fits(primitive.regions.len())
+        && fits(primitive.skin_uvs.len())
         && fits(primitive.joints.len())
         && primitive.weights.len() == primitive.joints.len()
 }
@@ -656,6 +659,7 @@ fn decode_primitive(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Prim
     let tangents = input.array()?;
     let region_count = input.count(1)?;
     let regions = input.take(region_count)?.to_vec();
+    let skin_uvs = input.array()?;
     let indices = input.u32s()?;
     let corners = positions.len();
     if indices.iter().any(|&index| index as usize >= corners) {
@@ -708,6 +712,7 @@ fn decode_primitive(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Prim
         uvs,
         tangents,
         regions,
+        skin_uvs,
         indices,
         material,
         joints,
@@ -951,13 +956,14 @@ mod tests {
         fn describe_primitive(out: &mut String, primitive: &Primitive) {
             let material = &primitive.material;
             out.push_str(&format!(
-                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {:?} {} {}
+                "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {} | {} {:?} {:?} {} {} {:?} {} {} {} {} {} {} {:?} {} {:?} {} {:?} {:?} {} {}
 ",
                 primitive.positions,
                 primitive.normals,
                 primitive.uvs,
                 primitive.tangents,
                 primitive.regions,
+                primitive.skin_uvs,
                 primitive.indices,
                 primitive.joints,
                 primitive.weights,

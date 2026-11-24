@@ -85,6 +85,47 @@ impl Coverage {
 /// The coverage of the garment `surface` (at rest, over the body at
 /// rest) of `body`'s regions (`regions`, one per body triangle).
 pub fn coverage(body: &BodyMesh, regions: &[u8], surface: &Surface) -> Coverage {
+    let under = under_cloth(body, regions, surface, true);
+    let mut covered: BTreeMap<u8, (usize, usize)> = BTreeMap::new();
+    for (&region, under) in regions.iter().zip(&under) {
+        if region == 0 {
+            continue;
+        }
+        let entry = covered.entry(region).or_default();
+        entry.1 += 1;
+        if under.is_some() {
+            entry.0 += 1;
+        }
+    }
+    Coverage {
+        shares: covered
+            .into_iter()
+            .map(|(region, (yes, all))| (region, yes as f32 / all.max(1) as f32))
+            .collect(),
+    }
+}
+
+/// A body triangle under a garment: how far the cloth stands off its
+/// middle (metres), and the cloth's triangle and the point on it nearest
+/// the middle (`None` for one only shut in a crease: no cloth is its own).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Under {
+    pub gap: f32,
+    pub cloth: Option<(u32, Vec3)>,
+}
+
+/// Which body triangles lie under the garment `surface` (both at rest):
+/// for each, how far the cloth stands off its middle (metres) and the
+/// cloth's triangle and the point on it nearest the middle, or `None`
+/// when it isn't covered. A triangle with no region (0) never is. With
+/// `creases`, one in a crease the garment closes over
+/// ([`closed_creases`]) is too, at 0 and with no cloth of its own.
+pub(super) fn under_cloth(
+    body: &BodyMesh,
+    regions: &[u8],
+    surface: &Surface,
+    creases: bool,
+) -> Vec<Option<Under>> {
     let weld = welded(&surface.positions);
     let open = open_edges(&weld, &surface.triangles);
     let middles: Vec<(Vec3, Vec3)> = body
@@ -100,53 +141,51 @@ pub fn coverage(body: &BodyMesh, regions: &[u8], surface: &Surface) -> Coverage 
             ((corners[0] + corners[1] + corners[2]) / 3.0, normal)
         })
         .collect();
-    let mut under: Vec<bool> = middles
+    let mut gaps: Vec<Option<Under>> = middles
         .iter()
         .zip(regions)
         .map(|((middle, normal), &region)| {
-            region != 0 && covers(surface, &weld, &open, *middle, *normal)
+            if region == 0 {
+                return None;
+            }
+            covers(surface, &weld, &open, *middle, *normal).map(|(gap, triangle, bary)| Under {
+                gap,
+                cloth: Some((triangle, bary)),
+            })
         })
         .collect();
-    for (t, closed) in closed_creases(body, surface, regions, &middles, &under)
-        .into_iter()
-        .enumerate()
-    {
-        under[t] |= closed;
-    }
-    let mut covered: BTreeMap<u8, (usize, usize)> = BTreeMap::new();
-    for (&region, &under) in regions.iter().zip(&under) {
-        if region == 0 {
-            continue;
-        }
-        let entry = covered.entry(region).or_default();
-        entry.1 += 1;
-        if under {
-            entry.0 += 1;
-        }
-    }
-    Coverage {
-        shares: covered
+    if creases {
+        let under: Vec<bool> = gaps.iter().map(Option::is_some).collect();
+        for (t, closed) in closed_creases(body, surface, regions, &middles, &under)
             .into_iter()
-            .map(|(region, (yes, all))| (region, yes as f32 / all.max(1) as f32))
-            .collect(),
+            .enumerate()
+        {
+            if closed && gaps[t].is_none() {
+                gaps[t] = Some(Under {
+                    gap: 0.0,
+                    cloth: None,
+                });
+            }
+        }
     }
+    gaps
 }
 
+/// How far the garment stands off the skin at `middle` when it covers
+/// it, and the cloth's triangle and the point on it nearest `middle`.
 fn covers(
     surface: &Surface,
     weld: &[u32],
     open: &BTreeSet<(u32, u32)>,
     middle: Vec3,
     normal: Vec3,
-) -> bool {
-    let Some(hit) = surface.closest(middle, COVER_REACH) else {
-        return false;
-    };
+) -> Option<(f32, u32, Vec3)> {
+    let hit = surface.closest(middle, COVER_REACH)?;
     let away = hit.point - middle;
     // The garment must be out along the skin's normal from here, not
     // beside it.
     if away.length() > 1e-4 && away.normalize().dot(normal) < 0.5 {
-        return false;
+        return None;
     }
     // On one of the garment's open edges: past its hem.
     let tri = surface.triangles[hit.triangle as usize].map(|v| weld[v as usize]);
@@ -155,11 +194,11 @@ fn covers(
         if b[k] < 1e-4 {
             let (u, v) = (tri[(k + 1) % 3], tri[(k + 2) % 3]);
             if open.contains(&(u.min(v), u.max(v))) {
-                return false;
+                return None;
             }
         }
     }
-    true
+    Some((away.length(), hit.triangle, hit.bary))
 }
 
 /// Skin in a crease the garment closes over (the armpit under a sleeve):
@@ -259,7 +298,7 @@ fn open_edges(weld: &[u32], triangles: &[[u32; 3]]) -> BTreeSet<(u32, u32)> {
 
 /// Each corner's first corner at the same place (within a hundredth of a
 /// millimetre).
-fn welded(positions: &[Vec3]) -> Vec<u32> {
+pub(super) fn welded(positions: &[Vec3]) -> Vec<u32> {
     let mut first: BTreeMap<[i64; 3], u32> = BTreeMap::new();
     positions
         .iter()

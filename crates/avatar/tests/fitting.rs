@@ -117,6 +117,12 @@ fn request(root: &Path, id: &str, under: &[&str]) -> ImportRequest {
         under: under.iter().map(|s| (*s).to_owned()).collect(),
         about: Some("A test garment for the import flow (a draft).".to_owned()),
         finish_pose: Some(finish_pose),
+        also_fills: Vec::new(),
+        tags: Vec::new(),
+        limitations: Vec::new(),
+        intake: None,
+        texture_size: None,
+        worn_with: None,
     }
 }
 
