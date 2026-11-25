@@ -10,6 +10,7 @@ pub use axcenity_render_types::{
     RealtimeGiTier, ReflectionQuality, ShadowMapSize, ShadowQuality, SpotShadowMapSize,
     TEXTURE_BUDGET_RANGE, TextureQuality,
 };
+pub use axcenity_render_types::{MESH_BUDGET_SHARE, texture_budget_for, whole_gib};
 
 /// The formats of the scene's HDR color and its depth, which multisampling
 /// must work for. Must match `HDR_FORMAT` and `DEPTH_FORMAT` in the renderer.
@@ -19,7 +20,9 @@ pub(crate) const SCENE_FORMATS: [wgpu::TextureFormat; 2] = [
 ];
 
 /// Reads what `device` can do: its limits and features. `adapter` (when
-/// known) says whether it draws in software.
+/// known) says whether it draws in software and which card it is; without
+/// it, the card's memory is that of the card a device was last opened on
+/// (`adapters::opened_card_memory`).
 pub fn read_capabilities(
     device: &wgpu::Device,
     adapter: Option<&wgpu::AdapterInfo>,
@@ -43,6 +46,10 @@ pub fn read_capabilities(
             .features()
             .contains(wgpu::Features::EXPERIMENTAL_RAY_QUERY)
             || crate::adapters::adapter_can_ray_trace(),
+        video_memory: match adapter {
+            Some(info) => crate::video_memory::of(info),
+            None => crate::adapters::opened_card_memory(),
+        },
     }
 }
 

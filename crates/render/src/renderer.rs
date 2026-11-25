@@ -96,6 +96,7 @@ mod terrain;
 pub(crate) mod text;
 mod texture_budget;
 mod ui_pass;
+mod undrawn;
 mod uploads;
 mod water;
 
@@ -241,6 +242,15 @@ pub struct RenderStats {
     pub texture_bytes: u64,
     /// Bytes of mesh vertices and indices on the GPU, counted the same way.
     pub mesh_bytes: u64,
+    /// What `texture_bytes` would be with no level left out to fit the
+    /// texture memory budget: more than the budget when a scene's
+    /// textures don't fit it ([`RenderStats::memory_warnings`]).
+    pub texture_bytes_wanted: u64,
+    /// How many meshes and textures have been freed to fit the memory
+    /// budgets since the renderer was made or its graphics settings last
+    /// changed, in a renderer that keeps what stops being drawn
+    /// (`set_keep_undrawn`).
+    pub freed_for_budget: u64,
     /// Bytes of the frame's own targets: HDR, depth, MSAA, bloom, FXAA,
     /// prepass and ambient occlusion targets, the shadow maps, the sky's
     /// environment maps and sky image, and the turned-text sheet.
@@ -424,6 +434,16 @@ impl Renderer {
         self.scene.set_background_uploads(on);
     }
 
+    /// While on, meshes and color textures that stop being drawn stay on
+    /// the GPU as long as they fit `EffectiveGraphics::mesh_budget` and
+    /// `texture_budget`, the least recently drawn leaving first past them;
+    /// off (the default), they leave after ten seconds undrawn. For a
+    /// renderer that shows a world to someone: looking back at what was
+    /// left a while ago then uploads nothing, so the frame doesn't stall.
+    pub fn set_keep_undrawn(&mut self, on: bool) {
+        self.scene.keep_undrawn = on;
+    }
+
     /// How many background uploads are still on their way.
     pub fn pending_uploads(&self) -> usize {
         self.scene.pending_uploads()
@@ -595,6 +615,11 @@ impl TextureRenderer {
     /// See [`Renderer::set_background_uploads`].
     pub fn set_background_uploads(&mut self, on: bool) {
         self.scene.set_background_uploads(on);
+    }
+
+    /// See [`Renderer::set_keep_undrawn`].
+    pub fn set_keep_undrawn(&mut self, on: bool) {
+        self.scene.keep_undrawn = on;
     }
 
     /// See [`Renderer::pending_uploads`].

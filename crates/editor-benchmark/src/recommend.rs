@@ -8,7 +8,7 @@
 //! GPU-bound machine gets a lower render scale. The texture memory budget
 //! follows the card's memory where the system reports it.
 
-use axcenity_render::{GraphicsSettings, ShadowQuality};
+use axcenity_render::{GraphicsSettings, ShadowQuality, texture_budget_for, whole_gib};
 
 use super::report::{Measurement, Recommendation, Report, Tier};
 use super::workloads::Workload;
@@ -119,22 +119,6 @@ fn render_scale_for(measurement: &Measurement) -> Option<f32> {
     let wanted = current * (FRAME_BUDGET_MS / gpu).sqrt();
     let wanted = ((wanted * 20.0).floor() / 20.0).max(MIN_RENDER_SCALE);
     (wanted < current).then_some(wanted)
-}
-
-/// The texture memory budget for a card with `video_memory` bytes: a
-/// quarter of it in MiB, rounded down to a power of two, between 256 MiB
-/// and 8 GiB. The memory is first rounded to whole GiB, as a "16 GB" card
-/// reports a little less (15.9 GiB on an RX 9070 XT).
-pub fn texture_budget_for(video_memory: u64) -> u32 {
-    let quarter = (whole_gib(video_memory) * 1024 / 4).max(1);
-    let power = 1u64 << (63 - quarter.leading_zeros());
-    power.clamp(256, 8192) as u32
-}
-
-/// The card's memory as its box says it: rounded to whole GiB, at least 1.
-fn whole_gib(video_memory: u64) -> u64 {
-    const GIB: f64 = (1u64 << 30) as f64;
-    (video_memory as f64 / GIB).round().max(1.0) as u64
 }
 
 /// What Apply sets on top of `current`: the recommendation, keeping the
@@ -289,13 +273,14 @@ pub fn recommend(report: &Report) -> Recommendation {
         (Tier::Performance, settings, title, chosen)
     };
 
-    // The texture budget, from the card's memory.
+    // The texture budget, from the card's memory. With no budget set the
+    // settings already take what the card allows where that is more than
+    // the preset's (`GraphicsSettings::texture_budget_on`), so one is set
+    // here only when the preset asks too much of a small card.
     if let Some(memory) = report.video_memory.filter(|_| !report.adapter.software) {
         let wanted = texture_budget_for(memory);
         let preset = GraphicsSettings::preset(settings.quality).texture_budget();
-        // Lower when the preset asks too much of a small card; higher only
-        // at Maximum Quality, where the card has room to spare.
-        if wanted < preset || (tier == Tier::MaximumQuality && wanted > preset) {
+        if wanted < preset {
             settings.texture_budget = Some(wanted);
             reasons.push(format!(
                 "Textures may use {} of this card's {}: a quarter, leaving the rest for \
@@ -566,22 +551,22 @@ mod tests {
 
     #[test]
     fn the_texture_budget_follows_the_cards_memory() {
-        assert_eq!(texture_budget_for(16 << 30), 4096);
-        // An RX 9070 XT's 16 GB, as Windows reports it.
-        assert_eq!(texture_budget_for(17_095_983_104), 4096);
-        assert_eq!(texture_budget_for(12 << 30), 2048);
-        assert_eq!(texture_budget_for(2 << 30), 512);
-        assert_eq!(texture_budget_for(512 << 20), 256);
-        assert_eq!(texture_budget_for(256 << 30), 8192);
-
-        // A big card at Maximum Quality gets more; a small one at High less.
+        // A big card needs no budget set: without one the settings take a
+        // quarter of its memory themselves.
         let presets = Tier::ALL
             .into_iter()
             .map(|tier| measured(tier, 3.0, &[]))
             .collect();
         let mut big = report(presets);
         big.video_memory = Some(16 << 30);
-        assert_eq!(recommend(&big).settings.texture_budget, Some(4096));
+        let advice = recommend(&big);
+        assert_eq!(advice.settings.texture_budget, None);
+        let card = axcenity_render::Capabilities {
+            video_memory: big.video_memory,
+            ..Default::default()
+        };
+        assert_eq!(advice.settings.texture_budget_on(&card), 4096);
+        // A small one at High gets less than the preset's.
         let mut small = report(vec![
             measured(Tier::Performance, 3.0, &[]),
             measured(Tier::Balanced, 4.0, &[]),
@@ -606,7 +591,7 @@ mod tests {
         let mut report = report(presets);
         report.video_memory = Some(17_095_983_104);
         report.recommendation = recommend(&report);
-        assert_eq!(report.recommendation.settings.texture_budget, Some(4096));
+        assert_eq!(report.recommendation.settings.texture_budget, None);
 
         // The owner's settings on the PC: Ultra, 8 GB of textures and
         // real-time GI. Both are kept; nothing else differs.
@@ -617,12 +602,12 @@ mod tests {
         let applied = apply_to(&current, &report);
         assert_eq!(applied, current);
 
-        // A budget the card can't hold is replaced, and one set by
-        // nobody takes the recommendation's.
+        // A budget the card can't hold is dropped, and one set by nobody
+        // stays unset: either way the settings take the card's own.
         current.texture_budget = Some(16384);
-        assert_eq!(apply_to(&current, &report).texture_budget, Some(4096));
+        assert_eq!(apply_to(&current, &report).texture_budget, None);
         current.texture_budget = None;
-        assert_eq!(apply_to(&current, &report).texture_budget, Some(4096));
+        assert_eq!(apply_to(&current, &report).texture_budget, None);
         // With the card's memory unknown, the owner's budget stands.
         report.video_memory = None;
         current.texture_budget = Some(16384);

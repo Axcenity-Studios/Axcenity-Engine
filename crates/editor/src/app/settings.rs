@@ -245,7 +245,13 @@ impl EditorApp {
                                 SettingsPage::Viewport => self.viewport_page(ui),
                                 SettingsPage::Graphics => {
                                     let capabilities = self.capabilities.unwrap_or_default();
-                                    restart |= graphics_page(ui, &mut self.graphics, &capabilities);
+                                    let drawn = self.last_drawn.map(|drawn| drawn.cost.stats);
+                                    restart |= graphics_page(
+                                        ui,
+                                        &mut self.graphics,
+                                        &capabilities,
+                                        drawn.as_ref(),
+                                    );
                                 }
                                 SettingsPage::Shortcuts => self.shortcuts_page(ui),
                                 SettingsPage::Accessibility => {

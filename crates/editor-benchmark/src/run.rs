@@ -20,8 +20,8 @@ use super::recommend::{self, worth_going_on};
 use super::report::{
     Adapter, Measurement, PassTime, REPORT_VERSION, Recommendation, Report, Tier, Timing,
 };
-use super::video_memory;
 use super::workloads::Workload;
+use axcenity_render::video_memory;
 
 /// How many frames each measurement takes.
 #[derive(Clone, Copy, Debug, PartialEq)]

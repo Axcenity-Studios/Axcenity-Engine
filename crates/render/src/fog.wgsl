@@ -3,6 +3,15 @@
 // bindings: each caller passes in its own copy of the fog. See `Fog` in
 // draw_list.rs and renderer/fog.rs, whose `FogRaw` matches `Fog` here.
 // Colors are linear light.
+//
+// The boxes of dust are the exception: they are read one at a time through
+// `fog_dust(i)`, which whoever includes this file defines over its own
+// uniform (lighting.wgsl's `frame.fog`, sprite.wgsl's `sprites.fog`). Never
+// index `dust` on a `Fog` passed by value (`fog.dust[i]` with `fog` an
+// argument): that copies all eight boxes for every box looked at, on every
+// pixel, and cost 50 ms of GPU time a box at 2560 x 1440 on an RX 9070 XT
+// under radv (docs/rendering/performance.md, "Fog boxes read one at a
+// time").
 
 // How far away the sky is taken to be, in studs. Must match
 // `Fog::SKY_DISTANCE` in draw_list.rs.
@@ -114,7 +123,7 @@ fn dust_at(fog: Fog, p: vec3<f32>, dir: vec3<f32>) -> DustAt {
     var at = DustAt(0.0, 1.0, vec3<f32>(0.0), vec3<f32>(0.0));
     let count = min(fog.dust_count.x, MAX_DUST);
     for (var i = 0u; i < count; i++) {
-        let b = fog.dust[i];
+        let b = fog_dust(i);
         if b.color.w > 0.5 {
             let clear = 1.0 - dust_inside(b, p);
             at.keep *= clear;
@@ -228,7 +237,7 @@ fn fogged_along(fog: Fog, eye: vec3<f32>, dir: vec3<f32>, distance: f32, color: 
     let count = min(fog.dust_count.x, MAX_DUST);
     var cleared = 0.0;
     for (var i = 0u; i < count; i++) {
-        let b = fog.dust[i];
+        let b = fog_dust(i);
         if b.color.w > 0.5 {
             let span = dust_span(b, eye, dir, distance);
             if span.y > span.x {
@@ -245,7 +254,7 @@ fn fogged_along(fog: Fog, eye: vec3<f32>, dir: vec3<f32>, distance: f32, color: 
     // The boxes of dust, taken as nearer than the rest of the fog (a room's
     // air, around the camera, in front of the world outside).
     for (var i = 0u; i < count; i++) {
-        let b = fog.dust[i];
+        let b = fog_dust(i);
         if b.params.x <= 0.0 {
             continue;
         }

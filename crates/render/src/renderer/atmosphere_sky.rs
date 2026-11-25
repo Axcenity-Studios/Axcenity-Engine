@@ -169,25 +169,35 @@ fn sky_colors(air: &Air, atmosphere: &Atmosphere, ground_color: Vec3) -> [Vec3; 
 /// The atmosphere's sky as a `SKY_WIDTH` × `SKY_HEIGHT` image's linear rgb
 /// (see `SkyImage`). Below the horizon it fades into `ground` as the
 /// gradient does.
+///
+/// Each column is worked out on its own thread of the renderer's pool: a
+/// moving sun (a time-lapse, a fast day cycle) makes a new sky nearly every
+/// frame, and the 16,000 looks through the air cost 25 to 30 ms on one
+/// thread (docs/rendering/sky.md). The columns come back in order, so the
+/// image is the same however the work was shared.
 fn sky_pixels(air: &Air, atmosphere: &Atmosphere, ground: Vec3) -> Vec<f32> {
     let (width, height) = (SKY_WIDTH, SKY_HEIGHT);
-    let mut rgb = vec![0.0; (width * height * 3) as usize];
-    let mut set = |x: u32, y: u32, color: Vec3| {
-        let at = ((y * width + x) * 3) as usize;
-        rgb[at..at + 3].copy_from_slice(&color.to_array());
-    };
-    for x in 0..width {
+    let columns: Vec<u32> = (0..width).collect();
+    let columns = super::parallel::map_each(&columns, true, |&x| {
         let level = super::environment::pixel_direction(x, height / 2, width, height);
         let along_horizon = air.radiance(atmosphere, Vec3::new(level.x, 0.0, level.z).normalize());
-        for y in 0..height {
-            let dir = super::environment::pixel_direction(x, y, width, height);
-            let color = if dir.y >= 0.0 {
-                air.radiance(atmosphere, dir)
-            } else {
-                let t = (-dir.y / 0.2).clamp(0.0, 1.0);
-                along_horizon.lerp(ground, t * t * (3.0 - 2.0 * t))
-            };
-            set(x, y, color);
+        (0..height)
+            .map(|y| {
+                let dir = super::environment::pixel_direction(x, y, width, height);
+                if dir.y >= 0.0 {
+                    air.radiance(atmosphere, dir)
+                } else {
+                    let t = (-dir.y / 0.2).clamp(0.0, 1.0);
+                    along_horizon.lerp(ground, t * t * (3.0 - 2.0 * t))
+                }
+            })
+            .collect::<Vec<Vec3>>()
+    });
+    let mut rgb = vec![0.0; (width * height * 3) as usize];
+    for (x, column) in columns.iter().enumerate() {
+        for (y, color) in column.iter().enumerate() {
+            let at = (y * width as usize + x) * 3;
+            rgb[at..at + 3].copy_from_slice(&color.to_array());
         }
     }
     rgb

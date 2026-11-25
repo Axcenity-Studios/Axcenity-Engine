@@ -127,3 +127,55 @@ fn textures_not_drawn_lately_shrink_first_and_come_back_when_there_is_room() {
     renderer.render(&only(0..4)).unwrap();
     assert!((100..108).all(|key| dropped(&renderer, key) == 0));
 }
+
+#[test]
+fn a_kept_texture_undrawn_a_long_time_stays_within_the_budget_and_leaves_whole_past_it() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let all = eight_textured_blocks();
+    let only = |keys: std::ops::Range<usize>| {
+        let mut list = all.clone();
+        list.items = all.items[keys].to_vec();
+        list
+    };
+    let a_long_time_passes = |renderer: &mut TextureRenderer| {
+        renderer.scene.frame += KEEP_UNDRAWN_FRAMES;
+        renderer.scene.frame_clock.clear();
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+    renderer.set_keep_undrawn(true);
+    // Room for all eight.
+    renderer.set_graphics(&with_budget(64));
+    renderer.render(&only(0..4)).unwrap();
+    a_long_time_passes(&mut renderer);
+    renderer.render(&only(4..8)).unwrap();
+    assert!(
+        (100..108).all(|key| dropped(&renderer, key) == 0),
+        "within the budget, what was drawn long ago is still there, whole"
+    );
+    let bytes = renderer.stats().texture_bytes;
+    renderer.render(&only(0..4)).unwrap();
+    assert_eq!(
+        renderer.stats().texture_bytes,
+        bytes,
+        "so cutting back to it uploads nothing"
+    );
+
+    // Room for about four: the four not drawn for a long time leave whole,
+    // before any of those being drawn loses a level.
+    a_long_time_passes(&mut renderer);
+    renderer.set_graphics(&with_budget(22));
+    renderer.render(&only(4..8)).unwrap();
+    assert!(renderer.stats().texture_bytes <= 22 * MIB);
+    assert!((100..104).all(|key| !renderer.scene.textures.contains_key(&key)));
+    assert!((104..108).all(|key| dropped(&renderer, key) == 0));
+
+    // Drawn again, they are uploaded again. The other four were drawn
+    // lately, so they stay and shrink, as without keeping.
+    renderer.render(&only(0..4)).unwrap();
+    assert!(renderer.stats().texture_bytes <= 22 * MIB);
+    assert!((100..104).all(|key| dropped(&renderer, key) == 0));
+    assert!((104..108).all(|key| dropped(&renderer, key) > 0));
+}

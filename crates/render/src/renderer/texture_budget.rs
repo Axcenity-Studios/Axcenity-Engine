@@ -60,6 +60,19 @@ pub(super) fn levels_to_drop(textures: &[Budgeted], fixed: u64, budget: u64) -> 
 }
 
 impl ScenePipeline {
+    /// The bytes textures would take with no level left out for the budget:
+    /// what's held, plus what the shrunk ones lack.
+    pub(super) fn texture_bytes_wanted(&self) -> u64 {
+        let lacking: u64 = self
+            .textures
+            .values()
+            .filter_map(|cached| cached.gpu.as_ref())
+            .filter(|gpu| gpu.dropped > 0)
+            .map(|gpu| texture_bytes(gpu.texels, gpu.base, 0).saturating_sub(gpu.bytes.bytes()))
+            .sum();
+        self.texture_bytes.total() + lacking
+    }
+
     /// Shrinks or restores the surface textures to fit the texture budget,
     /// and returns the keys of those it replaced (so the materials and
     /// sprite bindings holding the old ones are remade). Call after this

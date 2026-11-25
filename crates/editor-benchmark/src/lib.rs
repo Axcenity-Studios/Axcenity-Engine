@@ -12,7 +12,6 @@
 mod recommend;
 mod report;
 mod run;
-mod video_memory;
 mod workloads;
 
 #[cfg(any(test, feature = "test-support"))]
@@ -606,7 +605,11 @@ pub fn changes(now: &GraphicsSettings, recommended: &GraphicsSettings) -> Vec<Ch
         ("Texture quality", |s| {
             s.texture_quality().label().to_owned()
         }),
-        ("Texture memory", |s| format!("{} MB", s.texture_budget())),
+        ("Texture memory", |s| match s.texture_budget {
+            Some(megabytes) => format!("{megabytes} MB"),
+            // From the card's memory (`GraphicsSettings::texture_budget_on`).
+            None => "Automatic".to_owned(),
+        }),
         ("Post-processing", |s| on_off(s.post_processing())),
         ("Contact shadows", |s| on_off(s.contact_shadows())),
         ("Volumetric fog", |s| on_off(s.volumetric_fog())),
