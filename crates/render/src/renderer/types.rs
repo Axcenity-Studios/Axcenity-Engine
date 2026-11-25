@@ -89,6 +89,8 @@ pub(super) const NEAR_PLANE: f32 = 0.1;
 pub(super) const FAR_PLANE: f32 = 5000.0;
 /// A caller's mesh or texture not drawn for this many frames is taken off
 /// the GPU (about 10 seconds at 60 fps). Drawn again, it's uploaded again.
+/// A renderer keeping what's undrawn (renderer/undrawn.rs) frees a mesh or
+/// color texture this old only to fit its budget.
 pub(super) const KEEP_UNDRAWN_FRAMES: u64 = 600;
 /// ... and for at least this many seconds, however many frames that is: at
 /// 144 fps, 600 frames is only four seconds, and what was turned away from
@@ -1223,6 +1225,14 @@ pub(super) struct ScenePipeline {
     /// Bytes of textures and of meshes on the GPU.
     pub(super) texture_bytes: GpuBytes,
     pub(super) mesh_bytes: GpuBytes,
+    /// Whether meshes and color textures that stop being drawn stay while
+    /// they fit their budgets, rather than leaving by the clock
+    /// (renderer/undrawn.rs).
+    pub(super) keep_undrawn: bool,
+    /// How many meshes and textures were freed to fit their budgets since
+    /// the graphics settings last changed, for
+    /// [`RenderStats::freed_for_budget`](super::RenderStats).
+    pub(super) freed_for_budget: u64,
     /// While streaming: the thread that uploads what comes into range.
     pub(super) uploader: Option<super::uploads::Uploader>,
     /// When the last few seconds' frames started, oldest first, so what

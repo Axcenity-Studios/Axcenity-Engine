@@ -22,6 +22,8 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | PR | Area | Headline (Measured) | Machine |
 |---|---|---|---|---|
+| Undrawn meshes and textures kept within memory budgets | 2026-11-25 (ADR-0051) | Render, memory | Desert Homestead's tour: the frame on a cut back to a seen view 105 → 14 ms and 75 → 21 ms; first sights unchanged (30–62 ms) | Desktop under Fedora |
+| Fog boxes read one at a time; the atmosphere's sky on the renderer's threads | 2026-11-25 | Render (shaders, sky) | Desert Homestead at 2560 × 1440: GPU frame 110 → 12.4 ms on High, 139 → 16.9 on Ultra (about 9 → 48 frames a second shown on High); Render step in its dusk time-lapse 29–37 → 10–13 ms | Desktop under Fedora |
 | Character Studio's tiles previewed off the interface's thread | 2026-11-25 | Editor, Character Studio | A tile's first preview on the Clothing page 24–147 ms (median 44) → none for a tile crossed or scrolled past; a rested tile's first preview 79 → 47 ms with a renderer (hairstyle 133 → 22 ms), debug build | Desktop under Fedora |
 | Editor open without a frozen first frame | #290 | Editor startup | Abandoned Farmhouse first open (debug, lavapipe): first editor frame after the load 8 s → 1.5 s; the rest goes to the GPU behind a counted loading screen | Container |
 | Collaborate packing and the world load | C11 | Collaborate, project | S10k join message 953 → 82 KiB; `project::load` of S10k 5.66 → 0.19 s | Container |
@@ -59,6 +61,38 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Culling, LOD | graphics Ph. 12–13 | Render | Edge views draw only what's seen; foliage cull distances | Desktop |
 
 ## Entries
+
+### Kept within a budget (2026-11-25)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | [ADR-0051](../Architecture/Architecture-Decisions/ADR-0051-A-Renderer-That-Shows-A-World-Keeps-Undrawn-Meshes-And-Textures-Within-Memory-Budgets.md); Paul's choice among the options for the stall on a camera cut |
+| **Evidence** | Measured |
+| **Problem** | Every cut of Desert Homestead's tour stalled one frame, 30–105 ms |
+| **Root cause** | What wasn't drawn for 600 frames and 10 seconds was freed and uploaded again in the frame that next drew it, however much memory was free; the tour's shots are 10 seconds long. First sights upload in their frame too |
+| **Solution** | The player's window and the editor's viewport keep meshes and color textures while they fit the mesh and texture memory budgets; past one, the least recently drawn undrawn ones are freed first, before any drawn texture loses a level (`renderer/undrawn.rs`). Meshes get a budget of half the textures' |
+| **Affected components** | `crates/render/src/renderer/undrawn.rs`, `scene.rs`, `crates/render-types/src/graphics.rs`, `crates/player/src/window.rs`, `crates/editor/src/viewport.rs` |
+| **Before → after** | The cut frame, Ultra: back to the first view 105.3 → 14.3 ms, the tour's end 75.1 → 21.3; first sights 31.3 → 30.8, 61.9 → 61.8, 46.3 → 38.6, 47.3 → 30.0, 103.0 → 57.7. High: the same within 2 ms |
+| **Method** | Player `--bench 5500` (the whole tour) at `--size 2560x1440`, `AXCENITY_BENCH_TIMELINE`, the worst frame around each cut; one run each |
+| **Hardware** | Desktop under Fedora: see [Hardware notes](Hardware-Notes.md) |
+| **Trade-offs** | GPU memory in use grows toward the budgets and stays (Desert Homestead: 1,579 MiB of textures and 174 MiB of meshes after the tour on Ultra). Dead keys (a chunk's mesh from before an edit) stay until a budget is full. The budgets follow the card's memory (4,096 and 2,048 MiB on this card at every preset; the measurements here were taken with the presets' fixed numbers, and the tour at the default settings afterwards gave the same cuts: 12.7 and 22.7 ms on the two returns) |
+| **Detail** | `docs/rendering/performance.md`, "Kept within a budget (ADR-0051)" |
+
+### Fog boxes and the atmosphere's sky (2026-11-25)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | Paul's report of 2026-11-25: Desert Homestead "loads at about 11 FPS" on an RX 9070 XT |
+| **Evidence** | Measured |
+| **Problem** | The scene drew at 9 to 12 frames a second at every quality preset. Its last tour shot, a dusk time-lapse, also held the CPU at 29–37 ms a frame |
+| **Root cause** | (1) fog.wgsl's functions take the `Fog` as a value and indexed its array of eight dust boxes with the loop's counter (`fog.dust[i]`), which copies the array for each look: about 50 ms of GPU time a box, every pixel, and the scene has two (a valley's haze, the house's air). Reading the cause from the cost: the compiled shader wasn't looked at. (2) An Atmosphere's 256 × 128 sky image is worked out again whenever the sun moves a tenth of a degree, on the frame's thread: 16,000 looks through the air |
+| **Solution** | (1) A box is read through `fog_dust(i)`, defined by lighting.wgsl and sprite.wgsl over their own uniforms. (2) `sky_pixels` shares the image's columns among the renderer's threads (`parallel::map_each`), in order, so the image is the same |
+| **Affected components** | `crates/render/src/fog.wgsl`, `lighting.wgsl`, `sprite.wgsl`, `renderer/atmosphere_sky.rs` |
+| **Before → after** | GPU frame, median: High 110.3 → 12.4 ms, Ultra 138.9 → 16.9 (scene pass 109.2 → 10.4 and 134.5 → 13.4; volumetric fog's pass 2.53 → 0.45). As shown on the screen, timed over whole runs: 20.6 ms a frame on High and 23.4 on Ultra after. Render step through the time-lapse, median of each 3 s: 29–37 → 10–13 ms |
+| **Method** | Player `--bench` (200 to 5,500 frames) at `--size 2560x1440`, `467da9f2` against the fix, one run each; the cause found by taking one kind of Instance out of a copy's `world.json` at a time; the time-lapse by `AXCENITY_BENCH_TIMELINE` and `eu-stack` samples of the frame's thread. Not pinned |
+| **Hardware** | Desktop under Fedora (Ryzen 9 9950X3D, RX 9070 XT, radv, a 240 Hz display): see [Hardware notes](Hardware-Notes.md) |
+| **Trade-offs** | Each shader that includes fog.wgsl must define `fog_dust`. The sky image wakes the renderer's threads on a frame that makes one |
+| **Detail** | `docs/rendering/performance.md`, "Fog boxes read one at a time (Desert Homestead)" |
 
 ### Character Studio's tile previews (2026-11-25)
 

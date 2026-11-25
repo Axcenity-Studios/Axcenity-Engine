@@ -641,6 +641,31 @@ pub const RENDER_SCALE_RANGE: std::ops::RangeInclusive<f32> = 0.5..=2.0;
 /// megabytes (MiB).
 pub const TEXTURE_BUDGET_RANGE: std::ops::RangeInclusive<u32> = 16..=65_536;
 
+/// The mesh memory budget is the texture memory budget over this (with
+/// the presets' own budgets: Low 128 MiB, Medium 256, High 512, Ultra
+/// 1024). Meshes take a small share of what textures do (Desert Homestead:
+/// 174 MiB of meshes beside 1,579 MiB of textures), so half leaves room to
+/// keep a whole world's.
+pub const MESH_BUDGET_SHARE: u64 = 2;
+
+/// The texture memory budget for a card with `video_memory` bytes: a
+/// quarter of it in MiB, rounded down to a power of two, between 256 MiB
+/// and 8 GiB. The memory is first rounded to whole GiB, as a "16 GB" card
+/// reports a little less (15.9 GiB on an RX 9070 XT). A quarter leaves the
+/// rest for meshes (half as much again), the frame's own targets and other
+/// programs.
+pub fn texture_budget_for(video_memory: u64) -> u32 {
+    let quarter = (whole_gib(video_memory) * 1024 / 4).max(1);
+    let power = 1u64 << (63 - quarter.leading_zeros());
+    power.clamp(256, 8192) as u32
+}
+
+/// A card's memory as its box says it: rounded to whole GiB, at least 1.
+pub fn whole_gib(video_memory: u64) -> u64 {
+    const GIB: f64 = (1u64 << 30) as f64;
+    (video_memory as f64 / GIB).round().max(1.0) as u64
+}
+
 /// The nearest and farthest ray tracing can reach from the camera, in
 /// studs: what's past it is left out of the ray traced scene.
 pub const RAY_TRACING_DISTANCE_RANGE: std::ops::RangeInclusive<f32> = 50.0..=5000.0;
@@ -903,6 +928,22 @@ impl GraphicsSettings {
             },
             |budget| budget.clamp(*TEXTURE_BUDGET_RANGE.start(), *TEXTURE_BUDGET_RANGE.end()),
         )
+    }
+
+    /// The texture memory budget in megabytes (MiB) on a machine with
+    /// `capabilities`: the override; without one, what the card's memory
+    /// allows ([`texture_budget_for`]) where that is more than the
+    /// preset's, so a card with room keeps more and no card gets less than
+    /// the preset gave it. A card that doesn't say how much it has, and
+    /// software drawing, get the preset's.
+    pub fn texture_budget_on(&self, capabilities: &Capabilities) -> u32 {
+        let set = self.texture_budget();
+        if self.texture_budget.is_some() || capabilities.software {
+            return set;
+        }
+        capabilities
+            .video_memory
+            .map_or(set, |memory| set.max(texture_budget_for(memory)))
     }
 
     /// The anti-aliasing: the override, or the preset's.
@@ -1235,13 +1276,15 @@ impl GraphicsSettings {
                     .to_owned(),
             );
         }
+        let texture_budget = u64::from(self.texture_budget_on(capabilities)) * 1024 * 1024;
         EffectiveGraphics {
             shadow_quality,
             shadow_distance: self.shadow_distance(),
             post_processing: self.post_processing(),
             render_scale: self.render_scale(),
             texture_quality: self.texture_quality(),
-            texture_budget: u64::from(self.texture_budget()) * 1024 * 1024,
+            texture_budget,
+            mesh_budget: texture_budget / MESH_BUDGET_SHARE,
             anti_aliasing,
             // Every GPU can draw it: it needs nothing past what the scene does.
             ambient_occlusion: self.ambient_occlusion(),
@@ -1302,6 +1345,11 @@ pub struct Capabilities {
     /// device was opened with them: a game can offer Hardware ray tracing
     /// (taking effect at its next start) only where this is true.
     pub ray_tracing_offered: bool,
+    /// The graphics card's own memory in bytes, where the system says
+    /// (`render::video_memory`): the memory budgets are worked out from it
+    /// ([`GraphicsSettings::texture_budget_on`]). `None` for a card that
+    /// doesn't say and for software drawing: the preset's budget is used.
+    pub video_memory: Option<u64>,
 }
 
 impl Capabilities {
@@ -1326,6 +1374,8 @@ impl Default for Capabilities {
             // An optional feature: wgpu's defaults have none.
             ray_queries: false,
             ray_tracing_offered: false,
+            // Not reported: the presets' budgets.
+            video_memory: None,
         }
     }
 }
@@ -1344,6 +1394,11 @@ pub struct EffectiveGraphics {
     pub texture_quality: TextureQuality,
     /// The most bytes textures may take on the GPU.
     pub texture_budget: u64,
+    /// The most bytes meshes may take on the GPU before those not drawn
+    /// lately are freed, in a renderer that keeps them
+    /// (`Renderer::set_keep_undrawn`): [`MESH_BUDGET_SHARE`] of
+    /// `texture_budget`.
+    pub mesh_budget: u64,
     pub anti_aliasing: AntiAliasing,
     pub ambient_occlusion: AmbientOcclusion,
     pub reflection_quality: ReflectionQuality,
@@ -1402,6 +1457,53 @@ mod tests {
 
     fn map(size: u32, cascades: u32) -> Option<ShadowMapSize> {
         Some(ShadowMapSize { size, cascades })
+    }
+
+    #[test]
+    fn the_texture_budget_follows_the_cards_memory_where_that_is_more_than_the_presets() {
+        const GIB: u64 = 1 << 30;
+        let card = |memory: u64| Capabilities {
+            video_memory: Some(memory),
+            ..Capabilities::default()
+        };
+        let high = GraphicsSettings::preset(Quality::High);
+        // A quarter of the card's memory, as a power of two.
+        assert_eq!(texture_budget_for(16 * GIB), 4096);
+        // A "16 GB" card reports a little less.
+        assert_eq!(texture_budget_for(17_095_983_104), 4096);
+        assert_eq!(texture_budget_for(12 * GIB), 2048);
+        assert_eq!(texture_budget_for(2 * GIB), 512);
+        assert_eq!(texture_budget_for(512 << 20), 256);
+        assert_eq!(texture_budget_for(256 * GIB), 8192);
+        assert_eq!(high.texture_budget_on(&card(16 * GIB)), 4096);
+        assert_eq!(high.texture_budget_on(&card(8 * GIB)), 2048);
+        // Never less than the preset gave: a small card keeps its number.
+        assert_eq!(high.texture_budget_on(&card(2 * GIB)), 1024);
+        let ultra = GraphicsSettings::preset(Quality::Ultra);
+        assert_eq!(ultra.texture_budget_on(&card(4 * GIB)), 2048);
+        assert_eq!(ultra.texture_budget_on(&card(32 * GIB)), 8192);
+        // A card that doesn't say, and software drawing: the preset's.
+        assert_eq!(high.texture_budget_on(&Capabilities::default()), 1024);
+        let software = Capabilities {
+            software: true,
+            ..card(64 * GIB)
+        };
+        assert_eq!(high.texture_budget_on(&software), 1024);
+        // An override is what it says, on any card.
+        let set = GraphicsSettings {
+            texture_budget: Some(300),
+            ..high.clone()
+        };
+        assert_eq!(set.texture_budget_on(&card(16 * GIB)), 300);
+        // Meshes get half of it.
+        let effective = high.effective(&card(16 * GIB));
+        assert_eq!(effective.texture_budget, 4096 << 20);
+        assert_eq!(effective.mesh_budget, 2048 << 20);
+        let unknown = high.effective(&Capabilities::default());
+        assert_eq!(
+            (unknown.texture_budget, unknown.mesh_budget),
+            (1024 << 20, 512 << 20)
+        );
     }
 
     #[test]
@@ -2357,6 +2459,7 @@ mod tests {
                 compute_shaders: true,
                 ray_queries: true,
                 ray_tracing_offered: true,
+                video_memory: Some(16 << 30),
             },
             Capabilities {
                 max_texture_size: 1024,
@@ -2372,6 +2475,7 @@ mod tests {
                 compute_shaders: false,
                 ray_queries: false,
                 ray_tracing_offered: false,
+                video_memory: None,
             },
         ];
         let modes = AntiAliasing::ALL.map(Some).into_iter().chain([None]);

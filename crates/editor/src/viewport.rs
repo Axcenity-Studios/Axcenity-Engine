@@ -1586,6 +1586,9 @@ impl Viewport {
         // that first draws them: turning the camera toward what's not on
         // the GPU yet (or not drawn lately) never freezes the editor.
         target.renderer.set_background_uploads(true);
+        // What the camera turned away from stays on the GPU while it fits
+        // the budgets: turning back shows it at once, not a few frames on.
+        target.renderer.set_keep_undrawn(true);
         let render_started = Instant::now();
         // Blueprint textures are for building by: the game never shows them.
         assets.set_blueprint(

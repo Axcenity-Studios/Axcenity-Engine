@@ -6,10 +6,16 @@ use super::*;
 /// This computer's graphics settings: a preset, its overrides, and what's
 /// in use once the GPU's limits are applied, with why anything was lowered.
 /// True when Restart now was clicked.
+///
+/// `drawn` is what the viewport's last frame held on the graphics card: a
+/// world that needs more than the memory budgets is said so under the
+/// quality, where it's seen without scrolling
+/// (`RenderStats::memory_warnings`).
 pub(super) fn graphics_page(
     ui: &mut egui::Ui,
     settings: &mut GraphicsSettings,
     capabilities: &Capabilities,
+    drawn: Option<&axcenity_render::RenderStats>,
 ) -> bool {
     page_title(
         ui,
@@ -24,6 +30,23 @@ pub(super) fn graphics_page(
         &Quality::ALL.map(|quality| (quality, None, quality.label())),
     );
     let preset = GraphicsSettings::preset(settings.quality);
+    // What the world in the viewport needs past the memory budgets.
+    let memory = drawn
+        .map(|stats| stats.memory_warnings(&settings.effective(capabilities)))
+        .unwrap_or_default();
+    if !memory.is_empty() {
+        ui.add_space(space::S);
+        for warning in &memory {
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(theme::with_icon(icons::WARNING, warning))
+                        .size(type_scale::SMALL)
+                        .color(palette.warning),
+                )
+                .wrap(),
+            );
+        }
+    }
     ui.add_space(space::L);
     section(ui, "Overrides");
     egui::Grid::new("graphics overrides")
@@ -156,10 +179,14 @@ pub(super) fn graphics_page(
                 let mut custom = settings.texture_budget.is_some();
                 if ui
                     .checkbox(&mut custom, "")
-                    .on_hover_text("Off, the preset's budget is used.")
+                    .on_hover_text(
+                        "Off, the budget follows this graphics card's memory, \
+                         or is the preset's where that isn't known.",
+                    )
                     .changed()
                 {
-                    settings.texture_budget = custom.then(|| preset.texture_budget());
+                    settings.texture_budget =
+                        custom.then(|| preset.texture_budget_on(capabilities));
                 }
                 match &mut settings.texture_budget {
                     Some(budget) => {
@@ -171,10 +198,9 @@ pub(super) fn graphics_page(
                         );
                     }
                     None => {
-                        ui.label(
-                            egui::RichText::new(format!("Preset ({} MB)", preset.texture_budget()))
-                                .color(palette.text_secondary),
-                        );
+                        let (text, why) = automatic_texture_budget(&preset, capabilities);
+                        ui.label(egui::RichText::new(text).color(palette.text_secondary))
+                            .on_hover_text(why);
                     }
                 }
             });
@@ -515,8 +541,9 @@ fn in_use_section(
                         "Textures",
                         effective.texture_quality.label(),
                         &format!(
-                            "{} MB streaming budget (LRU)",
-                            effective.texture_budget >> 20
+                            "{} MB budget, {} MB for meshes",
+                            effective.texture_budget >> 20,
+                            effective.mesh_budget >> 20
                         ),
                         true,
                         settings.texture_quality.is_some() || settings.texture_budget.is_some(),
@@ -1326,5 +1353,38 @@ pub(super) fn ray_tracing_in_use(effective: &EffectiveGraphics) -> String {
         format!("Ray tracing: available, up to {reach} studs (no ray traced effects on)")
     } else {
         format!("Ray tracing up to {reach} studs: {}", effects.join(", "))
+    }
+}
+
+/// What the Texture memory row says while no budget is set, and why: the
+/// budget the card's memory gives where that is more than the preset's,
+/// otherwise the preset's.
+pub(super) fn automatic_texture_budget(
+    preset: &GraphicsSettings,
+    capabilities: &Capabilities,
+) -> (String, String) {
+    let own = preset.texture_budget();
+    let automatic = preset.texture_budget_on(capabilities);
+    match capabilities.video_memory {
+        Some(memory) if automatic > own => (
+            format!("Automatic ({automatic} MB)"),
+            format!(
+                "A quarter of this graphics card's {} GB. The preset alone gives {own} MB.",
+                axcenity_render::whole_gib(memory)
+            ),
+        ),
+        Some(memory) => (
+            format!("Preset ({own} MB)"),
+            format!(
+                "A quarter of this graphics card's {} GB is no more than the preset's budget.",
+                axcenity_render::whole_gib(memory)
+            ),
+        ),
+        None => (
+            format!("Preset ({own} MB)"),
+            "This graphics card doesn't say how much memory it has, so the preset's budget \
+             is used. Set one by hand if the card has room."
+                .to_owned(),
+        ),
     }
 }

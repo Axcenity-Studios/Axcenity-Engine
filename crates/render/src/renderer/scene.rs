@@ -410,6 +410,8 @@ impl ScenePipeline {
             debug_views: None,
             texture_bytes,
             mesh_bytes,
+            keep_undrawn: false,
+            freed_for_budget: 0,
         };
         pipeline.bind_frame();
         pipeline
@@ -444,6 +446,11 @@ impl ScenePipeline {
             compute_shaders: real.compute_shaders && limits.compute_shaders,
             ray_queries: real.ray_queries && limits.ray_queries,
             ray_tracing_offered: real.ray_tracing_offered && limits.ray_tracing_offered,
+            // Limits that don't name a memory leave the presets' budgets.
+            video_memory: real
+                .video_memory
+                .zip(limits.video_memory)
+                .map(|(real, limit)| real.min(limit)),
         };
         let settings = self.settings.clone();
         self.apply_graphics(&settings);
@@ -459,6 +466,8 @@ impl ScenePipeline {
         let old_samples = self.graphics.anti_aliasing.samples();
         self.settings = settings.clone();
         self.graphics = settings.effective(&self.capabilities);
+        // Counted against the budgets in use: new ones start again.
+        self.freed_for_budget = 0;
         if !self.graphics.realtime_gi && self.realtime_gi.take().is_some() {
             // The probes traced while it was on give way to their bakes.
             self.light_probes.restore_bakes();
@@ -2675,6 +2684,8 @@ impl ScenePipeline {
             posing: self.posing.stats(),
             texture_bytes: self.texture_bytes.total(),
             mesh_bytes: self.mesh_bytes.total(),
+            texture_bytes_wanted: self.texture_bytes_wanted(),
+            freed_for_budget: self.freed_for_budget,
             target_bytes: self.frame_targets.bytes
                 + shadow_bytes
                 + sheet_bytes
@@ -3015,7 +3026,10 @@ impl ScenePipeline {
         {
             self.note_texture(source, frame, false);
         }
-        let mut replaced = self.fit_texture_budget(list);
+        // What isn't being drawn makes room first (while it's kept at all:
+        // renderer/undrawn.rs), then what is drawn loses levels.
+        let mut replaced = self.free_undrawn_textures();
+        replaced.extend(self.fit_texture_budget(list));
         replaced.extend(arrived);
         if !replaced.is_empty() {
             self.materials.retain(|key, _| {
@@ -3249,38 +3263,6 @@ impl ScenePipeline {
             );
         }
         arrived
-    }
-
-    /// Frees the callers' meshes, textures and materials that haven't been
-    /// drawn lately.
-    pub(super) fn forget_undrawn(&mut self) {
-        let frame = self.frame;
-        // The first frame of the last `KEEP_UNDRAWN_SECONDS`.
-        let now = std::time::Instant::now();
-        self.frame_clock.push_back((frame, now));
-        while self
-            .frame_clock
-            .front()
-            .is_some_and(|&(_, at)| now.duration_since(at).as_secs_f32() > KEEP_UNDRAWN_SECONDS)
-        {
-            self.frame_clock.pop_front();
-        }
-        let since = self.frame_clock.front().map_or(frame, |&(first, _)| first);
-        let recent =
-            |last_drawn: u64| frame - last_drawn < KEEP_UNDRAWN_FRAMES || last_drawn >= since;
-        self.custom_meshes
-            .retain(|_, cached| recent(cached.last_drawn));
-        self.textures.retain(|_, cached| recent(cached.last_drawn));
-        self.full_textures
-            .retain(|_, cached| recent(cached.last_drawn));
-        self.ui_image_groups
-            .retain(|key, _| self.full_textures.contains_key(key));
-        self.sprites.forget(|key| self.textures.contains_key(&key));
-        self.decal_pass
-            .forget(|key| self.textures.contains_key(&key));
-        self.materials.retain(|_, cached| recent(cached.last_drawn));
-        self.terrain.forget(frame);
-        self.surface_shaders.forget(frame);
     }
 
     /// Replaces the instance buffer with a bigger one if `count` won't fit.

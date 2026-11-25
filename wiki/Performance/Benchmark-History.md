@@ -121,6 +121,23 @@ Desktop under Fedora, a **debug** build, one run, `timing_tests.rs` `browser_cos
 | A second preview of a tile | 7–49 ms, median 12 (hair 4) | the same |
 | A still frame of the Clothing page (Hair, Body) | 1.25 ms (0.63, 0.69) | the same |
 
+## Desert Homestead (2026-11-25)
+
+Desktop under Fedora (radv, 240 Hz), release player, `--bench` at 2560 × 1440, one run each, not pinned; `467da9f2` against the fog and sky fix ([Optimization log](Optimization-Log.md#fog-boxes-and-the-atmospheres-sky-2026-11-25)). GPU medians.
+
+| Measure | Before | After |
+|---|---|---|
+| GPU frame, Low / Medium / High (200 frames) | 50.5 / 78.3 / 110.3 | not run / 7.3–8.9 / 12.4 |
+| GPU frame, Ultra, the tour's first shot | 138.9 (p95 389) | 16.9 |
+| GPU frame, Ultra, the whole tour (5,500 frames) | not run | 17.1 (p95 20.7, worst 21.2) |
+| CPU frame, Ultra, the tour's first shot | 8.0 | 7.7 |
+| Render step through the dusk time-lapse | 29–37 | 10–13 |
+| A frame as shown (whole runs timed), High / Ultra | not timed (the GPU frame alone gives 9 and 7 a second) | 20.6 / 23.4 ms |
+| The frame on a cut to a view not seen before | 31–103 | 30–62 (ADR-0051: what it shares with earlier shots is kept) |
+| The frame on a cut back to a seen view | 105 and 75 | 12–14 and 21–23 (ADR-0051) |
+| GPU memory held after the tour, Ultra | not measured | 1,579 MiB textures, 174 MiB meshes |
+| Memory budgets at the default settings (High) on this 16 GB card | 1,024 MiB textures (the scene's were shrunk to fit) | 4,096 MiB textures, 2,048 MiB meshes, from the card's memory |
+
 ## Against other engines (XB10k)
 
 `benchmarks/cross-engine/` defines XB10k (S10k's parts, physics and scripts rebuilt in each engine with one timing rule; PR #80). On the Desktop, 2026-11-11, median frame: **s&box 2.05 ms** (real time, not ranked), **Unity 3.11**, **Axcenity 5.14** (6.70 before #84/#86/#88/#93), **Godot 10.27**; Unreal and Roblox not timed yet. Results: `benchmarks/cross-engine/results.md`; what the numbers mean against each engine's features: `docs/research/engine-comparison.md`.

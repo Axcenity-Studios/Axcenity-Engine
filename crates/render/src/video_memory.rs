@@ -2,16 +2,42 @@
 //! unsafe code (wgpu doesn't report it): on Windows the display driver's
 //! `HardwareInformation.qwMemorySize` in the registry, read with `reg`; on
 //! Linux the amdgpu driver's `mem_info_vram_total`. Elsewhere, and for
-//! cards that don't say, `None`, and the benchmark keeps the preset's
-//! texture budget.
+//! cards that don't say, `None`, and the presets' memory budgets are used
+//! (`GraphicsSettings::texture_budget_on`).
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 /// The card's own memory in bytes, matched by its PCI vendor and device
-/// (`wgpu::AdapterInfo::vendor` and `device`). Slow (it may start a
-/// program): call it off the UI thread.
+/// (`wgpu::AdapterInfo::vendor` and `device`). The first call for a card
+/// is slow on Windows (it starts a program, twice); the answer is kept,
+/// so later calls cost nothing.
 pub fn read(vendor: u32, device: u32) -> Option<u64> {
     if vendor == 0 && device == 0 {
         return None;
     }
+    static READ: OnceLock<Mutex<Cards>> = OnceLock::new();
+    let read = READ.get_or_init(Default::default);
+    // A thread that panicked while reading leaves nothing half-written.
+    let mut read = read.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    *read
+        .entry((vendor, device))
+        .or_insert_with(|| system(vendor, device))
+}
+
+/// Each card read so far, by its PCI vendor and device: its memory, or
+/// `None` if the system doesn't say.
+type Cards = HashMap<(u32, u32), Option<u64>>;
+
+/// The memory of the card `info` describes; `None` for software drawing.
+pub fn of(info: &wgpu::AdapterInfo) -> Option<u64> {
+    (info.device_type != wgpu::DeviceType::Cpu)
+        .then(|| read(info.vendor, info.device))
+        .flatten()
+}
+
+/// What the system says, read now.
+fn system(vendor: u32, device: u32) -> Option<u64> {
     #[cfg(windows)]
     {
         windows(vendor, device)
@@ -22,6 +48,7 @@ pub fn read(vendor: u32, device: u32) -> Option<u64> {
     }
     #[cfg(not(any(windows, target_os = "linux")))]
     {
+        let _ = (vendor, device);
         None
     }
 }

@@ -479,6 +479,67 @@ The levers that remain are the scene's: the oaks are 1.7 M triangles, three quar
 
 After all of this the full regression check matched every baseline within 7% (Temperate Dry Patch 11.6 ms, GPU 11.3 ms, 1% low 71.6 FPS) and `cargo nextest run --workspace` passed 3,184 of 3,184.
 
+## Fog boxes read one at a time (Desert Homestead)
+
+Paul's Desert Homestead (228 MeshParts, two terrains, 65,000 painted plants, an Atmosphere, Clouds and two fog volumes: a valley's haze and the house's interior air) ran at about 11 frames a second on an RX 9070 XT. Measured on 2026-11-25 on the Desktop under Fedora (radv, a 240 Hz 2560 × 1440 display), release build, the player's `--bench` at `--size 2560x1440`, main at `467da9f2` against the fix; one run each, GPU medians in milliseconds.
+
+**Finding it.** The CPU's frame was 8 ms; the GPU's scene pass was 50 ms on Low and 110 ms on High, with 10 million triangles that the shadow maps and the depth prepass drew in 1 and 0.55 ms: so shading, not geometry, and not a quality setting. A copy of the project with one kind of thing taken out of `world.json` at a time (High, 120 frames) said which:
+
+| Left out | Scene pass |
+|---|---|
+| Nothing | 110.0 |
+| Clouds, the Atmosphere, Weather, PointLights, particles (each) | 109.5–112.2 |
+| The terrains (and their plants) | 79.0 |
+| The MeshParts | 71.8 |
+| The interior volume | 64.2 |
+| The valley haze volume | 63.9 |
+| Both volumes, or only their FogEffects | 10.3 |
+
+**Cause.** Each box of dust cost about 50 ms, for a ray-box intersection and two `exp`s a pixel. fog.wgsl's functions take the `Fog` as a value (it has no bindings of its own) and indexed its array of eight boxes with the loop's counter (`fog.dust[i]`). An array inside a value can't be indexed in place by a number only known as the shader runs, so each look copies the array first: all eight boxes (64 `vec4`s) to pick one, twice a box in `fogged_along`, on every pixel. (That reading comes from the cost and from what took it away; the driver's compiled shader wasn't looked at.) `weather_sample_as`, which indexed the uniform itself (`frame.fog.dust[i]`), cost nothing measurable.
+
+**Fix.** The functions read a box through `fog_dust(i)`, which lighting.wgsl and sprite.wgsl define over their own uniforms ([fog.md](fog.md)). The pictures are the same (the render crate's 446 tests pass, the fog's among them).
+
+| 2560 × 1440 | Scene pass before | after | GPU frame before | after |
+|---|---|---|---|---|
+| Low (200 frames) | 50.1 | not run | 50.5 | not run |
+| Medium (200 frames) | 77.2 | not run | 78.3 | 7.3–8.9 |
+| High (200 frames) | 109.2 | 10.4 | 110.3 | 12.4 |
+| Ultra (the tour's first shot, 600 frames) | 134.5 (110 rising to 411 as the camera closes on the house) | 13.4 | 138.9 | 16.9 |
+| Ultra, volumetric fog's own pass | 2.53 | 0.45 | | |
+| Ultra, the whole 91-second tour (5,500 frames) | not run | 13.6 (5.2–16.5 by shot) | not run | 17.1 (9.5–21.2 by shot) |
+
+**What a frame takes on the screen.** The `--bench` table's FPS line counts the frame's steps only. Under Wayland the next frame starts when the compositor says the last one was shown, so the pace is the CPU's frame plus the GPU's, rounded up to the display's refresh: timing whole runs of two lengths gave 20.6 ms a frame on High (6.7 CPU + 13.3 GPU, about 48 a second) and 23.4 ms on Ultra (about 43), where the FPS line said 136. Before the fix that is about 9 a second on High and 12 on Medium, which is what Paul saw. A run whose window is hidden gets no such signal and crawls (a 360-frame run took 255 s once): keep the window in view.
+
+**The dusk time-lapse** (the tour's last shot runs the afternoon out in 20 seconds) held the CPU's Render step at 29–37 ms a frame: the sun moves a tenth of a degree nearly every frame, and each move works the atmosphere's 256 × 128 sky image out again, 16,000 looks through the air on the frame's thread (found by sampling the thread's stack with `eu-stack`). `sky_pixels` now shares the image's columns among the renderer's threads: Render is 10–13 ms through the lapse ([sky.md](sky.md)).
+
+**What is left**, at 2560 × 1440:
+
+- **The clouds' march** in the sky pass: 2.6 ms of the scene pass on High, 5.1 on Ultra (scene pass 10.4 → 7.8 and 13.4 → 8.3 without Clouds). It is stepped at full size for every pixel of sky, its noise worked out as it goes.
+- **The terrains with their 65,000 plants**: 4.9 ms of the scene pass on High and 4.6 ms of the CPU's Render step (5.7 → 1.2 without them), about 10,000 items and 3,500 draw calls a frame.
+- **A stall on a first sight**, 30–62 ms once on five of the tour's cuts: what is seen for the first time is uploaded in the frame that first draws it. Coming back to a view no longer stalls (next section).
+
+## Kept within a budget (ADR-0051)
+
+Each cut of Desert Homestead's tour stalled one frame for 30–105 ms. The renderer freed what hadn't been drawn for 10 seconds (`KEEP_UNDRAWN_FRAMES`, `KEEP_UNDRAWN_SECONDS`) and uploaded it again in the frame that next drew it, and the tour's shots are 10 seconds long; what is seen for the first time is uploaded in its frame too. Outside a streaming world the player uploads on the frame's thread. Paul chose to keep what fits a memory budget over uploading on a thread (a white or missing model after a cut is worse than one stall on a first view): the player's window and the editor's viewport now keep meshes and color textures while they fit the mesh and texture memory budgets ([models.md](models.md)).
+
+Same machine and method as above (player `--bench 5500`, the whole tour, 2560 × 1440, one run each, `AXCENITY_BENCH_TIMELINE`); the CPU's frame at each cut, the worst of the frames around it, in milliseconds. A frame is otherwise 7 to 8 ms (10–13 through the time-lapse).
+
+| Cut | Before (Ultra) | Kept, Ultra | Kept, High | Kept, High with a 2048 MB texture budget |
+|---|---|---|---|---|
+| Hero to Mailbox (first sight) | 31.3 | 30.8 | 31.1 | 30.2 |
+| Mailbox to Porch (first sight) | 61.9 | 61.8 | 61.0 | 60.5 |
+| Porch to Truck (first sight) | 46.3 | 38.6 | 38.1 | 38.4 |
+| Truck to Windmill (first sight) | 47.3 | 30.0 | 30.1 | 29.9 |
+| Windmill to Crane (first sight) | 103.0 | 57.7 | 56.8 | 57.8 |
+| Crane to Dusk (back to the first view) | 105.3 | 14.3 | 12.3 | 12.8 |
+| The tour's end (the fly camera, by the first view) | 75.1 | 21.3 | 22.6 | 22.2 |
+
+- **Coming back is free of uploads**: the two cuts to a view already seen went from 105 and 75 ms to 12–14 and 21–23 ms (what is left of the second wasn't profiled; materials still leave after 10 seconds and are made again there). The three later first sights are cheaper too: what they share with earlier shots is still on the card.
+- **First sights are as they were** (30–62 ms), by choice: the player would have to upload on a thread, or before the first frame, to take them away.
+- **What the scene holds**, with nothing freed through the whole tour: 1,579 MiB of textures on Ultra (1,452 in 528 color textures; the rest mostly the terrains' layers and weights) and 174 MiB of meshes in 3,083 meshes (each level of detail is one). Both fit Ultra's budgets (2,048 and 1,024 MiB). On High the textures don't fit its 1,024 MiB: the least recently drawn lose their largest levels (the total stays at 1,018–1,020 MiB), so some are drawn below their full size, but the cuts cost the same: the timings match those with a 2,048 MiB budget.
+- **Memory stays in use.** Nothing leaves while it fits, so what a session has seen stays on the card up to the budgets.
+- **The budgets follow the card's memory** (added the same day, [settings.md](settings.md)): the runs above had the presets' fixed numbers. With a quarter of this card's 16 GB the player takes 4,096 MiB for textures and 2,048 MiB for meshes at every preset, so the scene's textures fit on High too. The whole tour again at the default settings (High): the cuts 30.4, 60.7, 38.9, 29.9, 58.4, 12.7 and 22.7 ms, the GPU's frame 13.3 ms at the median.
+
 ## Levels of detail, inspected
 
 **How levels are picked today** (`renderer/lod.rs`, unchanged by this section): by **projected size**, the share of the view's height an item's bounding sphere covers, not by world distance or screen-space error. Below 30% an item draws its first simpler copy, below 12% its second (`LOD_SCREEN_SIZES`); it switches back once 15% past the threshold (hysteresis), and a switch cross-fades over 30 frames by dither (12 before 2026-11-14, which read as a pop). All primitives of a model share one decision (the sphere of the part's box). Shadow views draw the level the camera picked; only the level fading in casts. Levels come from the file (`_LOD1`, `_LOD2`) or are simplified at load to half and a quarter of the triangles with meshoptimizer, a copy that saves less than a fifth on the level before being dropped ([models.md](models.md)).

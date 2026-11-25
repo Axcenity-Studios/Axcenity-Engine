@@ -2,7 +2,8 @@
 //!
 //! A caller's mesh or texture is uploaded the first time it is drawn and
 //! dropped after `KEEP_UNDRAWN_FRAMES` frames and `KEEP_UNDRAWN_SECONDS`
-//! seconds without a draw. Color textures
+//! seconds without a draw, or, in a renderer keeping what's undrawn, only
+//! to fit its budget (`undrawn.rs`). Color textures
 //! are stored as bytes and sampled through an sRGB view.
 
 use std::borrow::Cow;

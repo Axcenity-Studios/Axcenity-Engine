@@ -23,7 +23,7 @@ flowchart LR
   P["core::streaming::Partition<br/>(split again when the Workspace's<br/>structure, the World or the characters change)"] --> NS["net::streaming Streams<br/>per player: MinRadius now, out to TargetRadius<br/>nearest first, 4,000 Instances/s"]
   P --> SS["scene::Streaming (host's screen)<br/>in range of the camera"]
   SS --> DL[build_draw_list leaves the rest out]
-  SS --> GPU["GPU frees after KEEP_UNDRAWN_FRAMES;<br/>background uploads when back in range"]
+  SS --> GPU["GPU keeps what fits its memory budgets (ADR-0051);<br/>background uploads for what is not there"]
   SS --> TC[terrain chunk weights made on a worker]
   SS --> PH[Physics::set_far_sleep]
   P --> OV["editor Streaming overlay (R16)<br/>unit boxes by Reach, legend from<br/>Partition::summary"]

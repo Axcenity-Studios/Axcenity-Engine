@@ -16,3 +16,4 @@ pub use graphics::{
     RealtimeGiTier, ReflectionQuality, ShadowMapSize, ShadowQuality, SpotShadowMapSize,
     TEXTURE_BUDGET_RANGE, TextureQuality,
 };
+pub use graphics::{MESH_BUDGET_SHARE, texture_budget_for, whole_gib};

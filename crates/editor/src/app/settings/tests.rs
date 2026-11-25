@@ -395,6 +395,109 @@ fn the_ray_tracing_section_says_what_a_restart_will_do() {
 }
 
 #[test]
+fn the_texture_memory_row_says_where_its_budget_comes_from() {
+    use super::graphics::automatic_texture_budget;
+    let high = GraphicsSettings::preset(Quality::High);
+    let card = |video_memory| Capabilities {
+        video_memory,
+        ..Capabilities::default()
+    };
+    // An RX 9070 XT's 16 GB, as the system reports it.
+    let (text, why) = automatic_texture_budget(&high, &card(Some(17_095_983_104)));
+    assert_eq!(text, "Automatic (4096 MB)");
+    assert!(why.contains("16 GB") && why.contains("1024 MB"), "{why}");
+    // A small card keeps the preset's.
+    let (text, why) = automatic_texture_budget(&high, &card(Some(2 << 30)));
+    assert_eq!(text, "Preset (1024 MB)");
+    assert!(why.contains("2 GB"), "{why}");
+    let (text, why) = automatic_texture_budget(&high, &card(None));
+    assert_eq!(text, "Preset (1024 MB)");
+    assert!(why.contains("doesn't say"), "{why}");
+}
+
+/// Every piece of text drawn in `shapes`.
+fn drawn_texts(shapes: &[egui::epaint::ClippedShape]) -> String {
+    fn walk(shape: &egui::Shape, found: &mut String) {
+        match shape {
+            egui::Shape::Text(text) => {
+                found.push_str(text.galley.text());
+                found.push('\n');
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| walk(shape, found)),
+            _ => {}
+        }
+    }
+    let mut found = String::new();
+    for clipped in shapes {
+        walk(&clipped.shape, &mut found);
+    }
+    found
+}
+
+#[test]
+fn the_graphics_page_says_when_the_world_needs_more_than_the_memory_budgets() {
+    use super::graphics::graphics_page;
+    const MIB: u64 = 1024 * 1024;
+    let ctx = theme::test_context();
+    // Desert Homestead on High: 1,579 MiB of textures shrunk into 1,024.
+    let drawn = axcenity_render::RenderStats {
+        texture_bytes: 1018 * MIB,
+        texture_bytes_wanted: 1579 * MIB,
+        mesh_bytes: 174 * MIB,
+        ..Default::default()
+    };
+    let page = |capabilities: &Capabilities, drawn: Option<&axcenity_render::RenderStats>| {
+        let mut settings = GraphicsSettings::preset(Quality::High);
+        // Tall enough that nothing is scrolled out of sight.
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(900.0, 4000.0),
+            )),
+            ..Default::default()
+        };
+        let mut draw = |ui: &mut egui::Ui| {
+            graphics_page(ui, &mut settings, capabilities, drawn);
+        };
+        if let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from)
+            && drawn.is_some()
+            && capabilities.video_memory.is_none()
+        {
+            crate::snapshot::snapshot(
+                &folder.join("settings-graphics-memory.png"),
+                egui::vec2(900.0, 420.0),
+                vec![Vec::new(); 3],
+                &mut draw,
+            );
+        }
+        drawn_texts(&crate::theme::run(&ctx, input, draw).shapes)
+    };
+    // A card that doesn't say its memory: the preset's 1,024 MB.
+    let unknown = Capabilities::default();
+    let text = page(&unknown, Some(&drawn));
+    assert!(text.contains("Preset (1024 MB)"), "{text}");
+    assert!(
+        text.contains("Textures here take 1579 MB at full size")
+            && text.contains("Raise Texture memory"),
+        "{text}"
+    );
+    // Nothing drawn yet, nothing to say.
+    assert!(!page(&unknown, None).contains("Textures here take"));
+    // A 16 GB card: 4,096 MB without being asked, and it all fits.
+    let card = Capabilities {
+        video_memory: Some(16 << 30),
+        ..Capabilities::default()
+    };
+    let text = page(&card, Some(&drawn));
+    assert!(text.contains("Automatic (4096 MB)"), "{text}");
+    assert!(
+        text.contains("4096 MB budget, 2048 MB for meshes"),
+        "{text}"
+    );
+    assert!(!text.contains("Textures here take"), "{text}");
+}
+
+#[test]
 fn the_in_use_line_lists_each_ray_traced_effect() {
     use super::graphics::ray_tracing_in_use;
     use axcenity_render::{EffectiveGraphics, RayTracedAmbientOcclusion};

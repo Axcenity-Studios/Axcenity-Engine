@@ -16,6 +16,7 @@ mod mesh;
 mod overdraw;
 mod renderer;
 mod tone_mapping;
+pub mod video_memory;
 mod water;
 
 pub use atmosphere::Atmosphere;
@@ -49,6 +50,7 @@ pub use graphics::{
     RealtimeGiTier, ReflectionQuality, ShadowMapSize, ShadowQuality, SpotShadowMapSize,
     TEXTURE_BUDGET_RANGE, TextureQuality, read_capabilities,
 };
+pub use graphics::{MESH_BUDGET_SHARE, texture_budget_for, whole_gib};
 pub use overdraw::{MAX_LAYERS, OVERDRAW_BANDS, OVERDRAW_STEP, OverdrawStats, layers_of};
 #[cfg(feature = "debug-views")]
 pub use renderer::DebugView;

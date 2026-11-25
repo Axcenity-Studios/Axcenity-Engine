@@ -1,5 +1,7 @@
 //! World streaming's background uploads (Phase 80): meshes and textures
-//! come in on their own thread, and what stops being drawn leaves the GPU.
+//! come in on their own thread, and what stops being drawn leaves the GPU:
+//! by the clock, or, in a renderer told to keep it, only past its budget
+//! (`undrawn.rs`).
 
 use super::*;
 use glam::Mat4;
@@ -133,6 +135,74 @@ fn what_stops_being_drawn_leaves_the_gpu_and_uploads_again_on_the_way_back() {
         renderer.scene.gpu_mesh(MeshKey::Custom(902)).is_some(),
         "loaded again when it comes back"
     );
+}
+
+/// A long time without a draw: the frames, and the seconds (the clock of
+/// recent frames forgets them).
+fn a_long_time_passes(renderer: &mut TextureRenderer) {
+    renderer.scene.frame += KEEP_UNDRAWN_FRAMES;
+    renderer.scene.frame_clock.clear();
+}
+
+#[test]
+fn a_kept_mesh_stays_however_long_it_goes_undrawn_while_meshes_fit_their_budget() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+    renderer.set_keep_undrawn(true);
+    renderer.render(&list_of(vec![mesh_item(905)])).unwrap();
+    let held = renderer.scene.mesh_bytes.total();
+    assert!(held < renderer.scene.graphics.mesh_budget);
+
+    let empty = list_of(Vec::new());
+    for _ in 0..3 {
+        a_long_time_passes(&mut renderer);
+        renderer.render(&empty).unwrap();
+    }
+    assert!(
+        renderer.scene.gpu_mesh(MeshKey::Custom(905)).is_some(),
+        "within the budget it stays: cutting back to it uploads nothing"
+    );
+    assert_eq!(renderer.scene.mesh_bytes.total(), held);
+}
+
+#[test]
+fn past_the_mesh_budget_the_least_recently_drawn_undrawn_meshes_leave_first() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+    renderer.set_keep_undrawn(true);
+    // Three meshes, each last drawn a long time after the one before.
+    for key in [906, 907, 908] {
+        a_long_time_passes(&mut renderer);
+        renderer.render(&list_of(vec![mesh_item(key)])).unwrap();
+    }
+    let on_gpu = |renderer: &TextureRenderer, key: u64| {
+        renderer.scene.gpu_mesh(MeshKey::Custom(key)).is_some()
+    };
+    assert!([906, 907, 908].iter().all(|&key| on_gpu(&renderer, key)));
+
+    // One byte too many: the oldest alone makes room. The newest was drawn
+    // lately, so it would stay whatever the budget.
+    renderer.scene.graphics.mesh_budget = renderer.scene.mesh_bytes.total() - 1;
+    renderer.render(&list_of(vec![mesh_item(908)])).unwrap();
+    assert!(!on_gpu(&renderer, 906), "the least recently drawn left");
+    assert!(on_gpu(&renderer, 907) && on_gpu(&renderer, 908));
+
+    // No room at all: everything not drawn lately leaves, and what is
+    // being drawn stays.
+    renderer.scene.graphics.mesh_budget = 0;
+    renderer.render(&list_of(vec![mesh_item(908)])).unwrap();
+    assert!(!on_gpu(&renderer, 907));
+    assert!(on_gpu(&renderer, 908), "what's drawn is never freed");
+
+    // Drawn again, what left is uploaded again.
+    renderer.render(&list_of(vec![mesh_item(906)])).unwrap();
+    assert!(on_gpu(&renderer, 906));
 }
 
 #[test]

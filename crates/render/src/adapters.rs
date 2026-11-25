@@ -6,7 +6,7 @@
 //! wgpu 25 managed (`docs/rendering/pipeline.md`, "Graphics API").
 //! `WGPU_BACKEND=vulkan` (or `dx12`, `metal`, `gl`) picks one by hand.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// A wgpu instance for every API this machine has, or only the ones
 /// `WGPU_BACKEND` names.
@@ -91,6 +91,23 @@ pub fn adapter_can_ray_trace() -> bool {
     RAY_TRACING_OFFERED.load(Ordering::Relaxed)
 }
 
+/// The PCI vendor (high half) and device of the card a device was last
+/// opened on, by [`with_ray_queries`]; 0 before that and for software
+/// drawing. A renderer made from a device alone (`TextureRenderer::new`)
+/// has no adapter to ask, so [`opened_card_memory`] reads the card's
+/// memory by these.
+static OPENED_CARD: AtomicU64 = AtomicU64::new(0);
+
+/// The memory, in bytes, of the card a device was last opened on, where
+/// the system says ([`crate::video_memory`]): what the memory budgets are
+/// worked out from. `None` before any device was opened through
+/// [`with_ray_queries`], for software drawing and for a card that doesn't
+/// say.
+pub fn opened_card_memory() -> Option<u64> {
+    let card = OPENED_CARD.load(Ordering::Relaxed);
+    crate::video_memory::read((card >> 32) as u32, card as u32)
+}
+
 /// The environment variable that overrides the hardware ray tracing
 /// setting: `1` opens devices with it, `0` without it.
 pub const RAY_TRACING_VARIABLE: &str = "AXCENITY_RAY_TRACING";
@@ -113,9 +130,18 @@ pub fn ray_tracing_override() -> Option<bool> {
 /// flashed in the editor's viewport on an RX 9070 XT under DirectX 12).
 /// `AXCENITY_RAY_TRACING=1` opens devices with it whatever the setting,
 /// and `=0` without it.
+///
+/// Every device is opened through here, so it also notes which card that
+/// is, for [`opened_card_memory`].
 // The one unsafe call is wgpu's opt-in to its experimental features.
 #[allow(unsafe_code)]
 pub fn with_ray_queries(adapter: &wgpu::Adapter, descriptor: &mut wgpu::DeviceDescriptor<'_>) {
+    let info = adapter.get_info();
+    let card = match info.device_type {
+        wgpu::DeviceType::Cpu => 0,
+        _ => (u64::from(info.vendor) << 32) | u64::from(info.device),
+    };
+    OPENED_CARD.store(card, Ordering::Relaxed);
     let offered = adapter
         .features()
         .contains(wgpu::Features::EXPERIMENTAL_RAY_QUERY);

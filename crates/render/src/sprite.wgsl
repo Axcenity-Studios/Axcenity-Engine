@@ -15,6 +15,11 @@ struct Sprites {
 };
 
 @group(0) @binding(0) var<uniform> sprites: Sprites;
+
+// Box `i` of the sprites' copy of the dust, for fog.wgsl.
+fn fog_dust(i: u32) -> DustBox {
+    return sprites.fog.dust[i];
+}
 @group(1) @binding(0) var sprite_texture: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
 

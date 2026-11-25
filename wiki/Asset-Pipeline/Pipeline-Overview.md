@@ -43,7 +43,7 @@ flowchart TD
   subgraph Draw["Draw"]
     D1["scene: mesh_cache shares meshes,<br/>materials, skins (I8); retained items (M4)"] --> D2["render upload_new on first sight:<br/>BC7/BC5 levels as-is, or RGBA8 + CPU mips"]
     D2 --> D3[fit_texture_budget: drop largest mips<br/>of least recently drawn]
-    D3 --> D4[free after 600 undrawn frames]
+    D3 --> D4["undrawn: kept within the budgets (player, viewport),<br/>or freed after 600 frames and 10 s"]
   end
   subgraph Ship["Build Game"]
     S1["pack_game_with cooked_only: current .axtex<br/>(texture sources shipped empty, listed: G12),<br/>models + .axlod, .axmodel → game.axgame v2 (zstd)"] --> S2["player unpacks (8 threads, mtimes kept)<br/>→ cooked copies trusted without hashing"]

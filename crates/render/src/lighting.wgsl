@@ -198,6 +198,12 @@ struct Light {
 const LIGHTS_PER_TILE: u32 = 64u;
 
 @group(0) @binding(0) var<uniform> frame: Frame;
+
+// Box `i` of the frame's dust, for fog.wgsl: read straight from the uniform,
+// so only that box is loaded (see the note at the top of fog.wgsl).
+fn fog_dust(i: u32) -> DustBox {
+    return frame.fog.dust[i];
+}
 @group(0) @binding(1) var shadow_map: texture_depth_2d_array;
 @group(0) @binding(2) var shadow_sampler: sampler_comparison;
 @group(0) @binding(3) var<storage, read> lights: array<Light>;
@@ -1350,7 +1356,7 @@ fn weather_sample_as(world_position: vec3<f32>, ground: bool) -> vec4<f32> {
     var exposure = 1.0;
     let dust_count = min(frame.fog.dust_count.x, MAX_DUST);
     for (var i = 0u; i < dust_count; i++) {
-        let b = frame.fog.dust[i];
+        let b = fog_dust(i);
         if b.color.w > 0.5 {
             exposure *= 1.0 - dust_inside(b, world_position);
         }
@@ -1910,7 +1916,7 @@ fn lightning_fill(world_position: vec3<f32>, n: vec3<f32>, color: vec3<f32>, str
     var open = weather_field_sample(world_position, false).x;
     let dust_count = min(frame.fog.dust_count.x, MAX_DUST);
     for (var i = 0u; i < dust_count; i++) {
-        let b = frame.fog.dust[i];
+        let b = fog_dust(i);
         if b.color.w > 0.5 {
             open *= 1.0 - dust_inside(b, world_position);
         }

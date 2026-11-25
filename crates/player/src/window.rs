@@ -131,6 +131,23 @@ impl ApplicationHandler for App {
                 }
                 self.sim.scripts.set_graphics(&settings, &capabilities);
                 set_graphics(&mut renderer, &settings);
+                // What the camera turns or cuts away from stays on the GPU
+                // while it fits the budgets, so coming back to it doesn't
+                // stall a frame uploading it again.
+                renderer.set_keep_undrawn(true);
+                // A player has no settings screen: the log says what the
+                // memory budgets came to on this card.
+                let effective = renderer.graphics();
+                log::info!(
+                    "memory budgets: {} MB of textures, {} MB of meshes ({})",
+                    effective.texture_budget >> 20,
+                    effective.mesh_budget >> 20,
+                    match capabilities.video_memory {
+                        Some(memory) =>
+                            format!("this card has {} GB", axcenity_render::whole_gib(memory)),
+                        None => "this card doesn't say how much memory it has".to_owned(),
+                    },
+                );
                 self.renderer = Some(renderer);
             }
             Err(err) => return self.fail(event_loop, err),
