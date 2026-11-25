@@ -1215,9 +1215,13 @@ fn the_realistic_clothing_page_is_drawn_with_the_test_tee() {
         also_fills: Vec::new(),
         tags: Vec::new(),
         limitations: Vec::new(),
-        intake: None,
+        home_frame: axcenity_avatar::fit::HomeFrame::Masculine,
+        proxy_kind: axcenity_avatar::fit::ProxyKind::Body,
+        sleeveless: false,
+        skip_align: false,
+        generate_shrink_under: true,
+        strict_validate: false,
         texture_size: None,
-        worn_with: None,
     });
     assert!(imported.is_ok(), "{:?}", imported.err());
     workspace.apply(Intent::PickCategory(Category::Clothing));

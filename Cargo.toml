@@ -94,6 +94,9 @@ egui-phosphor = { version = "0.14", default-features = false, features = ["fill"
 # 0.21 is the release for egui 0.36: upgrade it with eframe. `serde` saves the
 # layout between runs.
 egui_dock = { version = "0.21", features = ["serde"] }
+# Pure-Rust sparse Cholesky (`LLT`) solver for biharmonic skin-weight and
+# morph-delta inpainting in `axcenity-avatar` (ADR-0046), MIT.
+faer = { version = "0.22", default-features = false, features = ["std", "sparse"] }
 glam = "0.34"
 # GPU text for the game's UI. 0.12 is the release for wgpu 30: upgrade it with wgpu.
 glyphon = "0.12"

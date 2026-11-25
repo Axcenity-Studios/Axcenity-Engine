@@ -360,6 +360,23 @@ fn a_garment_is_hidden_under_the_ones_worn_over_it() {
     assert_eq!(covers(&part("test/tee").tucked_into), ["Skirt.cover.png"]);
     assert_eq!(covers(&part("test/skirt").under), ["Hood.cover.png"]);
     assert!(part("test/skirt").tucked_into.is_empty());
+    // ADR-0046: Shrink_Under activates live only when worn under a higher layer.
+    assert_eq!(
+        part("test/tee").shapes.get(crate::fit::SHRINK_UNDER_SHAPE),
+        Some(&1.0)
+    );
+    assert_eq!(
+        part("test/skirt")
+            .shapes
+            .get(crate::fit::SHRINK_UNDER_SHAPE),
+        Some(&1.0)
+    );
+    // Nothing is over the hood, so it names no shape of its own and wears
+    // the body's identity.
+    assert_eq!(
+        part("test/hood").shapes.get(crate::fit::SHRINK_UNDER_SHAPE),
+        None
+    );
 }
 
 #[test]

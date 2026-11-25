@@ -303,6 +303,8 @@ def make(key, built_root, scratch):
     src = f"{item['source']}Lod0"
     shutil.copy(os.path.join(lod0, f"{src}.binding.json"), os.path.join(out_dir, f"{obj}.binding.json"))
     shutil.copy(os.path.join(lod0, f"{src}.png"), os.path.join(out_dir, f"{obj}.png"))
+    if os.path.isfile(os.path.join(lod0, f"{src}.cover.png")):
+        shutil.copy(os.path.join(lod0, f"{src}.cover.png"), os.path.join(out_dir, f"{obj}.cover.png"))
     with open(os.path.join(lod0, f"{src}.item.json")) as f:
         imported = json.load(f)
     manifest = {
@@ -315,7 +317,11 @@ def make(key, built_root, scratch):
         "tier": "built_in",
         "bases": [BASE],
         "model": {"file": f"{obj}.glb", "object": f"AxcenityRealistic/{obj}"},
-        "hides": imported.get("hides", []),
+        # What it hides when worn: the import's cover map (ADR-0045), and
+        # the regions it names besides.
+        **({"cover_map": f"{obj}.cover.png"} if imported.get("cover_map") else {}),
+        **({"hides": imported.get("hides", [])}
+           if imported.get("hides") or not imported.get("cover_map") else {}),
         "materials": [dict({"name": n, "shading": m.get("shading", "cloth"), "label": m["label"]},
                            **({"role": m["role"]} if "role" in m else {}))
                       for n, m in item["materials"].items()],

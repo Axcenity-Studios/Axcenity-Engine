@@ -863,7 +863,10 @@ pub(super) fn update_custom_mesh(
 }
 
 /// A caller's mesh as the GPU's corners, or `None` (with a warning) if
-/// its data doesn't fit together.
+/// its data doesn't fit together. A mesh without triangles is `None`
+/// too, with no warning: there is nothing of it to draw (a part of a
+/// garment that lies wholly under another one has its corners left and
+/// every triangle taken out).
 fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
     let positions = source.positions();
     let normals = source.normals();
@@ -871,6 +874,9 @@ fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
     let tangents = source.tangents();
     let indices = source.indices();
     let count = positions.len();
+    if indices.is_empty() {
+        return None;
+    }
     let fits = count > 0
         && normals.len() == count
         && (uvs.is_empty() || uvs.len() == count)

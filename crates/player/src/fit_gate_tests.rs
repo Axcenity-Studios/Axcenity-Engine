@@ -106,9 +106,13 @@ pub(super) fn gate_library() -> &'static Path {
                 also_fills: Vec::new(),
                 tags: Vec::new(),
                 limitations: Vec::new(),
-                intake: None,
+                home_frame: axcenity_avatar::fit::HomeFrame::Masculine,
+                proxy_kind: axcenity_avatar::fit::ProxyKind::Body,
+                sleeveless: false,
+                skip_align: false,
+                generate_shrink_under: true,
+                strict_validate: false,
                 texture_size: None,
-                worn_with: None,
             })
             .expect("the test tee imports");
             // What it hides, and what it covers at rest but leaves drawn

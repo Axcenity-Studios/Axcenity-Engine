@@ -16,27 +16,17 @@ use super::cover::{COVER_SIZE, CoverReport, Proof, cover_map, skin_uvs};
 use super::coverage::{RegionMap, classify, coverage, hidden_regions, triangle_regions};
 use super::glb::{FittedModel, PieceMaps, write_fitted_glb};
 use super::hiding::pose_safe_hides;
-use super::intake::{IntakeOptions, IntakeReport, prepare};
 use super::pose::{FinishPose, fit_poses};
+use super::proxy::ProxyKind;
 use super::surface::Surface;
 use super::thumbnail::{thumbnail, write_png};
-use super::transfer::{
-    FitOptions, FitReport, Layer, carried_shapes, extremes_near, fit_garment, garment_at,
-};
+use super::transfer::{FitOptions, FitReport, HomeFrame, carried_shapes, fit_garment, garment_at};
+use super::validate::validate_garment;
 use super::{BodyMesh, FitError, GarmentMesh, is_mask_shape};
 use crate::{
     BaseManifest, CatalogueItem, ContentTier, Description, Fit, ItemKind, ItemManifest, Library,
     Limitation, MaterialSlot, ModelRef, Quality, ShadingModel, Source, body_shape_weights,
 };
-
-/// A side of a triangle of a garment that came through the intake may
-/// grow this many times in a fit pose before the triangle is a web and
-/// comes out ([`FitOptions::cut_webs`]). Cloth over a bent elbow or knee
-/// grows about half as much again, and cloth under a level arm two or
-/// three times: only what is drawn out into a string goes. (At 3 the
-/// cut left holes in sleeves that show with the arms down, which is how
-/// a character is mostly seen.)
-const WEB: f32 = 5.0;
 
 /// What to import and where.
 #[derive(Clone, Debug)]
@@ -58,9 +48,10 @@ pub struct ImportRequest {
     pub slot: Option<String>,
     /// Its layer (`None`: 1, a base layer).
     pub layer: Option<u8>,
-    /// Its clearance from the body and lower layers (metres).
+    /// Its clearance from the body (metres; used for chord-sag validation).
     pub margin: f32,
-    /// Items it is worn over (by ID): it is pushed clear of each.
+    /// Retained for compatibility; ADR-0046 uses non-destructive `Shrink_Under`
+    /// and UV cover maps instead of destructive rest-mesh push-out.
     pub under: Vec<String>,
     /// A sentence for the browser.
     pub about: Option<String>,
@@ -78,40 +69,40 @@ pub struct ImportRequest {
     /// fitted in are the runtime's ([`FinishPose`]). `None`: the fit's
     /// poses turn only the limbs.
     pub finish_pose: Option<FinishPose>,
-    /// For a garment that was not made on the body (a generated or
-    /// downloaded one, in its own size, place and pose): how to make it
-    /// ready ([`prepare`](super::prepare)) in place of [`align`]. `None`:
-    /// it is in the body's rest pose and only aligned.
-    pub intake: Option<IntakeOptions>,
+    /// Home frame the garment was authored on (no cross-frame rest warping).
+    pub home_frame: HomeFrame,
+    /// Proxy surface to bind against (`Body` or `Skirt`).
+    pub proxy_kind: ProxyKind,
+    /// When `true`, excludes `LeftArm`/`RightArm` during part assignment so
+    /// sleeveless garments bind strictly to `Trunk`.
+    pub sleeveless: bool,
+    /// When `true`, treats the source mesh as already aligned to its canonical
+    /// home frame and skips legacy `align()` (0.00 mm rest drift).
+    pub skip_align: bool,
+    /// Generates non-destructive `Shrink_Under` morph toward Layer Envelope `layer - 1`.
+    pub generate_shrink_under: bool,
+    /// When `true`, rejects garments that fail [`validate_garment`] (non-manifold
+    /// edges, degenerate triangles, or opening chord-sag violations).
+    pub strict_validate: bool,
     /// Carries the texture maps of the garment's file (a `.glb`'s base
     /// colour, normal and metal-roughness maps) into the item's model,
     /// each made no larger than this many pixels a side and stored as
     /// JPEG. `None`: the item has its materials' plain colours only.
     pub texture_size: Option<u32>,
-    /// The garments it will be worn with round the hips, and how
-    /// ([`WornWithRequest`]). `None`: it is fitted to the body and the
-    /// items under it alone.
-    pub worn_with: Option<WornWithRequest>,
 }
 
-/// The bottoms a top or a jacket is fitted for ([`Hang`](super::Hang)):
-/// items of the library, by ID.
-#[derive(Clone, Debug, PartialEq)]
-pub struct WornWithRequest {
-    pub items: Vec<String>,
-    /// Hanging over them, or tucked into them.
-    pub worn: super::Worn,
-    /// The farthest its cloth is moved for them (metres).
-    pub most: f32,
-}
-
-/// The regions of a body's map round the hips: where a top's hem lies
-/// over a bottom ([`WornWithRequest`]). A coat's skirt farther down hangs
-/// as it was made.
+/// The regions of a body's map round the hips: where a tucked top is hidden
+/// whole under a bottom (a cover map's blue).
 const ROUND_THE_HIPS: [&str; 3] = ["waist", "hips", "thighs_top"];
-/// The clearance a garment keeps from the cloth of those it is worn with
-/// (metres).
-const WORN_CLEAR: f32 = 0.003;
+
+/// The indices of [`ROUND_THE_HIPS`] in `base`'s region map.
+fn round_the_hips(base: &BaseManifest) -> Vec<u8> {
+    base.regions
+        .iter()
+        .filter(|region| ROUND_THE_HIPS.contains(&region.id.as_str()))
+        .filter_map(|region| region.map_index)
+        .collect()
+}
 
 /// How the garment was moved onto the body: each corner `p` became
 /// `p * scale + offset`.
@@ -145,8 +136,6 @@ pub struct Imported {
     pub unhidden: Vec<(String, f32)>,
     /// What its cover map hides, in body triangles (ADR-0045).
     pub cover: CoverReport,
-    /// What the intake did, when the request asked for one.
-    pub intake: Option<IntakeReport>,
 }
 
 fn library_error(message: impl Into<String>) -> FitError {
@@ -403,8 +392,22 @@ pub fn extremes_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f
 /// on each, so these are a few bodies far apart, not the [`extremes_of`]
 /// pairs.)
 pub fn pose_states_of(base: &BaseManifest, library: &Library) -> Vec<Vec<(String, f32)>> {
+    pose_states_for_frame(base, library, HomeFrame::Both)
+}
+
+/// Frame-scoped pose states for `home_frame`: masculine garments prove coverage
+/// on masculine states, feminine garments on feminine states, and `Both` on both.
+pub fn pose_states_for_frame(
+    base: &BaseManifest,
+    library: &Library,
+    home_frame: HomeFrame,
+) -> Vec<Vec<(String, f32)>> {
     let frames: Vec<Option<f32>> = match base.parameter("frame") {
-        Some(frame) => vec![Some(frame.range[0]), Some(frame.range[1])],
+        Some(frame) => match home_frame {
+            HomeFrame::Masculine => vec![Some(frame.range[0])],
+            HomeFrame::Feminine => vec![Some(frame.range[1])],
+            HomeFrame::Both => vec![Some(frame.range[0]), Some(frame.range[1])],
+        },
         None => vec![None],
     };
     let mut sets: Vec<Vec<(String, f32)>> = Vec::new();
@@ -501,113 +504,59 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
     if garment.is_empty() {
         return Err(FitError::Empty);
     }
-    let (alignment, intake) = match &request.intake {
-        Some(options) => {
-            let mut options = options.clone();
-            options.finish_pose = options.finish_pose.or(request.finish_pose);
-            let prepared = prepare(&garment, &body, &options)?;
-            garment = prepared.garment;
-            let alignment = Alignment {
-                scale: prepared.report.scale,
-                offset: Vec3::from(prepared.report.offset),
-                units: 1.0,
-                spread_before: 0.0,
-                spread_after: 0.0,
-            };
-            (alignment, Some(prepared.report))
+    let alignment = if request.skip_align {
+        Alignment {
+            scale: 1.0,
+            offset: Vec3::ZERO,
+            units: 1.0,
+            spread_before: 0.0,
+            spread_after: 0.0,
         }
-        None => (align(&mut garment, &body), None),
+    } else {
+        align(&mut garment, &body)
     };
-
-    // The layers it is worn over.
-    let mut under = Vec::new();
-    for id in &request.under {
-        let item = library
-            .item(id)
-            .ok_or_else(|| library_error(format!("the library has no item `{id}`")))?;
-        let model = item
-            .model
-            .as_ref()
-            .ok_or_else(|| library_error(format!("`{id}` has no model")))?;
-        let file = library
-            .path_of(id, &model.file)
-            .ok_or_else(|| library_error(format!("`{id}`'s model isn't in the library")))?;
-        let mesh_id = match &model.object {
-            Some(object) => format!("{file}#{object}"),
-            None => file,
-        };
-        let loaded = assets
-            .model_blocking(&mesh_id)
-            .ok_or_else(|| FitError::Model(format!("`{mesh_id}` doesn't load")))?;
-        under.push(Layer::of_body_mesh(id, &BodyMesh::from_model(&loaded)?));
+    let validation = validate_garment(&garment, request.margin);
+    if request.strict_validate && !validation.is_clean() {
+        return Err(FitError::Model(format!(
+            "`{}` failed canonical source validation: {}",
+            request.source.display(),
+            validation.warnings.join("; ")
+        )));
     }
 
     let map = region_map(&library, root, base)
         .ok_or_else(|| library_error(format!("`{}` has no region map", base.id)))?;
     let regions = triangle_regions(&body, &map);
-    // The garments it is worn with round the hips.
-    let hang = match &request.worn_with {
-        Some(wanted) if !wanted.items.is_empty() => {
-            let below_ids: Vec<u8> = base
-                .regions
-                .iter()
-                .filter(|region| ROUND_THE_HIPS.contains(&region.id.as_str()))
-                .filter_map(|region| region.map_index)
-                .collect();
-            let mut with = Vec::new();
-            for id in &wanted.items {
-                let item = library
-                    .item(id)
-                    .ok_or_else(|| library_error(format!("the library has no item `{id}`")))?;
-                let model = item
-                    .model
-                    .as_ref()
-                    .ok_or_else(|| library_error(format!("`{id}` has no model")))?;
-                let file = library
-                    .path_of(id, &model.file)
-                    .ok_or_else(|| library_error(format!("`{id}`'s model isn't in the library")))?;
-                let mesh_id = match &model.object {
-                    Some(object) => format!("{file}#{object}"),
-                    None => file,
-                };
-                let loaded = assets
-                    .model_blocking(&mesh_id)
-                    .ok_or_else(|| FitError::Model(format!("`{mesh_id}` doesn't load")))?;
-                let mesh = BodyMesh::from_model(&loaded)?;
-                with.push(super::WornWith {
-                    name: id.clone(),
-                    positions: mesh.positions,
-                    triangles: mesh.triangles,
-                });
-            }
-            Some(super::Hang {
-                worn: wanted.worn,
-                with,
-                below: regions.iter().map(|r| below_ids.contains(r)).collect(),
-                clear: WORN_CLEAR,
-                most: wanted.most,
-            })
-        }
-        _ => None,
-    };
 
     let options = FitOptions {
         margin: request.margin,
+        layer: request.layer.unwrap_or(1),
+        home_frame: request.home_frame,
+        proxy_kind: request.proxy_kind,
+        sleeveless: request.sleeveless,
         shapes: carried_shapes(base, &body),
-        under,
-        extremes: extremes_near(&body, &garment, &extremes_of(base, &library)),
         poses: fit_poses(&body.rig, request.finish_pose),
-        pose_states: pose_states_of(base, &library),
-        // A garment that came through the intake wasn't made on the body.
-        smooth_shapes: if intake.is_some() { 12 } else { 0 },
-        push_reach: if intake.is_some() { 0.12 } else { 0.03 },
-        cut_webs: if intake.is_some() { WEB } else { 0.0 },
-        weights_by_part: intake.is_some(),
-        skirt_from: intake.as_ref().and_then(|report| report.skirt_from),
-        hang,
+        pose_states: pose_states_for_frame(base, &library, request.home_frame),
+        generate_shrink_under: request.generate_shrink_under,
         ..FitOptions::default()
     };
     let fitted = fit_garment(&body, &garment, &options)?;
+
+    // For `HomeFrame::Feminine`, evaluate coverage, pose_safe_hides, and cover_map
+    // against the feminine rest body (with `Frame_Feminine` baked into rest and
+    // removed from shapes) so feminine garments are never tested against the wider
+    // masculine rest body.
+    let home_body: BodyMesh = if request.home_frame == HomeFrame::Feminine {
+        let mut hb = body.clone();
+        let hw = request.home_frame.rest_weights();
+        let (hp, hn) = body.shaped(&hw);
+        hb.positions = hp;
+        hb.normals = hn;
+        hb.shapes.retain(|s| s.name != "Frame_Feminine");
+        hb
+    } else {
+        body.clone()
+    };
 
     // What it covers: its regions and slot.
     let surface = Surface::new(
@@ -615,12 +564,12 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         fitted.garment.normals(),
         fitted.garment.triangles(),
     );
-    let covered = coverage(&body, &regions, &surface);
+    let covered = coverage(&home_body, &regions, &surface);
     // Hidden only where the cloth keeps the skin covered in every pose:
     // hidden skin out from under the cloth is a hole.
     let (hides, unhidden) = pose_safe_hides(
         base,
-        &body,
+        &home_body,
         &fitted,
         &regions,
         hidden_regions(base, &covered),
@@ -683,8 +632,8 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
             None => Vec::new(),
         },
         skin_uvs: &skin_uvs(&body, &fitted.binding),
-        // A tenth of a millimetre, where the moves were smoothed.
-        least_move: if intake.is_some() { 1e-4 } else { 0.0 },
+        // Drop sub-0.1 mm sparse delta tails to keep fitted `.glb` files compact.
+        least_move: 1e-4,
     });
     write(&format!("{object}.glb"), &glb)?;
     let mut binding = fitted.binding.clone();
@@ -698,8 +647,8 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
     let rest = fitted.garment.positions();
     let cloth_at = |weights: &[(String, f32)]| garment_at(&rest, &fitted.shapes, weights);
     let (cover, cover_report) = cover_map(
-        &body,
-        &regions,
+        &home_body,
+        (&regions, &round_the_hips(base)),
         &surface,
         (&fitted.joints, &fitted.weights),
         Some(&Proof {
@@ -809,7 +758,6 @@ pub fn import_garment(request: &ImportRequest) -> Result<Imported, FitError> {
         coverage,
         unhidden,
         cover: cover_report,
-        intake,
     })
 }
 
@@ -871,7 +819,7 @@ pub fn remake_cover_map(
     let cloth_at = |weights: &[(String, f32)]| worn.shaped(weights).0;
     let (cover, report) = cover_map(
         &body,
-        &regions,
+        (&regions, &round_the_hips(base)),
         &surface,
         (&worn.joints, &worn.weights),
         Some(&Proof {

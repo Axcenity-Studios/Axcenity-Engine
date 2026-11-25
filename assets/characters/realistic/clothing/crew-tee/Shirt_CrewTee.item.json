@@ -13,7 +13,7 @@
     "file": "Shirt_CrewTee.glb",
     "object": "AxcenityRealistic/Shirt_CrewTee"
   },
-  "hides": [],
+  "cover_map": "Shirt_CrewTee.cover.png",
   "materials": [
     {
       "name": "Jersey",

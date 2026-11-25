@@ -394,6 +394,23 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         let name = model
             .and_then(|model| model.object.as_deref())
             .map_or_else(|| last_segment(&manifest.id), last_segment);
+        let under: Vec<String> = manifest
+            .wearing_order()
+            .map(|own| {
+                covering
+                    .iter()
+                    .filter(|(id, order, _, _)| *id != manifest.id && *order > own)
+                    .map(|(_, _, map, _)| map.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        // ADR-0046: the non-destructive `Shrink_Under` morph is on only
+        // while a higher garment is worn over this one. It isn't named at
+        // all otherwise: a part with no shapes of its own wears the body's
+        // identity, and one with any gets an identity of its own.
+        if manifest.kind == crate::ItemKind::Garment && !under.is_empty() {
+            shapes.insert(crate::fit::SHRINK_UNDER_SHAPE.to_owned(), 1.0);
+        }
         parts.push(ResolvedPart {
             name: name.to_owned(),
             item: Some(manifest.id.clone()),
@@ -406,16 +423,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             materials,
             shapes,
             transform: item.transform.unwrap_or_default(),
-            under: manifest
-                .wearing_order()
-                .map(|own| {
-                    covering
-                        .iter()
-                        .filter(|(id, order, _, _)| *id != manifest.id && *order > own)
-                        .map(|(_, _, map, _)| map.clone())
-                        .collect()
-                })
-                .unwrap_or_default(),
+            under,
             // A top or a jacket under a bottom is tucked into it.
             tucked_into: manifest
                 .wearing_order()
