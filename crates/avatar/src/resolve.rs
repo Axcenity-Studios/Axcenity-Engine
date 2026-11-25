@@ -150,6 +150,12 @@ pub struct Resolved {
     /// the base's `material_maps` nearest the character's values. A slot
     /// that isn't here draws its file's own.
     pub colour_maps: BTreeMap<String, String>,
+    /// For a slot of `colour_maps` between two maps (the Age slider
+    /// between two photographed skins): the map its own fades toward, as
+    /// a library path, and how far it has (0 to 1; a half where the two
+    /// are as near). A shading model that can't draw two (all but Skin)
+    /// draws `colour_maps`'s alone.
+    pub colour_blends: BTreeMap<String, (String, f32)>,
 }
 
 /// One mesh of a resolved character.
@@ -538,14 +544,25 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
     }
     // The colour map nearest the character's values, for each material
     // the base offers any for (ADR-0048).
-    let colour_maps: BTreeMap<String, String> = base
-        .material_maps_for(&values)
-        .into_iter()
+    let nearest = base.material_maps_for(&values);
+    let colour_maps: BTreeMap<String, String> = nearest
+        .iter()
         .filter_map(|(material, map)| {
             Some((
-                material.to_owned(),
+                (*material).to_owned(),
                 library.path_of(&base.id, &map.colour_map)?,
             ))
+        })
+        .collect();
+    // And the one it fades toward, where it is between two (the Age
+    // slider between two photographed skins).
+    let colour_blends: BTreeMap<String, (String, f32)> = nearest
+        .iter()
+        .filter(|(material, _)| colour_maps.contains_key(**material))
+        .filter_map(|(material, map)| {
+            let (toward, amount) = base.material_blend_for(map, &values)?;
+            let path = library.path_of(&base.id, &toward.colour_map)?;
+            (amount > 0.0).then(|| ((*material).to_owned(), (path, amount)))
         })
         .collect();
     // The body's weights are what the layers add up to, so the two can't
@@ -572,6 +589,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .collect(),
         covers: covering.into_iter().map(|(_, _, map, _)| map).collect(),
         colour_maps,
+        colour_blends,
     })
 }
 

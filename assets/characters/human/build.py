@@ -65,12 +65,24 @@ PARTS = (
     ("Eyes", "eyes/high-poly/high-poly.mhclo", "Eyes", "Eyes"),
     ("Teeth", "teeth/teeth_base/teeth_base.mhclo", "Teeth", "Teeth"),
     ("Tongue", "tongue/tongue01/tongue01.mhclo", "Tongue", "Tongue"),
-    ("Brows", "eyebrows/eyebrow001/eyebrow001.mhclo", "Eyebrows", "Brows"),
+    # The fullest of MakeHuman's natural brows: the thin ones (001) are a
+    # pencil line at a head's distance.
+    ("Brows", "eyebrows/eyebrow008/eyebrow008.mhclo", "Eyebrows", "Brows"),
     ("Lashes", "eyelashes/eyelashes01/eyelashes01.mhclo", "Eyelashes", "Lashes"),
 )
 # How a part's texture is see-through: the brows' and lashes' hairs fade
 # out, and the eye's outer shell (the cornea) is clear over the iris.
-PART_ALPHA = {"Brows": "blend", "Lashes": "blend", "Eyes": "cut"}
+# Brows and lashes are hair: cut out by their textures, with soft edges
+# under TAA and a shadow through their holes (`docs/rendering/hair.md`).
+PART_ALPHA = {"Brows": "cut", "Lashes": "cut", "Eyes": "cut"}
+# What tells the engine a material's shading model (glTF `extras`, read by
+# `assets`: `docs/rendering/skin.md`); the manifest says the same
+# (`manifests.MATERIAL_SHADING`).
+MATERIAL_EXTRAS = {
+    "Skin": {"axcenity_shading": "skin"},
+    "Brows": {"axcenity_shading": "hair", "axcenity_hair_shell": True},
+    "Lashes": {"axcenity_shading": "hair"},
+}
 SKIN = f"skins/{skins.DEFAULT}/{skins.DEFAULT}.mhmat"
 
 # The body's shapes, each a sum of MakeHuman bodies: (weight, settings).
@@ -784,9 +796,10 @@ def main():
         bpy.data.objects.remove(o)
 
     armature = build_armature(joints)
-    objects = [make_object(name, piece, points, shapes, groups, material_of(*material), armature)
+    objects = [make_object(name, piece, points, shapes, groups,
+                           material_of(*material, extras=MATERIAL_EXTRAS.get(material[0])), armature)
                for name, piece, points, shapes, groups, material in pieces]
-    export(os.path.join(args.out, PARTS_FILE), armature, objects)
+    export(os.path.join(args.out, PARTS_FILE), armature, objects, extras=True)
     object_names = [o.name for o in objects]
     material_names = sorted({m.name for o in objects for m in o.data.materials})
 
@@ -802,6 +815,10 @@ def main():
     report["face"] = {"controls": sorted(c for c in build_expressions if c in body_shapes),
                       "unmapped": list(face.UNMAPPED), "parameters": face_parameters,
                       "bones": face_bones}
+    # What a person can point at on the face, and the handles on it.
+    heads = {name: np.array(head) for name, (head, _, _) in joints.items()}
+    report["face"]["features"], report["face"]["handles"] = face.features_and_handles(
+        face_parameters, body_shapes, pieces[0][2], heads)
     report["frame_bones"] = frame_bones
     # Every MakeHuman skin as an image beside the manifest (ADR-0048).
     report["skins"] = skins.write(args.assets, args.out, args.texture_size)

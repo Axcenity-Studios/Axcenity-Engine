@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Female",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/human-female",
+    "kind": "character",
+    "about": "The human base's female body, as it's built.",
+    "order": 20
+  }
+}

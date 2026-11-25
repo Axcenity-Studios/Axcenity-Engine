@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Narrow face",
+  "base": "axcenity/human",
+  "parameters": {
+    "cheeks_bones_left": -0.3,
+    "cheeks_bones_right": -0.3,
+    "chin_width": -0.5,
+    "face_shape_scale_horiz": -0.6,
+    "lips_scale_horiz": -0.3,
+    "nose_scale_horiz": -0.4,
+    "nose_scale_vert": 0.3
+  },
+  "preset": {
+    "id": "axcenity/human-face-narrow",
+    "kind": "face",
+    "about": "A narrow head and chin, a long thin nose.",
+    "order": 40
+  }
+}

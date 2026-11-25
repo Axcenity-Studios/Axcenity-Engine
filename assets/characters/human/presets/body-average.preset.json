@@ -1,0 +1,11 @@
+{
+  "format_version": 2,
+  "name": "Average",
+  "base": "axcenity/human",
+  "preset": {
+    "id": "axcenity/human-body-average",
+    "kind": "body",
+    "about": "The body as built.",
+    "order": 10
+  }
+}

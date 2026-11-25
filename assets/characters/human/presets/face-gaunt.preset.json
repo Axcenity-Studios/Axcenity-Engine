@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Gaunt face",
+  "base": "axcenity/human",
+  "parameters": {
+    "cheeks_volume_left": -0.7,
+    "cheeks_volume_right": -0.7,
+    "eyes_bag_left": 0.3,
+    "eyes_bag_right": 0.3,
+    "face_shape_fat": -0.8,
+    "forehead_temple": -0.4,
+    "neck_neck_circ": -0.4
+  },
+  "preset": {
+    "id": "axcenity/human-face-gaunt",
+    "kind": "face",
+    "about": "Little fat on the face: hollow cheeks and temples, a thin neck.",
+    "order": 70
+  }
+}

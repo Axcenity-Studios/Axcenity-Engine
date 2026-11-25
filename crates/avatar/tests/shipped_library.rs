@@ -366,14 +366,30 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
     assert_eq!(count(PresetKind::Face), Some(9));
     assert_eq!(count(PresetKind::Character), Some(6));
     assert_eq!(count(PresetKind::Feature), Some(16));
-    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
-        let of_feature = library
+    let of_feature = |base: &str, feature: &str| {
+        library
             .presets
             .values()
+            .filter(|preset| preset.base == base)
             .filter_map(|preset| preset.preset())
             .filter(|block| block.feature.as_deref() == Some(feature))
-            .count();
-        assert_eq!(of_feature, presets, "{feature}");
+            .count()
+    };
+    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
+        assert_eq!(
+            of_feature("axcenity/realistic", feature),
+            presets,
+            "{feature}"
+        );
+    }
+    // The human base (`assets/characters/human/presets.py`): its two
+    // characters, six builds, eight faces, seven face shapes and noses.
+    let human = |kind| kinds.get(&("axcenity/human".to_owned(), kind)).copied();
+    assert_eq!(human(PresetKind::Character), Some(2));
+    assert_eq!(human(PresetKind::Body), Some(6));
+    assert_eq!(human(PresetKind::Face), Some(8));
+    for (feature, presets) in [("nose", 7), ("face_shape", 7)] {
+        assert_eq!(of_feature("axcenity/human", feature), presets, "{feature}");
     }
 }
 
@@ -809,7 +825,7 @@ fn the_human_bases_skins_follow_the_body_type_and_the_age() {
         "human/skins/young_caucasian_female2.jpg"
     );
     assert_eq!(
-        skin(&[("skin", 3.0), ("age", 0.3)]),
+        skin(&[("skin", 3.0), ("age", 0.2)]),
         "human/skins/young_caucasian_male2.jpg"
     );
     assert_eq!(
@@ -827,6 +843,48 @@ fn the_human_bases_skins_follow_the_body_type_and_the_age() {
             "human/skins/young_caucasian_female_special_suit.jpg"
         );
     }
+
+    // Between two ages the skin fades from one photograph to the next
+    // (each map's `blend`): none of the other at an age a skin was made
+    // for, a half of it where the two are as near, and the same mix from
+    // either side of that, so nothing snaps as the Age slider moves.
+    let blend = |values: &[(&str, f32)]| {
+        let mut character = Description::new("Skin", "axcenity/human");
+        for (id, value) in values {
+            character.parameters.insert((*id).to_owned(), *value);
+        }
+        let resolved = resolve(&library, &character).unwrap();
+        let own = resolved.colour_maps["Skin"].clone();
+        let toward = resolved.colour_blends.get("Skin").cloned();
+        (own, toward)
+    };
+    for age in [0.0, 0.5, 1.0] {
+        assert_eq!(blend(&[("age", age)]).1, None, "age {age}");
+    }
+    let young = "human/skins/young_caucasian_male.jpg".to_owned();
+    let middle = "human/skins/middleage_caucasian_male.jpg".to_owned();
+    let (own, toward) = blend(&[("age", 0.1)]);
+    let (other, amount) = toward.expect("between two skins");
+    assert_eq!((own, other), (young.clone(), middle.clone()));
+    assert!((amount - 0.2).abs() < 1e-5, "{amount}");
+    let (own, toward) = blend(&[("age", 0.4)]);
+    let (other, amount) = toward.expect("between two skins");
+    assert_eq!((own, other), (middle.clone(), young.clone()));
+    assert!((amount - 0.2).abs() < 1e-5, "{amount}");
+    // Just either side of the middle: half of each, whichever is "own".
+    let before = blend(&[("age", 0.2499)]).1.unwrap();
+    let after = blend(&[("age", 0.2501)]).1.unwrap();
+    assert_eq!((before.0, after.0), (middle, young));
+    assert!((before.1 - 0.5).abs() < 1e-3 && (after.1 - 0.5).abs() < 1e-3);
+    // The bodysuit is one image at every age: nothing to fade to.
+    assert_eq!(blend(&[("skin", 4.0), ("age", 0.3)]).1, None);
+    // The second Caucasian pair ages into the first pair's skins.
+    let (own, toward) = blend(&[("skin", 3.0), ("age", 0.1)]);
+    assert_eq!(own, "human/skins/young_caucasian_male2.jpg");
+    assert_eq!(
+        toward.unwrap().0,
+        "human/skins/middleage_caucasian_male.jpg"
+    );
 
     let start = Description::new("Npc", "axcenity/human");
     let mut drawn: std::collections::BTreeSet<String> = Default::default();
@@ -941,6 +999,104 @@ fn the_human_bases_hairstyles_follow_the_head_and_not_its_expressions() {
                     variant.id
                 );
             }
+        }
+    }
+}
+
+/// Paul, 2026-11-24: Randomize draws the human base's hairstyles though
+/// they are drafts (its hair slot says `random_drafts`), so a random
+/// character isn't always bald; it still never draws a draft garment, and
+/// the other bases' drafts are never drawn.
+#[test]
+fn randomize_draws_the_human_bases_hairstyles_and_no_other_draft() {
+    use axcenity_avatar::{Scope, randomize};
+    let library = read();
+    for base in library.bases.values() {
+        let start = Description::new("Npc", &base.id);
+        let mut hair: std::collections::BTreeSet<String> = Default::default();
+        let mut bald = 0;
+        for seed in 0..400 {
+            let character = randomize(&start, &Scope::All, &Default::default(), seed, &library);
+            let mut has_hair = false;
+            for worn in &character.items {
+                let item = library.item(&worn.id).unwrap();
+                has_hair |= item.slot == "hair";
+                // What a parameter's choice wears (the underwear) isn't drawn.
+                let chosen = axcenity_avatar::chosen_slots(&library, &base.id);
+                let drawn_draft = item.is_draft() && !chosen.contains(&item.slot);
+                let allowed = base.slot(&item.slot).is_some_and(|slot| slot.random_drafts);
+                assert!(
+                    !drawn_draft || allowed,
+                    "{} seed {seed} wears the draft {}",
+                    base.id,
+                    item.id
+                );
+                if item.slot == "hair" {
+                    hair.insert(worn.id.clone());
+                }
+            }
+            bald += usize::from(!has_hair);
+        }
+        if base.id == "axcenity/human" {
+            assert_eq!(hair.len(), 5, "every shipped hairstyle is drawn: {hair:?}");
+            // One choice in six is no hair at all.
+            assert!((30..110).contains(&bald), "{bald} of 400 are bald");
+        }
+    }
+}
+
+/// The human base's face is laid out for a person (`face.py`): every
+/// slider has a name that isn't MakeHuman's target name and fits
+/// Character Studio's panel uncut (22 characters), every face page is a
+/// feature with a handle, and every handle can be dragged: each of its
+/// drives names a slider of its own feature's page and a direction on the
+/// screen in at least one framing.
+#[test]
+fn the_human_bases_face_has_readable_names_features_and_handles() {
+    let library = read();
+    let base = library.base("axcenity/human").expect("the human base");
+    for parameter in &base.parameters {
+        let label = &parameter.label;
+        assert!(
+            label.chars().count() <= 22,
+            "`{label}` is cut short in the panel"
+        );
+        assert!(
+            !label.contains('_') && !label.contains("Incr") && !label.contains("Trans"),
+            "`{label}` reads as a target's name"
+        );
+    }
+    let pages: Vec<&str> = base
+        .groups
+        .iter()
+        .filter(|group| group.category == axcenity_avatar::Category::Face)
+        .map(|group| group.id.as_str())
+        .collect();
+    assert_eq!(pages.len(), 10, "{pages:?}");
+    for page in &pages {
+        assert!(base.feature(page).is_some(), "{page} is a feature");
+        assert!(
+            base.handles.iter().any(|handle| handle.feature == *page),
+            "{page} has a handle"
+        );
+    }
+    assert_eq!(base.handles.len(), 24);
+    for handle in &base.handles {
+        assert!(!handle.drives.is_empty(), "{}", handle.id);
+        for drive in &handle.drives {
+            let parameter = base.parameter(&drive.parameter).expect("its slider");
+            assert_eq!(parameter.group, handle.feature, "{}", handle.id);
+            assert!(
+                !drive.screen.is_empty(),
+                "{}: {} can't be dragged in any framing",
+                handle.id,
+                drive.parameter
+            );
+            assert!(drive.travel >= 0.0008, "{}", handle.id);
+        }
+        if let Some(mirror) = &handle.mirror {
+            let other = base.handle(mirror).expect("its mirror");
+            assert_eq!(other.mirror.as_deref(), Some(handle.id.as_str()));
         }
     }
 }

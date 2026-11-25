@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "Long and thin",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_point_width": -0.4,
+    "nose_scale_horiz": -0.5,
+    "nose_scale_vert": 0.6
+  },
+  "preset": {
+    "id": "axcenity/human-nose-long-thin",
+    "kind": "feature",
+    "about": "A long, narrow nose.",
+    "feature": "nose",
+    "order": 120
+  }
+}

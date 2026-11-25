@@ -1086,7 +1086,8 @@ fn mip_count(width: u32, height: u32) -> u32 {
 /// Binds a material's `textures` (in [`MATERIAL_TEXTURES`] order) and
 /// `maps` for the shader. Colors are read through sRGB views, the rest as
 /// plain values. A toon ramp, in the specular map's place, is colors; a
-/// skin's layer masks, in the emissive map's place, are values.
+/// skin's layer masks, in the emissive map's place, are values; a skin's
+/// second colour map, in the occlusion map's place, is colors.
 pub(super) fn create_material(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -1098,6 +1099,8 @@ pub(super) fn create_material(
     // A skin's makeup and marking masks fill the emissive map's place:
     // values, not colours.
     let masks = maps.shading[0] == SHADING_SKIN && maps.specular[2] != 0.0;
+    // A skin's second colour map fills the occlusion map's place: colours.
+    let second_colour = maps.shading[0] == SHADING_SKIN && maps.uv_offset[2] > 0.0;
     let maps = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("material maps"),
         contents: bytemuck::bytes_of(&maps),
@@ -1133,7 +1136,14 @@ pub(super) fn create_material(
             view(3, &normal.linear),
             view(4, &metalness.linear),
             view(5, &roughness.linear),
-            view(6, &occlusion.linear),
+            view(
+                6,
+                if second_colour {
+                    &occlusion.srgb
+                } else {
+                    &occlusion.linear
+                },
+            ),
             view(
                 7,
                 if masks {

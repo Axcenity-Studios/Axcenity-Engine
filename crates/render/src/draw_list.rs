@@ -2500,6 +2500,11 @@ pub struct SkinShading {
     /// Makeup and markings (ADR-0042), drawn into the albedo and roughness
     /// before light: `None` draws the skin as made.
     pub layers: Option<Box<SkinLayers>>,
+    /// A second colour map placed like the material's own and how much of
+    /// it shows (0 to 1, in linear light): a skin between two photographed
+    /// ages (ADR-0048). It takes the occlusion map's place, so a skin with
+    /// an occlusion map of its own draws its colour map alone.
+    pub second_colour: Option<(Arc<dyn TextureSource>, f32)>,
 }
 
 impl Default for SkinShading {
@@ -2509,6 +2514,7 @@ impl Default for SkinShading {
             defined_normal: None,
             normal_blend: 0.0,
             layers: None,
+            second_colour: None,
         }
     }
 }

@@ -112,79 +112,92 @@
   ],
   "variants": [
     {
-      "id": "as-painted",
-      "label": "As painted"
-    },
-    {
-      "id": "darker",
-      "label": "Darker",
+      "id": "black",
+      "label": "Black",
       "materials": {
         "Hair": {
-          "melanin": 0.45
-        }
-      }
-    },
-    {
-      "id": "darkest",
-      "label": "Darkest",
-      "materials": {
-        "Hair": {
-          "melanin": 1.0,
+          "melanin": 0.95,
           "redness": -0.3
         }
       }
     },
     {
-      "id": "lighter",
-      "label": "Lighter",
+      "id": "dark-brown",
+      "label": "Dark brown",
       "materials": {
         "Hair": {
-          "melanin": -0.45
+          "melanin": 0.5,
+          "redness": 0.0
         }
       }
     },
     {
-      "id": "lightest",
-      "label": "Lightest",
+      "id": "brown",
+      "label": "Brown",
       "materials": {
         "Hair": {
-          "melanin": -1.0
+          "melanin": 0.1,
+          "redness": 0.15
         }
       }
     },
     {
-      "id": "dyed-blonde",
-      "label": "Dyed blonde",
+      "id": "auburn",
+      "label": "Auburn",
       "materials": {
         "Hair": {
-          "melanin": -1.0,
-          "redness": 0.35,
-          "dye": "#d9b877",
-          "dye_amount": 0.6
+          "melanin": -0.2,
+          "redness": 0.9,
+          "dye": "#8a3a1c",
+          "dye_amount": 0.5
         }
       }
     },
     {
-      "id": "dyed-auburn",
-      "label": "Dyed auburn",
+      "id": "ginger",
+      "label": "Ginger",
       "materials": {
         "Hair": {
           "melanin": -0.5,
           "redness": 1.0,
-          "dye": "#8a3a1c",
+          "dye": "#b5562a",
+          "dye_amount": 0.5
+        }
+      }
+    },
+    {
+      "id": "blonde",
+      "label": "Blonde",
+      "materials": {
+        "Hair": {
+          "melanin": -0.9,
+          "redness": 0.35,
+          "dye": "#d9b877",
           "dye_amount": 0.55
         }
       }
     },
     {
-      "id": "dyed-grey",
-      "label": "Dyed grey",
+      "id": "platinum",
+      "label": "Platinum",
+      "materials": {
+        "Hair": {
+          "melanin": -1.0,
+          "redness": -0.5,
+          "dye": "#e9e2d0",
+          "dye_amount": 0.35
+        }
+      }
+    },
+    {
+      "id": "grey",
+      "label": "Grey",
       "materials": {
         "Hair": {
           "melanin": -0.75,
           "redness": -1.0,
           "dye": "#bdbcb8",
-          "dye_amount": 0.6
+          "dye_amount": 0.55
         }
       }
     }

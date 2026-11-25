@@ -51,7 +51,10 @@ pub use enums::{
     ToneMapping, UserInputState, UserInputType,
 };
 pub use journal::Edit;
-pub use material_values::{MATERIAL_COLOUR_MAP, MATERIAL_VALUE_PREFIX, material_value_attribute};
+pub use material_values::{
+    MATERIAL_COLOUR_AMOUNT, MATERIAL_COLOUR_MAP, MATERIAL_COLOUR_TOWARD, MATERIAL_VALUE_PREFIX,
+    material_value_attribute,
+};
 pub use sequence::{
     ColorKeypoint, ColorSequence, MAX_KEYPOINTS, NumberKeypoint, NumberSequence, SequenceError,
 };

@@ -1,0 +1,24 @@
+{
+  "format_version": 2,
+  "name": "Soft features",
+  "base": "axcenity/human",
+  "parameters": {
+    "brows_trans_backward_forward": -0.3,
+    "cheeks_volume_left": 0.5,
+    "cheeks_volume_right": 0.5,
+    "chin_bones": -0.5,
+    "chin_height": -0.3,
+    "chin_width": 0.2,
+    "face_shape_round": 0.4,
+    "lips_lowerlip_volume": 0.3,
+    "lips_upperlip_volume": 0.3,
+    "nose_scale_depth": -0.3,
+    "nose_volume": 0.2
+  },
+  "preset": {
+    "id": "axcenity/human-face-soft",
+    "kind": "face",
+    "about": "Full cheeks, a short round chin and a small nose.",
+    "order": 10
+  }
+}

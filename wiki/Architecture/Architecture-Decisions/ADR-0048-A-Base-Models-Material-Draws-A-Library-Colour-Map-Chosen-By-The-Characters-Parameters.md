@@ -6,8 +6,8 @@ adr_status: Accepted
 date: 2026-11-24
 supersedes:
 superseded_by:
-affects: [avatar, gameplay, scene, core, project, assets]
-source: [crates/avatar/src/manifest.rs, crates/avatar/src/resolve.rs, crates/avatar/src/randomize.rs, crates/core/src/material_values.rs, crates/gameplay/src/description.rs, crates/scene/src/material.rs, crates/scene/src/draw_list.rs, crates/project/src/character_library.rs, assets/characters/human/skins.py, assets/characters/human/manifests.py]
+affects: [avatar, gameplay, scene, render, core, project, assets]
+source: [crates/render/src/draw_list.rs, crates/render/src/shader.wgsl, crates/avatar/src/manifest.rs, crates/avatar/src/resolve.rs, crates/avatar/src/randomize.rs, crates/core/src/material_values.rs, crates/gameplay/src/description.rs, crates/scene/src/material.rs, crates/scene/src/draw_list.rs, crates/project/src/character_library.rs, assets/characters/human/skins.py, assets/characters/human/manifests.py]
 docs: [docs/development/character-studio/architecture.md, assets/characters/human/README.md]
 tags: [adr, characters, rendering, assets]
 ---
@@ -53,9 +53,13 @@ Nothing in Character Data could name another texture. ADR-0036 made material val
 - Every map of a material must be laid out as the model file's own colour map is. Nothing checks that; the library test checks only that each is an image the engine reads and that a material's maps are one size.
 - Every map of a material should name the same parameters: one that names fewer is nearer than it should be.
 - A base's maps are part of its package: `project::add_character_packages` and the capture tool's library copy take them. A character pack's file list (`toolbox::character_pack`) is its own and would have to list them.
-- The skin changes in steps as the Age slider crosses a quarter and three quarters: there is no blend between two photographed skins.
+- As first built, the skin changed in steps as the Age slider crossed a quarter and three quarters. Since the note below it fades.
 - Ray traced reflections and GI see the chosen skin, as they see any material's colour map.
 - Revisit if a second kind of map needs choosing (a normal map per age), or if blending two maps becomes worth a shader change.
+
+## Notes
+
+- **2026-11-24 (the polish pass Paul asked for the same day): a map can fade into its neighbour.** The step as the Age slider crossed a quarter and three quarters was the first fault logged against this decision. A map may now name one of its `at` parameters as `blend`: between its own value and its neighbour's (the map at the same values of every other parameter, on the side the character's value lies) the character draws a mix of the two, none of the other at a map's own value and half of each where they are as near (`BaseManifest::material_blend_for`, `Resolved::colour_blends`). The applier names the second map and its share beside the first (`Mat_<material>_colour_map_toward`, `_amount`), and the **Skin** shading model draws both (`render::SkinShading::second_colour`): the second map rides in the occlusion map's place, read as colour, its share in the material's uniform, mixed in linear light before the tone and the light (`shader.wgsl`). Other shading models draw the first map alone, as before. Decision 4 stands: a character still replaces no map but the colour map, with maps its base offers. Costs: a skin with an occlusion map of its own can't fade (none has one); each distinct share is its own material on the GPU while a slider is dragged; ray traced reflections see the nearer map only. The human base's skins all blend along `age`, and its second Caucasian pair is listed at the older ages with the first pair's skins so it ages into them.
 
 ## Implementation references
 

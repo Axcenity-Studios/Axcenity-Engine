@@ -23,7 +23,9 @@ use axcenity_render::glam::{Mat3, Vec3};
 use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
 
 /// A base model's always-worn parts: not garments.
-const FACE_PARTS: [&str; 6] = ["Eyes", "Teeth", "EyeShell", "Lashes", "Brows", "LipSeal"];
+const FACE_PARTS: [&str; 7] = [
+    "Eyes", "Teeth", "Tongue", "EyeShell", "Lashes", "Brows", "LipSeal",
+];
 /// The worst a body vertex may be outside a garment that covers it.
 pub(super) const POKE: f32 = 0.001;
 pub(super) const TEE: &str = "imported/test-tee";
@@ -1224,4 +1226,82 @@ fn stylized_clothes_cover_the_stylized_cast() {
         worst,
     });
     check("stylized", &failures, &known);
+}
+
+/// The human base (ADR-0047: MakeHuman's body and clothes) in the gate:
+/// the underwear cut from the body, alone, and a MakeHuman outfit with
+/// shoes over it, on the human cast, measured with the same rule as the
+/// other bases' garments, at rest, in the walk and in the T-pose. Its
+/// garments follow the body by their own copies of its shapes, so nothing
+/// here is fitted by `avatar::fit`.
+#[test]
+fn human_clothes_cover_the_human_cast() {
+    let stage = Stage::new("fit-gate-human", &repository_library()).expect("the stage");
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    let cast = benchmarks("human-")
+        .into_iter()
+        .filter(|d| d.name.contains("-cast-"));
+    for description in cast {
+        let feminine = description.name.contains("-feminine-");
+        let outfit: [&str; 2] = if feminine {
+            ["makehuman/female-casualsuit01", "makehuman/shoes04"]
+        } else {
+            ["makehuman/male-casualsuit01", "makehuman/shoes01"]
+        };
+        let mut dressed = description.clone();
+        for id in outfit {
+            if !dressed.items.iter().any(|worn| worn.id == id) {
+                dressed.items.push(WornItem::new(id));
+            }
+        }
+        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
+        let outfits = [
+            (
+                format!("{} underwear", description.name),
+                description.clone(),
+            ),
+            (description.name.clone(), dressed),
+        ];
+        for (name, outfit) in &outfits {
+            let (body, garments) = worn(&stage.assets, outfit, Stance::Rest);
+            let cover = cover_at_rest(&body, &garments, &bare);
+            checked += measure(name, Stance::Rest, &body, &garments, &cover, &mut failures);
+            for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
+                let (body, garments) = worn(&stage.assets, outfit, stance);
+                checked += measure(name, stance, &body, &garments, &cover, &mut failures);
+            }
+        }
+    }
+    println!(
+        "human: {checked} garment checks, {} failing",
+        failures.len()
+    );
+    // First measured on 2026-11-24, as open defects of drafts. The cut
+    // underwear (boxer briefs, bandeau) has none in any pose. The MakeHuman
+    // outfits are as their authors fitted them: the women's T-shirt and
+    // jeans let a few corners of skin through, 2 mm at rest on the heavy
+    // and muscular bodies and up to 9 mm in the stride; the men's shirt
+    // and jeans one corner by 1 mm on the muscular body. "Hidden skin
+    // showing" is skin the outfits' files hide (`delete_verts`, their cover
+    // maps) that their cloth doesn't cover: one corner at the men's
+    // collar at rest (34 mm), and the ankles and insteps between the jeans
+    // and the shoes in the stride (the white patches of Known limitations).
+    let known = [
+        ("FemaleCasualsuit01", "rest", 3, 0.00208),
+        ("FemaleCasualsuit01", "TPose", 5, 0.00229),
+        ("FemaleCasualsuit01", "Walk@18", 12, 0.00887),
+        ("MaleCasualsuit01", "rest", 1, 0.00100),
+        ("MaleCasualsuit01", "TPose", 1, 0.00100),
+        ("MaleCasualsuit01", "Walk@18", 1, 0.00106),
+        ("hidden skin showing", "rest", 8, 0.03450),
+        ("hidden skin showing", "Walk@18", 24, 0.05513),
+    ]
+    .map(|(garment, pose, cases, worst)| Known {
+        garment,
+        pose,
+        cases,
+        worst,
+    });
+    check("human", &failures, &known);
 }

@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Diamond",
+  "base": "axcenity/human",
+  "parameters": {
+    "face_shape_diamond": 0.7
+  },
+  "preset": {
+    "id": "axcenity/human-face-shape-diamond",
+    "kind": "feature",
+    "about": "Narrow temples and jaw, wide cheekbones.",
+    "feature": "face_shape",
+    "order": 70
+  }
+}

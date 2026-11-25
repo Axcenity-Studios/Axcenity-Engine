@@ -1,0 +1,22 @@
+{
+  "format_version": 2,
+  "name": "Angular features",
+  "base": "axcenity/human",
+  "parameters": {
+    "brows_trans_backward_forward": 0.5,
+    "cheeks_bones_left": 0.6,
+    "cheeks_bones_right": 0.6,
+    "cheeks_volume_left": -0.6,
+    "cheeks_volume_right": -0.6,
+    "chin_bones": 0.7,
+    "chin_prominent": 0.4,
+    "face_shape_fat": -0.3,
+    "nose_hump": 0.3
+  },
+  "preset": {
+    "id": "axcenity/human-face-angular",
+    "kind": "face",
+    "about": "High cheekbones over hollow cheeks, a strong jaw and chin.",
+    "order": 20
+  }
+}

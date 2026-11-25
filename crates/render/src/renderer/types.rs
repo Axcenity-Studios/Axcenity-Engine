@@ -596,7 +596,9 @@ pub(super) struct MapsUniform {
     /// Turns texture coordinates, read in the vertex shader: the columns of
     /// a 2×2 matrix (the material's rotation times its scale).
     pub(super) uv_matrix: [f32; 4],
-    /// Added to the turned texture coordinates, then unused.
+    /// Added to the turned texture coordinates; then how much of a skin's
+    /// second colour map shows (0: none; it is bound in the occlusion
+    /// map's place, read as colour); then unused.
     pub(super) uv_offset: [f32; 4],
     /// How it's lit: the model ([`SHADING_STANDARD`], [`SHADING_UNLIT`] or
     /// [`SHADING_TOON`]), then toon's bands (0 when its ramp is bound in the

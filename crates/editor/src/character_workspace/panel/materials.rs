@@ -93,10 +93,11 @@ pub(super) fn skin(
     }
     let mut any = false;
     for slot in slots {
+        // What the slot offers: a skin with no detail or definition maps
+        // (the human base's) doesn't show sliders that would do nothing.
         let specs: Vec<_> = slot
-            .shading
-            .values()
-            .iter()
+            .offered()
+            .into_iter()
             .filter(|spec| {
                 super::has_words(&[&value_label(spec.name), spec.name, spec.meaning], search)
             })
@@ -199,17 +200,6 @@ pub(super) fn skin(
     let (asked, found) = makeup(ui, workspace, base, search);
     intents.extend(asked);
     any |= found;
-    if !searching {
-        ui.add_space(6.0);
-        ui.label(
-            egui::RichText::new(
-                "Until skin shading lands, the preview draws the tint and roughness only; the \
-                 other values are saved and take effect then.",
-            )
-            .small()
-            .color(palette.text_weak),
-        );
-    }
     (intents, any)
 }
 

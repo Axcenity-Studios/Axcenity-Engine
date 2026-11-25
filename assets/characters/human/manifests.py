@@ -53,7 +53,9 @@ FACE_GROUPS = [
     {"id": "neck", "label": "Neck", "category": "face"},
 ]
 SLOTS = [
-    {"id": "hair", "label": "Hairstyle", "category": "hair", "empty_label": "Bald"},
+    # Every hairstyle is still a draft (`hair.py`), and Randomize draws no
+    # draft unless the slot says so: without this a random character is bald.
+    {"id": "hair", "label": "Hairstyle", "category": "hair", "empty_label": "Bald", "random_drafts": True},
     {"id": "underwear_top", "label": "Underwear top", "category": "clothing"},
     {"id": "underwear_bottom", "label": "Underwear", "category": "clothing"},
     {"id": "top", "label": "Top", "category": "clothing"},
@@ -81,8 +83,20 @@ PROPORTIONS = [
     ("hip_width", "Hip width", "HipWidth", (0.85, 1.15), "detailed", "How wide the hips are."),
     ("head_size", "Head size", "HeadSize", (0.9, 1.1), "detailed", "How large the head is for the body."),
 ]
-MATERIAL_SHADING = {"Skin": "standard", "Eyes": "standard", "Teeth": "standard", "Tongue": "standard",
-                    "Brows": "standard", "Lashes": "standard"}
+MATERIAL_SHADING = {"Skin": "skin", "Eyes": "standard", "Teeth": "standard", "Tongue": "standard",
+                    "Brows": "hair", "Lashes": "hair"}
+# The values of its shading model a slot offers a person. The skin: its
+# tone over whichever photographed skin is drawn, and how it takes light.
+# Not the Skin model's `definition`, `softness` and `detail_strength`: they
+# need the normal maps MakeHuman's skins don't have.
+MATERIAL_VALUES = {
+    "Skin": ["melanin", "undertone", "redness", "tint", "roughness_scale", "scatter_scale"],
+    # Brows and lashes are painted cards: their colour along the pigment
+    # curve, or dyed.
+    "Brows": ["melanin", "redness", "dye", "dye_amount", "tint"],
+    "Lashes": ["melanin", "redness", "dye", "dye_amount", "tint"],
+}
+MATERIAL_LABELS = {"Skin": "Skin", "Brows": "Brows", "Lashes": "Lashes"}
 
 # What a new character wears: the boxer briefs cut from the body
 # (`underwear.py`; MakeHuman's packs have no men's underwear).
@@ -145,7 +159,8 @@ def base_manifest(data):
     for spec in face.get("parameters", []):
         low, high = spec.get("low"), spec.get("high")
         p = {"id": spec["id"], "label": spec["label"], "group": spec["group"],
-             "range": [-1 if low else 0, 1 if high else 0], "level": "detailed", "about": spec["about"],
+             "range": [-1 if low else 0, 1 if high else 0], "level": spec.get("level", "detailed"),
+             "about": spec["about"],
              "random": [-0.3 if low else 0, 0.3 if high else 0]}
         if "mirror" in spec:
             p["mirror"] = spec["mirror"]
@@ -193,11 +208,15 @@ def base_manifest(data):
         "regions": [{"id": rid, "label": label, "map_index": k + 1} for k, (rid, label) in enumerate(REGIONS)],
         "slots": SLOTS,
         "sockets": SOCKETS,
-        "materials": [{"name": name, "shading": MATERIAL_SHADING.get(name, "standard")}
+        "materials": [{"name": name, "shading": MATERIAL_SHADING.get(name, "standard"),
+                       **({"label": MATERIAL_LABELS[name]} if name in MATERIAL_LABELS else {}),
+                       **({"values": MATERIAL_VALUES[name]} if name in MATERIAL_VALUES else {})}
                       for name in sorted(data["materials"])],
         "face": {"profile": "axcenity", "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
         "defaults": {"items": MALE_WEARS},
         **({"material_maps": skins["maps"]} if skins.get("maps") else {}),
+        **({"features": face["features"]} if face.get("features") else {}),
+        **({"handles": face["handles"]} if face.get("handles") else {}),
     }
 
 

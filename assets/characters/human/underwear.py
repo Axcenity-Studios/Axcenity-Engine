@@ -10,8 +10,9 @@ corners, so it takes their weights and every shape the body has: the
 item follows the body by shapes (`fit: shapes`) with nothing fitted at
 run time. The cloth stands `GAP` off the skin and is relaxed so it spans
 the hollows (between the buttocks, at the groin) instead of following
-them, each corner moving only out from the skin it lies over, and each
-hem has a short rim turned in toward the skin so the cloth has an edge.
+them, each corner moving only out from the skin it lies over (along one
+line, never sideways), and each hem has a short rim turned in under the
+skin so the cloth has an edge.
 
 NumPy, and Blender's `mathutils` for the nearest point on the skin.
 Units are metres, Blender axes (Z up, the character faces -Y, left is +X).
@@ -40,12 +41,16 @@ LEG_SHARE = 0.36
 #: drawn under the cloth shows through in specks; the rim covers the edge.
 SETBACK = 0.0005
 RELAX_ROUNDS = 30
+#: The farthest the cloth is let stand off its own skin where it spans a
+#: hollow (between the buttocks, at the groin, under the bust).
+SPAN = 0.03
 #: The bones whose skin the garment may take (never a hand hanging by the hip).
 BONES = ("Hips", "Spine", "LeftUpperLeg", "RightUpperLeg", "LeftUpperLegTwist", "RightUpperLegTwist")
 
 
 def field(points, joints, allowed):
-    """Above zero inside the garment, in metres from its nearest hem."""
+    """Above zero inside the garment, in metres from its nearest hem
+    (`allowed`: [`on_bones`], the hem its bones make)."""
     hip_l, knee_l = (np.array(joints[n][0]) for n in ("LeftUpperLeg", "LeftLowerLeg"))
     hip_r, knee_r = (np.array(joints[n][0]) for n in ("RightUpperLeg", "RightLowerLeg"))
     waist = (hip_l[2] + hip_r[2]) / 2 + WAIST_ABOVE_HIPS - points[:, 2]
@@ -57,7 +62,7 @@ def field(points, joints, allowed):
         return LEG_SHARE * length - along
 
     legs = np.where(points[:, 0] >= 0, leg(hip_l, knee_l), leg(hip_r, knee_r))
-    return np.where(allowed, np.minimum(waist, legs), -1.0)
+    return np.minimum(np.minimum(waist, legs), allowed)
 
 
 def cut(faces, f):
@@ -126,14 +131,24 @@ def boundary_of(faces, count):
     return on, along, [edge for edge, n in uses.items() if n == 1]
 
 
+#: How far (metres) inside a garment a corner wholly on its bones counts
+#: as being, by its weights alone: what makes "mostly on these bones" a
+#: number that crosses zero inside a face, like a hem's.
+BONE_REACH = 0.1
+
+
 def on_bones(weights, bones, count):
-    """The body corners that are mostly on `bones`."""
+    """How much each body corner is on `bones`, as a number like a hem's:
+    above zero where it is mostly on them (`BONE_REACH` where wholly),
+    below where it is mostly on others. A garment's edge by its bones (the
+    bandeau's under the arm) is then a line cut through the faces, not the
+    faces' own stair steps."""
     total = np.zeros(count)
     for bone in bones:
         if bone in weights:
             idx, w = weights[bone]
             total[idx] += w
-    return total > 0.5
+    return (total - 0.5) * 2 * BONE_REACH
 
 
 def boxer_briefs(points, faces, weights, joints):
@@ -154,10 +169,10 @@ def bandeau(points, faces, weights, joints):
     allowed = on_bones(weights, BAND_BONES, len(points))
     chest = np.array(joints["Chest"][0])
     neck = np.array(joints["Neck"][0])
-    front = allowed & (points[:, 2] > chest[2]) & (points[:, 2] < neck[2] - 0.08) & (np.abs(points[:, 0]) < 0.12)
+    front = (allowed > 0) & (points[:, 2] > chest[2]) & (points[:, 2] < neck[2] - 0.08) & (np.abs(points[:, 0]) < 0.12)
     apex = points[front][points[front][:, 1].argmin(), 2]
     f = np.minimum(apex + BAND_ABOVE - points[:, 2], points[:, 2] - (apex - BAND_BELOW))
-    return cut_garment(points, faces, weights, np.where(allowed, f, -1.0))
+    return cut_garment(points, faces, weights, np.minimum(f, allowed))
 
 
 def cut_garment(points, faces, weights, f):
@@ -180,43 +195,55 @@ def cut_garment(points, faces, weights, f):
     inside = f[i] * (1 - t[:, 0]) + f[j] * t[:, 0]
     ease = np.clip(inside / HEM_BAND, 0.0, 1.0)
     gap = GAP + HEM_LIFT * (1 - ease * ease * (3 - 2 * ease))
-    cloth = skin + normals_of(skin, garment_faces) * gap[:, None]
-    on_edge, along, open_edges = boundary_of(garment_faces, len(cloth))
-    neighbours = [set() for _ in cloth]
+    # Out of the skin at each corner: the body's own normal there, which
+    # is the same on both sides of a hem (the garment's own faces stop at
+    # it, and their normal at a hem leans along the skin).
+    body_normals = normals_of(points, faces)
+    out_of_skin = body_normals[i] * (1 - t) + body_normals[j] * t
+    out_of_skin /= np.maximum(np.linalg.norm(out_of_skin, axis=1, keepdims=True), 1e-12)
+    on_edge, along, open_edges = boundary_of(garment_faces, len(skin))
+    neighbours = [set() for _ in skin]
     for face in garment_faces:
         for k, a in enumerate(face):
             b = face[(k + 1) % len(face)]
             neighbours[a].add(b)
             neighbours[b].add(a)
-    out_of_skin = normals_of(skin, garment_faces)
+    rings = [np.array(along[v] if on_edge[v] else sorted(neighbours[v]), dtype=np.int64) for v in range(len(skin))]
+    # Each corner stays on the line out of its own skin and only its
+    # height on it changes: a corner that left that line (even to keep
+    # its distance from the nearest skin, which near a ridge is another
+    # face's) walked sideways a little each round, up to 2 cm, and its
+    # faces then lay across skin they weren't cut from, with the skin
+    # through them at the leg hems and the hems themselves ragged.
+    height = gap.copy()
     for _ in range(RELAX_ROUNDS):
-        moved = cloth.copy()
-        for v in range(len(cloth)):
-            ring = along[v] if on_edge[v] else list(neighbours[v])
-            if ring:
-                # Only out from or in toward the skin, never along it: a
-                # corner that slid sideways would leave a face lying
-                # across a ridge of skin (a hip bone) with the skin
-                # through it.
-                pull = 0.5 * (cloth[ring].mean(axis=0) - cloth[v])
-                moved[v] = cloth[v] + out_of_skin[v] * (pull @ out_of_skin[v])
-        # Cloth is never nearer the skin than the gap, or inside it.
-        for v in range(len(moved)):
-            near, normal, _, distance = tree.find_nearest(Vector(moved[v]))
-            if near is None:
-                continue
-            out = moved[v] - np.array(near)
-            if distance < gap[v] or out @ np.array(normal) < 0:
-                moved[v] = np.array(near) + np.array(normal) * gap[v]
-        cloth = moved
+        cloth = skin + out_of_skin * height[:, None]
+        pull = np.array([
+            0.5 * (cloth[ring].mean(axis=0) - cloth[v]) @ out_of_skin[v] if len(ring) else 0.0
+            for v, ring in enumerate(rings)])
+        # Out over a hollow as far as its neighbours span it, in over a
+        # ridge no nearer its own skin than the gap.
+        height = np.clip(height + pull, gap, gap + SPAN)
+        # And no nearer any other skin than the gap (a crease's far wall).
+        for v in range(len(skin)):
+            for _ in range(8):
+                at = skin[v] + out_of_skin[v] * height[v]
+                near, normal, _, distance = tree.find_nearest(Vector(at))
+                if near is None:
+                    break
+                outside = (at - np.array(near)) @ np.array(normal) >= 0
+                if distance >= gap[v] - 1e-5 and outside:
+                    break
+                height[v] += 0.0005
+    cloth = skin + out_of_skin * height[:, None]
 
-    # The rim: each hem's corners again, turned in toward the skin.
-    normal = normals_of(cloth, garment_faces)
+    # The rim: each hem's corners again, turned in under the skin's own
+    # surface along the same line.
     rim_of = {}
     extra_points, extra_mix = [], []
     for v in np.nonzero(on_edge)[0]:
         rim_of[int(v)] = len(cloth) + len(extra_points)
-        extra_points.append(cloth[v] - normal[v] * (gap[v] + RIM))
+        extra_points.append(skin[v] - out_of_skin[v] * RIM)
         extra_mix.append(v)
     all_points = np.vstack([cloth, np.array(extra_points)]) if extra_points else cloth
     all_faces = [list(face) for face in garment_faces]

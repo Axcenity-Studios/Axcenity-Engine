@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "Snub",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_curve_concave_convex": -0.5,
+    "nose_hump": -0.6,
+    "nose_point_down_up": 0.6,
+    "nose_scale_vert": -0.3
+  },
+  "preset": {
+    "id": "axcenity/human-nose-snub",
+    "kind": "feature",
+    "about": "A scooped bridge and a short upturned tip.",
+    "feature": "nose",
+    "order": 140
+  }
+}

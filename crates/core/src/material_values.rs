@@ -17,6 +17,14 @@ pub const MATERIAL_VALUE_PREFIX: &str = "Mat_";
 /// modulate what it shows.
 pub const MATERIAL_COLOUR_MAP: &str = "colour_map";
 
+/// Beside [`MATERIAL_COLOUR_MAP`], for a material between two colour maps
+/// (a skin between two photographed ages): the map its own fades toward
+/// (`Mat_Skin_colour_map_toward`, a texture file as a string) and how far
+/// it has (`Mat_Skin_colour_map_amount`, a number from 0 to 1). Only a
+/// shading model that can draw two colour maps reads them (Skin).
+pub const MATERIAL_COLOUR_TOWARD: &str = "colour_map_toward";
+pub const MATERIAL_COLOUR_AMOUNT: &str = "colour_map_amount";
+
 /// The attribute holding the value `value` (`tint`, `roughness_scale`,
 /// `melanin`, …) of the material named `material` (`Mat_Skin_tint`).
 /// Characters an attribute name can't hold become `_`.

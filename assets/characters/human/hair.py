@@ -19,9 +19,11 @@ as the groom's `mesh` tier, no layer and no cover map.
 **Shading.** The material is marked for the engine's Hair shading model
 (`extras.axcenity_shading`, `docs/rendering/hair.md`) and cut out by its
 texture's alpha: under TAA a hair cut-out's edge is hashed and soft, and it
-alone casts its shadow through its holes. The texture is MakeHuman's
-painted one, colour and all; the item's colour variants move it along the
-Hair model's pigment curve (`VARIANTS`).
+alone casts its shadow through its holes. Its maps are made from
+MakeHuman's painted texture (`maps`): the colour map is the painted
+strands brought to one authored brown, so the colour variants (`VARIANTS`)
+mean the same on every hairstyle, and the flow map is the direction the
+painted strands run, which is where the Hair model puts its highlights.
 
 **Licence gate.** As for garments (`wardrobe.vet`): the file's header and
 its pack's metadata both say CC0 or CC BY, and agree.
@@ -64,20 +66,146 @@ LABELS = {
 # The Hair model's values a person may set on a painted texture: the ones
 # that need a data map (roots, tips, streaks) have nothing to read.
 VALUES = ["melanin", "redness", "dye", "dye_amount", "tint", "highlight", "shift_scale", "roughness_scale"]
-# Colours. The texture is painted in one colour (black, brown, platinum),
-# so the first five are moves from it along the pigment curve and are
-# named as moves; the last three mix in a dye and land near the same
-# colour on every hairstyle (`melanin` first, so a dark texture takes it).
+# The colour every hairstyle's texture is brought to (sRGB): the realistic
+# hairstyle's authored brown, the pigment curve's middle (`hair.md`), so
+# the colour variants mean the same on every hairstyle.
+AUTHORED = (0.283, 0.203, 0.137)
+# How much of the painted strands' light and dark is kept round that
+# colour (a share of it, lowest and highest), and over how many texels of
+# a 2048 map the painting's own shading is taken out.
+DETAIL = (0.7, 1.3)
+SHADING_RADIUS = 40
+FLOW_RADIUS = 14
+ROUGHNESS = 0.45
+# Colours: the realistic hairstyle's own variants, which are absolute
+# because the texture is brought to that hairstyle's authored brown first
+# (`maps`): black is black on the hairstyle MakeHuman painted platinum.
 VARIANTS = [
-    ("as-painted", "As painted", {}),
-    ("darker", "Darker", {"melanin": 0.45}),
-    ("darkest", "Darkest", {"melanin": 1.0, "redness": -0.3}),
-    ("lighter", "Lighter", {"melanin": -0.45}),
-    ("lightest", "Lightest", {"melanin": -1.0}),
-    ("dyed-blonde", "Dyed blonde", {"melanin": -1.0, "redness": 0.35, "dye": "#d9b877", "dye_amount": 0.6}),
-    ("dyed-auburn", "Dyed auburn", {"melanin": -0.5, "redness": 1.0, "dye": "#8a3a1c", "dye_amount": 0.55}),
-    ("dyed-grey", "Dyed grey", {"melanin": -0.75, "redness": -1.0, "dye": "#bdbcb8", "dye_amount": 0.6}),
+    ("black", "Black", {"melanin": 0.95, "redness": -0.3}),
+    ("dark-brown", "Dark brown", {"melanin": 0.5, "redness": 0.0}),
+    ("brown", "Brown", {"melanin": 0.1, "redness": 0.15}),
+    ("auburn", "Auburn", {"melanin": 0.0, "redness": 0.9}),
+    ("ginger", "Ginger", {"melanin": -0.45, "redness": 1.0}),
+    ("blonde", "Blonde", {"melanin": -0.85, "redness": 0.35}),
+    ("platinum", "Platinum", {"melanin": -1.0, "redness": -0.5, "dye": "#e9e2d0", "dye_amount": 0.35}),
+    ("grey", "Grey", {"melanin": -0.75, "redness": -1.0, "dye": "#bdbcb8", "dye_amount": 0.55}),
+    ("blonde-dark-roots", "Blonde, dark roots", {"melanin": -0.85, "redness": 0.35, "root_melanin": 0.9, "root_length": 0.3}),
+    ("brown-highlights", "Brown, highlights", {"melanin": 0.1, "redness": 0.15, "streaks": 1.0, "streak_melanin": -0.8}),
 ]
+# The pigment curve alone hardly moves the hue (`hair.md`, `redness`): on
+# these flat-lit meshes auburn, ginger and blonde came out brown, beige
+# and grey (captured 2026-11-24). A dye of the colour meant brings it.
+HUES = {
+    "auburn": {"melanin": -0.2, "dye": "#8a3a1c", "dye_amount": 0.5},
+    "ginger": {"melanin": -0.5, "dye": "#b5562a", "dye_amount": 0.5},
+    "blonde": {"melanin": -0.9, "dye": "#d9b877", "dye_amount": 0.55},
+}
+
+
+def maps(texture, folder, name, size):
+    """A hairstyle's maps from MakeHuman's painted texture `texture`,
+    written into `folder`: (colour map, flow map). Plain image work
+    (Pillow, NumPy), no MakeHuman code.
+
+    **Colour.** MakeHuman paints each hairstyle in one colour with its
+    shading baked in (a dark cap under the afro's curls, highlights on the
+    bob). The colour variants need one known colour to start from, and the
+    Hair model lights the strands itself, so the painting is reduced to
+    what the strands are: its brightness against the brightness round it
+    (the baked shading goes), as light and dark round `AUTHORED`. Clear
+    texels take the colour too, so nothing dark bleeds in at an edge.
+
+    **Flow.** The Hair model shines along the strands, which it takes to
+    run up the texture unless a flow map says otherwise; MakeHuman's
+    don't. The painted strands show their own direction: across a strand
+    the brightness changes, along it it doesn't. The flow map is that
+    direction at each texel (the structure tensor's quiet axis, smoothed),
+    pointing down the texture where it can, since nothing in the painting
+    says which end is the root."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+
+    image = Image.open(texture).convert("RGBA")
+    if max(image.size) > size:
+        image = image.resize((size, size), Image.LANCZOS)
+    rgba = np.asarray(image, dtype=np.float32) / 255.0
+    alpha = rgba[..., 3]
+    light = rgba[..., :3] @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+
+    def blurred(values, radius):
+        out = Image.fromarray(np.clip(values * 255.0, 0, 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(radius))
+        return np.asarray(out, dtype=np.float32) / 255.0
+
+    radius = max(2, SHADING_RADIUS * image.size[0] // 2048)
+    cover = np.maximum(blurred(alpha, radius), 1e-3)
+    around = blurred(light * alpha, radius) / cover
+    detail = np.clip(light / np.maximum(around, 0.02), DETAIL[0], DETAIL[1])
+    detail = np.where(alpha > 0.02, detail, 1.0)
+    colour = np.clip(np.array(AUTHORED, dtype=np.float32)[None, None, :] * detail[..., None], 0.0, 1.0)
+    out = np.dstack([colour, alpha[..., None]])
+    colour_path = os.path.join(folder, name + "_Colour.png")
+    Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGBA").save(colour_path, optimize=True)
+
+    # The direction the brightness changes least in, smoothed.
+    gy, gx = np.gradient(light * alpha)
+    radius = max(1, FLOW_RADIUS * image.size[0] // 2048)
+    # Blurring signed products: shift them into 0 to 1 and back.
+    def smooth(values):
+        span = max(float(np.abs(values).max()), 1e-6)
+        return (blurred(values / span * 0.5 + 0.5, radius) - 0.5) * 2.0 * span
+    xx, yy, xy = smooth(gx * gx), smooth(gy * gy), smooth(gx * gy)
+    # The tensor's major axis is across the strands, at this angle:
+    across = 0.5 * np.arctan2(2.0 * xy, xx - yy)
+    dx, dy = -np.sin(across), np.cos(across)
+    flip = (dy < 0) | ((dy == 0) & (dx < 0))
+    dx, dy = np.where(flip, -dx, dx), np.where(flip, -dy, dy)
+    # Where the painting says nothing (flat or clear), straight down.
+    strength = np.sqrt((xx - yy) ** 2 + 4.0 * xy ** 2)
+    quiet = strength < strength.max() * 1e-4
+    dx, dy = np.where(quiet, 0.0, dx), np.where(quiet, 1.0, dy)
+    flow = np.dstack([0.5 + 0.5 * dx, 0.5 + 0.5 * dy, np.zeros_like(dx)])
+    flow_path = os.path.join(folder, name + "_Flow.png")
+    Image.fromarray((flow * 255.0 + 0.5).astype(np.uint8), "RGB").save(flow_path, optimize=True)
+    return colour_path, flow_path
+
+
+def add_flow(path, flow_path):
+    """Puts the flow map into the model file `path` and names it in its
+    material's `extras` (`axcenity_hair_flow`, `docs/rendering/hair.md`):
+    the exporter writes a material's colour map, not a map only the engine
+    reads. A glTF binary is a JSON chunk and one buffer; this appends the
+    image to the buffer."""
+    import struct
+    with open(path, "rb") as f:
+        data = f.read()
+    length = struct.unpack("<I", data[12:16])[0]
+    doc = json.loads(data[20:20 + length])
+    start = 20 + length + 8
+    binary = bytearray(data[start:start + struct.unpack("<I", data[20 + length:24 + length])[0]])
+    with open(flow_path, "rb") as f:
+        png = f.read()
+    while len(binary) % 4:
+        binary.append(0)
+    doc["bufferViews"].append({"buffer": 0, "byteOffset": len(binary), "byteLength": len(png)})
+    binary += png
+    while len(binary) % 4:
+        binary.append(0)
+    doc["buffers"][0]["byteLength"] = len(binary)
+    doc.setdefault("images", []).append({"name": "Hair_Flow", "mimeType": "image/png",
+                                         "bufferView": len(doc["bufferViews"]) - 1})
+    texture = {"source": len(doc["images"]) - 1}
+    if doc.get("samplers"):
+        texture["sampler"] = 0
+    doc.setdefault("textures", []).append(texture)
+    for material in doc["materials"]:
+        if material.get("extras", {}).get("axcenity_shading") == "hair":
+            material["extras"]["axcenity_hair_flow"] = {"index": len(doc["textures"]) - 1}
+    text = json.dumps(doc, separators=(",", ":")).encode()
+    text += b" " * (-len(text) % 4)
+    body = (struct.pack("<II", len(text), 0x4E4F534A) + text
+            + struct.pack("<II", len(binary), 0x004E4942) + bytes(binary))
+    with open(path, "wb") as f:
+        f.write(struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body)
 
 
 def label_of(name):
@@ -153,12 +281,26 @@ def main():
             os.makedirs(folder, exist_ok=True)
             armature = body_build.build_armature(joints)
             try:
+                painted = body_build.read_mhmat(mhmat).get("diffuseTexture") if os.path.exists(mhmat) else None
+                if extras and painted and os.path.exists(painted):
+                    import tempfile
+                    with tempfile.TemporaryDirectory(prefix="human-hair-") as scratch:
+                        colour, flow = maps(painted, scratch, name, args.texture_size)
+                        material = body_build.simple_material(MATERIAL, (1.0, 1.0, 1.0, 1.0), colour, None, "cut",
+                                                              roughness=ROUGHNESS, extras=extras)
+                        obj = body_build.make_object(name, piece, points, shapes, groups, material, armature)
+                        body_build.export(os.path.join(folder, name + ".glb"), armature, [obj], extras=True,
+                                          morph_normals=False)
+                        add_flow(os.path.join(folder, name + ".glb"), flow)
+                    raise StopIteration
                 material = body_build.material_of(MATERIAL, mhmat, alpha="cut", extras=extras)
                 obj = body_build.make_object(name, piece, points, shapes, groups, material, armature)
                 # No normals with the shapes: they are half of a hairstyle's
                 # file, and a head's shape barely turns its hair's.
                 body_build.export(os.path.join(folder, name + ".glb"), armature, [obj], extras=bool(extras),
                                   morph_normals=False)
+            except StopIteration:  # made above, with its own maps
+                pass
             except Exception as error:  # one bad file mustn't stop the rest
                 left.append({"file": clothes.path, "reason": f"it couldn't be made: {error}"})
                 shutil.rmtree(folder, ignore_errors=True)
@@ -184,8 +326,10 @@ def main():
                 "tags": sorted(set(words) | {"makehuman"}),
             }
             if args.shading == "hair":
-                item["variants"] = [{"id": vid, "label": vlabel, **({"materials": {MATERIAL: values}} if values else {})}
-                                    for vid, vlabel, values in VARIANTS]
+                # Not the variants that need a data map (dark roots, streaks).
+                item["variants"] = [{"id": vid, "label": vlabel,
+                                     "materials": {MATERIAL: {**values, **HUES.get(vid, {})}}}
+                                    for vid, vlabel, values in VARIANTS if set(values) <= set(VALUES)]
             thumb = os.path.join(clothes.folder, os.path.splitext(os.path.basename(clothes.path))[0] + ".thumb")
             if os.path.exists(thumb):
                 shutil.copyfile(thumb, os.path.join(folder, name + ".png"))  # a `.thumb` is a PNG

@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "Aquiline",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_curve_concave_convex": 0.4,
+    "nose_hump": 0.7,
+    "nose_point_down_up": -0.4,
+    "nose_scale_depth": 0.3
+  },
+  "preset": {
+    "id": "axcenity/human-nose-aquiline",
+    "kind": "feature",
+    "about": "A high bridge that bows out, the tip turned a little down.",
+    "feature": "nose",
+    "order": 90
+  }
+}

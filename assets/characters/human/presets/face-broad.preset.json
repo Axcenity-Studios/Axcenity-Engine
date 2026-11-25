@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "Broad face",
+  "base": "axcenity/human",
+  "parameters": {
+    "cheeks_bones_left": 0.3,
+    "cheeks_bones_right": 0.3,
+    "chin_bones": 0.4,
+    "chin_width": 0.5,
+    "face_shape_scale_horiz": 0.6,
+    "lips_scale_horiz": 0.3,
+    "nose_scale_horiz": 0.4
+  },
+  "preset": {
+    "id": "axcenity/human-face-broad",
+    "kind": "face",
+    "about": "A wide head and jaw, a wide nose and mouth.",
+    "order": 30
+  }
+}

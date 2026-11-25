@@ -8,6 +8,9 @@ parameter values it was made for (`material_maps`: the `skin` choice, the
 body type, the age), and a character draws the one nearest its own values.
 So the sex of the skin follows the body type, its age follows the Age
 slider, and the one thing a person picks is the `skin` choice (`TONES`).
+Between two ages the skin is a mix of the two photographs (each map's
+`blend`: the Skin shading model draws both), so nothing snaps as the Age
+slider moves.
 
 Every MakeHuman skin is laid out on the same texture coordinates (the base
 mesh's own), which is what lets one material draw any of them.
@@ -49,18 +52,18 @@ def folders():
     """Every skin as (tone id, age value, body type value, MakeHuman's
     folder name). MakeHuman has one skin for each age, ethnicity and sex,
     a second young Caucasian pair, and a young pair with a bodysuit
-    painted on: the second pair is listed young only (an older character
-    with it draws the first Caucasian skin of its age, the nearest), and
-    the bodysuit at every age, so the costume doesn't come off as the Age
-    slider moves."""
+    painted on: the second pair is listed at the older ages with the first
+    Caucasian pair's skins (so it ages into them), and the bodysuit at
+    every age, so the costume doesn't come off as the Age slider moves."""
     out = []
     for tone, _, name in TONES[:3]:
         for age, at in AGES:
             for sex, frame in SEXES:
                 out.append((tone, at, frame, f"{age}_{name}_{sex}"))
     for sex, frame in SEXES:
-        out.append(("caucasian_2", 0.0, frame, f"young_caucasian_{sex}2"))
-        for _, at in AGES:
+        for age, at in AGES:
+            out.append(("caucasian_2", at, frame,
+                        f"young_caucasian_{sex}2" if age == "young" else f"{age}_caucasian_{sex}"))
             out.append(("bodysuit", at, frame, f"young_caucasian_{sex}_special_suit"))
     return out
 
@@ -105,7 +108,9 @@ def write(assets, out, size=2048, quality=90):
                 written[name] = file
         if written[name]:
             maps.append({"material": MATERIAL, "colour_map": written[name],
-                         "at": {"skin": index[tone], "frame": frame, "age": age}})
+                         "at": {"skin": index[tone], "frame": frame, "age": age},
+                         # Between two ages the skin is a mix of both.
+                         "blend": "age"})
     # A file a rebuild no longer writes doesn't stay behind.
     kept = {os.path.basename(file) for file in written.values() if file}
     for file in os.listdir(os.path.join(out, FOLDER)):

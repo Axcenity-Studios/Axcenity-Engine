@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "Elderly",
+  "base": "axcenity/human",
+  "parameters": {
+    "age": 0.9,
+    "fat": -0.3,
+    "muscle": -0.3
+  },
+  "preset": {
+    "id": "axcenity/human-body-elder",
+    "kind": "body",
+    "about": "An old, spare body.",
+    "order": 60
+  }
+}

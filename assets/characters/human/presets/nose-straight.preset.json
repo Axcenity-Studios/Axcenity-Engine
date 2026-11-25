@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Straight",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_greek": 0.3
+  },
+  "preset": {
+    "id": "axcenity/human-nose-straight",
+    "kind": "feature",
+    "about": "A straight bridge of middling width.",
+    "feature": "nose",
+    "order": 80
+  }
+}

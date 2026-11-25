@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Pear",
+  "base": "axcenity/human",
+  "parameters": {
+    "face_shape_triangular": 0.7
+  },
+  "preset": {
+    "id": "axcenity/human-face-shape-pear",
+    "kind": "feature",
+    "about": "Widest at the jaw.",
+    "feature": "face_shape",
+    "order": 60
+  }
+}

@@ -43,8 +43,8 @@ use axcenity_avatar::{
     ResolvedPart,
 };
 use axcenity_core::{
-    ClassName, Color3, InstanceId, MATERIAL_COLOUR_MAP, MATERIAL_VALUE_PREFIX, Value, World,
-    material_value_attribute,
+    ClassName, Color3, InstanceId, MATERIAL_COLOUR_AMOUNT, MATERIAL_COLOUR_MAP,
+    MATERIAL_COLOUR_TOWARD, MATERIAL_VALUE_PREFIX, Value, World, material_value_attribute,
 };
 
 /// The attribute on a MeshPart the applier owns: on a part inside a
@@ -444,7 +444,10 @@ pub fn apply_description(
         let (values, maps) = if part.item.is_some() {
             (&part.materials, None)
         } else {
-            (&resolved.materials, Some(&resolved.colour_maps))
+            (
+                &resolved.materials,
+                Some((&resolved.colour_maps, &resolved.colour_blends)),
+            )
         };
         set_material_values(world, *instance, values, maps);
     }
@@ -452,7 +455,7 @@ pub fn apply_description(
         world,
         body,
         &resolved.materials,
-        Some(&resolved.colour_maps),
+        Some((&resolved.colour_maps, &resolved.colour_blends)),
     );
 
     // What's applied, kept in the character.
@@ -643,21 +646,41 @@ fn new_part(world: &mut World, body: InstanceId) -> Option<InstanceId> {
     Some(part)
 }
 
+/// A base's colour maps for a part (ADR-0048): by material slot, each
+/// one's library path, and what each fades toward with its share.
+type ColourMaps<'a> = (
+    &'a BTreeMap<String, String>,
+    &'a BTreeMap<String, (String, f32)>,
+);
+
 /// Sets `instance`'s material value attributes to `values` (by material
-/// slot) and to the colour maps `maps` (by slot, library paths: ADR-0048),
-/// removing the ones it had that aren't among them.
+/// slot) and to the colour maps `maps`, removing the ones it had that
+/// aren't among them.
 fn set_material_values(
     world: &mut World,
     instance: InstanceId,
     values: &BTreeMap<String, MaterialValues>,
-    maps: Option<&BTreeMap<String, String>>,
+    maps: Option<ColourMaps>,
 ) {
     let mut wanted: BTreeMap<String, Value> = BTreeMap::new();
-    for (slot, map) in maps.into_iter().flatten() {
-        wanted.insert(
-            material_value_attribute(slot, MATERIAL_COLOUR_MAP),
-            Value::String(format!("{LIBRARY_FOLDER}/{map}")),
-        );
+    if let Some((maps, blends)) = maps {
+        for (slot, map) in maps {
+            wanted.insert(
+                material_value_attribute(slot, MATERIAL_COLOUR_MAP),
+                Value::String(format!("{LIBRARY_FOLDER}/{map}")),
+            );
+        }
+        // The map a slot's own fades toward, and how far (ADR-0048).
+        for (slot, (toward, amount)) in blends {
+            wanted.insert(
+                material_value_attribute(slot, MATERIAL_COLOUR_TOWARD),
+                Value::String(format!("{LIBRARY_FOLDER}/{toward}")),
+            );
+            wanted.insert(
+                material_value_attribute(slot, MATERIAL_COLOUR_AMOUNT),
+                Value::Number(f64::from(*amount)),
+            );
+        }
     }
     for (slot, values) in values {
         for (name, value) in values {

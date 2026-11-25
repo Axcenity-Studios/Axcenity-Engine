@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "Button",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_point_down_up": 0.5,
+    "nose_scale_depth": -0.3,
+    "nose_scale_vert": -0.5,
+    "nose_volume": -0.2
+  },
+  "preset": {
+    "id": "axcenity/human-nose-button",
+    "kind": "feature",
+    "about": "Short and small, the tip turned up.",
+    "feature": "nose",
+    "order": 100
+  }
+}

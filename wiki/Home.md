@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-25 | Known limitations | The human base's face handles are drawn (their drives had no screen directions), slider names fit the panel, the Skin page lists only what a slot offers; two more failing record tests of the realistic tee logged |
+| 2026-11-24 | ADR-0048, ADR-0047, Characters, Known limitations | The human base's polish pass: skin shading with tone controls and a fade between ages, brows and lashes as hair, hair highlights and colours, named face sliders with handles and presets, clean underwear hems, the base in the fit gate |
 | 2026-11-24 | ADR-0047, Characters, Known limitations | The human base has hair: MakeHuman's hairstyles as groom items on the Hair shading model, with colour variants (`hair.py`) |
 | 2026-11-24 | ADR-0048, Characters, Known limitations | The human base wears MakeHuman's 22 skins: library colour maps a manifest lists and the character's values choose (`material_maps`), outside the model file |
 | 2026-11-24 | ADR-0047, Characters, Known limitations | The realistic family is rebuilt on MakeHuman's body and wardrobe (`axcenity/human`), by driving MPFB as a tool; body, face (149 parameters, 30 control shapes) and underwear built, stages 1 and 2 of 7 |
-| 2026-11-24 | Characters, Known limitations | The realistic face's finer controls: 33 more parameters, a ring of outline handles on the new Face shape feature, `feature` presets (noses, face shapes); the shipped model grafted, not rebuilt |
-| 2026-11-24 | Toolbox, specialized editors, file formats | Character Studio's online wardrobe: garments listed from the Axcenity Wardrobe and downloaded into the library, each file checked by size and SHA-256 |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

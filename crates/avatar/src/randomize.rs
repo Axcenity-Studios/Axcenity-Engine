@@ -250,9 +250,14 @@ fn draw_items(
                 .values()
                 .filter(|item| item.slot == *slot && item.bases.contains(&base.id))
                 // Drafts never appear in randomization (asset-quality.md
-                // §5). Only items marked `draft` are left out: an item with
-                // no quality yet (from before the standard) still is drawn.
-                .filter(|item| item.quality != Some(Quality::Draft))
+                // §5), but in a slot whose base says to draw them
+                // (`Slot::random_drafts`). Only items marked `draft` are
+                // left out: an item with no quality yet (from before the
+                // standard) still is drawn.
+                .filter(|item| {
+                    item.quality != Some(Quality::Draft)
+                        || base.slot(slot).is_some_and(|slot| slot.random_drafts)
+                })
                 .filter(|item| !worn.iter().any(|other| other.id == item.id))
                 .filter(|item| !worn.iter().any(|other| item.conflicts_with(other)))
                 .filter(|item| {

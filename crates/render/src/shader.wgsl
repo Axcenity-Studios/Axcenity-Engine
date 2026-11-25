@@ -472,6 +472,13 @@ fn standard_surface(input: SurfaceInput) -> Surface {
     let opacity_map = map_value(opacity_texel, maps.opacity, maps.invert.w);
     var out: Surface;
     out.base_color = input.color * texel.rgb;
+    // A skin between two colour maps (two photographed ages): the second
+    // is in the occlusion map's place, read as colour, and `uv_offset.z`
+    // of it shows. `maps` is uniform, so every pixel takes the same branch.
+    if maps.shading.x == SHADING_SKIN && maps.uv_offset.z > 0.0 {
+        let second = textureSample(occlusion_texture, material_sampler, uv);
+        out.base_color = input.color * mix(texel.rgb, second.rgb, maps.uv_offset.z);
+    }
     out.metalness = input.metalness * map_value(metalness_texel, maps.metalness, maps.invert.x);
     out.roughness = input.roughness * map_value(roughness_texel, maps.roughness, maps.invert.y);
     out.normal = surface_normal(input.normal, input.tangent, uv);

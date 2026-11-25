@@ -497,6 +497,216 @@
   ],
   "presets": [
     {
+      "id": "axcenity/human-body-athletic",
+      "file": "human/presets/body-athletic.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-average",
+      "file": "human/presets/body-average.preset.json",
+      "label": "Average",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-elder",
+      "file": "human/presets/body-elder.preset.json",
+      "label": "Elderly",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-heavyset",
+      "file": "human/presets/body-heavyset.preset.json",
+      "label": "Heavyset",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-muscular",
+      "file": "human/presets/body-muscular.preset.json",
+      "label": "Muscular",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-slim",
+      "file": "human/presets/body-slim.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-angular",
+      "file": "human/presets/face-angular.preset.json",
+      "label": "Angular features",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-broad",
+      "file": "human/presets/face-broad.preset.json",
+      "label": "Broad face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-gaunt",
+      "file": "human/presets/face-gaunt.preset.json",
+      "label": "Gaunt face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-heavy",
+      "file": "human/presets/face-heavy.preset.json",
+      "label": "Heavy face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-long",
+      "file": "human/presets/face-long.preset.json",
+      "label": "Long face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-narrow",
+      "file": "human/presets/face-narrow.preset.json",
+      "label": "Narrow face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-diamond",
+      "file": "human/presets/face-shape-diamond.preset.json",
+      "label": "Diamond",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-heart",
+      "file": "human/presets/face-shape-heart.preset.json",
+      "label": "Heart",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-long",
+      "file": "human/presets/face-shape-long.preset.json",
+      "label": "Long",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-oval",
+      "file": "human/presets/face-shape-oval.preset.json",
+      "label": "Oval",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-pear",
+      "file": "human/presets/face-shape-pear.preset.json",
+      "label": "Pear",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-round",
+      "file": "human/presets/face-shape-round.preset.json",
+      "label": "Round",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-square",
+      "file": "human/presets/face-shape-square.preset.json",
+      "label": "Square",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-soft",
+      "file": "human/presets/face-soft.preset.json",
+      "label": "Soft features",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-weathered",
+      "file": "human/presets/face-weathered.preset.json",
+      "label": "Older face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-female",
+      "file": "human/presets/female.preset.json",
+      "label": "Female",
+      "kind": "character",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-male",
+      "file": "human/presets/male.preset.json",
+      "label": "Male",
+      "kind": "character",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-aquiline",
+      "file": "human/presets/nose-aquiline.preset.json",
+      "label": "Aquiline",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-bulbous",
+      "file": "human/presets/nose-bulbous.preset.json",
+      "label": "Bulbous",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-button",
+      "file": "human/presets/nose-button.preset.json",
+      "label": "Button",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-long-thin",
+      "file": "human/presets/nose-long-thin.preset.json",
+      "label": "Long and thin",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-snub",
+      "file": "human/presets/nose-snub.preset.json",
+      "label": "Snub",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-straight",
+      "file": "human/presets/nose-straight.preset.json",
+      "label": "Straight",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-wide",
+      "file": "human/presets/nose-wide.preset.json",
+      "label": "Wide",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
       "id": "axcenity/realistic-athletic-female",
       "file": "realistic/presets/athletic-female.preset.json",
       "label": "Athletic female",

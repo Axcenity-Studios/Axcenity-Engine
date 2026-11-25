@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "Muscular",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": 0.1,
+    "muscle": 0.9,
+    "shoulder_width": 1.05
+  },
+  "preset": {
+    "id": "axcenity/human-body-muscular",
+    "kind": "body",
+    "about": "Heavy muscle and broad shoulders.",
+    "order": 40
+  }
+}

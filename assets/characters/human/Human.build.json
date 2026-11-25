@@ -361,9 +361,9 @@
    "shapes": 33
   },
   "Brows": {
-   "mpfb_fit_difference_mm": 0.0002,
+   "mpfb_fit_difference_mm": 0.0001,
    "corners": 124,
-   "shapes": 137
+   "shapes": 123
   },
   "Lashes": {
    "mpfb_fit_difference_mm": 0.0001,
@@ -382,7 +382,7 @@
    "corners": 984,
    "faces": 1424,
    "shapes": 19,
-   "hidden_faces": 488
+   "hidden_faces": 484
   }
  },
  "joints": {
@@ -717,231 +717,245 @@
   ],
   "parameters": [
    {
-    "id": "face_shape_angle_in_out",
+    "id": "face_shape_scale_horiz",
     "group": "face_shape",
-    "label": "Head angle, in or out",
-    "about": "The head angle, from in to out.",
-    "low": "Face_Head_Angle_In",
-    "high": "Face_Head_Angle_Out"
+    "label": "Head width",
+    "about": "Head width: from narrow to wide.",
+    "level": "quick",
+    "stem": "face_shape_scale_horiz",
+    "low": "Face_Head_Scale_Horiz_Decr",
+    "high": "Face_Head_Scale_Horiz_Incr"
    },
    {
     "id": "face_shape_scale_vert",
     "group": "face_shape",
     "label": "Head height",
-    "about": "The head height, from less to more.",
+    "about": "Head height: from short to tall.",
+    "level": "quick",
+    "stem": "face_shape_scale_vert",
     "low": "Face_Head_Scale_Vert_Decr",
     "high": "Face_Head_Scale_Vert_Incr"
    },
    {
+    "id": "face_shape_scale_depth",
+    "group": "face_shape",
+    "label": "Head depth",
+    "about": "Head depth: from shallow to deep.",
+    "level": "detailed",
+    "stem": "face_shape_scale_depth",
+    "low": "Face_Head_Scale_Depth_Decr",
+    "high": "Face_Head_Scale_Depth_Incr"
+   },
+   {
+    "id": "face_shape_fat",
+    "group": "face_shape",
+    "label": "Face fat",
+    "about": "Face fat: from gaunt to full.",
+    "level": "quick",
+    "stem": "face_shape_fat",
+    "low": "Face_Head_Fat_Decr",
+    "high": "Face_Head_Fat_Incr"
+   },
+   {
+    "id": "face_shape_age",
+    "group": "face_shape",
+    "label": "Face age",
+    "about": "Face age: from younger to older.",
+    "level": "detailed",
+    "stem": "face_shape_age",
+    "low": "Face_Head_Age_Decr",
+    "high": "Face_Head_Age_Incr"
+   },
+   {
+    "id": "face_shape_oval",
+    "group": "face_shape",
+    "label": "Oval face",
+    "about": "How far the face goes toward an oval face, wide at the cheeks.",
+    "level": "detailed",
+    "stem": "face_shape_oval",
+    "high": "Face_Head_Oval"
+   },
+   {
+    "id": "face_shape_round",
+    "group": "face_shape",
+    "label": "Round face",
+    "about": "How far the face goes toward a round face.",
+    "level": "detailed",
+    "stem": "face_shape_round",
+    "high": "Face_Head_Round"
+   },
+   {
+    "id": "face_shape_square",
+    "group": "face_shape",
+    "label": "Square face",
+    "about": "How far the face goes toward a square face with a wide jaw.",
+    "level": "detailed",
+    "stem": "face_shape_square",
+    "high": "Face_Head_Square"
+   },
+   {
+    "id": "face_shape_rectangular",
+    "group": "face_shape",
+    "label": "Long, square face",
+    "about": "How far the face goes toward a long face with a square jaw.",
+    "level": "detailed",
+    "stem": "face_shape_rectangular",
+    "high": "Face_Head_Rectangular"
+   },
+   {
+    "id": "face_shape_invertedtriangular",
+    "group": "face_shape",
+    "label": "Heart-shaped face",
+    "about": "How far the face goes toward a face wide at the temples and narrow at the jaw.",
+    "level": "detailed",
+    "stem": "face_shape_invertedtriangular",
+    "high": "Face_Head_Invertedtriangular"
+   },
+   {
+    "id": "face_shape_triangular",
+    "group": "face_shape",
+    "label": "Pear-shaped face",
+    "about": "How far the face goes toward a face widest at the jaw.",
+    "level": "detailed",
+    "stem": "face_shape_triangular",
+    "high": "Face_Head_Triangular"
+   },
+   {
+    "id": "face_shape_diamond",
+    "group": "face_shape",
+    "label": "Diamond face",
+    "about": "How far the face goes toward a face narrow at the temples and the jaw.",
+    "level": "detailed",
+    "stem": "face_shape_diamond",
+    "high": "Face_Head_Diamond"
+   },
+   {
+    "id": "face_shape_angle_in_out",
+    "group": "face_shape",
+    "label": "Lower face slope",
+    "about": "Lower face slope: from receding to projecting.",
+    "level": "detailed",
+    "stem": "face_shape_angle_in_out",
+    "low": "Face_Head_Angle_In",
+    "high": "Face_Head_Angle_Out"
+   },
+   {
+    "id": "face_shape_back_scale_depth",
+    "group": "face_shape",
+    "label": "Back of the head",
+    "about": "Back of the head: from flat to deep.",
+    "level": "detailed",
+    "stem": "face_shape_back_scale_depth",
+    "low": "Face_Head_Back_Scale_Depth_Decr",
+    "high": "Face_Head_Back_Scale_Depth_Incr"
+   },
+   {
     "id": "face_shape_trans_backward_forward",
     "group": "face_shape",
-    "label": "Head position, back or forward",
-    "about": "The head position, from back to forward.",
+    "label": "Head set, depth",
+    "about": "Head set, depth: from back to forward.",
+    "level": "detailed",
+    "stem": "face_shape_trans_backward_forward",
     "low": "Face_Head_Trans_Backward",
     "high": "Face_Head_Trans_Forward"
    },
    {
     "id": "face_shape_trans_down_up",
     "group": "face_shape",
-    "label": "Head position, lower or higher",
-    "about": "The head position, from lower to higher.",
+    "label": "Head set, height",
+    "about": "Head set, height: from lower to higher.",
+    "level": "advanced",
+    "stem": "face_shape_trans_down_up",
     "low": "Face_Head_Trans_Down",
     "high": "Face_Head_Trans_Up"
    },
    {
-    "id": "face_shape_fat",
-    "group": "face_shape",
-    "label": "Head fat",
-    "about": "The head fat, from less to more.",
-    "low": "Face_Head_Fat_Decr",
-    "high": "Face_Head_Fat_Incr"
-   },
-   {
-    "id": "face_shape_invertedtriangular",
-    "group": "face_shape",
-    "label": "Heart shaped head",
-    "about": "How far the head goes toward heart shaped.",
-    "high": "Face_Head_Invertedtriangular"
-   },
-   {
-    "id": "face_shape_diamond",
-    "group": "face_shape",
-    "label": "Diamond head",
-    "about": "How far the head goes toward diamond.",
-    "high": "Face_Head_Diamond"
-   },
-   {
-    "id": "face_shape_oval",
-    "group": "face_shape",
-    "label": "Oval head",
-    "about": "How far the head goes toward oval.",
-    "high": "Face_Head_Oval"
-   },
-   {
-    "id": "face_shape_rectangular",
-    "group": "face_shape",
-    "label": "Rectangular head",
-    "about": "How far the head goes toward rectangular.",
-    "high": "Face_Head_Rectangular"
-   },
-   {
     "id": "face_shape_trans_in_out",
     "group": "face_shape",
-    "label": "Head position, in or out",
-    "about": "The head position, from in to out.",
+    "label": "Head set, sideways",
+    "about": "Head set, sideways: from toward its right to toward its left.",
+    "level": "advanced",
+    "stem": "face_shape_trans_in_out",
     "low": "Face_Head_Trans_In",
     "high": "Face_Head_Trans_Out"
-   },
-   {
-    "id": "face_shape_back_scale_depth",
-    "group": "face_shape",
-    "label": "Head back depth",
-    "about": "The head back depth, from less to more.",
-    "low": "Face_Head_Back_Scale_Depth_Decr",
-    "high": "Face_Head_Back_Scale_Depth_Incr"
-   },
-   {
-    "id": "face_shape_round",
-    "group": "face_shape",
-    "label": "Round head",
-    "about": "How far the head goes toward round.",
-    "high": "Face_Head_Round"
-   },
-   {
-    "id": "face_shape_age",
-    "group": "face_shape",
-    "label": "Head age",
-    "about": "The head age, from less to more.",
-    "low": "Face_Head_Age_Decr",
-    "high": "Face_Head_Age_Incr"
-   },
-   {
-    "id": "face_shape_scale_depth",
-    "group": "face_shape",
-    "label": "Head depth",
-    "about": "The head depth, from less to more.",
-    "low": "Face_Head_Scale_Depth_Decr",
-    "high": "Face_Head_Scale_Depth_Incr"
-   },
-   {
-    "id": "face_shape_scale_horiz",
-    "group": "face_shape",
-    "label": "Head width",
-    "about": "The head width, from less to more.",
-    "low": "Face_Head_Scale_Horiz_Decr",
-    "high": "Face_Head_Scale_Horiz_Incr"
-   },
-   {
-    "id": "face_shape_triangular",
-    "group": "face_shape",
-    "label": "Triangular head",
-    "about": "How far the head goes toward triangular.",
-    "high": "Face_Head_Triangular"
-   },
-   {
-    "id": "face_shape_square",
-    "group": "face_shape",
-    "label": "Square head",
-    "about": "How far the head goes toward square.",
-    "high": "Face_Head_Square"
-   },
-   {
-    "id": "forehead_temple",
-    "group": "forehead",
-    "label": "Forehead temple",
-    "about": "The forehead temple, from less to more.",
-    "low": "Face_Forehead_Temple_Decr",
-    "high": "Face_Forehead_Temple_Incr"
-   },
-   {
-    "id": "forehead_trans_backward_forward",
-    "group": "forehead",
-    "label": "Forehead position, back or forward",
-    "about": "The forehead position, from back to forward.",
-    "low": "Face_Forehead_Trans_Backward",
-    "high": "Face_Forehead_Trans_Forward"
    },
    {
     "id": "forehead_scale_vert",
     "group": "forehead",
     "label": "Forehead height",
-    "about": "The forehead height, from less to more.",
+    "about": "Forehead height: from low to high.",
+    "level": "detailed",
+    "stem": "forehead_scale_vert",
     "low": "Face_Forehead_Scale_Vert_Decr",
     "high": "Face_Forehead_Scale_Vert_Incr"
    },
    {
+    "id": "forehead_trans_backward_forward",
+    "group": "forehead",
+    "label": "Forehead slope",
+    "about": "Forehead slope: from sloped back to full.",
+    "level": "detailed",
+    "stem": "forehead_trans_backward_forward",
+    "low": "Face_Forehead_Trans_Backward",
+    "high": "Face_Forehead_Trans_Forward"
+   },
+   {
+    "id": "forehead_temple",
+    "group": "forehead",
+    "label": "Temple width",
+    "about": "Temple width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "forehead_temple",
+    "low": "Face_Forehead_Temple_Decr",
+    "high": "Face_Forehead_Temple_Incr"
+   },
+   {
     "id": "forehead_nubian",
     "group": "forehead",
-    "label": "Forehead nubian",
-    "about": "The forehead nubian, from less to more.",
+    "label": "Crown",
+    "about": "Crown: from flat to high and long.",
+    "level": "advanced",
+    "stem": "forehead_nubian",
     "low": "Face_Forehead_Nubian_Decr",
     "high": "Face_Forehead_Nubian_Incr"
    },
    {
-    "id": "brows_angle_down_up",
-    "group": "brows",
-    "label": "Brow angle, lower or higher",
-    "about": "The brow angle, from lower to higher.",
-    "low": "Face_Eyebrows_Angle_Down",
-    "high": "Face_Eyebrows_Angle_Up"
-   },
-   {
     "id": "brows_trans_down_up",
     "group": "brows",
-    "label": "Brow position, lower or higher",
-    "about": "The brow position, from lower to higher.",
+    "label": "Brow height",
+    "about": "Brow height: from low to high.",
+    "level": "quick",
+    "stem": "brows_trans_down_up",
     "low": "Face_Eyebrows_Trans_Down",
     "high": "Face_Eyebrows_Trans_Up"
    },
    {
+    "id": "brows_angle_down_up",
+    "group": "brows",
+    "label": "Brow slant",
+    "about": "Brow slant: from outer ends raised to outer ends lowered.",
+    "level": "detailed",
+    "stem": "brows_angle_down_up",
+    "low": "Face_Eyebrows_Angle_Down",
+    "high": "Face_Eyebrows_Angle_Up"
+   },
+   {
     "id": "brows_trans_backward_forward",
     "group": "brows",
-    "label": "Brow position, back or forward",
-    "about": "The brow position, from back to forward.",
+    "label": "Brow ridge",
+    "about": "Brow ridge: from flat to prominent.",
+    "level": "detailed",
+    "stem": "brows_trans_backward_forward",
     "low": "Face_Eyebrows_Trans_Backward",
     "high": "Face_Eyebrows_Trans_Forward"
    },
    {
-    "id": "eyes_corner1_down_up_left",
-    "group": "eyes",
-    "label": "Eye corner 1, lower or higher, left",
-    "about": "The eye corner 1, from lower to higher, on the left side.",
-    "low": "Face_Eye_Corner1_Down_Left",
-    "high": "Face_Eye_Corner1_Up_Left",
-    "mirror": "eyes_corner1_down_up_right"
-   },
-   {
-    "id": "eyes_corner1_down_up_right",
-    "group": "eyes",
-    "label": "Eye corner 1, lower or higher, right",
-    "about": "The eye corner 1, from lower to higher, on the right side.",
-    "low": "Face_Eye_Corner1_Down_Right",
-    "high": "Face_Eye_Corner1_Up_Right",
-    "mirror": "eyes_corner1_down_up_left"
-   },
-   {
-    "id": "eyes_height1_left",
-    "group": "eyes",
-    "label": "Eye height 1, left",
-    "about": "The eye height 1, from less to more, on the left side.",
-    "low": "Face_Eye_Height1_Decr_Left",
-    "high": "Face_Eye_Height1_Incr_Left",
-    "mirror": "eyes_height1_right"
-   },
-   {
-    "id": "eyes_height1_right",
-    "group": "eyes",
-    "label": "Eye height 1, right",
-    "about": "The eye height 1, from less to more, on the right side.",
-    "low": "Face_Eye_Height1_Decr_Right",
-    "high": "Face_Eye_Height1_Incr_Right",
-    "mirror": "eyes_height1_left"
-   },
-   {
     "id": "eyes_scale_left",
     "group": "eyes",
-    "label": "Eye size, left",
-    "about": "The eye size, from less to more, on the left side.",
+    "label": "Left eye size",
+    "about": "Left eye size: from small to large.",
+    "level": "quick",
+    "stem": "eyes_scale",
     "low": "Face_Eye_Scale_Decr_Left",
     "high": "Face_Eye_Scale_Incr_Left",
     "mirror": "eyes_scale_right"
@@ -949,233 +963,21 @@
    {
     "id": "eyes_scale_right",
     "group": "eyes",
-    "label": "Eye size, right",
-    "about": "The eye size, from less to more, on the right side.",
+    "label": "Right eye size",
+    "about": "Right eye size: from small to large.",
+    "level": "quick",
+    "stem": "eyes_scale",
     "low": "Face_Eye_Scale_Decr_Right",
     "high": "Face_Eye_Scale_Incr_Right",
     "mirror": "eyes_scale_left"
    },
    {
-    "id": "eyes_push1_in_out_left",
-    "group": "eyes",
-    "label": "Eye push 1, in or out, left",
-    "about": "The eye push 1, from in to out, on the left side.",
-    "low": "Face_Eye_Push1_In_Left",
-    "high": "Face_Eye_Push1_Out_Left",
-    "mirror": "eyes_push1_in_out_right"
-   },
-   {
-    "id": "eyes_push1_in_out_right",
-    "group": "eyes",
-    "label": "Eye push 1, in or out, right",
-    "about": "The eye push 1, from in to out, on the right side.",
-    "low": "Face_Eye_Push1_In_Right",
-    "high": "Face_Eye_Push1_Out_Right",
-    "mirror": "eyes_push1_in_out_left"
-   },
-   {
-    "id": "eyes_eyefold_down_up_left",
-    "group": "eyes",
-    "label": "Eye lid fold, lower or higher, left",
-    "about": "The eye lid fold, from lower to higher, on the left side.",
-    "low": "Face_Eye_Eyefold_Down_Left",
-    "high": "Face_Eye_Eyefold_Up_Left",
-    "mirror": "eyes_eyefold_down_up_right"
-   },
-   {
-    "id": "eyes_eyefold_down_up_right",
-    "group": "eyes",
-    "label": "Eye lid fold, lower or higher, right",
-    "about": "The eye lid fold, from lower to higher, on the right side.",
-    "low": "Face_Eye_Eyefold_Down_Right",
-    "high": "Face_Eye_Eyefold_Up_Right",
-    "mirror": "eyes_eyefold_down_up_left"
-   },
-   {
-    "id": "eyes_height3_left",
-    "group": "eyes",
-    "label": "Eye height 3, left",
-    "about": "The eye height 3, from less to more, on the left side.",
-    "low": "Face_Eye_Height3_Decr_Left",
-    "high": "Face_Eye_Height3_Incr_Left",
-    "mirror": "eyes_height3_right"
-   },
-   {
-    "id": "eyes_height3_right",
-    "group": "eyes",
-    "label": "Eye height 3, right",
-    "about": "The eye height 3, from less to more, on the right side.",
-    "low": "Face_Eye_Height3_Decr_Right",
-    "high": "Face_Eye_Height3_Incr_Right",
-    "mirror": "eyes_height3_left"
-   },
-   {
-    "id": "eyes_height2_left",
-    "group": "eyes",
-    "label": "Eye height 2, left",
-    "about": "The eye height 2, from less to more, on the left side.",
-    "low": "Face_Eye_Height2_Decr_Left",
-    "high": "Face_Eye_Height2_Incr_Left",
-    "mirror": "eyes_height2_right"
-   },
-   {
-    "id": "eyes_height2_right",
-    "group": "eyes",
-    "label": "Eye height 2, right",
-    "about": "The eye height 2, from less to more, on the right side.",
-    "low": "Face_Eye_Height2_Decr_Right",
-    "high": "Face_Eye_Height2_Incr_Right",
-    "mirror": "eyes_height2_left"
-   },
-   {
-    "id": "eyes_bag_left",
-    "group": "eyes",
-    "label": "Eye bag, left",
-    "about": "The eye bag, from less to more, on the left side.",
-    "low": "Face_Eye_Bag_Decr_Left",
-    "high": "Face_Eye_Bag_Incr_Left",
-    "mirror": "eyes_bag_right"
-   },
-   {
-    "id": "eyes_bag_right",
-    "group": "eyes",
-    "label": "Eye bag, right",
-    "about": "The eye bag, from less to more, on the right side.",
-    "low": "Face_Eye_Bag_Decr_Right",
-    "high": "Face_Eye_Bag_Incr_Right",
-    "mirror": "eyes_bag_left"
-   },
-   {
-    "id": "eyes_push2_in_out_left",
-    "group": "eyes",
-    "label": "Eye push 2, in or out, left",
-    "about": "The eye push 2, from in to out, on the left side.",
-    "low": "Face_Eye_Push2_In_Left",
-    "high": "Face_Eye_Push2_Out_Left",
-    "mirror": "eyes_push2_in_out_right"
-   },
-   {
-    "id": "eyes_push2_in_out_right",
-    "group": "eyes",
-    "label": "Eye push 2, in or out, right",
-    "about": "The eye push 2, from in to out, on the right side.",
-    "low": "Face_Eye_Push2_In_Right",
-    "high": "Face_Eye_Push2_Out_Right",
-    "mirror": "eyes_push2_in_out_left"
-   },
-   {
-    "id": "eyes_trans_down_up_left",
-    "group": "eyes",
-    "label": "Eye position, lower or higher, left",
-    "about": "The eye position, from lower to higher, on the left side.",
-    "low": "Face_Eye_Trans_Down_Left",
-    "high": "Face_Eye_Trans_Up_Left",
-    "mirror": "eyes_trans_down_up_right"
-   },
-   {
-    "id": "eyes_trans_down_up_right",
-    "group": "eyes",
-    "label": "Eye position, lower or higher, right",
-    "about": "The eye position, from lower to higher, on the right side.",
-    "low": "Face_Eye_Trans_Down_Right",
-    "high": "Face_Eye_Trans_Up_Right",
-    "mirror": "eyes_trans_down_up_left"
-   },
-   {
-    "id": "eyes_bag_height_left",
-    "group": "eyes",
-    "label": "Eye bag height, left",
-    "about": "The eye bag height, from less to more, on the left side.",
-    "low": "Face_Eye_Bag_Height_Decr_Left",
-    "high": "Face_Eye_Bag_Height_Incr_Left",
-    "mirror": "eyes_bag_height_right"
-   },
-   {
-    "id": "eyes_bag_height_right",
-    "group": "eyes",
-    "label": "Eye bag height, right",
-    "about": "The eye bag height, from less to more, on the right side.",
-    "low": "Face_Eye_Bag_Height_Decr_Right",
-    "high": "Face_Eye_Bag_Height_Incr_Right",
-    "mirror": "eyes_bag_height_left"
-   },
-   {
-    "id": "eyes_epicanthus_in_out_left",
-    "group": "eyes",
-    "label": "Eye epicanthus, in or out, left",
-    "about": "The eye epicanthus, from in to out, on the left side.",
-    "low": "Face_Eye_Epicanthus_In_Left",
-    "high": "Face_Eye_Epicanthus_Out_Left",
-    "mirror": "eyes_epicanthus_in_out_right"
-   },
-   {
-    "id": "eyes_epicanthus_in_out_right",
-    "group": "eyes",
-    "label": "Eye epicanthus, in or out, right",
-    "about": "The eye epicanthus, from in to out, on the right side.",
-    "low": "Face_Eye_Epicanthus_In_Right",
-    "high": "Face_Eye_Epicanthus_Out_Right",
-    "mirror": "eyes_epicanthus_in_out_left"
-   },
-   {
-    "id": "eyes_eyefold_angle_down_up_left",
-    "group": "eyes",
-    "label": "Eye lid fold angle, lower or higher, left",
-    "about": "The eye lid fold angle, from lower to higher, on the left side.",
-    "low": "Face_Eye_Eyefold_Angle_Down_Left",
-    "high": "Face_Eye_Eyefold_Angle_Up_Left",
-    "mirror": "eyes_eyefold_angle_down_up_right"
-   },
-   {
-    "id": "eyes_eyefold_angle_down_up_right",
-    "group": "eyes",
-    "label": "Eye lid fold angle, lower or higher, right",
-    "about": "The eye lid fold angle, from lower to higher, on the right side.",
-    "low": "Face_Eye_Eyefold_Angle_Down_Right",
-    "high": "Face_Eye_Eyefold_Angle_Up_Right",
-    "mirror": "eyes_eyefold_angle_down_up_left"
-   },
-   {
-    "id": "eyes_bag_in_out_left",
-    "group": "eyes",
-    "label": "Eye bag, in or out, left",
-    "about": "The eye bag, from in to out, on the left side.",
-    "low": "Face_Eye_Bag_In_Left",
-    "high": "Face_Eye_Bag_Out_Left",
-    "mirror": "eyes_bag_in_out_right"
-   },
-   {
-    "id": "eyes_bag_in_out_right",
-    "group": "eyes",
-    "label": "Eye bag, in or out, right",
-    "about": "The eye bag, from in to out, on the right side.",
-    "low": "Face_Eye_Bag_In_Right",
-    "high": "Face_Eye_Bag_Out_Right",
-    "mirror": "eyes_bag_in_out_left"
-   },
-   {
-    "id": "eyes_corner2_down_up_left",
-    "group": "eyes",
-    "label": "Eye corner 2, lower or higher, left",
-    "about": "The eye corner 2, from lower to higher, on the left side.",
-    "low": "Face_Eye_Corner2_Down_Left",
-    "high": "Face_Eye_Corner2_Up_Left",
-    "mirror": "eyes_corner2_down_up_right"
-   },
-   {
-    "id": "eyes_corner2_down_up_right",
-    "group": "eyes",
-    "label": "Eye corner 2, lower or higher, right",
-    "about": "The eye corner 2, from lower to higher, on the right side.",
-    "low": "Face_Eye_Corner2_Down_Right",
-    "high": "Face_Eye_Corner2_Up_Right",
-    "mirror": "eyes_corner2_down_up_left"
-   },
-   {
     "id": "eyes_trans_in_out_left",
     "group": "eyes",
-    "label": "Eye position, in or out, left",
-    "about": "The eye position, from in to out, on the left side.",
+    "label": "Left eye spacing",
+    "about": "Left eye spacing: from nearer the nose to farther from it.",
+    "level": "quick",
+    "stem": "eyes_trans_in_out",
     "low": "Face_Eye_Trans_In_Left",
     "high": "Face_Eye_Trans_Out_Left",
     "mirror": "eyes_trans_in_out_right"
@@ -1183,17 +985,131 @@
    {
     "id": "eyes_trans_in_out_right",
     "group": "eyes",
-    "label": "Eye position, in or out, right",
-    "about": "The eye position, from in to out, on the right side.",
+    "label": "Right eye spacing",
+    "about": "Right eye spacing: from nearer the nose to farther from it.",
+    "level": "quick",
+    "stem": "eyes_trans_in_out",
     "low": "Face_Eye_Trans_In_Right",
     "high": "Face_Eye_Trans_Out_Right",
     "mirror": "eyes_trans_in_out_left"
    },
    {
+    "id": "eyes_trans_down_up_left",
+    "group": "eyes",
+    "label": "Left eye height",
+    "about": "Left eye height: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_trans_down_up",
+    "low": "Face_Eye_Trans_Down_Left",
+    "high": "Face_Eye_Trans_Up_Left",
+    "mirror": "eyes_trans_down_up_right"
+   },
+   {
+    "id": "eyes_trans_down_up_right",
+    "group": "eyes",
+    "label": "Right eye height",
+    "about": "Right eye height: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_trans_down_up",
+    "low": "Face_Eye_Trans_Down_Right",
+    "high": "Face_Eye_Trans_Up_Right",
+    "mirror": "eyes_trans_down_up_left"
+   },
+   {
+    "id": "eyes_height2_left",
+    "group": "eyes",
+    "label": "Left eye opening",
+    "about": "Left eye opening: from narrow to wide.",
+    "level": "detailed",
+    "stem": "eyes_height2",
+    "low": "Face_Eye_Height2_Decr_Left",
+    "high": "Face_Eye_Height2_Incr_Left",
+    "mirror": "eyes_height2_right"
+   },
+   {
+    "id": "eyes_height2_right",
+    "group": "eyes",
+    "label": "Right eye opening",
+    "about": "Right eye opening: from narrow to wide.",
+    "level": "detailed",
+    "stem": "eyes_height2",
+    "low": "Face_Eye_Height2_Decr_Right",
+    "high": "Face_Eye_Height2_Incr_Right",
+    "mirror": "eyes_height2_left"
+   },
+   {
+    "id": "eyes_corner1_down_up_left",
+    "group": "eyes",
+    "label": "Left outer eye corner",
+    "about": "Left outer eye corner: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_corner1_down_up",
+    "low": "Face_Eye_Corner1_Down_Left",
+    "high": "Face_Eye_Corner1_Up_Left",
+    "mirror": "eyes_corner1_down_up_right"
+   },
+   {
+    "id": "eyes_corner1_down_up_right",
+    "group": "eyes",
+    "label": "Right outer eye corner",
+    "about": "Right outer eye corner: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_corner1_down_up",
+    "low": "Face_Eye_Corner1_Down_Right",
+    "high": "Face_Eye_Corner1_Up_Right",
+    "mirror": "eyes_corner1_down_up_left"
+   },
+   {
+    "id": "eyes_corner2_down_up_left",
+    "group": "eyes",
+    "label": "Left inner eye corner",
+    "about": "Left inner eye corner: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_corner2_down_up",
+    "low": "Face_Eye_Corner2_Down_Left",
+    "high": "Face_Eye_Corner2_Up_Left",
+    "mirror": "eyes_corner2_down_up_right"
+   },
+   {
+    "id": "eyes_corner2_down_up_right",
+    "group": "eyes",
+    "label": "Right inner eye corner",
+    "about": "Right inner eye corner: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_corner2_down_up",
+    "low": "Face_Eye_Corner2_Down_Right",
+    "high": "Face_Eye_Corner2_Up_Right",
+    "mirror": "eyes_corner2_down_up_left"
+   },
+   {
+    "id": "eyes_eyefold_down_up_left",
+    "group": "eyes",
+    "label": "Left upper lid crease",
+    "about": "Left upper lid crease: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_eyefold_down_up",
+    "low": "Face_Eye_Eyefold_Down_Left",
+    "high": "Face_Eye_Eyefold_Up_Left",
+    "mirror": "eyes_eyefold_down_up_right"
+   },
+   {
+    "id": "eyes_eyefold_down_up_right",
+    "group": "eyes",
+    "label": "Right upper lid crease",
+    "about": "Right upper lid crease: from lower to higher.",
+    "level": "detailed",
+    "stem": "eyes_eyefold_down_up",
+    "low": "Face_Eye_Eyefold_Down_Right",
+    "high": "Face_Eye_Eyefold_Up_Right",
+    "mirror": "eyes_eyefold_down_up_left"
+   },
+   {
     "id": "eyes_eyefold_concave_convex_left",
     "group": "eyes",
-    "label": "Eye lid fold, concave or convex, left",
-    "about": "The eye lid fold, from concave to convex, on the left side.",
+    "label": "Left lid fullness",
+    "about": "Left lid fullness: from hollow to full.",
+    "level": "detailed",
+    "stem": "eyes_eyefold_concave_convex",
     "low": "Face_Eye_Eyefold_Concave_Left",
     "high": "Face_Eye_Eyefold_Convex_Left",
     "mirror": "eyes_eyefold_concave_convex_right"
@@ -1201,239 +1117,429 @@
    {
     "id": "eyes_eyefold_concave_convex_right",
     "group": "eyes",
-    "label": "Eye lid fold, concave or convex, right",
-    "about": "The eye lid fold, from concave to convex, on the right side.",
+    "label": "Right lid fullness",
+    "about": "Right lid fullness: from hollow to full.",
+    "level": "detailed",
+    "stem": "eyes_eyefold_concave_convex",
     "low": "Face_Eye_Eyefold_Concave_Right",
     "high": "Face_Eye_Eyefold_Convex_Right",
     "mirror": "eyes_eyefold_concave_convex_left"
    },
    {
-    "id": "nose_nostrils_angle_down_up",
-    "group": "nose",
-    "label": "Nose nostrils angle, lower or higher",
-    "about": "The nose nostrils angle, from lower to higher.",
-    "low": "Face_Nose_Nostrils_Angle_Down",
-    "high": "Face_Nose_Nostrils_Angle_Up"
+    "id": "eyes_epicanthus_in_out_left",
+    "group": "eyes",
+    "label": "Left inner eye fold",
+    "about": "Left inner eye fold: from folded in to open.",
+    "level": "detailed",
+    "stem": "eyes_epicanthus_in_out",
+    "low": "Face_Eye_Epicanthus_In_Left",
+    "high": "Face_Eye_Epicanthus_Out_Left",
+    "mirror": "eyes_epicanthus_in_out_right"
    },
    {
-    "id": "nose_flaring",
-    "group": "nose",
-    "label": "Nose flaring",
-    "about": "The nose flaring, from less to more.",
-    "low": "Face_Nose_Flaring_Decr",
-    "high": "Face_Nose_Flaring_Incr"
+    "id": "eyes_epicanthus_in_out_right",
+    "group": "eyes",
+    "label": "Right inner eye fold",
+    "about": "Right inner eye fold: from folded in to open.",
+    "level": "detailed",
+    "stem": "eyes_epicanthus_in_out",
+    "low": "Face_Eye_Epicanthus_In_Right",
+    "high": "Face_Eye_Epicanthus_Out_Right",
+    "mirror": "eyes_epicanthus_in_out_left"
    },
    {
-    "id": "nose_curve_concave_convex",
-    "group": "nose",
-    "label": "Nose curve, concave or convex",
-    "about": "The nose curve, from concave to convex.",
-    "low": "Face_Nose_Curve_Concave",
-    "high": "Face_Nose_Curve_Convex"
+    "id": "eyes_bag_left",
+    "group": "eyes",
+    "label": "Left under-eye bag",
+    "about": "Left under-eye bag: from none to heavy.",
+    "level": "detailed",
+    "stem": "eyes_bag",
+    "low": "Face_Eye_Bag_Decr_Left",
+    "high": "Face_Eye_Bag_Incr_Left",
+    "mirror": "eyes_bag_right"
    },
    {
-    "id": "nose_scale_depth",
-    "group": "nose",
-    "label": "Nose depth",
-    "about": "The nose depth, from less to more.",
-    "low": "Face_Nose_Scale_Depth_Decr",
-    "high": "Face_Nose_Scale_Depth_Incr"
+    "id": "eyes_bag_right",
+    "group": "eyes",
+    "label": "Right under-eye bag",
+    "about": "Right under-eye bag: from none to heavy.",
+    "level": "detailed",
+    "stem": "eyes_bag",
+    "low": "Face_Eye_Bag_Decr_Right",
+    "high": "Face_Eye_Bag_Incr_Right",
+    "mirror": "eyes_bag_left"
    },
    {
-    "id": "nose_scale_vert",
-    "group": "nose",
-    "label": "Nose height",
-    "about": "The nose height, from less to more.",
-    "low": "Face_Nose_Scale_Vert_Decr",
-    "high": "Face_Nose_Scale_Vert_Incr"
+    "id": "eyes_height1_left",
+    "group": "eyes",
+    "label": "Left inner lid gap",
+    "about": "Left inner lid gap: from narrow to wide.",
+    "level": "advanced",
+    "stem": "eyes_height1",
+    "low": "Face_Eye_Height1_Decr_Left",
+    "high": "Face_Eye_Height1_Incr_Left",
+    "mirror": "eyes_height1_right"
    },
    {
-    "id": "nose_point_width",
-    "group": "nose",
-    "label": "Nose point width",
-    "about": "The nose point width, from less to more.",
-    "low": "Face_Nose_Point_Width_Decr",
-    "high": "Face_Nose_Point_Width_Incr"
+    "id": "eyes_height1_right",
+    "group": "eyes",
+    "label": "Right inner lid gap",
+    "about": "Right inner lid gap: from narrow to wide.",
+    "level": "advanced",
+    "stem": "eyes_height1",
+    "low": "Face_Eye_Height1_Decr_Right",
+    "high": "Face_Eye_Height1_Incr_Right",
+    "mirror": "eyes_height1_left"
+   },
+   {
+    "id": "eyes_height3_left",
+    "group": "eyes",
+    "label": "Left outer lid gap",
+    "about": "Left outer lid gap: from narrow to wide.",
+    "level": "advanced",
+    "stem": "eyes_height3",
+    "low": "Face_Eye_Height3_Decr_Left",
+    "high": "Face_Eye_Height3_Incr_Left",
+    "mirror": "eyes_height3_right"
+   },
+   {
+    "id": "eyes_height3_right",
+    "group": "eyes",
+    "label": "Right outer lid gap",
+    "about": "Right outer lid gap: from narrow to wide.",
+    "level": "advanced",
+    "stem": "eyes_height3",
+    "low": "Face_Eye_Height3_Decr_Right",
+    "high": "Face_Eye_Height3_Incr_Right",
+    "mirror": "eyes_height3_left"
+   },
+   {
+    "id": "eyes_push1_in_out_left",
+    "group": "eyes",
+    "label": "Left outer eye reach",
+    "about": "Left outer eye reach: from drawn in to drawn out.",
+    "level": "advanced",
+    "stem": "eyes_push1_in_out",
+    "low": "Face_Eye_Push1_In_Left",
+    "high": "Face_Eye_Push1_Out_Left",
+    "mirror": "eyes_push1_in_out_right"
+   },
+   {
+    "id": "eyes_push1_in_out_right",
+    "group": "eyes",
+    "label": "Right outer eye reach",
+    "about": "Right outer eye reach: from drawn in to drawn out.",
+    "level": "advanced",
+    "stem": "eyes_push1_in_out",
+    "low": "Face_Eye_Push1_In_Right",
+    "high": "Face_Eye_Push1_Out_Right",
+    "mirror": "eyes_push1_in_out_left"
+   },
+   {
+    "id": "eyes_push2_in_out_left",
+    "group": "eyes",
+    "label": "Left inner eye reach",
+    "about": "Left inner eye reach: from drawn in to drawn out.",
+    "level": "advanced",
+    "stem": "eyes_push2_in_out",
+    "low": "Face_Eye_Push2_In_Left",
+    "high": "Face_Eye_Push2_Out_Left",
+    "mirror": "eyes_push2_in_out_right"
+   },
+   {
+    "id": "eyes_push2_in_out_right",
+    "group": "eyes",
+    "label": "Right inner eye reach",
+    "about": "Right inner eye reach: from drawn in to drawn out.",
+    "level": "advanced",
+    "stem": "eyes_push2_in_out",
+    "low": "Face_Eye_Push2_In_Right",
+    "high": "Face_Eye_Push2_Out_Right",
+    "mirror": "eyes_push2_in_out_left"
+   },
+   {
+    "id": "eyes_eyefold_angle_down_up_left",
+    "group": "eyes",
+    "label": "Left lid crease slant",
+    "about": "Left lid crease slant: from down to up.",
+    "level": "advanced",
+    "stem": "eyes_eyefold_angle_down_up",
+    "low": "Face_Eye_Eyefold_Angle_Down_Left",
+    "high": "Face_Eye_Eyefold_Angle_Up_Left",
+    "mirror": "eyes_eyefold_angle_down_up_right"
+   },
+   {
+    "id": "eyes_eyefold_angle_down_up_right",
+    "group": "eyes",
+    "label": "Right lid crease slant",
+    "about": "Right lid crease slant: from down to up.",
+    "level": "advanced",
+    "stem": "eyes_eyefold_angle_down_up",
+    "low": "Face_Eye_Eyefold_Angle_Down_Right",
+    "high": "Face_Eye_Eyefold_Angle_Up_Right",
+    "mirror": "eyes_eyefold_angle_down_up_left"
+   },
+   {
+    "id": "eyes_bag_height_left",
+    "group": "eyes",
+    "label": "Left eye bag height",
+    "about": "Left eye bag height: from short to tall.",
+    "level": "advanced",
+    "stem": "eyes_bag_height",
+    "low": "Face_Eye_Bag_Height_Decr_Left",
+    "high": "Face_Eye_Bag_Height_Incr_Left",
+    "mirror": "eyes_bag_height_right"
+   },
+   {
+    "id": "eyes_bag_height_right",
+    "group": "eyes",
+    "label": "Right eye bag height",
+    "about": "Right eye bag height: from short to tall.",
+    "level": "advanced",
+    "stem": "eyes_bag_height",
+    "low": "Face_Eye_Bag_Height_Decr_Right",
+    "high": "Face_Eye_Bag_Height_Incr_Right",
+    "mirror": "eyes_bag_height_left"
+   },
+   {
+    "id": "eyes_bag_in_out_left",
+    "group": "eyes",
+    "label": "Left eye bag reach",
+    "about": "Left eye bag reach: from in to out.",
+    "level": "advanced",
+    "stem": "eyes_bag_in_out",
+    "low": "Face_Eye_Bag_In_Left",
+    "high": "Face_Eye_Bag_Out_Left",
+    "mirror": "eyes_bag_in_out_right"
+   },
+   {
+    "id": "eyes_bag_in_out_right",
+    "group": "eyes",
+    "label": "Right eye bag reach",
+    "about": "Right eye bag reach: from in to out.",
+    "level": "advanced",
+    "stem": "eyes_bag_in_out",
+    "low": "Face_Eye_Bag_In_Right",
+    "high": "Face_Eye_Bag_Out_Right",
+    "mirror": "eyes_bag_in_out_left"
    },
    {
     "id": "nose_scale_horiz",
     "group": "nose",
     "label": "Nose width",
-    "about": "The nose width, from less to more.",
+    "about": "Nose width: from narrow to wide.",
+    "level": "quick",
+    "stem": "nose_scale_horiz",
     "low": "Face_Nose_Scale_Horiz_Decr",
     "high": "Face_Nose_Scale_Horiz_Incr"
    },
    {
-    "id": "nose_width1",
+    "id": "nose_scale_vert",
     "group": "nose",
-    "label": "Nose width 1",
-    "about": "The nose width 1, from less to more.",
-    "low": "Face_Nose_Width1_Decr",
-    "high": "Face_Nose_Width1_Incr"
+    "label": "Nose length",
+    "about": "Nose length: from short to long.",
+    "level": "quick",
+    "stem": "nose_scale_vert",
+    "low": "Face_Nose_Scale_Vert_Decr",
+    "high": "Face_Nose_Scale_Vert_Incr"
    },
    {
-    "id": "nose_trans_backward_forward",
+    "id": "nose_scale_depth",
     "group": "nose",
-    "label": "Nose position, back or forward",
-    "about": "The nose position, from back to forward.",
-    "low": "Face_Nose_Trans_Backward",
-    "high": "Face_Nose_Trans_Forward"
-   },
-   {
-    "id": "nose_trans_down_up",
-    "group": "nose",
-    "label": "Nose position, lower or higher",
-    "about": "The nose position, from lower to higher.",
-    "low": "Face_Nose_Trans_Down",
-    "high": "Face_Nose_Trans_Up"
-   },
-   {
-    "id": "nose_hump",
-    "group": "nose",
-    "label": "Nose hump",
-    "about": "The nose hump, from less to more.",
-    "low": "Face_Nose_Hump_Decr",
-    "high": "Face_Nose_Hump_Incr"
-   },
-   {
-    "id": "nose_nostrils_width",
-    "group": "nose",
-    "label": "Nose nostrils width",
-    "about": "The nose nostrils width, from less to more.",
-    "low": "Face_Nose_Nostrils_Width_Decr",
-    "high": "Face_Nose_Nostrils_Width_Incr"
-   },
-   {
-    "id": "nose_trans_in_out",
-    "group": "nose",
-    "label": "Nose position, in or out",
-    "about": "The nose position, from in to out.",
-    "low": "Face_Nose_Trans_In",
-    "high": "Face_Nose_Trans_Out"
-   },
-   {
-    "id": "nose_greek",
-    "group": "nose",
-    "label": "Nose greek",
-    "about": "The nose greek, from less to more.",
-    "low": "Face_Nose_Greek_Decr",
-    "high": "Face_Nose_Greek_Incr"
+    "label": "Nose projection",
+    "about": "Nose projection: from flat to prominent.",
+    "level": "quick",
+    "stem": "nose_scale_depth",
+    "low": "Face_Nose_Scale_Depth_Decr",
+    "high": "Face_Nose_Scale_Depth_Incr"
    },
    {
     "id": "nose_point_down_up",
     "group": "nose",
-    "label": "Nose point, lower or higher",
-    "about": "The nose point, from lower to higher.",
+    "label": "Nose tip tilt",
+    "about": "Nose tip tilt: from turned down to turned up.",
+    "level": "detailed",
+    "stem": "nose_point_down_up",
     "low": "Face_Nose_Point_Down",
     "high": "Face_Nose_Point_Up"
    },
    {
-    "id": "nose_width2",
-    "group": "nose",
-    "label": "Nose width 2",
-    "about": "The nose width 2, from less to more.",
-    "low": "Face_Nose_Width2_Decr",
-    "high": "Face_Nose_Width2_Incr"
-   },
-   {
-    "id": "nose_width3",
-    "group": "nose",
-    "label": "Nose width 3",
-    "about": "The nose width 3, from less to more.",
-    "low": "Face_Nose_Width3_Decr",
-    "high": "Face_Nose_Width3_Incr"
-   },
-   {
-    "id": "nose_septumangle",
-    "group": "nose",
-    "label": "Nose septum angle",
-    "about": "The nose septum angle, from less to more.",
-    "low": "Face_Nose_Septumangle_Decr",
-    "high": "Face_Nose_Septumangle_Incr"
-   },
-   {
-    "id": "nose_base_down_up",
-    "group": "nose",
-    "label": "Nose base, lower or higher",
-    "about": "The nose base, from lower to higher.",
-    "low": "Face_Nose_Base_Down",
-    "high": "Face_Nose_Base_Up"
-   },
-   {
-    "id": "nose_compression_compress_uncompress",
-    "group": "nose",
-    "label": "Nose compression, pinched or open",
-    "about": "The nose compression, from pinched to open.",
-    "low": "Face_Nose_Compression_Compress",
-    "high": "Face_Nose_Compression_Uncompress"
-   },
-   {
     "id": "nose_volume",
     "group": "nose",
-    "label": "Nose volume",
-    "about": "The nose volume, from less to more.",
+    "label": "Nose tip size",
+    "about": "Nose tip size: from small to bulbous.",
+    "level": "detailed",
+    "stem": "nose_volume",
     "low": "Face_Nose_Volume_Decr",
     "high": "Face_Nose_Volume_Incr"
    },
    {
-    "id": "cheeks_trans_down_up_left",
-    "group": "cheeks",
-    "label": "Cheek position, lower or higher, left",
-    "about": "The cheek position, from lower to higher, on the left side.",
-    "low": "Face_Cheek_Trans_Down_Left",
-    "high": "Face_Cheek_Trans_Up_Left",
-    "mirror": "cheeks_trans_down_up_right"
+    "id": "nose_point_width",
+    "group": "nose",
+    "label": "Nose tip width",
+    "about": "Nose tip width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "nose_point_width",
+    "low": "Face_Nose_Point_Width_Decr",
+    "high": "Face_Nose_Point_Width_Incr"
    },
    {
-    "id": "cheeks_trans_down_up_right",
-    "group": "cheeks",
-    "label": "Cheek position, lower or higher, right",
-    "about": "The cheek position, from lower to higher, on the right side.",
-    "low": "Face_Cheek_Trans_Down_Right",
-    "high": "Face_Cheek_Trans_Up_Right",
-    "mirror": "cheeks_trans_down_up_left"
+    "id": "nose_hump",
+    "group": "nose",
+    "label": "Bridge hump",
+    "about": "Bridge hump: from scooped to humped.",
+    "level": "detailed",
+    "stem": "nose_hump",
+    "low": "Face_Nose_Hump_Decr",
+    "high": "Face_Nose_Hump_Incr"
    },
    {
-    "id": "cheeks_volume_left",
-    "group": "cheeks",
-    "label": "Cheek volume, left",
-    "about": "The cheek volume, from less to more, on the left side.",
-    "low": "Face_Cheek_Volume_Decr_Left",
-    "high": "Face_Cheek_Volume_Incr_Left",
-    "mirror": "cheeks_volume_right"
+    "id": "nose_curve_concave_convex",
+    "group": "nose",
+    "label": "Bridge curve",
+    "about": "Bridge curve: from concave to convex.",
+    "level": "detailed",
+    "stem": "nose_curve_concave_convex",
+    "low": "Face_Nose_Curve_Concave",
+    "high": "Face_Nose_Curve_Convex"
    },
    {
-    "id": "cheeks_volume_right",
-    "group": "cheeks",
-    "label": "Cheek volume, right",
-    "about": "The cheek volume, from less to more, on the right side.",
-    "low": "Face_Cheek_Volume_Decr_Right",
-    "high": "Face_Cheek_Volume_Incr_Right",
-    "mirror": "cheeks_volume_left"
+    "id": "nose_greek",
+    "group": "nose",
+    "label": "Nose root",
+    "about": "Nose root: from deep between the eyes to straight from the forehead.",
+    "level": "detailed",
+    "stem": "nose_greek",
+    "low": "Face_Nose_Greek_Decr",
+    "high": "Face_Nose_Greek_Incr"
    },
    {
-    "id": "cheeks_inner_left",
-    "group": "cheeks",
-    "label": "Cheek inner, left",
-    "about": "The cheek inner, from less to more, on the left side.",
-    "low": "Face_Cheek_Inner_Decr_Left",
-    "high": "Face_Cheek_Inner_Incr_Left",
-    "mirror": "cheeks_inner_right"
+    "id": "nose_width3",
+    "group": "nose",
+    "label": "Nose width, lower part",
+    "about": "Nose width, lower part: from narrow to wide.",
+    "level": "detailed",
+    "stem": "nose_width3",
+    "low": "Face_Nose_Width3_Decr",
+    "high": "Face_Nose_Width3_Incr"
    },
    {
-    "id": "cheeks_inner_right",
-    "group": "cheeks",
-    "label": "Cheek inner, right",
-    "about": "The cheek inner, from less to more, on the right side.",
-    "low": "Face_Cheek_Inner_Decr_Right",
-    "high": "Face_Cheek_Inner_Incr_Right",
-    "mirror": "cheeks_inner_left"
+    "id": "nose_nostrils_width",
+    "group": "nose",
+    "label": "Nostril width",
+    "about": "Nostril width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "nose_nostrils_width",
+    "low": "Face_Nose_Nostrils_Width_Decr",
+    "high": "Face_Nose_Nostrils_Width_Incr"
+   },
+   {
+    "id": "nose_flaring",
+    "group": "nose",
+    "label": "Nostril flare",
+    "about": "Nostril flare: from tight to flared.",
+    "level": "detailed",
+    "stem": "nose_flaring",
+    "low": "Face_Nose_Flaring_Decr",
+    "high": "Face_Nose_Flaring_Incr"
+   },
+   {
+    "id": "nose_base_down_up",
+    "group": "nose",
+    "label": "Nose base height",
+    "about": "Nose base height: from lower to higher.",
+    "level": "detailed",
+    "stem": "nose_base_down_up",
+    "low": "Face_Nose_Base_Down",
+    "high": "Face_Nose_Base_Up"
+   },
+   {
+    "id": "nose_trans_down_up",
+    "group": "nose",
+    "label": "Nose set, height",
+    "about": "Nose set, height: from lower to higher.",
+    "level": "detailed",
+    "stem": "nose_trans_down_up",
+    "low": "Face_Nose_Trans_Down",
+    "high": "Face_Nose_Trans_Up"
+   },
+   {
+    "id": "nose_width1",
+    "group": "nose",
+    "label": "Bridge width, upper",
+    "about": "Bridge width, upper: from narrow to wide.",
+    "level": "advanced",
+    "stem": "nose_width1",
+    "low": "Face_Nose_Width1_Decr",
+    "high": "Face_Nose_Width1_Incr"
+   },
+   {
+    "id": "nose_width2",
+    "group": "nose",
+    "label": "Bridge width, middle",
+    "about": "Bridge width, middle: from narrow to wide.",
+    "level": "advanced",
+    "stem": "nose_width2",
+    "low": "Face_Nose_Width2_Decr",
+    "high": "Face_Nose_Width2_Incr"
+   },
+   {
+    "id": "nose_nostrils_angle_down_up",
+    "group": "nose",
+    "label": "Nostril angle",
+    "about": "Nostril angle: from down to up.",
+    "level": "advanced",
+    "stem": "nose_nostrils_angle_down_up",
+    "low": "Face_Nose_Nostrils_Angle_Down",
+    "high": "Face_Nose_Nostrils_Angle_Up"
+   },
+   {
+    "id": "nose_septumangle",
+    "group": "nose",
+    "label": "Septum angle",
+    "about": "Septum angle: from level to raised.",
+    "level": "advanced",
+    "stem": "nose_septumangle",
+    "low": "Face_Nose_Septumangle_Decr",
+    "high": "Face_Nose_Septumangle_Incr"
+   },
+   {
+    "id": "nose_compression_compress_uncompress",
+    "group": "nose",
+    "label": "Bridge length",
+    "about": "Bridge length: from compressed to stretched.",
+    "level": "advanced",
+    "stem": "nose_compression_compress_uncompress",
+    "low": "Face_Nose_Compression_Compress",
+    "high": "Face_Nose_Compression_Uncompress"
+   },
+   {
+    "id": "nose_trans_backward_forward",
+    "group": "nose",
+    "label": "Nose set, depth",
+    "about": "Nose set, depth: from back to forward.",
+    "level": "advanced",
+    "stem": "nose_trans_backward_forward",
+    "low": "Face_Nose_Trans_Backward",
+    "high": "Face_Nose_Trans_Forward"
+   },
+   {
+    "id": "nose_trans_in_out",
+    "group": "nose",
+    "label": "Nose set, sideways",
+    "about": "Nose set, sideways: from toward its right to toward its left.",
+    "level": "advanced",
+    "stem": "nose_trans_in_out",
+    "low": "Face_Nose_Trans_In",
+    "high": "Face_Nose_Trans_Out"
    },
    {
     "id": "cheeks_bones_left",
     "group": "cheeks",
-    "label": "Cheek bones, left",
-    "about": "The cheek bones, from less to more, on the left side.",
+    "label": "Left cheekbone width",
+    "about": "Left cheekbone width: from narrow to wide.",
+    "level": "quick",
+    "stem": "cheeks_bones",
     "low": "Face_Cheek_Bones_Decr_Left",
     "high": "Face_Cheek_Bones_Incr_Left",
     "mirror": "cheeks_bones_right"
@@ -1441,400 +1547,386 @@
    {
     "id": "cheeks_bones_right",
     "group": "cheeks",
-    "label": "Cheek bones, right",
-    "about": "The cheek bones, from less to more, on the right side.",
+    "label": "Right cheekbone width",
+    "about": "Right cheekbone width: from narrow to wide.",
+    "level": "quick",
+    "stem": "cheeks_bones",
     "low": "Face_Cheek_Bones_Decr_Right",
     "high": "Face_Cheek_Bones_Incr_Right",
     "mirror": "cheeks_bones_left"
    },
    {
-    "id": "lips_lowerlip_height",
-    "group": "lips",
-    "label": "Mouth lower lip height",
-    "about": "The mouth lower lip height, from less to more.",
-    "low": "Face_Mouth_Lowerlip_Height_Decr",
-    "high": "Face_Mouth_Lowerlip_Height_Incr"
+    "id": "cheeks_volume_left",
+    "group": "cheeks",
+    "label": "Left cheek fullness",
+    "about": "Left cheek fullness: from hollow to full.",
+    "level": "quick",
+    "stem": "cheeks_volume",
+    "low": "Face_Cheek_Volume_Decr_Left",
+    "high": "Face_Cheek_Volume_Incr_Left",
+    "mirror": "cheeks_volume_right"
+   },
+   {
+    "id": "cheeks_volume_right",
+    "group": "cheeks",
+    "label": "Right cheek fullness",
+    "about": "Right cheek fullness: from hollow to full.",
+    "level": "quick",
+    "stem": "cheeks_volume",
+    "low": "Face_Cheek_Volume_Decr_Right",
+    "high": "Face_Cheek_Volume_Incr_Right",
+    "mirror": "cheeks_volume_left"
+   },
+   {
+    "id": "cheeks_trans_down_up_left",
+    "group": "cheeks",
+    "label": "Left cheekbone height",
+    "about": "Left cheekbone height: from lower to higher.",
+    "level": "detailed",
+    "stem": "cheeks_trans_down_up",
+    "low": "Face_Cheek_Trans_Down_Left",
+    "high": "Face_Cheek_Trans_Up_Left",
+    "mirror": "cheeks_trans_down_up_right"
+   },
+   {
+    "id": "cheeks_trans_down_up_right",
+    "group": "cheeks",
+    "label": "Right cheekbone height",
+    "about": "Right cheekbone height: from lower to higher.",
+    "level": "detailed",
+    "stem": "cheeks_trans_down_up",
+    "low": "Face_Cheek_Trans_Down_Right",
+    "high": "Face_Cheek_Trans_Up_Right",
+    "mirror": "cheeks_trans_down_up_left"
+   },
+   {
+    "id": "cheeks_inner_left",
+    "group": "cheeks",
+    "label": "Left inner cheek",
+    "about": "Left inner cheek: from flat to full.",
+    "level": "advanced",
+    "stem": "cheeks_inner",
+    "low": "Face_Cheek_Inner_Decr_Left",
+    "high": "Face_Cheek_Inner_Incr_Left",
+    "mirror": "cheeks_inner_right"
+   },
+   {
+    "id": "cheeks_inner_right",
+    "group": "cheeks",
+    "label": "Right inner cheek",
+    "about": "Right inner cheek: from flat to full.",
+    "level": "advanced",
+    "stem": "cheeks_inner",
+    "low": "Face_Cheek_Inner_Decr_Right",
+    "high": "Face_Cheek_Inner_Incr_Right",
+    "mirror": "cheeks_inner_left"
    },
    {
     "id": "lips_scale_horiz",
     "group": "lips",
     "label": "Mouth width",
-    "about": "The mouth width, from less to more.",
+    "about": "Mouth width: from narrow to wide.",
+    "level": "quick",
+    "stem": "lips_scale_horiz",
     "low": "Face_Mouth_Scale_Horiz_Decr",
     "high": "Face_Mouth_Scale_Horiz_Incr"
    },
    {
-    "id": "lips_cupidsbow",
+    "id": "lips_upperlip_volume",
     "group": "lips",
-    "label": "Mouth cupid's bow",
-    "about": "The mouth cupid's bow, from less to more.",
-    "low": "Face_Mouth_Cupidsbow_Decr",
-    "high": "Face_Mouth_Cupidsbow_Incr"
-   },
-   {
-    "id": "lips_laugh_lines_in_out",
-    "group": "lips",
-    "label": "Mouth laugh lines, in or out",
-    "about": "The mouth laugh lines, from in to out.",
-    "low": "Face_Mouth_Laugh_Lines_In",
-    "high": "Face_Mouth_Laugh_Lines_Out"
-   },
-   {
-    "id": "lips_scale_depth",
-    "group": "lips",
-    "label": "Mouth depth",
-    "about": "The mouth depth, from less to more.",
-    "low": "Face_Mouth_Scale_Depth_Decr",
-    "high": "Face_Mouth_Scale_Depth_Incr"
+    "label": "Upper lip fullness",
+    "about": "Upper lip fullness: from thin to full.",
+    "level": "quick",
+    "stem": "lips_upperlip_volume",
+    "low": "Face_Mouth_Upperlip_Volume_Decr",
+    "high": "Face_Mouth_Upperlip_Volume_Incr"
    },
    {
     "id": "lips_lowerlip_volume",
     "group": "lips",
-    "label": "Mouth lower lip volume",
-    "about": "The mouth lower lip volume, from less to more.",
+    "label": "Lower lip fullness",
+    "about": "Lower lip fullness: from thin to full.",
+    "level": "quick",
+    "stem": "lips_lowerlip_volume",
     "low": "Face_Mouth_Lowerlip_Volume_Decr",
     "high": "Face_Mouth_Lowerlip_Volume_Incr"
    },
    {
     "id": "lips_angles_down_up",
     "group": "lips",
-    "label": "Mouth angles, lower or higher",
-    "about": "The mouth angles, from lower to higher.",
+    "label": "Mouth corners",
+    "about": "Mouth corners: from turned down to turned up.",
+    "level": "quick",
+    "stem": "lips_angles_down_up",
     "low": "Face_Mouth_Angles_Down",
     "high": "Face_Mouth_Angles_Up"
-   },
-   {
-    "id": "lips_upperlip_ext_down_up",
-    "group": "lips",
-    "label": "Mouth upper lip outer part, lower or higher",
-    "about": "The mouth upper lip outer part, from lower to higher.",
-    "low": "Face_Mouth_Upperlip_Ext_Down",
-    "high": "Face_Mouth_Upperlip_Ext_Up"
-   },
-   {
-    "id": "lips_lowerlip_width",
-    "group": "lips",
-    "label": "Mouth lower lip width",
-    "about": "The mouth lower lip width, from less to more.",
-    "low": "Face_Mouth_Lowerlip_Width_Decr",
-    "high": "Face_Mouth_Lowerlip_Width_Incr"
-   },
-   {
-    "id": "lips_trans_backward_forward",
-    "group": "lips",
-    "label": "Mouth position, back or forward",
-    "about": "The mouth position, from back to forward.",
-    "low": "Face_Mouth_Trans_Backward",
-    "high": "Face_Mouth_Trans_Forward"
-   },
-   {
-    "id": "lips_upperlip_width",
-    "group": "lips",
-    "label": "Mouth upper lip width",
-    "about": "The mouth upper lip width, from less to more.",
-    "low": "Face_Mouth_Upperlip_Width_Decr",
-    "high": "Face_Mouth_Upperlip_Width_Incr"
    },
    {
     "id": "lips_scale_vert",
     "group": "lips",
     "label": "Mouth height",
-    "about": "The mouth height, from less to more.",
+    "about": "Mouth height: from thin to tall.",
+    "level": "detailed",
+    "stem": "lips_scale_vert",
     "low": "Face_Mouth_Scale_Vert_Decr",
     "high": "Face_Mouth_Scale_Vert_Incr"
    },
    {
-    "id": "lips_dimples_in_out",
-    "group": "lips",
-    "label": "Mouth dimples, in or out",
-    "about": "The mouth dimples, from in to out.",
-    "low": "Face_Mouth_Dimples_In",
-    "high": "Face_Mouth_Dimples_Out"
-   },
-   {
     "id": "lips_upperlip_height",
     "group": "lips",
-    "label": "Mouth upper lip height",
-    "about": "The mouth upper lip height, from less to more.",
+    "label": "Upper lip height",
+    "about": "Upper lip height: from short to tall.",
+    "level": "detailed",
+    "stem": "lips_upperlip_height",
     "low": "Face_Mouth_Upperlip_Height_Decr",
     "high": "Face_Mouth_Upperlip_Height_Incr"
    },
    {
-    "id": "lips_upperlip_volume",
+    "id": "lips_lowerlip_height",
     "group": "lips",
-    "label": "Mouth upper lip volume",
-    "about": "The mouth upper lip volume, from less to more.",
-    "low": "Face_Mouth_Upperlip_Volume_Decr",
-    "high": "Face_Mouth_Upperlip_Volume_Incr"
+    "label": "Lower lip height",
+    "about": "Lower lip height: from short to tall.",
+    "level": "detailed",
+    "stem": "lips_lowerlip_height",
+    "low": "Face_Mouth_Lowerlip_Height_Decr",
+    "high": "Face_Mouth_Lowerlip_Height_Incr"
    },
    {
-    "id": "lips_cupidsbow_width",
+    "id": "lips_upperlip_width",
     "group": "lips",
-    "label": "Mouth cupid's bow width",
-    "about": "The mouth cupid's bow width, from less to more.",
-    "low": "Face_Mouth_Cupidsbow_Width_Decr",
-    "high": "Face_Mouth_Cupidsbow_Width_Incr"
+    "label": "Upper lip width",
+    "about": "Upper lip width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "lips_upperlip_width",
+    "low": "Face_Mouth_Upperlip_Width_Decr",
+    "high": "Face_Mouth_Upperlip_Width_Incr"
    },
    {
-    "id": "lips_lowerlip_ext_down_up",
+    "id": "lips_lowerlip_width",
     "group": "lips",
-    "label": "Mouth lower lip outer part, lower or higher",
-    "about": "The mouth lower lip outer part, from lower to higher.",
-    "low": "Face_Mouth_Lowerlip_Ext_Down",
-    "high": "Face_Mouth_Lowerlip_Ext_Up"
+    "label": "Lower lip width",
+    "about": "Lower lip width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "lips_lowerlip_width",
+    "low": "Face_Mouth_Lowerlip_Width_Decr",
+    "high": "Face_Mouth_Lowerlip_Width_Incr"
    },
    {
-    "id": "lips_upperlip_middle_down_up",
+    "id": "lips_cupidsbow",
     "group": "lips",
-    "label": "Mouth upper lip middle, lower or higher",
-    "about": "The mouth upper lip middle, from lower to higher.",
-    "low": "Face_Mouth_Upperlip_Middle_Down",
-    "high": "Face_Mouth_Upperlip_Middle_Up"
-   },
-   {
-    "id": "lips_trans_down_up",
-    "group": "lips",
-    "label": "Mouth position, lower or higher",
-    "about": "The mouth position, from lower to higher.",
-    "low": "Face_Mouth_Trans_Down",
-    "high": "Face_Mouth_Trans_Up"
-   },
-   {
-    "id": "lips_trans_in_out",
-    "group": "lips",
-    "label": "Mouth position, in or out",
-    "about": "The mouth position, from in to out.",
-    "low": "Face_Mouth_Trans_In",
-    "high": "Face_Mouth_Trans_Out"
-   },
-   {
-    "id": "lips_lowerlip_middle_down_up",
-    "group": "lips",
-    "label": "Mouth lower lip middle, lower or higher",
-    "about": "The mouth lower lip middle, from lower to higher.",
-    "low": "Face_Mouth_Lowerlip_Middle_Down",
-    "high": "Face_Mouth_Lowerlip_Middle_Up"
+    "label": "Cupid's bow",
+    "about": "Cupid's bow: from flat to pronounced.",
+    "level": "detailed",
+    "stem": "lips_cupidsbow",
+    "low": "Face_Mouth_Cupidsbow_Decr",
+    "high": "Face_Mouth_Cupidsbow_Incr"
    },
    {
     "id": "lips_philtrum_volume",
     "group": "lips",
-    "label": "Mouth philtrum volume",
-    "about": "The mouth philtrum volume, from less to more.",
+    "label": "Philtrum",
+    "about": "Philtrum: from flat to full.",
+    "level": "detailed",
+    "stem": "lips_philtrum_volume",
     "low": "Face_Mouth_Philtrum_Volume_Decr",
     "high": "Face_Mouth_Philtrum_Volume_Incr"
    },
    {
-    "id": "chin_jaw_drop",
-    "group": "chin",
-    "label": "Chin jaw drop",
-    "about": "The chin jaw drop, from less to more.",
-    "low": "Face_Chin_Jaw_Drop_Decr",
-    "high": "Face_Chin_Jaw_Drop_Incr"
+    "id": "lips_laugh_lines_in_out",
+    "group": "lips",
+    "label": "Laugh lines",
+    "about": "Laugh lines: from creased to smooth.",
+    "level": "detailed",
+    "stem": "lips_laugh_lines_in_out",
+    "low": "Face_Mouth_Laugh_Lines_In",
+    "high": "Face_Mouth_Laugh_Lines_Out"
+   },
+   {
+    "id": "lips_dimples_in_out",
+    "group": "lips",
+    "label": "Dimples",
+    "about": "Dimples: from dimpled to smooth.",
+    "level": "detailed",
+    "stem": "lips_dimples_in_out",
+    "low": "Face_Mouth_Dimples_In",
+    "high": "Face_Mouth_Dimples_Out"
+   },
+   {
+    "id": "lips_trans_down_up",
+    "group": "lips",
+    "label": "Mouth set, height",
+    "about": "Mouth set, height: from lower to higher.",
+    "level": "detailed",
+    "stem": "lips_trans_down_up",
+    "low": "Face_Mouth_Trans_Down",
+    "high": "Face_Mouth_Trans_Up"
+   },
+   {
+    "id": "lips_trans_backward_forward",
+    "group": "lips",
+    "label": "Mouth set, depth",
+    "about": "Mouth set, depth: from back to forward.",
+    "level": "detailed",
+    "stem": "lips_trans_backward_forward",
+    "low": "Face_Mouth_Trans_Backward",
+    "high": "Face_Mouth_Trans_Forward"
+   },
+   {
+    "id": "lips_scale_depth",
+    "group": "lips",
+    "label": "Mouth depth",
+    "about": "Mouth depth: from shallow to deep.",
+    "level": "advanced",
+    "stem": "lips_scale_depth",
+    "low": "Face_Mouth_Scale_Depth_Decr",
+    "high": "Face_Mouth_Scale_Depth_Incr"
+   },
+   {
+    "id": "lips_cupidsbow_width",
+    "group": "lips",
+    "label": "Cupid's bow width",
+    "about": "Cupid's bow width: from narrow to wide.",
+    "level": "advanced",
+    "stem": "lips_cupidsbow_width",
+    "low": "Face_Mouth_Cupidsbow_Width_Decr",
+    "high": "Face_Mouth_Cupidsbow_Width_Incr"
+   },
+   {
+    "id": "lips_upperlip_middle_down_up",
+    "group": "lips",
+    "label": "Upper lip, middle",
+    "about": "Upper lip, middle: from lower to higher.",
+    "level": "advanced",
+    "stem": "lips_upperlip_middle_down_up",
+    "low": "Face_Mouth_Upperlip_Middle_Down",
+    "high": "Face_Mouth_Upperlip_Middle_Up"
+   },
+   {
+    "id": "lips_lowerlip_middle_down_up",
+    "group": "lips",
+    "label": "Lower lip, middle",
+    "about": "Lower lip, middle: from lower to higher.",
+    "level": "advanced",
+    "stem": "lips_lowerlip_middle_down_up",
+    "low": "Face_Mouth_Lowerlip_Middle_Down",
+    "high": "Face_Mouth_Lowerlip_Middle_Up"
+   },
+   {
+    "id": "lips_upperlip_ext_down_up",
+    "group": "lips",
+    "label": "Upper lip, outer parts",
+    "about": "Upper lip, outer parts: from lower to higher.",
+    "level": "advanced",
+    "stem": "lips_upperlip_ext_down_up",
+    "low": "Face_Mouth_Upperlip_Ext_Down",
+    "high": "Face_Mouth_Upperlip_Ext_Up"
+   },
+   {
+    "id": "lips_lowerlip_ext_down_up",
+    "group": "lips",
+    "label": "Lower lip, outer parts",
+    "about": "Lower lip, outer parts: from lower to higher.",
+    "level": "advanced",
+    "stem": "lips_lowerlip_ext_down_up",
+    "low": "Face_Mouth_Lowerlip_Ext_Down",
+    "high": "Face_Mouth_Lowerlip_Ext_Up"
+   },
+   {
+    "id": "lips_trans_in_out",
+    "group": "lips",
+    "label": "Mouth set, sideways",
+    "about": "Mouth set, sideways: from toward its right to toward its left.",
+    "level": "advanced",
+    "stem": "lips_trans_in_out",
+    "low": "Face_Mouth_Trans_In",
+    "high": "Face_Mouth_Trans_Out"
    },
    {
     "id": "chin_height",
     "group": "chin",
     "label": "Chin height",
-    "about": "The chin height, from less to more.",
+    "about": "Chin height: from short to long.",
+    "level": "quick",
+    "stem": "chin_height",
     "low": "Face_Chin_Height_Decr",
     "high": "Face_Chin_Height_Incr"
    },
    {
+    "id": "chin_width",
+    "group": "chin",
+    "label": "Chin width",
+    "about": "Chin width: from narrow to wide.",
+    "level": "quick",
+    "stem": "chin_width",
+    "low": "Face_Chin_Width_Decr",
+    "high": "Face_Chin_Width_Incr"
+   },
+   {
     "id": "chin_prominent",
     "group": "chin",
-    "label": "Chin prominent",
-    "about": "The chin prominent, from less to more.",
+    "label": "Chin projection",
+    "about": "Chin projection: from receding to prominent.",
+    "level": "quick",
+    "stem": "chin_prominent",
     "low": "Face_Chin_Prominent_Decr",
     "high": "Face_Chin_Prominent_Incr"
    },
    {
     "id": "chin_bones",
     "group": "chin",
-    "label": "Chin bones",
-    "about": "The chin bones, from less to more.",
+    "label": "Jaw corners",
+    "about": "Jaw corners: from soft to strong.",
+    "level": "quick",
+    "stem": "chin_bones",
     "low": "Face_Chin_Bones_Decr",
     "high": "Face_Chin_Bones_Incr"
    },
    {
-    "id": "chin_width",
+    "id": "chin_prognathism",
     "group": "chin",
-    "label": "Chin width",
-    "about": "The chin width, from less to more.",
-    "low": "Face_Chin_Width_Decr",
-    "high": "Face_Chin_Width_Incr"
+    "label": "Lower jaw",
+    "about": "Lower jaw: from set back to set forward.",
+    "level": "detailed",
+    "stem": "chin_prognathism",
+    "low": "Face_Chin_Prognathism_Decr",
+    "high": "Face_Chin_Prognathism_Incr"
+   },
+   {
+    "id": "chin_jaw_drop",
+    "group": "chin",
+    "label": "Under the chin",
+    "about": "Under the chin: from tight to dropped.",
+    "level": "detailed",
+    "stem": "chin_jaw_drop",
+    "low": "Face_Chin_Jaw_Drop_Decr",
+    "high": "Face_Chin_Jaw_Drop_Incr"
    },
    {
     "id": "chin_cleft",
     "group": "chin",
     "label": "Chin cleft",
-    "about": "The chin cleft, from less to more.",
+    "about": "Chin cleft: from none to deep.",
+    "level": "detailed",
+    "stem": "chin_cleft",
     "low": "Face_Chin_Cleft_Decr",
     "high": "Face_Chin_Cleft_Incr"
    },
    {
     "id": "chin_triangle",
     "group": "chin",
-    "label": "Triangle chin",
-    "about": "How far the chin goes toward triangle.",
+    "label": "Pointed chin",
+    "about": "How far the face goes toward a pointed chin.",
+    "level": "detailed",
+    "stem": "chin_triangle",
     "high": "Face_Chin_Triangle"
-   },
-   {
-    "id": "chin_prognathism",
-    "group": "chin",
-    "label": "Chin jaw forward",
-    "about": "The chin jaw forward, from less to more.",
-    "low": "Face_Chin_Prognathism_Decr",
-    "high": "Face_Chin_Prognathism_Incr"
-   },
-   {
-    "id": "ears_lobe_left",
-    "group": "ears",
-    "label": "Ear lobe, left",
-    "about": "The ear lobe, from less to more, on the left side.",
-    "low": "Face_Ear_Lobe_Decr_Left",
-    "high": "Face_Ear_Lobe_Incr_Left",
-    "mirror": "ears_lobe_right"
-   },
-   {
-    "id": "ears_lobe_right",
-    "group": "ears",
-    "label": "Ear lobe, right",
-    "about": "The ear lobe, from less to more, on the right side.",
-    "low": "Face_Ear_Lobe_Decr_Right",
-    "high": "Face_Ear_Lobe_Incr_Right",
-    "mirror": "ears_lobe_left"
-   },
-   {
-    "id": "ears_shape_square_round_left",
-    "group": "ears",
-    "label": "Ear shape, square or round, left",
-    "about": "The ear shape, from square to round, on the left side.",
-    "low": "Face_Ear_Shape_Square_Left",
-    "high": "Face_Ear_Shape_Round_Left",
-    "mirror": "ears_shape_square_round_right"
-   },
-   {
-    "id": "ears_shape_square_round_right",
-    "group": "ears",
-    "label": "Ear shape, square or round, right",
-    "about": "The ear shape, from square to round, on the right side.",
-    "low": "Face_Ear_Shape_Square_Right",
-    "high": "Face_Ear_Shape_Round_Right",
-    "mirror": "ears_shape_square_round_left"
-   },
-   {
-    "id": "ears_trans_backward_forward_left",
-    "group": "ears",
-    "label": "Ear position, back or forward, left",
-    "about": "The ear position, from back to forward, on the left side.",
-    "low": "Face_Ear_Trans_Backward_Left",
-    "high": "Face_Ear_Trans_Forward_Left",
-    "mirror": "ears_trans_backward_forward_right"
-   },
-   {
-    "id": "ears_trans_backward_forward_right",
-    "group": "ears",
-    "label": "Ear position, back or forward, right",
-    "about": "The ear position, from back to forward, on the right side.",
-    "low": "Face_Ear_Trans_Backward_Right",
-    "high": "Face_Ear_Trans_Forward_Right",
-    "mirror": "ears_trans_backward_forward_left"
-   },
-   {
-    "id": "ears_rot_backward_forward_left",
-    "group": "ears",
-    "label": "Ear tilt, back or forward, left",
-    "about": "The ear tilt, from back to forward, on the left side.",
-    "low": "Face_Ear_Rot_Backward_Left",
-    "high": "Face_Ear_Rot_Forward_Left",
-    "mirror": "ears_rot_backward_forward_right"
-   },
-   {
-    "id": "ears_rot_backward_forward_right",
-    "group": "ears",
-    "label": "Ear tilt, back or forward, right",
-    "about": "The ear tilt, from back to forward, on the right side.",
-    "low": "Face_Ear_Rot_Backward_Right",
-    "high": "Face_Ear_Rot_Forward_Right",
-    "mirror": "ears_rot_backward_forward_left"
-   },
-   {
-    "id": "ears_trans_down_up_left",
-    "group": "ears",
-    "label": "Ear position, lower or higher, left",
-    "about": "The ear position, from lower to higher, on the left side.",
-    "low": "Face_Ear_Trans_Down_Left",
-    "high": "Face_Ear_Trans_Up_Left",
-    "mirror": "ears_trans_down_up_right"
-   },
-   {
-    "id": "ears_trans_down_up_right",
-    "group": "ears",
-    "label": "Ear position, lower or higher, right",
-    "about": "The ear position, from lower to higher, on the right side.",
-    "low": "Face_Ear_Trans_Down_Right",
-    "high": "Face_Ear_Trans_Up_Right",
-    "mirror": "ears_trans_down_up_left"
-   },
-   {
-    "id": "ears_scale_vert_left",
-    "group": "ears",
-    "label": "Ear height, left",
-    "about": "The ear height, from less to more, on the left side.",
-    "low": "Face_Ear_Scale_Vert_Decr_Left",
-    "high": "Face_Ear_Scale_Vert_Incr_Left",
-    "mirror": "ears_scale_vert_right"
-   },
-   {
-    "id": "ears_scale_vert_right",
-    "group": "ears",
-    "label": "Ear height, right",
-    "about": "The ear height, from less to more, on the right side.",
-    "low": "Face_Ear_Scale_Vert_Decr_Right",
-    "high": "Face_Ear_Scale_Vert_Incr_Right",
-    "mirror": "ears_scale_vert_left"
-   },
-   {
-    "id": "ears_flap_left",
-    "group": "ears",
-    "label": "Ear flap, left",
-    "about": "The ear flap, from less to more, on the left side.",
-    "low": "Face_Ear_Flap_Decr_Left",
-    "high": "Face_Ear_Flap_Incr_Left",
-    "mirror": "ears_flap_right"
-   },
-   {
-    "id": "ears_flap_right",
-    "group": "ears",
-    "label": "Ear flap, right",
-    "about": "The ear flap, from less to more, on the right side.",
-    "low": "Face_Ear_Flap_Decr_Right",
-    "high": "Face_Ear_Flap_Incr_Right",
-    "mirror": "ears_flap_left"
-   },
-   {
-    "id": "ears_shape_pointed_triangle_left",
-    "group": "ears",
-    "label": "Ear shape, pointed or triangular, left",
-    "about": "The ear shape, from pointed to triangular, on the left side.",
-    "low": "Face_Ear_Shape_Pointed_Left",
-    "high": "Face_Ear_Shape_Triangle_Left",
-    "mirror": "ears_shape_pointed_triangle_right"
-   },
-   {
-    "id": "ears_shape_pointed_triangle_right",
-    "group": "ears",
-    "label": "Ear shape, pointed or triangular, right",
-    "about": "The ear shape, from pointed to triangular, on the right side.",
-    "low": "Face_Ear_Shape_Pointed_Right",
-    "high": "Face_Ear_Shape_Triangle_Right",
-    "mirror": "ears_shape_pointed_triangle_left"
    },
    {
     "id": "ears_scale_left",
     "group": "ears",
-    "label": "Ear size, left",
-    "about": "The ear size, from less to more, on the left side.",
+    "label": "Left ear size",
+    "about": "Left ear size: from small to large.",
+    "level": "quick",
+    "stem": "ears_scale",
     "low": "Face_Ear_Scale_Decr_Left",
     "high": "Face_Ear_Scale_Incr_Left",
     "mirror": "ears_scale_right"
@@ -1842,35 +1934,21 @@
    {
     "id": "ears_scale_right",
     "group": "ears",
-    "label": "Ear size, right",
-    "about": "The ear size, from less to more, on the right side.",
+    "label": "Right ear size",
+    "about": "Right ear size: from small to large.",
+    "level": "quick",
+    "stem": "ears_scale",
     "low": "Face_Ear_Scale_Decr_Right",
     "high": "Face_Ear_Scale_Incr_Right",
     "mirror": "ears_scale_left"
    },
    {
-    "id": "ears_scale_depth_left",
-    "group": "ears",
-    "label": "Ear depth, left",
-    "about": "The ear depth, from less to more, on the left side.",
-    "low": "Face_Ear_Scale_Depth_Decr_Left",
-    "high": "Face_Ear_Scale_Depth_Incr_Left",
-    "mirror": "ears_scale_depth_right"
-   },
-   {
-    "id": "ears_scale_depth_right",
-    "group": "ears",
-    "label": "Ear depth, right",
-    "about": "The ear depth, from less to more, on the right side.",
-    "low": "Face_Ear_Scale_Depth_Decr_Right",
-    "high": "Face_Ear_Scale_Depth_Incr_Right",
-    "mirror": "ears_scale_depth_left"
-   },
-   {
     "id": "ears_wing_left",
     "group": "ears",
-    "label": "Ear wing, left",
-    "about": "The ear wing, from less to more, on the left side.",
+    "label": "Left ear protrusion",
+    "about": "Left ear protrusion: from flat to the head to standing out.",
+    "level": "quick",
+    "stem": "ears_wing",
     "low": "Face_Ear_Wing_Decr_Left",
     "high": "Face_Ear_Wing_Incr_Left",
     "mirror": "ears_wing_right"
@@ -1878,116 +1956,336 @@
    {
     "id": "ears_wing_right",
     "group": "ears",
-    "label": "Ear wing, right",
-    "about": "The ear wing, from less to more, on the right side.",
+    "label": "Right ear protrusion",
+    "about": "Right ear protrusion: from flat to the head to standing out.",
+    "level": "quick",
+    "stem": "ears_wing",
     "low": "Face_Ear_Wing_Decr_Right",
     "high": "Face_Ear_Wing_Incr_Right",
     "mirror": "ears_wing_left"
    },
    {
+    "id": "ears_scale_vert_left",
+    "group": "ears",
+    "label": "Left ear height",
+    "about": "Left ear height: from short to tall.",
+    "level": "detailed",
+    "stem": "ears_scale_vert",
+    "low": "Face_Ear_Scale_Vert_Decr_Left",
+    "high": "Face_Ear_Scale_Vert_Incr_Left",
+    "mirror": "ears_scale_vert_right"
+   },
+   {
+    "id": "ears_scale_vert_right",
+    "group": "ears",
+    "label": "Right ear height",
+    "about": "Right ear height: from short to tall.",
+    "level": "detailed",
+    "stem": "ears_scale_vert",
+    "low": "Face_Ear_Scale_Vert_Decr_Right",
+    "high": "Face_Ear_Scale_Vert_Incr_Right",
+    "mirror": "ears_scale_vert_left"
+   },
+   {
+    "id": "ears_scale_depth_left",
+    "group": "ears",
+    "label": "Left ear width",
+    "about": "Left ear width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "ears_scale_depth",
+    "low": "Face_Ear_Scale_Depth_Decr_Left",
+    "high": "Face_Ear_Scale_Depth_Incr_Left",
+    "mirror": "ears_scale_depth_right"
+   },
+   {
+    "id": "ears_scale_depth_right",
+    "group": "ears",
+    "label": "Right ear width",
+    "about": "Right ear width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "ears_scale_depth",
+    "low": "Face_Ear_Scale_Depth_Decr_Right",
+    "high": "Face_Ear_Scale_Depth_Incr_Right",
+    "mirror": "ears_scale_depth_left"
+   },
+   {
+    "id": "ears_lobe_left",
+    "group": "ears",
+    "label": "Left earlobe",
+    "about": "Left earlobe: from small to long.",
+    "level": "detailed",
+    "stem": "ears_lobe",
+    "low": "Face_Ear_Lobe_Decr_Left",
+    "high": "Face_Ear_Lobe_Incr_Left",
+    "mirror": "ears_lobe_right"
+   },
+   {
+    "id": "ears_lobe_right",
+    "group": "ears",
+    "label": "Right earlobe",
+    "about": "Right earlobe: from small to long.",
+    "level": "detailed",
+    "stem": "ears_lobe",
+    "low": "Face_Ear_Lobe_Decr_Right",
+    "high": "Face_Ear_Lobe_Incr_Right",
+    "mirror": "ears_lobe_left"
+   },
+   {
+    "id": "ears_rot_backward_forward_left",
+    "group": "ears",
+    "label": "Left ear tilt",
+    "about": "Left ear tilt: from back to forward.",
+    "level": "detailed",
+    "stem": "ears_rot_backward_forward",
+    "low": "Face_Ear_Rot_Backward_Left",
+    "high": "Face_Ear_Rot_Forward_Left",
+    "mirror": "ears_rot_backward_forward_right"
+   },
+   {
+    "id": "ears_rot_backward_forward_right",
+    "group": "ears",
+    "label": "Right ear tilt",
+    "about": "Right ear tilt: from back to forward.",
+    "level": "detailed",
+    "stem": "ears_rot_backward_forward",
+    "low": "Face_Ear_Rot_Backward_Right",
+    "high": "Face_Ear_Rot_Forward_Right",
+    "mirror": "ears_rot_backward_forward_left"
+   },
+   {
+    "id": "ears_trans_down_up_left",
+    "group": "ears",
+    "label": "Left ear set, height",
+    "about": "Left ear set, height: from lower to higher.",
+    "level": "detailed",
+    "stem": "ears_trans_down_up",
+    "low": "Face_Ear_Trans_Down_Left",
+    "high": "Face_Ear_Trans_Up_Left",
+    "mirror": "ears_trans_down_up_right"
+   },
+   {
+    "id": "ears_trans_down_up_right",
+    "group": "ears",
+    "label": "Right ear set, height",
+    "about": "Right ear set, height: from lower to higher.",
+    "level": "detailed",
+    "stem": "ears_trans_down_up",
+    "low": "Face_Ear_Trans_Down_Right",
+    "high": "Face_Ear_Trans_Up_Right",
+    "mirror": "ears_trans_down_up_left"
+   },
+   {
+    "id": "ears_flap_left",
+    "group": "ears",
+    "label": "Left ear rim",
+    "about": "Left ear rim: from flat to turned out.",
+    "level": "advanced",
+    "stem": "ears_flap",
+    "low": "Face_Ear_Flap_Decr_Left",
+    "high": "Face_Ear_Flap_Incr_Left",
+    "mirror": "ears_flap_right"
+   },
+   {
+    "id": "ears_flap_right",
+    "group": "ears",
+    "label": "Right ear rim",
+    "about": "Right ear rim: from flat to turned out.",
+    "level": "advanced",
+    "stem": "ears_flap",
+    "low": "Face_Ear_Flap_Decr_Right",
+    "high": "Face_Ear_Flap_Incr_Right",
+    "mirror": "ears_flap_left"
+   },
+   {
+    "id": "ears_shape_square_round_left",
+    "group": "ears",
+    "label": "Left ear roundness",
+    "about": "Left ear roundness: from square to round.",
+    "level": "advanced",
+    "stem": "ears_shape_square_round",
+    "low": "Face_Ear_Shape_Square_Left",
+    "high": "Face_Ear_Shape_Round_Left",
+    "mirror": "ears_shape_square_round_right"
+   },
+   {
+    "id": "ears_shape_square_round_right",
+    "group": "ears",
+    "label": "Right ear roundness",
+    "about": "Right ear roundness: from square to round.",
+    "level": "advanced",
+    "stem": "ears_shape_square_round",
+    "low": "Face_Ear_Shape_Square_Right",
+    "high": "Face_Ear_Shape_Round_Right",
+    "mirror": "ears_shape_square_round_left"
+   },
+   {
+    "id": "ears_shape_pointed_triangle_left",
+    "group": "ears",
+    "label": "Left ear tip shape",
+    "about": "Left ear tip shape: from pointed to triangular.",
+    "level": "advanced",
+    "stem": "ears_shape_pointed_triangle",
+    "low": "Face_Ear_Shape_Pointed_Left",
+    "high": "Face_Ear_Shape_Triangle_Left",
+    "mirror": "ears_shape_pointed_triangle_right"
+   },
+   {
+    "id": "ears_shape_pointed_triangle_right",
+    "group": "ears",
+    "label": "Right ear tip shape",
+    "about": "Right ear tip shape: from pointed to triangular.",
+    "level": "advanced",
+    "stem": "ears_shape_pointed_triangle",
+    "low": "Face_Ear_Shape_Pointed_Right",
+    "high": "Face_Ear_Shape_Triangle_Right",
+    "mirror": "ears_shape_pointed_triangle_left"
+   },
+   {
+    "id": "ears_trans_backward_forward_left",
+    "group": "ears",
+    "label": "Left ear set, depth",
+    "about": "Left ear set, depth: from back to forward.",
+    "level": "advanced",
+    "stem": "ears_trans_backward_forward",
+    "low": "Face_Ear_Trans_Backward_Left",
+    "high": "Face_Ear_Trans_Forward_Left",
+    "mirror": "ears_trans_backward_forward_right"
+   },
+   {
+    "id": "ears_trans_backward_forward_right",
+    "group": "ears",
+    "label": "Right ear set, depth",
+    "about": "Right ear set, depth: from back to forward.",
+    "level": "advanced",
+    "stem": "ears_trans_backward_forward",
+    "low": "Face_Ear_Trans_Backward_Right",
+    "high": "Face_Ear_Trans_Forward_Right",
+    "mirror": "ears_trans_backward_forward_left"
+   },
+   {
     "id": "neck_neck_circ",
     "group": "neck",
     "label": "Neck girth",
-    "about": "The neck girth, from less to more.",
+    "about": "Neck girth: from thin to thick.",
+    "level": "quick",
+    "stem": "neck_neck_circ",
     "low": "Face_Measure_Neck_Circ_Decr",
     "high": "Face_Measure_Neck_Circ_Incr"
    },
    {
     "id": "neck_neck_height",
     "group": "neck",
-    "label": "Neck height",
-    "about": "The neck height, from less to more.",
+    "label": "Neck length",
+    "about": "Neck length: from short to long.",
+    "level": "quick",
+    "stem": "neck_neck_height",
     "low": "Face_Measure_Neck_Height_Decr",
     "high": "Face_Measure_Neck_Height_Incr"
-   },
-   {
-    "id": "neck_scale_depth",
-    "group": "neck",
-    "label": "Neck depth",
-    "about": "The neck depth, from less to more.",
-    "low": "Face_Neck_Scale_Depth_Decr",
-    "high": "Face_Neck_Scale_Depth_Incr"
-   },
-   {
-    "id": "neck_trans_backward_forward",
-    "group": "neck",
-    "label": "Neck position, back or forward",
-    "about": "The neck position, from back to forward.",
-    "low": "Face_Neck_Trans_Backward",
-    "high": "Face_Neck_Trans_Forward"
-   },
-   {
-    "id": "neck_double",
-    "group": "neck",
-    "label": "Neck double",
-    "about": "The neck double, from less to more.",
-    "low": "Face_Neck_Double_Decr",
-    "high": "Face_Neck_Double_Incr"
-   },
-   {
-    "id": "neck_trans_in_out",
-    "group": "neck",
-    "label": "Neck position, in or out",
-    "about": "The neck position, from in to out.",
-    "low": "Face_Neck_Trans_In",
-    "high": "Face_Neck_Trans_Out"
-   },
-   {
-    "id": "neck_back_scale_depth",
-    "group": "neck",
-    "label": "Neck back depth",
-    "about": "The neck back depth, from less to more.",
-    "low": "Face_Neck_Back_Scale_Depth_Decr",
-    "high": "Face_Neck_Back_Scale_Depth_Incr"
    },
    {
     "id": "neck_scale_horiz",
     "group": "neck",
     "label": "Neck width",
-    "about": "The neck width, from less to more.",
+    "about": "Neck width: from narrow to wide.",
+    "level": "detailed",
+    "stem": "neck_scale_horiz",
     "low": "Face_Neck_Scale_Horiz_Decr",
     "high": "Face_Neck_Scale_Horiz_Incr"
    },
    {
+    "id": "neck_scale_depth",
+    "group": "neck",
+    "label": "Neck depth",
+    "about": "Neck depth: from shallow to deep.",
+    "level": "detailed",
+    "stem": "neck_scale_depth",
+    "low": "Face_Neck_Scale_Depth_Decr",
+    "high": "Face_Neck_Scale_Depth_Incr"
+   },
+   {
+    "id": "neck_back_scale_depth",
+    "group": "neck",
+    "label": "Nape",
+    "about": "Nape: from flat to full.",
+    "level": "detailed",
+    "stem": "neck_back_scale_depth",
+    "low": "Face_Neck_Back_Scale_Depth_Decr",
+    "high": "Face_Neck_Back_Scale_Depth_Incr"
+   },
+   {
+    "id": "neck_double",
+    "group": "neck",
+    "label": "Double chin",
+    "about": "Double chin: from none to full.",
+    "level": "detailed",
+    "stem": "neck_double",
+    "low": "Face_Neck_Double_Decr",
+    "high": "Face_Neck_Double_Incr"
+   },
+   {
+    "id": "neck_trans_backward_forward",
+    "group": "neck",
+    "label": "Neck set, depth",
+    "about": "Neck set, depth: from back to forward.",
+    "level": "detailed",
+    "stem": "neck_trans_backward_forward",
+    "low": "Face_Neck_Trans_Backward",
+    "high": "Face_Neck_Trans_Forward"
+   },
+   {
     "id": "neck_scale_vert",
     "group": "neck",
-    "label": "Neck height",
-    "about": "The neck height, from less to more.",
+    "label": "Neck stretch",
+    "about": "Neck stretch: from compressed to stretched.",
+    "level": "advanced",
+    "stem": "neck_scale_vert",
     "low": "Face_Neck_Scale_Vert_Decr",
     "high": "Face_Neck_Scale_Vert_Incr"
    },
    {
     "id": "neck_trans_down_up",
     "group": "neck",
-    "label": "Neck position, lower or higher",
-    "about": "The neck position, from lower to higher.",
+    "label": "Neck set, height",
+    "about": "Neck set, height: from lower to higher.",
+    "level": "advanced",
+    "stem": "neck_trans_down_up",
     "low": "Face_Neck_Trans_Down",
     "high": "Face_Neck_Trans_Up"
+   },
+   {
+    "id": "neck_trans_in_out",
+    "group": "neck",
+    "label": "Neck set, sideways",
+    "about": "Neck set, sideways: from toward its right to toward its left.",
+    "level": "advanced",
+    "stem": "neck_trans_in_out",
+    "low": "Face_Neck_Trans_In",
+    "high": "Face_Neck_Trans_Out"
    }
   ],
   "bones": {
-   "Face_Head_Angle_In": {
+   "Face_Head_Scale_Horiz_Decr": {
     "LeftEye": [
+     -0.00587,
      0.0,
-     0.00119,
-     0.00202
+     -0.0
     ],
     "RightEye": [
+     0.00587,
      0.0,
-     0.00119,
-     0.00202
+     -0.0
     ]
    },
-   "Face_Head_Angle_Out": {
+   "Face_Head_Scale_Horiz_Incr": {
     "LeftEye": [
+     0.00587,
      0.0,
-     -0.00242,
-     -0.00255
+     -0.0
     ],
     "RightEye": [
+     -0.00587,
      0.0,
-     -0.00242,
-     -0.00255
+     -0.0
     ]
    },
    "Face_Head_Scale_Vert_Decr": {
@@ -2032,6 +2330,64 @@
      0.0,
      0.0018,
      -0.0
+    ]
+   },
+   "Face_Head_Scale_Depth_Decr": {
+    "Head": [
+     0.0,
+     -0.0004,
+     0.00718
+    ],
+    "LeftEye": [
+     0.0,
+     0.0,
+     -0.00769
+    ],
+    "RightEye": [
+     0.0,
+     0.0,
+     -0.00769
+    ]
+   },
+   "Face_Head_Scale_Depth_Incr": {
+    "Head": [
+     0.0,
+     0.00051,
+     -0.01062
+    ],
+    "LeftEye": [
+     0.0,
+     0.0,
+     0.01143
+    ],
+    "RightEye": [
+     0.0,
+     0.0,
+     0.01143
+    ]
+   },
+   "Face_Head_Angle_In": {
+    "LeftEye": [
+     0.0,
+     0.00119,
+     0.00202
+    ],
+    "RightEye": [
+     0.0,
+     0.00119,
+     0.00202
+    ]
+   },
+   "Face_Head_Angle_Out": {
+    "LeftEye": [
+     0.0,
+     -0.00242,
+     -0.00255
+    ],
+    "RightEye": [
+     0.0,
+     -0.00242,
+     -0.00255
     ]
    },
    "Face_Head_Trans_Backward": {
@@ -2166,60 +2522,30 @@
      -0.0
     ]
    },
-   "Face_Head_Scale_Depth_Decr": {
-    "Head": [
-     0.0,
-     -0.0004,
-     0.00718
-    ],
+   "Face_Eye_Trans_In_Left": {
     "LeftEye": [
-     0.0,
-     0.0,
-     -0.00769
-    ],
-    "RightEye": [
-     0.0,
-     0.0,
-     -0.00769
-    ]
-   },
-   "Face_Head_Scale_Depth_Incr": {
-    "Head": [
-     0.0,
-     0.00051,
-     -0.01062
-    ],
-    "LeftEye": [
-     0.0,
-     0.0,
-     0.01143
-    ],
-    "RightEye": [
-     0.0,
-     0.0,
-     0.01143
-    ]
-   },
-   "Face_Head_Scale_Horiz_Decr": {
-    "LeftEye": [
-     -0.00587,
-     0.0,
-     -0.0
-    ],
-    "RightEye": [
-     0.00587,
+     -0.00344,
      0.0,
      -0.0
     ]
    },
-   "Face_Head_Scale_Horiz_Incr": {
+   "Face_Eye_Trans_Out_Left": {
     "LeftEye": [
-     0.00587,
+     0.00465,
      0.0,
      -0.0
-    ],
+    ]
+   },
+   "Face_Eye_Trans_In_Right": {
     "RightEye": [
-     -0.00587,
+     0.00344,
+     0.0,
+     -0.0
+    ]
+   },
+   "Face_Eye_Trans_Out_Right": {
+    "RightEye": [
+     -0.00465,
      0.0,
      -0.0
     ]
@@ -2249,34 +2575,6 @@
     "RightEye": [
      0.0,
      0.00617,
-     -0.0
-    ]
-   },
-   "Face_Eye_Trans_In_Left": {
-    "LeftEye": [
-     -0.00344,
-     0.0,
-     -0.0
-    ]
-   },
-   "Face_Eye_Trans_Out_Left": {
-    "LeftEye": [
-     0.00465,
-     0.0,
-     -0.0
-    ]
-   },
-   "Face_Eye_Trans_In_Right": {
-    "RightEye": [
-     0.00344,
-     0.0,
-     -0.0
-    ]
-   },
-   "Face_Eye_Trans_Out_Right": {
-    "RightEye": [
-     -0.00465,
-     0.0,
      -0.0
     ]
    },
@@ -2373,7 +2671,1578 @@
      -0.0
     ]
    }
-  }
+  },
+  "features": [
+   {
+    "id": "face_shape",
+    "label": "Face shape",
+    "category": "face",
+    "about": "The head's size and outline.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.0,
+       0.01529,
+       0.05796
+      ]
+     }
+    ],
+    "radius": 0.0958
+   },
+   {
+    "id": "forehead",
+    "label": "Forehead",
+    "category": "face",
+    "about": "The forehead's height and slope, the temples.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.0,
+       0.13582,
+       0.01144
+      ]
+     }
+    ],
+    "radius": 0.0681
+   },
+   {
+    "id": "brows",
+    "label": "Brows",
+    "category": "face",
+    "about": "How high the brows sit and how they slant.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       -0.0,
+       0.06455,
+       0.0972
+      ]
+     }
+    ],
+    "radius": 0.0463
+   },
+   {
+    "id": "eyes",
+    "label": "Eyes",
+    "category": "face",
+    "about": "Each eye's size, place, corners and lids.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.03162,
+       0.03868,
+       0.09239
+      ]
+     },
+     {
+      "bone": "Head",
+      "offset": [
+       -0.03162,
+       0.03868,
+       0.09239
+      ]
+     }
+    ],
+    "radius": 0.02
+   },
+   {
+    "id": "nose",
+    "label": "Nose",
+    "category": "face",
+    "about": "The nose's size, bridge, tip and nostrils.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.0,
+       0.00062,
+       0.11073
+      ]
+     }
+    ],
+    "radius": 0.02
+   },
+   {
+    "id": "cheeks",
+    "label": "Cheeks",
+    "category": "face",
+    "about": "The cheekbones and the soft cheeks under them.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.0471,
+       0.00123,
+       0.0845
+      ]
+     },
+     {
+      "bone": "Head",
+      "offset": [
+       -0.0471,
+       0.00123,
+       0.0845
+      ]
+     }
+    ],
+    "radius": 0.0214
+   },
+   {
+    "id": "lips",
+    "label": "Lips",
+    "category": "face",
+    "about": "The mouth's width, the lips' fullness and shape.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       -1e-05,
+       -0.03094,
+       0.10304
+      ]
+     }
+    ],
+    "radius": 0.0252
+   },
+   {
+    "id": "chin",
+    "label": "Chin and jaw",
+    "category": "face",
+    "about": "The chin's size and the jaw's corners.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.0,
+       -0.06739,
+       0.08454
+      ]
+     }
+    ],
+    "radius": 0.0306
+   },
+   {
+    "id": "ears",
+    "label": "Ears",
+    "category": "face",
+    "about": "Each ear's size, shape and how far it stands out.",
+    "anchors": [
+     {
+      "bone": "Head",
+      "offset": [
+       0.07722,
+       0.02292,
+       -0.0012
+      ]
+     },
+     {
+      "bone": "Head",
+      "offset": [
+       -0.07722,
+       0.02292,
+       -0.0012
+      ]
+     }
+    ],
+    "radius": 0.0235
+   },
+   {
+    "id": "neck",
+    "label": "Neck",
+    "category": "face",
+    "about": "The neck's length and girth.",
+    "anchors": [
+     {
+      "bone": "Neck",
+      "offset": [
+       -0.0,
+       0.04466,
+       0.03545
+      ]
+     }
+    ],
+    "radius": 0.0923
+   }
+  ],
+  "handles": [
+   {
+    "id": "head_width",
+    "feature": "face_shape",
+    "label": "Head width",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.08665,
+      0.03804,
+      -0.01252
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "face_shape_scale_horiz",
+      "axis": [
+       1.0,
+       0.0,
+       -0.0
+      ],
+      "travel": 0.0172,
+      "screen": {
+       "front": [
+        1.0,
+        0.0
+       ],
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "back": [
+        -1.0,
+        0.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "back"
+    ]
+   },
+   {
+    "id": "head_height",
+    "feature": "face_shape",
+    "label": "Head height",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      0.15149,
+      0.01181
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "face_shape_scale_vert",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.02337,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "forehead",
+    "feature": "forehead",
+    "label": "Forehead",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      0.12418,
+      0.07996
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "forehead_trans_backward_forward",
+      "axis": [
+       0.0,
+       0.05773,
+       0.99833
+      ],
+      "travel": 0.0149,
+      "screen": {
+       "three_quarter": [
+        0.997,
+        0.082
+       ],
+       "side": [
+        0.998,
+        0.058
+       ]
+      }
+     },
+     {
+      "parameter": "forehead_scale_vert",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.01427,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "brow",
+    "feature": "brows",
+    "label": "Brows",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.01922,
+      0.09654,
+      0.09641
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "brows_trans_down_up",
+      "axis": [
+       0.09812,
+       0.99518,
+       -0.0
+      ],
+      "travel": 0.00361,
+      "screen": {
+       "front": [
+        0.098,
+        0.995
+       ],
+       "three_quarter": [
+        0.07,
+        0.998
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.098,
+        0.995
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "eye_left",
+    "feature": "eyes",
+    "label": "Left eye",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.03419,
+      0.04347,
+      0.09708
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "eyes_trans_down_up_left",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.00455,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     },
+     {
+      "parameter": "eyes_trans_in_out_left",
+      "axis": [
+       1.0,
+       0.0,
+       -0.0
+      ],
+      "travel": 0.00395,
+      "screen": {
+       "front": [
+        1.0,
+        0.0
+       ],
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "back": [
+        -1.0,
+        0.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "eye_right"
+   },
+   {
+    "id": "eye_right",
+    "feature": "eyes",
+    "label": "Right eye",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.03419,
+      0.04347,
+      0.09708
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "eyes_trans_down_up_right",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.00455,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     },
+     {
+      "parameter": "eyes_trans_in_out_right",
+      "axis": [
+       -1.0,
+       0.0,
+       -0.0
+      ],
+      "travel": 0.00395,
+      "screen": {
+       "front": [
+        -1.0,
+        0.0
+       ],
+       "three_quarter": [
+        -1.0,
+        0.0
+       ],
+       "back": [
+        1.0,
+        0.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "eye_left"
+   },
+   {
+    "id": "eye_corner_left",
+    "feature": "eyes",
+    "label": "Left outer corner",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.04352,
+      0.03974,
+      0.08803
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "eyes_corner1_down_up_left",
+      "axis": [
+       0.05121,
+       0.99869,
+       -0.0
+      ],
+      "travel": 0.00198,
+      "screen": {
+       "front": [
+        0.051,
+        0.999
+       ],
+       "three_quarter": [
+        0.036,
+        0.999
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.051,
+        0.999
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "eye_corner_right"
+   },
+   {
+    "id": "eye_corner_right",
+    "feature": "eyes",
+    "label": "Right outer corner",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.04352,
+      0.03974,
+      0.08803
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "eyes_corner1_down_up_right",
+      "axis": [
+       -0.0767,
+       0.99705,
+       -0.0
+      ],
+      "travel": 0.00198,
+      "screen": {
+       "front": [
+        -0.077,
+        0.997
+       ],
+       "three_quarter": [
+        -0.054,
+        0.999
+       ],
+       "side": [
+        -0.0,
+        1.0
+       ],
+       "back": [
+        0.077,
+        0.997
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "eye_corner_left"
+   },
+   {
+    "id": "nose_tip",
+    "feature": "nose",
+    "label": "Nose tip",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      0.00273,
+      0.12155
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "nose_scale_depth",
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "travel": 0.01022,
+      "screen": {
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "side": [
+        1.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "parameter": "nose_point_down_up",
+      "axis": [
+       0.0,
+       0.93221,
+       -0.36192
+      ],
+      "travel": 0.00922,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        -0.265,
+        0.964
+       ],
+       "side": [
+        -0.362,
+        0.932
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "nose_bridge",
+    "feature": "nose",
+    "label": "Bridge",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      0.02552,
+      0.10714
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "nose_hump",
+      "axis": [
+       0.0,
+       0.16178,
+       0.98683
+      ],
+      "travel": 0.00313,
+      "screen": {
+       "three_quarter": [
+        0.974,
+        0.226
+       ],
+       "side": [
+        0.987,
+        0.162
+       ]
+      }
+     }
+    ],
+    "views": [
+     "three_quarter",
+     "side"
+    ]
+   },
+   {
+    "id": "nose_wing",
+    "feature": "nose",
+    "label": "Nostril",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.01898,
+      -4e-05,
+      0.099
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "nose_scale_horiz",
+      "axis": [
+       0.9985,
+       -0.05471,
+       -0.0
+      ],
+      "travel": 0.0037,
+      "screen": {
+       "front": [
+        0.999,
+        -0.055
+       ],
+       "three_quarter": [
+        0.997,
+        -0.077
+       ],
+       "back": [
+        -0.999,
+        -0.055
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "back"
+    ]
+   },
+   {
+    "id": "cheekbone_left",
+    "feature": "cheeks",
+    "label": "Left cheekbone",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.06025,
+      0.00547,
+      0.07198
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "cheeks_bones_left",
+      "axis": [
+       0.99871,
+       -0.01884,
+       0.04711
+      ],
+      "travel": 0.00537,
+      "screen": {
+       "front": [
+        1.0,
+        -0.019
+       ],
+       "three_quarter": [
+        1.0,
+        -0.025
+       ],
+       "back": [
+        -1.0,
+        -0.019
+       ]
+      }
+     },
+     {
+      "parameter": "cheeks_trans_down_up_left",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.00268,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "cheekbone_right"
+   },
+   {
+    "id": "cheekbone_right",
+    "feature": "cheeks",
+    "label": "Right cheekbone",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.06025,
+      0.00547,
+      0.07198
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "cheeks_bones_right",
+      "axis": [
+       -0.99871,
+       -0.01884,
+       0.04711
+      ],
+      "travel": 0.00537,
+      "screen": {
+       "front": [
+        -1.0,
+        -0.019
+       ],
+       "three_quarter": [
+        -1.0,
+        -0.028
+       ],
+       "back": [
+        1.0,
+        -0.019
+       ]
+      }
+     },
+     {
+      "parameter": "cheeks_trans_down_up_right",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.00268,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "cheekbone_left"
+   },
+   {
+    "id": "cheek_left",
+    "feature": "cheeks",
+    "label": "Left cheek",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.04746,
+      -0.01739,
+      0.08188
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "cheeks_volume_left",
+      "axis": [
+       0.91263,
+       -0.16181,
+       0.37541
+      ],
+      "travel": 0.00782,
+      "screen": {
+       "front": [
+        0.985,
+        -0.175
+       ],
+       "three_quarter": [
+        0.985,
+        -0.175
+       ],
+       "side": [
+        0.918,
+        -0.396
+       ],
+       "back": [
+        -0.985,
+        -0.175
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "cheek_right"
+   },
+   {
+    "id": "cheek_right",
+    "feature": "cheeks",
+    "label": "Right cheek",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.04746,
+      -0.01739,
+      0.08188
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "cheeks_volume_right",
+      "axis": [
+       -0.91263,
+       -0.16181,
+       0.37541
+      ],
+      "travel": 0.00782,
+      "screen": {
+       "front": [
+        -0.985,
+        -0.175
+       ],
+       "three_quarter": [
+        -0.92,
+        -0.392
+       ],
+       "side": [
+        0.918,
+        -0.396
+       ],
+       "back": [
+        0.985,
+        -0.175
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "cheek_left"
+   },
+   {
+    "id": "mouth_corner",
+    "feature": "lips",
+    "label": "Mouth corner",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.02449,
+      -0.02944,
+      0.10109
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "lips_scale_horiz",
+      "axis": [
+       0.99956,
+       0.0,
+       -0.02969
+      ],
+      "travel": 0.00511,
+      "screen": {
+       "front": [
+        1.0,
+        0.0
+       ],
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "back": [
+        -1.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "parameter": "lips_angles_down_up",
+      "axis": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "travel": 0.00476,
+      "screen": {
+       "front": [
+        0.0,
+        1.0
+       ],
+       "three_quarter": [
+        0.0,
+        1.0
+       ],
+       "side": [
+        0.0,
+        1.0
+       ],
+       "back": [
+        -0.0,
+        1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "upper_lip",
+    "feature": "lips",
+    "label": "Upper lip",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.00293,
+      -0.02793,
+      0.1127
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "lips_upperlip_volume",
+      "axis": [
+       -0.1277,
+       -0.56189,
+       0.8173
+      ],
+      "travel": 0.00198,
+      "screen": {
+       "front": [
+        -0.222,
+        -0.975
+       ],
+       "three_quarter": [
+        0.655,
+        -0.755
+       ],
+       "side": [
+        0.824,
+        -0.567
+       ],
+       "back": [
+        0.222,
+        -0.975
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "lower_lip",
+    "feature": "lips",
+    "label": "Lower lip",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      -0.03726,
+      0.11121
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "lips_lowerlip_volume",
+      "axis": [
+       0.0,
+       0.06543,
+       0.99786
+      ],
+      "travel": 0.00309,
+      "screen": {
+       "three_quarter": [
+        0.996,
+        0.092
+       ],
+       "side": [
+        0.998,
+        0.065
+       ]
+      }
+     },
+     {
+      "parameter": "lips_lowerlip_height",
+      "axis": [
+       0.0,
+       -1.0,
+       -0.0
+      ],
+      "travel": 0.00228,
+      "screen": {
+       "front": [
+        0.0,
+        -1.0
+       ],
+       "three_quarter": [
+        0.0,
+        -1.0
+       ],
+       "side": [
+        0.0,
+        -1.0
+       ],
+       "back": [
+        -0.0,
+        -1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "chin_tip",
+    "feature": "chin",
+    "label": "Chin",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.0,
+      -0.07027,
+      0.09865
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "chin_prominent",
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "travel": 0.01062,
+      "screen": {
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "side": [
+        1.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "parameter": "chin_height",
+      "axis": [
+       0.0,
+       -1.0,
+       -0.0
+      ],
+      "travel": 0.01533,
+      "screen": {
+       "front": [
+        0.0,
+        -1.0
+       ],
+       "three_quarter": [
+        0.0,
+        -1.0
+       ],
+       "side": [
+        0.0,
+        -1.0
+       ],
+       "back": [
+        -0.0,
+        -1.0
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "jaw_corner",
+    "feature": "chin",
+    "label": "Jaw corner",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.05645,
+      -0.03875,
+      0.04668
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "chin_bones",
+      "axis": [
+       0.10502,
+       -0.98017,
+       0.16803
+      ],
+      "travel": 0.00723,
+      "screen": {
+       "front": [
+        0.107,
+        -0.994
+       ],
+       "three_quarter": [
+        0.193,
+        -0.981
+       ],
+       "side": [
+        0.169,
+        -0.986
+       ],
+       "back": [
+        -0.107,
+        -0.994
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ]
+   },
+   {
+    "id": "chin_side",
+    "feature": "chin",
+    "label": "Chin width",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.02685,
+      -0.06081,
+      0.08797
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "chin_width",
+      "axis": [
+       0.99968,
+       0.02515,
+       -0.0
+      ],
+      "travel": 0.00805,
+      "screen": {
+       "front": [
+        1.0,
+        0.025
+       ],
+       "three_quarter": [
+        0.999,
+        0.036
+       ],
+       "back": [
+        -1.0,
+        0.025
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "back"
+    ]
+   },
+   {
+    "id": "ear_left",
+    "feature": "ears",
+    "label": "Left ear",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      0.08667,
+      0.03377,
+      -0.01441
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "ears_wing_left",
+      "axis": [
+       0.85678,
+       0.0,
+       0.51569
+      ],
+      "travel": 0.01246,
+      "screen": {
+       "front": [
+        1.0,
+        0.0
+       ],
+       "three_quarter": [
+        1.0,
+        0.0
+       ],
+       "side": [
+        1.0,
+        0.0
+       ],
+       "back": [
+        -1.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "parameter": "ears_scale_left",
+      "axis": [
+       0.55907,
+       0.4193,
+       -0.71528
+      ],
+      "travel": 0.00615,
+      "screen": {
+       "front": [
+        0.8,
+        0.6
+       ],
+       "three_quarter": [
+        -0.255,
+        0.967
+       ],
+       "side": [
+        -0.863,
+        0.506
+       ],
+       "back": [
+        -0.8,
+        0.6
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "ear_right"
+   },
+   {
+    "id": "ear_right",
+    "feature": "ears",
+    "label": "Right ear",
+    "anchor": {
+     "bone": "Head",
+     "offset": [
+      -0.08667,
+      0.03377,
+      -0.01441
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "ears_wing_right",
+      "axis": [
+       -0.85678,
+       0.0,
+       0.51569
+      ],
+      "travel": 0.01246,
+      "screen": {
+       "front": [
+        -1.0,
+        0.0
+       ],
+       "side": [
+        1.0,
+        0.0
+       ],
+       "back": [
+        1.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "parameter": "ears_scale_right",
+      "axis": [
+       -0.55907,
+       0.4193,
+       -0.71528
+      ],
+      "travel": 0.00615,
+      "screen": {
+       "front": [
+        -0.8,
+        0.6
+       ],
+       "three_quarter": [
+        -0.907,
+        0.422
+       ],
+       "side": [
+        -0.863,
+        0.506
+       ],
+       "back": [
+        0.8,
+        0.6
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "side",
+     "back"
+    ],
+    "mirror": "ear_left"
+   },
+   {
+    "id": "neck_side",
+    "feature": "neck",
+    "label": "Neck",
+    "anchor": {
+     "bone": "Neck",
+     "offset": [
+      0.07642,
+      -0.00196,
+      -0.00166
+     ]
+    },
+    "drives": [
+     {
+      "parameter": "neck_neck_circ",
+      "axis": [
+       0.95564,
+       0.00211,
+       -0.29454
+      ],
+      "travel": 0.00566,
+      "screen": {
+       "front": [
+        1.0,
+        0.002
+       ],
+       "three_quarter": [
+        1.0,
+        0.005
+       ],
+       "back": [
+        -1.0,
+        0.002
+       ]
+      }
+     }
+    ],
+    "views": [
+     "front",
+     "three_quarter",
+     "back"
+    ]
+   }
+  ]
  },
  "frame_bones": {
   "Hips": [
@@ -2690,7 +4559,8 @@
      "skin": 0,
      "frame": 0.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2699,7 +4569,8 @@
      "skin": 0,
      "frame": 1.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2708,7 +4579,8 @@
      "skin": 0,
      "frame": 0.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2717,7 +4589,8 @@
      "skin": 0,
      "frame": 1.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2726,7 +4599,8 @@
      "skin": 0,
      "frame": 0.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2735,7 +4609,8 @@
      "skin": 0,
      "frame": 1.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2744,7 +4619,8 @@
      "skin": 1,
      "frame": 0.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2753,7 +4629,8 @@
      "skin": 1,
      "frame": 1.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2762,7 +4639,8 @@
      "skin": 1,
      "frame": 0.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2771,7 +4649,8 @@
      "skin": 1,
      "frame": 1.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2780,7 +4659,8 @@
      "skin": 1,
      "frame": 0.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2789,7 +4669,8 @@
      "skin": 1,
      "frame": 1.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2798,7 +4679,8 @@
      "skin": 2,
      "frame": 0.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2807,7 +4689,8 @@
      "skin": 2,
      "frame": 1.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2816,7 +4699,8 @@
      "skin": 2,
      "frame": 0.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2825,7 +4709,8 @@
      "skin": 2,
      "frame": 1.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2834,7 +4719,8 @@
      "skin": 2,
      "frame": 0.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2843,7 +4729,8 @@
      "skin": 2,
      "frame": 1.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2852,7 +4739,8 @@
      "skin": 3,
      "frame": 0.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2861,7 +4749,18 @@
      "skin": 4,
      "frame": 0.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_caucasian_male.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 0.0,
+     "age": 0.5
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2870,7 +4769,18 @@
      "skin": 4,
      "frame": 0.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_caucasian_male.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 0.0,
+     "age": 1.0
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2879,7 +4789,8 @@
      "skin": 4,
      "frame": 0.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2888,7 +4799,8 @@
      "skin": 3,
      "frame": 1.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2897,7 +4809,18 @@
      "skin": 4,
      "frame": 1.0,
      "age": 0.0
-    }
+    },
+    "blend": "age"
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_caucasian_female.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 1.0,
+     "age": 0.5
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2906,7 +4829,18 @@
      "skin": 4,
      "frame": 1.0,
      "age": 0.5
-    }
+    },
+    "blend": "age"
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_caucasian_female.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 1.0,
+     "age": 1.0
+    },
+    "blend": "age"
    },
    {
     "material": "Skin",
@@ -2915,7 +4849,8 @@
      "skin": 4,
      "frame": 1.0,
      "age": 1.0
-    }
+    },
+    "blend": "age"
    }
   ],
   "files": [

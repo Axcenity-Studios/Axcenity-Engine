@@ -250,6 +250,7 @@ fn a_colour_map_with_mistakes_reports_each() {
             .iter()
             .map(|(id, value)| ((*id).to_owned(), *value))
             .collect(),
+        blend: None,
     };
     let mut base = fixtures::base();
     base.material_maps = vec![

@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "Wide",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_flaring": 0.5,
+    "nose_hump": -0.4,
+    "nose_nostrils_width": 0.4,
+    "nose_scale_horiz": 0.6,
+    "nose_width2": 0.4
+  },
+  "preset": {
+    "id": "axcenity/human-nose-wide",
+    "kind": "feature",
+    "about": "A wide nose with flared nostrils and a low bridge.",
+    "feature": "nose",
+    "order": 110
+  }
+}
