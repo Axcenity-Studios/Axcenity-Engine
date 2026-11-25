@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-outfit-layered",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "makehuman/shoes01"
+    },
+    {
+      "id": "makehuman/female-casualsuit01"
+    }
+  ]
+}

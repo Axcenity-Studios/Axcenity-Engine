@@ -65,6 +65,18 @@ BUILDS = {
         "lean-muscular": {"fat": -1.0, "muscle": 1.0},
         "heavy-muscular": {"fat": 1.0, "muscle": 1.0},
     },
+    # The human base (MakeHuman's body, ADR-0047): the same corners of its
+    # muscle and fat sliders, and its age.
+    "axcenity/human": {
+        "slim": {"fat": -1.0},
+        "heavy": {"fat": 1.0},
+        "muscular": {"muscle": 1.0},
+        "slight": {"fat": -1.0, "muscle": -1.0},
+        "heavy-soft": {"fat": 1.0, "muscle": -1.0},
+        "lean-muscular": {"fat": -1.0, "muscle": 1.0},
+        "heavy-muscular": {"fat": 1.0, "muscle": 1.0},
+        "old": {"age": 1.0},
+    },
 }
 
 # The parameters that make a body shorter or taller, wherever a base has
@@ -195,7 +207,33 @@ CAST = {
 # Bases whose neutral face is the cast's average: `face-neutral` was the
 # same character as `body-default` (0 pixels differ in the refinement
 # baseline), so it isn't written; `cast-average` is the face reference.
-NEUTRAL_FACE_IN_CAST = {"axcenity/realistic"}
+NEUTRAL_FACE_IN_CAST = {"axcenity/realistic", "axcenity/human"}
+
+# The human base's cast: the realistic one's bodies, and faces set with
+# MakeHuman's own sliders (ADR-0047).
+CAST["axcenity/human"] = {
+    "average": {},
+    "slim": {"fat": -0.6, "muscle": -0.2},
+    "athletic": {
+        "masculine": {"muscle": 0.7, "fat": -0.4},
+        "feminine": {"muscle": 0.6, "fat": -0.4},
+    },
+    "muscular": {"muscle": 0.9, "fat": 0.1, "shoulder_width": 1.05},
+    "heavyset": {"fat": 0.8, "muscle": 0.2},
+    "broad-face": {"face_shape_scale_horiz": 0.6, "chin_width": 0.5, "face_shape_round": 0.4},
+    "narrow-face": {"face_shape_scale_horiz": -0.6, "chin_width": -0.5, "face_shape_oval": 0.4},
+    "distinctive": {"age": 0.6, "nose_hump": 0.7, "nose_scale_vert": 0.4, "chin_prominent": 0.6,
+                    "brows_trans_down_up": -0.5},
+    # Each pair differs between its sides, as the realistic cast's does.
+    "asymmetry": sided({
+        "eyes_trans_down_up": 0.35, "eyes_scale": -0.25, "eyes_corner1_down_up": 0.25,
+        "cheeks_bones": -0.6, "ears_trans_down_up": 0.7, "ears_wing": -0.7, "ears_scale": -0.7,
+    }),
+}
+# Bases whose face parameters aren't each given a file at both ends: the
+# human base's 149 are MakeHuman's own list, held by the library's random
+# characters test instead.
+NO_FACE_ENDS = {"axcenity/human"}
 
 
 def read(path):
@@ -309,7 +347,7 @@ def benchmarks(base, items):
     for frame, value in frames[:2]:
         if base["id"] not in NEUTRAL_FACE_IN_CAST:
             out.append(make(frame, value, "face-neutral", {}, underwear))
-        for parameter in face:
+        for parameter in [] if base["id"] in NO_FACE_ENDS else face:
             low, high = parameter["range"]
             pid = parameter["id"].replace("_", "-")
             out.append(make(frame, value, f"face-{pid}-min", {parameter["id"]: low}, underwear))

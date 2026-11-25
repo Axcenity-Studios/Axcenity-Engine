@@ -5,6 +5,10 @@ use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
 
+/// The human base (ADR-0047): MakeHuman's body, shipped beside the
+/// realistic one until it replaces it.
+const HUMAN_BASE: &str = "axcenity/human";
+
 /// The body's `MeshId` and the parts it wears, as [`CharacterWorkspace::worn`]
 /// lists them, with derived models' identity keys left out (a key names a
 /// bake, which the test needn't pin).
@@ -41,15 +45,20 @@ fn the_workspace_offers_the_realistic_body_and_shows_it() {
     for part in ["Eyes", "Teeth", "Lashes", "Brows", "Underwear_BoxerBriefs"] {
         assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
     }
-    // Both families are offered (plan section 0, decision 7), the
-    // realistic one first.
+    // Every family is offered (plan section 0, decision 7), the realistic
+    // one first, then by label: the human base (ADR-0047) ships beside the
+    // realistic one until it replaces it.
     assert!(offers_base(&library, DEFAULT_BASE));
+    assert!(offers_base(&library, HUMAN_BASE));
     assert!(offers_base(&library, axcenity_avatar::V1_BASE));
     let families: Vec<&str> = presets::families(&library)
         .iter()
         .map(|base| base.id.as_str())
         .collect();
-    assert_eq!(families, [DEFAULT_BASE, axcenity_avatar::V1_BASE]);
+    assert_eq!(
+        families,
+        [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE]
+    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -386,7 +395,7 @@ fn every_new_character_choice_is_sound_on_both_families() {
         .filter(|(_, _, start)| start.is_none())
         .map(|(label, _, _)| label.as_str())
         .collect();
-    assert_eq!(headings, ["Realistic", "Stylized"]);
+    assert_eq!(headings, ["Realistic", "Human", "Stylized"]);
     let starts: Vec<&Start> = choices.iter().filter_map(|(_, _, s)| s.as_ref()).collect();
     assert_eq!(starts[0], &Start::shipped("male"));
     assert_eq!(

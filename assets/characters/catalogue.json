@@ -2,6 +2,12 @@
   "format_version": 1,
   "bases": [
     {
+      "id": "axcenity/human",
+      "manifest": "human/Human.base.json",
+      "label": "Human",
+      "family": "human"
+    },
+    {
       "id": "axcenity/realistic",
       "manifest": "realistic/Realistic.base.json",
       "label": "Realistic",
@@ -149,6 +155,34 @@
         "short",
         "straight",
         "side-part"
+      ]
+    },
+    {
+      "id": "axcenity/human-bandeau",
+      "manifest": "human/items/bandeau/Bandeau.item.json",
+      "label": "Bandeau top",
+      "kind": "garment",
+      "slot": "underwear_top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
+      "id": "axcenity/human-boxer-briefs",
+      "manifest": "human/items/boxer-briefs/BoxerBriefs.item.json",
+      "label": "Boxer briefs",
+      "kind": "garment",
+      "slot": "underwear_bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "underwear"
       ]
     },
     {
@@ -309,6 +343,72 @@
         "cotton",
         "short-sleeve"
       ]
+    },
+    {
+      "id": "makehuman/female-casualsuit01",
+      "manifest": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.item.json",
+      "label": "T-shirt and jeans",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "female",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit01",
+      "manifest": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.item.json",
+      "label": "Shirt and jeans",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.png"
+    },
+    {
+      "id": "makehuman/shoes01",
+      "manifest": "human/wardrobe/shoes01/Shoes01.item.json",
+      "label": "Brown leather shoes",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes01/Shoes01.png"
+    },
+    {
+      "id": "makehuman/shoes04",
+      "manifest": "human/wardrobe/shoes04/Shoes04.item.json",
+      "label": "Black shoes",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes04/Shoes04.png"
     }
   ],
   "presets": [

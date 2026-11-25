@@ -1,0 +1,62 @@
+{
+  "format_version": 1,
+  "id": "axcenity/human-boxer-briefs",
+  "label": "Boxer briefs",
+  "kind": "garment",
+  "slot": "underwear_bottom",
+  "layer": 0,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/human"
+  ],
+  "model": {
+    "file": "BoxerBriefs.glb",
+    "object": "AxcenityHuman/BoxerBriefs"
+  },
+  "cover_map": "BoxerBriefs.cover.png",
+  "materials": [
+    {
+      "name": "Underwear",
+      "shading": "cloth",
+      "label": "Cloth",
+      "role": "primary"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Face_Chin_Width_Decr",
+      "Face_Mouth_Cupidsbow_Decr",
+      "Face_Mouth_Upperlip_Middle_Down",
+      "Face_Mouth_Upperlip_Middle_Up",
+      "Feminine_Age_Old",
+      "Feminine_Fat_Down",
+      "Feminine_Fat_Up",
+      "Feminine_Muscle_Down",
+      "Feminine_Muscle_Down_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Up",
+      "Feminine_Muscle_Up",
+      "Feminine_Muscle_Up_Fat_Down",
+      "Feminine_Muscle_Up_Fat_Up",
+      "Frame_Feminine",
+      "Masculine_Age_Old",
+      "Masculine_Fat_Down",
+      "Masculine_Fat_Up",
+      "Masculine_Muscle_Down",
+      "Masculine_Muscle_Down_Fat_Down",
+      "Masculine_Muscle_Down_Fat_Up",
+      "Masculine_Muscle_Up",
+      "Masculine_Muscle_Up_Fat_Down",
+      "Masculine_Muscle_Up_Fat_Up"
+    ]
+  },
+  "tags": [
+    "underwear"
+  ],
+  "about": "Cut from the body's own surface, so it follows every body slider.",
+  "source": {
+    "author": "Axcenity Engine contributors, from MakeHuman's base mesh (CC0)",
+    "licence": "CC0-1.0"
+  },
+  "quality": "draft"
+}

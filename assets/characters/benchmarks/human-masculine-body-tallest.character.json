@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-body-tallest",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 0,
+    "height": 1.13,
+    "leg_length": 1.125
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

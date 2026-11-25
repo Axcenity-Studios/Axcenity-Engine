@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-cast-heavyset",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": 0.8,
+    "frame": 1,
+    "muscle": 0.2
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

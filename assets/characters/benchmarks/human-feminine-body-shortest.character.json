@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-body-shortest",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 1,
+    "height": 0.82,
+    "leg_length": 0.85
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

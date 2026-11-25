@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-body-muscular",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 1,
+    "muscle": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

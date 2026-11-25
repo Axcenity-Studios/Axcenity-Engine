@@ -1,0 +1,58 @@
+{
+ "mpfb": "2.0.18",
+ "taken": [
+  {
+   "id": "makehuman/female-casualsuit01",
+   "label": "T-shirt and jeans",
+   "name": "female_casualsuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 2197,
+   "shapes": 75,
+   "hidden_faces": 2688
+  },
+  {
+   "id": "makehuman/male-casualsuit01",
+   "label": "Shirt and jeans",
+   "name": "male_casualsuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 8426,
+   "shapes": 75,
+   "hidden_faces": 3364
+  },
+  {
+   "id": "makehuman/shoes01",
+   "label": "Brown leather shoes",
+   "name": "shoes01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 1722,
+   "shapes": 18,
+   "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/shoes04",
+   "label": "Black shoes",
+   "name": "shoes04",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 1722,
+   "shapes": 18,
+   "hidden_faces": 2264
+  }
+ ],
+ "left_out": []
+}

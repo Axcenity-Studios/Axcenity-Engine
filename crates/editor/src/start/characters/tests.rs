@@ -127,10 +127,11 @@ fn recent_shows_four_then_show_more_lists_the_rest() {
     );
     assert_eq!(count(&drawn, "Edit"), 10);
     assert_eq!(count(&drawn, "Delete…"), 10);
-    // The realistic family's six whole-character presets and the stylized
-    // family's three (both families: plan section 0, decision 7; the
-    // stylized ones are data since wave 3).
-    assert_eq!(count(&drawn, "Start from this"), 9);
+    // The realistic family's six whole-character presets, the stylized
+    // family's three (plan section 0, decision 7; the stylized ones are
+    // data since wave 3) and the human base's default character, which
+    // has no presets yet (ADR-0047).
+    assert_eq!(count(&drawn, "Start from this"), 10);
     for name in ["Masculine", "Feminine"] {
         assert!(
             drawn
