@@ -748,3 +748,58 @@ fn the_human_bases_skin_is_a_choice_on_the_skin_page() {
     }
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// ADR-0047 stage 5: the human base's hairstyles (MakeHuman's, converted
+/// by `hair.py`) are on the Hair page, and one put on is a part on the
+/// body that wears the body's identity, in the colour variant picked.
+#[test]
+fn the_human_bases_hairstyles_are_on_the_hair_page_and_can_be_worn() {
+    let folder = test_folder("workspace-human-hair");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.set_base(HUMAN_BASE);
+    workspace.apply(Intent::PickCategory(Category::Hair));
+    let ctx = theme::test_context();
+    let mut drawn = Vec::new();
+    for _ in 0..3 {
+        let output = theme::run(&ctx, Default::default(), |ui| {
+            assert_eq!(workspace.ui(ui, None), None);
+        });
+        drawn = super::shell_tests::drawn_texts(&output);
+    }
+    // Every one is a draft, and a page of nothing but drafts lists them.
+    for label in ["Afro", "Long and straight", "Short and tousled"] {
+        assert!(
+            drawn.iter().any(|text| text.contains(label)),
+            "{label} in {drawn:?}"
+        );
+    }
+    assert_eq!(workspace.worn_in("hair"), None, "a new character is bald");
+
+    workspace.wear("hair", Some("makehuman/hair-short02"));
+    assert_eq!(workspace.notice, None);
+    assert_eq!(
+        workspace.worn_in("hair").as_deref(),
+        Some("makehuman/hair-short02")
+    );
+    let worn = worn_models(&workspace);
+    assert!(worn.iter().any(|name| name == "HairShort02"), "{worn:?}");
+    // It keeps to the head through the body type and a face slider.
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    workspace.choose(&frame, 1.0);
+    assert_eq!(
+        workspace.worn_in("hair").as_deref(),
+        Some("makehuman/hair-short02")
+    );
+    let library = workspace.library();
+    let resolved = axcenity_avatar::resolve(&library, workspace.description()).unwrap();
+    assert_eq!(resolved.problems, Vec::new());
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        super::shell_tests::snap(&mut workspace, &snapshots, "human-hair", 8);
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}

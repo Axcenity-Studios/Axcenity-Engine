@@ -325,10 +325,15 @@ def compact(path, keep_alpha):
     return _compact[path]
 
 
-def simple_material(name, colour=(0.8, 0.8, 0.8, 1.0), texture=None, normal=None, alpha=None, roughness=0.6):
+def simple_material(name, colour=(0.8, 0.8, 0.8, 1.0), texture=None, normal=None, alpha=None, roughness=0.6,
+                    extras=None):
     """A plain material; `alpha` is None (solid), `"cut"` (cut out where
-    the texture is see-through, if it is anywhere) or `"blend"`."""
+    the texture is see-through, if it is anywhere) or `"blend"`. `extras`
+    are written into the file with it (`export(..., extras=True)`): what
+    tells the engine its shading model (`axcenity_shading`)."""
     material = bpy.data.materials.new(name)
+    for key, value in (extras or {}).items():
+        material[key] = value
     material.use_nodes = True
     nodes, links = material.node_tree.nodes, material.node_tree.links
     shader = nodes["Principled BSDF"]
@@ -379,7 +384,7 @@ def read_mhmat(path):
     return out
 
 
-def material_of(name, mhmat, alpha=None):
+def material_of(name, mhmat, alpha=None, extras=None):
     values = read_mhmat(mhmat) if mhmat and os.path.exists(mhmat) else {}
     colour = (0.8, 0.8, 0.8, 1.0)
     if "diffuseColor" in values:
@@ -387,7 +392,8 @@ def material_of(name, mhmat, alpha=None):
             colour = tuple(float(x) for x in values["diffuseColor"].split()[:3]) + (1.0,)
         except ValueError:
             pass
-    return simple_material(name, colour, values.get("diffuseTexture"), values.get("normalmapTexture"), alpha)
+    return simple_material(name, colour, values.get("diffuseTexture"), values.get("normalmapTexture"), alpha,
+                           extras=extras)
 
 
 def make_object(name, piece, points, shapes, groups, material, armature):
@@ -577,7 +583,7 @@ def write_cut_item(root, spec, build, joints, body_points, body_groups, body_sha
             "hidden_faces": lit}
 
 
-def export(path, armature, objects):
+def export(path, armature, objects, extras=False, morph_normals=True):
     bpy.ops.object.select_all(action="DESELECT")
     armature.select_set(True)
     for o in objects:
@@ -585,9 +591,9 @@ def export(path, armature, objects):
     bpy.context.view_layer.objects.active = armature
     bpy.ops.export_scene.gltf(
         filepath=path, export_format="GLB", use_selection=True,
-        export_skins=True, export_morph=True, export_morph_normal=True, export_try_sparse_sk=True,
+        export_skins=True, export_morph=True, export_morph_normal=morph_normals, export_try_sparse_sk=True,
         export_animations=False, export_yup=True, export_def_bones=False, export_leaf_bone=False,
-        export_tangents=False, export_image_format="AUTO")
+        export_tangents=False, export_image_format="AUTO", export_extras=extras)
 
 
 def to_gltf(d):

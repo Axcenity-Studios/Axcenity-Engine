@@ -104,8 +104,8 @@ Universal (see assets/characters/transfer/shapes/LICENCE-RECORD.md).
 MakeHuman
 ---------
 assets/characters/human/ (the human base body, its eyes, teeth, tongue,
-brows and lashes, the skin textures in its skins/ folder, and the garments
-in its wardrobe/ folder) is made from MakeHuman's base mesh, targets and system assets
+brows and lashes, the skin textures in its skins/ folder, the hairstyles in
+its hair/ folder and the garments in its wardrobe/ folder) is made from MakeHuman's base mesh, targets and system assets
 (http://www.makehumancommunity.org), released under CC0 1.0 Universal by
 their copyright holders: Data Collection AB, Joel Palmius and Jonas
 Hauquier. CC0 asks for no attribution; the MakeHuman project and its

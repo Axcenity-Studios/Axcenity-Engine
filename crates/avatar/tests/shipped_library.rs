@@ -846,3 +846,101 @@ fn the_human_bases_skins_follow_the_body_type_and_the_age() {
         "every photographed skin is drawn: {drawn:?}"
     );
 }
+
+/// ADR-0047 stage 5: the human base's hairstyles (`hair.py`). Each is a
+/// groom with a mesh in the hair slot, credited, with a picture, on the
+/// Hair shading model; it follows the head's shape and none of the face's
+/// expressions; and every colour variant of it resolves on both body types.
+#[test]
+fn the_human_bases_hairstyles_follow_the_head_and_not_its_expressions() {
+    use axcenity_avatar::{ItemKind, ShadingModel, resolve};
+    let library = read();
+    let human = library.base("axcenity/human").expect("shipped");
+    let hair: Vec<_> = library
+        .items
+        .values()
+        .filter(|item| item.kind == ItemKind::Groom && item.bases.contains(&human.id))
+        .collect();
+    assert!(hair.len() >= 5, "{} hairstyles", hair.len());
+    // The standard facial controls the base has shapes for.
+    let controls = [
+        "Blink_",
+        "Eye_",
+        "Brow_",
+        "Nose_",
+        "Mouth_",
+        "Lip_",
+        "Upper_Lip_",
+        "Lower_Lip_",
+    ];
+    for item in hair {
+        let id = &item.id;
+        assert_eq!(item.slot, "hair", "{id}");
+        assert!(
+            item.is_draft(),
+            "{id}: a converted asset is a draft until reviewed"
+        );
+        let groom = item.groom.as_ref().expect("a groom");
+        assert!(groom.mesh.is_some() && item.model.is_none(), "{id}");
+        let source = item
+            .source
+            .as_ref()
+            .unwrap_or_else(|| panic!("{id}: no credit"));
+        assert!(
+            matches!(source.licence.as_str(), "CC0-1.0" | "CC-BY-4.0") && !source.author.is_empty(),
+            "{id}: {source:?}"
+        );
+        let picture = item.thumbnail.as_deref().expect("a picture");
+        let picture = library.path_of(id, picture).unwrap();
+        assert!(root().join(&picture).is_file(), "{picture}");
+        assert_eq!(item.materials.len(), 1, "{id}");
+        assert_eq!(item.materials[0].shading, ShadingModel::Hair, "{id}");
+        let axcenity_avatar::Fit::Shapes { follows } = &item.fit else {
+            panic!("{id}: fitted by its shapes");
+        };
+        assert!(follows.contains(&"Frame_Feminine".to_owned()), "{id}");
+        let expressions: Vec<&String> = follows
+            .iter()
+            .filter(|shape| controls.iter().any(|control| shape.starts_with(control)))
+            .collect();
+        assert!(expressions.is_empty(), "{id} follows {expressions:?}");
+        assert!(item.variants.len() >= 2, "{id}: colours to pick");
+        for variant in &item.variants {
+            for frame in [0.0, 1.0] {
+                let mut character = Description::new("Hair", &human.id);
+                character.parameters.insert("frame".to_owned(), frame);
+                let mut worn = WornItem::new(id.clone());
+                worn.variant = Some(variant.id.clone());
+                character.items = vec![worn];
+                let problems = character.validate(&library);
+                assert!(
+                    problems.is_empty(),
+                    "{id} {}: {}",
+                    variant.id,
+                    lines(&problems)
+                );
+                let resolved = resolve(&library, &character).unwrap();
+                assert!(
+                    resolved.problems.is_empty(),
+                    "{id}: {:?}",
+                    resolved.problems
+                );
+                let part = resolved
+                    .parts
+                    .iter()
+                    .find(|part| part.item.as_deref() == Some(id.as_str()))
+                    .unwrap_or_else(|| panic!("{id} is worn"));
+                assert_eq!(part.slot.as_deref(), Some("hair"));
+                assert_eq!(
+                    part.materials.get("Hair").map_or(0, |values| values.len()),
+                    variant
+                        .materials
+                        .get("Hair")
+                        .map_or(0, |values| values.len()),
+                    "{id} {}",
+                    variant.id
+                );
+            }
+        }
+    }
+}

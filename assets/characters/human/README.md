@@ -11,6 +11,7 @@ The realistic family's new body: **MakeHuman's base mesh, targets and clothes**,
 | `Human.build.json` | What the build measured (joints, shape reaches, versions) |
 | `items/` | The underwear a new character wears, cut from the body (`underwear.py`): boxer briefs, and a bandeau top for the feminine frame |
 | `wardrobe/` | Four MakeHuman garments (two casual outfits, two pairs of shoes), with `CREDITS.md` |
+| `hair/` | Five MakeHuman hairstyles (afro, blunt bob, long, two short), with `CREDITS.md` (`hair.py`) |
 
 ## How it is made
 
@@ -37,6 +38,13 @@ The realistic family's new body: **MakeHuman's base mesh, targets and clothes**,
 
 `wardrobe.py` does the same for garments and adds what an item needs: a licence check, a slot and layer from the garment's name and its pack's category, a cover map from the body corners its file hides (`delete_verts`), a thumbnail, a manifest with `fit: shapes`, and `CREDITS.md`. A garment follows every body slider exactly as MakeHuman fits it, with nothing solved at run time; the proxy fit of ADR-0046 isn't involved.
 
+`hair.py` makes hairstyles the same way. A MakeHuman hairstyle is a clothes-type asset too: a mesh of 500 to 4,200 faces with a painted texture, hung on the head and shoulders by its `.mhclo` file. It becomes a `groom` item in the `hair` slot with its mesh as the groom's `mesh` tier:
+
+- It carries the body's and the face's shapes, so it keeps to the head through every slider, but **not** the face's expression shapes (a fringe bound to the brow would rise with it), and no normals with its shapes (they were half of each file).
+- Its material is marked for the engine's **Hair shading model** (`extras.axcenity_shading`, `axcenity_hair_shell`) and cut out by the texture's alpha, so its edge is soft under TAA and it casts its shadow through its holes (`docs/rendering/hair.md`). The texture is MakeHuman's painted one, colour and all.
+- **Colour** is a variant: four moves from the painted colour along the pigment curve (Darker, Darkest, Lighter, Lightest) and three dyes that land near the same colour on every hairstyle (blonde, auburn, grey).
+- A new character is bald, as on the realistic base: a hairstyle is picked on the Hair page.
+
 ## Rebuilding
 
 Blender 5.2 with the MPFB extension installed (Preferences, Get Extensions), run **without** `--factory-startup`. `<system>` is the unpacked "MakeHuman system assets" pack and `<pack>` any unpacked asset pack, both from <https://static.makehumancommunity.org/assets/assetpacks.html>; neither is stored here.
@@ -46,6 +54,9 @@ blender -b --python assets/characters/human/build.py -- --assets <system> --out 
 blender -b --python assets/characters/human/wardrobe.py -- --assets <system> --system <system> \
     --out assets/characters/human/wardrobe \
     --only male_casualsuit01.mhclo --only shoes01.mhclo --only female_casualsuit01.mhclo --only shoes04.mhclo
+blender -b --python assets/characters/human/hair.py -- --assets <system> --system <system> \
+    --out assets/characters/human/hair \
+    --only afro01 --only bob02 --only long01 --only short02 --only short04
 python -I assets/characters/catalogue.py
 python -I assets/characters/benchmarks/make.py
 ```
@@ -57,7 +68,7 @@ blender -b --python assets/characters/human/wardrobe.py -- --assets <system> <pa
     --out <library>/human/wardrobe
 ```
 
-On 2026-11-24 seven packs (system assets, Underwear 01 to 04, Shirts 01, Pants 01) gave 86 garments in 30 seconds and left 10 out.
+On 2026-11-24 seven packs (system assets, Underwear 01 to 04, Shirts 01, Pants 01) gave 86 garments in 30 seconds and left 10 out. `hair.py` takes the same arguments (`--out <library>/human/hair`): the system assets' ten hairstyles convert in 7 seconds and are 52 MB, which is why five are here.
 
 ## The licence gate
 
@@ -65,19 +76,20 @@ A garment is taken only when **its own file's header and its pack's metadata bot
 
 ## Sources and credit
 
-- **MakeHuman** (<http://www.makehumancommunity.org>): the base mesh, the targets, and the system assets (the 22 skins in `skins/`, eyes, teeth, tongue, brows, lashes, the casual outfits and shoes). Released **CC0 1.0** by their copyright holders, Data Collection AB, Joel Palmius and Jonas Hauquier (each file's header: "This asset was explicitly released as CC0 in september 2020"). CC0 asks for no credit; it is given here, in `NOTICE` and in every item's `source`.
+- **MakeHuman** (<http://www.makehumancommunity.org>): the base mesh, the targets, and the system assets (the 22 skins in `skins/`, the hairstyles in `hair/`, eyes, teeth, tongue, brows, lashes, the casual outfits and shoes). Released **CC0 1.0** by their copyright holders, Data Collection AB, Joel Palmius and Jonas Hauquier (each file's header: "This asset was explicitly released as CC0 in september 2020"). CC0 asks for no credit; it is given here, in `NOTICE` and in every item's `source`.
 - **MakeHuman community asset packs**: each garment's author and licence (CC0 1.0 or CC BY 4.0) are in its item manifest and in the `CREDITS.md` written beside the items. CC BY requires that credit; keep `CREDITS.md` with the items wherever they go.
 - **MPFB** (<https://static.makehumancommunity.org/mpfb.html>), by Joel Palmius and the MakeHuman community, GPL-3.0-or-later: the tool that makes the body, loads its rig weights and fits the clothes. **None of its code is in this repository** (the scripts call the installed add-on); what it outputs is the person's who made it (MPFB's `LICENSE.md`, section D, as MakeHuman's). The `.mhclo` and `.mhmat` readers in `mh.py` and `build.py` are written from the formats' published description.
 - **Blender** (GPL) runs the scripts; nothing of it ships.
 
 ## Not yet
 
-Stages 1 and 2 of ADR-0047 and the skins of stage 3 are built. Against `axcenity/realistic` the base lacks:
+Stages 1 and 2 of ADR-0047, the skins of stage 3 and the hair of stage 5 are built. Against `axcenity/realistic` the base lacks:
 
 - **Face**: the sliders' labels and descriptions are made from MakeHuman's target names and need writing by hand; none is marked `quick`; there are no features, handles or face presets, so Character Studio lists the face as plain sliders. Thirteen of the 48 standard controls play nothing. MakeHuman's face rig bones are gathered onto `Head` and `Jaw`. The face capture frames the feminine frame low (she is 13 cm shorter).
 - **Skin**: MakeHuman's 22 skins as colour maps on the `standard` model. No skin tone, tint or roughness controls, no normal map, no makeup, no `skin` shading model (Character Studio's Skin and Makeup page says "No skin material" above the choice). The skin changes in a step where the Age slider crosses a quarter and three quarters. The choices have MakeHuman's names and no swatches. Brows and lashes are on `standard`, not `hair`, and the brows are a thin line.
 - **Body**: frame, muscle, fat and age only (and the proportion sliders). No regional sliders, correctives or helper bones; no simpler copies (levels of detail).
-- **Hair, presets, handles, features**: none.
+- **Hair**: five of MakeHuman's ten hairstyles, all drafts. Each is a low mesh with a painted texture, so it reads as a cap with a faceted outline up close, has no strand highlights (the painted strands don't run along the texture's V, which is where the Hair model takes its direction from, and there is no flow or data map), and its roots, tips and streaks can't be set. Light colours are flat and show the afro's dark base in blotches. Long hair is skinned to the spine and shoulders: it doesn't sway, and it is dragged by a raised arm. Nothing hides hair under a hat. Randomize never draws a draft, so random characters are bald. The other five hairstyles (bob01, braid01, ponytail01, short01, short03) and the community's hair packs are not in the repository: Paul, 2026-11-24, keeps five here so the repository stays lean and plans the rest for the downloadable wardrobe pack.
+- **Presets, handles, features**: none.
 - **Layering**: garments hide skin by their cover maps, but not each other's cloth.
 - **Underwear**: the boxer briefs show a pale speck by each front leg hem; the bandeau's upper hem has small spikes and the cloth follows the chest's surface closely. One dark cloth, no fabric texture.
 - **Quality**: every converted garment is a `draft` until reviewed (`docs/development/character-studio/asset-quality.md`).

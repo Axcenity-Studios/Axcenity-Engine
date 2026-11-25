@@ -362,6 +362,90 @@
       "thumbnail": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.png"
     },
     {
+      "id": "makehuman/hair-afro01",
+      "manifest": "human/hair/afro01/HairAfro01.item.json",
+      "label": "Afro",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "coily",
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/afro01/HairAfro01.png"
+    },
+    {
+      "id": "makehuman/hair-bob02",
+      "manifest": "human/hair/bob02/HairBob02.item.json",
+      "label": "Blunt bob with a fringe",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "fringe",
+        "makehuman",
+        "medium",
+        "straight"
+      ],
+      "thumbnail": "human/hair/bob02/HairBob02.png"
+    },
+    {
+      "id": "makehuman/hair-long01",
+      "manifest": "human/hair/long01/HairLong01.item.json",
+      "label": "Long and straight",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "long",
+        "makehuman",
+        "straight"
+      ],
+      "thumbnail": "human/hair/long01/HairLong01.png"
+    },
+    {
+      "id": "makehuman/hair-short02",
+      "manifest": "human/hair/short02/HairShort02.item.json",
+      "label": "Short and tousled",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short02/HairShort02.png"
+    },
+    {
+      "id": "makehuman/hair-short04",
+      "manifest": "human/hair/short04/HairShort04.item.json",
+      "label": "Short, brushed forward",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short04/HairShort04.png"
+    },
+    {
       "id": "makehuman/male-casualsuit01",
       "manifest": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.item.json",
       "label": "Shirt and jeans",

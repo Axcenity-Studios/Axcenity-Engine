@@ -264,14 +264,16 @@ def main():
         print("  left out:", entry["file"], "-", entry["reason"])
 
 
-def credits(path, taken):
-    """`CREDITS.md`: who made each garment and under which licence. CC BY
-    asks for this; CC0 doesn't, and it is given all the same."""
+def credits(path, taken, what="garment"):
+    """`CREDITS.md`: who made each garment (or hairstyle: `what`) and
+    under which licence. CC BY asks for this; CC0 doesn't, and it is given
+    all the same."""
+    script = "hair.py" if what == "hairstyle" else "wardrobe.py"
     lines = [
-        "# Wardrobe credits",
+        "# Hair credits" if what == "hairstyle" else "# Wardrobe credits",
         "",
-        "Every garment here is a MakeHuman community asset, converted for Axcenity's human base by",
-        "`assets/characters/human/wardrobe.py` with the MPFB add-on (https://static.makehumancommunity.org/mpfb.html).",
+        f"Every {what} here is a MakeHuman community asset, converted for Axcenity's human base by",
+        f"`assets/characters/human/{script}` with the MPFB add-on (https://static.makehumancommunity.org/mpfb.html).",
         "The meshes were re-posed, re-skinned to the Axcenity Humanoid skeleton and given the body's shapes;",
         "textures are as their authors made them. Source: " + SOURCE_URL,
         "",
