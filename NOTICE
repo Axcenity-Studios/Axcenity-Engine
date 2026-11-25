@@ -125,3 +125,13 @@ the MakeHuman Plugin For Blender by Joel Palmius and the MakeHuman
 community, licensed GPL-3.0-or-later. MPFB is used as a tool: no MPFB or
 MakeHuman source code is included in this repository or in anything built
 from it (assets/characters/human/README.md, "Sources and credit").
+
+Quaternius
+----------
+assets/characters/humanoid/HumanoidAnimations.glb holds 84 animations from
+the Universal Animation Library and the Universal Animation Library 2 by
+Quaternius (https://quaternius.com), released under CC0 1.0 Universal.
+They were brought onto the Axcenity Humanoid skeleton
+(assets/characters/humanoid/mocap.py) and renamed; the table of names is
+in that file. CC0 asks for no attribution; Quaternius is credited here
+with thanks.

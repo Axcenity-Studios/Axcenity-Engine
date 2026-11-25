@@ -87,7 +87,10 @@ pub const HUMANOID_PARTS: [&str; 17] = [
     "Hair_Ponytail",
 ];
 
-/// Its 32 starter animations (`HumanoidAnimations.glb`).
+/// Its 101 starter animations (`HumanoidAnimations.glb`): 84 from
+/// Quaternius's Universal Animation Library (CC0, `mocap.py`), its walk
+/// and jog again with root motion, and 15 keyed ones (`animations.py`):
+/// those the library has no motion for, and the idle.
 pub static DEFAULT_HUMANOID_ANIMATIONS: &[u8] =
     include_bytes!("../../../assets/characters/humanoid/HumanoidAnimations.glb");
 
@@ -124,11 +127,23 @@ enum End {
     ReturnsToIdle,
 }
 
+/// What the library's forward takes cover on the ground, metres a second
+/// (`mocap.SPEEDS`, its own root motion): the jog that the `Run` take is,
+/// its sprint and its crouched walk.
+const JOG_SPEED: f64 = 5.36;
+const SPRINT_SPEED: f64 = 8.25;
+const CROUCH_WALK_SPEED: f64 = 0.75;
+/// Studs per metre, as a `f64` for the speeds below.
+const STUDS: f64 = 5.0 / 1.75;
+
 /// The default state machine's states. Walk and Run play the Run and
-/// Sprint takes faster, so the feet keep up with the controller's default
-/// `WalkSpeed` (16 studs a second) and `RunSpeed` (32): the Run take covers
-/// 3.6 m a second (10.3 studs), Sprint 6.0 m (17.1 studs).
-const STATES: [State; 26] = {
+/// Sprint takes, a little faster, so the feet keep up with the
+/// controller's default `WalkSpeed` (16 studs a second) and `RunSpeed`
+/// (32): the Run take covers 5.36 m a second (15.3 studs), Sprint 8.25 m
+/// (23.6 studs). The library's own walk (0.97 m a second) is `Stroll`.
+/// After the states the Humanoid and Insert > Character play come one for
+/// every other take of the file, so each can be played by name.
+const STATES: [State; 96] = {
     use End::*;
     const fn s(name: &'static str, take: &'static str, speed: f64, end: End) -> State {
         State {
@@ -138,10 +153,14 @@ const STATES: [State; 26] = {
             end,
         }
     }
+    /// A state that plays the take of its own name as it is.
+    const fn t(name: &'static str, end: End) -> State {
+        s(name, name, 1.0, end)
+    }
     [
         s("Idle", "Idle", 1.0, Loops),
-        s("Walk", "Run", 16.0 / (3.6 * 5.0 / 1.75), Loops),
-        s("Run", "Sprint", 32.0 / (6.0 * 5.0 / 1.75), Loops),
+        s("Walk", "Run", 16.0 / (JOG_SPEED * STUDS), Loops),
+        s("Run", "Sprint", 32.0 / (SPRINT_SPEED * STUDS), Loops),
         s("Jump", "Jump", 1.0, Holds),
         s("Fall", "Fall", 1.0, Loops),
         s("Land", "Land", 1.0, ReturnsToIdle),
@@ -150,7 +169,7 @@ const STATES: [State; 26] = {
         s(
             "CrouchWalk",
             "CrouchWalk",
-            16.0 * CROUCH_SPEED_SCALE / (0.9 * 5.0 / 1.75),
+            16.0 * CROUCH_SPEED_SCALE / (CROUCH_WALK_SPEED * STUDS),
             Loops,
         ),
         s("Swim", "Swim", 1.0, Loops),
@@ -170,6 +189,77 @@ const STATES: [State; 26] = {
         s("WalkBackward", "WalkBackward", 1.0, Loops),
         s("WalkLeft", "WalkLeft", 1.0, Loops),
         s("WalkRight", "WalkRight", 1.0, Loops),
+        // The library's other takes (`mocap.TAKES`), each under its name.
+        s("Stroll", "Walk", 1.0, Loops),
+        t("WalkFormal", Loops),
+        t("WalkCarry", Loops),
+        t("IdleReady", Loops),
+        t("IdleTalking", Loops),
+        t("IdleFoldArms", Loops),
+        t("IdlePhone", Loops),
+        t("IdleTorch", Loops),
+        t("IdleLantern", Loops),
+        t("IdleRail", Loops),
+        t("IdleRailCall", ReturnsToIdle),
+        t("Yes", ReturnsToIdle),
+        t("No", Loops),
+        t("SwimIdle", Loops),
+        t("SitDown", Holds),
+        t("StandUp", ReturnsToIdle),
+        t("SitTalking", Loops),
+        t("GetUp", ReturnsToIdle),
+        t("Drive", Loops),
+        t("Roll", ReturnsToIdle),
+        t("SlideStart", Holds),
+        t("Slide", Loops),
+        t("SlideEnd", ReturnsToIdle),
+        t("ClimbUp", ReturnsToIdle),
+        t("HighJump", Holds),
+        t("HighJumpFall", Loops),
+        t("HighJumpLand", ReturnsToIdle),
+        t("Death", Holds),
+        t("HitHead", ReturnsToIdle),
+        t("Knockback", Holds),
+        t("Fix", ReturnsToIdle),
+        t("OpenChest", ReturnsToIdle),
+        t("Consume", ReturnsToIdle),
+        t("Harvest", ReturnsToIdle),
+        t("PlantSeed", ReturnsToIdle),
+        t("Water", ReturnsToIdle),
+        t("ChopTree", Loops),
+        t("Throw", ReturnsToIdle),
+        t("PunchJab", ReturnsToIdle),
+        t("PunchCross", ReturnsToIdle),
+        t("Hook", Holds),
+        t("HookRecover", ReturnsToIdle),
+        t("SwordIdle", Loops),
+        t("SwordAttack", ReturnsToIdle),
+        t("SwordBlock", ReturnsToIdle),
+        t("SwordDash", ReturnsToIdle),
+        t("SwordSlashA", Holds),
+        t("SwordSlashARecover", ReturnsToIdle),
+        t("SwordSlashB", Holds),
+        t("SwordSlashBRecover", ReturnsToIdle),
+        t("SwordSlashC", ReturnsToIdle),
+        t("SwordCombo", ReturnsToIdle),
+        t("SwordHeavyCombo", ReturnsToIdle),
+        t("ShieldIdle", Loops),
+        t("ShieldBreak", ReturnsToIdle),
+        t("ShieldDash", ReturnsToIdle),
+        t("ShieldBash", ReturnsToIdle),
+        t("PistolIdle", Loops),
+        t("PistolAim", Holds),
+        t("PistolAimUp", Holds),
+        t("PistolAimDown", Holds),
+        t("PistolShoot", ReturnsToIdle),
+        t("PistolReload", ReturnsToIdle),
+        t("SpellStart", Holds),
+        t("SpellIdle", Loops),
+        t("SpellCast", ReturnsToIdle),
+        t("SpellEnd", ReturnsToIdle),
+        t("ZombieIdle", Loops),
+        t("ZombieWalk", Loops),
+        t("ZombieScratch", ReturnsToIdle),
     ]
 };
 
@@ -361,8 +451,8 @@ pub fn default_humanoid_animation_files() -> Vec<(String, String)> {
             "events": [],
         });
         files.push((clip.clone(), pretty(&text)));
-        // Laid out in rows of six in the editor's graph.
-        let (column, row) = (index % 6, index / 6);
+        // Laid out in rows of eight in the editor's graph.
+        let (column, row) = (index % 8, index / 8);
         let mut entry = serde_json::json!({
             "name": state.name,
             "motion": { "clip": clip },
@@ -559,6 +649,30 @@ mod tests {
         for state in ["Idle", "Walk", "Run", "Jump", "Fall", "Sit"] {
             assert!(machine.state(state).is_some(), "{state}");
         }
+        // Every take of the file can be played by a state, but the keyed
+        // run in the three other directions and the versions with root
+        // motion (clips of a creator's own).
+        assert_eq!(takes.len(), 101);
+        let played: std::collections::BTreeSet<&str> =
+            STATES.iter().map(|state| state.take).collect();
+        let unplayed: Vec<&str> = takes
+            .iter()
+            .map(|take| take.name.as_str())
+            .filter(|name| !played.contains(name))
+            .collect();
+        assert_eq!(
+            unplayed,
+            [
+                "Run_RootMotion",
+                "RunBackward",
+                "RunLeft",
+                "RunRight",
+                "Walk_RootMotion"
+            ]
+        );
+        let names: std::collections::BTreeSet<&str> =
+            STATES.iter().map(|state| state.name).collect();
+        assert_eq!(names.len(), STATES.len(), "no state twice");
     }
 
     #[test]

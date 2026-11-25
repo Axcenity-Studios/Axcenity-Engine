@@ -688,13 +688,14 @@ fn stylized_cast() -> Vec<Description> {
 }
 
 /// A clip's frames for the checks: one stride of the walk and the run
-/// from their start (the clip played alone holds its last frame from
-/// about frame 44 on), and a second of the idle.
+/// from their start (the clip played alone holds its last frame at its
+/// end: the walk, which is the library's jog, at frame 56, the run, its
+/// sprint, at frame 40; ADR-0049), and a second of the idle.
 fn frames_of(clip: &str) -> Range<u32> {
     match clip {
         "Idle" => 2..62,
-        "Run" => 2..35,
-        _ => 2..44,
+        "Run" => 2..40,
+        _ => 2..56,
     }
 }
 
@@ -782,28 +783,33 @@ const RUN_RECORDS: [Record; 2] = [
 /// crotch) jolt past the thighs as a stride turns; four of the six
 /// stylized hairstyles (bob, long, ponytail, swept) have corners up to
 /// 11 mm inside the head, still or moving (the cards' roots).
+///
+/// Measured again on 2026-11-25 in the library's jog and sprint, which
+/// `Walk` and `Run` play since ADR-0049: longer strides and a head that
+/// leans with them. Before, in the keyed run and sprint: the pants 5.6 mm
+/// a frame in the walk and 3.2 in the run, the hair 11.4 and 11.2 mm.
 const STYLIZED_WALK_RECORDS: [Record; 2] = [
     Record {
         what: "Pants_Cargo pop",
         case: "Walk",
-        most: 0.0056,
+        most: 0.01134,
     },
     Record {
         what: "hair",
         case: "Walk",
-        most: 0.0114,
+        most: 0.01292,
     },
 ];
 const STYLIZED_RUN_RECORDS: [Record; 2] = [
     Record {
         what: "Pants_Cargo pop",
         case: "Run",
-        most: 0.0032,
+        most: 0.01374,
     },
     Record {
         what: "hair",
         case: "Run",
-        most: 0.0112,
+        most: 0.02257,
     },
 ];
 /// The stylized sneakers: in the walk's stride a few corners of the foot
@@ -814,7 +820,8 @@ const SNEAKER_RECORDS: [Record; 2] = [
     Record {
         what: "Shoes_Sneakers through",
         case: "Walk@18",
-        most: 0.0183,
+        // 18.3 mm in the keyed run; the library's jog, ADR-0049.
+        most: 0.0166,
     },
     Record {
         what: "Shoes_Sneakers tread",

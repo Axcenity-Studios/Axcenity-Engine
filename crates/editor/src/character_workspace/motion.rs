@@ -224,8 +224,15 @@ impl CharacterWorkspace {
         self.pose_previews();
         // The camera follows from where the head is now, as framed: a take
         // that leans the body (a run) moves the head at once, and the
-        // camera catches up with it.
-        self.follow = self.motion.moves().then(|| self.head()).flatten();
+        // camera catches up with it. From one take to the next it keeps
+        // the point it was following: the head is a bob away from that
+        // point, and starting again from the head would leave the view
+        // off the framing by that much for as long as takes play.
+        self.follow = match (self.motion.moves(), was_moving, self.follow) {
+            (true, true, Some(following)) => Some(following),
+            (true, ..) => self.head(),
+            (false, ..) => None,
+        };
         // Back to the view's own framing once nothing moves, after the
         // next frame has posed the body (the Face view aims at the head).
         self.reframe = was_moving && !self.motion.moves();

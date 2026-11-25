@@ -87,7 +87,8 @@ fn walk_plays_the_walk_take_at_its_own_speed_in_place() {
         link.source,
         axcenity_project::DEFAULT_HUMANOID_ANIMATIONS_PATH
     );
-    assert!((clip.duration - 1.0667).abs() < 0.01, "{}", clip.duration);
+    // The library's walk: 40 frames (ADR-0049; the keyed one was 32).
+    assert!((clip.duration - 1.3333).abs() < 0.01, "{}", clip.duration);
     assert_eq!((link.start, link.end), (0.0, clip.duration));
     assert!(clip.looping);
     let animation = workspace.motion_animation().unwrap();
@@ -331,8 +332,10 @@ fn the_camera_keeps_framing_a_moving_character() {
             "{motion:?}: on average the head is near the middle ({:.3})",
             mean.length()
         );
+        // The library's jog leans and bobs more than the keyed run did:
+        // the head comes 0.37 of the way to the edge at worst (ADR-0049).
         assert!(
-            worst < 0.35,
+            worst < 0.45,
             "{motion:?}: and never near the edge ({worst:.3})"
         );
 

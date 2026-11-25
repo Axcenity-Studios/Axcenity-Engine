@@ -411,11 +411,16 @@ def export_glb(path, armature, objects):
         export_image_format="AUTO")
 
 
-def export_animations(path, armature):
+def export_animations(path, armature, mocap_files):
     """The starter animations, one glTF animation per clip, with the
-    skeleton and no meshes."""
+    skeleton and no meshes: the keyed ones (`animations.py`), and over
+    them the takes from Quaternius's library (`mocap.py`, from
+    `mocap_files`: its two packs' files without root motion). Returns
+    {take: frames} of the library's."""
     import animations
+    import mocap
     animations.build_actions(armature)
+    taken = mocap.bake(armature, mocap_files)
     bpy.ops.object.select_all(action="DESELECT")
     armature.select_set(True)
     bpy.context.view_layer.objects.active = armature
@@ -425,9 +430,22 @@ def export_animations(path, armature):
         export_animation_mode="ACTIONS", export_force_sampling=True,
         export_optimize_animation_size=True, export_anim_slide_to_zero=True,
         export_yup=True, export_def_bones=False, export_leaf_bone=False)
+    return taken
 
 
-def main(out_dir):
+def skeleton():
+    """The armature alone, as `build` makes it (for `--animations-only`)."""
+    from common import reset_scene
+    reset_scene()
+    _, lm, frames = body.load()
+    M = frames["Masculine"]
+    return rig.build_armature(rig.fit_joints(M.P, lm, M.eye_centres()), ARMATURE)
+
+
+def main(out_dir, mocap_files=None):
+    """Builds everything into `out_dir`. The animation file is written
+    only with `mocap_files`: most of its takes come from them, and they
+    aren't in the repository (`mocap.py`)."""
     out_dir = os.path.abspath(out_dir)
     os.makedirs(out_dir, exist_ok=True)
     armature, parts, garments, custom, report, masks = build(out_dir)
@@ -475,7 +493,10 @@ def main(out_dir):
     for obj in parts.values():
         obj.data.name = obj.name
     export_glb(os.path.join(out_dir, "HumanoidParts.glb"), armature, list(parts.values()))
-    export_animations(os.path.join(out_dir, "HumanoidAnimations.glb"), armature)
+    if mocap_files:
+        export_animations(os.path.join(out_dir, "HumanoidAnimations.glb"), armature, mocap_files)
+    else:
+        print("HumanoidAnimations.glb left as it is: pass --mocap <UAL1.glb> <UAL2.glb> to make it again")
     with open(os.path.join(out_dir, "Humanoid.customization.json"), "w", newline="\n") as f:
         json.dump(custom, f, indent=1, sort_keys=True)
         f.write("\n")
@@ -491,7 +512,20 @@ def main(out_dir):
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     out = argv[argv.index("--out") + 1] if "--out" in argv else os.path.dirname(os.path.abspath(__file__))
-    rep = main(out)
+    mocap_files = argv[argv.index("--mocap") + 1:argv.index("--mocap") + 3] if "--mocap" in argv else None
+    if "--animations-only" in argv:
+        # The animation file alone: the skeleton, the keyed takes and the
+        # library's.
+        if not mocap_files or len(mocap_files) != 2:
+            sys.exit("--animations-only needs --mocap <UAL1_Standard.glb> <UAL2_Standard.glb>")
+        taken = export_animations(os.path.join(os.path.abspath(out), "HumanoidAnimations.glb"), skeleton(),
+                                  mocap_files)
+        print(f"{len(taken)} takes from the library")
+        for name, made in taken.items():
+            print(f"TAKE {name:20s} {made['frames']:4d} frames  feet {made['feet_off_mm']:6.1f} mm  "
+                  f"hips {made['hips_mean_m']:+.3f} m  lifted {made['lifted_mm']:6.1f} mm  ({made['from']})")
+        sys.exit(0)
+    rep = main(out, mocap_files)
     total = 0
     for k in sorted(rep):
         print(f"{k:24s} {rep[k]:6d}")

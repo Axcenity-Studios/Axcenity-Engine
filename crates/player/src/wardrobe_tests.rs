@@ -384,15 +384,25 @@ const IDLE: [Known; 5] = [
     ),
     known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0071),
 ];
+// Measured again on 2026-11-25 in the library's jog, which is what
+// `Walk` plays since ADR-0049 (a longer stride and a higher knee than the
+// keyed run it replaced). Before: the joggers 53 bodies, 22.2 mm; the
+// joggers through the tee 15.7 mm; the tee 34.5 mm; the boxer briefs
+// through the joggers 8.9 mm.
 const WALK: [Known; 5] = [
-    known("Pants_Joggers", "Walk@18", 53, 0.0222),
-    known("Pants_Joggers through Shirt_CrewTee", "Walk@18", 54, 0.0157),
-    known("Shirt_CrewTee", "Walk@18", 54, 0.0345),
+    known("Pants_Joggers", "Walk@18", 54, 0.03084),
+    known(
+        "Pants_Joggers through Shirt_CrewTee",
+        "Walk@18",
+        54,
+        0.01688,
+    ),
+    known("Shirt_CrewTee", "Walk@18", 54, 0.03095),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
         "Walk@18",
         33,
-        0.0089,
+        0.00462,
     ),
     known("Underwear_Bra through Shirt_CrewTee", "Walk@18", 21, 0.0055),
 ];
@@ -482,19 +492,19 @@ const LODS: [Known; 4] = [
 ];
 const MOTION_IDLE: [Record; 0] = [];
 /// The tee jolts at the armpit as the arm swings through hanging (the
-/// swing correctives' copies, as the test tee's: CO9 part 2).
-const MOTION_WALK: [Record; 1] = [Record {
-    what: "Shirt_CrewTee pop",
-    case: "Walk",
-    most: 0.0025,
-}];
+/// swing correctives' copies, as the test tee's: CO9 part 2). In the
+/// library's jog and sprint (ADR-0049, measured 2026-11-25) it no longer
+/// does in the walk (0.65 mm, 2.5 mm in the keyed one) and less in the
+/// run (3.42 mm, 5.1 mm before).
+const MOTION_WALK: [Record; 0] = [];
 const MOTION_RUN: [Record; 1] = [Record {
     what: "Shirt_CrewTee pop",
     case: "Run",
-    most: 0.0051,
+    most: 0.00342,
 }];
 /// The sneakers: in the walk's stride the heel and the toes come out of
-/// the shoe (3 to 12 corners, up to 11.3 mm), and at rest the tread isn't
+/// the shoe (15 to 20 corners, up to 18.5 mm in the library's jog since
+/// ADR-0049; 3 to 12 corners and 11.3 mm in the keyed run), and at rest the tread isn't
 /// flat on the floor: the fit carries the body's shapes onto the sole, so
 /// it tilts with the foot (masculine 3.9 mm under the floor to 5.7 mm over
 /// it; feminine 4 to 5 mm under it).
@@ -502,7 +512,7 @@ const FOOTWEAR: [Record; 2] = [
     Record {
         what: "Shoes_CourtSneakers through",
         case: "Walk@18",
-        most: 0.0113,
+        most: 0.01845,
     },
     Record {
         what: "Shoes_CourtSneakers tread",

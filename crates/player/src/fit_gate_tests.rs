@@ -1208,10 +1208,15 @@ fn stylized_clothes_cover_the_stylized_cast() {
         // The walk (new in review fixes 1): the cargo pants at the crotch
         // and the inner thighs in the stride, the tee as at rest plus the
         // armpit, the sports top at the side of the chest.
-        ("Pants_Cargo", "Walk@18", 15, 0.0272),
+        // The four walk records below were measured again on 2026-11-25
+        // in the library's jog, which `Walk` plays since ADR-0049 (a
+        // longer stride and a higher knee than the keyed run). Before:
+        // the pants 15 bodies, 27.2 mm; the sports top alone 1 body,
+        // 5.3 mm (none now); the top through the tee 12 bodies, 2.5 mm;
+        // the briefs 8 bodies, 1.9 mm.
+        ("Pants_Cargo", "Walk@18", 16, 0.03502),
         ("Shirt_Tee", "Walk@18", 16, 0.0247),
-        ("Underwear_Top", "Walk@18", 1, 0.0053),
-        ("Underwear_Top through Shirt_Tee", "Walk@18", 12, 0.0025),
+        ("Underwear_Top through Shirt_Tee", "Walk@18", 7, 0.00515),
         // The underwear alone (new in review fixes 2; dressed, the cargo
         // pants' mask sank the skin under the briefs): the feminine briefs
         // in the walk, the right buttock's skin 1.2 to 1.9 mm through on
@@ -1219,7 +1224,7 @@ fn stylized_clothes_cover_the_stylized_cast() {
         // the masculine briefs at rest and in the T-pose, one corner by
         // the front of the crotch 28 mm out, where small notches of skin
         // show under the hem.
-        ("Underwear_Briefs", "Walk@18", 8, 0.0019),
+        ("Underwear_Briefs", "Walk@18", 24, 0.00587),
         ("Underwear_Briefs", "rest", 4, 0.0280),
         ("Underwear_Briefs", "TPose", 4, 0.0280),
     ]
@@ -1295,14 +1300,17 @@ fn human_clothes_cover_the_human_cast() {
     // 48.57 mm) when each body shape was brought into the pose about its
     // own joints (`build.py` `shape_moves`), and the underwear under each
     // outfit joined the gate ([`LAYERS`]): no corner of it through either
-    // outfit in any of the three poses.
+    // outfit in any of the three poses. The walk records were measured
+    // again the same day in the library's jog (ADR-0049): the women's
+    // 7.03 to 5.29 mm, the men's 1 body and 1.06 mm to 4 bodies and
+    // 1.77 mm.
     let known = [
         ("FemaleCasualsuit01", "rest", 3, 0.00208),
         ("FemaleCasualsuit01", "TPose", 5, 0.00229),
-        ("FemaleCasualsuit01", "Walk@18", 12, 0.00703),
+        ("FemaleCasualsuit01", "Walk@18", 12, 0.00529),
         ("MaleCasualsuit01", "rest", 1, 0.00100),
         ("MaleCasualsuit01", "TPose", 1, 0.00100),
-        ("MaleCasualsuit01", "Walk@18", 1, 0.00106),
+        ("MaleCasualsuit01", "Walk@18", 4, 0.00177),
         ("hidden skin showing", "rest", 8, 0.03450),
         ("hidden skin showing", "Walk@18", 24, 0.04857),
     ]

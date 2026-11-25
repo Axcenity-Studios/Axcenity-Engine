@@ -66,7 +66,7 @@ fn the_default_humanoid_skeleton_maps_every_role_with_no_problems() {
     assert!((angle - 45.0).abs() < 1.0, "{angle}");
     // Every starter animation is a take for the same skeleton.
     let takes = assets.takes(ANIMATIONS).unwrap();
-    assert_eq!(takes.len(), 32);
+    assert_eq!(takes.len(), 101);
     for take in takes.iter() {
         let problems = check_pair(&take.skeleton, bones, &assets.rig_definitions());
         assert!(problems.is_empty(), "{}: {problems:?}", take.name);
